@@ -37,7 +37,7 @@ def generate_op_registration_files(manifests, function_name="register_generated_
 
 
 def generate_op_files(material, elements, kernel_sources=None):
-    c_abi_header = "sfem_%s_c_abi.hpp" % material.op_name if kernel_sources else None
+    c_abi_header = "sfem_%s_c_abi.hpp" % _op_file_stem(material) if kernel_sources else None
     kernel_sources = dict(kernel_sources or {})
     dispatch_sources, declared_signatures = (
         _dispatch_sources(material, elements, c_abi_header, kernel_sources)
@@ -77,9 +77,9 @@ def generate_op_files(material, elements, kernel_sources=None):
             )
     else:
         raise ValueError("unsupported generated Op equation form")
-    wrapper_header = "op/sfem_%s.hpp" % material.op_name
-    wrapper_source = "op/sfem_%s.cpp" % material.op_name
-    registration_source = "op/sfem_%s_registration.cpp" % material.op_name
+    wrapper_header = "op/sfem_%s.hpp" % _op_file_stem(material)
+    wrapper_source = "op/sfem_%s.cpp" % _op_file_stem(material)
+    registration_source = "op/sfem_%s_registration.cpp" % _op_file_stem(material)
     files = {
         wrapper_header: header,
         wrapper_source: source,
@@ -90,7 +90,7 @@ def generate_op_files(material, elements, kernel_sources=None):
     if c_abi_header:
         c_abi_path = "op/%s" % c_abi_header
         files[c_abi_path] = _c_abi_header(material, abi_sources)
-        files["op/sfem_%s_manifest.json" % material.op_name] = _op_manifest(
+        files["op/sfem_%s_manifest.json" % _op_file_stem(material)] = _op_manifest(
             material,
             abi_sources,
             wrapper_header,
@@ -559,14 +559,15 @@ namespace sfem {
     //! unchanged: its methods still take real_t*, which converts to void*
     //! at the call, exactly as gpu_laplacian_block_vector relies on.
     enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
-
+%(stream_member)s
   private:
     class Impl;
     std::unique_ptr<Impl> impl_;
   };
 }  // namespace sfem
 """ % {
-        "op": material.op_name,
+        "op": _op_class_name(material),
+        "stream_member": _op_stream_member(),
         "extra": extra,
         "value_steps": value_steps,
         "matrix_methods": matrix_methods,
@@ -1702,7 +1703,8 @@ namespace sfem {
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
 """ % {
-        "op": material.op_name,
+        "op": _op_class_name(material),
+        "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "packed_scratch_include": packed_scratch_include,
         "packed_scratch_prealloc": packed_scratch_prealloc,
@@ -1731,13 +1733,13 @@ namespace sfem {
         "block_size_lines": _residual_block_size_lines(n_field_components_by_dim),
         "metric_declaration": _metric_declaration(any(affine_metric_flags)),
         "gradient_metric_binding": _metric_binding(
-            any(affine_metric_flags), material.op_name, "gradient"
+            any(affine_metric_flags), _op_class_name(material), "gradient"
         ),
         "apply_metric_binding": _metric_binding(
-            any(affine_metric_flags), material.op_name, "hessian action"
+            any(affine_metric_flags), _op_class_name(material), "hessian action"
         ),
         "objective_steps_metric_binding": _metric_binding(
-            any(affine_metric_flags), material.op_name, "objective_steps"
+            any(affine_metric_flags), _op_class_name(material), "objective_steps"
         ),
         "gradient_cases": "\n".join(gradient_cases),
         "apply_cases": "\n".join(apply_cases),
@@ -1800,7 +1802,7 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "hessian_crs_current_prologue": _hyperelastic_hessian_current_prologue(
-            material.op_name,
+            _op_class_name(material),
             "hessian_crs",
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
@@ -1817,7 +1819,7 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "hessian_bsr_current_prologue": _hyperelastic_hessian_current_prologue(
-            material.op_name,
+            _op_class_name(material),
             "hessian_bsr",
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
@@ -1834,13 +1836,13 @@ namespace sfem {
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "hessian_block_diag_sym_current_prologue": _hyperelastic_hessian_current_prologue(
-            material.op_name,
+            _op_class_name(material),
             "hessian_block_diag_sym",
             {dim: deps[2] for dim, deps in dependencies_by_dim.items()},
         ),
         "inexact_cache_field": _inexact_cache_field(material),
         "inexact_needs_affine": _inexact_needs_affine(material),
-        "performance_methods": _performance_methods(material.op_name, material.name, elements, performance_cases),
+        "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
             "gradient_uses_affine",
@@ -1870,7 +1872,7 @@ namespace sfem {
         marker = "\n}  // namespace sfem"
         source = source.replace(
             marker,
-            inexact % {"op": material.op_name} + marker,
+            inexact % {"op": _op_class_name(material)} + marker,
             1,
         )
     return _header(material, False), source
@@ -2322,7 +2324,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                 )
                 if condition
             ),
-            material.op_name,
+            _op_class_name(material),
             (
                 "current and previous states"
                 if action_uses_current and action_uses_previous
@@ -2470,7 +2472,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
       return impl_->packed_affine_apply->apply(current, direction, out);
     }
 """
-        % material.op_name
+        % _op_class_name(material)
         if use_laplace_packed_fast_path
         else ""
     )
@@ -3022,7 +3024,8 @@ namespace sfem {
 
 %(merit_methods)s}  // namespace sfem
 """ % {
-        "op": material.op_name,
+        "op": _op_class_name(material),
+        "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "laplace_packed_include": laplace_packed_include,
         "packed_scratch_include": packed_scratch_include,
@@ -3043,17 +3046,17 @@ namespace sfem {
         "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
         "inexact_cache_field": _inexact_cache_field(material),
         "inexact_needs_affine": _inexact_needs_affine(material),
-        "performance_methods": _performance_methods(material.op_name, material.name, elements, performance_cases),
+        "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
         # Only the merit uses std::vector, so only the merit brings its header.
         "merit_include": "\n#include <vector>" if emits_merit else "",
         "merit_methods": (
-            _residual_merit_methods(material.op_name)
+            _residual_merit_methods(_op_class_name(material))
             if emits_merit
             else """    int %s::value(const real_t *, real_t *const) {
     SFEM_TRACE_SCOPE("%s::value");
     return SFEM_FAILURE;
   }
-""" % (material.op_name, material.op_name)
+""" % (_op_class_name(material), _op_class_name(material))
         ),
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
@@ -3174,7 +3177,7 @@ namespace sfem {
             "    if (!impl_->previous) {\n"
             '      SFEM_ERROR("%s requires a previous state\\n");\n'
             "      return SFEM_FAILURE;\n"
-            "    }" % material.op_name
+            "    }" % _op_class_name(material)
             if residual_uses_previous
             else ""
         ),
@@ -3197,7 +3200,7 @@ namespace sfem {
                     )
                     if condition
                 ),
-                material.op_name,
+                _op_class_name(material),
                 (
                     "current and previous states"
                     if action_uses_current and action_uses_previous
@@ -3636,7 +3639,8 @@ namespace sfem {
 #endif  // SFEM_ENABLE_RYAML
 }  // namespace sfem
 """ % {
-        "op": material.op_name,
+        "op": _op_class_name(material),
+        "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "declaration_block": "",
         "max_parameters": max_parameters,
@@ -3646,7 +3650,7 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
-        "performance_methods": _performance_methods(material.op_name, material.name, elements, {}),
+        "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, {}),
         "gradient_cases": "\n".join(gradient_cases),
     }
     return _boundary_header(material), source
@@ -3716,13 +3720,16 @@ namespace sfem {
     //! unchanged: its methods still take real_t*, which converts to void*
     //! at the call, exactly as gpu_laplacian_block_vector relies on.
     enum smesh::PrimitiveType real_type{smesh::SMESH_DEFAULT};
-
+%(stream_member)s
   private:
     class Impl;
     std::unique_ptr<Impl> impl_;
   };
 }  // namespace sfem
-""" % {"op": material.op_name}
+""" % {
+        "op": _op_class_name(material),
+        "stream_member": _op_stream_member(),
+    }
 
 
 def _coupled_energy_residual_op(
@@ -4163,9 +4170,10 @@ namespace sfem {
 
 %(hessian_bsr_method)s}  // namespace sfem
 """ % {
-        "op": material.op_name,
+        "op": _op_class_name(material),
+        "stream_member": _op_stream_member(),
         "hessian_bsr_method": _coupled_hessian_bsr_method(
-            material.op_name,
+            _op_class_name(material),
             cases["hessian_bsr"],
         ),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -4177,12 +4185,12 @@ namespace sfem {
         "element_connectivity": _element_connectivity_expression(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _coupled_block_size_lines(systems_by_dim),
-        "performance_methods": _performance_methods(material.op_name, material.name, elements, cases["performance"]),
+        "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, cases["performance"]),
         "gradient_previous_check": (
             "    if (!impl_->previous) {\n"
             '      SFEM_ERROR("%s requires a previous state\\n");\n'
             "      return SFEM_FAILURE;\n"
-            "    }" % material.op_name
+            "    }" % _op_class_name(material)
             if dependency_flags["gradient_previous"]
             else ""
         ),
@@ -4192,7 +4200,7 @@ namespace sfem {
             else ""
         ),
         "apply_state_check": _coupled_apply_state_check(
-            material.op_name,
+            _op_class_name(material),
             dependency_flags["apply_current"],
             dependency_flags["apply_previous"],
         ),
@@ -4204,7 +4212,7 @@ namespace sfem {
         "gradient_cases": "\n".join(cases["gradient"]),
         "apply_cases": "\n".join(cases["apply"]),
         "objective_cases": "\n".join(cases["objective"]),
-        "value_steps_method": _residual_merit_methods(material.op_name),
+        "value_steps_method": _residual_merit_methods(_op_class_name(material)),
         "affine_options": _affine_option_entries(
             "objective_uses_affine",
             "gradient_uses_affine",
@@ -4819,6 +4827,70 @@ def _coupled_parameter_array_lines(defaults):
     return "\n".join(lines)
 
 
+def _op_stream_member():
+    """The stream this Op hands every kernel, where the target has one.
+
+    `GPULaplacian` declares `void *stream{SFEM_DEFAULT_STREAM}` and passes it to
+    each call; a host Op has nothing to declare, so it declares nothing rather
+    than a member that means nothing.
+    """
+    if not current_target().op_stream_arguments():
+        return ""
+    return """
+    //! The stream every kernel call is issued on.
+    //!
+    //! Mirrors GPULaplacian, which declares the same member with the same
+    //! default.  A launch that ignored it would serialise onto the default
+    //! stream and silently undo the caller's ordering.
+    void *stream{SFEM_DEFAULT_STREAM};
+"""
+
+
+def _op_class_name(material):
+    """The class the generated wrapper declares.
+
+    `GPULaplacian`, `GPULinearElasticity`, `GPUKelvinVoigtNewmark`: SFEM names
+    its device Ops for the device and registers them under a `gpu:` key, so a
+    host and a device Op for one material are two classes and two factory
+    entries rather than one of each fighting over a name.
+    """
+    return "%s%s" % (current_target().op_class_prefix(), material.op_name)
+
+
+def _op_registered_name(material):
+    """The key the factory answers to."""
+    return "%s%s" % (current_target().op_registration_prefix(), material.op_name)
+
+
+def _op_file_stem(material):
+    """What the wrapper's translation units are called.
+
+    Distinct from the class, because a device wrapper is a second class in a
+    second pair of files beside the host's.
+    """
+    return "%s%s" % (material.op_name, current_target().op_file_suffix())
+
+
+def _logical_entry_point_name(name):
+    """A generated symbol with the target's prefix taken off."""
+    prefix = current_target().entry_point_name("")
+    if prefix and name and name.startswith(prefix):
+        return name[len(prefix):]
+    return name
+
+
+def _with_stream(arguments):
+    """A dispatch call's argument list, plus whatever the target appends.
+
+    The suffix goes last, after the outputs, because that is where every `cu_`
+    entry point in SFEM takes its stream.
+    """
+    suffix = _entry_point_suffix_arguments()
+    if not suffix:
+        return arguments
+    return "%s, %s" % (arguments, ", ".join(suffix))
+
+
 def _entry_point_name(public_name):
     """What the bound target calls this dispatcher.
 
@@ -5145,8 +5217,8 @@ def _boundary_residual_soa_case(element, function, arguments, field_stride, setu
             break;
           }""" % {
         "element": _mesh_element_name(element),
-        "function": function,
-        "arguments": arguments,
+        "function": _entry_point_name(function),
+        "arguments": _with_stream(arguments),
         "field_stride": field_stride,
         "setup": "\n".join(setup_lines),
     }
@@ -5209,7 +5281,7 @@ def _element_api_sources(material, elements, kernel_sources):
     element_headers = _element_api_headers(material, elements, kernel_sources)
     if not element_headers:
         return {}
-    header_path = "op/sfem_%s_element_api.hpp" % material.op_name
+    header_path = "op/sfem_%s_element_api.hpp" % _op_file_stem(material)
     return {header_path: _element_api_dispatch_header(material, element_headers)}
 
 
@@ -5434,11 +5506,11 @@ def _dispatch_sources(material, elements, c_abi_header, kernel_sources):
     sources = {}
     for kind, grouped in _dispatch_groups_by_source_kind(groups):
         sources[
-            "op/sfem_%s_%s_dispatch.cpp" % (material.op_name, kind)
+            "op/sfem_%s_%s_dispatch.cpp" % (_op_file_stem(material), kind)
         ] = _dispatch_source(c_abi_header, grouped)
     if diagnostic_groups:
         sources[
-            "op/sfem_%s_diagnostics_dispatch.cpp" % material.op_name
+            "op/sfem_%s_diagnostics_dispatch.cpp" % _op_file_stem(material)
         ] = _diagnostic_dispatch_source(c_abi_header, diagnostic_groups)
     return sources, _declared_dispatch_signatures(groups)
 
@@ -5565,7 +5637,7 @@ def _dispatch_groups(material, elements, declarations):
         )["variants"].append(
             {
                 "mesh_element": mesh_element,
-                "function": name,
+                "function": _entry_point_name(name),
                 "declaration": declaration,
             }
         )
@@ -5788,7 +5860,7 @@ def _merged_pair_dispatch_function_lines(group):
     lines = [
         'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % _entry_point_name(group["name"])
     ]
-    lines.extend(parameter_list_lines(params + _entry_point_suffix_parameters()))
+    lines.extend(parameter_list_lines(params))
     lines.extend(
         [
             ") {",
@@ -5879,7 +5951,7 @@ def _runtime_typed_dispatch_function_lines(group):
     lines = [
         'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % _entry_point_name(group["name"])
     ]
-    lines.extend(parameter_list_lines(params + _entry_point_suffix_parameters()))
+    lines.extend(parameter_list_lines(params))
     lines.extend(
         [
             ") {",
@@ -5895,10 +5967,7 @@ def _runtime_typed_dispatch_function_lines(group):
             [
                 "    case smesh::%s:" % variant["mesh_element"],
                 "      return %s(%s);"
-                % (
-                    variant["function"],
-                    ", ".join(arguments + list(_entry_point_suffix_arguments())),
-                ),
+                % (variant["function"], ", ".join(arguments)),
             ]
         )
     lines.extend(
@@ -6039,7 +6108,7 @@ def _dispatch_function_lines(group):
     lines = [
         'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % _entry_point_name(group["name"]),
     ]
-    lines.extend(parameter_list_lines(params + _entry_point_suffix_parameters()))
+    lines.extend(parameter_list_lines(params))
     lines.extend(
         [
             ") {",
@@ -6050,11 +6119,7 @@ def _dispatch_function_lines(group):
         lines.extend(
             [
                 "    case smesh::%s:" % variant["mesh_element"],
-                "      return %s(%s);"
-                % (
-                    variant["function"],
-                    ", ".join(arg_names + tuple(_entry_point_suffix_arguments())),
-                ),
+                "      return %s(%s);" % (variant["function"], ", ".join(arg_names)),
             ]
         )
     lines.extend(
@@ -6114,7 +6179,7 @@ def _diagnostic_dispatch_groups(material, elements, declarations):
         )["variants"].append(
             {
                 "mesh_element": mesh_element,
-                "function": name,
+                "function": _entry_point_name(name),
                 "declaration": declaration,
             }
         )
@@ -6205,7 +6270,7 @@ def _diagnostic_dispatch_source(c_abi_header, groups):
 def _diagnostic_dispatch_function_lines(group):
     lines = [
         "SFEM_CODEGEN_PUBLIC_C_ABI extern \"C\" const sfem::codegen::KernelDiagnostics *%s("
-        % group["name"],
+        % _entry_point_name(group["name"]),
         "    const smesh::ElemType element_type) {",
         "  switch (element_type) {",
     ]
@@ -6296,19 +6361,26 @@ def _registration_source(material, wrapper_header):
 
 namespace sfem {
   void %(function)s() {
-    Factory::register_op("%(op)s", %(op)s::create);
-    Factory::register_op("ss:%(op)s", %(op)s::create);
+    Factory::register_op("%(registered)s", %(op)s::create);
+    Factory::register_op("%(registered_ss)s", %(op)s::create);
   }
 }  // namespace sfem
 """ % {
         "header": os.path.basename(wrapper_header),
         "function": function,
-        "op": material.op_name,
+        "op": _op_class_name(material),
+        "stream_member": _op_stream_member(),
+        "registered": _op_registered_name(material),
+        #: `gpu:` first, the way SFEM spells `gpu:em:Laplacian`.
+        "registered_ss": "%sss:%s" % (
+            current_target().op_registration_prefix(),
+            material.op_name,
+        ),
     }
 
 
 def _registration_function(material):
-    return "register_%s_generated_op" % _safe_identifier(material.op_name)
+    return "register_%s_generated_op" % _safe_identifier(_op_file_stem(material))
 
 
 def _op_manifest(
@@ -6331,7 +6403,7 @@ def _op_manifest(
     manifest = {
         "schema": "sfem.generated_op_manifest.v1",
         "material": material.name,
-        "op_name": material.op_name,
+        "op_name": _op_registered_name(material),
         "wrapper": {
             "header": wrapper_header,
             "source": wrapper_source,
@@ -6340,12 +6412,12 @@ def _op_manifest(
         "registration": {
             "source": registration_source,
             "function": "sfem::%s" % _registration_function(material),
-            "operator_name": material.op_name,
+            "operator_name": _op_registered_name(material),
         },
         "factory": {
-            "class": "sfem::%s" % material.op_name,
-            "create": "sfem::%s::create" % material.op_name,
-            "create_from_yaml": "sfem::%s::create_from_yaml" % material.op_name,
+            "class": "sfem::%s" % _op_class_name(material),
+            "create": "sfem::%s::create" % _op_class_name(material),
+            "create_from_yaml": "sfem::%s::create_from_yaml" % _op_class_name(material),
         },
         "generated_include_paths": _generated_include_paths(kernel_sources),
         "header_api": _header_api_sources(kernel_sources, element_api_sources or {}),
@@ -6486,8 +6558,14 @@ def _parse_c_declaration(declaration):
     name = _c_abi_function_name(declaration)
     if not name:
         return None
+    # `name` is logical and the text is not: a device target spells it `cu_`,
+    # and `\b` finds no boundary inside `cu_laplace` because `_` is a word
+    # character, so matching the logical name here found nothing and the
+    # signature came back with no parameters at all.
     match = re.search(
-        r"\b%s\s*\((.*)\)\s*;" % re.escape(name), declaration, re.S
+        r"\b%s\s*\((.*)\)\s*;" % re.escape(_entry_point_name(name)),
+        declaration,
+        re.S,
     )
     if not match:
         return CSignature(name=name, parameters=(), declaration=declaration)
@@ -6542,10 +6620,15 @@ def _c_abi_signatures(kernel_sources, public_only=False):
     return cached
 
 
+#: Where a generated `extern "C"` declaration can be found, whichever target
+#: emitted it.
+_C_ABI_SOURCE_EXTENSIONS = (".cpp", ".hpp", ".cu", ".cuh", ".hip")
+
+
 def _extract_c_abi_declarations(kernel_sources, public_only=False):
     declarations = {}
     for path, source in sorted(kernel_sources.items()):
-        if not path.endswith((".cpp", ".hpp")) or path.startswith("op/"):
+        if not path.endswith(_C_ABI_SOURCE_EXTENSIONS) or path.startswith("op/"):
             if not (public_only and path.endswith("_dispatch.cpp")):
                 continue
         offset = 0
@@ -6576,8 +6659,15 @@ def _extract_c_abi_declarations(kernel_sources, public_only=False):
 
 
 def _c_abi_function_name(declaration):
+    """The kernel this declaration names, as this layer reasons about it.
+
+    Logical, with the target's prefix taken off: `plans/conventions` parses a
+    material, an element, an operation and a qualifier out of the name and
+    raises rather than guess, and `cu_` is none of those.  It goes back on at
+    every emission site through `_entry_point_name`.
+    """
     match = re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*\(", declaration)
-    return match.group(1) if match else None
+    return _logical_entry_point_name(match.group(1)) if match else None
 
 
 def _c_abi_function_exists(kernel_sources, function_name, public_only=False):
@@ -6802,7 +6892,7 @@ def _runtime_operations(c_abi):
                 "variant": variant,
                 "scalar_type": scalar_type,
                 "target": target,
-                "function": name,
+                "function": _entry_point_name(name),
             }
         )
     return tuple(
@@ -7010,7 +7100,7 @@ def _performance_flops_cases(cases):
             lines.append("        {")
             lines.append(
                 "          const sfem::codegen::KernelDiagnostics *const diagnostics = %s(domain.element_type);"
-                % name
+                % _entry_point_name(name)
             )
             lines.append("          if (diagnostics) {")
             if affine_flag is None:
@@ -7038,7 +7128,7 @@ def _performance_bytes_cases(cases):
             lines.append("        {")
             lines.append(
                 "          const sfem::codegen::KernelDiagnostics *const diagnostics = %s(domain.element_type);"
-                % name
+                % _entry_point_name(name)
             )
             lines.append("          if (diagnostics) {")
             if affine_flag is None:
@@ -7321,7 +7411,7 @@ def _residual_hessian_dispatch_body(
         for line in setup:
             lines.append(line)
         if _c_abi_function_exists(kernel_sources, function, public_only=True):
-            lines.append("%s  return %s(%s);" % (indent, function, ", ".join(args)))
+            lines.append("%s  return %s(%s);" % (indent, _entry_point_name(function), _with_stream(", ".join(args))))
         else:
             lines.append(
                 '%s  SFEM_ERROR("%s %s %dd dispatch was not generated\\n");'
@@ -7622,9 +7712,7 @@ def _residual_apply_dispatch_body(
                     ),
                     "%s        return %s(%s);"
                     % (
-                        indent,
-                        packed_affine,
-                        ", ".join(
+                        indent, _entry_point_name(packed_affine), _with_stream(", ".join(
                             [
                                 "domain.element_type",
                                 "real_type",
@@ -7642,7 +7730,7 @@ def _residual_apply_dispatch_body(
                                 *storage_args,
                                 *field_args,
                             ]
-                        ),
+                        )),
                     ),
                     "%s      }" % indent,
                     "%s    }" % indent,
@@ -7656,15 +7744,13 @@ def _residual_apply_dispatch_body(
             lines.append(
                 "%s      return %s(%s);"
                 % (
-                    indent,
-                    affine_aos_unit,
-                    ", ".join(
+                    indent, _entry_point_name(affine_aos_unit), _with_stream(", ".join(
                         [
                             *common_args,
                             "geom_metric_aos",
                             *unit_field_args,
                         ]
-                    ),
+                    )),
                 )
             )
             lines.append("%s    }" % indent)
@@ -7673,16 +7759,14 @@ def _residual_apply_dispatch_body(
             lines.append(
                 "%s      return %s(%s);"
                 % (
-                    indent,
-                    affine_aos,
-                    ", ".join(
+                    indent, _entry_point_name(affine_aos), _with_stream(", ".join(
                         [
                             *common_args,
                             "geom_metric_aos",
                             *storage_args,
                             *field_args,
                         ]
-                    ),
+                    )),
                 )
             )
             lines.append("%s    }" % indent)
@@ -7690,9 +7774,7 @@ def _residual_apply_dispatch_body(
             lines.append(
                 "%s    return %s(%s);"
                 % (
-                    indent,
-                    affine_soa,
-                    ", ".join(
+                    indent, _entry_point_name(affine_soa), _with_stream(", ".join(
                         [
                             *common_args,
                             # The geometry this entry point takes, not the one
@@ -7716,7 +7798,7 @@ def _residual_apply_dispatch_body(
                             *storage_args,
                             *field_args,
                         ]
-                    ),
+                    )),
                 )
             )
         else:
@@ -7742,9 +7824,7 @@ def _residual_apply_dispatch_body(
                     "%s      auto ghost_idx = packed->ghost_idx(packed_block);" % indent,
                     "%s      return %s(%s);"
                     % (
-                        indent,
-                        packed,
-                        ", ".join(
+                        indent, _entry_point_name(packed), _with_stream(", ".join(
                             [
                                 "domain.element_type",
                                 "real_type",
@@ -7762,7 +7842,7 @@ def _residual_apply_dispatch_body(
                                 *storage_args,
                                 *field_args,
                             ]
-                        ),
+                        )),
                     ),
                     "%s    }" % indent,
                     "%s  }" % indent,
@@ -7772,16 +7852,14 @@ def _residual_apply_dispatch_body(
             lines.append(
                 "%s  return %s(%s);"
                 % (
-                    indent,
-                    isop,
-                    ", ".join(
+                    indent, _entry_point_name(isop), _with_stream(", ".join(
                         [
                             *common_args,
                             "points",
                             *storage_args,
                             *field_args,
                         ]
-                    ),
+                    )),
                 )
             )
         else:
@@ -7897,7 +7975,7 @@ def _packed_return_lines(indent, function, leading_args, trailing_args, kernel_s
     base = list(leading_args) + _packed_call_args_common()
     one_call = ", ".join(base + trailing)
     if not _c_abi_function_exists(kernel_sources, two_pass, public_only=True):
-        return ["%sreturn %s(%s);" % (indent, function, one_call)]
+        return ["%sreturn %s(%s);" % (indent, _entry_point_name(function), _with_stream(one_call))]
     two_trailing = (
         list(trailing_args(two_pass)) if callable(trailing_args) else trailing
     )
@@ -7909,9 +7987,9 @@ def _packed_return_lines(indent, function, leading_args, trailing_args, kernel_s
     )
     return [
         "%sif (impl_->use_packed_two_pass) {" % indent,
-        "%s  return %s(%s);" % (indent, two_pass, two_call),
+        "%s  return %s(%s);" % (indent, _entry_point_name(two_pass), _with_stream(two_call)),
         "%s}" % indent,
-        "%sreturn %s(%s);" % (indent, function, one_call),
+        "%sreturn %s(%s);" % (indent, _entry_point_name(function), _with_stream(one_call)),
     ]
 
 
@@ -7947,9 +8025,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
             lines.append(
                 "%s      return %s(%s);"
                 % (
-                    indent,
-                    affine_aos_unit,
-                    ", ".join(
+                    indent, _entry_point_name(affine_aos_unit), _with_stream(", ".join(
                         [
                             "domain.element_type",
                             "real_type",
@@ -7966,7 +8042,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                             *current_args,
                             *output_args,
                         ]
-                    ),
+                    )),
                 )
             )
             lines.append("%s    }" % indent)
@@ -8003,9 +8079,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
             lines.append(
                 "%s  return %s(%s);"
                 % (
-                    indent,
-                    isop,
-                    ", ".join(
+                    indent, _entry_point_name(isop), _with_stream(", ".join(
                         [
                             "domain.element_type",
                             "real_type",
@@ -8021,7 +8095,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                             *current_args,
                             *output_args,
                         ]
-                    ),
+                    )),
                 )
             )
         else:
@@ -8059,9 +8133,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
             lines.append(
                 "%s    status = %s(%s);"
                 % (
-                    indent,
-                    affine,
-                    ", ".join(
+                    indent, _entry_point_name(affine), _with_stream(", ".join(
                         [
                             "domain.element_type",
                             "real_type",
@@ -8073,7 +8145,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                             *current_args,
                             "impl_->element_values.get()",
                         ]
-                    ),
+                    )),
                 )
             )
         else:
@@ -8084,9 +8156,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
             lines.append(
                 "%s    status = %s(%s);"
                 % (
-                    indent,
-                    isop,
-                    ", ".join(
+                    indent, _entry_point_name(isop), _with_stream(", ".join(
                         [
                             "domain.element_type",
                             "real_type",
@@ -8098,7 +8168,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                             *current_args,
                             "impl_->element_values.get()",
                         ]
-                    ),
+                    )),
                 )
             )
         else:
@@ -8169,9 +8239,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
             lines.append(
                 "%s    status = %s(%s);"
                 % (
-                    indent,
-                    isop,
-                    ", ".join(
+                    indent, _entry_point_name(isop), _with_stream(", ".join(
                         [
                             "domain.element_type",
                             "real_type",
@@ -8186,7 +8254,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                             "steps",
                             "impl_->element_values.get()",
                         ]
-                    ),
+                    )),
                 )
             )
         else:
@@ -8334,9 +8402,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
             lines.append(
                 "%s  return %s(%s);"
                 % (
-                    indent,
-                    isop,
-                    ", ".join(
+                    indent, _entry_point_name(isop), _with_stream(", ".join(
                         [
                             "domain.element_type",
                             "real_type",
@@ -8349,7 +8415,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                             *direction_args,
                             *output_args,
                         ]
-                    ),
+                    )),
                 )
             )
         else:
@@ -8516,9 +8582,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
             [
                 "%s    %s (dim == %d) {" % (indent, prefix, dim),
                 "%s      status = %s(%s);" % (
-                    indent,
-                    function,
-                    ", ".join(
+                    indent, _entry_point_name(function), _with_stream(", ".join(
                         [
                             "domain.element_type",
                             "real_type",
@@ -8540,7 +8604,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
                             "steps",
                             "impl_->element_values.get()",
                         ]
-                    ),
+                    )),
                 ),
                 "%s    }" % indent,
             ]
@@ -8586,9 +8650,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
             [
                 "%s    %s (dim == %d) {" % (indent, prefix, dim),
                 "%s      status = %s(%s);" % (
-                    indent,
-                    function,
-                    ", ".join(
+                    indent, _entry_point_name(function), _with_stream(", ".join(
                         [
                             "domain.element_type",
                             "real_type",
@@ -8610,7 +8672,7 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
                             "steps",
                             "impl_->element_values.get()",
                         ]
-                    ),
+                    )),
                 ),
                 "%s    }" % indent,
             ]
@@ -8655,9 +8717,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
             lines.append(
                 "%s  return %s(%s);"
                 % (
-                    indent,
-                    function,
-                    ", ".join(
+                    indent, _entry_point_name(function), _with_stream(", ".join(
                         [
                             "domain.element_type",
                             "real_type",
@@ -8669,7 +8729,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                             *current_args,
                             *tail_args,
                         ]
-                    ),
+                    )),
                 )
             )
         else:
@@ -9009,11 +9069,11 @@ def _affine_dispatch_call_lines(kernel_sources, name, indent, arguments):
                         for element in elements
                     ),
                 ),
-                "%s  return %s(%s);" % (indent, metric, arguments(metric)),
+                "%s  return %s(%s);" % (indent, _entry_point_name(metric), _with_stream(arguments(metric))),
                 "%s}" % indent,
             ]
         )
-    lines.append("%sreturn %s(%s);" % (indent, name, arguments(name)))
+    lines.append("%sreturn %s(%s);" % (indent, _entry_point_name(name), _with_stream(arguments(name))))
     return lines
 
 
@@ -9042,14 +9102,14 @@ def _affine_dispatch_status_lines(kernel_sources, name, indent, arguments):
                         for element in elements
                     ),
                 ),
-                "%s  status = %s(%s);" % (indent, metric, arguments(metric)),
+                "%s  status = %s(%s);" % (indent, _entry_point_name(metric), _with_stream(arguments(metric))),
                 "%s} else {" % indent,
-                "%s  status = %s(%s);" % (indent, name, arguments(name)),
+                "%s  status = %s(%s);" % (indent, _entry_point_name(name), _with_stream(arguments(name))),
                 "%s}" % indent,
             ]
         )
         return lines
-    lines.append("%sstatus = %s(%s);" % (indent, name, arguments(name)))
+    lines.append("%sstatus = %s(%s);" % (indent, _entry_point_name(name), _with_stream(arguments(name))))
     return lines
 
 

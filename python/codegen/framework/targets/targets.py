@@ -325,6 +325,40 @@ class TargetPlatform:
             ),
         )
 
+    def op_class_prefix(self):
+        """What a generated `Op` class is called here.
+
+        SFEM names its device Ops for the device -- `GPULaplacian`,
+        `GPULinearElasticity`, `GPUKelvinVoigtNewmark` -- so a host and a device
+        Op for one material are two classes rather than one name fought over.
+        """
+        return ""
+
+    def op_registration_prefix(self):
+        """The key the factory answers to.  `gpu:Laplacian`, `gpu:em:Laplacian`."""
+        return ""
+
+    def op_file_suffix(self):
+        """What keeps the two wrappers' translation units apart."""
+        return ""
+
+    def op_class_prefix(self):
+        """What a generated `Op` class is called here.
+
+        SFEM names its device Ops for the device -- `GPULaplacian`,
+        `GPULinearElasticity`, `GPUKelvinVoigtNewmark` -- so a host and a device
+        Op for one material are two classes rather than one name fought over.
+        """
+        return ""
+
+    def op_registration_prefix(self):
+        """The key the factory answers to.  `gpu:Laplacian`, `gpu:em:Laplacian`."""
+        return ""
+
+    def op_file_suffix(self):
+        """What keeps the two wrappers' translation units apart."""
+        return ""
+
     def element_connectivity_accessor(self):
         """Where a generated `Op` reads its connectivity from.
 
@@ -713,6 +747,24 @@ class CUDATarget(TargetPlatform):
             ),
             *trailing,
         )
+
+    def op_class_prefix(self):
+        return "GPU"
+
+    def op_registration_prefix(self):
+        return "gpu:"
+
+    def op_file_suffix(self):
+        return "_cuda"
+
+    def op_class_prefix(self):
+        return "GPU"
+
+    def op_registration_prefix(self):
+        return "gpu:"
+
+    def op_file_suffix(self):
+        return "_cuda"
 
     def element_connectivity_accessor(self):
         return "domain.block->device_elements_SoA()->data()"

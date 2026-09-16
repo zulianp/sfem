@@ -29,7 +29,7 @@ CUDASoAEmission = SoAEmission
 class CUDASoABackend(SoABackend):
     """CUDA/HIP SoA backend boundary for planned material code-generation units."""
 
-    supports_op_wrapper: bool = False
+    supports_op_wrapper: bool = True
     target: object = CUDATarget()
     emitter: object = None
 

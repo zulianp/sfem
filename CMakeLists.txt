@@ -207,6 +207,19 @@ file(GLOB_RECURSE SFEM_GENERATED_HEADERS CONFIGURE_DEPENDS
 list(APPEND SFEM_SOURCES ${SFEM_GENERATED_SOURCES})
 list(APPEND SFEM_HEADERS ${SFEM_GENERATED_HEADERS})
 
+# The generated device tree.  The per-module glob above walks SFEM_MODULES and
+# the generated tree is not one of them, so without this no generated `.cu`
+# reaches the build however correct it is.  Recursive, because the generated
+# tree nests by dimension and element rather than by module.
+if(SFEM_ENABLE_CUDA)
+    file(GLOB_RECURSE SFEM_GENERATED_KERNEL_SOURCES CONFIGURE_DEPENDS
+         "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cu")
+    file(GLOB_RECURSE SFEM_GENERATED_KERNEL_HEADERS CONFIGURE_DEPENDS
+         "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cuh")
+    list(APPEND SFEM_KERNEL_SOURCES ${SFEM_GENERATED_KERNEL_SOURCES})
+    list(APPEND SFEM_KERNEL_HEADERS ${SFEM_GENERATED_KERNEL_HEADERS})
+endif()
+
 list(REMOVE_DUPLICATES SFEM_SOURCES)
 list(REMOVE_DUPLICATES SFEM_HEADERS)
 
