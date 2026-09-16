@@ -219,6 +219,7 @@ from codegen.framework.fem import (
 from codegen.framework.backends.cuda import CUDASoABackend as _CUDASoABackend
 from codegen.framework.backends.openmp import OpenMPSoABackend as _OpenMPSoABackend
 from codegen.framework.targets import (
+    use_target,
     AVX512Target,
     ARMSMETarget,
     ARMSVETarget,
@@ -826,7 +827,12 @@ def generate(
     plan_dump = _write_plan_dump(codegen_plan, out_dir, material.name, plan_out, user_input) if dump_plan or plan_out else None
 
     if material.op_name and backend.supports_op_wrapper:
-        files.update(_generate_op_wrapper_files(material, selected, user_input, files))
+        # The backend's target has to be bound here too.  `backend.emit` binds
+        # it around the kernels and returns, so without this the wrapper is
+        # generated under whatever is ambient -- which is OpenMP -- and a CUDA
+        # generation would quietly emit a host-shaped Op.
+        with use_target(backend.target):
+            files.update(_generate_op_wrapper_files(material, selected, user_input, files))
         _replace_legacy_tensor_product_sources_with_proteus_aliases(files)
 
     files = _relocate_generated_primitive_headers(files, out_dir, material.name)
