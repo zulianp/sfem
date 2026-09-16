@@ -325,6 +325,46 @@ class TargetPlatform:
             ),
         )
 
+    def element_connectivity_accessor(self):
+        """Where a generated `Op` reads its connectivity from.
+
+        The mesh's own SoA on the host.  A device target reads the block's
+        device copy -- `device_elements_SoA()` -- which is what every `gpu:` Op
+        in SFEM hands its kernels, and what a `__global__` body can dereference.
+        """
+        return "domain.block->elements()->data()"
+
+    def geometry_memory_space(self):
+        """Where a generated `Op` asks smesh to leave its cached geometry.
+
+        `JacobianAdjugateAndDeterminant::create_SoA` and `FFF::create_SoA` both
+        end in `to_memory_space(buffer, space)`, so a device Op needs no copy of
+        its own: it asks for the space it wants and gets a device array of
+        device pointers, which is the shape the kernels already read.
+        """
+        return "smesh::MEMORY_SPACE_HOST"
+
+    def op_stream_arguments(self):
+        """What a generated `Op` passes after a kernel's own arguments."""
+        return ()
+
+    def entry_point_name(self, public_name):
+        """What this target calls a public `extern "C"` symbol.
+
+        Unchanged on the host.  A device target prefixes, because the host and
+        the device implementation of one operator are two symbols in one
+        library and SFEM names its own device kernels that way throughout.
+        """
+        return public_name
+
+    def entry_point_suffix_parameters(self):
+        """Parameters every public entry point takes here, after its own.
+
+        Empty on the host.  Every `cu_` entry point in SFEM ends with a
+        `void *stream`, and an `Op` holds one and hands it to each call.
+        """
+        return ()
+
     def header_name(self, stem):
         """What a generated header is called here.
 
@@ -674,6 +714,21 @@ class CUDATarget(TargetPlatform):
             *trailing,
         )
 
+    def element_connectivity_accessor(self):
+        return "domain.block->device_elements_SoA()->data()"
+
+    def geometry_memory_space(self):
+        return "smesh::MEMORY_SPACE_DEVICE"
+
+    def op_stream_arguments(self):
+        return ("stream",)
+
+    def entry_point_name(self, public_name):
+        return "cu_%s" % public_name
+
+    def entry_point_suffix_parameters(self):
+        return ("void *const stream",)
+
     def header_name(self, stem):
         return "%s.cuh" % stem
 
@@ -694,7 +749,11 @@ class CUDATarget(TargetPlatform):
             "%sconst int block_size = 256;" % indent,
             "%sconst int grid_size = (int)((%s + block_size - 1) / block_size);"
             % (indent, extent),
-            "%ssfem::codegen::%s<%s><<<grid_size, block_size>>>(%s);"
+            #: The stream the caller handed the entry point.  SFEM's own device
+            #: kernels all take one and an `Op` holds one; a launch that ignored
+            #: it would serialise onto the default stream and silently undo the
+            #: caller's ordering.
+            "%ssfem::codegen::%s<%s><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(%s);"
             % (indent, implementation_name, template_args, ", ".join(arguments)),
             "%sreturn SFEM_SUCCESS;" % indent,
         )

@@ -345,8 +345,36 @@ class MeshLoweringAccessorTest(unittest.TestCase):
         # a `__global__` kernel returns void, so there is no status to give
         self.assertEqual(target.success_return_lines(), ())
         launch = target.mesh_launch_lines("k", "double", ("a",))
-        self.assertIn("<<<grid_size, block_size>>>", launch[2])
+        # the stream the caller handed the entry point, not the default one:
+        # every `cu_` entry point in SFEM takes a stream and its Op holds one
+        self.assertIn("<<<grid_size, block_size, 0, (cudaStream_t)stream>>>", launch[2])
         self.assertEqual(launch[-1], "  return SFEM_SUCCESS;")
+
+    def test_the_device_abi_is_named_the_way_sfem_names_its_own(self):
+        """`cu_` and a trailing stream, which is not decoration.
+
+        SFEM's hand-written device kernels are `cu_laplacian_apply`,
+        `cu_laplacian_crs`, `cu_linear_elasticity_apply`, and that prefix is
+        what lets a host and a device implementation of one operator sit in one
+        library.  A generated device tree that reused the host names could not
+        be linked beside the host tree at all.
+        """
+        self.assertEqual(OpenMPTarget().entry_point_name("laplace_gradient"), "laplace_gradient")
+        self.assertEqual(CUDATarget().entry_point_name("laplace_gradient"), "cu_laplace_gradient")
+        self.assertEqual(OpenMPTarget().entry_point_suffix_parameters(), ())
+        self.assertEqual(CUDATarget().entry_point_suffix_parameters(), ("void *const stream",))
+
+    def test_a_device_op_reads_device_buffers(self):
+        """Where a generated `Op` finds its connectivity and its geometry."""
+        self.assertEqual(
+            OpenMPTarget().element_connectivity_accessor(), "domain.block->elements()->data()"
+        )
+        self.assertEqual(
+            CUDATarget().element_connectivity_accessor(),
+            "domain.block->device_elements_SoA()->data()",
+        )
+        self.assertEqual(OpenMPTarget().geometry_memory_space(), "smesh::MEMORY_SPACE_HOST")
+        self.assertEqual(CUDATarget().geometry_memory_space(), "smesh::MEMORY_SPACE_DEVICE")
 
     def test_the_scalar_pass_follows_the_same_split(self):
         openmp = element_loop_lines(OpenMPTarget())

@@ -227,19 +227,14 @@ class CUDAEnergySoASourceBuilder:
         )
 
     def mesh_function_line(self, implementation_name):
-        return "__global__ void %s(" % implementation_name
+        return self.target.mesh_function_line(implementation_name)
 
     def success_return_lines(self):
-        return ()
+        return self.target.success_return_lines()
 
     def wrapper_call_lines(self, implementation_name, scalar_type, extra_template_args, wrapper_args):
-        template_args = "%s%s" % (scalar_type, extra_template_args)
-        return (
-            "  const int block_size = 256;",
-            "  const int grid_size = (int)((nelements + block_size - 1) / block_size);",
-            "  sfem::codegen::%s<%s><<<grid_size, block_size>>>(%s);"
-            % (implementation_name, template_args, ", ".join(wrapper_args)),
-            "  return SFEM_SUCCESS;",
+        return self.target.mesh_launch_lines(
+            implementation_name, "%s%s" % (scalar_type, extra_template_args), wrapper_args
         )
 
     def scatter_add_lines(self, lhs, rhs, indent):
