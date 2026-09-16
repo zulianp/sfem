@@ -16,6 +16,7 @@ number that is wrong in a way no test on the generator would see.
 The caller supplies the measurements; nothing is decided here.
 """
 
+from codegen.framework.emitters.runtime_typed_abi import entry_point_name
 import dataclasses
 
 
@@ -111,8 +112,10 @@ def diagnostics_accessor_lines(public_name):
     referenced any of them.
     """
     return [
-        'extern "C" const sfem::codegen::%s *%s_diagnostics(void) {'
-        % (STRUCT_NAME, public_name),
+        # A public symbol like any other: a host and a device tree both
+        # publish it, so the target names it.
+        'extern "C" const sfem::codegen::%s *%s(void) {'
+        % (STRUCT_NAME, entry_point_name("%s_diagnostics" % public_name)),
         "  return &sfem::codegen::%s_diagnostics_data;" % public_name,
         "}",
     ]

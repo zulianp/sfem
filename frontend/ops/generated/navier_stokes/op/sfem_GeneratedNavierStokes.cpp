@@ -279,7 +279,7 @@ namespace sfem {
     //! the host and the device differ only here: a device Op hands its kernels
     //! the block's device copy, which is what every `gpu:` Op in SFEM passes
     //! and what a `__global__` body can dereference.
-    idx_t *const *element_connectivity(const OpDomain &domain) {
+    idx_t **element_connectivity(const OpDomain &domain) {
       return domain.block->elements()->data();
     }
 
