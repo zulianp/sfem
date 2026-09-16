@@ -4819,6 +4819,27 @@ def _coupled_parameter_array_lines(defaults):
     return "\n".join(lines)
 
 
+def _entry_point_name(public_name):
+    """What the bound target calls this dispatcher.
+
+    The per-element kernels below it are named by the same accessor, through
+    `runtime_typed_abi`; this is the element-type dispatcher above them, which
+    this module spells itself.
+    """
+    return current_target().entry_point_name(public_name)
+
+
+def _entry_point_suffix_parameters():
+    return current_target().entry_point_suffix_parameters()
+
+
+def _entry_point_suffix_arguments():
+    """What the dispatcher forwards after the kernel's own arguments."""
+    return tuple(
+        _c_parameter_name(parameter) for parameter in _entry_point_suffix_parameters()
+    )
+
+
 def _geometry_memory_space_expression():
     """Where the bound target wants its cached geometry left."""
     return current_target().geometry_memory_space()
@@ -5764,8 +5785,10 @@ def _merged_pair_dispatch_function_lines(group):
     """
     runtime = set(group["runtime_typed"])
     params = ("const smesh::ElemType element_type",) + tuple(group["params"])
-    lines = ['SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"]]
-    lines.extend(parameter_list_lines(params))
+    lines = [
+        'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % _entry_point_name(group["name"])
+    ]
+    lines.extend(parameter_list_lines(params + _entry_point_suffix_parameters()))
     lines.extend(
         [
             ") {",
@@ -5853,8 +5876,10 @@ def _runtime_typed_dispatch_function_lines(group):
     arguments = ["(int)%s" % _RESOLVED_RUNTIME_TYPE] + [
         _c_parameter_name(param) for param in group["params"][1:]
     ]
-    lines = ['SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"]]
-    lines.extend(parameter_list_lines(params))
+    lines = [
+        'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % _entry_point_name(group["name"])
+    ]
+    lines.extend(parameter_list_lines(params + _entry_point_suffix_parameters()))
     lines.extend(
         [
             ") {",
@@ -5870,7 +5895,10 @@ def _runtime_typed_dispatch_function_lines(group):
             [
                 "    case smesh::%s:" % variant["mesh_element"],
                 "      return %s(%s);"
-                % (variant["function"], ", ".join(arguments)),
+                % (
+                    variant["function"],
+                    ", ".join(arguments + list(_entry_point_suffix_arguments())),
+                ),
             ]
         )
     lines.extend(
@@ -6009,9 +6037,9 @@ def _dispatch_function_lines(group):
     params = ("const smesh::ElemType element_type",) + tuple(group["params"])
     arg_names = tuple(_c_parameter_name(param) for param in group["params"])
     lines = [
-        'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % group["name"],
+        'SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int %s(' % _entry_point_name(group["name"]),
     ]
-    lines.extend(parameter_list_lines(params))
+    lines.extend(parameter_list_lines(params + _entry_point_suffix_parameters()))
     lines.extend(
         [
             ") {",
@@ -6022,7 +6050,11 @@ def _dispatch_function_lines(group):
         lines.extend(
             [
                 "    case smesh::%s:" % variant["mesh_element"],
-                "      return %s(%s);" % (variant["function"], ", ".join(arg_names)),
+                "      return %s(%s);"
+                % (
+                    variant["function"],
+                    ", ".join(arg_names + tuple(_entry_point_suffix_arguments())),
+                ),
             ]
         )
     lines.extend(
