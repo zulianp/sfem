@@ -162,7 +162,18 @@ def _boundary_target_lines(function, sideset_function, current_args, param_args,
         "\n      nsides, nnodes, elements, parent, side_idx, points%s%s, out_stride, %s"
         % (current_args, param_args, scatter_streams)
     )
+    suffix = target.entry_point_suffix_parameters()
     return {
+        "public_function": target.entry_point_name(function),
+        "public_function_float": target.entry_point_name("%s_float" % function),
+        "public_sideset_function": target.entry_point_name(sideset_function),
+        "public_sideset_function_float": target.entry_point_name(
+            "%s_float" % sideset_function
+        ),
+        #: The declaration's tail.  It has to be a suffix rather than a
+        #: parameter in the list, because these four parameter lists are
+        #: assembled from the form's own components and end wherever they end.
+        "entry_point_suffix": "".join(",\n    %s" % parameter for parameter in suffix),
         "element_kernel_line": target.mesh_function_line("%s_impl" % function),
         "sideset_kernel_line": target.mesh_function_line("%s_impl" % sideset_function),
         #: `index="e"` and no schedule: this family has always spelled its
@@ -593,27 +604,27 @@ template <typename s_t>
 }}  // namespace codegen
 }}  // namespace sfem
 
-extern "C" int {function}(
+extern "C" int {public_function}(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
     const int out_stride,
-{extern_out_params}) {{
+{extern_out_params}{entry_point_suffix}) {{
 {element_launch_real}
 }}
 
-extern "C" int {function}_float(
+extern "C" int {public_function_float}(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
     const int out_stride,
-{extern_float_out_params}) {{
+{extern_float_out_params}{entry_point_suffix}) {{
 {element_launch_float}
 }}
 
-extern "C" int {sideset_function}(
+extern "C" int {public_sideset_function}(
     const ptrdiff_t nsides,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -621,11 +632,11 @@ extern "C" int {sideset_function}(
     const int16_t *const RSTR side_idx,
     const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
     const int out_stride,
-{extern_out_params}) {{
+{extern_out_params}{entry_point_suffix}) {{
 {sideset_launch_real}
 }}
 
-extern "C" int {sideset_function}_float(
+extern "C" int {public_sideset_function_float}(
     const ptrdiff_t nsides,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -633,7 +644,7 @@ extern "C" int {sideset_function}_float(
     const int16_t *const RSTR side_idx,
     const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
     const int out_stride,
-{extern_float_out_params}) {{
+{extern_float_out_params}{entry_point_suffix}) {{
 {sideset_launch_float}
 }}
 """.format(
@@ -1065,27 +1076,27 @@ template <typename s_t>
 }}  // namespace codegen
 }}  // namespace sfem
 
-extern "C" int {function}(
+extern "C" int {public_function}(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
     const int out_stride,
-{extern_out_params}) {{
+{extern_out_params}{entry_point_suffix}) {{
 {element_launch_real}
 }}
 
-extern "C" int {function}_float(
+extern "C" int {public_function_float}(
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
     const int out_stride,
-{extern_float_out_params}) {{
+{extern_float_out_params}{entry_point_suffix}) {{
 {element_launch_float}
 }}
 
-extern "C" int {sideset_function}(
+extern "C" int {public_sideset_function}(
     const ptrdiff_t nsides,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1093,11 +1104,11 @@ extern "C" int {sideset_function}(
     const int16_t *const RSTR side_idx,
     const geom_t *const *const RSTR points{extern_current_decls}{extern_param_decls},
     const int out_stride,
-{extern_out_params}) {{
+{extern_out_params}{entry_point_suffix}) {{
 {sideset_launch_real}
 }}
 
-extern "C" int {sideset_function}_float(
+extern "C" int {public_sideset_function_float}(
     const ptrdiff_t nsides,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
@@ -1105,7 +1116,7 @@ extern "C" int {sideset_function}_float(
     const int16_t *const RSTR side_idx,
     const geom_t *const *const RSTR points{extern_float_current_decls}{extern_float_param_decls},
     const int out_stride,
-{extern_float_out_params}) {{
+{extern_float_out_params}{entry_point_suffix}) {{
 {sideset_launch_float}
 }}
 """.format(
