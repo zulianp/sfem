@@ -541,7 +541,40 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Thirty-one, ordered by what unblocks what. Ten are new since the last pass, and seven of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Thirty-two, ordered by what unblocks what. Eleven are new since the last pass, and eight of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 31</div>
+    <div class="body">
+      <div class="op-title">The generated kernels, measured against the ones SFEM wrote by hand <span class="chip c-ok">closed &mdash; within 1.3% either way, and a dead heat on the heavier one</span></div>
+
+      <p><b>The question the host-versus-device numbers could not answer.</b> A generated kernel running 11&times; faster on a GH200 than on 72 Grace cores says something about the hardware and almost nothing about the generator. The comparison that says something about the generator is against SFEM's own device kernels, on the same element, the same mesh and the same geometry &mdash; and for TET4 both exist.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>TET4 apply, one GH200, saturated</th><th>ndof</th><th>hand-written</th><th>generated</th><th>ratio</th></tr>
+        <tr><td>Laplacian</td><td>4,173,281</td><td>7,245.5</td><td>7,149.4 MDOF/s</td><td><b>0.987&times;</b></td></tr>
+        <tr><td>linear elasticity</td><td>12,519,843</td><td>7,904.0</td><td>7,921.8 MDOF/s</td><td><b>1.002&times;</b></td></tr>
+      </table>
+
+      <p><b>Fair by construction, not by inspection.</b> One flat geometry buffer serves both kernels: SFEM's reads it as <code>fff</code> or <code>jacobian_adjugate</code> with an <code>nelements</code> stride, the generated one as component pointers into that same memory. Neither gets a layout the other does not, and the geometry is bit-identical between the two runs. With <code>kappa = 1</code> the Laplacian <em>apply</em> and the generated energy's <em>gradient</em> are the same matrix-vector product, so every row is a correctness check against the reference implementation as well as a rate: all entries non-zero, agreeing to <b>6.5e-16</b>.</p>
+
+      <p><b>A hazard that compiling did not find.</b> The first run faulted on an illegal memory access. The generated tree guards its scalar types with <code>#if __has_include("sfem_base.hpp")</code> and falls back to <code>idx_t = ptrdiff_t</code>; SFEM's <code>idx_t</code> is <code>int</code>. Compiled standalone, the generated half read the driver's four-byte indices as eight-byte ones. Both halves compiled cleanly. It is the same shape as the symbol collision the <code>cu_</code> prefix exists to prevent, one level down: two translation units agreeing on a name and disagreeing on a type.</p>
+
+      <p><b>And the heaviest material, which has no hand-written counterpart at all.</b> Mooney-Rivlin Kelvin-Voigt Newmark is two units, and both are what a matrix-free solver spends its time in.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>TET4, 12,519,843 dof, 24,576,000 elements</th><th>host</th><th>GH200</th><th>device / host</th></tr>
+        <tr><td>elastic apply &mdash; the energy family's Hessian action</td><td>245.3</td><td><b>4,252.0 MDOF/s</b></td><td><b>17.3&times;</b></td></tr>
+        <tr><td>viscous Jacobian action &mdash; the residual family's</td><td>136.9</td><td><b>1,938.7 MDOF/s</b></td><td><b>14.2&times;</b></td></tr>
+      </table>
+
+      <p>Both saturate &mdash; the host flat across the whole range, the device moving 0.1% and &minus;0.2% over the last doubling. <b>The speedups are much larger than the 11.1&times; and 10.5&times; the simpler kernels give</b>, which is the expected shape rather than a surprise: this material is far enough from memory bound that the device's arithmetic advantage matters more than its bandwidth advantage. And the viscous unit costs about 2.2&times; the elastic one on <em>both</em> sides; it reads three vector fields where the elastic reads two, and a ratio that holds across hardware says that cost is arithmetic rather than target-specific.</p>
+
+      <p><b>What is not claimed.</b> Two elements and two materials is where a hand-written counterpart exists, not a survey. These are the standard mesh layout; the packed one exists on the host only, because the OpenMP thread-local scratch it needs has no device meaning. And a kernel rate is not a solver: nothing here runs a Newton step or a multigrid cycle.</p>
+
+      <div class="op-facts"><span><i>vs hand-written</i> 0.987&times; laplace &middot; <b>1.002&times;</b> elasticity</span><span><i>agreement</i> &le; 6.5e-16, every entry</span><span><i>MRKVN elastic</i> 4,252 MDOF/s, <b>17.3&times;</b></span><span><i>MRKVN viscous</i> 1,939 MDOF/s, 14.2&times;</span><span><i>found by running</i> an `idx_t` width mismatch two clean compiles hid</span></div>
+    </div>
+  </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 30</div>
