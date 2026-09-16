@@ -541,7 +541,60 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Thirty-two, ordered by what unblocks what. Eleven are new since the last pass, and eight of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Thirty-four, ordered by what unblocks what. Thirteen are new since the last pass, and ten of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 33</div>
+    <div class="body">
+      <div class="op-title">A call site that knows the logical name and not the emitted one <span class="chip c-ok">closed &mdash; a standing gate over every generation, both targets</span></div>
+
+      <p><b>One defect, six instances, six compiler errors.</b> The emitted spelling of an entry point belongs to the target: <code>TargetPlatform.entry_point_name</code> prefixes <code>cu_</code>, and <code>entry_point_suffix_parameters</code> appends a stream. <code>plans/conventions</code> parses material, element and operation out of a name and raises rather than guess, and <code>cu_</code> is none of those &mdash; so names are stripped on the way in and re-prefixed at emission. An emitter that splices the <em>logical</em> name into a call therefore builds something that no longer names, or no longer fits, the function it meant. <code>\b</code> finds no word boundary inside <code>cu_laplace</code> either, which is why two parsers went on matching the wrong half of the pair.</p>
+
+      <p><b>Compiling was the wrong gate, twice over.</b> It needs a material that happens to publish both halves for the same element before anything is visible at all &mdash; the AoS dispatch forwarder sat wrong through every CUDA generation until Mooney-Rivlin HEX8 was generated, because no earlier material published an AoS dispatch for an element that also had one. And one instance had the right arity for the wrong parameters: <code>_affine_dispatch_parameters</code> handed laplace's metric dispatch nine adjugate components where six metric components belong. That compiled cleanly and would have answered wrongly.</p>
+
+      <p><b>The gate.</b> <code>driver._validate_generated_call_graph</code> runs over the whole emitted file set at the end of every generation, before anything is written. It collects every <code>extern "C"</code> name and arity the tree spells, then walks every call in every emitted source: a call to a name the tree defines only under a prefix is the first shape, a call whose argument count disagrees with the emitted parameter count is the second, and a symbol spelled with two different arities in two files is the third. It is static text analysis that changes nothing &mdash; a violation raises, so the fix lands in the plan, the IR or the emitter, where the spelling is decided.</p>
+
+      <p>The three <code>extern "C"</code> parsers in <code>pipeline/driver.py</code> became one while this landed. The old declaration parser was non-greedy across a definition's body and returned its internals as declarations &mdash; 192 of 377 tracked files gave a different answer from the strict one, and the tracked tree is byte-identical either way, because the alias pass filtered the garbage downstream rather than never receiving it.</p>
+
+      <div class="op-facts"><span><i>instances</i> 6, each found by a compiler</span><span><i>one of them</i> compiled and would have answered wrongly</span><span><i>gate</i> every material, every target, every generation</span><span><i>parsers</i> 3 &rarr; 1, tracked tree byte-identical</span></div>
+    </div>
+  </div>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 32</div>
+    <div class="body">
+      <div class="op-title">The same material on three elements, so the element is what varies <span class="chip c-ok">closed &mdash; 22.5&times; at the top of the table and 10.5&times; at the bottom</span></div>
+
+      <p><b>Why one element was not enough.</b> OP 31 measured TET4 because that is where a hand-written counterpart exists. A single element cannot say whether a speedup is a fact about the generator or a fact about that element, and the answer turns out to be neither uniform nor in the order the host suggests. One GH200 against 72 Grace cores, <code>OMP_PROC_BIND=true</code>, best of three, at side 160 &mdash; where every rate has stopped moving (largest device change over the last doubling: laplace HEX8 at +3.2%, everything else within 1.3%). The dof column counts the nodes the mesh <em>touches</em>, not the extent of the node array: the TET10 midpoint numbering is collision-free and as local as the vertices but leaves gaps at the far boundary, and counting the allocation instead would have made every TET10 rate 0.9% flattering.</p>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>laplace gradient</th><th>ndof</th><th>host</th><th>GH200</th><th>device / host</th></tr>
+        <tr><td>TET4</td><td>4,173,281</td><td>530.4</td><td><b>5,484.6 MDOF/s</b></td><td>10.3&times;</td></tr>
+        <tr><td>TET10</td><td>33,076,161</td><td>804.5</td><td><b>11,389.0 MDOF/s</b></td><td>14.2&times;</td></tr>
+        <tr><td>HEX8</td><td>4,173,281</td><td>712.0</td><td><b>15,939.7 MDOF/s</b></td><td><b>22.4&times;</b></td></tr>
+      </table>
+
+      <table class="measures" style="margin:8px 0 12px">
+        <tr><th>hyperelastic apply</th><th>ndof</th><th>host</th><th>GH200</th><th>device / host</th></tr>
+        <tr><td>neo-Hookean TET4</td><td>12,519,843</td><td>203.6</td><td><b>3,918.4 MDOF/s</b></td><td><b>19.2&times;</b></td></tr>
+        <tr><td>neo-Hookean TET10</td><td>99,228,483</td><td>394.9</td><td><b>6,594.6 MDOF/s</b></td><td>16.7&times;</td></tr>
+        <tr><td>neo-Hookean HEX8</td><td>12,519,843</td><td>228.2</td><td><b>3,559.8 MDOF/s</b></td><td>15.6&times;</td></tr>
+        <tr><td>neo-Hookean PROTEUS_HEX8</td><td>12,519,843</td><td>216.9</td><td><b>2,343.3 MDOF/s</b></td><td>10.8&times;</td></tr>
+        <tr><td>MRKVN elastic TET4</td><td>12,519,843</td><td>247.4</td><td><b>4,277.2 MDOF/s</b></td><td>17.3&times;</td></tr>
+        <tr><td>MRKVN elastic TET10</td><td>99,228,483</td><td>493.3</td><td><b>6,428.8 MDOF/s</b></td><td>13.0&times;</td></tr>
+        <tr><td>MRKVN elastic HEX8</td><td>12,519,843</td><td>313.3</td><td><b>3,511.1 MDOF/s</b></td><td>11.2&times;</td></tr>
+        <tr><td>MRKVN viscous Jacobian TET4</td><td>12,519,843</td><td>135.9</td><td><b>1,950.2 MDOF/s</b></td><td>14.4&times;</td></tr>
+      </table>
+
+      <p><b>The element ordering is not the same on the two targets.</b> On the host the laplace rates run TET4 &lt; HEX8 &lt; TET10 within a factor of 1.5; on the device they run TET4 &lt; TET10 &lt; HEX8 across a factor of 2.9. Same generator, same lowering choices, 22.4&times; at one end of the element table and 10.3&times; at the other &mdash; an element that looks unremarkable at 72 cores can be the best one on a GPU.</p>
+
+      <p><b>The mesh-order HEX8 costs 34% against its Cartesian twin on the device</b> (2,343.3 against 3,559.8) where on the host the two are within 5% (216.9 against 228.2). The mesh-order element delegates to its PROTEUS twin through a gather and a scatter in mesh order: on a CPU that is a few extra loads out of cache, on a GPU it is a scattered access pattern per warp. A real device-side cost of the indirection, visible only because both elements were measured.</p>
+
+      <p><b>And the speedup does not track arithmetic intensity monotonically.</b> Neo-Hookean TET4 takes the largest ratio in the table at 19.2&times; and laplace TET4 the smallest simplex ratio at 10.3&times;, which is the expected direction &mdash; but the heaviest kernel of all, the MRKVN viscous Jacobian, gets 14.4&times;, below neo-Hookean TET4. Reading a third vector field costs the device proportionally more than it costs the host, so intensity alone does not order these.</p>
+
+      <div class="op-facts"><span><i>cases</i> 11 kernels &times; 5 sizes &times; 2 targets</span><span><i>fastest</i> laplace HEX8, 15,940 MDOF/s</span><span><i>widest gap</i> 22.4&times; HEX8 vs 10.3&times; TET4, same material</span><span><i>indirection</i> mesh order costs 34% on the device, 5% on the host</span></div>
+    </div>
+  </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 31</div>

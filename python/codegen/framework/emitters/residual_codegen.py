@@ -7148,7 +7148,12 @@ def _mesh_operator_source(
 
 
 def _aos_dispatch_source(system, prefix, form, dependencies):
-    target = "%s_%s_i_msoa" % (prefix, form)
+    # The AoS entry point forwards to the SoA one, which the target names --
+    # so this call has to name it the same way.  `_runtime_typed_entry_point`
+    # already names the forwarder itself; only the callee was left logical, and
+    # it went unnoticed because the materials compiled so far publish no AoS
+    # dispatch for an element that also has one.
+    target = _target().entry_point_name("%s_%s_i_msoa" % (prefix, form))
     function = "%s_%s_i_maos" % (prefix, form)
     n_fields = len(system.fields)
     lines = []
@@ -7186,8 +7191,19 @@ def _aos_dispatch_source(system, prefix, form, dependencies):
         arguments.extend(
             "(%s *)output + %d" % (scalar_type, index) for index in range(n_fields)
         )
+        # ... and pass whatever the target appends, which the callee now takes
         return [
-            "  return %s(scalar_bytes, %s);" % (target, ", ".join(arguments)),
+            "  return %s(scalar_bytes, %s);"
+            % (
+                target,
+                ", ".join(
+                    list(arguments)
+                    + [
+                        parameter.split()[-1].lstrip("*")
+                        for parameter in _target().entry_point_suffix_parameters()
+                    ]
+                ),
+            ),
         ]
 
     lines.extend(_runtime_typed_entry_point(function, params, (), _forward))

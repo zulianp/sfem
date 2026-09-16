@@ -837,6 +837,7 @@ def generate(
 
     files = _relocate_generated_primitive_headers(files, out_dir, material.name)
     files = _collapse_duplicate_operators(files)
+    _validate_generated_call_graph(files)
     source_paths = _write_files(out_dir, files)
     object_paths = _compile_operators(source_paths) if compile else ()
     return GenerationResult(source_paths, object_paths, codegen_plan, plan_dump)
@@ -1471,22 +1472,189 @@ def _replace_legacy_tensor_product_sources_with_proteus_aliases(files):
                 )
 
 
+# A generated `extern "C"` header: a prototype through its `;` or a definition
+# through the `{` that opens its body.  A prototype ends in `);` and a
+# definition in `) {`, so the two are distinguishable without parsing C++, and
+# neither carries a default argument or a nested call -- so the parameter list
+# holds no `;` and no brace, and the non-greedy run cannot walk past the
+# function it belongs to into the next one.
+_EXTERN_C_HEADER = re.compile(r'extern "C"\s+[^;{]*?\)\s*[;{]', re.DOTALL)
+
+
+def _extern_c_headers(source):
+    """Every `extern "C"` function this source spells, declared or defined.
+
+    One parser for the question "what does this file say about a C symbol",
+    which three callers ask three ways: which symbols it defines, which it
+    declares, and with what arity each is spelled.
+    """
+    headers = []
+    for match in _EXTERN_C_HEADER.finditer(source):
+        text = match.group(0)
+        open_index = text.index("(")
+        name_match = re.search(r"([A-Za-z_]\w*)\s*$", text[:open_index])
+        if name_match is None:
+            continue
+        headers.append(
+            {
+                "name": name_match.group(1),
+                "return_type": text[len('extern "C"') : name_match.start()].strip(),
+                "params": text[open_index + 1 : text.rindex(")")].strip(),
+                "defines": text.rstrip().endswith("{"),
+            }
+        )
+    return tuple(headers)
+
+
 def _extern_c_defined_names(source):
     """The `extern "C"` functions this source *defines*, not merely declares.
 
-    A prototype ends in `);` and a definition in `) {`, so the two are
-    distinguishable without parsing C++.  The distinction is the whole point
-    here: a file that only declares a symbol is not the file that should be
-    aliased onto.
+    The distinction is the whole point here: a file that only declares a symbol
+    is not the file that should be aliased onto.
     """
     return frozenset(
-        match.group("name")
-        for match in re.finditer(
-            r'extern "C"\s+[^;{]*?\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*\([^;{]*?\)\s*\{',
-            source,
-            re.DOTALL,
-        )
+        header["name"] for header in _extern_c_headers(source) if header["defines"]
     )
+
+
+_CALL_GRAPH_SOURCE_EXTENSIONS = (".cpp", ".hpp", ".cu", ".cuh", ".hip")
+
+
+def _c_parameter_count(params):
+    text = params.strip()
+    if not text or text == "void":
+        return 0
+    count, depth = 1, 0
+    for character in text:
+        if character in "([{<":
+            depth += 1
+        elif character in ")]}>":
+            depth -= 1
+        elif character == "," and depth == 0:
+            count += 1
+    return count
+
+
+def _c_argument_count(text, open_index):
+    """Count the arguments of the call whose `(` sits at `open_index`.
+
+    Returns `None` when the parentheses do not balance before the text runs
+    out, which is what a match inside a macro or a truncated construct looks
+    like; the caller skips those rather than guessing.
+    """
+    depth, count, index, seen = 0, 0, open_index, False
+    while index < len(text):
+        character = text[index]
+        if character in "\"'":
+            index += 1
+            while index < len(text) and text[index] != character:
+                index += 2 if text[index] == "\\" else 1
+            index += 1
+            seen = True
+            continue
+        if character in "([{":
+            depth += 1
+        elif character in ")]}":
+            depth -= 1
+            if depth == 0:
+                return count + 1 if seen else 0
+        elif character == "," and depth == 1:
+            count += 1
+        elif not character.isspace():
+            seen = True
+        index += 1
+    return None
+
+
+def _masked_call_sites(source):
+    """The source with every `extern "C"` header blanked out, same length.
+
+    Blanking rather than deleting keeps every offset, so a diagnostic can still
+    name the line a call sits on, and it stops a signature from being read as a
+    call to itself.
+    """
+    masked = list(source)
+    for match in _EXTERN_C_HEADER.finditer(source):
+        for index in range(*match.span()):
+            if masked[index] != "\n":
+                masked[index] = " "
+    return "".join(masked)
+
+
+def _validate_generated_call_graph(files):
+    """Every generated symbol a generated source calls must link, and must be
+    called with the arity it was emitted with.
+
+    This gates one recurring defect: a call site that knows a symbol's
+    *logical* name but not its *emitted* one.  The emitted spelling belongs to
+    the target -- `entry_point_name` prefixes `cu_`, and
+    `entry_point_suffix_parameters` appends a stream -- so an emitter that
+    splices the logical name into a call builds something that no longer names,
+    or no longer fits, the function it meant.  Six such sites were found one
+    nvcc error at a time, each invisible until a material happened to publish
+    both halves for the same element, and one of them (a metric dispatch handed
+    nine adjugate components where six metric components belong) compiled
+    cleanly and gave a wrong answer.
+
+    It is static text analysis over what was emitted and it changes nothing: a
+    violation raises, so the fix lands where the spelling is decided.
+    """
+    sources = {
+        path: text
+        for path, text in files.items()
+        if path.endswith(_CALL_GRAPH_SOURCE_EXTENSIONS)
+    }
+    arities = {}
+    for path in sorted(sources):
+        for header in _extern_c_headers(sources[path]):
+            arity = _c_parameter_count(header["params"])
+            previous = arities.get(header["name"])
+            if previous is not None and previous != arity:
+                raise ValueError(
+                    'generated `extern "C"` %s is spelled with %d parameters '
+                    "and with %d; %s disagrees with an earlier file"
+                    % (header["name"], previous, arity, path)
+                )
+            arities[header["name"]] = arity
+
+    problems = []
+    for path in sorted(sources):
+        masked = _masked_call_sites(sources[path])
+        for match in re.finditer(r"(?<![\w:.>])([A-Za-z_]\w*)\s*\(", masked):
+            name = match.group(1)
+            line = masked.count("\n", 0, match.start()) + 1
+            if name not in arities:
+                # A name the tree defines only under a target's prefix is a
+                # logical name that escaped into a call site.  Anything else is
+                # a call out of the tree -- the standard library, SFEM, a
+                # control-flow keyword -- and is none of this check's business,
+                # so only a name shaped like a published entry point is asked
+                # about at all.
+                if len(name) < 8 or "_" not in name:
+                    continue
+                emitted = sorted(
+                    other
+                    for other in arities
+                    if other.endswith(name)
+                    and other != name
+                    and re.fullmatch(r"[A-Za-z_]\w*", other[: -len(name)])
+                )
+                if emitted:
+                    problems.append(
+                        "%s:%d calls %s, which nothing defines; the emitted "
+                        "spelling is %s" % (path, line, name, emitted[0])
+                    )
+                continue
+            count = _c_argument_count(masked, match.end() - 1)
+            if count is not None and count != arities[name]:
+                problems.append(
+                    "%s:%d calls %s with %d arguments; it is emitted with %d"
+                    % (path, line, name, count, arities[name])
+                )
+    if problems:
+        raise ValueError(
+            "the generated tree does not link:\n  " + "\n  ".join(problems)
+        )
 
 
 def _tensor_product_proteus_alias(element_name, proteus_name, dim, n_shape):
@@ -1516,24 +1684,15 @@ def _tensor_product_proteus_alias(element_name, proteus_name, dim, n_shape):
 
 
 def _extern_c_declarations(source):
-    pattern = re.compile(
-        r'extern "C"\s+(?P<head>.*?)\((?P<params>.*?)\);',
-        re.DOTALL,
+    return tuple(
+        {
+            "return_type": header["return_type"],
+            "name": header["name"],
+            "params": header["params"],
+        }
+        for header in _extern_c_headers(source)
+        if not header["defines"]
     )
-    declarations = []
-    for match in pattern.finditer(source):
-        head = match.group("head").strip()
-        name_match = re.search(r"([A-Za-z_]\w*)\s*$", head)
-        if name_match is None:
-            continue
-        declarations.append(
-            {
-                "return_type": head[: name_match.start()].rstrip(),
-                "name": name_match.group(1),
-                "params": match.group("params").strip(),
-            }
-        )
-    return tuple(declarations)
 
 
 def _tensor_product_proteus_alias_source(source_path, c_abi_path, declarations, alias):

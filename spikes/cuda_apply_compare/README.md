@@ -178,6 +178,60 @@ These are the standard mesh layout. The packed layout exists on the host only: t
 thread-local scratch it needs has no device meaning, which is a design question rather than a
 spelling one.
 
+## Across elements
+
+The same material on TET4, TET10 and HEX8, so the element rather than the physics is what
+varies. Everything below is one GH200 against 72 Grace cores at `OMP_PROC_BIND=true`, best of
+three, at side 160 — the largest point of the sweep and the one where every rate has stopped
+moving: over the last doubling the largest device change is laplace HEX8 at +3.2%, and every
+other case is within 1.3%.
+
+The dof column counts the nodes the mesh actually touches, not the extent of the node array.
+That matters for TET10 only: its midpoint numbering is `nnodes * edge_offset + lower_node`,
+which is collision-free and as local as the vertices but leaves gaps at the far boundary, so the
+array is 8·161³ while the mesh touches 321³. Counting the allocation instead would have made
+every TET10 rate 0.9% flattering.
+
+| laplace gradient | dof | host | GH200 | device / host |
+|---|---|---|---|---|
+| TET4 | 4,173,281 | 530.4 | **5484.6** MDOF/s | 10.3x |
+| TET10 | 33,076,161 | 804.5 | **11389.0** MDOF/s | 14.2x |
+| HEX8 | 4,173,281 | 712.0 | **15939.7** MDOF/s | 22.4x |
+
+| neo-Hookean apply | dof | host | GH200 | device / host |
+|---|---|---|---|---|
+| TET4 | 12,519,843 | 203.6 | **3918.4** MDOF/s | 19.2x |
+| TET10 | 99,228,483 | 394.9 | **6594.6** MDOF/s | 16.7x |
+| HEX8 (Cartesian) | 12,519,843 | 228.2 | **3559.8** MDOF/s | 15.6x |
+| PROTEUS_HEX8 (mesh order) | 12,519,843 | 216.9 | **2343.3** MDOF/s | 10.8x |
+
+| Mooney-Rivlin KV Newmark | dof | host | GH200 | device / host |
+|---|---|---|---|---|
+| elastic apply, TET4 | 12,519,843 | 247.4 | **4277.2** MDOF/s | 17.3x |
+| elastic apply, TET10 | 99,228,483 | 493.3 | **6428.8** MDOF/s | 13.0x |
+| elastic apply, HEX8 | 12,519,843 | 313.3 | **3511.1** MDOF/s | 11.2x |
+| viscous Jacobian action, TET4 | 12,519,843 | 135.9 | **1950.2** MDOF/s | 14.4x |
+
+Three things the sweep says that no single element could.
+
+**The element ordering is not the same on the two targets.** On the host the laplace rates run
+TET4 < HEX8 < TET10 within a factor of 1.5; on the device they run TET4 < TET10 < HEX8 across a
+factor of 2.9. HEX8 gains 22.4x and TET4 10.3x from the same generator and the same lowering
+choices, so whatever the device rewards, it is not distributed evenly over the element table —
+and an element that looks unremarkable at 72 cores can be the best one on a GPU.
+
+**The mesh-order HEX8 costs 34% against its Cartesian twin on the device** (2343.3 against
+3559.8 MDOF/s) where on the host the two are within 5% (216.9 against 228.2). The mesh-order
+element delegates to its PROTEUS twin through a gather and a scatter in mesh order, which on a
+CPU is a few extra loads out of cache and on a GPU is a scattered access pattern per warp. That
+is a real device-side cost of the indirection, visible only because both elements were measured.
+
+**The speedup does not track arithmetic intensity monotonically.** Neo-Hookean TET4 gets the
+largest ratio in the table (19.2x) and laplace TET4 the smallest for a simplex (10.3x), which is
+the expected direction — but the heaviest kernel of all, the MRKVN viscous Jacobian, gets 14.4x,
+below neo-Hookean TET4. Reading a third vector field costs the device proportionally more than
+it costs the host, so intensity alone does not order these.
+
 ## What this establishes, and what it does not
 
 **Establishes:** the framework generates CUDA that compiles with nvcc 12.6, runs on an H100,

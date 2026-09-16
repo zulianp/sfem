@@ -7,7 +7,7 @@
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=72
 #SBATCH --time=00:25:00
-#SBATCH --output=$SCRATCH/cuda_apply_compare/gh200.log
+#SBATCH --output=gh200.log
 # The generated kernels, host against device, on one Grace-Hopper node.  Same
 # driver source compiled twice, so the only difference between the two runs is
 # which generated kernel they link.
