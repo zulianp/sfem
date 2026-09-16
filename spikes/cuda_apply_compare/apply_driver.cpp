@@ -124,6 +124,49 @@ int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa)
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(neohookean_ogden_tet4_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const real_t,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(neohookean_ogden_tet10_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const real_t,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(neohookean_ogden_hex8_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const real_t,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const real_t,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const real_t,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(laplace_tet10_gradient_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t,
+    idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(laplace_hex8_gradient_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t,
+    idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
 int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa)(
     const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
@@ -537,6 +580,220 @@ static void bench_hex8_apply(ptrdiff_t side, int repeats, const char *out_path) 
 // energy family's matrix-free Hessian action on a hyperelastic solid; the
 // *viscous* Jacobian action is the residual family's, and it reads a current
 // state, a previous state and a direction.
+//: A TET10 mesh on the same lattice: the four vertices are lattice nodes and
+//: the six midpoints are numbered by the edge's lattice offset, which keeps
+//: them as local as the vertices.  Each (lower node, offset) pair is unique, so
+//: the numbering collides with nothing; it leaves gaps, which costs a larger
+//: node array and nothing else.
+static std::vector<std::vector<idx_t>> kuhn_tet10_connectivity(const Lattice &lattice,
+                                                               ptrdiff_t *n_total) {
+  static const int KUHN[6][4] = {{0, 1, 3, 7}, {0, 1, 5, 7}, {0, 2, 3, 7},
+                                 {0, 2, 6, 7}, {0, 4, 5, 7}, {0, 4, 6, 7}};
+  //: the six edges of a tetrahedron, in SFEM's TET10 order
+  static const int EDGE[6][2] = {{0, 1}, {1, 2}, {0, 2}, {0, 3}, {1, 3}, {2, 3}};
+  const ptrdiff_t nelements = 6 * lattice.ncells;
+  std::vector<std::vector<idx_t>> connectivity(10, std::vector<idx_t>(nelements));
+  for (ptrdiff_t cell = 0; cell < lattice.ncells; ++cell) {
+    ptrdiff_t base[3] = {0, 0, 0};
+    lattice.cell_base(cell, 3, base);
+    for (int t = 0; t < 6; ++t) {
+      const ptrdiff_t e = 6 * cell + t;
+      int corner[4];
+      for (int v = 0; v < 4; ++v) {
+        corner[v] = KUHN[t][v];
+        connectivity[v][e] = lattice.corner(base, corner[v], 3);
+      }
+      for (int k = 0; k < 6; ++k) {
+        const int a = corner[EDGE[k][0]], b = corner[EDGE[k][1]];
+        const int lo = a & b;                 // all-lower corner of the edge
+        const int offset = (a | b) & ~lo;     // the axes it spans, 1..7
+        connectivity[4 + k][e] =
+            lattice.nnodes * offset + lattice.corner(base, lo, 3);
+      }
+    }
+  }
+  *n_total = lattice.nnodes * 8;
+  return connectivity;
+}
+
+//: A well-conditioned affine geometry per element: the adjugate and the
+//: determinant of a Jacobian near the identity.  Synthetic, and identical
+//: between the two arms, so a host-against-device ratio means what it says.
+static void affine_geometry(ptrdiff_t nelements, std::vector<std::vector<geom_t>> *adjugate,
+                            std::vector<geom_t> *determinant) {
+  adjugate->assign(9, std::vector<geom_t>(nelements));
+  determinant->assign(nelements, 0);
+  for (ptrdiff_t e = 0; e < nelements; ++e) {
+    double J[3][3];
+    for (int a = 0; a < 3; ++a)
+      for (int b = 0; b < 3; ++b)
+        J[a][b] = (a == b ? 1.0 : 0.0) + 0.25 * (2.0 * rnd() - 1.0);
+    (*determinant)[e] = (geom_t)(J[0][0] * (J[1][1] * J[2][2] - J[1][2] * J[2][1]) -
+                                 J[0][1] * (J[1][0] * J[2][2] - J[1][2] * J[2][0]) +
+                                 J[0][2] * (J[1][0] * J[2][1] - J[1][1] * J[2][0]));
+    const double cof[9] = {
+         (J[1][1] * J[2][2] - J[1][2] * J[2][1]), -(J[0][1] * J[2][2] - J[0][2] * J[2][1]),
+         (J[0][1] * J[1][2] - J[0][2] * J[1][1]), -(J[1][0] * J[2][2] - J[1][2] * J[2][0]),
+         (J[0][0] * J[2][2] - J[0][2] * J[2][0]), -(J[0][0] * J[1][2] - J[0][2] * J[1][0]),
+         (J[1][0] * J[2][1] - J[1][1] * J[2][0]), -(J[0][0] * J[2][1] - J[0][1] * J[2][0]),
+         (J[0][0] * J[1][1] - J[0][1] * J[1][0])};
+    for (int c = 0; c < 9; ++c) (*adjugate)[c][e] = (geom_t)cof[c];
+  }
+}
+
+// How many nodes the mesh actually touches, which is not always the extent of
+// the node array.  The TET10 numbering above is sparse -- a midpoint whose edge
+// leaves the lattice is never named -- so `nnodes` is the allocation and this is
+// the problem size.  Every other element here is dense and the two agree.
+static ptrdiff_t distinct_nodes(const std::vector<std::vector<idx_t>> &connectivity,
+                                ptrdiff_t extent) {
+  std::vector<bool> seen((size_t)extent, false);
+  for (const std::vector<idx_t> &column : connectivity)
+    for (idx_t node : column) seen[(size_t)node] = true;
+  ptrdiff_t count = 0;
+  for (size_t index = 0; index < seen.size(); ++index) count += seen[index];
+  return count;
+}
+
+//: The generated affine Laplacian gradient on each 3D element the generator
+//: publishes one for, so the rates sit beside each other on one mesh.  The
+//: geometry is the same shape for all three -- nine adjugate components and a
+//: determinant -- which is why one loop can walk them.
+static void bench_elements(ptrdiff_t side, int repeats) {
+  struct Case {
+    const char *name;
+    int n_shape;
+  };
+  static const Case CASES[] = {{"tet4", 4}, {"tet10", 10}, {"hex8", 8}};
+  for (const Case &c : CASES) {
+    reseed();
+    const Lattice lattice(side, 3);
+    ptrdiff_t nelements = 0, nnodes = lattice.nnodes;
+    std::vector<std::vector<idx_t>> connectivity;
+    if (c.n_shape == 4) {
+      connectivity = kuhn_connectivity(lattice);
+      nelements = 6 * lattice.ncells;
+    } else if (c.n_shape == 10) {
+      connectivity = kuhn_tet10_connectivity(lattice, &nnodes);
+      nelements = 6 * lattice.ncells;
+    } else {
+      connectivity = lattice_connectivity(lattice, 3, false);
+      nelements = lattice.ncells;
+    }
+    idx_t **elements = upload_table(connectivity);
+    const ptrdiff_t ndof = distinct_nodes(connectivity, nnodes);
+
+    std::vector<std::vector<geom_t>> adjugate;
+    std::vector<geom_t> determinant;
+    affine_geometry(nelements, &adjugate, &determinant);
+    geom_t *adj[9];
+    for (int k = 0; k < 9; ++k) adj[k] = upload(adjugate[k]);
+    geom_t *det = upload(determinant);
+    real_t *u = upload(random_field(nnodes));
+    real_t *out = upload(std::vector<real_t>(nnodes, 0.0));
+
+    double best = 1e30;
+    for (int r = 0; r <= repeats; ++r) {
+      clear(out, (size_t)nnodes);
+      const double t0 = seconds();
+      if (c.n_shape == 4) {
+        SFEM_KERNEL(laplace_tet4_gradient_a_msoa)(
+            (int)sizeof(real_t), nelements, nnodes, elements,
+            adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], 1.7, 1, u, 1,
+            out SFEM_STREAM_ARG);
+      } else if (c.n_shape == 10) {
+        SFEM_KERNEL(laplace_tet10_gradient_a_msoa)(
+            (int)sizeof(real_t), nelements, nnodes, elements,
+            adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
+            1.7, 1, u, 1, out SFEM_STREAM_ARG);
+      } else {
+        SFEM_KERNEL(laplace_hex8_gradient_a_msoa)(
+            (int)sizeof(real_t), nelements, nnodes, elements,
+            adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
+            1.7, 1, u, 1, out SFEM_STREAM_ARG);
+      }
+      sync();
+      const double elapsed = seconds() - t0;
+      if (r > 0) best = std::min(best, elapsed);  // the first pass is the warm-up
+    }
+    std::printf("%-16s laplace %-6s gradient        side %4td  elements %10td  ndof %10td"
+                "  %8.4f ms  %9.1f MDOF/s\n",
+                WHERE, c.name, side, nelements, ndof, 1e3 * best,
+                1e-6 * (double)ndof / best);
+    std::fflush(stdout);
+  }
+}
+
+//: The two hyperelastic materials on each 3D element they publish an affine
+//: apply for.  All six take one shape -- adjugate, determinant, two material
+//: parameters, a state, a direction, an output -- so one loop walks them and
+//: the rates sit beside each other on one mesh.
+static void bench_hyperelastic_elements(ptrdiff_t side, int repeats) {
+  struct Case { const char *material; const char *element; int n_shape; };
+  static const Case CASES[] = {
+      {"neohookean", "tet4", 4}, {"neohookean", "tet10", 10}, {"neohookean", "hex8", 8},
+      {"mooney-rivlin", "tet10", 10}, {"mooney-rivlin", "hex8", 8}};
+  for (const Case &c : CASES) {
+    reseed();
+    const Lattice lattice(side, 3);
+    ptrdiff_t nelements = 0, nnodes = lattice.nnodes;
+    std::vector<std::vector<idx_t>> connectivity;
+    if (c.n_shape == 4) {
+      connectivity = kuhn_connectivity(lattice);
+      nelements = 6 * lattice.ncells;
+    } else if (c.n_shape == 10) {
+      connectivity = kuhn_tet10_connectivity(lattice, &nnodes);
+      nelements = 6 * lattice.ncells;
+    } else {
+      connectivity = lattice_connectivity(lattice, 3, false);
+      nelements = lattice.ncells;
+    }
+    idx_t **elements = upload_table(connectivity);
+    std::vector<std::vector<geom_t>> adjugate;
+    std::vector<geom_t> determinant;
+    affine_geometry(nelements, &adjugate, &determinant);
+    geom_t *adj[9];
+    for (int k = 0; k < 9; ++k) adj[k] = upload(adjugate[k]);
+    geom_t *det = upload(determinant);
+    real_t *u[3], *h[3], *out[3];
+    const std::vector<real_t> zero(nnodes, 0.0);
+    for (int k = 0; k < 3; ++k) {
+      u[k] = upload(random_field(nnodes));
+      h[k] = upload(random_field(nnodes));
+      out[k] = upload(zero);
+    }
+    const ptrdiff_t ndof = 3 * distinct_nodes(connectivity, nnodes);
+    double best = 1e30;
+    for (int r = 0; r <= repeats; ++r) {
+      for (int k = 0; k < 3; ++k) clear(out[k], (size_t)nnodes);
+      const double t0 = seconds();
+#define SFEM_APPLY(kernel)                                                     \
+      SFEM_KERNEL(kernel)((int)sizeof(real_t), nelements, nnodes, elements,    \
+          adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7],      \
+          adj[8], det, 0.77, 0.31, 1, u[0], u[1], u[2], 1, h[0], h[1], h[2],   \
+          1, out[0], out[1], out[2] SFEM_STREAM_ARG)
+      if (c.material[0] == 'n') {
+        if (c.n_shape == 4) { SFEM_APPLY(neohookean_ogden_tet4_apply_a_msoa); }
+        else if (c.n_shape == 10) { SFEM_APPLY(neohookean_ogden_tet10_apply_a_msoa); }
+        else { SFEM_APPLY(neohookean_ogden_hex8_apply_a_msoa); }
+      } else {
+        if (c.n_shape == 10) { SFEM_APPLY(mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_a_msoa); }
+        else { SFEM_APPLY(mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa); }
+      }
+#undef SFEM_APPLY
+      sync();
+      const double elapsed = seconds() - t0;
+      if (r > 0) best = std::min(best, elapsed);  // the first pass is the warm-up
+    }
+    char label[64];
+    std::snprintf(label, sizeof(label), "%s %s apply", c.material, c.element);
+    std::printf("%-16s %-30s side %4td  elements %10td  ndof %10td  %8.4f ms  %9.1f MDOF/s\n",
+                WHERE, label, side, nelements, ndof, 1e3 * best,
+                1e-6 * (double)ndof / best);
+    std::fflush(stdout);
+  }
+}
+
 static void bench_mooney_rivlin(ptrdiff_t side, int repeats) {
   reseed();
   const Lattice lattice(side, 3);
@@ -664,8 +921,9 @@ int main(int argc, char **argv) {
   }
 
   bench_hex8_apply(side, repeats, out_path);
-  bench_tet4_gradient(side, repeats);
+  bench_elements(side, repeats);
   bench_mooney_rivlin(side, repeats);
+  bench_hyperelastic_elements(side, repeats);
 
   if (record_file != nullptr) {
     std::fclose(record_file);
