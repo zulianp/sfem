@@ -124,6 +124,23 @@ int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa)
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa)(
+    const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const real_t,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa)(
+    const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
+    const real_t, const real_t, const real_t,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, const void *, const void *, const void *,
+    const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
 int SFEM_KERNEL(neumann_tet4_trishell3_boundary_residual_soa)(
     const ptrdiff_t, const ptrdiff_t, idx_t **, const geom_t *const *,
     const real_t, const real_t, const real_t, const int,
@@ -511,6 +528,91 @@ static void bench_hex8_apply(ptrdiff_t side, int repeats, const char *out_path) 
   }
 }
 
+// Mooney-Rivlin Kelvin-Voigt Newmark: the heaviest thing this framework
+// generates, and the one with no hand-written counterpart in SFEM to measure
+// against -- so the number stands on its own, reported at saturation with the
+// problem size, host beside device.
+//
+// Two kernels, because the material is two units.  The *elastic* apply is the
+// energy family's matrix-free Hessian action on a hyperelastic solid; the
+// *viscous* Jacobian action is the residual family's, and it reads a current
+// state, a previous state and a direction.
+static void bench_mooney_rivlin(ptrdiff_t side, int repeats) {
+  reseed();
+  const Lattice lattice(side, 3);
+  idx_t **elements = upload_table(kuhn_connectivity(lattice));
+  const ptrdiff_t nelements = 6 * lattice.ncells;
+  const ptrdiff_t ndof = 3 * lattice.nnodes;
+
+  std::vector<std::vector<geom_t>> adjugate(9, std::vector<geom_t>(nelements));
+  std::vector<geom_t> determinant(nelements);
+  for (ptrdiff_t e = 0; e < nelements; ++e) {
+    double J[3][3];
+    for (int a = 0; a < 3; ++a)
+      for (int b = 0; b < 3; ++b)
+        J[a][b] = (a == b ? 1.0 : 0.0) + 0.25 * (2.0 * rnd() - 1.0);
+    determinant[e] = (geom_t)(J[0][0] * (J[1][1] * J[2][2] - J[1][2] * J[2][1]) -
+                              J[0][1] * (J[1][0] * J[2][2] - J[1][2] * J[2][0]) +
+                              J[0][2] * (J[1][0] * J[2][1] - J[1][1] * J[2][0]));
+    const double cof[9] = {
+         (J[1][1] * J[2][2] - J[1][2] * J[2][1]), -(J[0][1] * J[2][2] - J[0][2] * J[2][1]),
+         (J[0][1] * J[1][2] - J[0][2] * J[1][1]), -(J[1][0] * J[2][2] - J[1][2] * J[2][0]),
+         (J[0][0] * J[2][2] - J[0][2] * J[2][0]), -(J[0][0] * J[1][2] - J[0][2] * J[1][0]),
+         (J[1][0] * J[2][1] - J[1][1] * J[2][0]), -(J[0][0] * J[2][1] - J[0][1] * J[2][0]),
+         (J[0][0] * J[1][1] - J[0][1] * J[1][0])};
+    for (int c = 0; c < 9; ++c) adjugate[c][e] = (geom_t)cof[c];
+  }
+  geom_t *adj[9];
+  for (int c = 0; c < 9; ++c) adj[c] = upload(adjugate[c]);
+  geom_t *det = upload(determinant);
+
+  real_t *u[3], *old[3], *h[3], *out[3];
+  const std::vector<real_t> zero(lattice.nnodes, 0.0);
+  for (int c = 0; c < 3; ++c) {
+    u[c] = upload(random_field(lattice.nnodes));
+    old[c] = upload(random_field(lattice.nnodes));
+    h[c] = upload(random_field(lattice.nnodes));
+    out[c] = upload(zero);
+  }
+
+  double best_elastic = 1e30, best_viscous = 1e30;
+  for (int r = 0; r <= repeats; ++r) {
+    for (int c = 0; c < 3; ++c) clear(out[c], (size_t)lattice.nnodes);
+    double t0 = seconds();
+    SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa)(
+        (int)sizeof(real_t), nelements, lattice.nnodes, elements,
+        adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
+        0.77, 0.31, 1, u[0], u[1], u[2], 1, h[0], h[1], h[2],
+        1, out[0], out[1], out[2] SFEM_STREAM_ARG);
+    sync();
+    const double elastic = seconds() - t0;
+
+    for (int c = 0; c < 3; ++c) clear(out[c], (size_t)lattice.nnodes);
+    t0 = seconds();
+    SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa)(
+        (int)sizeof(real_t), nelements, lattice.nnodes, elements,
+        adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
+        0.41, 0.73, 0.6, 1, u[0], u[1], u[2], 1, old[0], old[1], old[2],
+        1, h[0], h[1], h[2], 1, out[0], out[1], out[2] SFEM_STREAM_ARG);
+    sync();
+    const double viscous = seconds() - t0;
+
+    if (r > 0) {  // the first pass is the warm-up
+      best_elastic = std::min(best_elastic, elastic);
+      best_viscous = std::min(best_viscous, viscous);
+    }
+  }
+  std::printf("%-16s mooney-rivlin elastic apply    side %4td  elements %10td  ndof %10td"
+              "  %8.4f ms  %9.1f MDOF/s\n",
+              WHERE, side, nelements, ndof, 1e3 * best_elastic,
+              1e-6 * (double)ndof / best_elastic);
+  std::printf("%-16s mooney-rivlin viscous jacobian side %4td  elements %10td  ndof %10td"
+              "  %8.4f ms  %9.1f MDOF/s\n",
+              WHERE, side, nelements, ndof, 1e3 * best_viscous,
+              1e-6 * (double)ndof / best_viscous);
+  std::fflush(stdout);
+}
+
 static void bench_tet4_gradient(ptrdiff_t side, int repeats) {
   reseed();
   const Lattice lattice(side, 3);
@@ -563,6 +665,7 @@ int main(int argc, char **argv) {
 
   bench_hex8_apply(side, repeats, out_path);
   bench_tet4_gradient(side, repeats);
+  bench_mooney_rivlin(side, repeats);
 
   if (record_file != nullptr) {
     std::fclose(record_file);
