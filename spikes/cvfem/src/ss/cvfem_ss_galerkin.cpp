@@ -25,6 +25,13 @@ namespace cvfem_ss {
         // mesh with the same sizes misses instead of reusing a stale pattern. The row pointers
         // and columns are shared by the matrices built on them; nothing downstream writes
         // either -- patch_identity_rows and mask_block_columns touch values only.
+        // Which (macro-element, node, slot) triples denote one operator entry; see
+        // build_fold_map below. Empty until a caller that needs stencils asks for it.
+        struct FoldMap {
+            std::vector<ptrdiff_t> ptr;  // groups + 1
+            std::vector<ptrdiff_t> idx;  // triple indices, (e * nc + a) * 27 + s
+        };
+
         struct GalerkinPattern {
             ptrdiff_t                                       nmacro{-1}, n_coarse{-1};
             int                                             nc{-1};
@@ -33,6 +40,8 @@ namespace cvfem_ss {
             decltype(smesh::create_host_buffer<sfem::idx_t>(0))   ci;
             std::vector<ptrdiff_t>                          pos;
             std::vector<ptrdiff_t>                          slot;  // all -1 between uses
+            FoldMap                                         fold;
+            bool                                            fold_built{false};
         };
 
         GalerkinPattern &galerkin_pattern(const GalerkinLevel &gl) {
@@ -117,6 +126,32 @@ namespace cvfem_ss {
     }
 
     namespace {
+        // The fold: which (macro-element, node, slot) triples denote the same operator entry.
+        //
+        // galerkin_build_scatter already maps every triple to a position in the assembled BSR,
+        // and two triples share that position exactly when they are the same node pair reached
+        // from two macro-elements. Inverting the map therefore groups the triples that must be
+        // summed. Only groups with more than one member are kept: an interior pair is assembled
+        // once and needs no fold, and on the FDA nozzle at level 8 that is most of them.
+        //
+        // Derived from the cached pattern and cached with it, because it depends on the
+        // connectivity alone.
+        void build_fold_map(const GalerkinLevel &gl, GalerkinPattern &pat, FoldMap &fold) {
+            SFEM_TRACE_SCOPE("cvfem_ss::build_fold_map");
+            std::vector<ptrdiff_t> blocks, iptr, iidx;
+            galerkin_build_inverse(pat.pos, 0, pat.pos.size(), pat.slot, blocks, iptr, iidx);
+
+            fold.ptr.assign(1, 0);
+            fold.idx.clear();
+            for (size_t t = 0; t < blocks.size(); ++t) {
+                const ptrdiff_t n = iptr[t + 1] - iptr[t];
+                if (n < 2) continue;  // assembled once: the slot already holds the entry
+                for (ptrdiff_t k = iptr[t]; k < iptr[t + 1]; ++k) fold.idx.push_back(iidx[(size_t)k]);
+                fold.ptr.push_back((ptrdiff_t)fold.idx.size());
+            }
+            (void)gl;
+        }
+
         // Assemble one level's element matrices into a BSR. Shared by both entry points.
         std::shared_ptr<CoarseBSR> level_to_bsr(const GalerkinLevel &gl) {
             GalerkinPattern       &pat     = galerkin_pattern(gl);
@@ -200,6 +235,91 @@ namespace cvfem_ss {
                             out[(size_t)n * 16 + (size_t)(c * 4 + k)] = (k == c) ? real_t(1) : real_t(0);
         }
     }  // namespace
+
+    std::shared_ptr<FineStencil> assemble_fine_stencil(const sfem::CVFEMNavierStokes              &op,
+                                                       const std::shared_ptr<sfem::FunctionSpace> &space,
+                                                       const uint8_t *const                        fine_constrained,
+                                                       const bool                                  single) {
+        SFEM_TRACE_SCOPE("cvfem_ss::assemble_fine_stencil");
+        const ::SSMeshData *const ss = op.semi_structured_data();
+        if (!ss) SFEM_ERROR("assemble_fine_stencil: the operator is not semi-structured\n");
+
+        // q = 1: the coarse lattice IS the fine one, so P is the identity and the assembled
+        // stencils hold the operator's own entries -- the same identity the q = 1 gate checks.
+        GalerkinLevel gl;
+        galerkin_init(*ss, 1, gl);
+        galerkin_gid_from_spaces(space, space, gl);
+        if (fine_constrained)
+            gl.fine_constrained.assign(fine_constrained, fine_constrained + space->n_dofs());
+
+        GalerkinPattern &pat = galerkin_pattern(gl);
+        if (!pat.fold_built) {
+            build_fold_map(gl, pat, pat.fold);
+            pat.fold_built = true;
+        }
+
+        auto out    = std::make_shared<FineStencil>();
+        out->L      = gl.Lc;
+        out->nc     = gl.nc;
+        out->nmacro = gl.nmacro;
+        out->gid.assign(gl.gid.begin(), gl.gid.end());
+
+        const size_t stride = (size_t)gl.nc * 27;  // slots per macro-element
+        const size_t nvals  = (size_t)gl.nmacro * stride * 16;
+        if (single) out->vf.assign(nvals, 0.0f);
+        else        out->vd.assign(nvals, real_t(0));
+        float *const  vf = single ? out->vf.data() : nullptr;
+        real_t *const vd = single ? nullptr : out->vd.data();
+
+        // Assembled in the same chunks as the matrix path, for the same reason: the element
+        // matrices of a whole mesh at once are a transient the size of the result.
+        const ptrdiff_t step = galerkin_chunk(gl);
+        for (ptrdiff_t e0 = 0; e0 < gl.nmacro; e0 += step) {
+            const ptrdiff_t e1 = std::min(gl.nmacro, e0 + step);
+            galerkin_assemble(*ss, (scalar_t)op.rho, (scalar_t)op.mu, gl, e0, e1);
+            const size_t base = (size_t)e0 * stride * 16;
+            const size_t n    = (size_t)(e1 - e0) * stride * 16;
+#pragma omp parallel for schedule(static)
+            for (ptrdiff_t k = 0; k < (ptrdiff_t)n; ++k) {
+                if (single) vf[base + (size_t)k] = (float)gl.C[(size_t)k];
+                else        vd[base + (size_t)k] = (real_t)gl.C[(size_t)k];
+            }
+        }
+
+        // The fold. A pair on a shared face, edge or corner was assembled once per
+        // macro-element that contains both of its nodes; the entry is the sum, and every
+        // macro-element carrying the pair must hold it, because a sweep reads only its own
+        // stencils. Members are in increasing triple order and groups are disjoint, so this is
+        // the same sum on any thread count.
+        const ptrdiff_t ngroups = (ptrdiff_t)pat.fold.ptr.size() - 1;
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t t = 0; t < ngroups; ++t) {
+            const ptrdiff_t kb = pat.fold.ptr[(size_t)t], ke = pat.fold.ptr[(size_t)t + 1];
+            if (single) {
+                float acc[16] = {0};
+                for (ptrdiff_t k = kb; k < ke; ++k) {
+                    const float *const src = vf + (size_t)pat.fold.idx[(size_t)k] * 16;
+                    for (int c = 0; c < 16; ++c) acc[c] += src[c];
+                }
+                for (ptrdiff_t k = kb; k < ke; ++k) {
+                    float *const dst = vf + (size_t)pat.fold.idx[(size_t)k] * 16;
+                    for (int c = 0; c < 16; ++c) dst[c] = acc[c];
+                }
+            } else {
+                real_t acc[16] = {0};
+                for (ptrdiff_t k = kb; k < ke; ++k) {
+                    const real_t *const src = vd + (size_t)pat.fold.idx[(size_t)k] * 16;
+                    for (int c = 0; c < 16; ++c) acc[c] += src[c];
+                }
+                for (ptrdiff_t k = kb; k < ke; ++k) {
+                    real_t *const dst = vd + (size_t)pat.fold.idx[(size_t)k] * 16;
+                    for (int c = 0; c < 16; ++c) dst[c] = acc[c];
+                }
+            }
+        }
+
+        return out;
+    }
 
     CoarseHierarchy assemble_hierarchy(sfem::CVFEMNavierStokes                                 &op,
                                        const real_t *const                                      state,

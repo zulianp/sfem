@@ -105,6 +105,45 @@ namespace cvfem_ss {
             const uint8_t *const                        fine_constrained,
             const uint8_t *const                        coarse_constrained);
 
+    // The fine operator as per-macro-element lattice stencils, with no global matrix.
+    //
+    // The element-wise Galerkin assembly at q = 1 already produces exactly this: 27 fixed slots
+    // per lattice node of each macro-element, slot s holding the block coupling a node to its
+    // lattice neighbour at offset s. Accumulating those slots into a global BSR -- which is what
+    // assemble_coarse_operator goes on to do -- exists only so the smoother can read them back
+    // one patch at a time, through a binary search per block and a column-index indirection per
+    // row. This returns the stencils themselves.
+    //
+    // One correction is needed to make a stencil hold the operator's own entries rather than its
+    // macro-element's share of them. A node pair on a face, edge or corner shared between
+    // macro-elements is assembled once per macro-element that contains both nodes, and the
+    // operator's entry is the sum. The slots of such a pair are therefore folded: summed once and
+    // written back to every macro-element that carries them, in a fixed order, so the result is
+    // the same on any thread count. The fold map is derived from the cached pattern and reused
+    // across Newton steps like the pattern itself.
+    //
+    // Storage is nmacro * (L+1)^3 * 27 blocks against n_nodes * 27 for the assembled form -- the
+    // excess is the duplication at shared faces, about 1.37x on the FDA nozzle at level 8 -- and
+    // it replaces both the double-precision BSR and the narrowed copy of its values that the
+    // sweep reads today.
+    //
+    // `single` selects the storage precision, matching the smoother's own setting: the values are
+    // in `vf` when true and in `vd` when false. `fine_constrained`, when given, zeroes the
+    // columns of constrained dofs exactly as assemble_coarse_operator does.
+    struct FineStencil {
+        int                      L{0};       // lattice level of the macro-elements
+        int                      nc{0};      // (L+1)^3, lattice nodes per macro-element
+        ptrdiff_t                nmacro{0};
+        std::vector<sfem::idx_t> gid;        // nmacro * nc, lattice node -> global node
+        std::vector<float>       vf;         // nmacro * nc * 27 * 16 when single
+        std::vector<real_t>      vd;         // the same, when not
+    };
+
+    std::shared_ptr<FineStencil> assemble_fine_stencil(const sfem::CVFEMNavierStokes              &op,
+                                                       const std::shared_ptr<sfem::FunctionSpace> &space,
+                                                       const uint8_t *const                        fine_constrained,
+                                                       const bool                                  single);
+
     // Diagonal Vanka smoother, as an sfem operator applying M^-1.
     //
     // Replaces the nodal 4x4 block solve with a coupled solve over each micro-element patch

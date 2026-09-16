@@ -96,6 +96,16 @@ namespace cvfem_ss {
         std::unique_ptr<T[]> values_own;
         const T             *vals{nullptr};
 
+        // The same operator as per-macro-element lattice stencils, when the smoother is built
+        // from those instead of from a matrix (cvfem_ss::assemble_fine_stencil). Slot s of
+        // lattice node a in macro-element e is the block coupling it to its neighbour at offset
+        // s, folded so that a pair on a shared face carries the operator's entry and not this
+        // macro-element's share of it. Set, `rowptr`, `colidx`, `values` and `vals` are unused:
+        // the patch gather reads a slot instead of searching a row, and the sweep's row walk
+        // reads 27 contiguous blocks whose columns are implied by the lattice.
+        const T *sten{nullptr};
+        int      nc{0};  // (L+1)^3, lattice nodes per macro-element
+
         int                        L{0};
         ptrdiff_t                  nmacro{0};
         ptrdiff_t                  ncell{0};  // L^3 per macro-element
@@ -104,6 +114,18 @@ namespace cvfem_ss {
         std::vector<scalar_t>      ewt;       // 1 / (macro-elements touching a node), multiplicative form
         std::vector<uint8_t>       constrained;
     };
+
+    // Stencil slot for an ordered pair of micro-cell corners, and the lattice step of a slot.
+    //
+    // The corner ordering of sscvfem_corner_offsets is the one the Galerkin assembly uses for
+    // its slots (GAL_CORNER), so the offset between two corners is in {-1,0,1} per axis and the
+    // slot is that offset in base three -- the same expression as cvfem_ss::gal_slot, which is
+    // what makes a patch block a lookup rather than a search.
+    static SFEM_INLINE int vanka_corner_slot(const int a, const int b) {
+        static constexpr int C[8][3] = {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
+                                        {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}};
+        return ((C[b][2] - C[a][2]) + 1) * 9 + ((C[b][1] - C[a][1]) + 1) * 3 + ((C[b][0] - C[a][0]) + 1);
+    }
 
     // Dense LU with partial pivoting, n = 8. Small enough that the pivoting cost is noise and
     // large enough that skipping it is a real risk: the Schur complement of a convection
@@ -229,22 +251,34 @@ namespace cvfem_ss {
                         smesh::idx_t n[8];
                         for (int a = 0; a < 8; ++a) n[a] = d.elems[base + off[a]][e];
 
-                        // Gather the 8x8 blocks of the assembled operator over the patch nodes.
+                        // Gather the 8x8 blocks of the operator over the patch nodes: from the
+                        // macro-element's own stencils by slot arithmetic, or by searching the
+                        // rows of the assembled matrix.
                         scalar_t A[8][8][16];
-                        for (int a = 0; a < 8; ++a) {
-                            const sfem::count_t rb = rowptr[(size_t)n[a]], re = rowptr[(size_t)n[a] + 1];
-                            for (int b = 0; b < 8; ++b) {
-                                scalar_t *dst = A[a][b];
-                                for (int k = 0; k < 16; ++k) dst[k] = scalar_t(0);
-                                // columns are sorted, so this is a binary search
-                                sfem::count_t lo = rb, hi = re;
-                                while (lo < hi) {
-                                    const sfem::count_t mid = lo + (hi - lo) / 2;
-                                    if (colidx[(size_t)mid] < n[b]) lo = mid + 1;
-                                    else                            hi = mid;
+                        if (v.sten) {
+                            for (int a = 0; a < 8; ++a) {
+                                const size_t row = ((size_t)e * (size_t)v.nc + (size_t)(base + off[a])) * 27;
+                                for (int b = 0; b < 8; ++b) {
+                                    const T *const src = v.sten + (row + (size_t)vanka_corner_slot(a, b)) * 16;
+                                    for (int k = 0; k < 16; ++k) A[a][b][k] = (scalar_t)src[k];
                                 }
-                                if (lo < re && colidx[(size_t)lo] == n[b])
-                                    for (int k = 0; k < 16; ++k) dst[k] = (scalar_t)values[(size_t)lo * 16 + k];
+                            }
+                        } else {
+                            for (int a = 0; a < 8; ++a) {
+                                const sfem::count_t rb = rowptr[(size_t)n[a]], re = rowptr[(size_t)n[a] + 1];
+                                for (int b = 0; b < 8; ++b) {
+                                    scalar_t *dst = A[a][b];
+                                    for (int k = 0; k < 16; ++k) dst[k] = scalar_t(0);
+                                    // columns are sorted, so this is a binary search
+                                    sfem::count_t lo = rb, hi = re;
+                                    while (lo < hi) {
+                                        const sfem::count_t mid = lo + (hi - lo) / 2;
+                                        if (colidx[(size_t)mid] < n[b]) lo = mid + 1;
+                                        else                            hi = mid;
+                                    }
+                                    if (lo < re && colidx[(size_t)lo] == n[b])
+                                        for (int k = 0; k < 16; ++k) dst[k] = (scalar_t)values[(size_t)lo * 16 + k];
+                                }
                             }
                         }
 
@@ -329,6 +363,15 @@ namespace cvfem_ss {
                                 c.invdF[a * 3 + t] = (T)invd[a * 3 + t];
                             }
 
+                        // The G block below and the pressure-pressure entry after it are exactly
+                        // the entries an exact-operator patch -- 81 slots rather than 27, holding
+                        // the K W^-1 G term the Krylov operator carries and these patches do not
+                        // -- would correct. That was measured before building one: scaling them
+                        // by 1 +- 0.05 moves the linear iteration count by 1 to 2 percent, and by
+                        // 0.10 under 4 percent, with no consistent sign. The exact term is 2 to 7
+                        // percent of the operator, so such a patch could recover only that couple
+                        // of percent, against 1.5x the bytes this sweep streams while it is
+                        // memory bound. See the recommendation section of docs/Vanka.tex.
                         for (int a = 0; a < 8; ++a)
                             for (int i = 0; i < 8; ++i)
                                 for (int t = 0; t < 3; ++t)
@@ -361,7 +404,11 @@ namespace cvfem_ss {
         // The row walk's copy of the values, narrowed. Uninitialised allocation and a parallel
         // fill, so its pages are first touched by the threads that sweep them and no serial
         // zero pass of nnz * 16 floats is paid per Newton step.
-        if (std::is_same<T, real_t>::value) {
+        if (v.sten) {
+            // Stencil path: the sweep reads the macro-element's own slots, already in T.
+            v.values_own.reset();
+            v.vals = nullptr;
+        } else if (std::is_same<T, real_t>::value) {
             // Full precision reads the assembled values in place: a copy would be the same bytes.
             // The cast only names the type the branch already established, and keeps the
             // narrowed instantiation, which never takes this branch, compiling.
@@ -506,6 +553,13 @@ namespace cvfem_ss {
         int             off[8];
         sscvfem_corner_offsets(L, off);
 
+        // Lattice step of each stencil slot, for the row walk on the stencil path. Unused on
+        // the matrix path, where a row's columns come from the column-index array.
+        const int Lp1 = L + 1;
+        int       step[27];
+        for (int s = 0; s < 27; ++s)
+            step[s] = ((s / 9) - 1) * Lp1 * Lp1 + (((s / 3) % 3) - 1) * Lp1 + ((s % 3) - 1);
+
         work.resize((size_t)ndof);
         scalar_t *const z = work.data();
         for (ptrdiff_t k = 0; k < ndof; ++k) z[(size_t)k] = scalar_t(0);
@@ -544,6 +598,31 @@ namespace cvfem_ss {
                                 for (int a = 0; a < 8; ++a) {
                                     const int    la = base + off[a];
                                     scalar_t     acc[N_FIELDS] = {0, 0, 0, 0};
+                                    if (v.sten) {
+                                        // The row restricted to this macro-element IS the node's
+                                        // 27 slots: the column of slot s is la + step[s], and a
+                                        // slot that leaves the lattice is a coupling to another
+                                        // macro-element, which this sweep treats additively.
+                                        //
+                                        // The test stays inside the fixed 27-slot loop. Hoisting
+                                        // the bounds into variable loop ranges, so that only
+                                        // reachable slots are visited, was measured and is not
+                                        // worth it: the apply moved -1.9% at L = 4 but +1.6% at
+                                        // L = 8, where it costs 0.6 s of a 63 s run.
+                                        const int    ci2 = la % Lp1, cj2 = (la / Lp1) % Lp1, ck2 = la / (Lp1 * Lp1);
+                                        const size_t row = ((size_t)e * (size_t)v.nc + (size_t)la) * 27;
+                                        for (int s = 0; s < 27; ++s) {
+                                            const int di = (s % 3) - 1, dj = ((s / 3) % 3) - 1, dk = (s / 9) - 1;
+                                            if (ci2 + di < 0 || ci2 + di > L || cj2 + dj < 0 || cj2 + dj > L ||
+                                                ck2 + dk < 0 || ck2 + dk > L)
+                                                continue;
+                                            const T *const blk = v.sten + (row + (size_t)s) * 16;
+                                            const scalar_t *const zz = &zl[(size_t)(la + step[s]) * N_FIELDS];
+                                            for (int rr = 0; rr < N_FIELDS; ++rr)
+                                                for (int cc = 0; cc < N_FIELDS; ++cc)
+                                                    acc[rr] += (scalar_t)blk[rr * 4 + cc] * zz[cc];
+                                        }
+                                    } else {
                                     const size_t gn            = (size_t)lg[(size_t)la];
                                     for (sfem::count_t k = v.rowptr[gn]; k < v.rowptr[gn + 1]; ++k) {
                                         const int lj = loc_of[(size_t)v.colidx[(size_t)k]];
@@ -553,6 +632,7 @@ namespace cvfem_ss {
                                         for (int rr = 0; rr < N_FIELDS; ++rr)
                                             for (int cc = 0; cc < N_FIELDS; ++cc)
                                                 acc[rr] += (scalar_t)blk[rr * 4 + cc] * zz[cc];
+                                    }
                                     }
                                     const size_t lo = (size_t)la * N_FIELDS;
                                     ru[a * 3 + 0]   = rl[lo + 0] - acc[0];
