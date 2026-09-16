@@ -1,3 +1,4 @@
+from codegen.framework.targets import current_target
 from codegen.framework.emitters.runtime_typed_abi import (
     runtime_type_correspondence_lines,
 )
@@ -698,7 +699,7 @@ def _inexact_definitions(
         )
         arguments = ["domain.element_type", "real_type", "nelements"]
         if "elements" in tangent_parameters:
-            arguments.append("domain.block->elements()->data()")
+            arguments.append("element_connectivity(domain)")
         arguments.extend([adjugate, "determinant"])
         arguments.extend(parameter_args)
         if "ux" in tangent_parameters:
@@ -712,7 +713,7 @@ def _inexact_definitions(
             "      }",
         ])
         apply_arguments = ["domain.element_type", "real_type", "nelements",
-                           "domain.block->elements()->data()",
+                           "element_connectivity(domain)",
                            "tangent_stride",
                            "cache->inexact_tangent->data()",
                            increment, output]
@@ -967,11 +968,11 @@ def _hyperelastic_op(
         )
         gradient_common_isoparametric_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), points%s" % gradient_args
+            "element_connectivity(domain), points%s" % gradient_args
         )
         gradient_common_affine_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), %s%s"
+            "element_connectivity(domain), %s%s"
             % (
                 _affine_geometry_offsets_for(
                     kernel_sources, "%s_gradient_a_msoa" % stem, dim
@@ -981,16 +982,16 @@ def _hyperelastic_op(
         )
         gradient_common_affine_aos_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), adjugate_aos, determinant%s"
+            "element_connectivity(domain), adjugate_aos, determinant%s"
             % gradient_args
         )
         apply_common_isoparametric_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), points%s" % apply_args
+            "element_connectivity(domain), points%s" % apply_args
         )
         apply_common_affine_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), %s%s"
+            "element_connectivity(domain), %s%s"
             % (
                 _affine_geometry_offsets_for(
                     kernel_sources, "%s_apply_a_msoa" % stem, dim
@@ -1000,7 +1001,7 @@ def _hyperelastic_op(
         )
         apply_common_affine_aos_args = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), adjugate_aos, determinant%s"
+            "element_connectivity(domain), adjugate_aos, determinant%s"
             % apply_args
         )
         gradient_affine_uses_aos = _c_abi_function_exists(
@@ -1129,7 +1130,7 @@ def _hyperelastic_op(
                 element,
                 "%s_objective_a_msoa" % stem,
                 ", ".join(_nonempty(
-                    "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
+                    "nelements, mesh->n_nodes(), element_connectivity(domain), %s, determinant%s"
                     % (
                         _affine_geometry_offsets_for(
                             kernel_sources,
@@ -1143,7 +1144,7 @@ def _hyperelastic_op(
                 )),
                 "%s_objective_i_msoa" % stem,
                 ", ".join(_nonempty(
-                    "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
+                    "nelements, mesh->n_nodes(), element_connectivity(domain), points%s"
                     % objective_args,
                     *_energy_field_args(objective_dependencies, components, current="x"),
                     "impl_->element_values.get()",
@@ -1155,7 +1156,7 @@ def _hyperelastic_op(
                 element,
                 "%s_objective_steps_a_msoa" % stem,
                 ", ".join(_nonempty(
-                    "nelements, mesh->n_nodes(), domain.block->elements()->data(), %s, determinant%s"
+                    "nelements, mesh->n_nodes(), element_connectivity(domain), %s, determinant%s"
                     % (
                         _affine_geometry_offsets_for(
                             kernel_sources,
@@ -1173,7 +1174,7 @@ def _hyperelastic_op(
                 )),
                 "%s_objective_steps_i_msoa" % stem,
                 ", ".join(_nonempty(
-                    "nelements, mesh->n_nodes(), domain.block->elements()->data(), points%s"
+                    "nelements, mesh->n_nodes(), element_connectivity(domain), points%s"
                     % objective_args,
                     *_energy_field_args(objective_dependencies, components, current="x"),
                     dim,
@@ -1293,13 +1294,13 @@ namespace sfem {
             block_id_for_domain(*mesh, *entry.second.block);
         auto cache = std::make_shared<AffineGeometryCache>();
         cache->jacobian_soa = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+            mesh, %(geometry_memory_space)s, block_id);
         if (!cache->jacobian_soa) {
           return SFEM_FAILURE;
         }
         if (needs_jacobian_aos) {
           cache->jacobian_aos = smesh::JacobianAdjugateAndDeterminant::create_AoS(
-              mesh, smesh::MEMORY_SPACE_HOST, block_id);
+              mesh, %(geometry_memory_space)s, block_id);
           if (!cache->jacobian_aos) {
             return SFEM_FAILURE;
           }
@@ -1307,6 +1308,16 @@ namespace sfem {
 %(metric_cache_setup)s                entry.second.user_data = std::static_pointer_cast<void>(cache);
       }
       return SFEM_SUCCESS;
+    }
+
+    //! Where this build's kernels read the connectivity from.
+    //!
+    //! One function rather than the same expression at every call site, because
+    //! the host and the device differ only here: a device Op hands its kernels
+    //! the block's device copy, which is what every `gpu:` Op in SFEM passes
+    //! and what a `__global__` body can dereference.
+    idx_t *const *element_connectivity(const OpDomain &domain) {
+      return %(element_connectivity)s;
     }
 
     ptrdiff_t block_size_for_dim(const int dim) {
@@ -1715,6 +1726,8 @@ namespace sfem {
         # only for a displacement.  Laplace-as-an-energy has one component in
         # every dimension, and the hard-coded `spatial_dimension` rejected
         # every space it could legitimately be built on.
+        "element_connectivity": _element_connectivity_expression(),
+        "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(n_field_components_by_dim),
         "metric_declaration": _metric_declaration(any(affine_metric_flags)),
         "gradient_metric_binding": _metric_binding(
@@ -1963,7 +1976,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         )
         common_isoparametric = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), points"
+            "element_connectivity(domain), points"
         )
         residual_affine_uses_metric = _c_abi_function_uses_cached_metric(
             kernel_sources, "%s_residual_a_msoa" % stem
@@ -2004,7 +2017,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             action_affine_metric_aos_unit_elements_by_dim.setdefault(dim, []).append(mesh_element)
         common_affine_residual = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), %s"
+            "element_connectivity(domain), %s"
             % (
                 _affine_metric_offsets(dim)
                 if residual_affine_uses_metric
@@ -2013,11 +2026,11 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         )
         common_affine_residual_aos = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), geom_metric_aos"
+            "element_connectivity(domain), geom_metric_aos"
         )
         common_affine_action = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), %s"
+            "element_connectivity(domain), %s"
             % (
                 _affine_metric_offsets(dim)
                 if action_affine_uses_metric
@@ -2026,7 +2039,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         )
         common_affine_action_aos = (
             "domain.block->n_elements(), mesh->n_nodes(), "
-            "domain.block->elements()->data(), geom_metric_aos"
+            "element_connectivity(domain), geom_metric_aos"
         )
         residual_common_args = []
         residual_common_args.extend(
@@ -2599,21 +2612,21 @@ namespace sfem {
             block_id_for_domain(*mesh, *entry.second.block);
         if (needs_jacobian && !cache->jacobian) {
           cache->jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-              mesh, smesh::MEMORY_SPACE_HOST, block_id);
+              mesh, %(geometry_memory_space)s, block_id);
           if (!cache->jacobian) {
             return SFEM_FAILURE;
           }
         }
         if (needs_metric_soa && !cache->metric_soa) {
           cache->metric_soa = smesh::FFF::create_SoA(
-              mesh, smesh::MEMORY_SPACE_HOST, block_id);
+              mesh, %(geometry_memory_space)s, block_id);
           if (!cache->metric_soa) {
             return SFEM_FAILURE;
           }
         }
         if (needs_metric_aos && !cache->metric_aos) {
           cache->metric_aos = smesh::FFF::create_AoS(
-              mesh, smesh::MEMORY_SPACE_HOST, block_id);
+              mesh, %(geometry_memory_space)s, block_id);
           if (!cache->metric_aos) {
             return SFEM_FAILURE;
           }
@@ -2628,6 +2641,16 @@ namespace sfem {
                              real_t *const values) {
       int index = 0;
 %(parameter_lines)s
+    }
+
+    //! Where this build's kernels read the connectivity from.
+    //!
+    //! One function rather than the same expression at every call site, because
+    //! the host and the device differ only here: a device Op hands its kernels
+    //! the block's device copy, which is what every `gpu:` Op in SFEM passes
+    //! and what a `__global__` body can dereference.
+    idx_t *const *element_connectivity(const OpDomain &domain) {
+      return %(element_connectivity)s;
     }
 
     ptrdiff_t block_size_for_dim(const int dim) {
@@ -3012,6 +3035,8 @@ namespace sfem {
         "defaults": defaults,
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": parameter_lines,
+        "element_connectivity": _element_connectivity_expression(),
+        "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "laplace_packed_helpers": laplace_packed_helpers,
         "laplace_packed_member": laplace_packed_member,
@@ -3243,7 +3268,7 @@ def _boundary_residual_op(material, elements, c_abi_header=None, form_collection
             "real_type",
             "sideset->size()",
             "mesh->n_nodes()",
-            "domain.block->elements()->data()",
+            "element_connectivity(domain)",
             "sideset->parent()->data()",
             "sideset->lfi()->data()",
             "points",
@@ -3300,6 +3325,16 @@ namespace sfem {
                              real_t *const values) {
       int index = 0;
 %(parameter_lines)s
+    }
+
+    //! Where this build's kernels read the connectivity from.
+    //!
+    //! One function rather than the same expression at every call site, because
+    //! the host and the device differ only here: a device Op hands its kernels
+    //! the block's device copy, which is what every `gpu:` Op in SFEM passes
+    //! and what a `__global__` body can dereference.
+    idx_t *const *element_connectivity(const OpDomain &domain) {
+      return %(element_connectivity)s;
     }
 
     ptrdiff_t block_size_for_dim(const int dim) {
@@ -3608,6 +3643,8 @@ namespace sfem {
         "defaults": defaults,
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": parameter_lines,
+        "element_connectivity": _element_connectivity_expression(),
+        "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "performance_methods": _performance_methods(material.op_name, material.name, elements, {}),
         "gradient_cases": "\n".join(gradient_cases),
@@ -3789,7 +3826,7 @@ namespace sfem {
         const smesh::block_idx_t block_id =
             block_id_for_domain(*mesh, *entry.second.block);
         auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+            mesh, %(geometry_memory_space)s, block_id);
         if (!jacobian) {
           return SFEM_FAILURE;
         }
@@ -3801,6 +3838,16 @@ namespace sfem {
     void parameter_array(const Parameters &parameters,
                              real_t *const values) {
 %(parameter_lines)s
+    }
+
+    //! Where this build's kernels read the connectivity from.
+    //!
+    //! One function rather than the same expression at every call site, because
+    //! the host and the device differ only here: a device Op hands its kernels
+    //! the block's device copy, which is what every `gpu:` Op in SFEM passes
+    //! and what a `__global__` body can dereference.
+    idx_t *const *element_connectivity(const OpDomain &domain) {
+      return %(element_connectivity)s;
     }
 
     ptrdiff_t block_size_for_dim(const int dim) {
@@ -3925,7 +3972,7 @@ namespace sfem {
         const smesh::block_idx_t block_id =
             block_id_for_domain(*mesh, *entry.second.block);
         auto jacobian = smesh::JacobianAdjugateAndDeterminant::create_SoA(
-            mesh, smesh::MEMORY_SPACE_HOST, block_id);
+            mesh, %(geometry_memory_space)s, block_id);
         if (!jacobian) {
           return SFEM_FAILURE;
         }
@@ -4127,6 +4174,8 @@ namespace sfem {
         "defaults": defaults,
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": _coupled_parameter_array_lines(material.parameter_defaults),
+        "element_connectivity": _element_connectivity_expression(),
+        "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _coupled_block_size_lines(systems_by_dim),
         "performance_methods": _performance_methods(material.op_name, material.name, elements, cases["performance"]),
         "gradient_previous_check": (
@@ -4446,8 +4495,8 @@ def _coupled_cases(
         residual_out_args = _residual_soa_field_argument_names(residual_fields, "out", mixed_order)
 
         geometry_affine = _affine_geometry_offsets(dim) + ", determinant"
-        common_iso = "domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points"
-        common_affine = "domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), %s" % geometry_affine
+        common_iso = "domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points"
+        common_affine = "domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), %s" % geometry_affine
         common_iso_dispatch = "domain.element_type, real_type, %s" % common_iso
         common_affine_dispatch = "domain.element_type, real_type, %s" % common_affine
         energy_grad_args = ", ".join(
@@ -4768,6 +4817,16 @@ def _coupled_parameter_array_lines(defaults):
     if not lines:
         lines.append("      values[0] = 0;")
     return "\n".join(lines)
+
+
+def _geometry_memory_space_expression():
+    """Where the bound target wants its cached geometry left."""
+    return current_target().geometry_memory_space()
+
+
+def _element_connectivity_expression():
+    """The bound target's connectivity buffer, as a C++ expression."""
+    return current_target().element_connectivity_accessor()
 
 
 def _coupled_block_size_lines(systems_by_dim):
@@ -7196,7 +7255,7 @@ def _residual_hessian_dispatch_body(
             "real_type",
             "domain.block->n_elements()",
             "mesh->n_nodes()",
-            "domain.block->elements()->data()",
+            "element_connectivity(domain)",
             "points",
         ]
         parameter_index = {
@@ -7290,7 +7349,7 @@ def _residual_apply_dispatch_body(
             "real_type",
             "domain.block->n_elements()",
             "mesh->n_nodes()",
-            "domain.block->elements()->data()",
+            "element_connectivity(domain)",
         ]
         field_args = []
         unit_field_args = []
@@ -7864,7 +7923,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                             "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             "adjugate_aos",
                             "determinant",
                             *_c_abi_ordered_domain_parameter_args(
@@ -7891,7 +7950,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                             "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             *_affine_geometry_call_args(kernel_sources, callee, dim),
                             *_c_abi_ordered_domain_parameter_args(
                                 kernel_sources,
@@ -7920,7 +7979,7 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
                             "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             "points",
                             *_c_abi_ordered_domain_parameter_args(
                                 kernel_sources,
@@ -7976,7 +8035,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                             "real_type",
                             "nelements",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             *_affine_geometry_call_args(kernel_sources, affine, dim),
                             *parameter_args,
                             *current_args,
@@ -8001,7 +8060,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                             "real_type",
                             "nelements",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             "points",
                             *parameter_args,
                             *current_args,
@@ -8058,7 +8117,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                             "real_type",
                             "nelements",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             *_affine_geometry_call_args(kernel_sources, callee, dim),
                             *parameter_args,
                             *current_args,
@@ -8086,7 +8145,7 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                             "real_type",
                             "nelements",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             "points",
                             *parameter_args,
                             *current_args,
@@ -8187,7 +8246,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                             "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             *_affine_geometry_call_args(kernel_sources, callee, dim),
                             *parameter_args,
                             *current_args,
@@ -8251,7 +8310,7 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
                             "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             "points",
                             *parameter_args,
                             *current_args,
@@ -8572,7 +8631,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                             "real_type",
                             "domain.block->n_elements()",
                             "mesh->n_nodes()",
-                            "domain.block->elements()->data()",
+                            "element_connectivity(domain)",
                             "points",
                             *parameter_args,
                             *current_args,
@@ -8978,13 +9037,15 @@ def _metric_cache_setup(uses_metric):
     """Building that metric once per domain, alongside the Jacobian."""
     if not uses_metric:
         return ""
+    # Spliced into the template after it is formatted, so this one substitutes
+    # here rather than carrying a placeholder onward.
     return (
         "        cache->metric_soa = smesh::FFF::create_SoA(\n"
-        "            mesh, smesh::MEMORY_SPACE_HOST, block_id);\n"
+        "            mesh, %s, block_id);\n"
         "        if (!cache->metric_soa) {\n"
         "          return SFEM_FAILURE;\n"
         "        }\n"
-    )
+    ) % _geometry_memory_space_expression()
 
 
 def _metric_declaration(uses_metric):

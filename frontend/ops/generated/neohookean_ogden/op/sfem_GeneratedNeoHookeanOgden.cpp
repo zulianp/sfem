@@ -222,6 +222,16 @@ namespace sfem {
       return SFEM_SUCCESS;
     }
 
+    //! Where this build's kernels read the connectivity from.
+    //!
+    //! One function rather than the same expression at every call site, because
+    //! the host and the device differ only here: a device Op hands its kernels
+    //! the block's device copy, which is what every `gpu:` Op in SFEM passes
+    //! and what a `__global__` body can dereference.
+    idx_t *const *element_connectivity(const OpDomain &domain) {
+      return domain.block->elements()->data();
+    }
+
     ptrdiff_t block_size_for_dim(const int dim) {
       switch (dim) {
         case 2: return 2;
@@ -626,15 +636,15 @@ namespace sfem {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if (impl_->gradient_uses_affine) {
-          return neohookean_ogden_gradient_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+          return neohookean_ogden_gradient_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
         }
-        return neohookean_ogden_gradient_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
+        return neohookean_ogden_gradient_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, out + 0, out + 1);
       }
       else if (dim == 3) {
         if (impl_->gradient_uses_affine) {
-          return neohookean_ogden_gradient_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+          return neohookean_ogden_gradient_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
         }
-        return neohookean_ogden_gradient_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
+        return neohookean_ogden_gradient_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, out + 0, out + 1, out + 2);
       }
       SFEM_ERROR("neohookean_ogden gradient does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
@@ -676,9 +686,9 @@ namespace sfem {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         if (impl_->apply_uses_affine) {
-          return neohookean_ogden_apply_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
+          return neohookean_ogden_apply_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
         }
-        return neohookean_ogden_apply_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
+        return neohookean_ogden_apply_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, 2, out + 0, out + 1);
       }
       else if (dim == 3) {
         if (impl_->apply_uses_affine) {
@@ -700,7 +710,7 @@ namespace sfem {
               return neohookean_ogden_apply_packed_3d_a_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
             }
           }
-          return neohookean_ogden_apply_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+          return neohookean_ogden_apply_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
         }
         if (impl_->space->has_packed_mesh()) {
           auto packed = impl_->space->packed_mesh();
@@ -720,7 +730,7 @@ namespace sfem {
             return neohookean_ogden_apply_packed_3d_i_msoa(domain.element_type, real_type, packed->n_packs(packed_block), packed->n_elements_per_pack(packed_block), domain.block->n_elements(), mesh->n_nodes(), packed->max_nodes_per_pack(), packed_elements->data(), owned_nodes_ptr->data(), n_shared_nodes->data(), ghost_ptr->data(), ghost_idx->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
           }
         }
-        return neohookean_ogden_apply_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
+        return neohookean_ogden_apply_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, 3, out + 0, out + 1, out + 2);
       }
       SFEM_ERROR("neohookean_ogden apply does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
@@ -815,16 +825,16 @@ namespace sfem {
         const int dim = mesh->spatial_dimension();
         if (dim == 2) {
           if (impl_->objective_uses_affine) {
-            status = neohookean_ogden_objective_steps_2d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+            status = neohookean_ogden_objective_steps_2d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
           } else {
-            status = neohookean_ogden_objective_steps_2d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
+            status = neohookean_ogden_objective_steps_2d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, steps, impl_->element_values.get());
           }
         }
         else if (dim == 3) {
           if (impl_->objective_uses_affine) {
-            status = neohookean_ogden_objective_steps_3d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+            status = neohookean_ogden_objective_steps_3d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
           } else {
-            status = neohookean_ogden_objective_steps_3d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
+            status = neohookean_ogden_objective_steps_3d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, steps, impl_->element_values.get());
           }
         }
         if (dim != 2 && dim != 3) {
@@ -887,10 +897,10 @@ namespace sfem {
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
-        return neohookean_ogden_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values);
+        return neohookean_ogden_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, current + 0, current + 1, rowptr, colidx, values);
       }
       else if (dim == 3) {
-        return neohookean_ogden_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), domain.block->elements()->data(), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+        return neohookean_ogden_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
       }
       SFEM_ERROR("neohookean_ogden hessian_bsr does not support spatial dimension %d\n", dim);
       return SFEM_FAILURE;
@@ -1072,7 +1082,7 @@ namespace sfem {
             domain.element_type,
                         real_type,
                         nelements,
-                        domain.block->elements()->data(),
+                        element_connectivity(domain),
                         adjugate[0], adjugate[1], adjugate[2], adjugate[3],
                         determinant,
                         domain.parameters->require_real_value("lmbda"),
@@ -1086,7 +1096,7 @@ namespace sfem {
             domain.element_type,
                         real_type,
                         nelements,
-                        domain.block->elements()->data(),
+                        element_connectivity(domain),
                         adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8],
                         determinant,
                         domain.parameters->require_real_value("lmbda"),
@@ -1123,7 +1133,7 @@ namespace sfem {
             domain.element_type,
                         real_type,
                         nelements,
-                        domain.block->elements()->data(),
+                        element_connectivity(domain),
                         tangent_stride,
                         cache->inexact_tangent->data(),
                         2, h + 0, h + 1,
@@ -1168,7 +1178,7 @@ namespace sfem {
             domain.element_type,
                         real_type,
                         nelements,
-                        domain.block->elements()->data(),
+                        element_connectivity(domain),
                         tangent_stride,
                         cache->inexact_tangent->data(),
                         3, h + 0, h + 1, h + 2,

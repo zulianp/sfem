@@ -24,6 +24,8 @@ now go through this module so the two boundaries cannot disagree about what a
 runtime-typed parameter looks like.
 """
 
+from codegen.framework.targets import current_target
+
 import re
 
 #: The parameter that names the scalar, and the argument that forwards it.
@@ -138,6 +140,19 @@ def cast_arguments(params, argument_names, scalar_type):
     )
 
 
+def entry_point_name(public_name):
+    """What the bound target calls this `extern "C"` symbol.
+
+    SFEM's own device kernels are `cu_`-prefixed to the last one --
+    `cu_laplacian_apply`, `cu_laplacian_crs`, `cu_linear_elasticity_apply` --
+    and that prefix is the whole reason a host and a device implementation of
+    the same operator can sit in one library.  A generated device tree that
+    reused the host names could not be linked beside the host tree at all,
+    whatever else was right about it.
+    """
+    return current_target().entry_point_name(public_name)
+
+
 def runtime_typed_entry_point_lines(
     public_name, params, call, indent="  ", parameter_lines=None
 ):
@@ -151,8 +166,8 @@ def runtime_typed_entry_point_lines(
     `parameter_lines` formats the declaration, defaulting to one parameter per
     line at four spaces; a caller with its own indentation passes its own.
     """
-    lines = ['extern "C" int %s(' % public_name]
-    declared = runtime_typed_parameters(params)
+    lines = ['extern "C" int %s(' % entry_point_name(public_name)]
+    declared = runtime_typed_parameters(params) + current_target().entry_point_suffix_parameters()
     if parameter_lines is None:
         lines.extend(
             "    %s%s" % (param, "," if index + 1 < len(declared) else "")
