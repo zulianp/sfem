@@ -369,9 +369,12 @@ class MeshLoweringAccessorTest(unittest.TestCase):
         self.assertEqual(
             OpenMPTarget().element_connectivity_accessor(), "domain.block->elements()->data()"
         )
+        # the cast is the point: `device_elements_SoA()` hands back
+        # `idx_t *const *` and the C ABI takes `idx_t **`, and the const is the
+        # buffer's rather than the kernel's
         self.assertEqual(
             CUDATarget().element_connectivity_accessor(),
-            "domain.block->device_elements_SoA()->data()",
+            "const_cast<idx_t **>(domain.block->device_elements_SoA()->data())",
         )
         self.assertEqual(OpenMPTarget().geometry_memory_space(), "smesh::MEMORY_SPACE_HOST")
         self.assertEqual(CUDATarget().geometry_memory_space(), "smesh::MEMORY_SPACE_DEVICE")

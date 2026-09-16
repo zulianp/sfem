@@ -80,7 +80,7 @@ Neo-Hookean Ogden apply, PROTEUS_HEX8:
 | 823,875 | 262,144 | 216.9 | 2258.5 | 10.4x |
 | 2,738,019 | 884,736 | 216.5 | 2305.6 | 10.6x |
 | 6,440,067 | 2,097,152 | 214.5 | 2337.5 | 10.9x |
-| 12,519,843 | 4,096,000 | 213.7 | 2334.3 | **10.9x** |
+| 12,519,843 | 4,096,000 | 211.5 | 2352.6 | **11.1x** |
 
 Laplace gradient, TET4, constant-metric closed form:
 
@@ -90,15 +90,23 @@ Laplace gradient, TET4, constant-metric closed form:
 | 274,625 | 1,572,864 | 516.4 | 4460.7 | 8.6x |
 | 912,673 | 5,308,416 | 524.8 | 5218.1 | 9.9x |
 | 2,146,689 | 12,582,912 | 520.4 | 5413.7 | 10.4x |
-| 4,173,281 | 24,576,000 | 522.1 | 5481.2 | **10.5x** |
+| 4,173,281 | 24,576,000 | 523.1 | 5491.3 | **10.5x** |
 
 Both sides are saturated at the top of each sweep. The host is flat across the whole range in
 both cases (214-221 and 516-525), and the device gains 0.1% on the hexahedral apply and 1.2% on
 the tetrahedral gradient over the last doubling, so each ratio is between two saturated numbers
 rather than an artefact of an under-filled problem.
 
-**Every output vector agrees to at most 5.3e-16** relative to its largest entry, across all
+**Every output vector agrees to at most 5.7e-16** relative to its largest entry, across all
 eighteen — including the residual family's three and the boundary family's three.
+
+**The two arms call two different names with two different arities**, and
+`SFEM_KERNEL` / `SFEM_STREAM_PARAM` / `SFEM_STREAM_ARG` at the top of the driver are the whole
+of that difference. SFEM names every device entry point `cu_` and ends it with a stream —
+`cu_laplacian_apply`, `cu_linear_elasticity_apply` — because a host and a device implementation
+of one operator are two symbols in one library, and the generated tree follows that now. The
+numbers above are measured across that change and are within 1% of what the same sweep recorded
+before it, so neither the rename nor the stream argument costs anything.
 The comparison is not vacuous in either of the two ways it could be: every vector is fully
 non-zero with every entry distinct, so nothing agrees by being empty, and moving a single entry
 by 1e-9 relative makes `compare.py` report a failure at 1.2e-10.

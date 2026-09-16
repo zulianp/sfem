@@ -6518,8 +6518,8 @@ def _kernel_diagnostics_lines(
         "} // namespace codegen",
         "} // namespace sfem",
         "",
-        'extern "C" const sfem::codegen::KernelDiagnostics *%s_diagnostics(void) {'
-        % public_name,
+        'extern "C" const sfem::codegen::KernelDiagnostics *%s(void) {'
+        % _target().entry_point_name("%s_diagnostics" % public_name),
         "  return &sfem::codegen::%s;" % variable_name,
         # Only the record is published.  See the note in
         # `emitters/energy_codegen.py`: the intensity and print-rate helpers

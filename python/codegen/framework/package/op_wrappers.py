@@ -567,6 +567,7 @@ namespace sfem {
 }  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "extra": extra,
         "value_steps": value_steps,
@@ -1226,7 +1227,7 @@ def _hyperelastic_op(
                     ),
                 )
             )
-    source = """#include "sfem_%(op)s.hpp"
+    source = """#include "sfem_%(header_stem)s.hpp"
 %(c_abi_include)s
 %(packed_scratch_include)s
 
@@ -1317,7 +1318,7 @@ namespace sfem {
     //! the host and the device differ only here: a device Op hands its kernels
     //! the block's device copy, which is what every `gpu:` Op in SFEM passes
     //! and what a `__global__` body can dereference.
-    idx_t *const *element_connectivity(const OpDomain &domain) {
+    idx_t **element_connectivity(const OpDomain &domain) {
       return %(element_connectivity)s;
     }
 
@@ -1704,6 +1705,7 @@ namespace sfem {
 }  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "packed_scratch_include": packed_scratch_include,
@@ -2539,7 +2541,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         declaration_block = 'extern "C" {\n%s\n}' % "\n".join(
             [*declarations, *private_declarations]
         )
-    source = """#include "sfem_%(op)s.hpp"
+    source = """#include "sfem_%(header_stem)s.hpp"
 %(c_abi_include)s
 %(laplace_packed_include)s
 %(packed_scratch_include)s
@@ -2651,7 +2653,7 @@ namespace sfem {
     //! the host and the device differ only here: a device Op hands its kernels
     //! the block's device copy, which is what every `gpu:` Op in SFEM passes
     //! and what a `__global__` body can dereference.
-    idx_t *const *element_connectivity(const OpDomain &domain) {
+    idx_t **element_connectivity(const OpDomain &domain) {
       return %(element_connectivity)s;
     }
 
@@ -3025,6 +3027,7 @@ namespace sfem {
 %(merit_methods)s}  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "laplace_packed_include": laplace_packed_include,
@@ -3289,7 +3292,7 @@ def _boundary_residual_op(material, elements, c_abi_header=None, form_collection
             )
         )
 
-    source = """#include "sfem_%(op)s.hpp"
+    source = """#include "sfem_%(header_stem)s.hpp"
 %(c_abi_include)s
 
 #include "sfem_aliases.hpp"
@@ -3336,7 +3339,7 @@ namespace sfem {
     //! the host and the device differ only here: a device Op hands its kernels
     //! the block's device copy, which is what every `gpu:` Op in SFEM passes
     //! and what a `__global__` body can dereference.
-    idx_t *const *element_connectivity(const OpDomain &domain) {
+    idx_t **element_connectivity(const OpDomain &domain) {
       return %(element_connectivity)s;
     }
 
@@ -3640,6 +3643,7 @@ namespace sfem {
 }  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "declaration_block": "",
@@ -3728,6 +3732,7 @@ namespace sfem {
 }  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
     }
 
@@ -3779,7 +3784,7 @@ def _coupled_energy_residual_op(
     )
     declarations = _extract_c_abi_declarations(kernel_sources or {}, public_only=False)
     max_parameters = max(1, len(material.parameter_defaults))
-    source = """#include "sfem_%(op)s.hpp"
+    source = """#include "sfem_%(header_stem)s.hpp"
 %(c_abi_include)s
 
 #include "sfem_FunctionSpace.hpp"
@@ -3853,7 +3858,7 @@ namespace sfem {
     //! the host and the device differ only here: a device Op hands its kernels
     //! the block's device copy, which is what every `gpu:` Op in SFEM passes
     //! and what a `__global__` body can dereference.
-    idx_t *const *element_connectivity(const OpDomain &domain) {
+    idx_t **element_connectivity(const OpDomain &domain) {
       return %(element_connectivity)s;
     }
 
@@ -4171,6 +4176,7 @@ namespace sfem {
 %(hessian_bsr_method)s}  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "hessian_bsr_method": _coupled_hessian_bsr_method(
             _op_class_name(material),
@@ -6369,6 +6375,7 @@ namespace sfem {
         "header": os.path.basename(wrapper_header),
         "function": function,
         "op": _op_class_name(material),
+        "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "registered": _op_registered_name(material),
         #: `gpu:` first, the way SFEM spells `gpu:em:Laplacian`.
@@ -9183,8 +9190,13 @@ def _affine_dispatch_parameters(kernel_sources, name):
     # Matched on `int <name>(`, which every declaration and definition of an
     # entry point spells and no call site does, so an element-level kernel --
     # declared in its own header without `extern "C"` -- answers here too.
+    # The emitted spelling, not the logical one: a device tree writes
+    # `int cu_laplace_..._a_met_msoa(` and `\b` finds no boundary inside
+    # `cu_laplace`, so matching the logical name here found nothing, the
+    # parameter list came back empty, and the caller concluded this dispatch
+    # does not take the metric -- and passed it an adjugate.
     pattern = re.compile(
-        r"\bint\s+" + re.escape(name) + r"\s*\(([^;{}]*)\)",
+        r"\bint\s+" + re.escape(_entry_point_name(name)) + r"\s*\(([^;{}]*)\)",
         re.S,
     )
     for source in (kernel_sources or {}).values():

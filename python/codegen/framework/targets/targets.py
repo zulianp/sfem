@@ -767,7 +767,11 @@ class CUDATarget(TargetPlatform):
         return "_cuda"
 
     def element_connectivity_accessor(self):
-        return "domain.block->device_elements_SoA()->data()"
+        #: `device_elements_SoA()` hands back `idx_t *const *` where the C ABI
+        #: takes `idx_t **`, and the const is the buffer's rather than the
+        #: kernel's -- `GPULaplacian` passes its own device elements to
+        #: `cu_laplacian_apply` the same way.
+        return "const_cast<idx_t **>(domain.block->device_elements_SoA()->data())"
 
     def geometry_memory_space(self):
         return "smesh::MEMORY_SPACE_DEVICE"

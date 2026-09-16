@@ -47,6 +47,16 @@ typedef double geom_t;
     }                                                                            \
   } while (0)
 static const char *WHERE = "gh200 (device)";
+//: SFEM names every device entry point `cu_` and ends it with a stream --
+//: `cu_laplacian_apply`, `cu_linear_elasticity_apply` -- because a host and a
+//: device implementation of one operator are two symbols in one library.  The
+//: generated tree follows that now, so the two arms of this driver call two
+//: different names with two different arities, and saying so here is the whole
+//: of the difference.
+#define SFEM_KERNEL(name) cu_##name
+//: the declaration takes a type, the call takes a value
+#define SFEM_STREAM_PARAM , void *const
+#define SFEM_STREAM_ARG , nullptr
 template <class T> static T *upload(const std::vector<T> &host) {
   T *device = nullptr;
   CUDA_OK(cudaMalloc((void **)&device, host.size() * sizeof(T)));
@@ -63,6 +73,9 @@ template <class T> static void clear(T *device, size_t count) {
 static void sync() { CUDA_OK(cudaDeviceSynchronize()); }
 #else
 static const char *WHERE = "host (OpenMP)";
+#define SFEM_KERNEL(name) name
+#define SFEM_STREAM_PARAM
+#define SFEM_STREAM_ARG
 template <class T> static T *upload(const std::vector<T> &host) {
   T *copy = (T *)std::malloc(host.size() * sizeof(T));
   std::memcpy(copy, host.data(), host.size() * sizeof(T));
@@ -78,43 +91,43 @@ static void sync() {}
 #endif
 
 extern "C" {
-int neohookean_ogden_proteus_hex8_apply_i_msoa(
+int SFEM_KERNEL(neohookean_ogden_proteus_hex8_apply_i_msoa)(
     const int, const ptrdiff_t, const ptrdiff_t, idx_t **const, const geom_t *const *const,
     const real_t, const real_t, const ptrdiff_t, const void *const, const void *const,
     const void *const, const ptrdiff_t, const void *const, const void *const, const void *const,
-    const ptrdiff_t, void *const, void *const, void *const);
-int laplace_tri3_gradient_a_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const ptrdiff_t, void *const, void *const, void *const SFEM_STREAM_PARAM);
+int SFEM_KERNEL(laplace_tri3_gradient_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const real_t,
-    const ptrdiff_t, const void *, const ptrdiff_t, void *);
-int laplace_tri3_apply_a_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(laplace_tri3_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const real_t,
-    const ptrdiff_t, const void *, const ptrdiff_t, void *);
-int laplace_tet4_gradient_a_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(laplace_tet4_gradient_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
-    const geom_t *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
-int laplace_tet4_apply_a_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(laplace_tet4_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
-    const geom_t *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
-int linear_elasticity_tet4_gradient_a_msoa_aos_unit(const int, const ptrdiff_t, const ptrdiff_t,
+    const geom_t *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(linear_elasticity_tet4_gradient_a_msoa_aos_unit)(const int, const ptrdiff_t, const ptrdiff_t,
     idx_t **, const geom_t *, const geom_t *, const real_t, const real_t,
     const ptrdiff_t, const void *, const void *, const void *,
-    const ptrdiff_t, void *, void *, void *);
-int laplace_quad4_gradient_i_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
-    const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
-int laplace_hex8_gradient_i_msoa(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
-    const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void *);
-int mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa(
+    const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(laplace_quad4_gradient_i_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(laplace_hex8_gradient_i_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+    const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa)(
     const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const real_t, const real_t, const real_t,
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, const void *, const void *, const void *,
-    const ptrdiff_t, void *, void *, void *);
-int neumann_tet4_trishell3_boundary_residual_soa(
+    const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
+int SFEM_KERNEL(neumann_tet4_trishell3_boundary_residual_soa)(
     const ptrdiff_t, const ptrdiff_t, idx_t **, const geom_t *const *,
     const real_t, const real_t, const real_t, const int,
-    real_t *, real_t *, real_t *);
+    real_t *, real_t *, real_t * SFEM_STREAM_PARAM);
 }
 
 static double seconds() {
@@ -265,13 +278,15 @@ static void agree_simplex_metric(int dim) {
   for (int is_apply = 0; is_apply < 2; ++is_apply) {
     real_t *out = upload(zero);
     if (dim == 2) {
-      (is_apply ? laplace_tri3_apply_a_msoa : laplace_tri3_gradient_a_msoa)(
+      (is_apply ? SFEM_KERNEL(laplace_tri3_apply_a_msoa)
+                 : SFEM_KERNEL(laplace_tri3_gradient_a_msoa))(
           (int)sizeof(real_t), nelements, nnodes, elements, met[0], met[1], met[2],
-          1.7, 1, u, 1, out);
+          1.7, 1, u, 1, out SFEM_STREAM_ARG);
     } else {
-      (is_apply ? laplace_tet4_apply_a_msoa : laplace_tet4_gradient_a_msoa)(
+      (is_apply ? SFEM_KERNEL(laplace_tet4_apply_a_msoa)
+                 : SFEM_KERNEL(laplace_tet4_gradient_a_msoa))(
           (int)sizeof(real_t), nelements, nnodes, elements,
-          met[0], met[1], met[2], met[3], met[4], met[5], 1.7, 1, u, 1, out);
+          met[0], met[1], met[2], met[3], met[4], met[5], 1.7, 1, u, 1, out SFEM_STREAM_ARG);
     }
     sync();
     std::vector<real_t> result(nnodes);
@@ -313,9 +328,9 @@ static void agree_linear_elasticity_tet4() {
   const std::vector<real_t> zero(nnodes, 0.0);
   real_t *ox = upload(zero), *oy = upload(zero), *oz = upload(zero);
 
-  linear_elasticity_tet4_gradient_a_msoa_aos_unit(
+  SFEM_KERNEL(linear_elasticity_tet4_gradient_a_msoa_aos_unit)(
       (int)sizeof(real_t), nelements, nnodes, elements, g_adj, g_det, 0.31, 0.77,
-      1, ux, uy, uz, 1, ox, oy, oz);
+      1, ux, uy, uz, 1, ox, oy, oz SFEM_STREAM_ARG);
   sync();
   std::vector<real_t> rx(nnodes), ry(nnodes), rz(nnodes);
   download(rx, ox); download(ry, oy); download(rz, oz);
@@ -362,12 +377,12 @@ static void agree_residual_tet4() {
     u_old[c] = upload(random_field(nnodes));
     out[c] = upload(zero);
   }
-  mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa(
+  SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa)(
       (int)sizeof(real_t), nelements, nnodes, elements,
       g_adj[0], g_adj[1], g_adj[2], g_adj[3], g_adj[4], g_adj[5], g_adj[6], g_adj[7], g_adj[8],
       g_det, 0.41, 0.73, 0.6,
       1, u[0], u[1], u[2], 1, u_old[0], u_old[1], u_old[2],
-      1, out[0], out[1], out[2]);
+      1, out[0], out[1], out[2] SFEM_STREAM_ARG);
   sync();
   std::vector<real_t> result(nnodes);
   char name[128];
@@ -405,9 +420,9 @@ static void agree_boundary_tet4() {
   real_t *out[3];
   const std::vector<real_t> zero(lattice.nnodes, 0.0);
   for (int c = 0; c < 3; ++c) out[c] = upload(zero);
-  neumann_tet4_trishell3_boundary_residual_soa(
+  SFEM_KERNEL(neumann_tet4_trishell3_boundary_residual_soa)(
       nfaces, lattice.nnodes, elements, points, 0.3, -0.7, 1.1, 1,
-      out[0], out[1], out[2]);
+      out[0], out[1], out[2] SFEM_STREAM_ARG);
   sync();
   std::vector<real_t> result(lattice.nnodes);
   char name[128];
@@ -431,11 +446,11 @@ static void agree_mesh_order_tensor_product(int dim) {
   real_t *out = upload(std::vector<real_t>(lattice.nnodes, 0.0));
 
   if (dim == 2) {
-    laplace_quad4_gradient_i_msoa((int)sizeof(real_t), lattice.ncells, lattice.nnodes,
-                                  elements, points, 1.3, 1, u, 1, out);
+    SFEM_KERNEL(laplace_quad4_gradient_i_msoa)((int)sizeof(real_t), lattice.ncells, lattice.nnodes,
+                                  elements, points, 1.3, 1, u, 1, out SFEM_STREAM_ARG);
   } else {
-    laplace_hex8_gradient_i_msoa((int)sizeof(real_t), lattice.ncells, lattice.nnodes,
-                                 elements, points, 1.3, 1, u, 1, out);
+    SFEM_KERNEL(laplace_hex8_gradient_i_msoa)((int)sizeof(real_t), lattice.ncells, lattice.nnodes,
+                                 elements, points, 1.3, 1, u, 1, out SFEM_STREAM_ARG);
   }
   sync();
   std::vector<real_t> result(lattice.nnodes);
@@ -472,9 +487,9 @@ static void bench_hex8_apply(ptrdiff_t side, int repeats, const char *out_path) 
   for (int r = 0; r <= repeats; ++r) {
     for (int c = 0; c < 3; ++c) clear(out[c], (size_t)lattice.nnodes);
     const double t0 = seconds();
-    neohookean_ogden_proteus_hex8_apply_i_msoa(
+    SFEM_KERNEL(neohookean_ogden_proteus_hex8_apply_i_msoa)(
         (int)sizeof(real_t), lattice.ncells, lattice.nnodes, elements, points, lmbda, mu,
-        1, u[0], u[1], u[2], 1, h[0], h[1], h[2], 1, out[0], out[1], out[2]);
+        1, u[0], u[1], u[2], 1, h[0], h[1], h[2], 1, out[0], out[1], out[2] SFEM_STREAM_ARG);
     sync();
     const double elapsed = seconds() - t0;
     if (r > 0) best = std::min(best, elapsed);  // the first pass is the warm-up
@@ -511,9 +526,9 @@ static void bench_tet4_gradient(ptrdiff_t side, int repeats) {
   for (int r = 0; r <= repeats; ++r) {
     clear(out, (size_t)lattice.nnodes);
     const double t0 = seconds();
-    laplace_tet4_gradient_a_msoa((int)sizeof(real_t), nelements, lattice.nnodes, elements,
+    SFEM_KERNEL(laplace_tet4_gradient_a_msoa)((int)sizeof(real_t), nelements, lattice.nnodes, elements,
                                  met[0], met[1], met[2], met[3], met[4], met[5],
-                                 1.7, 1, u, 1, out);
+                                 1.7, 1, u, 1, out SFEM_STREAM_ARG);
     sync();
     const double elapsed = seconds() - t0;
     if (r > 0) best = std::min(best, elapsed);
