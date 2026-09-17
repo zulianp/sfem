@@ -4,6 +4,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{array}
+\usepackage{multirow}
 \usepackage{xcolor}
 \usepackage[colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!55!black]{hyperref}
 \usepackage{fancyvrb}
@@ -207,6 +208,10 @@ The patch matrices depend on the linearisation state, so they are valid for one 
 must be rebuilt when it changes --- the same lifetime as the element-wise Galerkin coarse
 operators, and they can be built in the same pass.
 
+That lifetime is not free, and at the sizes this solver runs at it is the largest single item in
+a transient step; Section~\ref{sec:setupcost} measures it and asks whether it has to be paid
+every Newton iteration.
+
 \begin{itemize}[leftmargin=*]
 \item \textbf{Cache the $8\times8$ Schur factors} (27\,MiB at $L=8$): build once per Newton
 step, apply on every sweep. Six sweeps per V-cycle and hundreds of cycles per Newton step make
@@ -317,7 +322,9 @@ That is 472 values of type $T$ plus 8 integers: 1\,920\,B in single precision an
 \subsection{Set-up}
 
 Set-up runs once per Newton step, because the patch operators depend on the linearisation.
-This is the same lifetime as the Galerkin coarse operators.
+This is the same lifetime as the Galerkin coarse operators. What that costs, and the one case
+in which the rebuild can be skipped without changing what the solver computes, is
+Section~\ref{sec:setupcost}.
 
 \begin{algorithm}[H]
 \caption{Vanka set-up, \code{vanka\_setup}}\label{alg:setup}
@@ -546,6 +553,121 @@ application does not change with $T$. The factor of 1.75 over the whole step is 
 lower bound for the sweeps alone. It is close to the factor of two in bytes streamed, which is
 further evidence that the sweep is memory bound. A smoother only has to reduce the error, and FGMRES
 absorbs the difference.
+
+\subsection{What the set-up costs, and whether it must be paid every iteration}
+\label{sec:setupcost}
+
+The apply is what the sweep spends its time on at a fixed problem size, but the set-up is what
+grows fastest with it. Measured on the FDA nozzle on one Grace socket at 72 threads, 20 time
+steps with step~1 excluded --- a fresh run pays a continuation ramp on its first step that no
+later step pays --- the per-rebuild cost and its share of a time step are:
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+& 116\,212 dof & 893\,924 dof & 7\,014\,340 dof \\
+\midrule
+\code{vanka\_setup}, per rebuild & 18.1\,ms & 126.4\,ms & 3614\,ms \\
+Time step, mean                  & 1.253\,s & 4.933\,s  & 45.366\,s \\
+Newton iterations per step       & 3.11     & 4.00      & 4.00 \\
+Set-up share of the run          & 4.5\,\%  & 10.9\,\%  & \textbf{30.9\,\%} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Between the top two rungs the set-up scales as roughly $\text{dof}^{1.65}$, against a step cost
+that grows about linearly, which is why its share triples over one refinement and why it will
+keep rising. The Péclet-blended arm confirms that the growth is in the \emph{number} of rebuilds
+and not in their price: per-rebuild cost there is 17.8\,ms and 126.5\,ms at the two smaller
+sizes, statistically the same, while the Newton count per step rises from 3.11 to 17.0 and from
+4.00 to 26.7 and drags the total with it.
+
+At four Newton iterations per step this is four full rebuilds per step, and a DNS time step moves
+the state by $O(\Delta t)$. \code{SFEM\_VANKA\_FREEZE}$=N$ rebuilds on the first Newton iteration
+of each time step and then every $N$th within it, reusing the previous smoother in between;
+$N=1$ is the default and is the behaviour described above, bit for bit.
+
+What the freeze does and does not change is worth stating precisely, because the same call also
+looks like a state update. \code{make\_diagonal\_vanka} begins with \code{op.update(state)},
+which refreshes the nodal pressure gradient. That is not the per-iteration state push: the
+residual evaluation \code{gradient(x,\,\ldots)} redoes the same unpack and nodal gradient from
+its own argument on every Newton iteration and before every linear solve, which is exactly the
+loop shape the \code{cache\_nodal\_pgrad} option already requires of its caller; and the
+matrix-free level operators read the fine state buffer live. Freezing therefore stales the
+\emph{preconditioner} and leaves the residual, the Jacobian action and the cycle's operators at
+the current linearisation.
+
+\subsubsection*{What it measures}
+
+The worry was that a preconditioner built at an older linearisation would buy wall time and spend
+it again on iterations, most likely in the blended arm, whose defect correction contracts at only
+$r \approx 0.49$. It does not. Across both sizes, both convection schemes and strides of 2 and 4,
+the Newton count per step and the linear count per step are unchanged to the digit.
+
+\begin{center}
+\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+& dof & $N$ & rebuilds & Newton/step & linear/step & $t_{\text{step}}$ \\
+\midrule
+\multirow{3}{*}{blend off}
+ & 893\,924   & 1 &  97 &  4.00 &  84.42 & 4.933\,s \\
+ & 893\,924   & 2 &  50 &  4.00 &  84.47 & 4.684\,s \;($-5.0\,\%$) \\
+ & 893\,924   & 4 &  27 &  4.00 &  84.42 & 4.562\,s \;($-7.5\,\%$) \\
+\midrule
+\multirow{3}{*}{blend off}
+ & 7\,014\,340 & 1 &  56 &  4.00 &  59.00 & 45.366\,s \\
+ & 7\,014\,340 & 2 &  30 &  4.00 &  59.00 & 38.219\,s \;($-15.8\,\%$) \\
+ & 7\,014\,340 & 4 &  15 &  4.00 &  58.89 & 34.472\,s \;($-24.0\,\%$) \\
+\midrule
+\multirow{3}{*}{blend tanh}
+ & 893\,924   & 1 & 660 & 26.68 & 221.89 & 16.147\,s \\
+ & 893\,924   & 2 & 338 & 26.68 & 221.89 & 14.559\,s \;($-9.8\,\%$) \\
+ & 893\,924   & 4 & 176 & 26.68 & 221.89 & 13.806\,s \;($-14.5\,\%$) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The linear counts are not merely equal on average. Per step at 7\,014\,340 dof, over steps 2 to
+10, the sequences are $56,64,60,61,60,59,58,56,57$ at $N=1$, identical at $N=2$, and differ by a
+single iteration in one step at $N=4$. Whatever the frozen smoother loses by being a step behind,
+the outer FGMRES does not have to pay for it.
+
+The saving is therefore the skipped set-up and nothing else, and it lands within a few per cent of
+that ceiling: the \code{vanka\_setup} total falls $202.4 \to 108.6 \to 55.0$\,s at 7\,014\,340 dof
+and $12.26 \to 6.41 \to 3.47$\,s at 893\,924, while the cost of one rebuild stays put --- 3.614,
+3.620 and 3.664\,s on the large mesh, 126.4, 128.2 and 128.4\,ms on the small one, a spread under
+two per cent. The share of the run that set-up accounts for collapses from 30.9\,\% to 2.8\,\%.
+
+Two details are worth keeping. The blended arm gains more than its blend-off counterpart at the
+same mesh ($-9.8\,\%$ and $-14.5\,\%$ against $-5.0\,\%$ and $-7.5\,\%$) because it runs 26.68
+Newton iterations per step rather than four, so set-up is 21.1\,\% of that run rather than
+10.9\,\%: the freeze is worth most exactly where the Newton count is worst.
+
+And the stride's useful range is set by the Newton count, because it restarts each time step. A
+case converging in four Newton iterations already rebuilds only once per step at $N=4$ --- its
+floor --- so $N=8$ would measure identically and $-24\,\%$ is the ceiling for the large mesh
+rather than a point on a curve that keeps falling. The blended arm is nowhere near that floor:
+176 rebuilds over 20 steps at $N=4$ against a floor of 20, so larger strides there still have
+something to give.
+
+The count is not simply $\lceil \nu/N \rceil$ per step, and the gap is worth explaining rather than
+leaving a formula that misses by a quarter. The blended arm rebuilds 660, 338 and 176 times where
+$\lceil 26.68/N \rceil \times 20$ predicts 540, 280 and 140. The reported Newton count is a mean
+over steps 2 onwards, but the first step walks the whole continuation ramp --- six stages here,
+$\Rey = 1, 4, 16, 64, 256, 500$ --- and pays rebuilds for all of them while contributing nothing
+to that mean. Charging the ramp its six stages' worth gives 675, 350 and 175 against the measured
+660, 338 and 176. The stride itself restarts once per time step and runs continuously across a
+step's continuation stages, so what the ramp adds is iterations, not extra resets.
+
+\begin{tcolorbox}[colback=blue!4,colframe=blue!50!black,title={\bfseries How this was checked}]
+The $N=1$ rows are the control and reproduce the independent cost run on a different node
+(4.933 against 4.864\,s, 45.366 against 45.365\,s, 16.147 against 16.379\,s, with the iteration
+counts equal). The rebuild column is the \code{vanka\_setup} call count from the phase table, not
+a derived quantity, so a run states directly how many rebuilds it actually paid for. No run
+produced a residual-floor acceptance or a failed step.
+\end{tcolorbox}
 
 \section{Assembling the patches without the global BSR}
 \label{sec:nobsr}
