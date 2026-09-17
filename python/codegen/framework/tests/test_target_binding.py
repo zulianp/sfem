@@ -348,7 +348,13 @@ class MeshLoweringAccessorTest(unittest.TestCase):
         # the stream the caller handed the entry point, not the default one:
         # every `cu_` entry point in SFEM takes a stream and its Op holds one
         self.assertIn("<<<grid_size, block_size, 0, (cudaStream_t)stream>>>", launch[2])
-        self.assertEqual(launch[-1], "  return SFEM_SUCCESS;")
+        # The launch's own status, not an unconditional success.  A device
+        # launch reports failure through `cudaGetLastError`, and returning
+        # `SFEM_SUCCESS` without asking turns a refused kernel into a call that
+        # claims to have computed something -- after which the sticky error
+        # makes every later CUDA call in the process return garbage, far from
+        # the kernel that caused it.
+        self.assertEqual(launch[-1], '  return sfem::codegen::launch_status("k");')
 
     def test_the_device_abi_is_named_the_way_sfem_names_its_own(self):
         """`cu_` and a trailing stream, which is not decoration.

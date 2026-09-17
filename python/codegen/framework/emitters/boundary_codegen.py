@@ -457,7 +457,7 @@ def _boundary_source(function, element_type, surface, components, parameters, co
 {restrict_prelude}
 
 #include <math.h>
-#include "{math_header}"
+#include "{math_header}"{launch_status_include}
 
 namespace sfem {{
 namespace codegen {{
@@ -659,6 +659,15 @@ extern "C" int {public_sideset_function_float}(
         macros_include="\n".join(optional_sfem_include("sfem_macros.hpp")),
         scalar_type_fallback="\n".join(sfem_scalar_type_fallback()),
         math_header=current_target().header_name("kernel_math"),
+        #: The entry points below ask `launch_status` whether their launch
+        #: started, and it lives with the other things a launching target
+        #: needs.  The boundary family writes that header already; it just
+        #: never included it.
+        launch_status_include=(
+            '\n#include "%s"' % current_target().header_name("kernel_diagnostics")
+            if current_target().supports_device_kernels
+            else ""
+        ),
         #: The reference tables are called from `{function}_element`, which is
         #: `__host__ __device__` on a device target.  They carried no qualifier
         #: at all -- correct for the only target that had ever read them, and
@@ -889,7 +898,7 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
 {restrict_prelude}
 
 #include <math.h>
-#include "{math_header}"
+#include "{math_header}"{launch_status_include}
 
 namespace sfem {{
 namespace codegen {{
@@ -1135,6 +1144,15 @@ extern "C" int {public_sideset_function_float}(
         macros_include="\n".join(optional_sfem_include("sfem_macros.hpp")),
         scalar_type_fallback="\n".join(sfem_scalar_type_fallback()),
         math_header=current_target().header_name("kernel_math"),
+        #: The entry points below ask `launch_status` whether their launch
+        #: started, and it lives with the other things a launching target
+        #: needs.  The boundary family writes that header already; it just
+        #: never included it.
+        launch_status_include=(
+            '\n#include "%s"' % current_target().header_name("kernel_diagnostics")
+            if current_target().supports_device_kernels
+            else ""
+        ),
         #: The reference tables are called from `{function}_element`, which is
         #: `__host__ __device__` on a device target.  They carried no qualifier
         #: at all -- correct for the only target that had ever read them, and

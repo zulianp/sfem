@@ -872,7 +872,11 @@ class CUDATarget(TargetPlatform):
             #: caller's ordering.
             "%ssfem::codegen::%s<%s><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(%s);"
             % (indent, implementation_name, template_args, ", ".join(arguments)),
-            "%sreturn SFEM_SUCCESS;" % indent,
+            #: Ask whether the launch started.  Returning `SFEM_SUCCESS` for a
+            #: launch nobody checked turns a refused kernel into a silent
+            #: no-op, and the sticky error it leaves makes every later CUDA
+            #: call in the process return garbage.
+            '%sreturn sfem::codegen::launch_status("%s");' % (indent, implementation_name),
         )
 
     @property

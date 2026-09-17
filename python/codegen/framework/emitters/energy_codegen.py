@@ -9320,6 +9320,11 @@ def _sfem_soa_diagnostics_header(
         "",
         "#include <stddef.h>",
         "#include <cstdio>",
+        # `launch_status` below names `cudaError_t` and `cudaGetLastError`, and
+        # this header is read by the device `Op` wrapper too -- which is host
+        # C++ compiled by the host compiler, where nvcc's implicit prelude does
+        # not apply.  The target names its own runtime header.
+        *(current_target().includes() if current_target().supports_device_kernels else ()),
         "",
     ]
     if define_sfem_inline:
@@ -9360,6 +9365,7 @@ def _sfem_soa_diagnostics_header(
         "  return SFEM_FAILURE;",
         "}",
         "",
+        *_launch_status_lines(host_inline),
         "struct %s {" % struct_name,
         "  const char *kernel_name;",
         "  const char *element_type;",
@@ -9729,6 +9735,41 @@ def _sfem_soa_diagnostics_lines(
     )
     lines.extend(diagnostics_accessor_lines(public_name))
     return lines
+
+
+def _launch_status_lines(host_inline):
+    """Whether the launch that just happened actually started, on targets that launch.
+
+    A device kernel launch reports failure through `cudaGetLastError`, and the
+    generated entry points did not ask: they issued the launch and returned
+    `SFEM_SUCCESS` unconditionally.  A launch that never ran therefore looked
+    like a successful call that computed nothing and -- because a launch failure
+    is sticky -- every later CUDA call in the process returned garbage too.
+    That is how a correct kernel and a correct cuBLAS came to disagree about a
+    buffer both had read: the reduction ran in a context the refused launch had
+    already poisoned, and `compute-sanitizer` reports nothing because there was
+    no invalid access, only a launch that never happened.
+
+    Host targets launch nothing and get nothing here.
+    """
+    if not current_target().supports_device_kernels:
+        return ()
+    return (
+        "//! Reports a kernel launch that did not start.",
+        "//!",
+        "//! Without this an entry point returns `SFEM_SUCCESS` for a launch it",
+        "//! never checked, and the sticky error surfaces much later, somewhere",
+        "//! unrelated, as a wrong number rather than as a failure.",
+        "static %s int launch_status(const char *const name) {" % host_inline,
+        "  const cudaError_t status = cudaGetLastError();",
+        "  if (status != cudaSuccess) {",
+        '    std::fprintf(stderr, "%s launch failed: %s\\n", name, cudaGetErrorString(status));',
+        "    return SFEM_FAILURE;",
+        "  }",
+        "  return SFEM_SUCCESS;",
+        "}",
+        "",
+    )
 
 
 def _sfem_soa_diagnostics_struct_name():
