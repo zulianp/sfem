@@ -93,7 +93,7 @@ class OpenMPEnergySoASourceBuilder:
         return () if pragma is None else (pragma,)
 
     def effective_vector_size(self, vector_size):
-        return int(vector_size)
+        return self.target.effective_vector_size(vector_size)
 
     def element_loop_lines(self, pragma_indent="", reduction=None):
         return element_loop_lines(self.target, pragma_indent, reduction=reduction)
@@ -214,7 +214,7 @@ class CUDAEnergySoASourceBuilder:
         return ()
 
     def effective_vector_size(self, vector_size):
-        return 1
+        return self.target.effective_vector_size(vector_size)
 
     def element_loop_lines(self, pragma_indent="", reduction=None):
         return element_loop_lines(self.target, pragma_indent, reduction=reduction)

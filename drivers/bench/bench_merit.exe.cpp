@@ -240,7 +240,7 @@ int main(int argc, char *argv[]) {
             // buffer it was handed (`impl_->previous_buffer.reset()`), so the
             // only owner left is this variable -- and a block-scoped one frees
             // the device memory the kernels are about to read.
-            SharedBuffer<real_t> previous_device;
+            smesh::SharedBuffer<real_t> previous_device;
             if (needs_previous) {
                 previous_device = smesh::to_device(previous_host);
                 op->set_field("previous", previous_device, 0);
