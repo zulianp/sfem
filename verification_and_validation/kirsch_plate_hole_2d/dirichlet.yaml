@@ -1,0 +1,5 @@
+dirichlet_conditions:
+  - {type: nodeset, format: file, path: "{mesh}/n16/sets/outer.int32.raw", value: {path: "{mesh}/n16/boundary_values/outer.0.float64.raw"}, component: 0}
+  - {type: nodeset, format: file, path: "{mesh}/n16/sets/outer.int32.raw", value: {path: "{mesh}/n16/boundary_values/outer.1.float64.raw"}, component: 1}
+  - {type: nodeset, format: file, path: "{mesh}/n16/sets/axis_x.int32.raw", value: 0, component: 1}
+  - {type: nodeset, format: file, path: "{mesh}/n16/sets/axis_y.int32.raw", value: 0, component: 0}

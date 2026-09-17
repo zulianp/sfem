@@ -1,0 +1,179 @@
+schema_version: 2
+id: inflated_spherical_shell_3d
+name: Finite-strain pressured spherical octant
+kind: verification
+family: hyperelastic
+dimension: 3
+tier: extended
+
+source:
+  description: Independent spherical radial equilibrium BVP with follower-pressure boundary condition
+  reference: README.md
+
+oracle:
+  type: semi_analytical
+  implementation: oracle.py
+
+geometry:
+  inner_radius_m: 1.0
+  outer_radius_m: 1.5
+
+loading:
+  inner_pressure_mpa: 0.1
+  ramp_duration_s: 1.0
+  dt_s: 0.25
+  steps: 4
+
+material:
+  mu: 2.0
+  lambda: 3.0
+  c1: 0.5
+  c2: 0.5
+  kappa: 5.0
+
+refinements:
+  - {id: n8, radial_cells: 8, surface_frequency: 8}
+  - {id: n16, radial_cells: 16, surface_frequency: 12}
+  - {id: n32, radial_cells: 32, surface_frequency: 16}
+
+mesh:
+  command:
+    - "{python}"
+    - "{case_dir}/generate_mesh.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{mesh}"
+
+inputs:
+  - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
+  - {template: neumann.yaml, output: "{output}/neumann.yaml"}
+
+verification:
+  command:
+    - "{python}"
+    - "{case_dir}/verify.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{output}"
+    - --report
+    - "{output}/verification.json"
+  report: "{output}/verification.json"
+  tolerances:
+    finest_inner_displacement_relative_l2: 0.02
+    finest_radial_stress_relative_l2: 0.04
+    finest_hoop_stress_relative_l2: 0.04
+    finest_pressure_volume_relative_l2: 0.02
+    displacement_monotonic_deficit: 0.0
+    radial_stress_monotonic_deficit: 0.0
+    hoop_stress_monotonic_deficit: 0.0
+    minimum_jacobian_deficit: 0.0
+
+variants:
+  - id: neo_tet4_moderate
+    operator: GeneratedNeoHookeanOgden
+    element: TET4
+    resolution: {levels: 3, finest_cells: 32}
+    driver: &driver
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_hyperelastic_refinements.py"
+        - --case
+        - "{resolved_case}"
+        - --driver
+        - "{build_dir}/hyperelasticity_bdf2"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_OPERATOR: "{operator}"
+        SFEM_MU: "{material_mu}"
+        SFEM_LAMBDA: "{material_lambda}"
+        SFEM_C1: "{material_c1}"
+        SFEM_C2: "{material_c2}"
+        SFEM_KAPPA: "{material_kappa}"
+        SFEM_RHO: 0
+        SFEM_DT: "{loading_dt_s}"
+        SFEM_T_END: "{loading_ramp_duration_s}"
+        SFEM_STEPS: "{loading_steps}"
+        SFEM_EXPORT_FREQ: 1
+        SFEM_LOAD_RAMP_TIME: "{loading_ramp_duration_s}"
+        SFEM_NL_MAX_IT: 100
+        SFEM_NL_TOL: 1.0e-7
+        SFEM_LSOLVE_RTOL: 1.0e-5
+        SFEM_LSOLVE_MAX_IT: 20000
+        SFEM_ENABLE_LINE_SEARCH: 1
+    expected_output: &expected_output
+      required:
+        - {pattern: "(converged)", count: 12}
+        - {pattern: SFEM_HYPERELASTIC_REFINEMENT_COMPLETE, count: 3}
+      forbidden:
+        - No progress made
+        - "(max iterations)"
+    tolerances: &variant_tolerances
+      finest_inner_displacement_relative_l2: 0.02
+
+  - id: neo_hex8_moderate
+    operator: GeneratedNeoHookeanOgden
+    element: HEX8
+    resolution: {levels: 3, finest_cells: 32}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: mr_tet4_moderate
+    operator: GeneratedModifiedMooneyRivlin
+    element: TET4
+    resolution: {levels: 3, finest_cells: 32}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: mr_hex8_moderate
+    operator: GeneratedModifiedMooneyRivlin
+    element: HEX8
+    resolution: {levels: 3, finest_cells: 32}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: neo_tet4_nearly_incompressible
+    operator: GeneratedNeoHookeanOgden
+    element: TET4
+    resolution: {levels: 3, finest_cells: 32}
+    material: &near_material {mu: 2.0, lambda: 98.0, c1: 0.5, c2: 0.5, kappa: 100.0}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: neo_hex8_nearly_incompressible
+    operator: GeneratedNeoHookeanOgden
+    element: HEX8
+    resolution: {levels: 3, finest_cells: 32}
+    material: *near_material
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: mr_tet4_nearly_incompressible
+    operator: GeneratedModifiedMooneyRivlin
+    element: TET4
+    resolution: {levels: 3, finest_cells: 32}
+    material: *near_material
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: mr_hex8_nearly_incompressible
+    operator: GeneratedModifiedMooneyRivlin
+    element: HEX8
+    resolution: {levels: 3, finest_cells: 32}
+    material: *near_material
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances

@@ -1,0 +1,117 @@
+schema_version: 2
+id: kirsch_plate_hole_2d
+name: Plane-strain Kirsch quarter annulus
+kind: verification
+family: elastic
+dimension: 2
+tier: medium
+
+source:
+  description: Classical infinite-plane Kirsch field for a traction-free circular hole
+  reference: README.md
+
+oracle:
+  type: analytical
+  implementation: oracle.py
+
+geometry:
+  hole_radius_m: 1.0
+  outer_radius_m: 8.0
+
+loading:
+  remote_tension_mpa: 1.0
+
+material:
+  mu: 2.0
+  lambda: 3.0
+
+refinements:
+  - {id: n16, radial_cells: 16, angular_cells: 16}
+  - {id: n32, radial_cells: 32, angular_cells: 32}
+  - {id: n64, radial_cells: 64, angular_cells: 64}
+
+mesh:
+  command:
+    - "{python}"
+    - "{case_dir}/generate_mesh.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{mesh}"
+
+inputs:
+  - {template: operator.yaml, output: "{output}/operator.yaml"}
+  - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
+
+verification:
+  command:
+    - "{python}"
+    - "{case_dir}/verify.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{output}"
+    - --report
+    - "{output}/verification.json"
+  report: "{output}/verification.json"
+  tolerances:
+    finest_displacement_relative_l2: 0.01
+    finest_stress_relative_l2: 0.03
+    hole_peak_hoop_relative_error: 0.05
+    displacement_monotonic_deficit: 0.0
+    stress_monotonic_deficit: 0.0
+    displacement_rate_deficit: 0.0
+
+variants:
+  - id: legacy_tri3
+    operator: LinearElasticity
+    element: TRI3
+    resolution: {levels: 3, finest_cells: 64}
+    material_parameter_map: {mu: mu, lambda: lambda}
+    driver: &driver
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_linear_refinements.py"
+        - --case
+        - "{resolved_case}"
+        - --driver
+        - "{build_dir}/linear_elasticity"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_REORDER: 0
+        SFEM_USE_PACKED_MESH: 0
+        SFEM_VERBOSE: 0
+        SFEM_RTOL: 1.0e-12
+        SFEM_MAX_IT: 20000
+    expected_output: &expected_output
+      required:
+        - {pattern: SFEM_LINEAR_REFINEMENT_COMPLETE, count: 3}
+      forbidden:
+        - No progress made
+        - "(max iterations)"
+    tolerances: &variant_tolerances
+      finest_displacement_relative_l2: 0.01
+
+  - id: generated_tri3
+    operator: GeneratedLinearElasticity
+    element: TRI3
+    resolution: {levels: 3, finest_cells: 64}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_quad4
+    operator: GeneratedLinearElasticity
+    element: QUAD4
+    resolution: {levels: 3, finest_cells: 64}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances

@@ -1,0 +1,132 @@
+schema_version: 2
+id: lame_spherical_shell_3d
+name: Linear-elastic pressured spherical octant
+kind: verification
+family: elastic
+dimension: 3
+tier: medium
+
+source:
+  description: Lame spherical thick-shell solution from radial elasticity equilibrium
+  reference: README.md
+
+oracle:
+  type: analytical
+  implementation: oracle.py
+
+geometry:
+  inner_radius_m: 1.0
+  outer_radius_m: 2.5
+
+loading:
+  inner_pressure_mpa: 0.2
+
+material:
+  mu: 2.0
+  lambda: 3.0
+
+refinements:
+  - {id: n16, radial_cells: 16, surface_frequency: 8}
+  - {id: n32, radial_cells: 32, surface_frequency: 16}
+  - {id: n64, radial_cells: 64, surface_frequency: 32}
+
+mesh:
+  command:
+    - "{python}"
+    - "{case_dir}/generate_mesh.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{mesh}"
+
+inputs:
+  - {template: operator.yaml, output: "{output}/operator.yaml"}
+  - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
+  - {template: neumann.yaml, output: "{output}/neumann.yaml"}
+
+verification:
+  command:
+    - "{python}"
+    - "{case_dir}/verify.py"
+    - --case
+    - "{resolved_case}"
+    - --output
+    - "{output}"
+    - --report
+    - "{output}/verification.json"
+  report: "{output}/verification.json"
+  tolerances:
+    finest_displacement_relative_l2: 0.02
+    finest_radial_stress_relative_l2: 0.04
+    finest_hoop_stress_relative_l2: 0.04
+    finest_pressure_resultant_relative_l2: 0.02
+    finest_applied_pressure_resultant_relative_l2: 0.02
+    displacement_monotonic_deficit: 0.0
+    radial_stress_monotonic_deficit: 0.0
+    hoop_stress_monotonic_deficit: 0.0
+    displacement_rate_deficit: 0.0
+
+variants:
+  - id: legacy_tet4
+    operator: LinearElasticity
+    element: TET4
+    resolution: {levels: 3, finest_cells: 64}
+    material_parameter_map: {mu: mu, lambda: lambda}
+    driver: &driver
+      executable: "{python}"
+      arguments:
+        - "{suite_dir}/common/run_linear_refinements.py"
+        - --case
+        - "{resolved_case}"
+        - --driver
+        - "{build_dir}/linear_elasticity"
+        - --mesh
+        - "{mesh}"
+        - --input-dir
+        - "{output}"
+        - --output
+        - "{output}/solution"
+        - --neumann
+        - neumann.yaml
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_REORDER: 0
+        SFEM_USE_PACKED_MESH: 0
+        SFEM_VERBOSE: 0
+        SFEM_RTOL: 1.0e-12
+        SFEM_MAX_IT: 20000
+    expected_output: &expected_output
+      required:
+        - {pattern: SFEM_LINEAR_REFINEMENT_COMPLETE, count: 3}
+      forbidden:
+        - No progress made
+        - "(max iterations)"
+    tolerances: &variant_tolerances
+      finest_displacement_relative_l2: 0.02
+
+  - id: generated_tet4
+    operator: GeneratedLinearElasticity
+    element: TET4
+    resolution: {levels: 3, finest_cells: 64}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: legacy_hex8
+    operator: LinearElasticity
+    element: HEX8
+    resolution: {levels: 3, finest_cells: 64}
+    material_parameter_map: {mu: mu, lambda: lambda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_hex8
+    operator: GeneratedLinearElasticity
+    element: HEX8
+    resolution: {levels: 3, finest_cells: 64}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
