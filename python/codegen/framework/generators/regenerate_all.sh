@@ -71,30 +71,48 @@ run_generator() {
     start_generator "$@"
 }
 
-run_generator codegen.framework.generators.linear_elasticity
-run_generator codegen.framework.generators.laplace
-run_generator codegen.framework.generators.neohookean_ogden
-run_generator codegen.framework.generators.mooney_rivlin_kelvin_voigt_newmark
-run_generator codegen.framework.generators.neumann
-# shellcheck disable=SC2086
-run_generator codegen.framework.generators.neumann_general ${SFEM_NEUMANN_GENERAL_ARGS:-}
-run_generator codegen.framework.generators.two_phase_flow
-run_generator codegen.framework.generators.navier_stokes
-
-status=0
-for index in "${!PIDS[@]}"; do
-    if wait "${PIDS[$index]}"; then
-        printf '==> %s done (%s)\n' "${NAMES[$index]}" "$(date +%T)"
-    else
-        status=1
-        printf '==> %s FAILED (%s); its log follows\n' "${NAMES[$index]}" "$(date +%T)"
-        cat "${LOGS[$index]}"
+# Wait for the wave that is running, report each material by name, and stop the
+# script if any of them failed.  A function rather than a block because the
+# device wave below drains the same way, and a second copy of this loop would
+# be a second place for the reporting to drift.
+drain_generators() {
+    local status=0 index
+    for index in "${!PIDS[@]}"; do
+        if wait "${PIDS[$index]}"; then
+            printf '==> %s done (%s)\n' "${NAMES[$index]}" "$(date +%T)"
+        else
+            status=1
+            printf '==> %s FAILED (%s); its log follows\n' "${NAMES[$index]}" "$(date +%T)"
+            cat "${LOGS[$index]}"
+        fi
+    done
+    PIDS=(); NAMES=(); LOGS=()
+    if (( status != 0 )); then
+        printf 'logs: %s\n' "$LOG_DIR"
+        exit "$status"
     fi
-done
-if (( status != 0 )); then
-    printf 'logs: %s\n' "$LOG_DIR"
-    exit "$status"
-fi
+}
+
+# One list, used for both targets.  `generators/cuda.py` used to carry its own
+# and they had drifted apart -- it named three materials the host tree does not
+# carry and missed four that it does -- so the device tree could not be the
+# host tree's twin however it was invoked.  Every material generator already
+# takes `--target`, so the device pass is these same generators with the target
+# switched rather than a second generator.
+generate_materials() {
+    run_generator codegen.framework.generators.linear_elasticity "$@"
+    run_generator codegen.framework.generators.laplace "$@"
+    run_generator codegen.framework.generators.neohookean_ogden "$@"
+    run_generator codegen.framework.generators.mooney_rivlin_kelvin_voigt_newmark "$@"
+    run_generator codegen.framework.generators.neumann "$@"
+    # shellcheck disable=SC2086
+    run_generator codegen.framework.generators.neumann_general ${SFEM_NEUMANN_GENERAL_ARGS:-} "$@"
+    run_generator codegen.framework.generators.two_phase_flow "$@"
+    run_generator codegen.framework.generators.navier_stokes "$@"
+}
+
+generate_materials
+drain_generators
 
 # The headers that belong to a target rather than to a material.  The OpenMP set
 # falls out of the material runs above; the CUDA set does not, because CUDA
@@ -112,11 +130,16 @@ if ! "$PYTHON" -m codegen.framework.generators.shared_headers; then
     exit 1
 fi
 
-# These two run after the materials because they read what the materials wrote.
+# The device tree: the same materials, the same generators, `--target cuda`.
+# It lands in `cuda/` folders inside each material's own tree, beside the host
+# sources it mirrors, which is where the rest of the repository keeps its
+# device sources.  After the host wave rather than beside it, because the two
+# share a directory and both write the target-independent matrix-format files.
 if [[ "${SFEM_GENERATE_CUDA:-0}" == "1" ]]; then
     printf '==> cuda\n'
     # shellcheck disable=SC2086
-    "$PYTHON" -m codegen.framework.generators.cuda ${SFEM_CUDA_ARGS:-}
+    generate_materials --target cuda ${SFEM_CUDA_ARGS:-}
+    drain_generators
 fi
 
 if [[ -n "${SFEM_GENERATOR_MANIFESTS:-}" ]]; then

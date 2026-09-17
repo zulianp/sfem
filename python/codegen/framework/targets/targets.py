@@ -342,21 +342,18 @@ class TargetPlatform:
         """What keeps the two wrappers' translation units apart."""
         return ""
 
-    def op_class_prefix(self):
-        """What a generated `Op` class is called here.
+    def source_subdirectory(self):
+        """Where this target's sources sit inside the directory they mirror.
 
-        SFEM names its device Ops for the device -- `GPULaplacian`,
-        `GPULinearElasticity`, `GPUKelvinVoigtNewmark` -- so a host and a device
-        Op for one material are two classes rather than one name fought over.
+        SFEM keeps device sources in a local `cuda/` folder beside the host
+        sources of the same module: `operators/tet4/tet4_laplacian.cpp` is
+        mirrored by `operators/tet4/cuda/cu_tet4_laplacian.cu`, and the same
+        shape holds in `operators/hex8`, `operators/tet10`, `algebra`,
+        `resampling`, `frontend` and inside `external/smesh`.  The generated
+        tree follows the repository rather than inventing its own placement.
+
+        Nothing for the host, whose sources are the ones being mirrored.
         """
-        return ""
-
-    def op_registration_prefix(self):
-        """The key the factory answers to.  `gpu:Laplacian`, `gpu:em:Laplacian`."""
-        return ""
-
-    def op_file_suffix(self):
-        """What keeps the two wrappers' translation units apart."""
         return ""
 
     def element_connectivity_accessor(self):
@@ -757,14 +754,8 @@ class CUDATarget(TargetPlatform):
     def op_file_suffix(self):
         return "_cuda"
 
-    def op_class_prefix(self):
-        return "GPU"
-
-    def op_registration_prefix(self):
-        return "gpu:"
-
-    def op_file_suffix(self):
-        return "_cuda"
+    def source_subdirectory(self):
+        return "cuda"
 
     def element_connectivity_accessor(self):
         #: `device_elements_SoA()` hands back `idx_t *const *` where the C ABI
@@ -837,6 +828,12 @@ class HIPTarget(CUDATarget):
 
     def includes(self):
         return ("#include <hip/hip_runtime.h>",)
+
+    def source_subdirectory(self):
+        #: The repository has no `hip/` folder to follow, so this names the
+        #: target rather than copying `cuda/`: two device trees in one
+        #: directory would collide the way the host and device trees did.
+        return "hip"
 
     def kernel_launch_style(self):
         return "hip_grid_stride"

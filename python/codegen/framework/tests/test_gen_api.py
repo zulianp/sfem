@@ -2623,17 +2623,18 @@ int main() {
             )
             relative = _relative_sources(result, out_dir)
             self.assertIn(
-                os.path.join("d2", "quad4", "neohookean_ogden_quad4_operator.cu"),
+                os.path.join("d2", "quad4", "cuda", "neohookean_ogden_quad4_operator.cu"),
                 relative,
             )
             self.assertIn(
-                os.path.join("d2", "neohookean_ogden_d2_tensor_product_local.cuh"),
+                os.path.join("d2", "cuda", "neohookean_ogden_d2_tensor_product_local.cuh"),
                 relative,
             )
             operator_path = os.path.join(
                 out_dir,
                 "d2",
                 "quad4",
+                "cuda",
                 "neohookean_ogden_quad4_operator.cu",
             )
             with open(operator_path, encoding="utf-8") as input_file:
@@ -2652,7 +2653,7 @@ int main() {
             self.assertNotIn("lane", operator_source)
             self.assertNotIn("const ptrdiff_t thread = 0", operator_source)
             self.assertNotIn("SFEM_INLINE", operator_source)
-            with open(os.path.join(out_dir, "tensor_product_kernels.cuh"), encoding="utf-8") as input_file:
+            with open(os.path.join(out_dir, "cuda", "tensor_product_kernels.cuh"), encoding="utf-8") as input_file:
                 tensor_product_source = input_file.read()
             self.assertIn("__host__ __device__ __forceinline__", tensor_product_source)
             self.assertNotIn("#pragma omp", tensor_product_source)
@@ -2675,13 +2676,14 @@ int main() {
             )
             relative = _relative_sources(result, out_dir)
             self.assertIn(
-                os.path.join("d2", "quad4", "neohookean_ogden_quad4_operator.hip"),
+                os.path.join("d2", "quad4", "hip", "neohookean_ogden_quad4_operator.hip"),
                 relative,
             )
             operator_path = os.path.join(
                 out_dir,
                 "d2",
                 "quad4",
+                "hip",
                 "neohookean_ogden_quad4_operator.hip",
             )
             with open(operator_path, encoding="utf-8") as input_file:
@@ -2786,6 +2788,7 @@ int main() {
                 out_dir,
                 "d2",
                 "quad4",
+                "cuda",
                 "neohookean_ogden_quad4_operator.cu",
             )
             subprocess.run(

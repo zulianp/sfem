@@ -125,7 +125,12 @@ UNUSED_CONSTANT_BUDGET = 0
 #: 74 -> 56 with the same change: a tangent that reads no field no longer names
 #: the one-dimensional basis tables its contraction would have used.  All 56
 #: that remain are the simplex local kernels described above.
-UNUSED_PARAMETER_BUDGET = 56
+#: 56 -> 64 when the generated device tree was staged into the repository.  The
+#: eight are one per material: `sfem_<Op>_cuda.cpp` names `space` and does not
+#: read it, exactly as its host twin does and is already counted for.  The tree
+#: grew a second target, so a defect that exists on both is now counted twice --
+#: which is the honest number, and the budget still only shrinks from here.
+UNUSED_PARAMETER_BUDGET = 64
 
 #: Node-ordering permutations built inside a kernel.
 #:

@@ -541,7 +541,30 @@
 <section>
   <div class="sec-head"><span class="sec-num g">PART 3</span><h2>Open points</h2></div>
 
-  <p>Thirty-four, ordered by what unblocks what. Thirteen are new since the last pass, and ten of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+  <p>Thirty-five, ordered by what unblocks what. Fourteen are new since the last pass, and eleven of those are already closed — they are kept because both are findings rather than tasks, and a closed finding that is deleted gets rediscovered. The rail colour is status: <span class="chip c-gap">blocked</span> waits on something above it, <span class="chip c-part">needs a decision</span> is yours to call, <span class="chip c-ok">ready</span> can start now.</p>
+
+  <div class="op ready">
+    <div class="rail"></div><div class="num">OP 34</div>
+    <div class="body">
+      <div class="op-title">The device tree had nowhere to live in the repository <span class="chip c-ok">closed &mdash; local <code>cuda/</code> folders, one tree per material</span></div>
+
+      <p><b>What was staged, and what was not.</b> Four <code>.cuh</code> headers at the root of <code>frontend/ops/generated</code>, and nothing else: no generated <code>.cu</code>, no device <code>Op</code> wrapper. A CUDA generation wrote a <code>&lt;material&gt;_cuda</code> sibling tree that nothing tracked, nothing included and no build reached. Two trees for one material, which is the shape the repository bans.</p>
+
+      <p><b>Why they could not simply share a directory.</b> Most of the two trees separate by name already &mdash; <code>_operator.cu</code> against <code>.cpp</code>, <code>_local.cuh</code> against <code>.hpp</code>, and the wrapper carries <code>_cuda</code> in its stem. Three files do not: the element API header and the two quadrature reference tables are <code>.hpp</code> on both targets and differ in content, because <code>quadrature_codegen.reference_header_path</code> and the element header path were never routed through <code>header_name()</code>. Written into one directory they would have collided by path.</p>
+
+      <p><b>The repository already had the answer.</b> SFEM keeps device sources in a local <code>cuda/</code> folder beside the host sources of the same module: <code>operators/tet4/tet4_laplacian.cpp</code> beside <code>operators/tet4/cuda/cu_tet4_laplacian.cu</code>, and the same in <code>operators/hex8</code>, <code>operators/tet10</code>, <code>operators/sshex8</code>, <code>algebra</code>, <code>resampling</code>, <code>frontend</code>, <code>amg</code> and inside <code>external/smesh</code>. Following it makes the collision disappear rather than needing the extension fixed first.</p>
+
+      <p><b>One hook.</b> <code>TargetPlatform.source_subdirectory()</code> &mdash; nothing on the host, <code>cuda</code> on CUDA, <code>hip</code> on HIP. Everything else follows: the driver's layout puts each emitted file in <code>&lt;host directory&gt;/cuda/</code> and rewrites its relative includes to match, <code>op_wrappers</code> writes the wrapper into <code>op/cuda/</code>, and the backend's <code>shared_primitive_files</code> carries the folder so <code>generators/shared_headers</code> needs no change of its own. The result is one tree per material with 115 <code>.cu</code>, 70 <code>.cuh</code> and the wrapper's 36 host <code>.cpp</code> in <code>cuda/</code> folders inside it.</p>
+
+      <p><b>Two things one tree forced.</b> <code>_clean_outputs</code> is target-scoped now &mdash; the host run's <code>d*/*</code> glob reached <code>d3/cuda/</code> and would have deleted device headers nothing rewrites &mdash; and the set of folders to keep apart is derived from the registered backends rather than listed. And <code>matrix_formats.hpp</code> with <code>*_matrix_format_operator.cpp</code> keep the host position under every target: matrix assembly has no device lowering, so those are host C++ either way and a copy in <code>cuda/</code> would differ only by the include path the copy itself forced.</p>
+
+      <p><b>Three redundant paths went with it.</b> <code>generators/cuda.py</code> is deleted: every material generator already takes <code>--target</code>, and its own material list had drifted to name three materials the host tree does not carry while missing four that it does &mdash; so the device tree could not have been the host tree's twin however it was invoked. <code>backends/cuda.py</code> carried a byte-identical override of <code>shared_primitive_files</code>. And <code>targets.py</code> defined <code>op_class_prefix</code>, <code>op_registration_prefix</code> and <code>op_file_suffix</code> twice in both the base class and <code>CUDATarget</code>, the second copy silently winning.</p>
+
+      <p><b>What is still open.</b> The device Ops are compiled but not reachable: each material emits <code>op/cuda/sfem_&lt;Op&gt;_cuda_registration.cpp</code>, and no aggregate unit lists them the way <code>sfem_generated_ops_registration.cpp</code> lists the host ones, so <code>register_device_ops()</code> in <code>frontend/cuda/sfem_Function_incore_cuda.cpp</code> never calls them. That is a wiring step, not a placement one.</p>
+
+      <div class="op-facts"><span><i>before</i> 4 tracked <code>.cuh</code>, 0 <code>.cu</code></span><span><i>after</i> 115 <code>.cu</code> &middot; 70 <code>.cuh</code> &middot; 36 wrapper <code>.cpp</code></span><span><i>hook</i> one, <code>source_subdirectory()</code></span><span><i>host tree</i> byte-identical</span></div>
+    </div>
+  </div>
 
   <div class="op ready">
     <div class="rail"></div><div class="num">OP 33</div>

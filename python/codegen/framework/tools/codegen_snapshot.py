@@ -139,37 +139,47 @@ def _generator_env():
     return env
 
 
+#: Both targets, in the order `regenerate_all.sh` runs them.  The device pass
+#: comes second because the two share a material's directory and both write the
+#: target-independent matrix-format files.
+GENERATION_TARGETS = ("openmp", "cuda")
+
+
 def generate_all(out_dir, materials=MATERIALS, verbose=True):
-    """Run every generator into ``out_dir``/<material>.
+    """Run every generator into ``out_dir``/<material>, for every target.
 
     Returns the list of materials that failed, empty when all succeeded.
     """
     env = _generator_env()
     failed = []
-    for material in materials:
-        target = os.path.join(out_dir, material)
-        command = [
-            sys.executable,
-            "-m",
-            "codegen.framework.generators.%s" % material,
-            "--out-dir",
-            target,
-        ]
-        if verbose:
-            print("==> %s" % material, flush=True)
-        completed = subprocess.run(
-            command,
-            env=env,
-            cwd=_python_root(),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-        )
-        if completed.returncode != 0:
-            failed.append(material)
-            sys.stderr.write(
-                "generator '%s' failed with exit code %d:\n%s\n"
-                % (material, completed.returncode, completed.stdout.decode("utf-8", "replace"))
+    for generation_target in GENERATION_TARGETS:
+        for material in materials:
+            target = os.path.join(out_dir, material)
+            command = [
+                sys.executable,
+                "-m",
+                "codegen.framework.generators.%s" % material,
+                "--out-dir",
+                target,
+                "--target",
+                generation_target,
+            ]
+            label = "%s (%s)" % (material, generation_target)
+            if verbose:
+                print("==> %s" % label, flush=True)
+            completed = subprocess.run(
+                command,
+                env=env,
+                cwd=_python_root(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
             )
+            if completed.returncode != 0:
+                failed.append(label)
+                sys.stderr.write(
+                    "generator '%s' failed with exit code %d:\n%s\n"
+                    % (label, completed.returncode, completed.stdout.decode("utf-8", "replace"))
+                )
     # The headers that belong to a target rather than to a material.  A material
     # run writes its own target's set beside its kernels, which is where the
     # `.hpp` ones come from; the `.cuh` ones have no material to ride along with

@@ -14,7 +14,8 @@ not because the residual family could not be lowered, but because the code that
 lowers it was behind a class the CUDA backend could not name.
 """
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, replace
 
 import sympy as sp
 
@@ -119,9 +120,20 @@ class SoABackend:
         Asked of the backend for the same reason `emit_inexact` is: the target
         is what decides how they are spelled, and the caller should not have to
         build an emitter to find out.
+
+        The paths carry the target's folder, because these are the one set no
+        material generation lays out -- `generators/shared_headers` writes what
+        comes back straight into the tree, so the placement has to be in the
+        answer rather than applied by the caller.
         """
+        subdirectory = self.target.source_subdirectory()
         with use_target(self.target):
-            return tuple(self._shared_emitter().shared_primitive_files())
+            return tuple(
+                replace(generated, path=os.path.join(subdirectory, generated.path))
+                if subdirectory
+                else generated
+                for generated in self._shared_emitter().shared_primitive_files()
+            )
 
     def emit_inexact(self, material, unit, context):
         """The inexact-apply family, through the same boundary as everything else.

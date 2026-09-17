@@ -181,10 +181,14 @@ class TheTablesLiveInOnePlaceTest(unittest.TestCase):
     def test_every_call_names_a_header_that_exists(self):
         """A call into a struct nobody emits is a compile error, so this cannot
         fail silently -- it fails early instead, with the name."""
+        # Walked rather than listed: `reference/` carries a `cuda/` folder with
+        # the device spelling of the same tables, the way every other directory
+        # in the repository keeps its device sources.
         structs = set()
-        for name in os.listdir(os.path.join(GENERATED, "reference")):
-            with open(os.path.join(GENERATED, "reference", name), encoding="utf-8") as handle:
-                structs.update(re.findall(r"struct ([a-z0-9_]+) \{", handle.read()))
+        for base, _dirs, names in os.walk(os.path.join(GENERATED, "reference")):
+            for name in names:
+                with open(os.path.join(base, name), encoding="utf-8") as handle:
+                    structs.update(re.findall(r"struct ([a-z0-9_]+) \{", handle.read()))
         self.assertGreater(len(structs), 10)
         unknown, seen = set(), 0
         for base, _dirs, files in os.walk(GENERATED):
