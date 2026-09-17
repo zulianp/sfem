@@ -717,6 +717,7 @@
     }
   ],
   "schema": "sfem.generated_op_manifest.v1",
+  "target": "openmp",
   "wrapper": {
     "c_abi_header": "op/sfem_GeneratedMooneyRivlinKelvinVoigtNewmark_c_abi.hpp",
     "header": "op/sfem_GeneratedMooneyRivlinKelvinVoigtNewmark.hpp",

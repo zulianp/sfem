@@ -19,6 +19,7 @@ from codegen.framework.targets.context import (  # noqa: F401
 )
 from codegen.framework.targets.targets import *  # noqa: F401,F403
 from codegen.framework.targets.targets import (  # noqa: F401
+    target_for_name,
     CUDATarget,
     HIPTarget,
     OpenMPTarget,

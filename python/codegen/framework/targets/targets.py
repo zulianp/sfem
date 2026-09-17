@@ -854,6 +854,44 @@ class HIPTarget(CUDATarget):
         )
 
 
+#: Every target, by the name it answers to.
+#:
+#: A record that outlives the generation which wrote it -- an Op manifest -- has
+#: to say which target produced it, because what it holds is only readable under
+#: that target: a `c_abi` entry pairs a logical name with an emitted
+#: declaration, and only the target knows the prefix between them.
+def _targets_by_name():
+    return {
+        target.name: target
+        for target in (
+            OpenMPTarget(),
+            AVX512Target(),
+            ARMSVETarget(),
+            ARMSMETarget(),
+            CUDATarget(),
+            HIPTarget(),
+        )
+    }
+
+
+def target_for_name(name):
+    """The target that answers to `name`.
+
+    The host target when the name is missing, so a record written before the
+    field existed still reads -- it was written by the host generation, which is
+    the only one that produced tracked output then.
+    """
+    if not name:
+        return OpenMPTarget()
+    targets = _targets_by_name()
+    if name not in targets:
+        raise ValueError(
+            "unknown target '%s'; known targets are %s"
+            % (name, ", ".join(sorted(targets)))
+        )
+    return targets[name]
+
+
 def _pow_helper_name(exponent):
     if isinstance(exponent, int):
         value = exponent

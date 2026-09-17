@@ -377,6 +377,7 @@
     }
   ],
   "schema": "sfem.generated_op_manifest.v1",
+  "target": "cuda",
   "wrapper": {
     "c_abi_header": "op/cuda/sfem_GeneratedLinearElasticity_cuda_c_abi.hpp",
     "header": "op/cuda/sfem_GeneratedLinearElasticity_cuda.hpp",

@@ -48,6 +48,7 @@ import argparse
 import difflib
 import filecmp
 import hashlib
+import glob
 import os
 import shutil
 import subprocess
@@ -205,6 +206,41 @@ def generate_all(out_dir, materials=MATERIALS, verbose=True):
             "generator 'shared_headers' failed with exit code %d:\n%s\n"
             % (completed.returncode, completed.stdout.decode("utf-8", "replace"))
         )
+
+    # The device Ops' aggregate registration unit, from the manifests the device
+    # pass just wrote.  It runs here for the same reason the shared headers do:
+    # the shipped tree carries it, so a check that did not produce it would
+    # report it as drift for ever.  The host's twin is not generated here --
+    # it is hand-edited to disable operators, which is why it is one of the two
+    # exempt paths.
+    manifests = sorted(
+        glob.glob(os.path.join(out_dir, "*", "op", "cuda", "sfem_*_manifest.json"))
+    )
+    if manifests:
+        if verbose:
+            print("==> device op_registration", flush=True)
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "codegen.framework.generators.op_registration",
+                *manifests,
+                "--out-dir",
+                os.path.join(out_dir, "cuda"),
+                "--function-name",
+                "register_generated_device_ops",
+            ],
+            env=env,
+            cwd=_python_root(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        if completed.returncode != 0:
+            failed.append("device op_registration")
+            sys.stderr.write(
+                "generator 'device op_registration' failed with exit code %d:\n%s\n"
+                % (completed.returncode, completed.stdout.decode("utf-8", "replace"))
+            )
     return failed
 
 
