@@ -34,7 +34,7 @@ class CUDASoABackend(SoABackend):
     emitter: object = None
 
     def mesh_source_extension(self):
-        return "hip" if isinstance(self.target, HIPTarget) else "cu"
+        return self.target.mesh_source_extension()
 
     def local_header_extension(self):
         #: `.cuh` for HIP too: the header is included by device code either

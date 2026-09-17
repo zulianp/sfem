@@ -92,7 +92,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
-__global__ void neohookean_ogden_hex8_objective_a_msoa_impl(
+__global__ void neohookean_ogden_hex8_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -112,6 +112,12 @@ __global__ void neohookean_ogden_hex8_objective_a_msoa_impl(
         const s_t *const RSTR ux,
         const s_t *const RSTR uy,
         const s_t *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
+        const int nsteps,
+        const s_t *const RSTR steps,
         s_t *const RSTR value
 ) {
   static constexpr int NC = 3;
@@ -125,6 +131,8 @@ __global__ void neohookean_ogden_hex8_objective_a_msoa_impl(
     const int ne = 1;
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
+    s_t bu_base_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
     s_t bvalue[VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
@@ -134,22 +142,21 @@ __global__ void neohookean_ogden_hex8_objective_a_msoa_impl(
         ev_node[0] = element_shape[0];
       }
     }
+
     const s_t *const u_components[NC] = {ux, uy, uz};
+    const s_t *const h_components[NC] = {hx, hy, hz};
+    const s_t *const bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[9], bu_data[10], bu_data[11], bu_data[6], bu_data[7], bu_data[8], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[21], bu_data[22], bu_data[23], bu_data[18], bu_data[19], bu_data[20]};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_base_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
         }
       }
     }
-    {
-      bvalue[0] = s_t(0);
-    }
-
-    const s_t *const bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[9], bu_data[10], bu_data[11], bu_data[6], bu_data[7], bu_data[8], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[21], bu_data[22], bu_data[23], bu_data[18], bu_data[19], bu_data[20]};
     s_t badj0_data[VS];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
@@ -181,10 +188,24 @@ __global__ void neohookean_ogden_hex8_objective_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    neohookean_ogden_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bvalue);
+    for (int step = 0; step < nsteps; ++step) {
+      const s_t alpha = steps[step];
+      for (int shape = 0; shape < NS; ++shape) {
+        for (int d = 0; d < NC; ++d) {
+          {
+            bu_data[shape * NC + d][0] = bu_base_data[shape * NC + d][0] + alpha * bh_data[shape * NC + d][0];
+          }
+        }
+      }
+      {
+        bvalue[0] = s_t(0);
+      }
 
-    {
-      value[evb + 0] += bvalue[0];
+      neohookean_ogden_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bvalue);
+
+      {
+        value[(ptrdiff_t)step * nelements + evb + 0] = bvalue[0];
+      }
     }
   }
 
@@ -193,7 +214,7 @@ __global__ void neohookean_ogden_hex8_objective_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int cu_neohookean_ogden_hex8_objective_a_msoa(
+extern "C" int cu_neohookean_ogden_hex8_objective_steps_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -214,6 +235,12 @@ extern "C" int cu_neohookean_ogden_hex8_objective_a_msoa(
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -221,19 +248,19 @@ extern "C" int cu_neohookean_ogden_hex8_objective_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_hex8_objective_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, (double *)value);
+        sfem::codegen::neohookean_ogden_hex8_objective_steps_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_hex8_objective_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, (float *)value);
+        sfem::codegen::neohookean_ogden_hex8_objective_steps_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         return SFEM_SUCCESS;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("neohookean_ogden_hex8_objective_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("neohookean_ogden_hex8_objective_steps_a_msoa", -1, (int)scalar_bytes);
 }
 
 
@@ -241,7 +268,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
-__global__ void neohookean_ogden_hex8_objective_i_msoa_impl(
+__global__ void neohookean_ogden_hex8_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -252,6 +279,12 @@ __global__ void neohookean_ogden_hex8_objective_i_msoa_impl(
         const s_t *const RSTR ux,
         const s_t *const RSTR uy,
         const s_t *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
+        const int nsteps,
+        const s_t *const RSTR steps,
         s_t *const RSTR value
 ) {
   static constexpr int NC = 3;
@@ -270,6 +303,8 @@ __global__ void neohookean_ogden_hex8_objective_i_msoa_impl(
     const int ne = 1;
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
+    s_t bu_base_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
     s_t bvalue[VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -300,22 +335,21 @@ __global__ void neohookean_ogden_hex8_objective_i_msoa_impl(
         }
       }
     }
+
     const s_t *const u_components[NC] = {ux, uy, uz};
+    const s_t *const h_components[NC] = {hx, hy, hz};
+    const s_t *const bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[9], bu_data[10], bu_data[11], bu_data[6], bu_data[7], bu_data[8], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[21], bu_data[22], bu_data[23], bu_data[18], bu_data[19], bu_data[20]};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_base_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
         }
       }
     }
-    {
-      bvalue[0] = s_t(0);
-    }
-
-    const s_t *const bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[9], bu_data[10], bu_data[11], bu_data[6], bu_data[7], bu_data[8], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[21], bu_data[22], bu_data[23], bu_data[18], bu_data[19], bu_data[20]};
 
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
@@ -332,10 +366,24 @@ __global__ void neohookean_ogden_hex8_objective_i_msoa_impl(
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    neohookean_ogden_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bvalue);
+    for (int step = 0; step < nsteps; ++step) {
+      const s_t alpha = steps[step];
+      for (int shape = 0; shape < NS; ++shape) {
+        for (int d = 0; d < NC; ++d) {
+          {
+            bu_data[shape * NC + d][0] = bu_base_data[shape * NC + d][0] + alpha * bh_data[shape * NC + d][0];
+          }
+        }
+      }
+      {
+        bvalue[0] = s_t(0);
+      }
 
-    {
-      value[evb + 0] += bvalue[0];
+      neohookean_ogden_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bvalue);
+
+      {
+        value[(ptrdiff_t)step * nelements + evb + 0] = bvalue[0];
+      }
     }
   }
 
@@ -344,7 +392,7 @@ __global__ void neohookean_ogden_hex8_objective_i_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int cu_neohookean_ogden_hex8_objective_i_msoa(
+extern "C" int cu_neohookean_ogden_hex8_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -356,6 +404,12 @@ extern "C" int cu_neohookean_ogden_hex8_objective_i_msoa(
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -363,19 +417,19 @@ extern "C" int cu_neohookean_ogden_hex8_objective_i_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_hex8_objective_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, (double *)value);
+        sfem::codegen::neohookean_ogden_hex8_objective_steps_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::neohookean_ogden_hex8_objective_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, (float *)value);
+        sfem::codegen::neohookean_ogden_hex8_objective_steps_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         return SFEM_SUCCESS;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("neohookean_ogden_hex8_objective_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("neohookean_ogden_hex8_objective_steps_i_msoa", -1, (int)scalar_bytes);
 }
 
 

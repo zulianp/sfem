@@ -69,32 +69,32 @@
       "name": "laplace_hex8_matrix_assembly_variant_count"
     },
     {
-      "declaration": "extern \"C\" int cu_laplace_objective_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_met0,\n        const geom_t *const RSTR g_met1,\n        const geom_t *const RSTR g_met2,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        void *const RSTR value,\n        void *const stream\n);",
-      "name": "laplace_objective_2d_a_msoa"
-    },
-    {
-      "declaration": "extern \"C\" int cu_laplace_objective_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        void *const RSTR value,\n        void *const stream\n);",
-      "name": "laplace_objective_2d_i_msoa"
-    },
-    {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *cu_laplace_objective_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "laplace_objective_2d_soa_diagnostics"
     },
     {
-      "declaration": "extern \"C\" int cu_laplace_objective_3d_a_met_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_met0,\n        const geom_t *const RSTR g_met1,\n        const geom_t *const RSTR g_met2,\n        const geom_t *const RSTR g_met3,\n        const geom_t *const RSTR g_met4,\n        const geom_t *const RSTR g_met5,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        void *const RSTR value,\n        void *const stream\n);",
-      "name": "laplace_objective_3d_a_met_msoa"
-    },
-    {
-      "declaration": "extern \"C\" int cu_laplace_objective_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        void *const RSTR value,\n        void *const stream\n);",
-      "name": "laplace_objective_3d_a_msoa"
-    },
-    {
-      "declaration": "extern \"C\" int cu_laplace_objective_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        void *const RSTR value,\n        void *const stream\n);",
-      "name": "laplace_objective_3d_i_msoa"
-    },
-    {
       "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *cu_laplace_objective_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
       "name": "laplace_objective_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int cu_laplace_objective_steps_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_met0,\n        const geom_t *const RSTR g_met1,\n        const geom_t *const RSTR g_met2,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value,\n        void *const stream\n);",
+      "name": "laplace_objective_steps_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_laplace_objective_steps_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value,\n        void *const stream\n);",
+      "name": "laplace_objective_steps_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_laplace_objective_steps_3d_a_met_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_met0,\n        const geom_t *const RSTR g_met1,\n        const geom_t *const RSTR g_met2,\n        const geom_t *const RSTR g_met3,\n        const geom_t *const RSTR g_met4,\n        const geom_t *const RSTR g_met5,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value,\n        void *const stream\n);",
+      "name": "laplace_objective_steps_3d_a_met_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_laplace_objective_steps_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value,\n        void *const stream\n);",
+      "name": "laplace_objective_steps_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_laplace_objective_steps_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value,\n        void *const stream\n);",
+      "name": "laplace_objective_steps_3d_i_msoa"
     },
     {
       "declaration": "extern \"C\" void laplace_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
@@ -351,28 +351,28 @@
       ]
     },
     {
-      "name": "objective",
+      "name": "objective_steps",
       "variants": [
         {
-          "function": "cu_laplace_objective_2d_a_msoa",
+          "function": "cu_laplace_objective_steps_2d_a_msoa",
           "scalar_type": "real_t",
           "target": "laplace",
           "variant": "affine"
         },
         {
-          "function": "cu_laplace_objective_3d_a_msoa",
+          "function": "cu_laplace_objective_steps_3d_a_msoa",
           "scalar_type": "real_t",
           "target": "laplace",
           "variant": "affine"
         },
         {
-          "function": "cu_laplace_objective_2d_i_msoa",
+          "function": "cu_laplace_objective_steps_2d_i_msoa",
           "scalar_type": "real_t",
           "target": "laplace",
           "variant": "isoparametric"
         },
         {
-          "function": "cu_laplace_objective_3d_i_msoa",
+          "function": "cu_laplace_objective_steps_3d_i_msoa",
           "scalar_type": "real_t",
           "target": "laplace",
           "variant": "isoparametric"

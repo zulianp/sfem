@@ -2,6 +2,7 @@
 #include "sfem_GeneratedNeoHookeanOgden_cuda_c_abi.hpp"
 
 
+#include "sfem_API.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -191,7 +192,6 @@ namespace sfem {
     struct AffineGeometryCache {
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_soa;
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
-            SharedBuffer<metric_tensor_t> inexact_tangent;
         };
 
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
@@ -231,6 +231,15 @@ namespace sfem {
       return const_cast<idx_t **>(domain.block->device_elements_SoA()->data());
     }
 
+    //! Where the kernels read the mesh geometry from.  The mesh's own array on
+    //! the host; a device target reads smesh's device copy, because a
+    //! `__global__` body cannot dereference a host pointer -- and on a Grace
+    //! Hopper node it sometimes can, which is worse: the merit came out exact
+    //! at one mesh size and nonsense at the next.
+    const geom_t *const *element_points(const std::shared_ptr<smesh::Mesh> &mesh) {
+      return const_cast<const geom_t *const *>(mesh->device_points_SoA()->data());
+    }
+
     ptrdiff_t block_size_for_dim(const int dim) {
       switch (dim) {
         case 2: return 2;
@@ -248,8 +257,11 @@ namespace sfem {
 
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
-    std::unique_ptr<real_t[]> element_values;
+    SharedBuffer<real_t> element_values;
+    SharedBuffer<real_t> element_ones;
     ptrdiff_t element_capacity{0};
+    SharedBuffer<real_t> step_values;
+    int step_capacity{0};
     bool objective_uses_affine{false};
     bool gradient_uses_affine{false};
     bool apply_uses_affine{false};
@@ -523,8 +535,7 @@ namespace sfem {
     const bool needs_affine_geometry =
         impl_->objective_uses_affine ||
         impl_->gradient_uses_affine ||
-        impl_->apply_uses_affine ||
-                (impl_->space->mesh_ptr()->spatial_dimension() == 3 /* the inexact path assembles from the affine geometry, which smesh fills for 3D elements only */);
+        impl_->apply_uses_affine;
     for (auto &entry : impl_->domains->domains()) {
       seed_parameters(*entry.second.parameters);
       impl_->element_capacity =
@@ -539,7 +550,9 @@ namespace sfem {
       cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
       return SFEM_FAILURE;
     }
-    impl_->element_values.reset(new real_t[impl_->element_capacity]);
+    impl_->element_values = create_buffer<real_t>(impl_->element_capacity, EXECUTION_SPACE_DEVICE);
+    impl_->element_ones = create_buffer<real_t>(impl_->element_capacity, EXECUTION_SPACE_DEVICE);
+    sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->values(impl_->element_capacity, real_t(1), impl_->element_ones->data());
 
     return SFEM_SUCCESS;
   }
@@ -547,7 +560,7 @@ namespace sfem {
   int GPUGeneratedNeoHookeanOgden::gradient(const real_t *const x, real_t *const out) {
     SFEM_TRACE_SCOPE("GPUGeneratedNeoHookeanOgden::gradient");
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
@@ -598,7 +611,7 @@ namespace sfem {
                       real_t *const out) {
     SFEM_TRACE_SCOPE("GPUGeneratedNeoHookeanOgden::apply");
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
@@ -674,7 +687,7 @@ namespace sfem {
               real_t *const out) {
     SFEM_TRACE_SCOPE("GPUGeneratedNeoHookeanOgden::value_steps");
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
     }
@@ -695,33 +708,34 @@ namespace sfem {
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
             }
+      if (nsteps > impl_->step_capacity) {
+        impl_->step_values = create_buffer<real_t>(nsteps, EXECUTION_SPACE_DEVICE);
+        impl_->step_capacity = nsteps;
+      }
+      buffer_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());
       if (nvalues > impl_->element_capacity) {
-        impl_->element_values.reset(new real_t[nvalues]);
+        impl_->element_values = create_buffer<real_t>(nvalues, EXECUTION_SPACE_DEVICE);
+        impl_->element_ones = create_buffer<real_t>(nvalues, EXECUTION_SPACE_DEVICE);
+        sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->values(nvalues, real_t(1), impl_->element_ones->data());
         impl_->element_capacity = nvalues;
       }
-      std::fill(impl_->element_values.get(),
-                      impl_->element_values.get() + nvalues,
-                      real_t(0));
+      sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->zeros(nvalues, impl_->element_values->data());
       int status = SFEM_FAILURE;
 
       if (status == SFEM_FAILURE) {
         const int dim = mesh->spatial_dimension();
         if (dim == 2) {
           if (impl_->objective_uses_affine) {
-            SFEM_ERROR("neohookean_ogden affine objective_steps 2d dispatch was not generated\n");
-            return SFEM_FAILURE;
+            status = cu_neohookean_ogden_objective_steps_2d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, impl_->step_values->data(), impl_->element_values->data(), stream);
           } else {
-            SFEM_ERROR("neohookean_ogden isoparametric objective_steps 2d dispatch was not generated\n");
-            return SFEM_FAILURE;
+            status = cu_neohookean_ogden_objective_steps_2d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 2, x + 0, x + 1, 2, h + 0, h + 1, nsteps, impl_->step_values->data(), impl_->element_values->data(), stream);
           }
         }
         else if (dim == 3) {
           if (impl_->objective_uses_affine) {
-            SFEM_ERROR("neohookean_ogden affine objective_steps 3d dispatch was not generated\n");
-            return SFEM_FAILURE;
+            status = cu_neohookean_ogden_objective_steps_3d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, impl_->step_values->data(), impl_->element_values->data(), stream);
           } else {
-            SFEM_ERROR("neohookean_ogden isoparametric objective_steps 3d dispatch was not generated\n");
-            return SFEM_FAILURE;
+            status = cu_neohookean_ogden_objective_steps_3d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("lmbda"), domain.parameters->require_real_value("mu"), 3, x + 0, x + 1, x + 2, 3, h + 0, h + 1, h + 2, nsteps, impl_->step_values->data(), impl_->element_values->data(), stream);
           }
         }
         if (dim != 2 && dim != 3) {
@@ -730,13 +744,11 @@ namespace sfem {
         }
       }
       if (status != SFEM_SUCCESS) return status;
+      auto element_blas = sfem::blas<real_t>(EXECUTION_SPACE_DEVICE);
       for (int step = 0; step < nsteps; ++step) {
-        real_t sum = 0;
-#pragma omp simd reduction(+ : sum)
-        for (ptrdiff_t element = 0; element < nelements; ++element) {
-          sum += impl_->element_values[(ptrdiff_t)step * nelements + element];
-        }
-        out[step] += sum;
+        out[step] += element_blas->dot(nelements,
+            impl_->element_values->data() + (ptrdiff_t)step * nelements,
+            impl_->element_ones->data());
       }
       return SFEM_SUCCESS;
     });
@@ -753,7 +765,7 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
@@ -780,7 +792,7 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
@@ -808,7 +820,7 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {

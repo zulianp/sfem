@@ -1,6 +1,7 @@
 #include "sfem_GeneratedMooneyRivlinKelvinVoigtNewmark_cuda.hpp"
 #include "sfem_GeneratedMooneyRivlinKelvinVoigtNewmark_cuda_c_abi.hpp"
 
+#include "sfem_API.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
@@ -223,6 +224,15 @@ namespace sfem {
       return const_cast<idx_t **>(domain.block->device_elements_SoA()->data());
     }
 
+    //! Where the kernels read the mesh geometry from.  The mesh's own array on
+    //! the host; a device target reads smesh's device copy, because a
+    //! `__global__` body cannot dereference a host pointer -- and on a Grace
+    //! Hopper node it sometimes can, which is worse: the merit came out exact
+    //! at one mesh size and nonsense at the next.
+    const geom_t *const *element_points(const std::shared_ptr<smesh::Mesh> &mesh) {
+      return const_cast<const geom_t *const *>(mesh->device_points_SoA()->data());
+    }
+
     ptrdiff_t block_size_for_dim(const int dim) {
       switch (dim) {
         case 2: return 2;
@@ -241,8 +251,11 @@ namespace sfem {
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
     std::shared_ptr<Buffer<real_t>> previous_buffer;
-    std::unique_ptr<real_t[]> element_values;
+    SharedBuffer<real_t> element_values;
+    SharedBuffer<real_t> element_ones;
     ptrdiff_t element_capacity{0};
+    SharedBuffer<real_t> step_values;
+    int step_capacity{0};
     const real_t *previous{nullptr};
     const real_t *current{nullptr};
     bool objective_uses_affine{false};
@@ -313,7 +326,22 @@ namespace sfem {
     const int dim = impl_->space->mesh_ptr()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
-
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+          }
+        }
+      }
+      if (dim == 3) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+          }
+        }
+      }
       return SFEM_SUCCESS;
     });
 
@@ -329,7 +357,22 @@ namespace sfem {
     const int dim = impl_->space->mesh_ptr()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
-
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+          }
+        }
+      }
+      if (dim == 3) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->gradient_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+          }
+        }
+      }
       return SFEM_SUCCESS;
     });
 
@@ -345,7 +388,22 @@ namespace sfem {
     const int dim = impl_->space->mesh_ptr()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
-
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+          }
+        }
+      }
+      if (dim == 3) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_flops_affine_mesh(diagnostics, nelements) : sfem::codegen::KernelDiagnostics_total_flops_isoparametric_mesh(diagnostics, nelements);
+          }
+        }
+      }
       return SFEM_SUCCESS;
     });
 
@@ -361,7 +419,22 @@ namespace sfem {
     const int dim = impl_->space->mesh_ptr()->spatial_dimension();
     impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
-
+      if (dim == 2) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+          }
+        }
+      }
+      if (dim == 3) {
+        {
+          const sfem::codegen::KernelDiagnostics *const diagnostics = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_soa_diagnostics(domain.element_type);
+          if (diagnostics) {
+            total += impl_->apply_uses_affine ? sfem::codegen::KernelDiagnostics_total_bytes_affine_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t)) : sfem::codegen::KernelDiagnostics_total_bytes_isoparametric_mesh(diagnostics, nelements, sizeof(geom_t), sizeof(real_t), sizeof(real_t));
+          }
+        }
+      }
       return SFEM_SUCCESS;
     });
 
@@ -447,7 +520,9 @@ namespace sfem {
         entry.second.user_data = std::static_pointer_cast<void>(jacobian);
       }
     }
-    impl_->element_values.reset(new real_t[impl_->element_capacity]);
+    impl_->element_values = create_buffer<real_t>(impl_->element_capacity, EXECUTION_SPACE_DEVICE);
+    impl_->element_ones = create_buffer<real_t>(impl_->element_capacity, EXECUTION_SPACE_DEVICE);
+    sfem::blas<real_t>(EXECUTION_SPACE_DEVICE)->values(impl_->element_capacity, real_t(1), impl_->element_ones->data());
     return SFEM_SUCCESS;
   }
 
@@ -474,7 +549,7 @@ namespace sfem {
     }
     impl_->current = state;
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
@@ -494,7 +569,53 @@ namespace sfem {
       parameter_array(*domain.parameters, storage);
       const real_t *const previous = impl_->previous;
       switch (domain.element_type) {
-
+        case smesh::TRI3: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 2;
+          const real_t *const RSTR u_data[2] = {state + 0, state + 1};
+          const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
+          real_t *const RSTR u_out[2] = {out + 0, out + 1};
+          int status = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 2, state + 0, state + 1, 2, out + 0, out + 1, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1], stream);
+        }
+        case smesh::TET4: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          const real_t *const RSTR u_data[3] = {state + 0, state + 1, state + 2};
+          const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+          int status = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, out + 0, out + 1, out + 2, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2], stream);
+        }
+        case smesh::TET10: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          const real_t *const RSTR u_data[3] = {state + 0, state + 1, state + 2};
+          const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+          int status = impl_->gradient_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, out + 0, out + 1, out + 2, stream) : cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, out + 0, out + 1, out + 2, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return impl_->residual_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2], stream) : cu_mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2], stream);
+        }
+        case smesh::QUAD4:
+        case smesh::PROTEUS_QUAD4: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 2;
+          const real_t *const RSTR u_data[2] = {state + 0, state + 1};
+          const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
+          real_t *const RSTR u_out[2] = {out + 0, out + 1};
+          int status = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], 2, state + 0, state + 1, 2, out + 0, out + 1, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return impl_->residual_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1], stream) : cu_mooney_rivlin_kelvin_voigt_newmark_viscous_residual_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_out[0], u_out[1], stream);
+        }
+        case smesh::HEX8:
+        case smesh::PROTEUS_HEX8: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          const real_t *const RSTR u_data[3] = {state + 0, state + 1, state + 2};
+          const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+          int status = impl_->gradient_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, out + 0, out + 1, out + 2, stream) : cu_mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, out + 0, out + 1, out + 2, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return impl_->residual_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2], stream) : cu_mooney_rivlin_kelvin_voigt_newmark_viscous_residual_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_out[0], u_out[1], u_out[2], stream);
+        }
         default:
           SFEM_ERROR("GPUGeneratedMooneyRivlinKelvinVoigtNewmark does not support element type %d\n",
                                domain.element_type);
@@ -513,7 +634,7 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
@@ -533,7 +654,58 @@ namespace sfem {
       parameter_array(*domain.parameters, storage);
       const real_t *const previous = impl_->previous;
       switch (domain.element_type) {
-
+        case smesh::TRI3: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 2;
+          const real_t *const RSTR u_data[2] = {current + 0, current + 1};
+          const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
+          const real_t *const RSTR u_direction_data[2] = {direction + 0, direction + 1};
+          real_t *const RSTR u_out[2] = {out + 0, out + 1};
+          int status = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], 2, state + 0, state + 1, 2, direction + 0, direction + 1, 2, out + 0, out + 1, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1], stream);
+        }
+        case smesh::TET4: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          const real_t *const RSTR u_data[3] = {current + 0, current + 1, current + 2};
+          const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+          const real_t *const RSTR u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+          int status = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, direction + 0, direction + 1, direction + 2, 3, out + 0, out + 1, out + 2, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2], stream);
+        }
+        case smesh::TET10: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          const real_t *const RSTR u_data[3] = {current + 0, current + 1, current + 2};
+          const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+          const real_t *const RSTR u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+          int status = impl_->apply_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, direction + 0, direction + 1, direction + 2, 3, out + 0, out + 1, out + 2, stream) : cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, direction + 0, direction + 1, direction + 2, 3, out + 0, out + 1, out + 2, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return impl_->jacobian_action_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2], stream) : cu_mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2], stream);
+        }
+        case smesh::QUAD4:
+        case smesh::PROTEUS_QUAD4: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 2;
+          const real_t *const RSTR u_data[2] = {current + 0, current + 1};
+          const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
+          const real_t *const RSTR u_direction_data[2] = {direction + 0, direction + 1};
+          real_t *const RSTR u_out[2] = {out + 0, out + 1};
+          int status = cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], 2, state + 0, state + 1, 2, direction + 0, direction + 1, 2, out + 0, out + 1, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return impl_->jacobian_action_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1], stream) : cu_mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[3], storage[2], storage[4], 2, u_data[0], u_data[1], 2, u_old_data[0], u_old_data[1], 2, u_direction_data[0], u_direction_data[1], 2, u_out[0], u_out[1], stream);
+        }
+        case smesh::HEX8:
+        case smesh::PROTEUS_HEX8: {
+          static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          const real_t *const RSTR u_data[3] = {current + 0, current + 1, current + 2};
+          const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+          const real_t *const RSTR u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+          int status = impl_->apply_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, direction + 0, direction + 1, direction + 2, 3, out + 0, out + 1, out + 2, stream) : cu_mooney_rivlin_kelvin_voigt_newmark_elastic_apply_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], 3, state + 0, state + 1, state + 2, 3, direction + 0, direction + 1, direction + 2, 3, out + 0, out + 1, out + 2, stream);
+          if (status != SFEM_SUCCESS) return status;
+          return impl_->jacobian_action_uses_affine ? cu_mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2], stream) : cu_mooney_rivlin_kelvin_voigt_newmark_viscous_jacobian_action_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[3], storage[2], storage[4], 3, u_data[0], u_data[1], u_data[2], 3, u_old_data[0], u_old_data[1], u_old_data[2], 3, u_direction_data[0], u_direction_data[1], u_direction_data[2], 3, u_out[0], u_out[1], u_out[2], stream);
+        }
         default:
           SFEM_ERROR("GPUGeneratedMooneyRivlinKelvinVoigtNewmark does not support element type %d\n",
                                domain.element_type);

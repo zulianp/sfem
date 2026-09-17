@@ -12,6 +12,15 @@ namespace sfem {
     ~GeneratedLinearElasticity() override;
 
     const char *name() const override { return "GeneratedLinearElasticity"; }
+    //! Where this `Op` runs, which the `Function` above it needs in order to
+    //! allocate anything the `Op` will write.  `Op::execution_space` defaults
+    //! to the host and the device wrapper did not override it, so
+    //! `Function::execution_space` reported the host for a device `Op` and
+    //! `Function::node_wise_merit` allocated its residual there -- which the
+    //! device `gradient` then `atomicAdd`ed into.  `compute-sanitizer`:
+    //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
+    //! out of bounds".
+    ExecutionSpace execution_space() const override { return EXECUTION_SPACE_HOST; }
     bool is_linear() const override { return false; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;

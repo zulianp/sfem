@@ -139,7 +139,7 @@ extern "C" int cu_laplace_tet10_gradient_i_msoa(
         void *const RSTR outx,
         void *const stream
 );
-extern "C" int cu_laplace_proteus_quad4_objective_i_msoa(
+extern "C" int cu_laplace_proteus_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -148,10 +148,14 @@ extern "C" int cu_laplace_proteus_quad4_objective_i_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_laplace_quad4_objective_i_msoa(
+extern "C" int cu_laplace_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -160,10 +164,14 @@ extern "C" int cu_laplace_quad4_objective_i_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_laplace_hex8_objective_i_msoa(
+extern "C" int cu_laplace_hex8_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -172,10 +180,14 @@ extern "C" int cu_laplace_hex8_objective_i_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_laplace_proteus_hex8_objective_i_msoa(
+extern "C" int cu_laplace_proteus_hex8_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -184,10 +196,14 @@ extern "C" int cu_laplace_proteus_hex8_objective_i_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_laplace_tet10_objective_i_msoa(
+extern "C" int cu_laplace_tet10_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -196,6 +212,10 @@ extern "C" int cu_laplace_tet10_objective_i_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
@@ -324,7 +344,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_laplace_gradient_3d_i_msoa(
       "laplace_gradient_3d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_laplace_objective_2d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_laplace_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -334,6 +354,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_laplace_objective_2d_i_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -343,17 +367,17 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_laplace_objective_2d_i_msoa(
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_laplace_proteus_quad4_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, value, stream);
+      return cu_laplace_proteus_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value, stream);
     case smesh::QUAD4:
-      return cu_laplace_quad4_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, value, stream);
+      return cu_laplace_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "laplace_objective_2d_i_msoa", (int)element_type, (int)real_type);
+      "laplace_objective_steps_2d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_laplace_objective_3d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_laplace_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -363,6 +387,10 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_laplace_objective_3d_i_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -372,14 +400,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_laplace_objective_3d_i_msoa(
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return cu_laplace_hex8_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, value, stream);
+      return cu_laplace_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_laplace_proteus_hex8_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, value, stream);
+      return cu_laplace_proteus_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value, stream);
     case smesh::TET10:
-      return cu_laplace_tet10_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, value, stream);
+      return cu_laplace_tet10_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "laplace_objective_3d_i_msoa", (int)element_type, (int)real_type);
+      "laplace_objective_steps_3d_i_msoa", (int)element_type, (int)real_type);
 }

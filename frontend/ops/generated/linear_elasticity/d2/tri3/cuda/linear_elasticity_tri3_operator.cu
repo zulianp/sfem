@@ -92,7 +92,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
-__global__ void linear_elasticity_tri3_objective_a_msoa_impl(
+__global__ void linear_elasticity_tri3_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -106,6 +106,11 @@ __global__ void linear_elasticity_tri3_objective_a_msoa_impl(
         const ptrdiff_t u_stride,
         const s_t *const RSTR ux,
         const s_t *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const int nsteps,
+        const s_t *const RSTR steps,
         s_t *const RSTR value
 ) {
   static constexpr int NC = 2;
@@ -117,6 +122,8 @@ __global__ void linear_elasticity_tri3_objective_a_msoa_impl(
     const int ne = 1;
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
+    s_t bu_base_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
     s_t bvalue[VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
@@ -126,24 +133,23 @@ __global__ void linear_elasticity_tri3_objective_a_msoa_impl(
         ev_node[0] = element_shape[0];
       }
     }
+
     const s_t *const u_components[NC] = {ux, uy};
+    const s_t *const h_components[NC] = {hx, hy};
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_base_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
         }
       }
-    }
-    {
-      bvalue[0] = s_t(0);
-    }
-
-    const s_t *bu_streams[NS * NC];
-    for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
     }
     s_t badj0_data[VS];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
@@ -161,10 +167,24 @@ __global__ void linear_elasticity_tri3_objective_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    linear_elasticity_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
+    for (int step = 0; step < nsteps; ++step) {
+      const s_t alpha = steps[step];
+      for (int shape = 0; shape < NS; ++shape) {
+        for (int d = 0; d < NC; ++d) {
+          {
+            bu_data[shape * NC + d][0] = bu_base_data[shape * NC + d][0] + alpha * bh_data[shape * NC + d][0];
+          }
+        }
+      }
+      {
+        bvalue[0] = s_t(0);
+      }
 
-    {
-      value[evb + 0] += bvalue[0];
+      linear_elasticity_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, bdet0, affine_q_weight, lmbda, mu, bu_streams, bvalue);
+
+      {
+        value[(ptrdiff_t)step * nelements + evb + 0] = bvalue[0];
+      }
     }
   }
 
@@ -173,7 +193,7 @@ __global__ void linear_elasticity_tri3_objective_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int cu_linear_elasticity_tri3_objective_a_msoa(
+extern "C" int cu_linear_elasticity_tri3_objective_steps_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -188,6 +208,11 @@ extern "C" int cu_linear_elasticity_tri3_objective_a_msoa(
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -195,19 +220,19 @@ extern "C" int cu_linear_elasticity_tri3_objective_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_tri3_objective_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (double *)value);
+        sfem::codegen::linear_elasticity_tri3_objective_steps_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_tri3_objective_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (float *)value);
+        sfem::codegen::linear_elasticity_tri3_objective_steps_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
         return SFEM_SUCCESS;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("linear_elasticity_tri3_objective_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("linear_elasticity_tri3_objective_steps_a_msoa", -1, (int)scalar_bytes);
 }
 
 

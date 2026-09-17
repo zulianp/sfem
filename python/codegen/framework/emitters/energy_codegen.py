@@ -6134,6 +6134,17 @@ def _objective_steps_lines(
     n_field_components = form_n_field_components(form, dim)
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
+    # The width the *target* runs at, which is what every other operation in
+    # this module instantiates with.  This function asked for the plan's width
+    # instead, and it is the only one that did: on a device target, where each
+    # thread handles a single element (`ne = 1`) and
+    # `effective_vector_size` answers 1, `objective_steps` alone was
+    # instantiated at 16.  The kernel then declared sixteen-lane arrays,
+    # initialised lane zero, and handed them to micro-kernels parameterised by
+    # VS=16, which read the other fifteen lanes out of uninitialised local
+    # memory -- a merit of `-nan`, no out-of-bounds access for
+    # `compute-sanitizer` to find, and a 283 KB stack frame per thread.
+    effective_vector_size = source_builder.effective_vector_size(vector_size)
     if geometry_mode not in ("affine", "isoparametric"):
         raise ValueError("mesh geometry_mode must be 'affine' or 'isoparametric'")
     work_item = _work_item_index(source_builder)
@@ -6628,7 +6639,7 @@ def _objective_steps_lines(
             lambda scalar_type, _positional: source_builder.wrapper_call_lines(
                 implementation_name,
                 scalar_type,
-                ", geom_t, %d" % vector_size,
+                ", geom_t, %d" % effective_vector_size,
                 cast_arguments(wrapper_params, wrapper_args, scalar_type),
             ),
             parameter_lines=parameter_list_lines,
@@ -6657,7 +6668,7 @@ def _objective_steps_lines(
                 omit_reference_basis_inputs=omit_reference_basis_inputs,
                 stream_shape_order=stream_shape_order,
                 identity_stream_shape_order=identity_stream_shape_order,
-                vector_size=vector_size,
+                vector_size=effective_vector_size,
                 geometry_mode=geometry_mode,
                 material_parameter_names=material_parameter_names,
                 source_builder=source_builder,

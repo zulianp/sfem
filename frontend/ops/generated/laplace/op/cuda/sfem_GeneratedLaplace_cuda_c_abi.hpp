@@ -236,7 +236,13 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *laplace_hex8_matrix_assembly_va
 
 extern "C" int laplace_hex8_matrix_assembly_variant_count();
 
-extern "C" int cu_laplace_objective_2d_a_msoa(
+extern "C" const sfem::codegen::KernelDiagnostics *cu_laplace_objective_2d_soa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" const sfem::codegen::KernelDiagnostics *cu_laplace_objective_3d_soa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" int cu_laplace_objective_steps_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -248,11 +254,15 @@ extern "C" int cu_laplace_objective_2d_a_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
 
-extern "C" int cu_laplace_objective_2d_i_msoa(
+extern "C" int cu_laplace_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -262,14 +272,15 @@ extern "C" int cu_laplace_objective_2d_i_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
 
-extern "C" const sfem::codegen::KernelDiagnostics *cu_laplace_objective_2d_soa_diagnostics(
-    const smesh::ElemType element_type);
-
-extern "C" int cu_laplace_objective_3d_a_met_msoa(
+extern "C" int cu_laplace_objective_steps_3d_a_met_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -284,11 +295,15 @@ extern "C" int cu_laplace_objective_3d_a_met_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
 
-extern "C" int cu_laplace_objective_3d_a_msoa(
+extern "C" int cu_laplace_objective_steps_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -307,11 +322,15 @@ extern "C" int cu_laplace_objective_3d_a_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
 
-extern "C" int cu_laplace_objective_3d_i_msoa(
+extern "C" int cu_laplace_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -321,12 +340,13 @@ extern "C" int cu_laplace_objective_3d_i_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-
-extern "C" const sfem::codegen::KernelDiagnostics *cu_laplace_objective_3d_soa_diagnostics(
-    const smesh::ElemType element_type);
 
 extern "C" void laplace_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 

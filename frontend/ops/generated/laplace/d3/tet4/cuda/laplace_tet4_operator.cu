@@ -92,7 +92,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
-__global__ void laplace_tet4_objective_a_msoa_impl(
+__global__ void laplace_tet4_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -105,68 +105,42 @@ __global__ void laplace_tet4_objective_a_msoa_impl(
         const s_t kappa,
         const ptrdiff_t u_stride,
         const s_t *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const int nsteps,
+        const s_t *const RSTR steps,
         s_t *const RSTR value
 ) {
-  static constexpr int NC = 1;
-  static constexpr int NQ = 1;
-  static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
-  for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
-    s_t bvalue[VS];
-
-    for (int element_node = 0; element_node < NS; ++element_node) {
-      const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
-      {
-        ev_node[0] = element_shape[0];
-      }
-    }
-    const s_t *const u_components[NC] = {ux};
-
-    for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
-      for (int d = 0; d < NC; ++d) {
-        {
-          const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-        }
-      }
-    }
-    {
-      bvalue[0] = s_t(0);
-    }
-
-    const s_t *bu_streams[NS * NC];
-    for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
-    }
-    s_t bgeom_metric0_data[VS];
-    const s_t *const bgeom_metric0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_met0 + evb, bgeom_metric0_data, std::is_same<g_t, s_t>());
-    s_t bgeom_metric1_data[VS];
-    const s_t *const bgeom_metric1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_met1 + evb, bgeom_metric1_data, std::is_same<g_t, s_t>());
-    s_t bgeom_metric2_data[VS];
-    const s_t *const bgeom_metric2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_met2 + evb, bgeom_metric2_data, std::is_same<g_t, s_t>());
-    s_t bgeom_metric3_data[VS];
-    const s_t *const bgeom_metric3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_met3 + evb, bgeom_metric3_data, std::is_same<g_t, s_t>());
-    s_t bgeom_metric4_data[VS];
-    const s_t *const bgeom_metric4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_met4 + evb, bgeom_metric4_data, std::is_same<g_t, s_t>());
-    s_t bgeom_metric5_data[VS];
-    const s_t *const bgeom_metric5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_met5 + evb, bgeom_metric5_data, std::is_same<g_t, s_t>());
-
-    laplace_d3_simplex_tet4_metric_objective_block<s_t, NQ, NS, VS>(ne, 0, bgeom_metric0, bgeom_metric1, bgeom_metric2, bgeom_metric3, bgeom_metric4, bgeom_metric5, affine_q_weight, kappa, bu_streams, bvalue);
-
-    {
-      value[evb + 0] += bvalue[0];
+  for (ptrdiff_t element = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; element < nelements; element += (ptrdiff_t)blockDim.x * gridDim.x) {
+    const idx_t ev0 = elements[0][element];
+    const idx_t ev1 = elements[1][element];
+    const idx_t ev2 = elements[2][element];
+    const idx_t ev3 = elements[3][element];
+    const s_t x0 = ux[ev0 * u_stride];
+    const s_t x1 = ux[ev1 * u_stride];
+    const s_t x2 = ux[ev2 * u_stride];
+    const s_t x3 = ux[ev3 * u_stride];
+    const s_t h0 = hx[ev0 * h_stride];
+    const s_t h1 = hx[ev1 * h_stride];
+    const s_t h2 = hx[ev2 * h_stride];
+    const s_t h3 = hx[ev3 * h_stride];
+    const s_t fff0 = kappa * s_t(g_met0[element]);
+    const s_t fff1 = kappa * s_t(g_met1[element]);
+    const s_t fff2 = kappa * s_t(g_met2[element]);
+    const s_t fff3 = kappa * s_t(g_met3[element]);
+    const s_t fff4 = kappa * s_t(g_met4[element]);
+    const s_t fff5 = kappa * s_t(g_met5[element]);
+    for (int step = 0; step < nsteps; ++step) {
+      const s_t alpha = steps[step];
+      const s_t u0 = x0 + alpha * h0;
+      const s_t u1 = x1 + alpha * h1;
+      const s_t u2 = x2 + alpha * h2;
+      const s_t u3 = x3 + alpha * h3;
+      const s_t t0 = -u0 + u1;
+      const s_t t1 = -u0 + u2;
+      const s_t t2 = -u0 + u3;
+      value[(ptrdiff_t)step * nelements + element] = ((s_t(1) / s_t(2)))*t0*(fff0*t0 + fff1*t1 + fff2*t2) + ((s_t(1) / s_t(2)))*t1*(fff1*t0 + fff3*t1 + fff4*t2) + ((s_t(1) / s_t(2)))*t2*(fff2*t0 + fff4*t1 + fff5*t2);
     }
   }
 
@@ -175,7 +149,7 @@ __global__ void laplace_tet4_objective_a_msoa_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int cu_laplace_tet4_objective_a_msoa(
+extern "C" int cu_laplace_tet4_objective_steps_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -189,6 +163,10 @@ extern "C" int cu_laplace_tet4_objective_a_msoa(
         const real_t kappa,
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -196,19 +174,19 @@ extern "C" int cu_laplace_tet4_objective_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::laplace_tet4_objective_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, (double *)value);
+        sfem::codegen::laplace_tet4_objective_steps_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::laplace_tet4_objective_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, (float *)value);
+        sfem::codegen::laplace_tet4_objective_steps_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, g_met3, g_met4, g_met5, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         return SFEM_SUCCESS;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("laplace_tet4_objective_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("laplace_tet4_objective_steps_a_msoa", -1, (int)scalar_bytes);
 }
 
 

@@ -274,7 +274,13 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_hex8_matrix_a
 
 extern "C" int linear_elasticity_hex8_matrix_assembly_variant_count();
 
-extern "C" int cu_linear_elasticity_objective_2d_a_msoa(
+extern "C" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_objective_2d_soa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_objective_3d_soa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" int cu_linear_elasticity_objective_steps_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -290,11 +296,16 @@ extern "C" int cu_linear_elasticity_objective_2d_a_msoa(
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
 
-extern "C" int cu_linear_elasticity_objective_2d_i_msoa(
+extern "C" int cu_linear_elasticity_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -306,14 +317,16 @@ extern "C" int cu_linear_elasticity_objective_2d_i_msoa(
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
 
-extern "C" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_objective_2d_soa_diagnostics(
-    const smesh::ElemType element_type);
-
-extern "C" int cu_linear_elasticity_objective_3d_a_msoa(
+extern "C" int cu_linear_elasticity_objective_steps_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -335,11 +348,17 @@ extern "C" int cu_linear_elasticity_objective_3d_a_msoa(
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
 
-extern "C" int cu_linear_elasticity_objective_3d_i_msoa(
+extern "C" int cu_linear_elasticity_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -352,12 +371,15 @@ extern "C" int cu_linear_elasticity_objective_3d_i_msoa(
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-
-extern "C" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_objective_3d_soa_diagnostics(
-    const smesh::ElemType element_type);
 
 extern "C" void linear_elasticity_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 

@@ -355,6 +355,15 @@ namespace sfem {
       return domain.block->elements()->data();
     }
 
+    //! Where the kernels read the mesh geometry from.  The mesh's own array on
+    //! the host; a device target reads smesh's device copy, because a
+    //! `__global__` body cannot dereference a host pointer -- and on a Grace
+    //! Hopper node it sometimes can, which is worse: the merit came out exact
+    //! at one mesh size and nonsense at the next.
+    const geom_t *const *element_points(const std::shared_ptr<smesh::Mesh> &mesh) {
+      return const_cast<const geom_t *const *>(mesh->points()->data());
+    }
+
     ptrdiff_t block_size_for_dim(const int dim) {
       switch (dim) {
         case 2: return 2;
@@ -662,7 +671,7 @@ namespace sfem {
     }
     impl_->current = state;
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
@@ -749,7 +758,7 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
 
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;

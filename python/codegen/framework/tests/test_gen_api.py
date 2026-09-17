@@ -2646,7 +2646,18 @@ int main() {
             # it is constant-P1, which QUAD4 is not.  The old `_a_msoa` spelling
             # was pinning a kernel that has never existed on any target, and so
             # said nothing about the CUDA lowering it was written to check.
-            self.assertIn("__global__ void neohookean_ogden_quad4_objective_i_msoa_impl", operator_source)
+            # `objective_steps`, not `objective`, and the same kernel the host
+            # publishes.  A device target used to emit the unstepped one --
+            # `CUDAEnergySoASourceBuilder.emit_objective_steps` was False with
+            # no reason given -- while `plans.form_emission
+            # .objective_kernel_variants` states that the plain kernel is the
+            # stepped one with a single alpha of zero, `x + 0*h` being `x`
+            # exactly.  Two spellings of one computation, split by target, and
+            # the `Op`'s `value` calls the stepped dispatch on both: on the
+            # device it found nothing to call.
+            self.assertIn(
+                "__global__ void neohookean_ogden_quad4_objective_steps_i_msoa_impl", operator_source
+            )
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
             self.assertNotIn("#pragma omp", operator_source)
@@ -2696,7 +2707,18 @@ int main() {
             # it is constant-P1, which QUAD4 is not.  The old `_a_msoa` spelling
             # was pinning a kernel that has never existed on any target, and so
             # said nothing about the CUDA lowering it was written to check.
-            self.assertIn("__global__ void neohookean_ogden_quad4_objective_i_msoa_impl", operator_source)
+            # `objective_steps`, not `objective`, and the same kernel the host
+            # publishes.  A device target used to emit the unstepped one --
+            # `CUDAEnergySoASourceBuilder.emit_objective_steps` was False with
+            # no reason given -- while `plans.form_emission
+            # .objective_kernel_variants` states that the plain kernel is the
+            # stepped one with a single alpha of zero, `x + 0*h` being `x`
+            # exactly.  Two spellings of one computation, split by target, and
+            # the `Op`'s `value` calls the stepped dispatch on both: on the
+            # device it found nothing to call.
+            self.assertIn(
+                "__global__ void neohookean_ogden_quad4_objective_steps_i_msoa_impl", operator_source
+            )
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
             self.assertNotIn("#pragma omp", operator_source)

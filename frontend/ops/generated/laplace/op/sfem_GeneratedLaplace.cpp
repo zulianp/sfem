@@ -235,6 +235,15 @@ namespace sfem {
       return domain.block->elements()->data();
     }
 
+    //! Where the kernels read the mesh geometry from.  The mesh's own array on
+    //! the host; a device target reads smesh's device copy, because a
+    //! `__global__` body cannot dereference a host pointer -- and on a Grace
+    //! Hopper node it sometimes can, which is worse: the merit came out exact
+    //! at one mesh size and nonsense at the next.
+    const geom_t *const *element_points(const std::shared_ptr<smesh::Mesh> &mesh) {
+      return const_cast<const geom_t *const *>(mesh->points()->data());
+    }
+
     ptrdiff_t block_size_for_dim(const int dim) {
       switch (dim) {
         case 2: return 1;
@@ -566,7 +575,7 @@ namespace sfem {
   int GeneratedLaplace::gradient(const real_t *const x, real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedLaplace::gradient");
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
@@ -674,7 +683,7 @@ namespace sfem {
                       real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedLaplace::apply");
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
@@ -802,7 +811,7 @@ namespace sfem {
               real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedLaplace::value_steps");
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
     }
@@ -830,6 +839,7 @@ namespace sfem {
         geom_metric = reinterpret_cast<const geom_t *const *>(
             cache->metric_soa->fff_SoA()->data());
             }
+
       if (nvalues > impl_->element_capacity) {
         impl_->element_values.reset(new real_t[nvalues]);
         impl_->element_capacity = nvalues;
@@ -913,7 +923,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_crs");
 
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
@@ -934,7 +944,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_bsr");
 
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
@@ -956,7 +966,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("GeneratedLaplace::hessian_block_diag_sym");
 
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {

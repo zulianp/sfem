@@ -135,7 +135,15 @@ fi
 # sources it mirrors, which is where the rest of the repository keeps its
 # device sources.  After the host wave rather than beside it, because the two
 # share a directory and both write the target-independent matrix-format files.
-if [[ "${SFEM_GENERATE_CUDA:-0}" == "1" ]]; then
+#
+# On by default, because the device tree is tracked and `codegen_snapshot
+# check-tree` generates both targets unconditionally.  While this defaulted to
+# off -- a holdover from when the device tree came from a `generators/cuda.py`
+# that no longer exists -- a plain run of this script rewrote the host tree and
+# left the device tree at whatever it had been, so the two halves of one commit
+# could come from different revisions of the generator and only `check-tree`
+# would know.  `SFEM_GENERATE_CUDA=0` still buys a host-only run.
+if [[ "${SFEM_GENERATE_CUDA:-1}" == "1" ]]; then
     printf '==> cuda\n'
     # shellcheck disable=SC2086
     generate_materials --target cuda ${SFEM_CUDA_ARGS:-}
@@ -148,7 +156,7 @@ fi
 # device generation and checked like any other generated file.  Without it the
 # `op/cuda/sfem_<Op>_cuda_registration.cpp` each material emits is compiled and
 # never called, which is a device Op the factory cannot hand out.
-if [[ "${SFEM_GENERATE_CUDA:-0}" == "1" ]]; then
+if [[ "${SFEM_GENERATE_CUDA:-1}" == "1" ]]; then
     printf '==> device op_registration\n'
     DEVICE_MANIFESTS=("$ROOT_DIR"/frontend/ops/generated/*/op/cuda/sfem_*_manifest.json)
     if [[ -e "${DEVICE_MANIFESTS[0]}" ]]; then

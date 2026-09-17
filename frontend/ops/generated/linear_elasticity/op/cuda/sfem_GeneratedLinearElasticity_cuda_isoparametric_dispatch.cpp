@@ -181,7 +181,7 @@ extern "C" int cu_linear_elasticity_tet10_gradient_i_msoa(
         void *const RSTR outz,
         void *const stream
 );
-extern "C" int cu_linear_elasticity_proteus_quad4_objective_i_msoa(
+extern "C" int cu_linear_elasticity_proteus_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -192,10 +192,15 @@ extern "C" int cu_linear_elasticity_proteus_quad4_objective_i_msoa(
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_linear_elasticity_quad4_objective_i_msoa(
+extern "C" int cu_linear_elasticity_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -206,10 +211,15 @@ extern "C" int cu_linear_elasticity_quad4_objective_i_msoa(
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_linear_elasticity_hex8_objective_i_msoa(
+extern "C" int cu_linear_elasticity_hex8_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -221,10 +231,16 @@ extern "C" int cu_linear_elasticity_hex8_objective_i_msoa(
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_linear_elasticity_proteus_hex8_objective_i_msoa(
+extern "C" int cu_linear_elasticity_proteus_hex8_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -236,10 +252,16 @@ extern "C" int cu_linear_elasticity_proteus_hex8_objective_i_msoa(
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_linear_elasticity_tet10_objective_i_msoa(
+extern "C" int cu_linear_elasticity_tet10_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -251,6 +273,12 @@ extern "C" int cu_linear_elasticity_tet10_objective_i_msoa(
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
@@ -395,7 +423,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_gradient_3d_i_msoa
       "linear_elasticity_gradient_3d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_2d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -407,6 +435,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_2d_i_mso
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -416,17 +449,17 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_2d_i_mso
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_linear_elasticity_proteus_quad4_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value, stream);
+      return cu_linear_elasticity_proteus_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
     case smesh::QUAD4:
-      return cu_linear_elasticity_quad4_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value, stream);
+      return cu_linear_elasticity_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "linear_elasticity_objective_2d_i_msoa", (int)element_type, (int)real_type);
+      "linear_elasticity_objective_steps_2d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_3d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -439,6 +472,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_3d_i_mso
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -448,14 +487,14 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_linear_elasticity_objective_3d_i_mso
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return cu_linear_elasticity_hex8_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value, stream);
+      return cu_linear_elasticity_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_linear_elasticity_proteus_hex8_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value, stream);
+      return cu_linear_elasticity_proteus_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
     case smesh::TET10:
-      return cu_linear_elasticity_tet10_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value, stream);
+      return cu_linear_elasticity_tet10_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "linear_elasticity_objective_3d_i_msoa", (int)element_type, (int)real_type);
+      "linear_elasticity_objective_steps_3d_i_msoa", (int)element_type, (int)real_type);
 }

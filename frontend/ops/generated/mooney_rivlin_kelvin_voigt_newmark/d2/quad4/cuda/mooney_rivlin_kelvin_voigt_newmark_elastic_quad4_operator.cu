@@ -92,7 +92,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
-__global__ void mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_msoa_impl(
+__global__ void mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
         idx_t **const RSTR elements,
@@ -102,6 +102,11 @@ __global__ void mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_mso
         const ptrdiff_t u_stride,
         const s_t *const RSTR ux,
         const s_t *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const int nsteps,
+        const s_t *const RSTR steps,
         s_t *const RSTR value
 ) {
   static constexpr int NC = 2;
@@ -119,6 +124,8 @@ __global__ void mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_mso
     const int ne = 1;
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
+    s_t bu_base_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
     s_t bvalue[VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -144,22 +151,21 @@ __global__ void mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_mso
         }
       }
     }
+
     const s_t *const u_components[NC] = {ux, uy};
+    const s_t *const h_components[NC] = {hx, hy};
+    const s_t *const bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[6], bu_data[7], bu_data[4], bu_data[5]};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_base_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
         }
       }
     }
-    {
-      bvalue[0] = s_t(0);
-    }
-
-    const s_t *const bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[6], bu_data[7], bu_data[4], bu_data[5]};
 
     s_t coordinate_grad_ref[ND * NQ * ND * VS];
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
@@ -173,10 +179,24 @@ __global__ void mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_mso
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bvalue);
+    for (int step = 0; step < nsteps; ++step) {
+      const s_t alpha = steps[step];
+      for (int shape = 0; shape < NS; ++shape) {
+        for (int d = 0; d < NC; ++d) {
+          {
+            bu_data[shape * NC + d][0] = bu_base_data[shape * NC + d][0] + alpha * bh_data[shape * NC + d][0];
+          }
+        }
+      }
+      {
+        bvalue[0] = s_t(0);
+      }
 
-    {
-      value[evb + 0] += bvalue[0];
+      mooney_rivlin_kelvin_voigt_newmark_elastic_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bvalue);
+
+      {
+        value[(ptrdiff_t)step * nelements + evb + 0] = bvalue[0];
+      }
     }
   }
 
@@ -185,7 +205,7 @@ __global__ void mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_mso
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -196,6 +216,11 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_m
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -203,19 +228,19 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_m
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (double *)value);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (float *)value);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
         return SFEM_SUCCESS;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa", -1, (int)scalar_bytes);
 }
 
 

@@ -199,7 +199,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_gradient_i_ms
         void *const RSTR outz,
         void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -210,10 +210,15 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objec
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -224,10 +229,15 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_m
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -239,10 +249,16 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_i_ms
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -254,10 +270,16 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_object
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -269,6 +291,12 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_i_m
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 );
@@ -929,7 +957,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_e
       "mooney_rivlin_kelvin_voigt_newmark_elastic_gradient_3d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_objective_2d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -941,6 +969,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_e
         const ptrdiff_t u_stride,
         const void *const RSTR ux,
         const void *const RSTR uy,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -950,17 +983,17 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_e
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
     case smesh::QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, value, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_2d_i_msoa", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_2d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_objective_3d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -973,6 +1006,12 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_e
         const void *const RSTR ux,
         const void *const RSTR uy,
         const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
         void *const RSTR value,
         void *const stream
 ) {
@@ -982,16 +1021,16 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_e
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
     case smesh::TET10:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, value, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_3d_i_msoa", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_newmark_elastic_objective_steps_3d_i_msoa", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_hessian_bsr_2d_i_msoa(
