@@ -1,4 +1,4 @@
-from codegen.framework.targets import current_target
+from codegen.framework.targets import current_target, target_for_name, use_target
 from codegen.framework.emitters.runtime_typed_abi import (
     runtime_type_correspondence_lines,
 )
@@ -29,9 +29,18 @@ from codegen.framework.plans.form_transformations import (
 
 
 def generate_op_registration_files(manifests, function_name="register_generated_ops"):
+    """The aggregate unit that calls every material's registration function.
+
+    The file is named after the function it defines, because there is one of
+    these per target now -- the host's `register_generated_ops` beside the
+    device's `register_generated_device_ops` -- and both folders are on the
+    include path.  A fixed name would have let the device unit's own header
+    include resolve to the host one.
+    """
     entries = _registration_entries_from_manifests(manifests)
-    header_name = "sfem_generated_ops_registration.hpp"
-    source_name = "sfem_generated_ops_registration.cpp"
+    stem = "sfem_%s_registration" % function_name.replace("register_", "", 1)
+    header_name = "%s.hpp" % stem
+    source_name = "%s.cpp" % stem
     return {
         header_name: _registration_aggregate_header(function_name),
         source_name: _registration_aggregate_source(header_name, function_name, entries),
@@ -236,7 +245,8 @@ def _registration_entries_from_manifests(manifests):
     for manifest in manifests:
         if isinstance(manifest, str):
             manifest = json.loads(manifest)
-        _validate_op_manifest(manifest)
+        with use_target(target_for_name(manifest.get("target"))):
+            _validate_op_manifest(manifest)
         registration = manifest["registration"]
         operator_name = registration["operator_name"]
         if operator_name in seen_operators:
@@ -351,7 +361,11 @@ def _validate_manifest_runtime_operations(runtime_operations, c_abi_names):
                 "generated Op manifest runtime variant",
             )
             _required_string(variant, "target", "generated Op manifest runtime variant")
-            if function not in c_abi_names:
+            # `runtime_operations` names the symbol a caller dials, which is
+            # the emitted one; `c_abi` keys on the logical name, because that is
+            # what `plans/conventions` can parse.  The two sections are the same
+            # set through the target, not by string equality.
+            if _logical_entry_point_name(function) not in c_abi_names:
                 raise ValueError(
                     "generated Op manifest runtime function '%s' is not declared in c_abi"
                     % function
@@ -399,7 +413,7 @@ def _registration_aggregate_source(header_name, function_name, entries):
 namespace sfem {
 %(declarations)s
   void %(function)s() {
-%(calls)s    }
+%(calls)s  }
 }  // namespace sfem
 """ % {
         "header": header_name,
@@ -6444,6 +6458,14 @@ def _op_manifest(
     ]
     manifest = {
         "schema": "sfem.generated_op_manifest.v1",
+        # Which target wrote this.  The `c_abi` entries pair a *logical* name
+        # with the *emitted* declaration -- `plans/conventions` parses material,
+        # element and operation out of a name and `cu_` is none of those -- so
+        # reading the pair back needs the same target bound that wrote it.
+        # Without this a manifest was only self-consistent by luck: read under
+        # the ambient default, `cu_laplace_apply_2d_a_msoa` stripped to itself
+        # and no longer matched the `laplace_apply_2d_a_msoa` beside it.
+        "target": current_target().name,
         "material": material.name,
         "op_name": _op_registered_name(material),
         "wrapper": {

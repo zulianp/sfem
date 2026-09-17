@@ -142,6 +142,26 @@ if [[ "${SFEM_GENERATE_CUDA:-0}" == "1" ]]; then
     drain_generators
 fi
 
+# The device Ops' aggregate registration unit.  Unlike the host's, which is
+# hand-edited to disable operators and so is exempt from `check-tree`, this one
+# is nothing but what the device manifests say -- so it is written on every
+# device generation and checked like any other generated file.  Without it the
+# `op/cuda/sfem_<Op>_cuda_registration.cpp` each material emits is compiled and
+# never called, which is a device Op the factory cannot hand out.
+if [[ "${SFEM_GENERATE_CUDA:-0}" == "1" ]]; then
+    printf '==> device op_registration\n'
+    DEVICE_MANIFESTS=("$ROOT_DIR"/frontend/ops/generated/*/op/cuda/sfem_*_manifest.json)
+    if [[ -e "${DEVICE_MANIFESTS[0]}" ]]; then
+        if ! "$PYTHON" -m codegen.framework.generators.op_registration \
+                "${DEVICE_MANIFESTS[@]}" \
+                --out-dir "$ROOT_DIR/frontend/ops/generated/cuda" \
+                --function-name register_generated_device_ops; then
+            printf '==> device op_registration FAILED\n'
+            exit 1
+        fi
+    fi
+fi
+
 if [[ -n "${SFEM_GENERATOR_MANIFESTS:-}" ]]; then
     printf '==> op_registration\n'
     # shellcheck disable=SC2086
