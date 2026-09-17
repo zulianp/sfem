@@ -400,11 +400,11 @@ extern "C" int cu_two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_form_2_p_w_p_w_d3_simplex_jacobian_action_block<double, 11, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q11<double>::shape(), sfem::codegen::ref_tet4_q11<double>::grad_ref_x(), sfem::codegen::ref_tet4_q11<double>::grad_ref_y(), sfem::codegen::ref_tet4_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), (const double *const *)current, (const double *const *)direction, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
+        sfem::codegen::two_phase_flow_form_2_p_w_p_w_d3_simplex_jacobian_action_block<double, 11, 4, 1>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q11<double>::shape(), sfem::codegen::ref_tet4_q11<double>::grad_ref_x(), sfem::codegen::ref_tet4_q11<double>::grad_ref_y(), sfem::codegen::ref_tet4_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), (const double *const *)current, (const double *const *)direction, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_form_2_p_w_p_w_d3_simplex_jacobian_action_block<float, 11, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q11<float>::shape(), sfem::codegen::ref_tet4_q11<float>::grad_ref_x(), sfem::codegen::ref_tet4_q11<float>::grad_ref_y(), sfem::codegen::ref_tet4_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), (const float *const *)current, (const float *const *)direction, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
+        sfem::codegen::two_phase_flow_form_2_p_w_p_w_d3_simplex_jacobian_action_block<float, 11, 4, 1>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q11<float>::shape(), sfem::codegen::ref_tet4_q11<float>::grad_ref_x(), sfem::codegen::ref_tet4_q11<float>::grad_ref_y(), sfem::codegen::ref_tet4_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), (const float *const *)current, (const float *const *)direction, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -463,7 +463,7 @@ __global__ void two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_a_msoa_impl(
   static constexpr int NQ = 11;
   static constexpr int NS = 4;
   static constexpr int NC = 2;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const affine_shape = sfem::codegen::ref_tet4_q11<s_t>::shape();
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y();

@@ -397,11 +397,11 @@ extern "C" int cu_two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_form_2_p_c_p_c_d2_tensor_product_jacobian_action_block<double, 16, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q4<double>::shape_1d(), sfem::codegen::ref_line_p1_q4<double>::grad_1d(), sfem::codegen::quad_line_q4<double>::q_weight_1d(), (const double *const *)current, (const double *const *)direction, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (double *const *)output);
+        sfem::codegen::two_phase_flow_form_2_p_c_p_c_d2_tensor_product_jacobian_action_block<double, 16, 4, 1>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q4<double>::shape_1d(), sfem::codegen::ref_line_p1_q4<double>::grad_1d(), sfem::codegen::quad_line_q4<double>::q_weight_1d(), (const double *const *)current, (const double *const *)direction, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_form_2_p_c_p_c_d2_tensor_product_jacobian_action_block<float, 16, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q4<float>::shape_1d(), sfem::codegen::ref_line_p1_q4<float>::grad_1d(), sfem::codegen::quad_line_q4<float>::q_weight_1d(), (const float *const *)current, (const float *const *)direction, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (float *const *)output);
+        sfem::codegen::two_phase_flow_form_2_p_c_p_c_d2_tensor_product_jacobian_action_block<float, 16, 4, 1>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q4<float>::shape_1d(), sfem::codegen::ref_line_p1_q4<float>::grad_1d(), sfem::codegen::quad_line_q4<float>::q_weight_1d(), (const float *const *)current, (const float *const *)direction, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -452,7 +452,7 @@ __global__ void two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_a_msoa_impl(
   static constexpr int NQ = 16;
   static constexpr int NS = 4;
   static constexpr int NC = 2;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
@@ -611,7 +611,7 @@ __global__ void two_phase_flow_form_2_p_c_p_c_quad4_jacobian_action_i_msoa_impl(
   static constexpr int NQ = 16;
   static constexpr int NS = 4;
   static constexpr int NC = 2;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q4<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q4<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();

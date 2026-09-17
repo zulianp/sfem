@@ -357,6 +357,20 @@ class TargetPlatform:
         """
         return "cpp"
 
+    def effective_vector_size(self, vector_size):
+        """How many elements one work item of this target processes at once.
+
+        The plan's width is a tuning choice for a CPU kernel, where one work
+        item strides over a block of elements.  A device work item is a thread
+        and owns exactly one element, so the width there is 1 whatever the plan
+        says -- and a kernel that takes the plan's 16 anyway declares
+        sixteen-lane arrays, fills lane zero, and hands VS=16 to every
+        micro-kernel it calls.  The energy builders each answered this; the
+        residual family never asked, which is why its device kernels ran with
+        fifteen lanes of uninitialised local memory.
+        """
+        return int(vector_size)
+
     def execution_space(self):
         """The `sfem::ExecutionSpace` enumerator a generated `Op` runs in here.
 
@@ -811,6 +825,10 @@ class CUDATarget(TargetPlatform):
 
     def mesh_source_extension(self):
         return "cu"
+
+    def effective_vector_size(self, vector_size):
+        #: One thread, one element.
+        return 1
 
     def execution_space(self):
         return "EXECUTION_SPACE_DEVICE"

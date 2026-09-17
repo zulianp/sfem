@@ -5402,7 +5402,7 @@ def _operator_source(
     n_fields = len(system.fields)
     n_shape = rule.n_shape
     n_qp = rule.n_qp
-    vector_size = specialization.vector_size
+    vector_size = current_target().effective_vector_size(specialization.vector_size)
     element = rule.element_type.lower()
     tensor_product = is_tensor_product_family(basis_family)
     lines = [
@@ -6732,7 +6732,7 @@ def _mesh_operator_source(
     n_fields = len(system.fields)
     n_shape = rule.n_shape
     n_qp = rule.n_qp
-    vector_size = affine_specialization.vector_size
+    vector_size = current_target().effective_vector_size(affine_specialization.vector_size)
     tensor_product = is_tensor_product_family(basis_family)
     specialized_prefix = _constant_p1_affine_specialized_local_prefix(
         local_prefix,
@@ -8583,7 +8583,7 @@ def _isoparametric_mesh_operator_source(
     n_fields = len(system.fields)
     n_shape = rule.n_shape
     n_qp = rule.n_qp
-    vector_size = specialization.vector_size
+    vector_size = current_target().effective_vector_size(specialization.vector_size)
     tensor_product = is_tensor_product_family(basis_family)
     tensor_product_geometry = is_tensor_product_family(geometry_family)
     gradient_metric = None
@@ -8908,7 +8908,7 @@ def _scalar_packed_jacobian_action_source(
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
             kernel_constant("N_STREAMS", "NC * NS", indent="  "),
-            kernel_constant("VS", specialization.vector_size, indent="  "),
+            kernel_constant("VS", current_target().effective_vector_size(specialization.vector_size), indent="  "),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -9255,7 +9255,7 @@ def _scalar_packed_affine_jacobian_action_source(
     n_fields = len(system.fields)
     n_shape = rule.n_shape
     n_qp = rule.n_qp
-    vector_size = specialization.vector_size
+    vector_size = current_target().effective_vector_size(specialization.vector_size)
     tensor_product = is_tensor_product_family(basis_family)
     specialized_prefix = _constant_p1_affine_specialized_local_prefix(
         local_prefix,

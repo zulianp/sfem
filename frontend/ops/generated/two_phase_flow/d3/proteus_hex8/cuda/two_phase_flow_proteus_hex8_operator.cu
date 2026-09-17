@@ -407,11 +407,11 @@ extern "C" int cu_two_phase_flow_proteus_hex8_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_d3_tensor_product_residual_block<double, 27, 8, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::ref_line_p1_q3<double>::grad_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
+        sfem::codegen::two_phase_flow_d3_tensor_product_residual_block<double, 27, 8, 1>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::ref_line_p1_q3<double>::grad_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_d3_tensor_product_residual_block<float, 27, 8, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::ref_line_p1_q3<float>::grad_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
+        sfem::codegen::two_phase_flow_d3_tensor_product_residual_block<float, 27, 8, 1>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::ref_line_p1_q3<float>::grad_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -477,7 +477,7 @@ __global__ void two_phase_flow_proteus_hex8_residual_a_msoa_impl(
   static constexpr int NQ = 27;
   static constexpr int NS = 8;
   static constexpr int NC = 2;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q3<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q3<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
@@ -660,7 +660,7 @@ __global__ void two_phase_flow_proteus_hex8_residual_i_msoa_impl(
   static constexpr int NQ = 27;
   static constexpr int NS = 8;
   static constexpr int NC = 2;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q3<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q3<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
@@ -868,11 +868,11 @@ extern "C" int cu_two_phase_flow_proteus_hex8_jacobian_action_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_d3_tensor_product_jacobian_action_block<double, 27, 8, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::ref_line_p1_q3<double>::grad_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), (const double *const *)current, (const double *const *)direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
+        sfem::codegen::two_phase_flow_d3_tensor_product_jacobian_action_block<double, 27, 8, 1>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::ref_line_p1_q3<double>::grad_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), (const double *const *)current, (const double *const *)direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_d3_tensor_product_jacobian_action_block<float, 27, 8, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::ref_line_p1_q3<float>::grad_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), (const float *const *)current, (const float *const *)direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
+        sfem::codegen::two_phase_flow_d3_tensor_product_jacobian_action_block<float, 27, 8, 1>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::ref_line_p1_q3<float>::grad_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), (const float *const *)current, (const float *const *)direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -938,7 +938,7 @@ __global__ void two_phase_flow_proteus_hex8_jacobian_action_a_msoa_impl(
   static constexpr int NQ = 27;
   static constexpr int NS = 8;
   static constexpr int NC = 2;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q3<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q3<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
@@ -1121,7 +1121,7 @@ __global__ void two_phase_flow_proteus_hex8_jacobian_action_i_msoa_impl(
   static constexpr int NQ = 27;
   static constexpr int NS = 8;
   static constexpr int NC = 2;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q3<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q3<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();

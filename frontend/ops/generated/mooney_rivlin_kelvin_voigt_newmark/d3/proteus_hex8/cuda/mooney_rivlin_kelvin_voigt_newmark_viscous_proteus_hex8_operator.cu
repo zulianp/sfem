@@ -60,11 +60,11 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residu
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_residual_block<double, 8, 8, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, newmark_velocity_alpha, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_residual_block<double, 8, 8, 1>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, newmark_velocity_alpha, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_residual_block<float, 8, 8, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, newmark_velocity_alpha, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_residual_block<float, 8, 8, 1>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, newmark_velocity_alpha, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -110,7 +110,7 @@ __global__ void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int NC = 3;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
@@ -253,7 +253,7 @@ __global__ void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int NC = 3;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
@@ -419,11 +419,11 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobi
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block<double, 8, 8, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, newmark_velocity_alpha, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block<double, 8, 8, 1>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, newmark_velocity_alpha, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block<float, 8, 8, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, newmark_velocity_alpha, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block<float, 8, 8, 1>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, newmark_velocity_alpha, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -473,7 +473,7 @@ __global__ void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int NC = 3;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
@@ -627,7 +627,7 @@ __global__ void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
   static constexpr int NC = 3;
-  static constexpr int VS = 16;
+  static constexpr int VS = 1;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
