@@ -266,7 +266,17 @@ __global__ void tdot(const ptrdiff_t n, const T *const SFEM_RESTRICT l, const T 
     __syncthreads();
 
     if (!warp_id) {
-        acc = block_accumulator[lid];
+        // One entry per warp was written, and `block_accumulator` holds
+        // `SFEM_WARP_SIZE` of them.  With the 128-thread blocks every caller
+        // here launches there are four warps, so lanes 4..31 read shared
+        // memory nothing in this kernel ever wrote.  Shared memory is not
+        // zeroed between launches: early in a process it usually happens to be
+        // zero and the sum is right, and once other kernels have left residue
+        // in it the same dot product returns a different wrong answer every
+        // call -- or `nan`.  Neither `memcheck` nor `initcheck` reports it,
+        // because uninitialised *shared* memory is not what either tracks.
+        const unsigned int n_warps = (blockDim.x + SFEM_WARP_SIZE - 1) / SFEM_WARP_SIZE;
+        acc                        = (lid < n_warps) ? block_accumulator[lid] : T(0);
         acc = warp_reduce_32(acc);
 
         if (!threadIdx.x) {
