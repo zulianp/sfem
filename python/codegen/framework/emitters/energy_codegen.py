@@ -12,7 +12,11 @@ from codegen.framework.plans.conventions import (
     abi_geometry_name,
     abi_local_level,
     abi_mesh_fragment,
+    INLINE_QUALIFIER_MACROS,
+    inline_qualifier_prelude,
     restrict_prelude,
+    sfem_scalar_type_fallback,
+    sfem_scalar_type_prelude,
 )
 
 #: The staged-buffer and per-thread-scratch prefixes, from the one
@@ -835,13 +839,7 @@ def _sfem_soa_local_header(
         "#define %s" % guard,
         "",
         "#include <math.h>",
-        "#include <stddef.h>",
-        "#if defined(__has_include)",
-        '#if __has_include("sfem_base.hpp")',
-        '#include "sfem_base.hpp"',
-        "#define SFEM_GENERATED_SCALAR_T",
-        "#endif",
-        "#endif",
+        *sfem_scalar_type_prelude(),
         "",
         *source_builder.local_header_preamble_lines(
             math_name,
@@ -849,13 +847,7 @@ def _sfem_soa_local_header(
             basis_family,
         ),
         "",
-        "#ifndef SFEM_GENERATED_SCALAR_T",
-        "#define SFEM_GENERATED_SCALAR_T",
-        "typedef double real_t;",
-        "typedef ptrdiff_t idx_t;",
-        "typedef ptrdiff_t count_t;",
-        "typedef double geom_t;",
-        "#endif",
+        *sfem_scalar_type_fallback(),
         "",
     ]
     lines = [line for line in lines if line != ""]
@@ -1033,13 +1025,7 @@ def _sfem_soa_hessian_header(
         "#define %s" % guard,
         "",
         "#include <math.h>",
-        "#include <stddef.h>",
-        "#if defined(__has_include)",
-        '#if __has_include("sfem_base.hpp")',
-        '#include "sfem_base.hpp"',
-        "#define SFEM_GENERATED_SCALAR_T",
-        "#endif",
-        "#endif",
+        *sfem_scalar_type_prelude(),
         "",
         *source_builder.local_header_preamble_lines(
             math_name,
@@ -1047,13 +1033,7 @@ def _sfem_soa_hessian_header(
             basis_family,
         ),
         "",
-        "#ifndef SFEM_GENERATED_SCALAR_T",
-        "#define SFEM_GENERATED_SCALAR_T",
-        "typedef double real_t;",
-        "typedef ptrdiff_t idx_t;",
-        "typedef ptrdiff_t count_t;",
-        "typedef double geom_t;",
-        "#endif",
+        *sfem_scalar_type_fallback(),
         "",
     ]
     lines = [line for line in lines if line != ""]
@@ -2925,22 +2905,11 @@ def _tensor_product_dynamic_reference_gradient_expr(
     return " * ".join(factors)
 
 
-def _tensor_product_shape_coordinate_arrays(quadrature_rule, indent):
-    coords = _tensor_product_node_coords(quadrature_rule)
-    axis_names = ("x", "y", "z")[: quadrature_rule.dim]
-    lines = []
-    for axis, name in enumerate(axis_names):
-        lines.append(
-            "%sstatic constexpr int SHAPE_%s[NS] = {%s};"
-            % (
-                indent,
-                name.upper(),
-                ", ".join(str(coord[axis]) for coord in coords),
-            )
-        )
-    return lines
-
-
+#: `SHAPE_X`, `SHAPE_Y` and `SHAPE_Z` -- one `NS`-entry table per axis holding
+#: a node's coordinate in the tensor-product grid -- were emitted from here and
+#: called by nothing.  `_tensor_product_shape_coordinate_lines` below is the
+#: same three numbers as `s % NS1`, `(s / NS1) % NS1` and `s / (NS1 * NS1)`,
+#: which is what every caller uses.
 def _tensor_product_shape_coordinate_lines(dim, shape_expr, prefix, indent):
     if dim == 2:
         return (
@@ -9352,6 +9321,15 @@ def _sfem_soa_diagnostics_header(
             ]
         )
     lines.extend(kernel_status_macro_lines())
+    # A device target's qualifiers go behind a macro so a host compiler can read
+    # this header: the Op wrapper's C ABI header names the struct below, and the
+    # wrapper is host C++ under every target.
+    device_inline, host_inline = inline_qualifier, host_qualifier
+    if "__device__" in inline_qualifier or "__host__" in host_qualifier:
+        lines.extend(inline_qualifier_prelude(inline_qualifier, host_qualifier))
+        lines.append("")
+        device_inline = INLINE_QUALIFIER_MACROS[0][0]
+        host_inline = INLINE_QUALIFIER_MACROS[1][0]
     lines.extend([
         "namespace sfem {",
         "namespace codegen {",
@@ -9361,7 +9339,7 @@ def _sfem_soa_diagnostics_header(
         "//! One function rather than the five-line `std::fprintf` every",
         "//! dispatch entry point used to carry: there were 248 copies of it,",
         "//! differing only in the name they print.",
-        "static %s int unsupported_dispatch(" % host_qualifier,
+        "static %s int unsupported_dispatch(" % host_inline,
         "    const char *const name,",
         "    const int element_type,",
         "    const int real_type) {",
@@ -9415,28 +9393,28 @@ def _sfem_soa_diagnostics_header(
         "  double store_cpi;",
         "};",
         "",
-        "static %s double %s_total_flops(" % (inline_qualifier, struct_name),
+        "static %s double %s_total_flops(" % (device_inline, struct_name),
         "    const %s *const d," % struct_name,
         "    const ptrdiff_t nelements) {",
         "  const double n = nelements > 0 ? (double)nelements : 0.0;",
         "  return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->isoparametric_mesh_flops_per_element);" % per_qp,
         "}",
         "",
-        "static %s double %s_total_flops_affine_mesh(" % (inline_qualifier, struct_name),
+        "static %s double %s_total_flops_affine_mesh(" % (device_inline, struct_name),
         "    const %s *const d," % struct_name,
         "    const ptrdiff_t nelements) {",
         "  const double n = nelements > 0 ? (double)nelements : 0.0;",
         "  return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->affine_mesh_flops_per_element);" % per_qp,
         "}",
         "",
-        "static %s double %s_total_flops_isoparametric_mesh(" % (inline_qualifier, struct_name),
+        "static %s double %s_total_flops_isoparametric_mesh(" % (device_inline, struct_name),
         "    const %s *const d," % struct_name,
         "    const ptrdiff_t nelements) {",
         "  const double n = nelements > 0 ? (double)nelements : 0.0;",
         "  return n * ((double)d->n_qp * (double)d->flops_%s + (double)d->isoparametric_mesh_flops_per_element);" % per_qp,
         "}",
         "",
-        "static %s size_t %s_total_bytes(" % (inline_qualifier, struct_name),
+        "static %s size_t %s_total_bytes(" % (device_inline, struct_name),
         "    const %s *const d," % struct_name,
         "    const ptrdiff_t nelements,",
         "    const size_t scalar_bytes,",
@@ -9450,7 +9428,7 @@ def _sfem_soa_diagnostics_header(
         "  return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
         "}",
         "",
-        "static %s size_t %s_total_bytes_affine_mesh(" % (inline_qualifier, struct_name),
+        "static %s size_t %s_total_bytes_affine_mesh(" % (device_inline, struct_name),
         "    const %s *const d," % struct_name,
         "    const ptrdiff_t nelements,",
         "    const size_t scalar_bytes,",
@@ -9464,7 +9442,7 @@ def _sfem_soa_diagnostics_header(
         "  return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
         "}",
         "",
-        "static %s size_t %s_total_bytes_isoparametric_mesh(" % (inline_qualifier, struct_name),
+        "static %s size_t %s_total_bytes_isoparametric_mesh(" % (device_inline, struct_name),
         "    const %s *const d," % struct_name,
         "    const ptrdiff_t nelements,",
         "    const size_t scalar_bytes,",
@@ -9478,7 +9456,7 @@ def _sfem_soa_diagnostics_header(
         "  return geometry_bytes + field_bytes + output_bytes + reference_bytes;",
         "}",
         "",
-        "static %s double %s_arithmetic_intensity(" % (inline_qualifier, struct_name),
+        "static %s double %s_arithmetic_intensity(" % (device_inline, struct_name),
         "    const %s *const d," % struct_name,
         "    const ptrdiff_t nelements,",
         "    const size_t scalar_bytes,",
@@ -9488,7 +9466,7 @@ def _sfem_soa_diagnostics_header(
         "  return bytes ? %s_total_flops(d, nelements) / (double)bytes : 0.0;" % struct_name,
         "}",
         "",
-        "static %s double %s_arithmetic_intensity_affine_mesh(" % (inline_qualifier, struct_name),
+        "static %s double %s_arithmetic_intensity_affine_mesh(" % (device_inline, struct_name),
         "    const %s *const d," % struct_name,
         "    const ptrdiff_t nelements,",
         "    const size_t scalar_bytes,",
@@ -9498,7 +9476,7 @@ def _sfem_soa_diagnostics_header(
         "  return bytes ? %s_total_flops_affine_mesh(d, nelements) / (double)bytes : 0.0;" % struct_name,
         "}",
         "",
-        "static %s double %s_arithmetic_intensity_isoparametric_mesh(" % (inline_qualifier, struct_name),
+        "static %s double %s_arithmetic_intensity_isoparametric_mesh(" % (device_inline, struct_name),
         "    const %s *const d," % struct_name,
         "    const ptrdiff_t nelements,",
         "    const size_t scalar_bytes,",
@@ -9508,7 +9486,7 @@ def _sfem_soa_diagnostics_header(
         "  return bytes ? %s_total_flops_isoparametric_mesh(d, nelements) / (double)bytes : 0.0;" % struct_name,
         "}",
         "",
-        "static %s void %s_print_rate_with_ai(" % (inline_qualifier, struct_name),
+        "static %s void %s_print_rate_with_ai(" % (device_inline, struct_name),
         "    const char *const name,",
         "    const %s *const d," % struct_name,
         "    const double elapsed,",
@@ -9526,7 +9504,7 @@ def _sfem_soa_diagnostics_header(
         "           elapsed, element_rate, dof_rate, ai, gflops);",
         "}",
         "",
-        "static %s void %s_print_rate(" % (inline_qualifier, struct_name),
+        "static %s void %s_print_rate(" % (device_inline, struct_name),
         "    const char *const name,",
         "    const %s *const d," % struct_name,
         "    const double elapsed,",
@@ -9541,7 +9519,7 @@ def _sfem_soa_diagnostics_header(
         "  %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
         "}",
         "",
-        "static %s void %s_print_rate_affine_mesh(" % (inline_qualifier, struct_name),
+        "static %s void %s_print_rate_affine_mesh(" % (device_inline, struct_name),
         "    const char *const name,",
         "    const %s *const d," % struct_name,
         "    const double elapsed,",
@@ -9556,7 +9534,7 @@ def _sfem_soa_diagnostics_header(
         "  %s_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);" % struct_name,
         "}",
         "",
-        "static %s void %s_print_rate_isoparametric_mesh(" % (inline_qualifier, struct_name),
+        "static %s void %s_print_rate_isoparametric_mesh(" % (device_inline, struct_name),
         "    const char *const name,",
         "    const %s *const d," % struct_name,
         "    const double elapsed,",
@@ -9970,6 +9948,21 @@ def _sfem_soa_element_api_header(
     return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 
+def _sibling_element_include(element_name, header):
+    """Another element's API header, seen from inside this element's directory.
+
+    Both sit in `d<dim>/<element>/` plus whatever folder the target claims for
+    its sources, so the number of steps up is the target's answer rather than a
+    constant: `../hex8/x.hpp` on the host, `../../hex8/cuda/x.hpp` on a device.
+    The mesh-order element delegates to its PROTEUS twin through exactly this
+    include, so a wrong count here breaks the delegation rather than a header.
+    """
+    subdirectory = current_target().source_subdirectory()
+    if not subdirectory:
+        return "../%s/%s" % (element_name, header)
+    return "../../%s/%s/%s" % (element_name, subdirectory, header)
+
+
 def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
     aliases = (
         ("quad4", "proteus_quad4", 2, 4),
@@ -9984,10 +9977,9 @@ def _sfem_tensor_product_element_api_alias(prefix, dim, n_nodes):
                 "element_name": element_name,
                 "proteus_name": proteus_name,
                 "target_prefix": "%s_%s" % (prefix[: -len(suffix)], proteus_name),
-                "include": "../%s/%s_%s_element.hpp" % (
+                "include": _sibling_element_include(
                     proteus_name,
-                    prefix[: -len(suffix)],
-                    proteus_name,
+                    "%s_%s_element.hpp" % (prefix[: -len(suffix)], proteus_name),
                 ),
                 "shape_order": tensor_product_cartesian_shape_order(dim, n_nodes),
             }

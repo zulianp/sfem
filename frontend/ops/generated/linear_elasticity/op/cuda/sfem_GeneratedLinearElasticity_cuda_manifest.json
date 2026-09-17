@@ -1,0 +1,385 @@
+{
+  "c_abi": [
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_apply_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const stream\n);",
+      "name": "linear_elasticity_apply_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_apply_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const stream\n);",
+      "name": "linear_elasticity_apply_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_apply_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "linear_elasticity_apply_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_apply_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz,\n        void *const stream\n);",
+      "name": "linear_elasticity_apply_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_apply_3d_a_msoa_aos_unit(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj_aos,\n        const geom_t *const RSTR g_det0,\n        const real_t mu,\n        const real_t lmbda,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz,\n        void *const stream\n);",
+      "name": "linear_elasticity_apply_3d_a_msoa_aos_unit"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_apply_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz,\n        void *const stream\n);",
+      "name": "linear_elasticity_apply_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_apply_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "linear_elasticity_apply_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_gradient_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const stream\n);",
+      "name": "linear_elasticity_gradient_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_gradient_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const stream\n);",
+      "name": "linear_elasticity_gradient_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_gradient_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "linear_elasticity_gradient_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_gradient_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz,\n        void *const stream\n);",
+      "name": "linear_elasticity_gradient_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_gradient_3d_a_msoa_aos_unit(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj_aos,\n        const geom_t *const RSTR g_det0,\n        const real_t mu,\n        const real_t lmbda,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz,\n        void *const stream\n);",
+      "name": "linear_elasticity_gradient_3d_a_msoa_aos_unit"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_gradient_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz,\n        void *const stream\n);",
+      "name": "linear_elasticity_gradient_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_gradient_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "linear_elasticity_gradient_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" void linear_elasticity_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "linear_elasticity_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_hex8_matrix_assembly_variant(const int variant);",
+      "name": "linear_elasticity_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int linear_elasticity_hex8_matrix_assembly_variant_count();",
+      "name": "linear_elasticity_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_objective_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        void *const RSTR value,\n        void *const stream\n);",
+      "name": "linear_elasticity_objective_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_objective_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        void *const RSTR value,\n        void *const stream\n);",
+      "name": "linear_elasticity_objective_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_objective_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "linear_elasticity_objective_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_objective_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        void *const RSTR value,\n        void *const stream\n);",
+      "name": "linear_elasticity_objective_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_linear_elasticity_objective_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        void *const RSTR value,\n        void *const stream\n);",
+      "name": "linear_elasticity_objective_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_objective_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "linear_elasticity_objective_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" void linear_elasticity_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "linear_elasticity_proteus_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_hex8_matrix_assembly_variant(const int variant);",
+      "name": "linear_elasticity_proteus_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int linear_elasticity_proteus_hex8_matrix_assembly_variant_count();",
+      "name": "linear_elasticity_proteus_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void linear_elasticity_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "linear_elasticity_proteus_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_proteus_quad4_matrix_assembly_variant(const int variant);",
+      "name": "linear_elasticity_proteus_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int linear_elasticity_proteus_quad4_matrix_assembly_variant_count();",
+      "name": "linear_elasticity_proteus_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void linear_elasticity_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "linear_elasticity_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_quad4_matrix_assembly_variant(const int variant);",
+      "name": "linear_elasticity_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int linear_elasticity_quad4_matrix_assembly_variant_count();",
+      "name": "linear_elasticity_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void linear_elasticity_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "linear_elasticity_tet10_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_tet10_matrix_assembly_variant(const int variant);",
+      "name": "linear_elasticity_tet10_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int linear_elasticity_tet10_matrix_assembly_variant_count();",
+      "name": "linear_elasticity_tet10_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void linear_elasticity_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "linear_elasticity_tet4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_tet4_matrix_assembly_variant(const int variant);",
+      "name": "linear_elasticity_tet4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int linear_elasticity_tet4_matrix_assembly_variant_count();",
+      "name": "linear_elasticity_tet4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void linear_elasticity_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "linear_elasticity_tri3_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *linear_elasticity_tri3_matrix_assembly_variant(const int variant);",
+      "name": "linear_elasticity_tri3_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int linear_elasticity_tri3_matrix_assembly_variant_count();",
+      "name": "linear_elasticity_tri3_matrix_assembly_variant_count"
+    }
+  ],
+  "factory": {
+    "class": "sfem::GPUGeneratedLinearElasticity",
+    "create": "sfem::GPUGeneratedLinearElasticity::create",
+    "create_from_yaml": "sfem::GPUGeneratedLinearElasticity::create_from_yaml"
+  },
+  "generated_include_paths": [
+    ".",
+    "cuda",
+    "d2/cuda",
+    "d2/proteus_quad4",
+    "d2/proteus_quad4/cuda",
+    "d2/quad4",
+    "d2/quad4/cuda",
+    "d2/tri3",
+    "d2/tri3/cuda",
+    "d3/cuda",
+    "d3/hex8",
+    "d3/hex8/cuda",
+    "d3/proteus_hex8",
+    "d3/proteus_hex8/cuda",
+    "d3/tet10",
+    "d3/tet10/cuda",
+    "d3/tet4",
+    "d3/tet4/cuda",
+    "op/cuda",
+    "reference/cuda"
+  ],
+  "header_api": [
+    {
+      "gather_scatter": "external",
+      "header": "d2/proteus_quad4/cuda/linear_elasticity_proteus_quad4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d2/quad4/cuda/linear_elasticity_quad4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d2/tri3/cuda/linear_elasticity_tri3_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/hex8/cuda/linear_elasticity_hex8_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/proteus_hex8/cuda/linear_elasticity_proteus_hex8_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/tet10/cuda/linear_elasticity_tet10_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/tet4/cuda/linear_elasticity_tet4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "op/cuda/sfem_GeneratedLinearElasticity_cuda_element_api.hpp",
+      "kind": "dense_element_dispatch",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    }
+  ],
+  "material": "linear_elasticity",
+  "matrix_formats": [
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/proteus_quad4/linear_elasticity_proteus_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/quad4/linear_elasticity_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/tri3/linear_elasticity_tri3_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/hex8/linear_elasticity_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/proteus_hex8/linear_elasticity_proteus_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet10/linear_elasticity_tet10_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet4/linear_elasticity_tet4_matrix_format_operator.cpp"
+    }
+  ],
+  "op_name": "gpu:GeneratedLinearElasticity",
+  "registration": {
+    "function": "sfem::register_GeneratedLinearElasticity_cuda_generated_op",
+    "operator_name": "gpu:GeneratedLinearElasticity",
+    "source": "op/cuda/sfem_GeneratedLinearElasticity_cuda_registration.cpp"
+  },
+  "runtime_operations": [
+    {
+      "name": "apply",
+      "variants": [
+        {
+          "function": "cu_linear_elasticity_apply_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "affine"
+        },
+        {
+          "function": "cu_linear_elasticity_apply_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "affine"
+        },
+        {
+          "function": "cu_linear_elasticity_apply_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "cu_linear_elasticity_apply_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "gradient",
+      "variants": [
+        {
+          "function": "cu_linear_elasticity_gradient_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "affine"
+        },
+        {
+          "function": "cu_linear_elasticity_gradient_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "affine"
+        },
+        {
+          "function": "cu_linear_elasticity_gradient_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "cu_linear_elasticity_gradient_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "objective",
+      "variants": [
+        {
+          "function": "cu_linear_elasticity_objective_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "affine"
+        },
+        {
+          "function": "cu_linear_elasticity_objective_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "affine"
+        },
+        {
+          "function": "cu_linear_elasticity_objective_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "cu_linear_elasticity_objective_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "linear_elasticity",
+          "variant": "isoparametric"
+        }
+      ]
+    }
+  ],
+  "schema": "sfem.generated_op_manifest.v1",
+  "wrapper": {
+    "c_abi_header": "op/cuda/sfem_GeneratedLinearElasticity_cuda_c_abi.hpp",
+    "header": "op/cuda/sfem_GeneratedLinearElasticity_cuda.hpp",
+    "source": "op/cuda/sfem_GeneratedLinearElasticity_cuda.cpp"
+  }
+}

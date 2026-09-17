@@ -1,5 +1,23 @@
+#include <stddef.h>
+#if defined(__has_include)
+#if __has_include("sfem_base.hpp")
 #include "sfem_base.hpp"
+#define SFEM_GENERATED_SCALAR_T
+#endif
+#endif
+#if defined(__has_include)
+#if __has_include("sfem_macros.hpp")
 #include "sfem_macros.hpp"
+#endif
+#endif
+#ifndef SFEM_GENERATED_SCALAR_T
+#define SFEM_GENERATED_SCALAR_T
+typedef double real_t;
+typedef ptrdiff_t idx_t;
+typedef ptrdiff_t element_idx_t;
+typedef ptrdiff_t count_t;
+typedef double geom_t;
+#endif
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__
 #endif

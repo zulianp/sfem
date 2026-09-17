@@ -751,12 +751,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4
     s_t *const RSTR values) {
   static constexpr int NS = 4;
   static constexpr int NC = 2;
-  static constexpr int N_ROW_STREAMS = 8;
   static constexpr int N_COL_STREAMS = 8;
-  static constexpr int ROW_COMPONENT[8] = {0, 0, 0, 0, 1, 1, 1, 1};
-  static constexpr int ROW_SHAPE[8] = {0, 1, 2, 3, 0, 1, 2, 3};
-  static constexpr int COL_COMPONENT[8] = {0, 0, 0, 0, 1, 1, 1, 1};
-  static constexpr int COL_SHAPE[8] = {0, 1, 2, 3, 0, 1, 2, 3};
   count_t entries[NS * NS];
   idx_t ks[NS];
   for (int i = 0; i < NS; ++i) {
@@ -768,15 +763,16 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4
       entries[i * NS + j] = row_begin + ks[j];
     }
   }
-  for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {
-    const int row_shape = ROW_SHAPE[row_stream];
-    const int bi = ROW_COMPONENT[row_stream];
-    for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {
-      const int col_shape = COL_SHAPE[col_stream];
-      const int bj = COL_COMPONENT[col_stream];
-      s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
+  for (int bi = 0; bi < NC; ++bi) {
+    for (int row_shape = 0; row_shape < NS; ++row_shape) {
+      const s_t *const RSTR row = &element_matrix[(bi * NS + row_shape) * N_COL_STREAMS];
+      for (int bj = 0; bj < NC; ++bj) {
+        for (int col_shape = 0; col_shape < NS; ++col_shape) {
+          s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];
 #pragma omp atomic update
-      block[bi * NC + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];
+          block[bi * NC + bj] += row[bj * NS + col_shape];
+        }
+      }
     }
   }
 }

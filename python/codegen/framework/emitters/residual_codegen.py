@@ -9,7 +9,13 @@ from codegen.framework.emitters.kernel_prologue import (
     resolve_kernel_constants,
     retag_constants,
 )
-from codegen.framework.plans.conventions import PREFIXES, abi_geometry_name, restrict_prelude
+from codegen.framework.plans.conventions import (
+    PREFIXES,
+    abi_geometry_name,
+    restrict_prelude,
+    sfem_scalar_type_fallback,
+    sfem_scalar_type_prelude,
+)
 
 #: The staged-buffer and per-thread-scratch prefixes, from the one
 #: table that owns them.  Spelling either here again is what made the
@@ -81,8 +87,7 @@ from codegen.framework.plans.kernel_signature import (
 )
 from codegen.framework.plans.layout import (
     _compatible_matrix_stream_indices,
-    _compatible_stream_component_offsets,
-    _compatible_stream_shape_offsets,
+    compatible_matrix_stream_fields,
     _field_element_type,
     _field_n_shape_by_name,
     _identity_order,
@@ -2352,25 +2357,13 @@ def _local_header(
         "#define %s" % guard,
         "",
         "#include <math.h>",
-        "#include <stddef.h>",
-        "#if defined(__has_include)",
-        '#if __has_include("sfem_base.hpp")',
-        '#include "sfem_base.hpp"',
-        "#define SFEM_GENERATED_SCALAR_T",
-        "#endif",
-        "#endif",
+        *sfem_scalar_type_prelude(),
         '#include "%s"' % _header("kernel_math"),
         '#include "%s"' % _header("tensor_product_kernels"),
         "",
         *_inline_definition_lines(),
         *restrict_prelude(""),
-        "#ifndef SFEM_GENERATED_SCALAR_T",
-        "#define SFEM_GENERATED_SCALAR_T",
-        "typedef double real_t;",
-        "typedef ptrdiff_t idx_t;",
-        "typedef ptrdiff_t count_t;",
-        "typedef double geom_t;",
-        "#endif",
+        *sfem_scalar_type_fallback(),
         "",
         "namespace sfem {",
         "namespace codegen {",
@@ -5660,13 +5653,7 @@ def _mixed_operator_source(
         "",
         *restrict_prelude(""),
         *_inline_definition_lines(),
-        "#ifndef SFEM_GENERATED_SCALAR_T",
-        "#define SFEM_GENERATED_SCALAR_T",
-        "typedef double real_t;",
-        "typedef ptrdiff_t idx_t;",
-        "typedef ptrdiff_t count_t;",
-        "typedef double geom_t;",
-        "#endif",
+        *sfem_scalar_type_fallback(),
         "#ifdef _OPENMP",
         "#include <omp.h>",
         "#endif",
@@ -7344,9 +7331,87 @@ def _scalar_crs_matrix_scatter_lines(function_base, n_shape, assembly=None):
     ]
 
 
+def _block_scatter_side_lines(side, streams, n_fields, n_shape, indent):
+    """The component loop for one side of the block scatter, and its field.
+
+    Nothing is emitted for the field when the side covers the fields in order,
+    because the loop variable is then the field itself.  A block whose rows or
+    columns are a subset -- an off-diagonal `_form_2_` block -- gets an
+    `n_fields`-entry list, which is the field list, not a table indexed by every
+    stream.
+    """
+    fields = compatible_matrix_stream_fields(streams, n_fields, n_shape)
+    table, component = [], side
+    if fields != tuple(range(len(fields))):
+        table = [
+            "%sstatic constexpr int %s_FIELD[%d] = {%s};"
+            % (indent, side.upper(), len(fields), ", ".join(str(f) for f in fields))
+        ]
+        component = "%s_field" % side
+    # `NC` where the side covers every field, which is every block the tree
+    # produces today; the count only differs for a subset block.
+    extent = "NC" if len(fields) == n_fields else str(len(fields))
+    header = [
+        "%sfor (int %s = 0; %s < %s; ++%s) {" % (indent, side, side, extent, side)
+    ]
+    if component != side:
+        header.append(
+            "%s  const int %s = %s_FIELD[%s];" % (indent, component, side.upper(), side)
+        )
+    return table, header, component
+
+
+def _block_scatter_loop_lines(n_shape, n_fields, row_streams, column_streams):
+    """The scatter's loop nest: component, then shape, on each side.
+
+    The element matrix is component-major, so a stream is `component * NS +
+    shape` and both indices are closed-form in the position.  This was four
+    `constexpr` tables of `NC * NS` entries -- the stored inverse of a
+    flattening the loop nest does not have to perform -- and the column pair was
+    byte-identical to the row pair whenever the block is square.  Nesting the
+    loops spells both indices as loop variables, and the row's offset into the
+    element matrix hoists out of the two inner loops with them.
+    """
+    row_table, row_header, bi = _block_scatter_side_lines(
+        "bi", row_streams, n_fields, n_shape, "  "
+    )
+    col_table, col_header, bj = _block_scatter_side_lines(
+        "bj", column_streams, n_fields, n_shape, "      "
+    )
+    return (
+        row_table
+        + col_table
+        + row_header
+        + [
+            "    for (int row_shape = 0; row_shape < NS; ++row_shape) {",
+            "      const s_t *const RSTR row = "
+            "&element_matrix[(bi * NS + row_shape) * N_COL_STREAMS];",
+        ]
+        + col_header
+        + [
+            "        for (int col_shape = 0; col_shape < NS; ++col_shape) {",
+            "          s_t *const block = "
+            "&values[entries[row_shape * NS + col_shape] * NC * NC];",
+        ]
+        + [
+            line
+            for line in _scatter_add_lines(
+                "block[%s * NC + %s]" % (bi, bj),
+                "row[bj * NS + col_shape]",
+                "          ",
+                "",
+            )
+        ]
+        + [
+            "        }",
+            "      }",
+            "    }",
+            "  }",
+        ]
+    )
+
+
 def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_streams, column_streams):
-    component_offsets = _compatible_stream_component_offsets(n_fields, n_shape)
-    shape_offsets = _compatible_stream_shape_offsets(n_fields, n_shape)
     return _crs_find_cols_lines(function_base, n_shape) + [
         "template <typename s_t>",
         "%s void %s_scatter_crs(" % (_function_qualifier(), function_base),
@@ -7357,28 +7422,7 @@ def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_s
         "    s_t *const RSTR values) {",
         kernel_constant("NS", n_shape, indent="  "),
         kernel_constant("NC", n_fields, indent="  "),
-        kernel_constant("N_ROW_STREAMS", len(row_streams), indent="  "),
         kernel_constant("N_COL_STREAMS", len(column_streams), indent="  "),
-        "  static constexpr int ROW_COMPONENT[%d] = {%s};"
-        % (
-            len(row_streams),
-            ", ".join(str(component_offsets[stream]) for stream in row_streams),
-        ),
-        "  static constexpr int ROW_SHAPE[%d] = {%s};"
-        % (
-            len(row_streams),
-            ", ".join(str(shape_offsets[stream]) for stream in row_streams),
-        ),
-        "  static constexpr int COL_COMPONENT[%d] = {%s};"
-        % (
-            len(column_streams),
-            ", ".join(str(component_offsets[stream]) for stream in column_streams),
-        ),
-        "  static constexpr int COL_SHAPE[%d] = {%s};"
-        % (
-            len(column_streams),
-            ", ".join(str(shape_offsets[stream]) for stream in column_streams),
-        ),
         "  count_t entries[NS * NS];",
         "  idx_t ks[NS];",
         "  for (int i = 0; i < NS; ++i) {",
@@ -7390,21 +7434,7 @@ def _compatible_crs_matrix_scatter_lines(function_base, n_shape, n_fields, row_s
         "      entries[i * NS + j] = row_begin + ks[j];",
         "    }",
         "  }",
-        "  for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {",
-        "    const int row_shape = ROW_SHAPE[row_stream];",
-        "    const int bi = ROW_COMPONENT[row_stream];",
-        "    for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {",
-        "      const int col_shape = COL_SHAPE[col_stream];",
-        "      const int bj = COL_COMPONENT[col_stream];",
-        "      s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];",
-        *_scatter_add_lines(
-            "block[bi * NC + bj]",
-            "element_matrix[row_stream * N_COL_STREAMS + col_stream]",
-            "      ",
-            "",
-        ),
-        "    }",
-        "  }",
+        *_block_scatter_loop_lines(n_shape, n_fields, row_streams, column_streams),
         "}",
         "",
     ]
@@ -7467,8 +7497,6 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
         )
         return lines
 
-    component_offsets = _compatible_stream_component_offsets(n_fields, n_shape)
-    shape_offsets = _compatible_stream_shape_offsets(n_fields, n_shape)
     lines.extend(
         [
             "template <typename s_t>",
@@ -7478,43 +7506,8 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
             "    s_t *const RSTR values) {",
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
-            kernel_constant("N_ROW_STREAMS", len(row_streams), indent="  "),
             kernel_constant("N_COL_STREAMS", len(column_streams), indent="  "),
-            "  static constexpr int ROW_COMPONENT[%d] = {%s};"
-            % (
-                len(row_streams),
-                ", ".join(str(component_offsets[stream]) for stream in row_streams),
-            ),
-            "  static constexpr int ROW_SHAPE[%d] = {%s};"
-            % (
-                len(row_streams),
-                ", ".join(str(shape_offsets[stream]) for stream in row_streams),
-            ),
-            "  static constexpr int COL_COMPONENT[%d] = {%s};"
-            % (
-                len(column_streams),
-                ", ".join(str(component_offsets[stream]) for stream in column_streams),
-            ),
-            "  static constexpr int COL_SHAPE[%d] = {%s};"
-            % (
-                len(column_streams),
-                ", ".join(str(shape_offsets[stream]) for stream in column_streams),
-            ),
-            "  for (int row_stream = 0; row_stream < N_ROW_STREAMS; ++row_stream) {",
-            "    const int row_shape = ROW_SHAPE[row_stream];",
-            "    const int bi = ROW_COMPONENT[row_stream];",
-            "    for (int col_stream = 0; col_stream < N_COL_STREAMS; ++col_stream) {",
-            "      const int col_shape = COL_SHAPE[col_stream];",
-            "      const int bj = COL_COMPONENT[col_stream];",
-            "      s_t *const block = &values[entries[row_shape * NS + col_shape] * NC * NC];",
-            *_scatter_add_lines(
-                "block[bi * NC + bj]",
-                "element_matrix[row_stream * N_COL_STREAMS + col_stream]",
-                "      ",
-                "",
-            ),
-            "    }",
-            "  }",
+            *_block_scatter_loop_lines(n_shape, n_fields, row_streams, column_streams),
             "}",
             "",
         ]

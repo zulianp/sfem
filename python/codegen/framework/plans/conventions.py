@@ -97,6 +97,110 @@ QUALIFIERS = {
 }
 
 
+#: The macros a shared header marks its helpers with, and what they expand to
+#: away from a device compiler.
+INLINE_QUALIFIER_MACROS = (
+    ("SFEM_CODEGEN_DEVICE_INLINE", "inline"),
+    ("SFEM_CODEGEN_HOST_INLINE", "inline"),
+)
+
+
+#: The sentinel that says SFEM's own scalar types were taken.
+SCALAR_TYPE_SOURCE = "SFEM_GENERATED_SCALAR_T"
+
+
+def sfem_scalar_type_prelude(indent=""):
+    """Take SFEM's scalar widths where its header is present.
+
+    Every generated translation unit that names `idx_t`, `real_t`, `geom_t` or
+    `count_t` has to agree with the library about how wide they are, and has to
+    compile standalone as well -- the spike drivers and the nvcc sweeps have no
+    SFEM include path.  `__has_include` answers both: inside the tree the real
+    header wins, outside it `sfem_scalar_type_fallback` defines the same names.
+
+    Three emitters spelled these six lines out, identically, and the boundary
+    family spelled a bare `#include "sfem_base.hpp"` instead -- so 26 of the
+    tree's files could not be preprocessed without SFEM on the include path
+    while the other 164 could.  Getting that wrong is not a compile error in
+    the library build, which is why it survived: SFEM's `idx_t` is `int` and
+    the fallback's is `ptrdiff_t`, and two halves that disagree link cleanly and
+    fault at run time.
+    """
+    return [
+        # `ptrdiff_t` is what the fallback below types `idx_t` and `count_t` as,
+        # so the prelude carries its header rather than trusting each caller to
+        # have put one above the call.
+        "%s#include <stddef.h>" % indent,
+        "%s#if defined(__has_include)" % indent,
+        '%s#if __has_include("sfem_base.hpp")' % indent,
+        '%s#include "sfem_base.hpp"' % indent,
+        "%s#define %s" % (indent, SCALAR_TYPE_SOURCE),
+        "%s#endif" % indent,
+        "%s#endif" % indent,
+    ]
+
+
+def optional_sfem_include(header, indent=""):
+    """Include one of SFEM's headers where it is on the path, and carry on where
+    it is not.
+
+    For headers a generated file only wants the definitions of and already has
+    a fallback for -- `sfem_macros.hpp` gives `SFEM_RESTRICT`, which the file
+    defines itself two lines later if the include did not land.
+    """
+    return [
+        "%s#if defined(__has_include)" % indent,
+        '%s#if __has_include("%s")' % (indent, header),
+        '%s#include "%s"' % (indent, header),
+        "%s#endif" % indent,
+        "%s#endif" % indent,
+    ]
+
+
+def sfem_scalar_type_fallback(indent=""):
+    """The widths to use when SFEM's header was not there to be taken."""
+    return [
+        "%s#ifndef %s" % (indent, SCALAR_TYPE_SOURCE),
+        "%s#define %s" % (indent, SCALAR_TYPE_SOURCE),
+        "%stypedef double real_t;" % indent,
+        "%stypedef ptrdiff_t idx_t;" % indent,
+        # The five copies of this list did not agree: the C ABI header's had
+        # `element_idx_t` and the four kernel ones did not, so a boundary kernel
+        # compiled outside SFEM named a type nothing had defined.  One list.
+        "%stypedef ptrdiff_t element_idx_t;" % indent,
+        "%stypedef ptrdiff_t count_t;" % indent,
+        "%stypedef double geom_t;" % indent,
+        "%s#endif" % indent,
+    ]
+
+
+def inline_qualifier_prelude(device_qualifier, host_qualifier, indent=""):
+    """Make a device header's qualifiers survive a host compiler.
+
+    The diagnostics header is the one generated header that host code includes:
+    the Op wrapper's C ABI header names its struct, and the wrapper is host C++
+    under every target -- it calls `cu_` entry points, it does not launch them.
+    Spelled literally, `__host__ __device__ __forceinline__` is a parse error
+    there, which is how 42 device wrapper translation units failed to build
+    while every kernel beside them compiled.
+
+    Same shape as `restrict_prelude`: one definition, in one place, chosen by
+    the compiler that is actually reading the file rather than by the generator
+    guessing which one will.
+    """
+    device_macro, device_fallback = INLINE_QUALIFIER_MACROS[0]
+    host_macro, host_fallback = INLINE_QUALIFIER_MACROS[1]
+    return [
+        "%s#if defined(__CUDACC__) || defined(__HIPCC__)" % indent,
+        "%s#define %s %s" % (indent, device_macro, device_qualifier),
+        "%s#define %s %s" % (indent, host_macro, host_qualifier),
+        "%s#else" % indent,
+        "%s#define %s %s" % (indent, device_macro, device_fallback),
+        "%s#define %s %s" % (indent, host_macro, host_fallback),
+        "%s#endif" % indent,
+    ]
+
+
 def restrict_prelude(definition="__restrict__", indent=""):
     """The lines that make the short qualifier available in a generated file.
 

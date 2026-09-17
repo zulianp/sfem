@@ -295,16 +295,41 @@ def _compatible_matrix_stream_indices(field_indices, n_shape, n_fields):
     return tuple(streams)
 
 
-def _compatible_stream_component_offsets(n_fields, n_shape):
-    """Which field each kernel stream carries, indexed by the stream.
+def compatible_matrix_stream_fields(streams, n_fields, n_shape):
+    """The field list a run of element-matrix streams is blocked by.
 
-    A stream is `shape * n_fields + field`, so the field is the remainder.  This
-    is indexed by the stream itself and not by a position in an element matrix,
-    which is why it is not simply the order the streams are listed in.
+    `_compatible_matrix_streams` lists the streams field-major, so entry
+    `k * n_shape + s` carries field `field_indices[k]` and shape function `s`.
+    That makes both indices closed-form in the position, and returning the field
+    list -- `n_fields` entries at most -- is what lets a scatter loop over the
+    two indices instead of looking up a stored inverse of the flattening.
+
+    Raises when the streams are not that grid.  The caller builds a loop nest on
+    the answer, and a loop nest that disagreed with the ordering would compute
+    the wrong entry with nothing in the emitted text to show for it.
     """
-    return tuple(stream % n_fields for stream in range(n_fields * n_shape))
+    streams = tuple(streams)
+    if not streams or len(streams) % n_shape:
+        raise ValueError(
+            "element-matrix streams must be a whole number of shape runs, got %d "
+            "for n_shape %d" % (len(streams), n_shape)
+        )
+    fields = []
+    for block in range(len(streams) // n_shape):
+        run = streams[block * n_shape : (block + 1) * n_shape]
+        field = run[0] % n_fields
+        expected = tuple(shape * n_fields + field for shape in range(n_shape))
+        if run != expected:
+            raise ValueError(
+                "element-matrix stream run %d is not one field's shapes in order: "
+                "%r against %r" % (block, run, expected)
+            )
+        fields.append(field)
+    return tuple(fields)
 
 
-def _compatible_stream_shape_offsets(n_fields, n_shape):
-    """Which shape function each kernel stream carries, indexed by the stream."""
-    return tuple(stream // n_fields for stream in range(n_fields * n_shape))
+#: The two per-stream tables that used to live here -- `stream % n_fields` and
+#: `stream // n_fields`, one entry per stream -- are gone with the scatter that
+#: emitted them.  `compatible_matrix_stream_fields` returns the field list the
+#: streams are blocked by, and the scatter loops over the two indices instead of
+#: reading back a table of their stored decomposition.

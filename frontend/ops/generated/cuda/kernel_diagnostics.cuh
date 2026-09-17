@@ -16,6 +16,14 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
+#if defined(__CUDACC__) || defined(__HIPCC__)
+#define SFEM_CODEGEN_DEVICE_INLINE __host__ __device__ __forceinline__
+#define SFEM_CODEGEN_HOST_INLINE __host__ __forceinline__
+#else
+#define SFEM_CODEGEN_DEVICE_INLINE inline
+#define SFEM_CODEGEN_HOST_INLINE inline
+#endif
+
 namespace sfem {
 namespace codegen {
 
@@ -24,7 +32,7 @@ namespace codegen {
 //! One function rather than the five-line `std::fprintf` every
 //! dispatch entry point used to carry: there were 248 copies of it,
 //! differing only in the name they print.
-static __host__ __forceinline__ int unsupported_dispatch(
+static SFEM_CODEGEN_HOST_INLINE int unsupported_dispatch(
     const char *const name,
     const int element_type,
     const int real_type) {
@@ -78,28 +86,28 @@ struct KernelDiagnostics {
   double store_cpi;
 };
 
-static __host__ __device__ __forceinline__ double KernelDiagnostics_total_flops(
+static SFEM_CODEGEN_DEVICE_INLINE double KernelDiagnostics_total_flops(
     const KernelDiagnostics *const d,
     const ptrdiff_t nelements) {
   const double n = nelements > 0 ? (double)nelements : 0.0;
   return n * ((double)d->n_qp * (double)d->flops_per_qp_scalar + (double)d->isoparametric_mesh_flops_per_element);
 }
 
-static __host__ __device__ __forceinline__ double KernelDiagnostics_total_flops_affine_mesh(
+static SFEM_CODEGEN_DEVICE_INLINE double KernelDiagnostics_total_flops_affine_mesh(
     const KernelDiagnostics *const d,
     const ptrdiff_t nelements) {
   const double n = nelements > 0 ? (double)nelements : 0.0;
   return n * ((double)d->n_qp * (double)d->flops_per_qp_scalar + (double)d->affine_mesh_flops_per_element);
 }
 
-static __host__ __device__ __forceinline__ double KernelDiagnostics_total_flops_isoparametric_mesh(
+static SFEM_CODEGEN_DEVICE_INLINE double KernelDiagnostics_total_flops_isoparametric_mesh(
     const KernelDiagnostics *const d,
     const ptrdiff_t nelements) {
   const double n = nelements > 0 ? (double)nelements : 0.0;
   return n * ((double)d->n_qp * (double)d->flops_per_qp_scalar + (double)d->isoparametric_mesh_flops_per_element);
 }
 
-static __host__ __device__ __forceinline__ size_t KernelDiagnostics_total_bytes(
+static SFEM_CODEGEN_DEVICE_INLINE size_t KernelDiagnostics_total_bytes(
     const KernelDiagnostics *const d,
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
@@ -113,7 +121,7 @@ static __host__ __device__ __forceinline__ size_t KernelDiagnostics_total_bytes(
   return geometry_bytes + field_bytes + output_bytes + reference_bytes;
 }
 
-static __host__ __device__ __forceinline__ size_t KernelDiagnostics_total_bytes_affine_mesh(
+static SFEM_CODEGEN_DEVICE_INLINE size_t KernelDiagnostics_total_bytes_affine_mesh(
     const KernelDiagnostics *const d,
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
@@ -127,7 +135,7 @@ static __host__ __device__ __forceinline__ size_t KernelDiagnostics_total_bytes_
   return geometry_bytes + field_bytes + output_bytes + reference_bytes;
 }
 
-static __host__ __device__ __forceinline__ size_t KernelDiagnostics_total_bytes_isoparametric_mesh(
+static SFEM_CODEGEN_DEVICE_INLINE size_t KernelDiagnostics_total_bytes_isoparametric_mesh(
     const KernelDiagnostics *const d,
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
@@ -141,7 +149,7 @@ static __host__ __device__ __forceinline__ size_t KernelDiagnostics_total_bytes_
   return geometry_bytes + field_bytes + output_bytes + reference_bytes;
 }
 
-static __host__ __device__ __forceinline__ double KernelDiagnostics_arithmetic_intensity(
+static SFEM_CODEGEN_DEVICE_INLINE double KernelDiagnostics_arithmetic_intensity(
     const KernelDiagnostics *const d,
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
@@ -151,7 +159,7 @@ static __host__ __device__ __forceinline__ double KernelDiagnostics_arithmetic_i
   return bytes ? KernelDiagnostics_total_flops(d, nelements) / (double)bytes : 0.0;
 }
 
-static __host__ __device__ __forceinline__ double KernelDiagnostics_arithmetic_intensity_affine_mesh(
+static SFEM_CODEGEN_DEVICE_INLINE double KernelDiagnostics_arithmetic_intensity_affine_mesh(
     const KernelDiagnostics *const d,
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
@@ -161,7 +169,7 @@ static __host__ __device__ __forceinline__ double KernelDiagnostics_arithmetic_i
   return bytes ? KernelDiagnostics_total_flops_affine_mesh(d, nelements) / (double)bytes : 0.0;
 }
 
-static __host__ __device__ __forceinline__ double KernelDiagnostics_arithmetic_intensity_isoparametric_mesh(
+static SFEM_CODEGEN_DEVICE_INLINE double KernelDiagnostics_arithmetic_intensity_isoparametric_mesh(
     const KernelDiagnostics *const d,
     const ptrdiff_t nelements,
     const size_t scalar_bytes,
@@ -171,7 +179,7 @@ static __host__ __device__ __forceinline__ double KernelDiagnostics_arithmetic_i
   return bytes ? KernelDiagnostics_total_flops_isoparametric_mesh(d, nelements) / (double)bytes : 0.0;
 }
 
-static __host__ __device__ __forceinline__ void KernelDiagnostics_print_rate_with_ai(
+static SFEM_CODEGEN_DEVICE_INLINE void KernelDiagnostics_print_rate_with_ai(
     const char *const name,
     const KernelDiagnostics *const d,
     const double elapsed,
@@ -189,7 +197,7 @@ static __host__ __device__ __forceinline__ void KernelDiagnostics_print_rate_wit
            elapsed, element_rate, dof_rate, ai, gflops);
 }
 
-static __host__ __device__ __forceinline__ void KernelDiagnostics_print_rate(
+static SFEM_CODEGEN_DEVICE_INLINE void KernelDiagnostics_print_rate(
     const char *const name,
     const KernelDiagnostics *const d,
     const double elapsed,
@@ -204,7 +212,7 @@ static __host__ __device__ __forceinline__ void KernelDiagnostics_print_rate(
   KernelDiagnostics_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);
 }
 
-static __host__ __device__ __forceinline__ void KernelDiagnostics_print_rate_affine_mesh(
+static SFEM_CODEGEN_DEVICE_INLINE void KernelDiagnostics_print_rate_affine_mesh(
     const char *const name,
     const KernelDiagnostics *const d,
     const double elapsed,
@@ -219,7 +227,7 @@ static __host__ __device__ __forceinline__ void KernelDiagnostics_print_rate_aff
   KernelDiagnostics_print_rate_with_ai(name, d, elapsed, nelements, ndofs, ai, total_flops);
 }
 
-static __host__ __device__ __forceinline__ void KernelDiagnostics_print_rate_isoparametric_mesh(
+static SFEM_CODEGEN_DEVICE_INLINE void KernelDiagnostics_print_rate_isoparametric_mesh(
     const char *const name,
     const KernelDiagnostics *const d,
     const double elapsed,

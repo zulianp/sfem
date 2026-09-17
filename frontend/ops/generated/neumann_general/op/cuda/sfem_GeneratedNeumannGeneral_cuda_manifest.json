@@ -1,0 +1,93 @@
+{
+  "c_abi": [
+    {
+      "declaration": "extern \"C\" int cu_neumann_general_edgeshell2_boundary_residual_2d_ss_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nsides,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const element_idx_t *const RSTR parent,\n        const int16_t *const RSTR side_idx,\n        const geom_t *const *const RSTR points,\n        const real_t t0,\n        const real_t t0_010,\n        const real_t t0_100,\n        const real_t t1,\n        const real_t t1_010,\n        const real_t t1_100,\n        const int out_stride,\n        real_t *const RSTR out0,\n        real_t *const RSTR out1,\n        void *const stream\n);",
+      "name": "neumann_general_edgeshell2_boundary_residual_2d_ss_soa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_neumann_general_proteus_quadshell4_boundary_residual_3d_ss_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nsides,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const element_idx_t *const RSTR parent,\n        const int16_t *const RSTR side_idx,\n        const geom_t *const *const RSTR points,\n        const real_t t0,\n        const real_t t0_001,\n        const real_t t0_010,\n        const real_t t0_100,\n        const real_t t1,\n        const real_t t1_001,\n        const real_t t1_010,\n        const real_t t1_100,\n        const real_t t2,\n        const real_t t2_001,\n        const real_t t2_010,\n        const real_t t2_100,\n        const int out_stride,\n        real_t *const RSTR out0,\n        real_t *const RSTR out1,\n        real_t *const RSTR out2,\n        void *const stream\n);",
+      "name": "neumann_general_proteus_quadshell4_boundary_residual_3d_ss_soa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_neumann_general_quadshell4_boundary_residual_3d_ss_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nsides,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const element_idx_t *const RSTR parent,\n        const int16_t *const RSTR side_idx,\n        const geom_t *const *const RSTR points,\n        const real_t t0,\n        const real_t t0_001,\n        const real_t t0_010,\n        const real_t t0_100,\n        const real_t t1,\n        const real_t t1_001,\n        const real_t t1_010,\n        const real_t t1_100,\n        const real_t t2,\n        const real_t t2_001,\n        const real_t t2_010,\n        const real_t t2_100,\n        const int out_stride,\n        real_t *const RSTR out0,\n        real_t *const RSTR out1,\n        real_t *const RSTR out2,\n        void *const stream\n);",
+      "name": "neumann_general_quadshell4_boundary_residual_3d_ss_soa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_neumann_general_trishell3_boundary_residual_3d_ss_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nsides,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const element_idx_t *const RSTR parent,\n        const int16_t *const RSTR side_idx,\n        const geom_t *const *const RSTR points,\n        const real_t t0,\n        const real_t t0_001,\n        const real_t t0_010,\n        const real_t t0_100,\n        const real_t t1,\n        const real_t t1_001,\n        const real_t t1_010,\n        const real_t t1_100,\n        const real_t t2,\n        const real_t t2_001,\n        const real_t t2_010,\n        const real_t t2_100,\n        const int out_stride,\n        real_t *const RSTR out0,\n        real_t *const RSTR out1,\n        real_t *const RSTR out2,\n        void *const stream\n);",
+      "name": "neumann_general_trishell3_boundary_residual_3d_ss_soa"
+    },
+    {
+      "declaration": "extern \"C\" int cu_neumann_general_trishell6_boundary_residual_3d_ss_soa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nsides,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const element_idx_t *const RSTR parent,\n        const int16_t *const RSTR side_idx,\n        const geom_t *const *const RSTR points,\n        const real_t t0,\n        const real_t t0_001,\n        const real_t t0_010,\n        const real_t t0_100,\n        const real_t t1,\n        const real_t t1_001,\n        const real_t t1_010,\n        const real_t t1_100,\n        const real_t t2,\n        const real_t t2_001,\n        const real_t t2_010,\n        const real_t t2_100,\n        const int out_stride,\n        real_t *const RSTR out0,\n        real_t *const RSTR out1,\n        real_t *const RSTR out2,\n        void *const stream\n);",
+      "name": "neumann_general_trishell6_boundary_residual_3d_ss_soa"
+    }
+  ],
+  "factory": {
+    "class": "sfem::GPUGeneratedNeumannGeneral",
+    "create": "sfem::GPUGeneratedNeumannGeneral::create",
+    "create_from_yaml": "sfem::GPUGeneratedNeumannGeneral::create_from_yaml"
+  },
+  "generated_include_paths": [
+    ".",
+    "cuda",
+    "d2/proteus_quad4/cuda",
+    "d2/quad4/cuda",
+    "d2/tri3/cuda",
+    "d3/hex8/cuda",
+    "d3/proteus_hex8/cuda",
+    "d3/tet10/cuda",
+    "d3/tet4/cuda",
+    "op/cuda"
+  ],
+  "header_api": [],
+  "material": "neumann_general",
+  "matrix_formats": [],
+  "op_name": "gpu:GeneratedNeumannGeneral",
+  "registration": {
+    "function": "sfem::register_GeneratedNeumannGeneral_cuda_generated_op",
+    "operator_name": "gpu:GeneratedNeumannGeneral",
+    "source": "op/cuda/sfem_GeneratedNeumannGeneral_cuda_registration.cpp"
+  },
+  "runtime_operations": [
+    {
+      "name": "boundary_residual",
+      "variants": [
+        {
+          "function": "cu_neumann_general_edgeshell2_boundary_residual_2d_ss_soa",
+          "scalar_type": "real_t",
+          "target": "neumann_general_edgeshell2",
+          "variant": "sideset"
+        },
+        {
+          "function": "cu_neumann_general_proteus_quadshell4_boundary_residual_3d_ss_soa",
+          "scalar_type": "real_t",
+          "target": "neumann_general_proteus_quadshell4",
+          "variant": "sideset"
+        },
+        {
+          "function": "cu_neumann_general_quadshell4_boundary_residual_3d_ss_soa",
+          "scalar_type": "real_t",
+          "target": "neumann_general_quadshell4",
+          "variant": "sideset"
+        },
+        {
+          "function": "cu_neumann_general_trishell3_boundary_residual_3d_ss_soa",
+          "scalar_type": "real_t",
+          "target": "neumann_general_trishell3",
+          "variant": "sideset"
+        },
+        {
+          "function": "cu_neumann_general_trishell6_boundary_residual_3d_ss_soa",
+          "scalar_type": "real_t",
+          "target": "neumann_general_trishell6",
+          "variant": "sideset"
+        }
+      ]
+    }
+  ],
+  "schema": "sfem.generated_op_manifest.v1",
+  "wrapper": {
+    "c_abi_header": "op/cuda/sfem_GeneratedNeumannGeneral_cuda_c_abi.hpp",
+    "header": "op/cuda/sfem_GeneratedNeumannGeneral_cuda.hpp",
+    "source": "op/cuda/sfem_GeneratedNeumannGeneral_cuda.cpp"
+  }
+}

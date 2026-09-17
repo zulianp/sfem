@@ -745,6 +745,7 @@ class CodeGenerationStage:
                         unit,
                         context,
                         _emit_codegen_unit(unit, context, target),
+                        backend.target.source_subdirectory(),
                     ),
                 )
                 if wants_inexact:
@@ -754,6 +755,7 @@ class CodeGenerationStage:
                             unit,
                             context,
                             tuple(backend.emit_inexact(material, unit, context)),
+                            backend.target.source_subdirectory(),
                         ),
                     )
         return outputs
@@ -794,8 +796,14 @@ def generate(
     selected = _with_tensor_product_proteus_alias_dependencies(selected, available_elements)
     out_dir = os.path.abspath(os.fspath(out_dir))
     os.makedirs(out_dir, exist_ok=True)
+    target = _normalize_generation_target(target)
+    backend = _backend_for_target(target)
     if clean:
-        _clean_outputs(out_dir, material.name)
+        # Only this target's own files: the host and the device tree share a
+        # directory now, and a clean that crossed between them would delete
+        # what the other run wrote.  Resolving the backend first is what makes
+        # the question answerable here.
+        _clean_outputs(out_dir, material.name, backend.target.source_subdirectory())
 
     matrix_format_plan = _selected_matrix_format_plan(
         material,
@@ -804,8 +812,6 @@ def generate(
         matrix_packed_passes,
         matrix_patch_node_index_filter,
     )
-    target = _normalize_generation_target(target)
-    backend = _backend_for_target(target)
     while True:
         user_input = UserInputStage.create(
             material,
@@ -1834,7 +1840,7 @@ def _c_element_pointer_type(param):
     raise ValueError("unsupported HEX27 element pointer parameter '%s'" % param)
 
 
-def _layout_codegen_files(unit, context, files):
+def _layout_codegen_files(unit, context, files, subdirectory=""):
     local_headers = tuple(
         generated.path
         for generated in files
@@ -1842,35 +1848,75 @@ def _layout_codegen_files(unit, context, files):
     )
     return tuple(
         GeneratedKernelFile(
-            _layout_codegen_path(unit, context, generated.path),
+            _layout_codegen_path(unit, context, generated.path, subdirectory),
             _layout_codegen_source(
                 unit,
                 context,
                 generated.path,
                 generated.source,
                 local_headers,
+                subdirectory,
             ),
         )
         for generated in files
     )
 
 
-def _layout_codegen_path(unit, context, filename):
-    directory = _codegen_file_directory(unit, context, filename)
+def _in_target_subdirectory(directory, subdirectory):
+    """`d3/tet4` becomes `d3/tet4/cuda`, and the tree root becomes `cuda`.
+
+    The whole of the target's placement decision: a device file sits in a local
+    folder inside the directory its host twin occupies, which is how the rest
+    of the repository is laid out and what stops the two trees colliding on the
+    files that are `.hpp` on both -- the element API and the reference tables.
+    """
+    if not subdirectory:
+        return directory
+    return os.path.join(directory, subdirectory) if directory else subdirectory
+
+
+def _layout_codegen_path(unit, context, filename, subdirectory=""):
+    if _is_target_independent_codegen_file(filename):
+        subdirectory = ""
+    if _is_shared_reference_header(filename):
+        # The name already carries `reference/`, so the target's folder goes
+        # inside it -- beside the host tables, not above them.
+        reference_directory, name = os.path.split(filename)
+        return os.path.join(
+            _in_target_subdirectory(reference_directory, subdirectory), name
+        )
+    directory = _codegen_file_directory(unit, context, filename, subdirectory)
     if not directory:
         return filename
     return os.path.join(directory, filename)
 
 
-def _layout_codegen_source(unit, context, filename, source, local_headers):
-    directory = _codegen_file_directory(unit, context, filename)
+def _layout_codegen_source(
+    unit, context, filename, source, local_headers, subdirectory=""
+):
+    if _is_target_independent_codegen_file(filename):
+        subdirectory = ""
+    directory = _codegen_file_directory(unit, context, filename, subdirectory)
     replacements = {}
     for header in _CODEGEN_COMMON_HEADERS:
-        replacements[header] = _relative_codegen_include(directory, header)
+        # Each included header is looked up where *it* was placed, which is not
+        # always where this file was: `matrix_formats.hpp` keeps the host
+        # position under every target.
+        header_directory = _in_target_subdirectory(
+            "", "" if _is_target_independent_codegen_file(header) else subdirectory
+        )
+        replacements[header] = _relative_codegen_include(
+            directory, os.path.join(header_directory, header)
+        )
     for local in local_headers:
         replacements[local] = _relative_codegen_include(
             directory,
-            os.path.join(_codegen_dimension_directory(context), local),
+            os.path.join(
+                _in_target_subdirectory(
+                    _codegen_dimension_directory(context), subdirectory
+                ),
+                local,
+            ),
         )
 
     relocated = source
@@ -1882,12 +1928,24 @@ def _layout_codegen_source(unit, context, filename, source, local_headers):
             )
     # The reference headers are a family, so their includes move by path rather
     # than by a lookup of each name.
-    if directory:
+    reference_directory = _in_target_subdirectory(REFERENCE_DIRECTORY, subdirectory)
+    if directory or reference_directory != REFERENCE_DIRECTORY:
         relocated = relocated.replace(
             '#include "%s/' % REFERENCE_DIRECTORY,
-            '#include "%s/' % _relative_codegen_include(directory, REFERENCE_DIRECTORY),
+            '#include "%s/' % _relative_codegen_include(directory, reference_directory),
         )
     return relocated
+
+
+def _is_shared_primitive_header(filename):
+    """`kernel_math.hpp`, or `cuda/kernel_math.cuh` under a device target.
+
+    The set names the files; the target decides which folder they sit in, so
+    membership is tested on the name and whatever directory the layout gave it
+    is carried along when the header is hoisted.
+    """
+    normalized = str(filename).replace(os.sep, "/")
+    return normalized.rsplit("/", 1)[-1] in _CODEGEN_SHARED_PRIMITIVE_HEADERS
 
 
 def _is_shared_reference_header(filename):
@@ -1903,16 +1961,35 @@ def _is_shared_reference_header(filename):
     ) and normalized.endswith((".hpp", ".cuh"))
 
 
-def _codegen_file_directory(unit, context, filename):
+#: Files a device generation emits unchanged, so there is one copy of each.
+#:
+#: The matrix-format record and the assembly operator it describes are host
+#: C++ whatever the target -- no `__global__`, no `__device__`, no stream --
+#: because matrix assembly has no device lowering.  Putting them in the
+#: target's folder would make a second copy of a file that is byte-identical
+#: apart from the include path the copy itself forced, which is the redundant
+#: path rather than a device variant of anything.
+def _is_target_independent_codegen_file(filename):
+    name = str(filename).replace(os.sep, "/").rsplit("/", 1)[-1]
+    return name == "matrix_formats.hpp" or name.endswith("_matrix_format_operator.cpp")
+
+
+def _codegen_file_directory(unit, context, filename, subdirectory=""):
+    if _is_target_independent_codegen_file(filename):
+        subdirectory = ""
     if _is_shared_reference_header(filename):
         # The path already carries its directory, and the file is shared by every
         # material, so it must not be pushed down into d3/tet4/.
         return ""
     if filename in _CODEGEN_COMMON_HEADERS:
-        return ""
+        return _in_target_subdirectory("", subdirectory)
     if _is_codegen_local_header(filename):
-        return _codegen_dimension_directory(context)
-    return _codegen_output_directory(unit, context)
+        return _in_target_subdirectory(
+            _codegen_dimension_directory(context), subdirectory
+        )
+    return _in_target_subdirectory(
+        _codegen_output_directory(unit, context), subdirectory
+    )
 
 
 def _is_codegen_local_header(filename):
@@ -1977,11 +2054,8 @@ def _relocate_generated_primitive_headers(files, out_dir, material_name):
 
     relocated = {}
     header_targets = {}
-    for header in _CODEGEN_SHARED_PRIMITIVE_HEADERS:
-        if header in files:
-            header_targets[header] = os.path.join("..", header)
     for filename in files:
-        if _is_shared_reference_header(filename):
+        if _is_shared_primitive_header(filename) or _is_shared_reference_header(filename):
             header_targets[filename] = os.path.join("..", filename)
 
     if not header_targets:
@@ -2001,11 +2075,11 @@ def _uses_generated_shared_primitive_headers(out_dir, material_name):
     normalized = os.path.normpath(os.path.abspath(out_dir))
     output_name = os.path.basename(normalized)
     generated_root = os.path.basename(os.path.dirname(normalized))
-    return generated_root == "generated" and output_name in (
-        material_name,
-        "%s_cuda" % material_name,
-        "%s_hip" % material_name,
-    )
+    # One tree per material, whatever the target: the device files sit in
+    # `cuda/` folders inside it, the way the rest of the repository lays out
+    # its device sources.  The sibling `<material>_cuda` tree this used to
+    # accept was a second place for the same material and is gone.
+    return generated_root == "generated" and output_name == material_name
 
 
 def _rewrite_generated_primitive_includes(filename, source, header_targets):
@@ -2446,7 +2520,31 @@ def _write_files(out_dir, files):
     return tuple(paths)
 
 
-def _clean_outputs(out_dir, name):
+def _target_subdirectories():
+    """Every folder a target claims for its own sources.
+
+    Derived from the registered backends rather than listed, so adding a target
+    cannot leave a folder that some other target's clean will walk into.
+    """
+    return frozenset(
+        backend.target.source_subdirectory() for backend in BACKENDS_BY_TARGET.values()
+    ) - {""}
+
+
+def _belongs_to_target_tree(path, out_dir, subdirectory):
+    """Is this file part of the tree the run being cleaned owns?
+
+    The host and the device trees share a directory now, so a clean has to be
+    able to tell them apart: without this, the host run's `d*/*` glob reaches
+    `d3/cuda/` and deletes device headers that no later step rewrites.
+    """
+    segments = os.path.relpath(path, out_dir).split(os.sep)[:-1]
+    claimed = _target_subdirectories()
+    present = [segment for segment in segments if segment in claimed]
+    return present == ([subdirectory] if subdirectory else [])
+
+
+def _clean_outputs(out_dir, name, subdirectory=""):
     patterns = (
         "generated_%s*.hpp" % name,
         "generated_%s*.cuh" % name,
@@ -2470,9 +2568,17 @@ def _clean_outputs(out_dir, name):
         # `tools/codegen_snapshot.py check-tree` compares the committed tree
         # against a fresh generation and reports anything extra.
     )
+    def _remove(*parts):
+        #: The target's folder sits between the directory and the file name,
+        #: and the predicate then rejects anything that belongs to a different
+        #: target -- the `d*/*` glob below would otherwise reach `d3/cuda/`.
+        directories = parts[:-1] + ((subdirectory,) if subdirectory else ())
+        for path in glob.glob(os.path.join(out_dir, *directories, parts[-1])):
+            if _belongs_to_target_tree(path, out_dir, subdirectory):
+                os.remove(path)
+
     for pattern in patterns:
-        for path in glob.glob(os.path.join(out_dir, pattern)):
-            os.remove(path)
+        _remove(pattern)
     nested_patterns = (
         "generated_%s*.hpp" % name,
         "generated_%s*.cuh" % name,
@@ -2500,14 +2606,11 @@ def _clean_outputs(out_dir, name):
         "geometry_kernels.cuh",
     )
     for pattern in nested_patterns:
-        for path in glob.glob(os.path.join(out_dir, "d*", pattern)):
-            os.remove(path)
+        _remove("d*", pattern)
     for pattern in nested_patterns:
-        for path in glob.glob(os.path.join(out_dir, "d*", "*", pattern)):
-            os.remove(path)
+        _remove("d*", "*", pattern)
     for pattern in ("sfem_*.hpp", "sfem_*.cuh", "sfem_*.cpp", "sfem_*.cu", "sfem_*.o", "sfem_*_manifest.json"):
-        for path in glob.glob(os.path.join(out_dir, "op", pattern)):
-            os.remove(path)
+        _remove("op", pattern)
 
 
 def _repo_root():

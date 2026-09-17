@@ -2,7 +2,12 @@ import math
 
 import sympy as sp
 
-from codegen.framework.plans.conventions import restrict_prelude
+from codegen.framework.plans.conventions import (
+    optional_sfem_include,
+    restrict_prelude,
+    sfem_scalar_type_fallback,
+    sfem_scalar_type_prelude,
+)
 
 from codegen.framework.emitters.artifacts import (
     GeneratedKernelFile,
@@ -446,8 +451,9 @@ def _boundary_source(function, element_type, surface, components, parameters, co
         "    float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
-    return """#include "sfem_base.hpp"
-#include "sfem_macros.hpp"
+    return """{scalar_type_prelude}
+{macros_include}
+{scalar_type_fallback}
 {restrict_prelude}
 
 #include <math.h>
@@ -649,6 +655,9 @@ extern "C" int {public_sideset_function_float}(
 }}
 """.format(
         restrict_prelude="\n".join(restrict_prelude()),
+        scalar_type_prelude="\n".join(sfem_scalar_type_prelude()),
+        macros_include="\n".join(optional_sfem_include("sfem_macros.hpp")),
+        scalar_type_fallback="\n".join(sfem_scalar_type_fallback()),
         math_header=current_target().header_name("kernel_math"),
         #: The reference tables are called from `{function}_element`, which is
         #: `__host__ __device__` on a device target.  They carried no qualifier
@@ -874,8 +883,9 @@ def _boundary_tensor_product_source(function, element_type, surface, components,
         "    float *const RSTR out%d%s" % (i, "," if i + 1 < components else "")
         for i in range(components)
     )
-    return """#include "sfem_base.hpp"
-#include "sfem_macros.hpp"
+    return """{scalar_type_prelude}
+{macros_include}
+{scalar_type_fallback}
 {restrict_prelude}
 
 #include <math.h>
@@ -1121,6 +1131,9 @@ extern "C" int {public_sideset_function_float}(
 }}
 """.format(
         restrict_prelude="\n".join(restrict_prelude()),
+        scalar_type_prelude="\n".join(sfem_scalar_type_prelude()),
+        macros_include="\n".join(optional_sfem_include("sfem_macros.hpp")),
+        scalar_type_fallback="\n".join(sfem_scalar_type_fallback()),
         math_header=current_target().header_name("kernel_math"),
         #: The reference tables are called from `{function}_element`, which is
         #: `__host__ __device__` on a device target.  They carried no qualifier

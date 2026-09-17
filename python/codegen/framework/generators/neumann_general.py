@@ -40,6 +40,17 @@ def main(argv=None):
     parser.add_argument("--vector-size", type=int, default=gen.DEFAULT_VECTOR_SIZE)
     parser.add_argument("--compile", action="store_true")
     parser.add_argument(
+        # This parser exists only to add `--polynomial-order`; everything else
+        # it spells, `gen.run` spells too, and a copy that is missing an option
+        # is a generator the regeneration cannot drive.  That is not
+        # hypothetical: without this the device wave failed on this material
+        # alone, with `unrecognized arguments: --target cuda`.
+        "--target",
+        choices=("openmp", "avx512", "arm_sve", "arm_sme", "cuda", "hip"),
+        default="openmp",
+        help="Backend target to emit.",
+    )
+    parser.add_argument(
         "--keep-existing",
         action="store_true",
         help="Keep stale outputs from previous generator runs.",
@@ -60,6 +71,7 @@ def main(argv=None):
         quadrature_order=args.quadrature_order,
         compile=args.compile,
         clean=not args.keep_existing,
+        target=args.target,
     )
     print_generation_result(result)
     return result

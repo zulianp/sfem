@@ -23,6 +23,7 @@
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
 typedef ptrdiff_t idx_t;
+typedef ptrdiff_t element_idx_t;
 typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif

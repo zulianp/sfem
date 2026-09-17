@@ -3,6 +3,8 @@ from codegen.framework.emitters.runtime_typed_abi import (
     runtime_type_correspondence_lines,
 )
 from codegen.framework.plans.conventions import (
+    sfem_scalar_type_fallback,
+    sfem_scalar_type_prelude,
     diagnostics_tail,
     ABI_TRAVERSAL_UNIT,
     abi_geometry,
@@ -77,9 +79,9 @@ def generate_op_files(material, elements, kernel_sources=None):
             )
     else:
         raise ValueError("unsupported generated Op equation form")
-    wrapper_header = "op/sfem_%s.hpp" % _op_file_stem(material)
-    wrapper_source = "op/sfem_%s.cpp" % _op_file_stem(material)
-    registration_source = "op/sfem_%s_registration.cpp" % _op_file_stem(material)
+    wrapper_header = _op_path("sfem_%s.hpp" % _op_file_stem(material))
+    wrapper_source = _op_path("sfem_%s.cpp" % _op_file_stem(material))
+    registration_source = _op_path("sfem_%s_registration.cpp" % _op_file_stem(material))
     files = {
         wrapper_header: header,
         wrapper_source: source,
@@ -88,9 +90,9 @@ def generate_op_files(material, elements, kernel_sources=None):
     files.update(dispatch_sources)
     files.update(element_api_sources)
     if c_abi_header:
-        c_abi_path = "op/%s" % c_abi_header
+        c_abi_path = _op_path(c_abi_header)
         files[c_abi_path] = _c_abi_header(material, abi_sources)
-        files["op/sfem_%s_manifest.json" % _op_file_stem(material)] = _op_manifest(
+        files[_op_path("sfem_%s_manifest.json" % _op_file_stem(material))] = _op_manifest(
             material,
             abi_sources,
             wrapper_header,
@@ -4868,6 +4870,46 @@ def _op_registered_name(material):
     return "%s%s" % (current_target().op_registration_prefix(), material.op_name)
 
 
+def _op_directory():
+    """Where the wrapper's translation units go.
+
+    `op/` beside the kernels on the host, `op/cuda/` under a device target --
+    the same local folder the rest of the repository puts device sources in.
+    The wrapper is the one part of the tree whose file names already carry the
+    target (`_cuda`), so the folder is not what keeps the two apart; it is what
+    makes the generated tree look like the hand-written one.
+    """
+    subdirectory = current_target().source_subdirectory()
+    return "op/%s" % subdirectory if subdirectory else "op"
+
+
+def _op_path(name):
+    return "%s/%s" % (_op_directory(), name)
+
+
+def _op_relative_include(path):
+    """Spell `path`, given from the material's root, as the wrapper sees it.
+
+    The wrapper's own directory is the target's -- `op/` on the host,
+    `op/cuda/` on a device -- so the number of `../` steps is not a constant.
+    It was written as one, which left every device wrapper's include a level
+    short of where the file it names actually sits.
+    """
+    return os.path.relpath(path, start=_op_directory()).replace(os.sep, "/")
+
+
+def _op_shared_header_include(stem):
+    """One of the target's shared primitive headers, as the wrapper sees it.
+
+    The name and the folder are both the target's: `kernel_diagnostics.hpp` at
+    the tree root on the host, `cuda/kernel_diagnostics.cuh` on a device.
+    """
+    target = current_target()
+    return _op_relative_include(
+        os.path.join(target.source_subdirectory(), target.header_name(stem))
+    )
+
+
 def _op_file_stem(material):
     """What the wrapper's translation units are called.
 
@@ -5287,7 +5329,7 @@ def _element_api_sources(material, elements, kernel_sources):
     element_headers = _element_api_headers(material, elements, kernel_sources)
     if not element_headers:
         return {}
-    header_path = "op/sfem_%s_element_api.hpp" % _op_file_stem(material)
+    header_path = _op_path("sfem_%s_element_api.hpp" % _op_file_stem(material))
     return {header_path: _element_api_dispatch_header(material, element_headers)}
 
 
@@ -5320,7 +5362,7 @@ def _element_api_dispatch_header(material, entries):
         "",
     ]
     for header in sorted({entry["header"] for entry in entries}):
-        lines.append('#include "../%s"' % header)
+        lines.append('#include "%s"' % _op_relative_include(header))
     lines.extend(["", "namespace sfem {", "namespace codegen {", ""])
 
     for operation in ("energy", "gradient", "hessian"):
@@ -5512,11 +5554,11 @@ def _dispatch_sources(material, elements, c_abi_header, kernel_sources):
     sources = {}
     for kind, grouped in _dispatch_groups_by_source_kind(groups):
         sources[
-            "op/sfem_%s_%s_dispatch.cpp" % (_op_file_stem(material), kind)
+            _op_path("sfem_%s_%s_dispatch.cpp" % (_op_file_stem(material), kind))
         ] = _dispatch_source(c_abi_header, grouped)
     if diagnostic_groups:
         sources[
-            "op/sfem_%s_diagnostics_dispatch.cpp" % _op_file_stem(material)
+            _op_path("sfem_%s_diagnostics_dispatch.cpp" % _op_file_stem(material))
         ] = _diagnostic_dispatch_source(c_abi_header, diagnostic_groups)
     return sources, _declared_dispatch_signatures(groups)
 
@@ -6318,7 +6360,8 @@ def _c_abi_header(material, kernel_sources):
     if body:
         body += "\n"
     matrix_formats_include = (
-        '#include "../matrix_formats.hpp"\n'
+        #: Target-independent, so it keeps the host name and the host place.
+        '#include "%s"\n' % _op_relative_include("matrix_formats.hpp")
         if "sfem_MatrixAssemblyDiagnostics" in body
         else ""
     )
@@ -6327,24 +6370,13 @@ def _c_abi_header(material, kernel_sources):
 #include <cstddef>
 #include <cstdint>
 
-#if defined(__has_include)
-#if __has_include("sfem_base.hpp")
-#include "sfem_base.hpp"
-#define SFEM_CODEGEN_OP_HAS_SFEM_BASE
-#endif
-#endif
+%(scalar_type_prelude)s
 
-#ifndef SFEM_CODEGEN_OP_HAS_SFEM_BASE
-typedef ptrdiff_t idx_t;
-typedef ptrdiff_t element_idx_t;
-typedef ptrdiff_t count_t;
-typedef double real_t;
-typedef double geom_t;
-#endif
+%(scalar_type_fallback)s
 
 %(restrict_prelude)s
 
-#include "../kernel_diagnostics.hpp"
+#include "%(kernel_diagnostics_include)s"
 %(matrix_formats_include)s
 %(smesh_include)s
 
@@ -6355,6 +6387,9 @@ typedef double geom_t;
 %(body)s""" % {
         "body": body,
         "restrict_prelude": "\n".join(restrict_prelude()),
+        "scalar_type_prelude": "\n".join(sfem_scalar_type_prelude()),
+        "scalar_type_fallback": "\n".join(sfem_scalar_type_fallback()),
+        "kernel_diagnostics_include": _op_shared_header_include("kernel_diagnostics"),
         "matrix_formats_include": matrix_formats_include,
         "smesh_include": '#include "smesh_mesh.hpp"' if "smesh::ElemType" in body else "",
     }
@@ -6463,7 +6498,7 @@ def _header_api_sources(kernel_sources, element_api_sources):
 
 
 def _generated_include_paths(kernel_sources):
-    paths = set([".", "op"])
+    paths = set([".", _op_directory()])
     for path in kernel_sources:
         if path.startswith("op/"):
             continue
