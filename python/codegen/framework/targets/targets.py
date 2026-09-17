@@ -342,6 +342,46 @@ class TargetPlatform:
         """What keeps the two wrappers' translation units apart."""
         return ""
 
+    def mesh_source_extension(self):
+        """What this target's mesh translation unit is called.
+
+        The backends each answered this themselves, which was one answer per
+        backend for a fact about the target -- and the consumers that needed it
+        outside a backend could not ask at all, so they assumed `cpp`.  Two of
+        them did: the tensor-product alias replacement in `pipeline/driver` and
+        the test that reads it back in `package/op_wrappers`.  On a device
+        target neither fired, so the mesh-order element kept a full duplicate
+        kernel set instead of delegating to its PROTEUS twin, and the `Op`
+        emitted a `case smesh::HEX8` twice -- once alone and once beside
+        `PROTEUS_HEX8` -- which does not compile.
+        """
+        return "cpp"
+
+    def execution_space(self):
+        """The `sfem::ExecutionSpace` enumerator a generated `Op` runs in here.
+
+        A generated `Op` allocates its own per-element scratch for the merit,
+        and where that memory lives is not a property of the material.  While
+        the wrapper spelled `new real_t[n]` for every target, the device `Op`
+        handed a *host* pointer to a device kernel as the per-element output
+        and then read the result back from it -- a merit computed from memory
+        no kernel had written.
+        """
+        return "EXECUTION_SPACE_HOST"
+
+    def supports_inexact_apply(self):
+        """Whether this target has a lowering for the inexact-apply family.
+
+        The material says whether it *wants* the split; this says whether the
+        target can produce it.  Both have to hold, and conflating them is how
+        the device `Op` came to declare `inexact_supported`, `inexact_update`
+        and `inexact_apply` in its header while its source defined none of
+        them: the declaration asked the material, the definitions needed
+        kernels this target does not emit.  Three undefined vtable slots, and
+        nothing noticed until an executable was linked against the library.
+        """
+        return True
+
     def source_subdirectory(self):
         """Where this target's sources sit inside the directory they mirror.
 
@@ -355,6 +395,21 @@ class TargetPlatform:
         Nothing for the host, whose sources are the ones being mirrored.
         """
         return ""
+
+    def points_accessor(self):
+        """Where a generated `Op` reads the mesh geometry from.
+
+        The companion of `element_connectivity_accessor`, and it was the one
+        that never became a fact.  Connectivity and cached geometry both moved
+        onto the target; `points` stayed spelled `mesh->points()->data()`
+        everywhere, so a device `Op` handed its `__global__` kernels a *host*
+        pointer.  `compute-sanitizer` named it exactly -- "Invalid __global__
+        read of size 8 bytes ... Address 0xd8433f8 is out of bounds" in
+        `objective_steps` and in `gradient` -- and on a Grace Hopper node the
+        read sometimes succeeds through address translation, which is why the
+        merit came out exact at one mesh size and nonsense at the next.
+        """
+        return "mesh->points()->data()"
 
     def element_connectivity_accessor(self):
         """Where a generated `Op` reads its connectivity from.
@@ -754,8 +809,23 @@ class CUDATarget(TargetPlatform):
     def op_file_suffix(self):
         return "_cuda"
 
+    def mesh_source_extension(self):
+        return "cu"
+
+    def execution_space(self):
+        return "EXECUTION_SPACE_DEVICE"
+
+    def supports_inexact_apply(self):
+        #: `CUDASoABackend.emit_inexact` returns no files -- the family has not
+        #: been lowered for a device target -- so nothing may be declared for it.
+        return False
+
     def source_subdirectory(self):
         return "cuda"
+
+    def points_accessor(self):
+        #: `device_points_SoA()` is smesh's device copy of the same array.
+        return "mesh->device_points_SoA()->data()"
 
     def element_connectivity_accessor(self):
         #: `device_elements_SoA()` hands back `idx_t *const *` where the C ABI
@@ -828,6 +898,9 @@ class HIPTarget(CUDATarget):
 
     def includes(self):
         return ("#include <hip/hip_runtime.h>",)
+
+    def mesh_source_extension(self):
+        return "hip"
 
     def source_subdirectory(self):
         #: The repository has no `hip/` folder to follow, so this names the

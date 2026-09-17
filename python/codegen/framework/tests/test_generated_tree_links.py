@@ -121,3 +121,93 @@ class GeneratedTreeLinksTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# A vtable slot is a link fact too, and it fails later and louder than a missing
+# `extern "C"` kernel: an undefined `override` compiles, archives, and survives
+# the whole library build, because nothing emits a reference to it until an
+# executable is linked.  That is how a device `Op` came to declare
+# `inexact_supported`, `inexact_update` and `inexact_apply` while its source
+# defined none -- the declaration asked the *material*, the definitions needed
+# kernels the *target* does not lower, and the two questions were the same
+# `getattr`.
+OP_HEADER = '''
+namespace sfem {
+  class %sGeneratedThing final : public Op {
+  public:
+    const char *name() const override { return "GeneratedThing"; }
+    int gradient(const real_t *const x, real_t *const out) override;
+    int apply(const real_t *const x,
+              const real_t *const h,
+              real_t *const out) override;%s
+  };
+}
+'''
+
+INEXACT_DECLARATIONS = '''
+    bool inexact_supported() const override;'''
+
+OP_SOURCE = '''
+int %sGeneratedThing::gradient(const real_t *const x, real_t *const out) { return 0; }
+int %sGeneratedThing::apply(const real_t *const x, const real_t *const h, real_t *const out) { return 0; }
+'''
+
+
+def _op_tree(prefix, extra_declarations, extra_definitions=""):
+    return {
+        "thing/op/sfem_GeneratedThing.hpp": OP_HEADER % (prefix, extra_declarations),
+        "thing/op/sfem_GeneratedThing.cpp": OP_SOURCE % (prefix, prefix) + extra_definitions,
+    }
+
+
+class GeneratedOpOverridesTest(unittest.TestCase):
+    def test_a_class_whose_overrides_are_all_defined_passes(self):
+        driver._validate_generated_op_overrides(_op_tree("", ""))
+
+    def test_an_override_nothing_defines_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            driver._validate_generated_op_overrides(_op_tree("", INEXACT_DECLARATIONS))
+        self.assertIn("inexact_supported", str(caught.exception))
+
+    def test_the_same_override_with_a_definition_passes(self):
+        driver._validate_generated_op_overrides(
+            _op_tree(
+                "",
+                INEXACT_DECLARATIONS,
+                "\nbool GeneratedThing::inexact_supported() const { return true; }\n",
+            )
+        )
+
+    def test_an_inline_body_in_the_header_needs_no_definition(self):
+        # `name()` is declared *and* defined in the class body.  A checker that
+        # only looked for `override` would demand an out-of-line definition for
+        # it and fail every generated Op there is.
+        tree = _op_tree("", "")
+        self.assertIn("name() const override {", tree["thing/op/sfem_GeneratedThing.hpp"])
+        self.assertNotIn("::name", tree["thing/op/sfem_GeneratedThing.cpp"])
+        driver._validate_generated_op_overrides(tree)
+
+    def test_a_host_definition_does_not_satisfy_a_device_declaration(self):
+        # The device class name contains the host's as a suffix
+        # (`GPUGeneratedThing` ends with `GeneratedThing`), so a substring match
+        # would see `GeneratedThing::inexact_supported` inside
+        # `GPUGeneratedThing::inexact_supported` and pass a header that declares
+        # what nothing defines -- which is the exact pair that shipped.
+        tree = _op_tree("GPU", INEXACT_DECLARATIONS)
+        tree["thing/op/sfem_GeneratedThingHost.cpp"] = (
+            "\nbool GeneratedThing::inexact_supported() const { return true; }\n"
+        )
+        with self.assertRaises(ValueError):
+            driver._validate_generated_op_overrides(tree)
+
+    def test_a_multi_line_declaration_is_read_as_one(self):
+        # `apply` spans three lines in every generated Op header.  A line-wise
+        # checker reads its tail as a statement of its own and finds no name.
+        tree = _op_tree("", "")
+        self.assertIn("real_t *const out) override;", tree["thing/op/sfem_GeneratedThing.hpp"])
+        driver._validate_generated_op_overrides(tree)
+
+    def test_a_pure_virtual_declaration_is_not_this_check_s_business(self):
+        driver._validate_generated_op_overrides(
+            _op_tree("", "\n    int value(const real_t *x, real_t *const out) override = 0;")
+        )

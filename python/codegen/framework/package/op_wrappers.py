@@ -465,6 +465,16 @@ def _equation_form_orders(equation):
     raise ValueError("unsupported equation form")
 
 
+def _emits_inexact_apply(material):
+    """Whether this generation publishes the inexact-apply family at all.
+
+    The material has to want it and the target has to be able to lower it.  The
+    declaration used to ask only the first, so a device `Op` declared three
+    overrides whose definitions the backend never emitted.
+    """
+    return bool(getattr(material, "inexact_apply", False)) and current_target().supports_inexact_apply()
+
+
 def _inexact_declarations(material):
     """The inexact methods, where the material generates the kernels for them.
 
@@ -472,7 +482,7 @@ def _inexact_declarations(material):
     generate the split simply does not override them and callers see
     `inexact_supported() == false`.  Nothing else changes shape.
     """
-    if not getattr(material, "inexact_apply", False):
+    if not _emits_inexact_apply(material):
         return ""
     return """
     bool inexact_supported() const override;
@@ -546,6 +556,15 @@ namespace sfem {
     ~%(op)s() override;
 
     const char *name() const override { return "%(op)s"; }
+    //! Where this `Op` runs, which the `Function` above it needs in order to
+    //! allocate anything the `Op` will write.  `Op::execution_space` defaults
+    //! to the host and the device wrapper did not override it, so
+    //! `Function::execution_space` reported the host for a device `Op` and
+    //! `Function::node_wise_merit` allocated its residual there -- which the
+    //! device `gradient` then `atomicAdd`ed into.  `compute-sanitizer`:
+    //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
+    //! out of bounds".
+    ExecutionSpace execution_space() const override { return %(execution_space)s; }
     bool is_linear() const override { return false; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
@@ -592,6 +611,7 @@ namespace sfem {
 }  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "execution_space": current_target().execution_space(),
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "extra": extra,
@@ -610,7 +630,7 @@ def _inexact_needs_affine(material):
     isoparametrically would offer `inexact_update` and then fail in it for want
     of a cache the caller has no way to ask for.
     """
-    if not getattr(material, "inexact_apply", False):
+    if not _emits_inexact_apply(material):
         return ""
     # Only where the cache can actually be built.  smesh's adjugate fill has no
     # TRI3 or QUAD4 case and aborts rather than returning, so asking for the
@@ -631,7 +651,7 @@ def _inexact_cache_field(material):
     which is what makes calling it a precondition of the inexact apply rather
     than a hint.
     """
-    if not getattr(material, "inexact_apply", False):
+    if not _emits_inexact_apply(material):
         return ""
     return """            SharedBuffer<metric_tensor_t> inexact_tangent;
 """
@@ -689,7 +709,7 @@ def _inexact_definitions(
     of the operator, and reallocating each time would dominate a kernel whose
     whole purpose is to be cheap.
     """
-    if not getattr(material, "inexact_apply", False):
+    if not _emits_inexact_apply(material):
         return ""
     components = _inexact_tangent_components(material, form_collections, elements)
     if not components:
@@ -1167,14 +1187,14 @@ def _hyperelastic_op(
                         objective_args,
                     ),
                     *_energy_field_args(objective_dependencies, components, current="x"),
-                    "impl_->element_values.get()",
+                    _element_values_pointer(),
                 )),
                 "%s_objective_i_msoa" % stem,
                 ", ".join(_nonempty(
                     "nelements, mesh->n_nodes(), element_connectivity(domain), points%s"
                     % objective_args,
                     *_energy_field_args(objective_dependencies, components, current="x"),
-                    "impl_->element_values.get()",
+                    _element_values_pointer(),
                 )),
             )
         )
@@ -1196,8 +1216,8 @@ def _hyperelastic_op(
                     dim,
                     _offsets("h", components),
                     "nsteps",
-                    "steps",
-                    "impl_->element_values.get()",
+                    _steps_pointer(),
+                    _element_values_pointer(),
                 )),
                 "%s_objective_steps_i_msoa" % stem,
                 ", ".join(_nonempty(
@@ -1207,8 +1227,8 @@ def _hyperelastic_op(
                     dim,
                     _offsets("h", components),
                     "nsteps",
-                    "steps",
-                    "impl_->element_values.get()",
+                    _steps_pointer(),
+                    _element_values_pointer(),
                 )),
             )
         )
@@ -1256,7 +1276,7 @@ def _hyperelastic_op(
 %(c_abi_include)s
 %(packed_scratch_include)s
 
-#include "sfem_FunctionSpace.hpp"
+%(element_scratch_include)s#include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
@@ -1347,6 +1367,15 @@ namespace sfem {
       return %(element_connectivity)s;
     }
 
+    //! Where the kernels read the mesh geometry from.  The mesh's own array on
+    //! the host; a device target reads smesh's device copy, because a
+    //! `__global__` body cannot dereference a host pointer -- and on a Grace
+    //! Hopper node it sometimes can, which is worse: the merit came out exact
+    //! at one mesh size and nonsense at the next.
+    const geom_t *const *element_points(const std::shared_ptr<smesh::Mesh> &mesh) {
+      return const_cast<const geom_t *const *>(%(points_accessor)s);
+    }
+
     ptrdiff_t block_size_for_dim(const int dim) {
 %(block_size_lines)s
     }
@@ -1358,8 +1387,7 @@ namespace sfem {
 
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
-    std::unique_ptr<real_t[]> element_values;
-    ptrdiff_t element_capacity{0};
+%(element_scratch_fields)s
     bool objective_uses_affine{false};
     bool gradient_uses_affine{false};
     bool apply_uses_affine{false};
@@ -1464,7 +1492,7 @@ namespace sfem {
       cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
       return SFEM_FAILURE;
     }
-    impl_->element_values.reset(new real_t[impl_->element_capacity]);
+%(element_scratch_alloc)s
 %(packed_scratch_prealloc)s
     return SFEM_SUCCESS;
   }
@@ -1472,7 +1500,7 @@ namespace sfem {
   int %(op)s::gradient(const real_t *const x, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
@@ -1509,7 +1537,7 @@ namespace sfem {
                       real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::apply");
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
@@ -1571,7 +1599,7 @@ namespace sfem {
               real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::value_steps");
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
     }
@@ -1592,27 +1620,19 @@ namespace sfem {
         determinant = reinterpret_cast<const geom_t *>(
             cache->jacobian_soa->jacobian_determinant()->data());
 %(objective_steps_metric_binding)s            }
+%(steps_staging)s
       if (nvalues > impl_->element_capacity) {
-        impl_->element_values.reset(new real_t[nvalues]);
+%(element_scratch_grow)s
         impl_->element_capacity = nvalues;
       }
-      std::fill(impl_->element_values.get(),
-                      impl_->element_values.get() + nvalues,
-                      real_t(0));
+%(element_scratch_zero)s
       int status = SFEM_FAILURE;
 %(objective_steps_packed_dispatch_body)s
       if (status == SFEM_FAILURE) {
 %(objective_steps_dispatch_body)s
       }
       if (status != SFEM_SUCCESS) return status;
-      for (int step = 0; step < nsteps; ++step) {
-        real_t sum = 0;
-#pragma omp simd reduction(+ : sum)
-        for (ptrdiff_t element = 0; element < nelements; ++element) {
-          sum += impl_->element_values[(ptrdiff_t)step * nelements + element];
-        }
-        out[step] += sum;
-      }
+%(element_scalar_reduction)s
       return SFEM_SUCCESS;
     });
   }
@@ -1624,7 +1644,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
 %(hessian_crs_current_prologue)s
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
 %(hessian_crs_dispatch_body)s
     });
@@ -1637,7 +1657,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
 %(hessian_bsr_current_prologue)s
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
 %(hessian_bsr_dispatch_body)s
     });
@@ -1651,7 +1671,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::hessian_block_diag_sym");
 %(hessian_block_diag_sym_current_prologue)s
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
 %(hessian_block_diag_sym_dispatch_body)s
     });
@@ -1741,6 +1761,13 @@ namespace sfem {
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
         "packed_scratch_include": packed_scratch_include,
         "packed_scratch_prealloc": packed_scratch_prealloc,
+        "element_scratch_include": _element_scratch_include(),
+        "element_scratch_fields": "\n".join(_element_scratch_fields()),
+        "element_scratch_alloc": _element_scratch_allocation("    ", "impl_->element_capacity"),
+        "element_scratch_grow": _element_scratch_allocation("        ", "nvalues"),
+        "element_scratch_zero": _element_scratch_zeroing("      ", "nvalues"),
+        "steps_staging": _steps_staging("      "),
+        "element_scalar_reduction": _element_scalar_reduction("      "),
         "declaration_block": (
             ""
             if c_abi_header
@@ -1762,6 +1789,8 @@ namespace sfem {
         # every dimension, and the hard-coded `spatial_dimension` rejected
         # every space it could legitimately be built on.
         "element_connectivity": _element_connectivity_expression(),
+        "execution_space": current_target().execution_space(),
+        "points_accessor": _points_accessor_expression(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(n_field_components_by_dim),
         "metric_declaration": _metric_declaration(any(affine_metric_flags)),
@@ -2688,6 +2717,15 @@ namespace sfem {
       return %(element_connectivity)s;
     }
 
+    //! Where the kernels read the mesh geometry from.  The mesh's own array on
+    //! the host; a device target reads smesh's device copy, because a
+    //! `__global__` body cannot dereference a host pointer -- and on a Grace
+    //! Hopper node it sometimes can, which is worse: the merit came out exact
+    //! at one mesh size and nonsense at the next.
+    const geom_t *const *element_points(const std::shared_ptr<smesh::Mesh> &mesh) {
+      return const_cast<const geom_t *const *>(%(points_accessor)s);
+    }
+
     ptrdiff_t block_size_for_dim(const int dim) {
 %(block_size_lines)s
     }
@@ -2832,7 +2870,7 @@ namespace sfem {
 %(gradient_previous_check)s
     impl_->current = state;
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
@@ -2888,7 +2926,7 @@ namespace sfem {
     const real_t *const current = state ? state : impl_->current;
 %(apply_state_check)s
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
 %(laplace_packed_apply_fast_path)s
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -3064,6 +3102,13 @@ namespace sfem {
         "laplace_packed_include": laplace_packed_include,
         "packed_scratch_include": packed_scratch_include,
         "packed_scratch_prealloc": packed_scratch_prealloc,
+        "element_scratch_include": _element_scratch_include(),
+        "element_scratch_fields": "\n".join(_element_scratch_fields()),
+        "element_scratch_alloc": _element_scratch_allocation("    ", "impl_->element_capacity"),
+        "element_scratch_grow": _element_scratch_allocation("        ", "nvalues"),
+        "element_scratch_zero": _element_scratch_zeroing("      ", "nvalues"),
+        "steps_staging": _steps_staging("      "),
+        "element_scalar_reduction": _element_scalar_reduction("      "),
         "declaration_block": (
             declaration_block
         ),
@@ -3073,6 +3118,8 @@ namespace sfem {
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": parameter_lines,
         "element_connectivity": _element_connectivity_expression(),
+        "execution_space": current_target().execution_space(),
+        "points_accessor": _points_accessor_expression(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "laplace_packed_helpers": laplace_packed_helpers,
@@ -3128,7 +3175,7 @@ namespace sfem {
             "%s\n"
             "%s\n"
             "    auto mesh = impl_->space->mesh_ptr();\n"
-            "    auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
+            "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
             "      parameter_array(*domain.parameters,\n"
@@ -3161,7 +3208,7 @@ namespace sfem {
             "%s\n"
             "%s\n"
             "    auto mesh = impl_->space->mesh_ptr();\n"
-            "    auto points = const_cast<const geom_t *const *>(mesh->points()->data());\n"
+            "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
             "      parameter_array(*domain.parameters,\n"
@@ -3490,6 +3537,15 @@ namespace sfem {
       return %(element_connectivity)s;
     }
 
+    //! Where the kernels read the mesh geometry from.  The mesh's own array on
+    //! the host; a device target reads smesh's device copy, because a
+    //! `__global__` body cannot dereference a host pointer -- and on a Grace
+    //! Hopper node it sometimes can, which is worse: the merit came out exact
+    //! at one mesh size and nonsense at the next.
+    const geom_t *const *element_points(const std::shared_ptr<smesh::Mesh> &mesh) {
+      return const_cast<const geom_t *const *>(%(points_accessor)s);
+    }
+
     ptrdiff_t block_size_for_dim(const int dim) {
 %(block_size_lines)s
     }
@@ -3686,7 +3742,7 @@ namespace sfem {
       return SFEM_SUCCESS;
     }
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
       int status = SFEM_SUCCESS;
@@ -3796,6 +3852,8 @@ namespace sfem {
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": parameter_lines,
         "element_connectivity": _element_connectivity_expression(),
+        "execution_space": current_target().execution_space(),
+        "points_accessor": _points_accessor_expression(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, {}),
@@ -3834,6 +3892,15 @@ namespace sfem {
     ~%(op)s() override;
 
     const char *name() const override { return "%(op)s"; }
+    //! Where this `Op` runs, which the `Function` above it needs in order to
+    //! allocate anything the `Op` will write.  `Op::execution_space` defaults
+    //! to the host and the device wrapper did not override it, so
+    //! `Function::execution_space` reported the host for a device `Op` and
+    //! `Function::node_wise_merit` allocated its residual there -- which the
+    //! device `gradient` then `atomicAdd`ed into.  `compute-sanitizer`:
+    //! "Invalid __global__ atomic of size 8 bytes ... Address 0x3aa240f8 is
+    //! out of bounds".
+    ExecutionSpace execution_space() const override { return %(execution_space)s; }
     bool is_linear() const override { return true; }
     ptrdiff_t n_dofs_domain() const override;
     ptrdiff_t n_dofs_image() const override;
@@ -3887,6 +3954,7 @@ namespace sfem {
 }  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "execution_space": current_target().execution_space(),
         "value_steps": value_steps,
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
@@ -3943,7 +4011,7 @@ def _coupled_energy_residual_op(
     source = """#include "sfem_%(header_stem)s.hpp"
 %(c_abi_include)s
 
-#include "sfem_FunctionSpace.hpp"
+%(element_scratch_include)s#include "sfem_FunctionSpace.hpp"
 #include "sfem_MultiDomainOp.hpp"
 #include "sfem_OpTracer.hpp"
 #include "sfem_Parameters.hpp"
@@ -4018,6 +4086,15 @@ namespace sfem {
       return %(element_connectivity)s;
     }
 
+    //! Where the kernels read the mesh geometry from.  The mesh's own array on
+    //! the host; a device target reads smesh's device copy, because a
+    //! `__global__` body cannot dereference a host pointer -- and on a Grace
+    //! Hopper node it sometimes can, which is worse: the merit came out exact
+    //! at one mesh size and nonsense at the next.
+    const geom_t *const *element_points(const std::shared_ptr<smesh::Mesh> &mesh) {
+      return const_cast<const geom_t *const *>(%(points_accessor)s);
+    }
+
     ptrdiff_t block_size_for_dim(const int dim) {
       switch (dim) {
 %(block_size_lines)s
@@ -4035,8 +4112,7 @@ namespace sfem {
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
     std::shared_ptr<Buffer<real_t>> previous_buffer;
-    std::unique_ptr<real_t[]> element_values;
-    ptrdiff_t element_capacity{0};
+%(element_scratch_fields)s
     const real_t *previous{nullptr};
     const real_t *current{nullptr};
     bool objective_uses_affine{false};
@@ -4147,7 +4223,7 @@ namespace sfem {
         entry.second.user_data = std::static_pointer_cast<void>(jacobian);
       }
     }
-    impl_->element_values.reset(new real_t[impl_->element_capacity]);
+%(element_scratch_alloc)s
     return SFEM_SUCCESS;
   }
 
@@ -4171,7 +4247,7 @@ namespace sfem {
 %(gradient_previous_check)s
     impl_->current = state;
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
@@ -4207,7 +4283,7 @@ namespace sfem {
     const real_t *const current = state ? state : impl_->current;
 %(apply_state_check)s
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
@@ -4345,6 +4421,8 @@ namespace sfem {
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": _coupled_parameter_array_lines(material.parameter_defaults),
         "element_connectivity": _element_connectivity_expression(),
+        "execution_space": current_target().execution_space(),
+        "points_accessor": _points_accessor_expression(),
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _coupled_block_size_lines(systems_by_dim),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, cases["performance"]),
@@ -4372,6 +4450,13 @@ namespace sfem {
             else ""
         ),
         "gradient_cases": "\n".join(cases["gradient"]),
+        "element_scratch_include": _element_scratch_include(),
+        "element_scratch_fields": "\n".join(_element_scratch_fields()),
+        "element_scratch_alloc": _element_scratch_allocation("    ", "impl_->element_capacity"),
+        "element_scratch_grow": _element_scratch_allocation("        ", "nvalues"),
+        "element_scratch_zero": _element_scratch_zeroing("      ", "nvalues"),
+        "steps_staging": _steps_staging("      "),
+        "element_scalar_reduction": _element_scalar_reduction("      "),
         "apply_cases": "\n".join(cases["apply"]),
         "objective_cases": "\n".join(cases["objective"]),
         "value_steps_method": _residual_merit_methods(_op_class_name(material)),
@@ -4666,11 +4751,13 @@ def _coupled_cases(
                 energy_out,
             )
         )
-        energy_grad_affine = "%s_gradient_%dd_a_msoa(%s%s, %s)" % (
-            energy_dispatch_stem, dim, common_affine_dispatch, energy_params, energy_grad_args
+        energy_grad_affine = _coupled_dispatch_call(
+            energy_dispatch_stem, "gradient", dim, "a",
+            "%s%s, %s" % (common_affine_dispatch, energy_params, energy_grad_args),
         )
-        energy_grad_iso = "%s_gradient_%dd_i_msoa(%s%s, %s)" % (
-            energy_dispatch_stem, dim, common_iso_dispatch, energy_params, energy_grad_args
+        energy_grad_iso = _coupled_dispatch_call(
+            energy_dispatch_stem, "gradient", dim, "i",
+            "%s%s, %s" % (common_iso_dispatch, energy_params, energy_grad_args),
         )
         residual_gradient_args = []
         residual_gradient_setup = []
@@ -4688,11 +4775,13 @@ def _coupled_cases(
                 *residual_gradient_args,
             )
         )
-        residual_grad_affine = "%s_residual_%dd_a_msoa(%s, %s)" % (
-            residual_dispatch_stem, dim, common_affine_dispatch, residual_args_common
+        residual_grad_affine = _coupled_dispatch_call(
+            residual_dispatch_stem, "residual", dim, "a",
+            "%s, %s" % (common_affine_dispatch, residual_args_common),
         )
-        residual_grad_iso = "%s_residual_%dd_i_msoa(%s, %s)" % (
-            residual_dispatch_stem, dim, common_iso_dispatch, residual_args_common
+        residual_grad_iso = _coupled_dispatch_call(
+            residual_dispatch_stem, "residual", dim, "i",
+            "%s, %s" % (common_iso_dispatch, residual_args_common),
         )
         if has_gradient:
             cases["gradient"].append(
@@ -4729,11 +4818,13 @@ def _coupled_cases(
                 energy_out,
             )
         )
-        energy_apply_affine = "%s_apply_%dd_a_msoa(%s%s, %s)" % (
-            energy_dispatch_stem, dim, common_affine_dispatch, energy_apply_params, energy_apply_args
+        energy_apply_affine = _coupled_dispatch_call(
+            energy_dispatch_stem, "apply", dim, "a",
+            "%s%s, %s" % (common_affine_dispatch, energy_apply_params, energy_apply_args),
         )
-        energy_apply_iso = "%s_apply_%dd_i_msoa(%s%s, %s)" % (
-            energy_dispatch_stem, dim, common_iso_dispatch, energy_apply_params, energy_apply_args
+        energy_apply_iso = _coupled_dispatch_call(
+            energy_dispatch_stem, "apply", dim, "i",
+            "%s%s, %s" % (common_iso_dispatch, energy_apply_params, energy_apply_args),
         )
         residual_apply_args = []
         residual_apply_setup = []
@@ -4754,11 +4845,13 @@ def _coupled_cases(
                 *residual_apply_args,
             )
         )
-        residual_apply_affine = "%s_jacobian_action_%dd_a_msoa(%s, %s)" % (
-            residual_dispatch_stem, dim, common_affine_dispatch, residual_apply_args_common
+        residual_apply_affine = _coupled_dispatch_call(
+            residual_dispatch_stem, "jacobian_action", dim, "a",
+            "%s, %s" % (common_affine_dispatch, residual_apply_args_common),
         )
-        residual_apply_iso = "%s_jacobian_action_%dd_i_msoa(%s, %s)" % (
-            residual_dispatch_stem, dim, common_iso_dispatch, residual_apply_args_common
+        residual_apply_iso = _coupled_dispatch_call(
+            residual_dispatch_stem, "jacobian_action", dim, "i",
+            "%s, %s" % (common_iso_dispatch, residual_apply_args_common),
         )
         if has_apply:
             cases["apply"].append(
@@ -4821,14 +4914,19 @@ def _coupled_cases(
                     block_size,
                     residual_hessian_setup,
                     (
-                        "          int status = %s_hessian_bsr_%dd_i_msoa(%s%s, %s);\n"
+                        "          int status = %s;\n"
                         "          if (status != SFEM_SUCCESS) return status;\n"
-                        "          return %s_hessian_bsr_%dd_i_msoa(%s, %s);"
+                        "          return %s;"
                     ) % (
-                        energy_dispatch_stem, dim, common_iso_dispatch,
-                        energy_apply_params, energy_hessian_args,
-                        residual_dispatch_stem, dim, common_iso_dispatch,
-                        residual_hessian_args_common,
+                        _coupled_dispatch_call(
+                            energy_dispatch_stem, "hessian_bsr", dim, "i",
+                            "%s%s, %s" % (common_iso_dispatch, energy_apply_params,
+                                          energy_hessian_args),
+                        ),
+                        _coupled_dispatch_call(
+                            residual_dispatch_stem, "hessian_bsr", dim, "i",
+                            "%s, %s" % (common_iso_dispatch, residual_hessian_args_common),
+                        ),
                     ),
                 )
             )
@@ -4840,14 +4938,16 @@ def _coupled_cases(
                     block_size,
                     current=energy_data,
                 ),
-                "impl_->element_values.get()",
+                _element_values_pointer(),
             )
         )
-        energy_objective_affine = "%s_objective_%dd_a_msoa(%s%s, %s)" % (
-            energy_dispatch_stem, dim, common_affine_dispatch, energy_objective_params, energy_objective_args
+        energy_objective_affine = _coupled_dispatch_call(
+            energy_dispatch_stem, "objective", dim, "a",
+            "%s%s, %s" % (common_affine_dispatch, energy_objective_params, energy_objective_args),
         )
-        energy_objective_iso = "%s_objective_%dd_i_msoa(%s%s, %s)" % (
-            energy_dispatch_stem, dim, common_iso_dispatch, energy_objective_params, energy_objective_args
+        energy_objective_iso = _coupled_dispatch_call(
+            energy_dispatch_stem, "objective", dim, "i",
+            "%s%s, %s" % (common_iso_dispatch, energy_objective_params, energy_objective_args),
         )
         if has_objective:
             cases["objective"].append(
@@ -4875,19 +4975,19 @@ def _coupled_cases(
                 str(block_size),
                 energy_increment,
                 "nsteps",
-                "steps",
-                "impl_->element_values.get()",
+                _steps_pointer(),
+                _element_values_pointer(),
             )
         )
-        energy_objective_steps_affine = (
-            "%s_objective_steps_%dd_a_msoa(%s%s, %s)"
-            % (energy_dispatch_stem, dim, common_affine_dispatch,
-               energy_objective_params, energy_objective_steps_args)
+        energy_objective_steps_affine = _coupled_dispatch_call(
+            energy_dispatch_stem, "objective_steps", dim, "a",
+            "%s%s, %s" % (common_affine_dispatch, energy_objective_params,
+                          energy_objective_steps_args),
         )
-        energy_objective_steps_iso = (
-            "%s_objective_steps_%dd_i_msoa(%s%s, %s)"
-            % (energy_dispatch_stem, dim, common_iso_dispatch,
-               energy_objective_params, energy_objective_steps_args)
+        energy_objective_steps_iso = _coupled_dispatch_call(
+            energy_dispatch_stem, "objective_steps", dim, "i",
+            "%s%s, %s" % (common_iso_dispatch, energy_objective_params,
+                          energy_objective_steps_args),
         )
         if has_objective_steps:
             cases["objective_steps"].append(
@@ -4933,7 +5033,7 @@ def _coupled_hessian_bsr_method(op_name, hessian_bsr_cases):
       return SFEM_FAILURE;
     }
     auto mesh = impl_->space->mesh_ptr();
-    auto points = const_cast<const geom_t *const *>(mesh->points()->data());
+    auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       real_t storage[MAX_PARAMETERS];
       parameter_array(*domain.parameters, storage);
@@ -5105,6 +5205,10 @@ def _geometry_memory_space_expression():
     return current_target().geometry_memory_space()
 
 
+def _points_accessor_expression():
+    return current_target().points_accessor()
+
+
 def _element_connectivity_expression():
     """The bound target's connectivity buffer, as a C++ expression."""
     return current_target().element_connectivity_accessor()
@@ -5152,6 +5256,22 @@ def _geometry_variant_expression(kernel_sources, stem, operation, flag, affine_e
     if has_affine and has_isoparametric:
         return "%s ? %s : %s" % (flag, affine_expr, iso_expr)
     return affine_expr if has_affine else iso_expr
+
+
+def _coupled_dispatch_call(stem, operation, dim, geometry, arguments):
+    """One coupled dispatch call, spelled the way the bound target spells it.
+
+    Two target facts apply to every such call and both were missing here: the
+    name carries the target's prefix, and the argument list carries whatever
+    the target appends after the outputs.  Written out as
+    `"%s_gradient_%dd_a_msoa(%s)"`, a call named nothing at all under a device
+    target -- and once the case around it stopped being dropped, it was also
+    one argument short of the stream.  Fourteen sites in this builder needed
+    the same two calls, which is thirteen chances to apply one and forget the
+    other.
+    """
+    name = "%s_%s_%dd_%s_msoa" % (stem, operation, dim, geometry)
+    return "%s(%s)" % (_entry_point_name(name), _with_stream(arguments))
 
 
 def _publishes_either_geometry(kernel_sources, stem, operation):
@@ -6796,7 +6916,7 @@ def _c_abi_signatures(kernel_sources, public_only=False):
     """
     if not kernel_sources:
         return {}
-    key = (id(kernel_sources), bool(public_only))
+    key = (id(kernel_sources), bool(public_only), current_target().name)
     cached = _SIGNATURE_CACHE.get(key)
     if cached is None:
         cached = {}
@@ -6805,7 +6925,21 @@ def _c_abi_signatures(kernel_sources, public_only=False):
         ):
             signature = _parse_c_declaration(declaration)
             if signature:
-                cached[signature.name] = signature
+                # Keyed by the *logical* name, which is the only name a caller
+                # here can spell.  Every lookup in this module builds its key
+                # from a stem and an operation -- `"%s_hessian_bsr_i_msoa" %
+                # stem` -- while the text being searched spells what the target
+                # emitted, and on CUDA that carries a `cu_` prefix.  Keying by
+                # the emitted name therefore made every one of the forty-eight
+                # `_c_abi_function_exists` calls answer False under a device
+                # target, and because those calls exist to *omit* an optional
+                # path, the result was a device `Op` whose every element switch
+                # was empty: it compiled, linked, registered, initialised, and
+                # then failed at `default:` for every element type there is.
+                # `_c_abi_function_exists`'s own docstring predicted it -- "it
+                # compiles, it links, it runs, and it has quietly lost the path
+                # the name selected".
+                cached[_logical_entry_point_name(signature.name)] = signature
         _SIGNATURE_CACHE[key] = cached
     return cached
 
@@ -6969,12 +7103,181 @@ def _c_abi_ordered_domain_parameter_args(kernel_sources, function_name, dependen
     )
 
 
+#: What `TargetPlatform.execution_space` answers on a host target.  Compared
+#: against rather than duplicated as a second boolean fact, so there is one
+#: place that decides where a generated `Op`'s memory lives.
+_HOST_EXECUTION_SPACE = "EXECUTION_SPACE_HOST"
+
+
+def _runs_on_device():
+    return current_target().execution_space() != _HOST_EXECUTION_SPACE
+
+
+def _steps_pointer():
+    """How a dispatch call names the step-length array.
+
+    The caller's own array on the host.  On a device target it has to be a
+    device copy: `Op::value_steps` takes `const real_t *const steps` and every
+    caller passes host memory -- `value()` passes `&objective_step`, a local --
+    so the kernel was handed a host stack address and dereferenced it.
+    `compute-sanitizer`: "Invalid __global__ read of size 8 bytes ... Address
+    0xfffff1c7cca0 is out of bounds".  On a Grace Hopper node that read
+    sometimes succeeds, which is why the merit was exact at one mesh size and
+    nonsense at the next.
+    """
+    if not _runs_on_device():
+        return "steps"
+    return "impl_->step_values->data()"
+
+
+def _steps_staging(indent):
+    """Copy the caller's step lengths to where the kernels can read them."""
+    if not _runs_on_device():
+        return ""
+    space = current_target().execution_space()
+    return "\n".join(
+        (
+            "%sif (nsteps > impl_->step_capacity) {" % indent,
+            "%s  impl_->step_values = create_buffer<real_t>(nsteps, %s);" % (indent, space),
+            "%s  impl_->step_capacity = nsteps;" % indent,
+            "%s}" % indent,
+            "%sbuffer_host_to_device(nsteps * sizeof(real_t), steps, impl_->step_values->data());"
+            % indent,
+        )
+    )
+
+
+def _element_scratch_include():
+    """`sfem_API.hpp`, where the target's scratch needs `create_buffer` and `blas`.
+
+    Only a device target does: its per-element scratch is a `SharedBuffer` and
+    its reduction is the library's own, so the header comes in with them rather
+    than unconditionally.
+    """
+    if not _runs_on_device():
+        return ""
+    return '#include "sfem_API.hpp"\n'
+
+
+def _element_scratch_fields():
+    """The `Impl` fields holding the merit's per-element scratch.
+
+    On the host this is an owning array and the reduction is a loop over it.
+    On a device it has to be device memory, because the objective kernels write
+    it from the device -- and the reduction then has to be a device reduction,
+    which SFEM spells `BLAS::dot`.  There is no device sum in
+    `algebra/sfem_tpl_blas.hpp`, so the ones vector is what turns the dot into
+    one; it is allocated once beside the values it reduces.
+    """
+    if not _runs_on_device():
+        return (
+            "    std::unique_ptr<real_t[]> element_values;",
+            "    ptrdiff_t element_capacity{0};",
+        )
+    return (
+        "    SharedBuffer<real_t> element_values;",
+        "    SharedBuffer<real_t> element_ones;",
+        "    ptrdiff_t element_capacity{0};",
+        "    SharedBuffer<real_t> step_values;",
+        "    int step_capacity{0};",
+    )
+
+
+def _element_values_pointer():
+    """How a dispatch call names the per-element scratch."""
+    if not _runs_on_device():
+        return "impl_->element_values.get()"
+    return "impl_->element_values->data()"
+
+
+def _element_scratch_allocation(indent, count):
+    if not _runs_on_device():
+        return "%simpl_->element_values.reset(new real_t[%s]);" % (indent, count)
+    space = current_target().execution_space()
+    return "\n".join(
+        (
+            "%simpl_->element_values = create_buffer<real_t>(%s, %s);" % (indent, count, space),
+            "%simpl_->element_ones = create_buffer<real_t>(%s, %s);" % (indent, count, space),
+            "%ssfem::blas<real_t>(%s)->values(%s, real_t(1), impl_->element_ones->data());"
+            % (indent, space, count),
+        )
+    )
+
+
+def _element_scratch_zeroing(indent, count):
+    if not _runs_on_device():
+        return "\n".join(
+            (
+                "%sstd::fill(impl_->element_values.get()," % indent,
+                "%s                impl_->element_values.get() + %s," % (indent, count),
+                "%s                real_t(0));" % indent,
+            )
+        )
+    return "%ssfem::blas<real_t>(%s)->zeros(%s, impl_->element_values->data());" % (
+        indent,
+        current_target().execution_space(),
+        count,
+    )
+
+
+def _element_scalar_reduction(indent):
+    """Sum the per-element values of each step into `out[step]`.
+
+    Two spellings for one operation, and this is the case the rule allows: the
+    numbers live in different memories, so there is no single loop that reads
+    both.  The host keeps its vectorised loop unchanged -- it is a measured
+    quantity -- and the device reduces where the numbers already are rather
+    than copying `nelements` doubles back to sum them.
+    """
+    if not _runs_on_device():
+        return "\n".join(
+            (
+                "%sfor (int step = 0; step < nsteps; ++step) {" % indent,
+                "%s  real_t sum = 0;" % indent,
+                "#pragma omp simd reduction(+ : sum)",
+                "%s  for (ptrdiff_t element = 0; element < nelements; ++element) {" % indent,
+                "%s    sum += impl_->element_values[(ptrdiff_t)step * nelements + element];" % indent,
+                "%s  }" % indent,
+                "%s  out[step] += sum;" % indent,
+                "%s}" % indent,
+            )
+        )
+    space = current_target().execution_space()
+    return "\n".join(
+        (
+            "%sauto element_blas = sfem::blas<real_t>(%s);" % (indent, space),
+            "%sfor (int step = 0; step < nsteps; ++step) {" % indent,
+            "%s  out[step] += element_blas->dot(nelements," % indent,
+            "%s      impl_->element_values->data() + (ptrdiff_t)step * nelements," % indent,
+            "%s      impl_->element_ones->data());" % indent,
+            "%s}" % indent,
+        )
+    )
+
+
 def _c_abi_function_defined(kernel_sources, function_name):
+    """Whether a generated source *defines* this entry point.
+
+    The caller spells the logical name -- `"%s_residual_i_msoa" % stem` -- and
+    the text being searched spells what the target emitted, so the name is
+    translated here rather than at each of the call sites, none of which can
+    know the target.
+
+    Searching for the logical name directly does not merely miss; it misses
+    silently and in a way `\b` makes look correct.  `cu_mooney_rivlin_..._residual_i_msoa`
+    contains the logical name, but there is no word boundary before the `m` of
+    `mooney` inside `cu_mooney`, so the pattern finds nothing.  Every caller
+    here reads the answer as "the material did not ask for this variant" and
+    omits the case, which is how the device coupled `Op` came to emit an
+    element switch with no cases at all: it compiled, linked, registered and
+    initialised, and then every element type fell through to `default:`.  The
+    same `\b` cost `_parse_c_declaration` once already.
+    """
     if not kernel_sources:
         return False
     pattern = re.compile(
         r'extern\s+"C"\s+[A-Za-z_][A-Za-z0-9_:<>\s\*&]*\b'
-        + re.escape(function_name)
+        + re.escape(_entry_point_name(function_name))
         + r"\s*\([^;{}]*\)\s*\{",
         re.S,
     )
@@ -6990,8 +7293,16 @@ def _c_abi_function_defined(kernel_sources, function_name):
     return False
 
 
+#: An operator translation unit, whatever the target calls it.  Spelled as a
+#: pattern rather than a list of extensions because the question here is which
+#: *kind* of file this is, not which target wrote it -- and the literal
+#: `.cpp` that stood here matched no device source, so the replacement this
+#: predicate reports was invisible on CUDA.
+_OPERATOR_SOURCE = re.compile(r"_(?:boundary_)?operator\.[A-Za-z]+$")
+
+
 def _is_replaced_tensor_product_source(path, kernel_sources):
-    if not path.endswith(("_operator.cpp", "_boundary_operator.cpp")):
+    if not _OPERATOR_SOURCE.search(path):
         return False
     keys = {str(key).replace("\\", "/") for key in kernel_sources}
     aliases = (
@@ -8333,7 +8644,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                             *_affine_geometry_call_args(kernel_sources, affine, dim),
                             *parameter_args,
                             *current_args,
-                            "impl_->element_values.get()",
+                            _element_values_pointer(),
                         ]
                     )),
                 )
@@ -8356,7 +8667,7 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
                             "points",
                             *parameter_args,
                             *current_args,
-                            "impl_->element_values.get()",
+                            _element_values_pointer(),
                         ]
                     )),
                 )
@@ -8415,8 +8726,8 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                             *current_args,
                             *direction_args,
                             "nsteps",
-                            "steps",
-                            "impl_->element_values.get()",
+                            _steps_pointer(),
+                            _element_values_pointer(),
                         ]
                     ),
                 )
@@ -8441,8 +8752,8 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
                             *current_args,
                             *direction_args,
                             "nsteps",
-                            "steps",
-                            "impl_->element_values.get()",
+                            _steps_pointer(),
+                            _element_values_pointer(),
                         ]
                     )),
                 )
@@ -8791,8 +9102,8 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
                             *current_args,
                             *direction_args,
                             "nsteps",
-                            "steps",
-                            "impl_->element_values.get()",
+                            _steps_pointer(),
+                            _element_values_pointer(),
                         ]
                     )),
                 ),
@@ -8859,8 +9170,8 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
                             *current_args,
                             *direction_args,
                             "nsteps",
-                            "steps",
-                            "impl_->element_values.get()",
+                            _steps_pointer(),
+                            _element_values_pointer(),
                         ]
                     )),
                 ),

@@ -219,6 +219,7 @@ from codegen.framework.fem import (
 from codegen.framework.backends.cuda import CUDASoABackend as _CUDASoABackend
 from codegen.framework.backends.openmp import OpenMPSoABackend as _OpenMPSoABackend
 from codegen.framework.targets import (
+    current_target,
     use_target,
     AVX512Target,
     ARMSMETarget,
@@ -844,6 +845,7 @@ def generate(
     files = _relocate_generated_primitive_headers(files, out_dir, material.name)
     files = _collapse_duplicate_operators(files)
     _validate_generated_call_graph(files)
+    _validate_generated_op_overrides(files)
     source_paths = _write_files(out_dir, files)
     object_paths = _compile_operators(source_paths) if compile else ()
     return GenerationResult(source_paths, object_paths, codegen_plan, plan_dump)
@@ -1587,6 +1589,100 @@ def _masked_call_sites(source):
     return "".join(masked)
 
 
+_OVERRIDE_CLASS = re.compile(r"\bclass\s+(\w+)\s*(?:final\s*)?:\s*public\b")
+
+
+def _class_body(text, open_brace):
+    """The text between `open_brace`'s `{` and its match, or `None` if unbalanced."""
+    depth = 0
+    for index in range(open_brace, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_brace + 1 : index]
+    return None
+
+
+def _declared_overrides(body):
+    """The names a class body declares with `override` and does not define inline.
+
+    A declaration ends at the first `;` outside any nested braces; one that
+    opens a brace first carries its own body and needs nothing elsewhere.
+    """
+    names = []
+    statement = []
+    index = 0
+    while index < len(body):
+        character = body[index]
+        if character == "{":
+            skipped = _class_body(body, index)
+            if skipped is None:
+                break
+            index += len(skipped) + 2
+            statement = []
+            continue
+        if character == ";":
+            text = "".join(statement)
+            if re.search(r"\boverride\b", text) and not re.search(r"=\s*(0|default|delete)\s*$", text.strip()):
+                call = re.search(r"(~?\w+)\s*\(", text)
+                if call:
+                    names.append(call.group(1))
+            statement = []
+            index += 1
+            continue
+        statement.append(character)
+        index += 1
+    return names
+
+
+def _validate_generated_op_overrides(files):
+    """Every `override` a generated class declares is defined by a generated source.
+
+    A declaration and its definition are decided in different places: the
+    declaration asks what the *material* wants, the definition needs kernels the
+    *target* can lower.  Conflating the two produced a device `Op` whose header
+    declared `inexact_supported`, `inexact_update` and `inexact_apply` while its
+    source defined none of them -- three undefined vtable slots that compiled
+    without complaint, survived the whole library build, and surfaced only when
+    an executable was linked against it.
+
+    Nothing here inspects the linker.  The header and the sources of one
+    generation are in hand at once, so the mismatch is a text fact about what
+    was just emitted, and it raises where the spelling is decided.
+    """
+    sources = {
+        path: text
+        for path, text in files.items()
+        if path.endswith(_CALL_GRAPH_SOURCE_EXTENSIONS)
+    }
+    problems = []
+    for path in sorted(sources):
+        text = sources[path]
+        for match in _OVERRIDE_CLASS.finditer(text):
+            brace = text.find("{", match.end())
+            if brace < 0:
+                continue
+            body = _class_body(text, brace)
+            if body is None:
+                continue
+            klass = match.group(1)
+            for name in _declared_overrides(body):
+                qualified = re.compile(r"(?<![\w:])%s::%s\b" % (re.escape(klass), re.escape(name)))
+                if any(qualified.search(other) for other in sources.values()):
+                    continue
+                problems.append(
+                    "%s declares `%s::%s` with `override`; no generated source defines it"
+                    % (path, klass, name)
+                )
+    if problems:
+        raise ValueError(
+            "generated classes declare %d override(s) nothing defines:\n  %s"
+            % (len(problems), "\n  ".join(problems))
+        )
+
+
 def _validate_generated_call_graph(files):
     """Every generated symbol a generated source calls must link, and must be
     called with the arity it was emitted with.
@@ -1664,6 +1760,7 @@ def _validate_generated_call_graph(files):
 
 
 def _tensor_product_proteus_alias(element_name, proteus_name, dim, n_shape):
+    extension = current_target().mesh_source_extension()
     return {
         "element_name": element_name,
         "proteus_name": proteus_name,
@@ -1675,16 +1772,18 @@ def _tensor_product_proteus_alias(element_name, proteus_name, dim, n_shape):
         # it is why the pass now selects per file which aliases it writes: the
         # whole list into every rewritten file was invisible while each element
         # had one source and produces duplicate symbols with two.
-        "source_suffixes": (
-            "_%s_operator.cpp" % element_name,
-            "_%s_boundary_operator.cpp" % element_name,
-            "_%s_inexact_apply_operator.cpp" % element_name,
+        # The extension is the bound target's, not `cpp`.  While it was
+        # spelled here, no device source ever matched, so the mesh-order
+        # element kept its own kernels on a device target instead of
+        # delegating to the PROTEUS twin the way it does on the host.
+        "source_suffixes": tuple(
+            "_%s_%s.%s" % (element_name, kind, extension)
+            for kind in ("operator", "boundary_operator", "inexact_apply_operator")
         ),
-        "suffix_pairs": (
-            ("_%s_inexact_apply_operator.cpp" % element_name,
-             "_%s_inexact_apply_operator.cpp" % proteus_name),
-            ("_%s_operator.cpp" % element_name, "_%s_operator.cpp" % proteus_name),
-            ("_%s_boundary_operator.cpp" % element_name, "_%s_boundary_operator.cpp" % proteus_name),
+        "suffix_pairs": tuple(
+            ("_%s_%s.%s" % (element_name, kind, extension),
+             "_%s_%s.%s" % (proteus_name, kind, extension))
+            for kind in ("inexact_apply_operator", "operator", "boundary_operator")
         ),
     }
 

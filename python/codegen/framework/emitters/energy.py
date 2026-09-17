@@ -133,7 +133,17 @@ class OpenMPEnergySoASourceBuilder:
 @dataclass(frozen=True)
 class CUDAEnergySoASourceBuilder:
     operator_extension: str = "cu"
-    emit_objective_steps: bool = False
+    #: The same answer the host builder gives, and for the reason
+    #: `plans.form_emission.objective_kernel_variants` states: the plain
+    #: objective is the stepped one with a single alpha of zero, and `x + 0*h`
+    #: is `x` exactly, so emitting the plain kernel instead of the stepped one
+    #: is a second path to one computation rather than a cheaper one.  While
+    #: this said False the device published `objective` where the host
+    #: published `objective_steps`, and the `Op`'s `value` -- which calls the
+    #: stepped dispatch on both targets -- had nothing to call on the device:
+    #: "isoparametric objective_steps 3d dispatch was not generated", at run
+    #: time, on a GPU, for the merit.
+    emit_objective_steps: bool = True
     target: object = CUDATarget()
 
     def header_name(self, stem):

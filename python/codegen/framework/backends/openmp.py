@@ -35,7 +35,7 @@ class OpenMPSoABackend(SoABackend):
         return OpenMPEnergySoAEmitter(target=self.target)
 
     def mesh_source_extension(self):
-        return "cpp"
+        return self.target.mesh_source_extension()
 
     def local_header_extension(self):
         return "hpp"
