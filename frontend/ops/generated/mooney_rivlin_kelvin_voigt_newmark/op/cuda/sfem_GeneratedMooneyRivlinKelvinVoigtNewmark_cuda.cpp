@@ -543,46 +543,21 @@ namespace sfem {
   }
 
 
-  int GPUGeneratedMooneyRivlinKelvinVoigtNewmark::value_steps(const real_t *state,
-              const real_t *h,
-              const int nsteps,
-              const real_t *const steps,
-              real_t *const out) {
-    SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinKelvinVoigtNewmark::value_steps");
-    if (nsteps <= 0) {
-      return SFEM_SUCCESS;
-    }
-    const ptrdiff_t ndofs = n_dofs_domain();
-    std::vector<real_t> stepped(ndofs);
-    std::vector<real_t> residual(ndofs);
-    for (int step = 0; step < nsteps; ++step) {
-      const real_t alpha = steps[step];
-      for (ptrdiff_t i = 0; i < ndofs; ++i) {
-        stepped[i] = state[i] + alpha * h[i];
-      }
-      std::fill(residual.begin(), residual.end(), real_t(0));
-      const int status = gradient(stepped.data(), residual.data());
-      if (status != SFEM_SUCCESS) {
-        return status;
-      }
-      real_t sum = 0;
-#pragma omp simd reduction(+ : sum)
-      for (ptrdiff_t i = 0; i < ndofs; ++i) {
-        sum += residual[i] * residual[i];
-      }
-      out[step] += real_t(0.5) * sum;
-    }
-    return SFEM_SUCCESS;
+  sfem::Op::ValueReduction GPUGeneratedMooneyRivlinKelvinVoigtNewmark::value_reduction() const {
+    return sfem::Op::ValueReduction::NODE_WISE;
   }
 
-  int GPUGeneratedMooneyRivlinKelvinVoigtNewmark::value(const real_t *state, real_t *const out) {
+  int GPUGeneratedMooneyRivlinKelvinVoigtNewmark::value(const real_t *, real_t *const) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinKelvinVoigtNewmark::value");
-    // One step of length zero: `state + 0 * h` is `state` exactly, so the
-    // increment is unused and `state` can stand in for it.  One
-    // implementation, so the two cannot disagree.
-    const real_t objective_step = 0;
-    *out = 0;
-    return value_steps(state, state, 1, &objective_step, out);
+    // `Op::value` is pure virtual, so this has to exist -- but there is no
+    // scalar this operator can correctly return.  Its 0-form is a norm, and a
+    // norm of *its* residual is not the system's: whatever else contributes to
+    // the residual, forcing included, is missing from it.  `Function::value`
+    // sees the NODE_WISE declaration above and reduces over the residual it
+    // assembles instead, so it never reaches here.  A direct caller gets told
+    // rather than handed a number that is wrong by however much the rest of
+    // the system contributes.
+    return SFEM_FAILURE;
   }
 
   void GPUGeneratedMooneyRivlinKelvinVoigtNewmark::set_field(const char *name,

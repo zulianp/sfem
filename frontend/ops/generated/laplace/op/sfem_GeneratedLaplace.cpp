@@ -784,8 +784,14 @@ namespace sfem {
     // `value_steps` only accumulated, so the same Op answered the same
     // question two ways depending on which entry point was used.  With one
     // implementation there is nothing left to diverge.
+    //
+    // The zeroing that used to sit here is gone too, which is the other half
+    // of the same disagreement: `value_steps` accumulates, every hand-written
+    // `Op` accumulates (`NeumannConditions::value` ends `*out += acc`), and
+    // `Function::value` does not clear `out` before its loop -- so an `Op` that
+    // zeroed discarded every contribution made before it.  With two generated
+    // operators in one `Function`, the answer depended on their order.
     const real_t objective_step = 0;
-    *out = 0;
     return value_steps(x, x, 1, &objective_step, out);
   }
 

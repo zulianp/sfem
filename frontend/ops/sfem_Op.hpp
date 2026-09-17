@@ -309,6 +309,29 @@ namespace sfem {
         }
 
         /**
+         * @brief Over what this operator's 0-form reduces to a scalar.
+         *
+         * An energy or a recovered potential is an element integral:
+         * ELEMENT_WISE. Each element contributes a number, the numbers sum, and
+         * the total adds across operators -- which is what lets `value` be a
+         * term in the sum `Function::value` accumulates.
+         *
+         * A residual that is the gradient of nothing has no such integral. Its
+         * merit is `1/2 * ||R||^2`, squared per node once every element
+         * touching that node has contributed: NODE_WISE. It is *not* additive
+         * over operators, so no operator can report it for the system --
+         * `1/2*||sum_op R_op||^2` is not `sum_op 1/2*||R_op||^2`, and the
+         * forcing an operator does not own is missing from its own residual.
+         * `Function` reduces it instead, over the residual it assembles.
+         *
+         * A `Function` mixing the two reduces node-wise throughout: an energy
+         * and a squared residual norm are not terms of one sum.
+         */
+        enum class ValueReduction { ELEMENT_WISE, NODE_WISE };
+
+        virtual ValueReduction value_reduction() const { return ValueReduction::ELEMENT_WISE; }
+
+        /**
          * @brief Compute the value/energy of the operator
          * @param x Current solution vector
          * @param h Input vector

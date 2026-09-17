@@ -33,11 +33,7 @@ namespace sfem {
                   const real_t *const h,
                   real_t *const out) override;
     int value(const real_t *x, real_t *const out) override;
-    int value_steps(const real_t *x,
-            const real_t *h,
-            const int nsteps,
-            const real_t *const steps,
-            real_t *const out) override;
+    sfem::Op::ValueReduction value_reduction() const override;
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,

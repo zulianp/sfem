@@ -311,35 +311,46 @@ def publishes_objective_steps(form):
 
 
 class FormReduction(Enum):
-    """Where a 0-form's reduction to one scalar happens.
+    """Over what a 0-form's reduction to one scalar runs.
 
     Both formulations produce a 0-form, and below the form layer they differ in
-    exactly one respect: whether the scalar is finished inside the element loop
-    or after the scatter.
+    exactly one respect: what the sum runs over.
 
-    ``ELEMENT_SUM`` is an energy or a recovered potential.  Each element
+    ``ELEMENT_WISE`` is an energy or a recovered potential.  Each element
     contributes a number, the numbers are summed, and the total adds across
     operators -- which is what lets it be a term in the sum ``Function::value``
     accumulates.
 
-    ``ASSEMBLED_NORM`` is ``1/2 * ||R||^2`` over the assembled residual, for a
-    system that is the gradient of nothing.  It needs no element kernel of its
-    own: the 1-form already computes R, so the whole reduction is one dot
-    product over the degrees of freedom once the scatter is done.  It is not
-    additive over operators, so it belongs to whoever holds the complete
-    residual rather than to any one operator contributing part of it.
+    ``NODE_WISE`` is ``1/2 * ||R||^2``, for a system that is the gradient of
+    nothing.  A node's residual is complete once every element touching it has
+    contributed, so the square is taken per node, after the contraction and not
+    over an element.  It needs no element kernel of its own: the 1-form already
+    produces the contributions.
+
+    It is not additive over operators -- ``1/2*||sum_op R_op||^2`` is not
+    ``sum_op 1/2*||R_op||^2`` -- so it belongs to whoever holds the complete
+    residual rather than to any one operator contributing part of it.  That is
+    also why the two cannot be added: a system mixing them reduces node-wise
+    throughout, because an energy and a squared residual norm are not terms of
+    one sum.
+
+    The names said ``element_sum`` and ``assembled_norm`` before, which put the
+    emphasis on where the reduction finished rather than on what it ran over,
+    and left "assembled" ambiguous between assembled-over-elements (which it
+    was) and assembled-over-operators (which it was not, and which is the
+    property that actually matters).
     """
 
-    ELEMENT_SUM = "element_sum"
-    ASSEMBLED_NORM = "assembled_norm"
+    ELEMENT_WISE = "element_wise"
+    NODE_WISE = "node_wise"
 
 
 #: The reduction each 0-form role implies.  A table rather than a chain of
 #: comparisons, so emission reads the answer instead of deciding it.
 FORM_REDUCTION_BY_ROLE = {
-    "energy": FormReduction.ELEMENT_SUM,
-    "potential": FormReduction.ELEMENT_SUM,
-    "merit": FormReduction.ASSEMBLED_NORM,
+    "energy": FormReduction.ELEMENT_WISE,
+    "potential": FormReduction.ELEMENT_WISE,
+    "merit": FormReduction.NODE_WISE,
 }
 
 

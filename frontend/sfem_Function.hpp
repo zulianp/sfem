@@ -136,6 +136,26 @@ namespace sfem {
                   const ElementScope  scope = ElementScope::ALL);
         int value(const real_t *x, real_t *const out, const ElementScope scope = ElementScope::ALL);
 
+        /**
+         * @brief Whether this Function's 0-form reduces node-wise.
+         *
+         * True as soon as one operator's does. An energy and a squared residual
+         * norm are not terms of one sum, and a norm is not additive over
+         * operators, so a mixture reduces node-wise throughout.
+         */
+        bool reduces_node_wise() const;
+
+        /**
+         * @brief `1/2 * ||R||^2` over the residual this Function assembles.
+         *
+         * The only place the system's merit can be computed: an operator norms
+         * its own residual, which omits every other operator's contribution --
+         * a Neumann traction is its own Op, so its forcing is absent from the
+         * interior operator's residual and the result is not zero at the
+         * solution of the combined system.
+         */
+        int node_wise_merit(const real_t *x, real_t *const out, const ElementScope scope = ElementScope::ALL);
+
         int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out);
 
         int apply_constraints(real_t *const x);

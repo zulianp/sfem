@@ -480,7 +480,7 @@ def _inexact_declarations(material):
     int inexact_apply(const real_t *const h, real_t *const out) override;"""
 
 
-def _header(material, residual, publishes_value_steps=None):
+def _header(material, residual, publishes_value_steps=None, node_wise=False):
     """The Op's declared interface.
 
     ``publishes_value_steps`` says whether this Op offers the Newton
@@ -497,8 +497,14 @@ def _header(material, residual, publishes_value_steps=None):
     separately here.  The default keeps the two single-equation paths spelling
     it the way they always have.
     """
+    # `node_wise` replaces the line-search method with the declaration that
+    # says why there is none: the operator's 0-form is a norm, `Function`
+    # reduces it over the residual it assembles, and an operator that answered
+    # `value_steps` here would be norming its own residual instead.
     if publishes_value_steps is None:
         publishes_value_steps = not residual
+    if node_wise:
+        publishes_value_steps = False
     extra = """
     int update(const real_t *const x) override;
     int update(const real_t *const previous, const real_t *const current) override;
@@ -510,7 +516,10 @@ def _header(material, residual, publishes_value_steps=None):
             const real_t *h,
             const int nsteps,
             const real_t *const steps,
-            real_t *const out) override;""" if publishes_value_steps else ""
+            real_t *const out) override;""" if publishes_value_steps else (
+        """
+    sfem::Op::ValueReduction value_reduction() const override;""" if node_wise else ""
+    )
     matrix_methods = """
     int hessian_bsr(const real_t *const x,
             const count_t *const rowptr,
@@ -1544,8 +1553,14 @@ namespace sfem {
     // `value_steps` only accumulated, so the same Op answered the same
     // question two ways depending on which entry point was used.  With one
     // implementation there is nothing left to diverge.
+    //
+    // The zeroing that used to sit here is gone too, which is the other half
+    // of the same disagreement: `value_steps` accumulates, every hand-written
+    // `Op` accumulates (`NeumannConditions::value` ends `*out += acc`), and
+    // `Function::value` does not clear `out` before its loop -- so an `Op` that
+    // zeroed discarded every contribution made before it.  With two generated
+    // operators in one `Function`, the answer depended on their order.
     const real_t objective_step = 0;
-    *out = 0;
     return value_steps(x, x, 1, &objective_step, out);
   }
 
@@ -3239,13 +3254,129 @@ namespace sfem {
             else ""
         ),
     }
-    return _header(material, True, publishes_value_steps=emits_merit), source
+    return _header(material, True, node_wise=emits_merit), source
+
+
+def _boundary_value_method(op_name, linear_work):
+    """The forcing operator's 0-form.
+
+    It returned `SFEM_SUCCESS` having written nothing, so a Neumann traction
+    contributed zero to `Function::value` and the objective was the interior
+    energy alone -- not a potential of the assembled residual, whose gradient
+    includes the traction.  A line search then minimised a scalar whose gradient
+    was not the residual it was searching along.
+
+    The potential is the linear work `-t . u`, and `gradient` already assembles
+    `g = -t` per node, so the value is `g . u` and needs no kernel: the same
+    identity `NeumannConditions::value` has always used.  `value_steps` follows
+    from it, and because the work is linear in the state the step is exact
+    rather than a re-evaluation -- `g` does not depend on `u`.
+    """
+    if not linear_work:
+        return """
+  int %(op)s::value(const real_t *, real_t *const) {
+    SFEM_TRACE_SCOPE("%(op)s::value");
+    // This boundary residual depends on the field, so its potential is not the
+    // linear work and `g . u` would be twice it.  Refusing beats a factor of 2.
+    return SFEM_FAILURE;
+  }
+""" % {"op": op_name}
+    return """
+  int %(op)s::value(const real_t *x, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::value");
+    // `-t . u`, from the `g = -t` this operator's own gradient assembles.
+    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    std::vector<real_t> work(ndofs, 0);
+    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    real_t acc = 0;
+#pragma omp parallel for reduction(+ : acc)
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+      acc += work[i] * x[i];
+    }
+    *out += acc;
+    return SFEM_SUCCESS;
+  }
+
+  int %(op)s::value_steps(const real_t *x,
+              const real_t *h,
+              const int nsteps,
+              const real_t *const steps,
+              real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::value_steps");
+    if (nsteps <= 0) {
+      return SFEM_SUCCESS;
+    }
+    // The work is linear in the state, so `g` is the same at every step and one
+    // gradient serves all of them: `g . (x + alpha * h)` splits exactly.
+    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    std::vector<real_t> work(ndofs, 0);
+    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    real_t gx = 0;
+    real_t gh = 0;
+#pragma omp parallel for reduction(+ : gx, gh)
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+      gx += work[i] * x[i];
+      gh += work[i] * h[i];
+    }
+    for (int step = 0; step < nsteps; ++step) {
+      out[step] += gx + steps[step] * gh;
+    }
+    return SFEM_SUCCESS;
+  }
+""" % {"op": op_name}
+
+
+def _boundary_potential_is_linear_work(form_collections):
+    """Whether this boundary system's potential is the linear work `g . u`.
+
+    The form layer already derives the 0-form: a traction `-t . v` contains no
+    field at all, its flux is the constant `-t`, and `_recovered_potential`
+    returns `-t . u`.  When that potential is linear in the fields it equals
+    `g . u` for the `g` this operator's own `gradient` assembles -- which is the
+    identity the hand-written `NeumannConditions::value` uses, and it needs no
+    kernel of its own.
+
+    The linearity is what makes the identity exact, so it is checked rather than
+    assumed.  A boundary residual that *does* depend on the field -- a Robin
+    condition -- has a quadratic potential, `g . u` would be twice it, and this
+    returns False so the caller refuses instead of shipping a factor of two.
+    """
+    import sympy as sp
+
+    from codegen.framework.forms.forms import FormOrder
+
+    seen = False
+    for collection in (form_collections or {}).values():
+        field_symbols = []
+        for field in collection.fields:
+            components = int(getattr(field, "components", 1) or 1)
+            field_symbols.extend(
+                sp.Symbol("%s%d" % (field.name, component))
+                for component in range(components)
+            )
+        for form in getattr(collection, "forms", ()):
+            if getattr(form, "order", None) is not FormOrder.ZERO:
+                continue
+            seen = True
+            expression = sp.sympify(form.expression)
+            for symbol in field_symbols:
+                if sp.diff(expression, symbol, 2) != 0:
+                    return False
+    return seen
 
 
 def _boundary_residual_op(material, elements, c_abi_header=None, form_collections=None):
     defaults = _seed_lines(material.parameter_defaults)
     if form_collections is None:
         raise ValueError("boundary residual generated Op requires form collections")
+
+    # Whether the 0-form the form layer derived is the linear work, which is
+    # what lets `value` be `g . u` over the gradient this Op already assembles.
+    linear_work = _boundary_potential_is_linear_work(form_collections)
 
     material_parameter_index = {
         str(name): index
@@ -3583,10 +3714,7 @@ namespace sfem {
     return SFEM_SUCCESS;
   }
 
-  int %(op)s::value(const real_t *, real_t *const) {
-    SFEM_TRACE_SCOPE("%(op)s::value");
-    return SFEM_SUCCESS;
-  }
+%(boundary_value_method)s
 
   int %(op)s::hessian_crs(const real_t *const,
               const count_t *const,
@@ -3672,11 +3800,22 @@ namespace sfem {
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, {}),
         "gradient_cases": "\n".join(gradient_cases),
+        "boundary_value_method": _boundary_value_method(
+            _op_class_name(material), linear_work
+        ),
     }
-    return _boundary_header(material), source
+    return _boundary_header(material, linear_work), source
 
 
-def _boundary_header(material):
+def _boundary_header(material, linear_work=False):
+    # A forcing operator that can report its potential also offers the
+    # line-search form of it; one that cannot declares neither.
+    value_steps = """
+    int value_steps(const real_t *x,
+            const real_t *h,
+            const int nsteps,
+            const real_t *const steps,
+            real_t *const out) override;""" if linear_work else ""
     return """#pragma once
 
 #include "sfem_NeumannConditions.hpp"
@@ -3714,7 +3853,7 @@ namespace sfem {
     int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const out) override;
-    int value(const real_t *x, real_t *const out) override;
+    int value(const real_t *x, real_t *const out) override;%(value_steps)s
     int hessian_crs(const real_t *const x,
             const count_t *const rowptr,
             const idx_t *const colidx,
@@ -3748,6 +3887,7 @@ namespace sfem {
 }  // namespace sfem
 """ % {
         "op": _op_class_name(material),
+        "value_steps": value_steps,
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
     }
@@ -4254,7 +4394,7 @@ namespace sfem {
     # A coupled Op always publishes the line-search 0-form: its merit is built
     # from `gradient`, which every operator has, rather than from the energy
     # block's objective kernels.
-    return _header(material, True, publishes_value_steps=True), source
+    return _header(material, True, node_wise=True), source
 
 
 def _coupled_dependency_flags(systems_by_dim, energy_name, residual_name):
@@ -4319,79 +4459,65 @@ def _residual_zero_form_is_assembled_norm(form_collections):
     from codegen.framework.plans.form_emission import FormReduction, form_reduction
     from codegen.framework.forms.forms import FormOrder
 
+    # Every 0-form the system publishes, not the first one found.  Both
+    # branches used to return from inside the inner loop, so a material whose
+    # 2D collection carried a merit and whose 3D collection carried a potential
+    # was decided by whichever the dict yielded first.  They cannot disagree
+    # legitimately -- the reduction follows from the role, and a system is one
+    # kind or the other -- so disagreement is refused rather than resolved.
+    reductions = set()
     for collection in (form_collections or {}).values():
         for form in getattr(collection, "forms", ()):
             if getattr(form, "order", None) is not FormOrder.ZERO:
                 continue
-            if form_reduction(form) is not FormReduction.ASSEMBLED_NORM:
-                return False
-            return True
-    return False
+            reductions.add(form_reduction(form))
+    if len(reductions) > 1:
+        raise ValueError(
+            "this residual system's 0-forms do not agree on how they reduce: %s. "
+            "A system is a potential or it is a merit; it cannot be both, and "
+            "picking one by dictionary order is how that went unnoticed."
+            % ", ".join(sorted(reduction.value for reduction in reductions))
+        )
+    return reductions == {FormReduction.NODE_WISE}
 
 def _residual_merit_methods(op_name):
-    """The 0-form of a mixed energy/residual system: one residual merit.
+    """A residual system's 0-form: declared, not computed here.
 
-    A material that declares both an energy and a residual has, in general, no
-    potential: if the residual is not the gradient of anything -- a Kelvin-Voigt
-    viscous term is the case that matters -- then neither is the sum of it and
-    the energy's gradient.  So the system's 0-form is the merit over its
-    assembled residual, `1/2 * ||R||^2`.
+    A material that declares a residual with no potential -- a Kelvin-Voigt
+    viscous term is the case that matters -- has `1/2 * ||R||^2` as its 0-form,
+    and the energy beside it contributes its *gradient* rather than a potential,
+    because a potential is never added to a norm.
 
-    The part worth stating plainly is what happens to the energy.  It does not
-    contribute its potential to this, and a potential is never added to a norm:
-    those are different kinds of quantity and their sum means nothing.  The
-    energy contributes its *gradient*, which is already one of the two terms
-    this operator's `gradient` accumulates.  So the merit is computed for the
-    whole system including the part that would otherwise supply an energy, and
-    the elastic objective kernels play no role in it.
+    This operator used to compute that merit itself, from its own `gradient`.
+    That is the one thing it cannot do.  A norm is not additive over operators,
+    so `1/2*||R_op||^2` is not the system's merit whenever anything else
+    contributes to the residual -- and something almost always does: forcing is
+    a separate `Op`, so a Neumann traction never appears in this operator's
+    residual at all.  The scalar was then not zero at the solution of the
+    combined system, and a line search minimised it.
 
-    That is also why this needs no kernel of its own.  `gradient` already
-    computes `R = grad(E) + R_residual`; the merit is one dot product over the
-    degrees of freedom once it has.  A step of length alpha is evaluated by
-    forming `x + alpha * h` and asking for the gradient there, which is the
-    same traversal the Newton iteration performs anyway.
+    So the operator states how its 0-form reduces and `Function` does the
+    reduction, over the residual it assembles from every operator.  Declaring
+    `NODE_WISE` also promotes the whole `Function` to the node-wise merit, which
+    is what stops an energy operator's element-wise potential being added to a
+    squared residual norm.
     """
     return """
-  int %(op)s::value_steps(const real_t *state,
-              const real_t *h,
-              const int nsteps,
-              const real_t *const steps,
-              real_t *const out) {
-    SFEM_TRACE_SCOPE("%(op)s::value_steps");
-    if (nsteps <= 0) {
-      return SFEM_SUCCESS;
-    }
-    const ptrdiff_t ndofs = n_dofs_domain();
-    std::vector<real_t> stepped(ndofs);
-    std::vector<real_t> residual(ndofs);
-    for (int step = 0; step < nsteps; ++step) {
-      const real_t alpha = steps[step];
-      for (ptrdiff_t i = 0; i < ndofs; ++i) {
-        stepped[i] = state[i] + alpha * h[i];
-      }
-      std::fill(residual.begin(), residual.end(), real_t(0));
-      const int status = gradient(stepped.data(), residual.data());
-      if (status != SFEM_SUCCESS) {
-        return status;
-      }
-      real_t sum = 0;
-#pragma omp simd reduction(+ : sum)
-      for (ptrdiff_t i = 0; i < ndofs; ++i) {
-        sum += residual[i] * residual[i];
-      }
-      out[step] += real_t(0.5) * sum;
-    }
-    return SFEM_SUCCESS;
+  sfem::Op::ValueReduction %(op)s::value_reduction() const {
+    return sfem::Op::ValueReduction::NODE_WISE;
   }
 
-  int %(op)s::value(const real_t *state, real_t *const out) {
+  int %(op)s::value(const real_t *, real_t *const) {
     SFEM_TRACE_SCOPE("%(op)s::value");
-    // One step of length zero: `state + 0 * h` is `state` exactly, so the
-    // increment is unused and `state` can stand in for it.  One
-    // implementation, so the two cannot disagree.
-    const real_t objective_step = 0;
-    *out = 0;
-    return value_steps(state, state, 1, &objective_step, out);
+    // `Op::value` is pure virtual, so this has to exist -- but there is no
+    // scalar this operator can correctly return.  Its 0-form is a norm, and a
+    // norm of *its* residual is not the system's: whatever else contributes to
+    // the residual, forcing included, is missing from it.  `Function::value`
+    // sees the NODE_WISE declaration above and reduces over the residual it
+    // assembles instead, so it never reaches here.  A direct caller gets told
+    // rather than handed a number that is wrong by however much the rest of
+    // the system contributes.
+    return SFEM_FAILURE;
   }
 """ % {"op": op_name}
 
