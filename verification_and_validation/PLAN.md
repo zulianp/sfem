@@ -125,7 +125,7 @@ after the primary variants pass.
 perturbations of `mu`, `lambda/lmbda`, a displacement component, and element
 orientation each cause a clear failure.
 
-## Phase 4: Spatial Structural Cases
+## Phase 4: Spatial Structural Cases (Complete)
 
 1. Complete `cylindrical_pressure_vessel` provenance by recording the pinned
    upstream data revision, units, interpolation convention, and extraction
