@@ -116,6 +116,80 @@ static real_t smoother_omega() {
     return smesh::Env::read<real_t>("SFEM_VANKA_OMEGA", real_t(1));
 }
 
+// SFEM_VANKA_FREEZE=N rebuilds the Vanka smoother every Nth Newton iteration and reuses the
+// previous one in between. N = 1, the default, rebuilds every iteration and is what this code
+// has always done, bit for bit.
+//
+// Why there is a knob at all: the rebuild is the largest single cost in a transient step and it
+// scales worse than the solve. Measured on the nozzle at one Grace socket, vanka_setup costs
+// 18.1 ms at 116,212 dof, 126.8 ms at 893,924 and 3,604 ms at 7,014,340 -- about dof^1.65
+// between the top two rungs -- which is 11.2% of the step at 893,924 dof and 31.6% at
+// 7,014,340. At 4.00 Newton iterations per step it is paid four times per step, while a DNS
+// timestep moves the state by O(dt) and the factorisations it produces barely move with it.
+//
+// What it is safe to skip, and why. make_diagonal_vanka calls op.update(state) first, which
+// refreshes the nodal pressure gradient and stamps pgrad_for. That is NOT the per-iteration
+// state push: gradient() redoes the same unpack and nodal_p_grad from its own x argument on
+// every Newton iteration, and the residual is evaluated before the linear solve -- the loop
+// shape cache_nodal_pgrad already documents as its precondition. The matrix-free level
+// operators read states[0] live, and states[0] IS xbuf, so the cycle's operator tracks the
+// linearisation whether or not the smoother is rebuilt. Freezing therefore stales the
+// PRECONDITIONER and nothing else.
+//
+// What that costs is iterations, and it is the thing to measure rather than assume: a
+// preconditioner built at an older linearisation can raise the Newton and linear counts faster
+// than the skipped rebuilds save, particularly with the Peclet blend on, where the defect
+// correction already contracts at only r ~ 0.49 at L = 8. Any report of this knob quotes
+// Newton and linear iterations beside wall time, or it is not a result.
+static int vanka_freeze_every() {
+    static const int n = smesh::Env::read<int>("SFEM_VANKA_FREEZE", 1);
+    return n > 1 ? n : 1;
+}
+
+// The frozen smoother, and the rebuild index it was built at.
+//
+// One cache for both preconditioner paths, because there is exactly one smoother in a run: the
+// multigrid fine level (refresh_gmg) and the hierarchy-free SFEM_PRECOND=vanka path are the two
+// arms of one if/else and never both execute. Sharing the slot is what keeps this a single
+// mechanism rather than two that can drift apart.
+//
+// Counting rebuilds here rather than keying on newton_it, which is a local of main() and is not
+// in scope inside refresh_gmg. The count is equivalent -- both sites are reached once per Newton
+// iteration -- and it keeps the policy in one place instead of in each caller.
+//
+// The operator keeps its own factorisations and, on the stencil path, the stencil buffer they
+// were built from alive, so a cached smoother owns everything it reads.
+static std::shared_ptr<sfem::Operator<real_t>> g_vanka_cached;
+static long                                    g_vanka_calls = 0;
+
+// Whether this call should build a new smoother, given how many have been requested so far.
+// Always true for the first one and whenever the knob is 1, which is the default.
+//
+// Asking advances the count, so ask exactly once per production preconditioner build and never
+// from a diagnostic. The SFEM_GMG_CHECK gates build their own throwaway smoothers and call
+// refresh_gmg once before the Newton loop; counting those would shift the rebuild phase on a
+// checked run, so the cycle and the check would disagree about when the smoother is fresh --
+// the same trap SFEM_VANKA_OMEGA was consolidated into one function to avoid.
+static bool vanka_rebuild_now() {
+    const bool build = !g_vanka_cached || (g_vanka_calls % vanka_freeze_every()) == 0;
+    ++g_vanka_calls;
+    return build;
+}
+
+// Start a time step's freeze cycle, so the first Newton iteration after the state jumps by a
+// full dt always gets a smoother built at that state, and the stride runs within the step
+// rather than across the whole run. Without this the rebuild lands on an arbitrary iteration of
+// an arbitrary step, which is both worse -- the staleness is largest right after the step -- and
+// unreadable in a log. A steady solve enters the step loop once, so it is unaffected.
+//
+// Per time step, not per continuation stage: this is called above the stage loop, so a step
+// that ramps through several stages runs one stride across all of their Newton iterations and
+// only the first stage begins with a freshly built smoother. That is deliberate -- a
+// continuation stage moves the state by a change of parameter, not by a full dt, and it
+// typically begins nearly solved -- but it does mean the guarantee is "first iteration of a
+// step", never "first iteration of a stage".
+static void vanka_freeze_step_begin() { g_vanka_calls = 0; }
+
 // Which Newton iteration the SFEM_GMG_CHECK gates fire on. Default 0, which is where they
 // have always fired and where they should stay for anything that depends only on geometry.
 //
@@ -2624,11 +2698,16 @@ private:
                     g.data->functions[0]->constraints_mask(m0.data());
                     std::vector<uint8_t> cb((size_t)nd0, 0);
                     for (ptrdiff_t k = 0; k < nd0; ++k) cb[(size_t)k] = mask_get(k, m0.data()) ? 1 : 0;
-                    const double t_v = smesh::time_seconds();
-                    prec_op = cvfem_ss::make_diagonal_vanka(*g.level_ops[0], g.data->functions[0]->space(),
-                                                            g.states[0]->data(), cb.data(),
-                                                            smoother_omega());
-                    phase_add("vanka_setup", smesh::time_seconds() - t_v);
+                    if (vanka_rebuild_now()) {
+                        const double t_v = smesh::time_seconds();
+                        g_vanka_cached = cvfem_ss::make_diagonal_vanka(
+                                *g.level_ops[0], g.data->functions[0]->space(), g.states[0]->data(),
+                                cb.data(), smoother_omega());
+                        // Counted per REBUILD, so the phase table's call count is the number of
+                        // rebuilds a run actually paid for and not the number of Newton steps.
+                        phase_add("vanka_setup", smesh::time_seconds() - t_v);
+                    }
+                    prec_op = g_vanka_cached;
                 }
 
                 std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> sm;
@@ -4481,6 +4560,10 @@ int main(int argc, char **argv) {
     }
 
     std::vector<real_t> x_stage_start((size_t)ndof, real_t(0));
+    // The last residual a TIME STEP reached, for the step-failure policy below: the stage
+    // loop's own prev_rnorm and r_stage0 are declared inside it and are gone by the time a
+    // failure is detected.
+    real_t              step_last_rnorm = 0;
     int                 re_retries = 0;
     real_t              step_f     = re_step;  // current continuation step factor
 
@@ -4558,7 +4641,8 @@ int main(int argc, char **argv) {
     // A hundred times nl_rtol, and it used to be ten. The reason for ten was that "anything
     // looser starts accepting states that simply have not converged", which is the right
     // worry and is now a measured question rather than a guess, because rel is measured
-    // against the STAGE's own starting residual: a stage that begins nearly solved has no
+    // against r0 -- the first residual of the current time step, and of the whole run for a
+    // steady solve -- shared by that step's stages: a stage that begins nearly solved has no
     // reachable rtol at all, and the corrected Rhie-Chow time scale makes stages begin nearly
     // solved routinely.
     //
@@ -4577,10 +4661,18 @@ int main(int argc, char **argv) {
     const real_t nl_ls_floor = smesh::Env::read<real_t>("SFEM_NL_LS_FLOOR", real_t(1e-6));
     std::vector<real_t> x_try((size_t)ndof, 0), r_try((size_t)ndof, 0);
     bool converged    = false;
-    // Set once from the first nonzero residual and kept across stages, as in the
-    // standalone driver: the continuation stage and the physical stage are measured
+    // Set from the first nonzero residual of a time step and kept across that step's stages,
+    // as in the standalone driver: the continuation stage and the physical stage are measured
     // against the same reference.
-    real_t r0 = 0;
+    //
+    // Per STEP, not per run. Left global, it made SFEM_NL_RTOL meaningless after the first
+    // step of a transient: every later step starts O(dt) from its answer, so rel was already
+    // below rtol at the first Newton iteration and only SFEM_NL_ATOL decided convergence --
+    // the run silently swapped a relative criterion for an absolute one. A steady solve takes
+    // the step loop exactly once, so it is untouched bit for bit. SFEM_NL_R0_SCOPE=run
+    // restores the old behaviour, for bisecting against transient logs recorded before this.
+    real_t     r0          = 0;
+    const bool r0_per_step = smesh::Env::read_string("SFEM_NL_R0_SCOPE", "step") != "run";
 
     // ---------------------------------------------------------------- time stepping
     //
@@ -4597,6 +4689,12 @@ int main(int argc, char **argv) {
     const std::string restart_in    = smesh::Env::read_string("SFEM_RESTART_IN", "");
     const std::string restart_out   = smesh::Env::read_string("SFEM_RESTART_OUT", "");
     const int         restart_every = smesh::Env::read<int>("SFEM_RESTART_EVERY", 0);
+    // What to do with a time step that exhausts its continuation retries. `abort` is the only
+    // implemented policy and the only defensible default: the alternative this replaced was to
+    // accept the unconverged state and step on, which leaves no trace in the output. A `cutback`
+    // policy -- restore the step's starting state, halve dt, retry -- is the natural second
+    // option and is refused explicitly until it exists, rather than silently meaning `abort`.
+    const std::string step_on_fail = smesh::Env::read_string("SFEM_STEP_ON_FAIL", "abort");
     int               tstep0        = 0;
     real_t            t0            = 0;
     bool              resumed       = false;
@@ -4637,6 +4735,22 @@ int main(int argc, char **argv) {
             if (!st || !h1 || !meta || !(meta >> m_step >> m_t >> m_dt >> m_bdf >> m_nnodes >> m_sum)) {
                 std::fprintf(stderr, "restart: cannot read a complete restart from '%s'\n", restart_in.c_str());
                 return EXIT_FAILURE;
+            }
+            // The live step size, if this checkpoint carries it. Absent in anything written
+            // before it was added, which is why its failure is not an error: the defaults
+            // below reproduce exactly what such a checkpoint used to resume with.
+            double    m_dt_now = 0, m_dt_prev = 0;
+            int       m_dt_fixed = 1;
+            const bool have_dt_state = static_cast<bool>(meta >> m_dt_now >> m_dt_prev >> m_dt_fixed);
+            if (have_dt_state && !m_dt_fixed) {
+                // An adapted run: the env dt is only where it started, so the guard below --
+                // which compares the env value -- cannot speak for it. Resume at the size the
+                // controller had reached, with the previous size BDF2's variable-step
+                // coefficients need.
+                dt_now        = (real_t)m_dt_now;
+                dt_prev_step  = (real_t)m_dt_prev;
+                std::printf("restart: resuming an adapted step, dt %.17g (previous %.17g)\n", m_dt_now,
+                            m_dt_prev);
             }
             if ((ptrdiff_t)st->size() != ndof || (ptrdiff_t)h1->size() != nnodes * 3 || m_nnodes != (long long)nnodes) {
                 std::fprintf(stderr,
@@ -4711,11 +4825,22 @@ int main(int argc, char **argv) {
     // diagnostics' is: these are ndof-sized and reallocating them every step is pure waste.
     std::vector<real_t>   conv_grad, conv_trial;
     FILE                 *diag_fh = nullptr;
+    // Whether this segment has written the geometry its frames share. Outside the loop because
+    // the first frame a segment writes is rarely its first step: a stride, or a resumed
+    // segment, both start elsewhere, and frames without the mesh beside them are unreadable.
+    bool                  wrote_step_mesh = false;
 
     for (int tstep = 0; tstep < (dt_step > real_t(0) ? nsteps : 1); ++tstep) {
     // Absolute, so a segmented run and a single one report the same instants and a frame
     // written in segment three is not labelled as though it were the third frame overall.
     const int    abs_step = tstep0 + tstep + 1;
+    // Wall time of this step, reported as the diagnostics' t_step column. The cost model a
+    // long campaign is planned from needs the per-step cost directly: t_solve is a run total,
+    // and lin_it is cumulative, so both have to be differenced to say what one step cost --
+    // which is exactly the arithmetic a reader gets wrong. Measured here rather than around
+    // the solve alone so that it counts everything a step actually spends: the residual, the
+    // preconditioner rebuild, the diagnostics and the output.
+    const double t_step_wall0 = smesh::time_seconds();
     // TELL THE OPERATOR. Without this the CFL controller below is inert: it moves dt_now,
     // the diagnostics compute their CFL from dt_now, and the log reports a step size that
     // converges on the target -- while every step the solver actually takes is still
@@ -4913,6 +5038,12 @@ int main(int argc, char **argv) {
         re_retries = 0;
         step_f     = re_step;
     }
+    // The reference this step's `rel` is measured against, taken from its own first residual
+    // by the test at the top of the Newton loop. See r0's declaration for why it is per step.
+    if (dt_step > real_t(0) && r0_per_step) r0 = 0;
+    // Rebuild the Vanka smoother on this step's first Newton iteration, whatever the freeze
+    // stride. See vanka_freeze_step_begin.
+    vanka_freeze_step_begin();
 
     for (size_t stage = 0; stage < rho_schedule.size(); ++stage) {
     const real_t rho_use = rho_schedule[stage];
@@ -5054,6 +5185,7 @@ int main(int argc, char **argv) {
         for (ptrdiff_t i = 0; i < ndof; ++i) rnorm += r[(size_t)i] * r[(size_t)i];
         rnorm = std::sqrt(rnorm);
         if (r0 == real_t(0) && rnorm > 0) r0 = rnorm;
+        step_last_rnorm = rnorm;  // outlives the stage loop, for the step-failure report
 
         const real_t rel = (r0 > 0) ? rnorm / r0 : rnorm;
         std::printf("newton %d  ||R||: %.6e  rel: %.6e\n", newton_it, rnorm, rel);
@@ -5110,7 +5242,27 @@ int main(int argc, char **argv) {
             diverged = true;
             break;
         }
-        if (newton_it == max_newton) break;
+        if (newton_it == max_newton) {
+            // The residual floor the other two stage-ending paths already respect -- the linear
+            // solve giving up, and the line search finding no decrease -- applied to the third.
+            // At the floor there is nothing left to reduce, so a stage that reaches the
+            // iteration cap there has converged rather than failed, and the cap was the only
+            // exit that could not say so. That mattered little while an unconverged step was
+            // silently accepted; now that such a step aborts the run, a step at the floor would
+            // take a multi-day campaign down with it.
+            //
+            // rel, not the contraction rate, for the reason measured at the site below: the
+            // accepted cavity stage and the rejected manufactured solution have rates 0.612 and
+            // 0.548 -- indistinguishable -- while their rel differ by four orders of magnitude.
+            if (rel < nl_ls_floor) {
+                std::printf("  iteration cap reached at rel=%.3e (rate %.3f) -- residual floor,"
+                            " accepting as converged\n",
+                            (double)rel, (double)newton_rate);
+                converged = true;
+                ++newton_total;
+            }
+            break;
+        }
 
         for (ptrdiff_t i = 0; i < ndof; ++i) rhs[(size_t)i] = -r[(size_t)i];
         std::fill(dx.begin(), dx.end(), real_t(0));
@@ -5584,10 +5736,19 @@ int main(int argc, char **argv) {
                                                smesh::Env::read<int>("SFEM_SIMPLE_INNER", 1),
                                                smesh::Env::read<real_t>("SFEM_SIMPLE_DS", real_t(1)))));
                 } else if (pc == "vanka") {
-                    std::vector<uint8_t> cb((size_t)ndof, 0);
-                    for (ptrdiff_t k = 0; k < ndof; ++k) cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
-                    set_prec(timed("precond_total",
-                                   cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), om)));
+                    // Same freeze policy as the multigrid fine level, through the same cache.
+                    // set_prec still runs every Newton iteration -- the solver's preconditioner
+                    // slot is reassigned each step, so a frozen iteration reuses the operator
+                    // rather than skipping the hand-off.
+                    if (vanka_rebuild_now()) {
+                        std::vector<uint8_t> cb((size_t)ndof, 0);
+                        for (ptrdiff_t k = 0; k < ndof; ++k)
+                            cb[(size_t)k] = mask_get(k, cmask.data()) ? 1 : 0;
+                        const double t_v = smesh::time_seconds();
+                        g_vanka_cached   = cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), om);
+                        phase_add("vanka_setup", smesh::time_seconds() - t_v);
+                    }
+                    set_prec(timed("precond_total", g_vanka_cached));
                 } else {
                     if (pc != "bjacobi") {
                         std::fprintf(stderr, "SFEM_PRECOND='%s' is not one of bjacobi|simple|vanka|direct\n",
@@ -5810,6 +5971,35 @@ int main(int argc, char **argv) {
     }
     }
 
+    // A step that did not converge is not a step.
+    //
+    // Reaching here with `converged` false means the continuation exhausted its retries. The
+    // loop used to accept that silently: the history shifted, the next step started from an
+    // unconverged field, and nothing in the output said so -- the failure was invisible in a
+    // run whose whole purpose is the sequence. Over a campaign of 10^5 steps that is not a
+    // degraded answer, it is fiction with a plausible shape.
+    //
+    // Abort rather than continue, and deliberately WITHOUT writing a restart: the checkpoint
+    // already on disk is the last step that did converge, so leaving it untouched is what
+    // makes the campaign resumable from the last good state.
+    if (dt_step > real_t(0) && !converged) {
+        std::fprintf(stderr,
+                     "step %d (t = %.17g) FAILED to converge: %d Newton iterations, ||R|| %.6e, "
+                     "rel %.6e\n",
+                     abs_step, (double)t_abs, newton_it, (double)step_last_rnorm,
+                     (double)(r0 > 0 ? step_last_rnorm / r0 : step_last_rnorm));
+        if (!restart_out.empty())
+            std::fprintf(stderr, "restart: resume from '%s', which still holds the last converged step\n",
+                         restart_out.c_str());
+        if (step_on_fail != "abort") {
+            std::fprintf(stderr,
+                         "SFEM_STEP_ON_FAIL='%s' is not implemented yet; only 'abort' is. Refusing rather "
+                         "than continuing, because the alternative is the silent acceptance this replaces.\n",
+                         step_on_fail.c_str());
+        }
+        return EXIT_FAILURE;
+    }
+
     // Shift the history: u^{n-1} <- u^n, u^n <- the state just solved for. Done after the
     // step rather than before the next one so a run that stops early leaves the history
     // consistent with the state it reports.
@@ -5833,7 +6023,16 @@ int main(int argc, char **argv) {
     // verification numbers want none of it. The mesh is written once at the top rather than
     // per step -- this is transpiration on a FIXED mesh, so there is exactly one geometry
     // for every frame to share.
-    if (dt_step > real_t(0) && smesh::Env::read<int>("SFEM_WRITE_STEPS", 0)) {
+    // SFEM_WRITE_STEPS is a STRIDE, not a flag: 1 keeps its original meaning of every step,
+    // N writes every Nth. At 793k nodes a frame is ~25 MB, so a campaign of 10^5 steps writing
+    // every one of them is ~2.5 TB of fields nobody will animate. SFEM_WRITE_STEPS_FIRST skips
+    // the start-up transient. The segment's last step is always written, so segments
+    // concatenate without a gap where the stride happened to fall.
+    const int  write_every = smesh::Env::read<int>("SFEM_WRITE_STEPS", 0);
+    const int  write_first = smesh::Env::read<int>("SFEM_WRITE_STEPS_FIRST", 0);
+    const bool want_frame  = dt_step > real_t(0) && write_every > 0 && abs_step >= write_first &&
+                            ((abs_step - write_first) % write_every == 0 || tstep + 1 == nsteps);
+    if (want_frame) {
         char sub[64];
         // Absolute, so segments concatenate into one animation instead of each
         // overwriting the other's step_0000.
@@ -5841,11 +6040,15 @@ int main(int argc, char **argv) {
         const smesh::Path step_dir = smesh::Path(out_folder) / sub;
         smesh::create_directory(smesh::Path(out_folder));
         smesh::create_directory(step_dir);
-        if (tstep == 0) {
+        // The FIRST frame this segment writes, not step 0: with a stride or a resumed segment
+        // the first frame is rarely step 0, and without the mesh beside them the frames are
+        // unreadable.
+        if (!wrote_step_mesh) {
             if (fs->has_semi_structured_mesh())
                 smesh::semistructured_export_as_standard(fs->mesh_ptr(), smesh::Path(out_folder) / "mesh");
             else
                 mesh->write(smesh::Path(out_folder) / "mesh");
+            wrote_step_mesh = true;
         }
         auto so = f->output();
         so->enable_AoS_to_SoA(true);
@@ -5942,22 +6145,34 @@ int main(int argc, char **argv) {
                                                  have_out ? (double)q_out : 0.0);
                 const int budget_valid = (dt_step <= real_t(0) || !first) ? 1 : 0;
                 if (!diag_fh) {
-                    diag_fh = std::fopen(diag_csv.c_str(), "w");
-                    if (diag_fh)
-                        std::fprintf(diag_fh,
-                                     "step,t,ndof,E,dEdt,P_in,P_out,eps_visc,eps_num,closure,"
-                                     "enstrophy,omega_max,div_l2,div_inf,cfl_max,u_max,"
-                                     "newton_it,lin_it,have_in,have_out,budget_valid,mdot_in,mdot_out\n");
+                    // Appended when this run resumes a segment, because the CSV is the whole
+                    // record of a campaign that spans allocations: opened "w" every time, each
+                    // segment destroyed the rows of the ones before it and only the last
+                    // 24 hours survived. The header goes in only when the file is empty, so a
+                    // resumed segment continues the table rather than restarting it.
+                    const bool append = !restart_in.empty();
+                    diag_fh           = std::fopen(diag_csv.c_str(), append ? "a" : "w");
+                    if (diag_fh) {
+                        std::fseek(diag_fh, 0, SEEK_END);
+                        if (std::ftell(diag_fh) <= 0)
+                            std::fprintf(diag_fh,
+                                         "step,t,ndof,E,dEdt,P_in,P_out,eps_visc,eps_num,closure,"
+                                         "enstrophy,omega_max,div_l2,div_inf,cfl_max,u_max,"
+                                         "newton_it,lin_it,t_step,have_in,have_out,budget_valid,"
+                                         "mdot_in,mdot_out\n");
+                    }
                 }
                 if (diag_fh) {
                     std::fprintf(diag_fh,
                                  "%d,%.17g,%td,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,"
-                                 "%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%d,%d,%d,%d,%d,%.17g,%.17g\n",
+                                 "%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%d,%d,%.6f,%d,%d,%d,"
+                                 "%.17g,%.17g\n",
                                  abs_step, (double)t_abs, (ptrdiff_t)ndof, st.E, b.dEdt, b.p_in,
                                  b.p_out, b.eps_visc, b.eps_num, b.closure, st.enstrophy,
                                  st.omega_max, st.div_l2, st.div_inf, st.cfl_max, st.u_max,
-                                 newton_it, lin_it_total, have_in ? 1 : 0, have_out ? 1 : 0,
-                                 budget_valid, (double)mdot_in, (double)mdot_out);
+                                 newton_it, lin_it_total, smesh::time_seconds() - t_step_wall0,
+                                 have_in ? 1 : 0, have_out ? 1 : 0, budget_valid,
+                                 (double)mdot_in, (double)mdot_out);
                     std::fflush(diag_fh);
                 }
                 // Echoed as well as written, because a long run whose only output appears at
@@ -6033,6 +6248,18 @@ int main(int argc, char **argv) {
                  << bdf_order << "\n"
                  << (long long)nnodes << "\n"
                  << mesh_coord_checksum << "\n";
+            // The LIVE step size, appended after the six fields every earlier checkpoint has.
+            // Optional by construction, in both directions: an old restart.txt loads here
+            // because the reader stops after six and keeps its defaults, and this file loads
+            // into an older build because that build stops after six and ignores the rest.
+            //
+            // Without them an adapted run resumed at the wrong size silently -- dt_step is the
+            // env value and says nothing about where the CFL controller had got to, and
+            // dt_prev_step re-initialised to zero, which hands BDF2 the uniform-step
+            // coefficients on the first step of every segment.
+            meta << (double)dt_now << "\n"
+                 << (double)dt_prev_step << "\n"
+                 << (cfl_target > real_t(0) ? 0 : 1) << "\n";
             if (rc != SFEM_SUCCESS || !meta) {
                 std::fprintf(stderr, "restart: failed to write '%s'\n", restart_out.c_str());
                 return EXIT_FAILURE;

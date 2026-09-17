@@ -368,9 +368,9 @@ fluid back and forth and nets nothing. That is the scope, not an oversight.
 | steady | -- | -- | +1.000000000 | +1.000000000 | 0.000e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
 | t1 | 0.125 | +0.7071 | +0.707106781 | +0.707106781 | 0.000e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
 | t2 | 0.250 | +1.0000 | +1.000000000 | +1.000000000 | 0.000e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| t4 | 0.500 | +0.0000 | +0.000000000 | +0.000000000 | 7.007e-19 | 7.007e-19 | <span class="st-pass">pass</span> |
+| t4 | 0.500 | +0.0000 | +0.000000000 | +0.000000000 | 9.708e-18 | 9.708e-18 | <span class="st-pass">pass</span> |
 | t6 | 0.750 | -1.0000 | -1.000000000 | -1.000000000 | 0.000e+00 | 0.000e+00 | <span class="st-pass">pass</span> |
-| t8 | 1.000 | -0.0000 | -0.000000000 | -0.000000000 | 5.238e-17 | 5.238e-17 | <span class="st-pass">pass</span> |
+| t8 | 1.000 | -0.0000 | -0.000000000 | -0.000000000 | 1.378e-17 | 1.378e-17 | <span class="st-pass">pass</span> |
 
 <svg class="cvfig" viewBox="0 0 720 330" width="100%" role="img">
 <title>Pump: swept volume against port flux</title>
@@ -425,7 +425,7 @@ is kept because it does check the prescribed profile, against its own tolerance.
 | case | ndof | sum of continuity | relative to inflow | inflow | inflow err | flux imbalance (not scored) | status |
 |---|---|---|---|---|---|---|---|
 | lshape | 7060 | 4.252e-18 | 3.827e-17 | 1.111e-01 | 1.345e-02 | 5.066e-01 | <span class="st-pass">pass</span> |
-| re500 | 4540 | 5.605e-22 | 1.077e-16 | 4.226e-06 | 1.883e-01 | 1.944e-16 | <span class="st-pass">pass</span> |
+| re500 | 4540 | 1.077e-22 | 2.068e-17 | 4.226e-06 | 1.883e-01 | 1.944e-16 | <span class="st-pass">pass</span> |
 
 
 ## Solver behaviour
@@ -438,16 +438,16 @@ machine is named in Provenance.
 | case | ndof | converged | Newton | linear its | t_solve (s) | Re reached | gauge |
 |---|---|---|---|---|---|---|---|
 | re1_n4 | 500 | yes | 3 | 138 | 0.042 | 2 | zero mean |
-| re1_n8 | 2916 | yes | 2 | 203 | 0.102 | 2 | zero mean |
-| re1_n16 | 19652 | yes | 2 | 453 | 0.498 | 2 | zero mean |
-| re1_n32 | 143748 | yes | 2 | 1200 | 2.095 | 2 | zero mean |
-| re100_n4 | 500 | yes | 5 | 918 | 0.315 | 200 | zero mean |
-| re100_n8 | 2916 | yes | 5 | 1333 | 0.691 | 200 | zero mean |
-| re100_n16 | 19652 | yes | 4 | 2223 | 2.486 | 200 | zero mean |
-| re100_n32 | 143748 | yes | 4 | 4681 | 8.123 | 200 | zero mean |
+| re1_n8 | 2916 | yes | 2 | 203 | 0.100 | 2 | zero mean |
+| re1_n16 | 19652 | yes | 2 | 453 | 0.507 | 2 | zero mean |
+| re1_n32 | 143748 | yes | 2 | 1200 | 2.189 | 2 | zero mean |
+| re100_n4 | 500 | yes | 5 | 918 | 0.314 | 200 | zero mean |
+| re100_n8 | 2916 | yes | 5 | 1333 | 0.650 | 200 | zero mean |
+| re100_n16 | 19652 | yes | 4 | 2223 | 2.449 | 200 | zero mean |
+| re100_n32 | 143748 | yes | 4 | 4681 | 8.234 | 200 | zero mean |
 | dirichlet | 4900 | yes | 0 | 3 | 0.035 | 100 | zero mean |
-| natural | 33124 | yes | 3 | 8283 | 8.954 | 100 | determined by the do-nothing outflow |
-| traction0 | 33124 | yes | 3 | 8283 | 8.886 | 100 | determined by the traction surface |
+| natural | 33124 | yes | 3 | 8283 | 8.988 | 100 | determined by the do-nothing outflow |
+| traction0 | 33124 | yes | 3 | 8283 | 8.788 | 100 | determined by the traction surface |
 | direct_p-0.16 | 4900 | yes | 0 | 3 | 0.035 | 100 | determined by the prescribed pressure |
 | direct_p-0.08 | 4900 | yes | 0 | 3 | 0.035 | 100 | determined by the prescribed pressure |
 | direct_p0 | 4900 | yes | 0 | 3 | 0.035 | 100 | determined by the prescribed pressure |
@@ -455,47 +455,47 @@ machine is named in Provenance.
 | direct_p0.5 | 4900 | yes | 0 | 3 | 0.035 | 100 | determined by the prescribed pressure |
 | direct_p1.0 | 4900 | yes | 0 | 3 | 0.035 | 100 | determined by the prescribed pressure |
 | direct_p1.5 | 4900 | yes | 0 | 3 | 0.035 | 100 | determined by the prescribed pressure |
-| direct_p3.0 | 4900 | yes | 0 | 3 | 0.035 | 100 | determined by the prescribed pressure |
-| mg_p-0.16 | 33124 | yes | 1 | 57 | 0.163 | 100 | determined by the prescribed pressure |
-| mg_p-0.08 | 33124 | yes | 1 | 57 | 0.165 | 100 | determined by the prescribed pressure |
-| mg_p0 | 33124 | yes | 1 | 58 | 0.165 | 100 | determined by the prescribed pressure |
-| mg_p0.16 | 33124 | yes | 1 | 58 | 0.180 | 100 | determined by the prescribed pressure |
-| mg_p0.5 | 33124 | yes | 1 | 51 | 0.149 | 100 | determined by the prescribed pressure |
-| mg_p1.0 | 33124 | yes | 0 | 31 | 0.093 | 100 | determined by the prescribed pressure |
-| mg_p1.5 | 33124 | yes | 0 | 32 | 0.093 | 100 | determined by the prescribed pressure |
-| mg_p3.0 | 33124 | yes | 0 | 31 | 0.091 | 100 | determined by the prescribed pressure |
-| vanka_p-0.16 | 33124 | yes | 1 | 450 | 0.322 | 100 | determined by the prescribed pressure |
-| vanka_p-0.08 | 33124 | yes | 1 | 462 | 0.372 | 100 | determined by the prescribed pressure |
-| vanka_p0 | 33124 | yes | 1 | 491 | 0.357 | 100 | determined by the prescribed pressure |
-| vanka_p0.16 | 33124 | yes | 1 | 487 | 0.346 | 100 | determined by the prescribed pressure |
-| vanka_p0.5 | 33124 | yes | 1 | 410 | 0.299 | 100 | determined by the prescribed pressure |
-| vanka_p1.0 | 33124 | yes | 0 | 387 | 0.278 | 100 | determined by the prescribed pressure |
-| vanka_p1.5 | 33124 | yes | 0 | 332 | 0.245 | 100 | determined by the prescribed pressure |
-| vanka_p3.0 | 33124 | yes | 0 | 351 | 0.251 | 100 | determined by the prescribed pressure |
-| mg_n2l4 | 10692 | yes | 0 | 16 | 0.034 | 100 | zero mean |
-| mg_n2l8 | 75140 | yes | 0 | 27 | 0.188 | 100 | zero mean |
-| mg_n4l8 | 561924 | yes | 0 | 71 | 2.278 | 100 | zero mean |
-| vanka_n2l8 | 75140 | yes | 0 | 189 | 0.346 | 100 | zero mean |
-| lshape | 7060 | yes | 3 | 16 | 0.378 | 20 | determined by the do-nothing outflow |
-| steady | 2916 | yes | 3 | 13 | 0.050 | 20 | determined by the prescribed pressure |
+| direct_p3.0 | 4900 | yes | 0 | 3 | 0.038 | 100 | determined by the prescribed pressure |
+| mg_p-0.16 | 33124 | yes | 1 | 57 | 0.166 | 100 | determined by the prescribed pressure |
+| mg_p-0.08 | 33124 | yes | 1 | 57 | 0.170 | 100 | determined by the prescribed pressure |
+| mg_p0 | 33124 | yes | 1 | 58 | 0.176 | 100 | determined by the prescribed pressure |
+| mg_p0.16 | 33124 | yes | 1 | 58 | 0.177 | 100 | determined by the prescribed pressure |
+| mg_p0.5 | 33124 | yes | 1 | 51 | 0.167 | 100 | determined by the prescribed pressure |
+| mg_p1.0 | 33124 | yes | 0 | 31 | 0.092 | 100 | determined by the prescribed pressure |
+| mg_p1.5 | 33124 | yes | 0 | 32 | 0.095 | 100 | determined by the prescribed pressure |
+| mg_p3.0 | 33124 | yes | 0 | 31 | 0.092 | 100 | determined by the prescribed pressure |
+| vanka_p-0.16 | 33124 | yes | 1 | 450 | 0.336 | 100 | determined by the prescribed pressure |
+| vanka_p-0.08 | 33124 | yes | 1 | 462 | 0.350 | 100 | determined by the prescribed pressure |
+| vanka_p0 | 33124 | yes | 1 | 491 | 0.362 | 100 | determined by the prescribed pressure |
+| vanka_p0.16 | 33124 | yes | 1 | 487 | 0.357 | 100 | determined by the prescribed pressure |
+| vanka_p0.5 | 33124 | yes | 1 | 410 | 0.300 | 100 | determined by the prescribed pressure |
+| vanka_p1.0 | 33124 | yes | 0 | 387 | 0.287 | 100 | determined by the prescribed pressure |
+| vanka_p1.5 | 33124 | yes | 0 | 332 | 0.251 | 100 | determined by the prescribed pressure |
+| vanka_p3.0 | 33124 | yes | 0 | 351 | 0.261 | 100 | determined by the prescribed pressure |
+| mg_n2l4 | 10692 | yes | 0 | 16 | 0.038 | 100 | zero mean |
+| mg_n2l8 | 75140 | yes | 0 | 27 | 0.192 | 100 | zero mean |
+| mg_n4l8 | 561924 | yes | 0 | 71 | 2.298 | 100 | zero mean |
+| vanka_n2l8 | 75140 | yes | 0 | 189 | 0.370 | 100 | zero mean |
+| lshape | 7060 | yes | 3 | 16 | 0.371 | 20 | determined by the do-nothing outflow |
+| steady | 2916 | yes | 3 | 13 | 0.049 | 20 | determined by the prescribed pressure |
 | t1 | 2916 | yes | 3 | 13 | 0.051 | 20 | determined by the prescribed pressure |
-| t2 | 2916 | yes | 4 | 17 | 0.066 | 20 | determined by the prescribed pressure |
-| t4 | 2916 | yes | 6 | 27 | 0.105 | 20 | determined by the prescribed pressure |
-| t6 | 2916 | yes | 4 | 37 | 0.142 | 20 | determined by the prescribed pressure |
-| t8 | 2916 | yes | 5 | 46 | 0.177 | 20 | determined by the prescribed pressure |
+| t2 | 2916 | yes | 3 | 16 | 0.062 | 20 | determined by the prescribed pressure |
+| t4 | 2916 | yes | 6 | 26 | 0.099 | 20 | determined by the prescribed pressure |
+| t6 | 2916 | yes | 4 | 35 | 0.133 | 20 | determined by the prescribed pressure |
+| t8 | 2916 | yes | 5 | 44 | 0.169 | 20 | determined by the prescribed pressure |
 | re500 | 4540 | yes | 5 | 24 | 0.228 | 500 | determined by the do-nothing outflow |
 
 ## Provenance
 
 | field | value |
 |---|---|
-| generated | 2026-09-15 10:31:35 |
-| machine | nid006555 |
+| generated | 2026-09-17 16:34:47 |
+| machine | nid006549 |
 | threads | 72 |
 | commit | -- |
 | linear solver | direct |
 | element refine level | 1 |
-| run directory | /Users/patrickzulian/Desktop/code/merge_git_repos/sfem/spikes/cvfem/verification_runs/grace-direct-4670539 |
+| run directory | /Users/patrickzulian/Desktop/code/merge_git_repos/sfem/spikes/cvfem/verification_runs/grace-direct-4684979 |
 | runs parsed | 47 of 47 |
 
-Regenerate with `python3 python/cvfem_verify_report.py verification_runs/grace-direct-4670539`.
+Regenerate with `python3 python/cvfem_verify_report.py verification_runs/grace-direct-4684979`.
