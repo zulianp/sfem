@@ -9,6 +9,7 @@
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
 #include "sfem_openmp_blas.hpp"
+#include "sfem_API.hpp"
 #include "smesh_glob.hpp"
 #include "smesh_mesh.hpp"
 
@@ -615,11 +616,29 @@ namespace sfem {
     /// individual operator does not own -- a Neumann traction is its own Op --
     /// is included here and cannot be included anywhere else.
     int Function::node_wise_merit(const real_t *x, real_t *const out, const ElementScope scope) {
-        const ptrdiff_t ndofs = impl_->space->n_dofs();
-        std::vector<real_t> residual(ndofs, 0);
-        if (gradient(x, residual.data(), scope) != SFEM_SUCCESS) {
+        const ptrdiff_t      ndofs = impl_->space->n_dofs();
+        const ExecutionSpace es    = execution_space();
+
+        // The residual has to live where the operators write it.  A host
+        // `std::vector` handed to a device `gradient` is device kernels writing
+        // through a host pointer, so the buffer follows the execution space.
+        auto residual = create_buffer<real_t>(ndofs, es);
+        if (gradient(x, residual->data(), scope) != SFEM_SUCCESS) {
             return SFEM_FAILURE;
         }
+
+        if (es == EXECUTION_SPACE_DEVICE) {
+            // The device's own reduction.  It is not the deterministic one
+            // below -- a GPU dot product sums in whatever order its blocks
+            // retire -- but reading the vector back to reduce it on the host
+            // would cost more than the merit itself.
+            auto         blas = sfem::blas<real_t>(es);
+            const real_t sum  = blas->dot(ndofs, residual->data(), residual->data());
+            *out += real_t(0.5) * sum;
+            return SFEM_SUCCESS;
+        }
+
+        const real_t *const values = residual->data();
 
         // Node-wise: a node's components are contracted together, after every
         // operator has contributed to it.  That ordering is not a detail --
@@ -651,7 +670,7 @@ namespace sfem {
             real_t          sum   = 0;
             for (ptrdiff_t node = begin; node < end; ++node) {
                 for (int component = 0; component < components; ++component) {
-                    const real_t r = residual[node * components + component];
+                    const real_t r = values[node * components + component];
                     sum += r * r;
                 }
             }

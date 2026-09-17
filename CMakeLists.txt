@@ -174,6 +174,7 @@ if(SFEM_ENABLE_CUDA)
         operators/tet4/cuda
         resampling/surface/cuda
         resampling/quadshell4/cuda
+        ssmg/cuda
         # The generated device tree, laid out the way the hand-written one is:
         # a local `cuda/` folder beside the host sources it mirrors.  These are
         # the folders whose files are included by bare name and so need to be
