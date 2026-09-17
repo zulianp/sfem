@@ -1,6 +1,8 @@
 #include "sfem_Function.hpp"
 
+#include <algorithm>
 #include <stddef.h>
+#include <vector>
 
 #include "utils.h"
 
@@ -596,8 +598,80 @@ namespace sfem {
                 this->execution_space());
     }
 
+    /// Whether any operator's 0-form reduces node-wise, which promotes the whole
+    /// Function to the node-wise merit: an energy and a squared residual norm
+    /// are not terms of one sum, and a norm is not additive over operators.
+    bool Function::reduces_node_wise() const {
+        for (auto &op : impl_->ops) {
+            if (op->value_reduction() == Op::ValueReduction::NODE_WISE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// `1/2 * ||R||^2` over the residual this Function assembles, squared per
+    /// node.  Every operator contributes to `gradient`, so the forcing an
+    /// individual operator does not own -- a Neumann traction is its own Op --
+    /// is included here and cannot be included anywhere else.
+    int Function::node_wise_merit(const real_t *x, real_t *const out, const ElementScope scope) {
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        std::vector<real_t> residual(ndofs, 0);
+        if (gradient(x, residual.data(), scope) != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+
+        // Node-wise: a node's components are contracted together, after every
+        // operator has contributed to it.  That ordering is not a detail --
+        // squaring earlier, inside an element kernel or inside one operator,
+        // squares a partial sum, and element residuals cancel when they are
+        // scattered while their squares do not.
+        //
+        // Deterministic, too.  The packed traversal that assembles the residual
+        // is deterministic by design; a flat `reduction(+ : acc)` over the dofs
+        // would add the same numbers in whatever order the threads happened to
+        // finish and hand that property straight back, which matters here
+        // because a line search compares these values across runs.  Nodes are
+        // grouped into fixed chunks, each chunk is summed by one thread, and the
+        // chunk partials are added in index order -- so the answer does not
+        // depend on the thread count.
+        const int       block_size = impl_->space->block_size();
+        const bool      blocked    = block_size > 0 && (ndofs % block_size) == 0;
+        const ptrdiff_t nnodes     = blocked ? ndofs / block_size : ndofs;
+        const int       components = blocked ? block_size : 1;
+
+        static constexpr ptrdiff_t nodes_per_chunk = 4096;
+        const ptrdiff_t            n_chunks = (nnodes + nodes_per_chunk - 1) / nodes_per_chunk;
+        std::vector<real_t>        partial(n_chunks > 0 ? n_chunks : 1, 0);
+
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t chunk = 0; chunk < n_chunks; ++chunk) {
+            const ptrdiff_t begin = chunk * nodes_per_chunk;
+            const ptrdiff_t end   = std::min(begin + nodes_per_chunk, nnodes);
+            real_t          sum   = 0;
+            for (ptrdiff_t node = begin; node < end; ++node) {
+                for (int component = 0; component < components; ++component) {
+                    const real_t r = residual[node * components + component];
+                    sum += r * r;
+                }
+            }
+            partial[chunk] = sum;
+        }
+
+        real_t acc = 0;
+        for (ptrdiff_t chunk = 0; chunk < n_chunks; ++chunk) {
+            acc += partial[chunk];
+        }
+        *out += real_t(0.5) * acc;
+        return SFEM_SUCCESS;
+    }
+
     int Function::value(const real_t *x, real_t *const out, const ElementScope scope) {
         SFEM_TRACE_SCOPE("Function::value");
+
+        if (reduces_node_wise()) {
+            return node_wise_merit(x, out, scope);
+        }
 
         for (auto &op : impl_->ops) {
             if (op->value(x, out, scope) != SFEM_SUCCESS) {
@@ -617,6 +691,25 @@ namespace sfem {
 
     int Function::value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) {
         SFEM_TRACE_SCOPE("Function::value_steps");
+
+        if (reduces_node_wise()) {
+            // The merit at each step, from the residual assembled there.  The
+            // per-operator `value_steps` are not called at all: each would
+            // norm its own residual, which is not the system's.
+            const ptrdiff_t       ndofs = impl_->space->n_dofs();
+            std::vector<real_t>   stepped(ndofs);
+            for (int step = 0; step < nsteps; ++step) {
+                const real_t alpha = steps[step];
+                for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                    stepped[i] = x[i] + alpha * h[i];
+                }
+                if (node_wise_merit(stepped.data(), &out[step]) != SFEM_SUCCESS) {
+                    return SFEM_FAILURE;
+                }
+            }
+            return SFEM_SUCCESS;
+        }
+
         for (auto &op : impl_->ops) {
             if (op->value_steps(x, h, nsteps, steps, out) != SFEM_SUCCESS) {
                 std::cerr << "Failed value_steps in op: " << op->name() << "\n";
