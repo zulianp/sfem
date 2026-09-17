@@ -318,13 +318,13 @@ extern "C" int cu_navier_stokes_tri6_tri3_residual_a_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_tri6_tri3_residual_affine_mesh_mixed_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_tri6_tri3_residual_affine_mesh_mixed_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_tri6_tri3_residual_affine_mesh_mixed_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_tri6_tri3_residual_affine_mesh_mixed_impl");
     }
     default:
       break;
@@ -502,13 +502,13 @@ extern "C" int cu_navier_stokes_tri6_tri3_residual_i_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const double *const *)u_data, (const double *)p_data, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, out_stride, (double *const *)u_out, (double *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, convection_scale, dt, f0, f1, nu, rho, current_stride, (const float *const *)u_data, (const float *)p_data, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, out_stride, (float *const *)u_out, (float *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl");
     }
     default:
       break;
@@ -671,13 +671,13 @@ extern "C" int cu_navier_stokes_tri6_tri3_jacobian_action_a_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_tri6_tri3_jacobian_action_affine_mesh_mixed_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_tri6_tri3_jacobian_action_affine_mesh_mixed_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_tri6_tri3_jacobian_action_affine_mesh_mixed_impl");
     }
     default:
       break;
@@ -851,13 +851,13 @@ extern "C" int cu_navier_stokes_tri6_tri3_jacobian_action_i_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const double *const *)u_old_data, (const double *)p_old_data, direction_stride, (const double *const *)u_direction_data, (const double *)p_direction_data, out_stride, (double *const *)u_out, (double *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, convection_scale, dt, nu, rho, previous_stride, (const float *const *)u_old_data, (const float *)p_old_data, direction_stride, (const float *const *)u_direction_data, (const float *)p_direction_data, out_stride, (float *const *)u_out, (float *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed_impl");
     }
     default:
       break;

@@ -195,13 +195,13 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_ms
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_msoa_impl");
     }
     default:
       break;
@@ -341,13 +341,13 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_ms
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_i_msoa_impl");
     }
     default:
       break;
@@ -541,13 +541,13 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_acti
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_a_msoa_impl");
     }
     default:
       break;
@@ -696,13 +696,13 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_acti
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_i_msoa_impl");
     }
     default:
       break;
@@ -938,13 +938,13 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_hessian_bsr_i
       const int block_size = 256;
       const int grid_size = (int)((nelements + block_size - 1) / block_size);
       sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_hessian_crs_i_msoa_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, rowptr, colidx, (double *)values);
-      return SFEM_SUCCESS;
+      return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_hessian_crs_i_msoa_impl");
     }
     case (int)sizeof(float): {
       const int block_size = 256;
       const int grid_size = (int)((nelements + block_size - 1) / block_size);
       sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_hessian_crs_i_msoa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, rowptr, colidx, (float *)values);
-      return SFEM_SUCCESS;
+      return sfem::codegen::launch_status("mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_hessian_crs_i_msoa_impl");
     }
     default:
       break;

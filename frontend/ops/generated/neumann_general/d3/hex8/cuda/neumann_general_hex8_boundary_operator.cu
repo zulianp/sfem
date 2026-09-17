@@ -27,6 +27,7 @@ typedef double geom_t;
 
 #include <math.h>
 #include "../../../../cuda/kernel_math.cuh"
+#include "../../../../cuda/kernel_diagnostics.cuh"
 
 namespace sfem {
 namespace codegen {
@@ -296,7 +297,7 @@ extern "C" int cu_neumann_general_hex8_quadshell4_boundary_residual_soa(
   const int grid_size = (int)((nelements + block_size - 1) / block_size);
   sfem::codegen::neumann_general_hex8_quadshell4_boundary_residual_soa_impl<real_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(
       nelements, nnodes, elements, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, out_stride, out0, out1, out2);
-  return SFEM_SUCCESS;
+  return sfem::codegen::launch_status("neumann_general_hex8_quadshell4_boundary_residual_soa_impl");
 }
 
 extern "C" int cu_neumann_general_hex8_quadshell4_boundary_residual_soa_float(
@@ -313,7 +314,7 @@ extern "C" int cu_neumann_general_hex8_quadshell4_boundary_residual_soa_float(
   const int grid_size = (int)((nelements + block_size - 1) / block_size);
   sfem::codegen::neumann_general_hex8_quadshell4_boundary_residual_soa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(
       nelements, nnodes, elements, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, out_stride, out0, out1, out2);
-  return SFEM_SUCCESS;
+  return sfem::codegen::launch_status("neumann_general_hex8_quadshell4_boundary_residual_soa_impl");
 }
 
 extern "C" int cu_neumann_general_hex8_quadshell4_boundary_residual_ss_soa(
@@ -332,7 +333,7 @@ extern "C" int cu_neumann_general_hex8_quadshell4_boundary_residual_ss_soa(
   const int grid_size = (int)((nsides + block_size - 1) / block_size);
   sfem::codegen::neumann_general_hex8_quadshell4_boundary_residual_ss_soa_impl<real_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(
       nsides, nnodes, elements, parent, side_idx, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, out_stride, out0, out1, out2);
-  return SFEM_SUCCESS;
+  return sfem::codegen::launch_status("neumann_general_hex8_quadshell4_boundary_residual_ss_soa_impl");
 }
 
 extern "C" int cu_neumann_general_hex8_quadshell4_boundary_residual_ss_soa_float(
@@ -351,5 +352,5 @@ extern "C" int cu_neumann_general_hex8_quadshell4_boundary_residual_ss_soa_float
   const int grid_size = (int)((nsides + block_size - 1) / block_size);
   sfem::codegen::neumann_general_hex8_quadshell4_boundary_residual_ss_soa_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(
       nsides, nnodes, elements, parent, side_idx, points, t0, t0_001, t0_010, t0_100, t1, t1_001, t1_010, t1_100, t2, t2_001, t2_010, t2_100, out_stride, out0, out1, out2);
-  return SFEM_SUCCESS;
+  return sfem::codegen::launch_status("neumann_general_hex8_quadshell4_boundary_residual_ss_soa_impl");
 }

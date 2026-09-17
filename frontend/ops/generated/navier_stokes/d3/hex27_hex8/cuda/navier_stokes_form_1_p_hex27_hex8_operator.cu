@@ -328,13 +328,13 @@ extern "C" int cu_navier_stokes_form_1_p_hex27_hex8_residual_a_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_mixed_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_mixed_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_mixed_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_form_1_p_hex27_hex8_residual_affine_mesh_mixed_impl");
     }
     default:
       break;
@@ -516,13 +516,13 @@ extern "C" int cu_navier_stokes_form_1_p_hex27_hex8_residual_i_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_mixed_impl<double><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, current_stride, (const double *const *)u_data, (const double *)p_data, out_stride, (double *const *)u_out, (double *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_mixed_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_mixed_impl<float><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, current_stride, (const float *const *)u_data, (const float *)p_data, out_stride, (float *const *)u_out, (float *)p_out);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("navier_stokes_form_1_p_hex27_hex8_residual_isoparametric_mesh_mixed_impl");
     }
     default:
       break;

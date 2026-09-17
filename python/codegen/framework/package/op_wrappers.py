@@ -7245,6 +7245,18 @@ def _element_scalar_reduction(indent):
     space = current_target().execution_space()
     return "\n".join(
         (
+            # The kernels above were launched on this `Op`'s stream and the
+            # reduction below is the library's, and the two are not ordered
+            # against each other.  Without this the reduction reads the
+            # per-element values while the objective kernel is still writing
+            # them: the buffer is valid and initialised, so neither `memcheck`
+            # nor `initcheck` reports anything, and the merit comes back as a
+            # different wrong number every call -- 1e265, then `nan`, then
+            # 1e264 -- while the values themselves are exact once the kernel
+            # has finished.  It is a full device synchronisation because that
+            # is what SFEM exposes; the cost is once per merit evaluation
+            # against a kernel that takes a millisecond.
+            "%ssfem::device_synchronize();" % indent,
             "%sauto element_blas = sfem::blas<real_t>(%s);" % (indent, space),
             "%sfor (int step = 0; step < nsteps; ++step) {" % indent,
             "%s  out[step] += element_blas->dot(nelements," % indent,

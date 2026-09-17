@@ -779,6 +779,7 @@ namespace sfem {
         }
       }
       if (status != SFEM_SUCCESS) return status;
+      sfem::device_synchronize();
       auto element_blas = sfem::blas<real_t>(EXECUTION_SPACE_DEVICE);
       for (int step = 0; step < nsteps; ++step) {
         out[step] += element_blas->dot(nelements,

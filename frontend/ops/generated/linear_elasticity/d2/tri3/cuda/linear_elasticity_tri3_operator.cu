@@ -221,13 +221,13 @@ extern "C" int cu_linear_elasticity_tri3_objective_steps_a_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_tri3_objective_steps_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_tri3_objective_steps_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_tri3_objective_steps_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_tri3_objective_steps_a_msoa_impl");
     }
     default:
       break;
@@ -414,13 +414,13 @@ extern "C" int cu_linear_elasticity_tri3_gradient_a_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_tri3_gradient_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_tri3_gradient_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_tri3_gradient_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_tri3_gradient_a_msoa_impl");
     }
     default:
       break;
@@ -607,13 +607,13 @@ extern "C" int cu_linear_elasticity_tri3_apply_a_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_tri3_apply_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_tri3_apply_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_tri3_apply_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_tri3_apply_a_msoa_impl");
     }
     default:
       break;

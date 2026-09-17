@@ -632,9 +632,21 @@ namespace sfem {
             // below -- a GPU dot product sums in whatever order its blocks
             // retire -- but reading the vector back to reduce it on the host
             // would cost more than the merit itself.
+            // The operators' kernels are still in flight on their own
+            // streams; the reduction below is the library's and is not ordered
+            // against them.  Reading early gives a different wrong number every
+            // call from a buffer whose contents are exact once the kernels have
+            // finished -- and because the memory is valid and initialised,
+            // neither `memcheck` nor `initcheck` says a word.
+            sfem::device_synchronize();
+            // `norm2`, not `dot(r, r)`.  The two are the same arithmetic and
+            // not the same call: passing one pointer as both cuBLAS operands
+            // aliases `x` and `y`, which cuBLAS does not support in general,
+            // and the library is free to return anything.  `norm2` is the
+            // interface's name for this quantity and takes one vector.
             auto         blas = sfem::blas<real_t>(es);
-            const real_t sum  = blas->dot(ndofs, residual->data(), residual->data());
-            *out += real_t(0.5) * sum;
+            const real_t norm = blas->norm2(ndofs, residual->data());
+            *out += real_t(0.5) * norm * norm;
             return SFEM_SUCCESS;
         }
 

@@ -231,13 +231,13 @@ extern "C" int cu_linear_elasticity_proteus_quad4_objective_steps_i_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_proteus_quad4_objective_steps_i_msoa_impl");
     }
     default:
       break;
@@ -434,13 +434,13 @@ extern "C" int cu_linear_elasticity_proteus_quad4_gradient_i_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_quad4_gradient_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_proteus_quad4_gradient_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_quad4_gradient_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_proteus_quad4_gradient_i_msoa_impl");
     }
     default:
       break;
@@ -637,13 +637,13 @@ extern "C" int cu_linear_elasticity_proteus_quad4_apply_i_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_quad4_apply_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_proteus_quad4_apply_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::linear_elasticity_proteus_quad4_apply_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("linear_elasticity_proteus_quad4_apply_i_msoa_impl");
     }
     default:
       break;

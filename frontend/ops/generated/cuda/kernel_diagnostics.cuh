@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <cstdio>
+#include <cuda_runtime.h>
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -40,6 +41,20 @@ static SFEM_CODEGEN_HOST_INLINE int unsupported_dispatch(
       "%s does not support element type %d with real type %d\n",
       name, element_type, real_type);
   return SFEM_FAILURE;
+}
+
+//! Reports a kernel launch that did not start.
+//!
+//! Without this an entry point returns `SFEM_SUCCESS` for a launch it
+//! never checked, and the sticky error surfaces much later, somewhere
+//! unrelated, as a wrong number rather than as a failure.
+static SFEM_CODEGEN_HOST_INLINE int launch_status(const char *const name) {
+  const cudaError_t status = cudaGetLastError();
+  if (status != cudaSuccess) {
+    std::fprintf(stderr, "%s launch failed: %s\n", name, cudaGetErrorString(status));
+    return SFEM_FAILURE;
+  }
+  return SFEM_SUCCESS;
 }
 
 struct KernelDiagnostics {

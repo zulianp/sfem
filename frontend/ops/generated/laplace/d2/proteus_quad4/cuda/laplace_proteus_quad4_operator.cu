@@ -225,13 +225,13 @@ extern "C" int cu_laplace_proteus_quad4_objective_steps_i_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::laplace_proteus_quad4_objective_steps_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("laplace_proteus_quad4_objective_steps_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::laplace_proteus_quad4_objective_steps_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("laplace_proteus_quad4_objective_steps_i_msoa_impl");
     }
     default:
       break;
@@ -422,13 +422,13 @@ extern "C" int cu_laplace_proteus_quad4_gradient_i_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::laplace_proteus_quad4_gradient_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("laplace_proteus_quad4_gradient_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::laplace_proteus_quad4_gradient_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("laplace_proteus_quad4_gradient_i_msoa_impl");
     }
     default:
       break;
@@ -619,13 +619,13 @@ extern "C" int cu_laplace_proteus_quad4_apply_i_msoa(
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("laplace_proteus_quad4_apply_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
         sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
-        return SFEM_SUCCESS;
+        return sfem::codegen::launch_status("laplace_proteus_quad4_apply_i_msoa_impl");
     }
     default:
       break;
