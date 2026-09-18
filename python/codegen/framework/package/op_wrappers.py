@@ -1952,9 +1952,18 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
 
     # A residual whose 0-form is a merit can compute it here: it is half the
     # squared norm of what `gradient` already produces.  One whose 0-form is a
-    # potential needs an element kernel this emitter cannot yet build, so it
-    # keeps the failing stub rather than being handed a different quantity.
+    # potential generally needs an element kernel this emitter cannot yet build,
+    # and keeps the failing stub rather than being handed a different quantity.
+    #
+    # The exception is a potential that is the linear work `g . u` -- a forcing
+    # term, linear in the test function and independent of the field -- which
+    # `gradient` already determines and which needs no kernel at all.  That is
+    # the identity the boundary path has used since the traction got its 0-form;
+    # the measure was never part of it.
     emits_merit = _residual_zero_form_is_assembled_norm(form_collections)
+    emits_linear_work = not emits_merit and _boundary_potential_is_linear_work(
+        form_collections
+    )
 
     defaults = _seed_lines(material.parameter_defaults)
     declarations = []
@@ -2085,7 +2094,17 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             % (
                 _affine_metric_offsets(dim)
                 if residual_affine_uses_metric
-                else "%s, determinant" % _affine_geometry_offsets(dim)
+                # The geometry this kernel declares, not the geometry every
+                # residual has happened to want.  A form that reads no gradient
+                # -- a body force `-rho * g . v` needs the volume measure and
+                # nothing else -- declares `g_det0` alone, and spelling the full
+                # adjugate here hands it nine arguments it does not take.  This
+                # is the `_for` variant the energy builder already uses, and
+                # `_affine_metric_offsets` beside it records what deriving
+                # geometry independently of the kernel cost the first time.
+                else _affine_geometry_offsets_for(
+                    kernel_sources, "%s_residual_a_msoa" % stem, dim
+                )
             )
         )
         common_affine_residual_aos = (
@@ -3128,11 +3147,16 @@ namespace sfem {
         "inexact_cache_field": _inexact_cache_field(material),
         "inexact_needs_affine": _inexact_needs_affine(material),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, performance_cases),
-        # Only the merit uses std::vector, so only the merit brings its header.
-        "merit_include": "\n#include <vector>" if emits_merit else "",
+        # The merit and the linear work both use std::vector, so either brings
+        # the header.
+        "merit_include": (
+            "\n#include <vector>" if emits_merit or emits_linear_work else ""
+        ),
         "merit_methods": (
             _residual_merit_methods(_op_class_name(material))
             if emits_merit
+            else _linear_work_value_method(_op_class_name(material))
+            if emits_linear_work
             else """    int %s::value(const real_t *, real_t *const) {
     SFEM_TRACE_SCOPE("%s::value");
     return SFEM_FAILURE;
@@ -3302,6 +3326,44 @@ namespace sfem {
         ),
     }
     return _header(material, True, node_wise=emits_merit), source
+
+
+def _linear_work_value_method(op_name):
+    """A volume forcing operator's 0-form, by the same identity as a traction's.
+
+    `_boundary_value_method` derives this for `ds`; the measure never entered
+    the reasoning.  A residual linear in the test function and independent of
+    the field -- a body force `-rho * g . v` -- has the potential `-rho * g . u`,
+    and `gradient` already assembles `g` per node, so the value is `g . u` and
+    needs no kernel of its own.
+
+    Without it the volume template answered `SFEM_FAILURE` for every 0-form that
+    is a potential rather than a merit, so a body force could be added to a
+    `Function` and then refuse to contribute to its energy -- the same hole the
+    Neumann operator had before it was given this identity.
+
+    Only `value`, because the volume header declares only `value`; the stepped
+    form is the boundary path's and stays there until a volume forcing needs it.
+    """
+    return """
+  int %(op)s::value(const real_t *x, real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::value");
+    // `-rho * g . u`, from the load vector this operator's own gradient
+    // assembles.  Linear in the state, so the identity is exact.
+    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    std::vector<real_t> work(ndofs, 0);
+    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    real_t acc = 0;
+#pragma omp parallel for reduction(+ : acc)
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+      acc += work[i] * x[i];
+    }
+    *out += acc;
+    return SFEM_SUCCESS;
+  }
+""" % {"op": op_name}
 
 
 def _boundary_value_method(op_name, linear_work):
@@ -9727,13 +9789,30 @@ def _affine_dispatch_uses_metric(kernel_sources, name):
 
 
 def _affine_geometry_call_args(kernel_sources, name, dim):
-    """The geometry arguments an affine entry point takes, in ABI order."""
+    """The geometry arguments an affine entry point takes, in ABI order.
+
+    The *kind* comes from the kernel and the *count* from the dimension.  Which
+    geometry a form wants is decided in `plans.form_transformations` and is
+    visible in the signature, so it is read there; how many components that
+    geometry has is the dimension's answer, and `_affine_metric_offsets` records
+    why it is not recovered from the text a second time.
+
+    Three kinds, not two.  A form that contracts through the symmetric gradient
+    metric declares `g_met*` and no determinant, because the metric carries it.
+    One that reads a gradient declares the adjugate and the determinant.  One
+    that reads neither -- a body force `-rho * g . v` wants the volume measure
+    and nothing else -- declares `g_det0` alone, and handing it the adjugate is
+    nine arguments it does not take.
+    """
     if _affine_dispatch_uses_metric(kernel_sources, name):
         # The metric carries the determinant, so there is none to pass.
         return tuple(
             "geom_metric[%d]" % index
             for index in range(symmetric_metric_component_count(dim))
         )
+    declaration = _affine_dispatch_parameters(kernel_sources, name)
+    if declaration is not None and "g_adj" not in declaration and "g_det" in declaration:
+        return ("determinant",)
     return tuple(
         ["adjugate[%d]" % index for index in range(dim * dim)] + ["determinant"]
     )
@@ -9757,10 +9836,14 @@ def _affine_metric_offsets(dim):
 
 
 def _affine_dispatch_geometry_args(kernel_sources, function_name, dim):
-    """The geometry arguments one affine entry point takes, as a list."""
-    if _c_abi_function_uses_cached_metric(kernel_sources, function_name):
-        return _affine_metric_offsets(dim).split(", ")
-    return [*_affine_geometry_offsets(dim).split(", "), "determinant"]
+    """The geometry arguments one affine entry point takes, as a list.
+
+    The same question `_affine_geometry_call_args` answers, so the same answer:
+    two functions deciding independently how much geometry a kernel wants is how
+    the caller above this one came to hand ten arguments to a kernel taking
+    three.
+    """
+    return list(_affine_geometry_call_args(kernel_sources, function_name, dim))
 
 
 def _c_abi_function_uses_cached_metric(kernel_sources, function_name):

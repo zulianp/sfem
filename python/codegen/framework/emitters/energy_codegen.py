@@ -9324,7 +9324,15 @@ def _sfem_soa_diagnostics_header(
         # this header is read by the device `Op` wrapper too -- which is host
         # C++ compiled by the host compiler, where nvcc's implicit prelude does
         # not apply.  The target names its own runtime header.
-        *(current_target().includes() if current_target().supports_device_kernels else ()),
+        #
+        # Guarded, because `CMakeLists.txt` globs every generated `.cpp` into
+        # the build whether or not CUDA is enabled, so these wrappers are also
+        # compiled where no CUDA include path exists.  Nothing in a `.cpp` calls
+        # `launch_status` -- only the `.cu` entry points do, and those are built
+        # only when CUDA is on -- so the declaration can simply be absent there.
+        # This is the `__has_include` idiom the generated sources already use
+        # for the optional SFEM headers.
+        *_optional_device_runtime_include(),
         "",
     ]
     if define_sfem_inline:
@@ -9737,6 +9745,30 @@ def _sfem_soa_diagnostics_lines(
     return lines
 
 
+def _optional_device_runtime_include():
+    """The target's runtime header, where the compiler can find it.
+
+    See the call site: the generated device wrappers are `.cpp` and are compiled
+    even in a build without CUDA.
+    """
+    if not current_target().supports_device_kernels:
+        return ()
+    lines = []
+    for include in current_target().includes():
+        header = include.split()[-1].strip("<>\"")
+        lines.extend(
+            [
+                "#if defined(__has_include)",
+                "#if __has_include(<%s>)" % header,
+                include,
+                "#define SFEM_CODEGEN_HAS_DEVICE_RUNTIME",
+                "#endif",
+                "#endif",
+            ]
+        )
+    return tuple(lines)
+
+
 def _launch_status_lines(host_inline):
     """Whether the launch that just happened actually started, on targets that launch.
 
@@ -9755,6 +9787,7 @@ def _launch_status_lines(host_inline):
     if not current_target().supports_device_kernels:
         return ()
     return (
+        "#ifdef SFEM_CODEGEN_HAS_DEVICE_RUNTIME",
         "//! Reports a kernel launch that did not start.",
         "//!",
         "//! Without this an entry point returns `SFEM_SUCCESS` for a launch it",
@@ -9768,6 +9801,7 @@ def _launch_status_lines(host_inline):
         "  }",
         "  return SFEM_SUCCESS;",
         "}",
+        "#endif",
         "",
     )
 

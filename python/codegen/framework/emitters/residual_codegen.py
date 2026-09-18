@@ -110,6 +110,7 @@ from codegen.framework.plans.generation import (
 from codegen.framework.plans.generation import LocalPhase, MeshPhase
 from codegen.framework.plans.residual_structure import (
     publishes_scalar_jacobian_action,
+    published_jacobian_blocks,
     jacobian_block_plan,
     residual_local_phase_plans,
     residual_mesh_phase_plans,
@@ -1915,7 +1916,14 @@ def generate_coupled_residual_sfem_files(
     ]
     expected_diagnostics.extend(
         "%s_%s" % (element_prefix, jacobian_block_plan(block).name)
-        for block in system.jacobian_blocks()
+        for block in published_jacobian_blocks(
+            system,
+            residual_codegen_dependencies(
+                system,
+                action_coeffs,
+                system.jacobian_action_dependencies(),
+            ),
+        )
     )
     expected_diagnostics.append("%s_jacobian_action_esoa" % element_prefix)
     validate_diagnostics_plan_names(diagnostics_plan, expected_diagnostics)
@@ -5431,9 +5439,8 @@ def _operator_source(
         "",
     ]
     lines.extend(_affine_geometry_stream_helper_lines())
-    if emit_diagnostics:
-        lines.extend(_residual_diagnostics_lines(system, prefix, specialization))
-        lines.append("")
+    # Built before the diagnostics rather than after, because the diagnostics
+    # describe the kernels below and have to be told which of them exist.
     form_dependencies = {
         "residual": residual_codegen_dependencies(
             system,
@@ -5446,6 +5453,13 @@ def _operator_source(
             system.jacobian_action_dependencies(),
         ),
     }
+    if emit_diagnostics:
+        lines.extend(
+            _residual_diagnostics_lines(
+                system, prefix, specialization, form_dependencies["jacobian_action"]
+            )
+        )
+        lines.append("")
     # Which forms publish a kernel is the plan's answer, and the loop walks
     # what it returns: a form that contracts nothing has no element entry
     # point, rather than one wrapping an empty loop nest.
@@ -6293,7 +6307,7 @@ def _mixed_triplet_group_names_from_prefix(prefix, layout):
     return (), ()
 
 
-def _residual_diagnostics_lines(system, prefix, specialization):
+def _residual_diagnostics_lines(system, prefix, specialization, action_dependencies):
     rule = specialization.quadrature_rule
     diagnostics = [
         (
@@ -6303,7 +6317,11 @@ def _residual_diagnostics_lines(system, prefix, specialization):
             "residual",
         )
     ]
-    block_expressions = system.jacobian_blocks()
+    # The blocks that publish a kernel, which is the same list
+    # `generate_coupled_residual_sfem_files` asks the plan to carry.  Advertising
+    # a `KernelDiagnostics` record for a block that was never emitted describes a
+    # kernel nothing can call.
+    block_expressions = published_jacobian_blocks(system, action_dependencies)
     for block in block_expressions:
         # What a block is called is the plan's decision, not this function's.
         block_plan = jacobian_block_plan(block)

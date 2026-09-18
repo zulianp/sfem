@@ -130,6 +130,8 @@ list(APPEND SFEM_MODULES
     frontend/constraints
     frontend/ops
     frontend/ops/generated
+    frontend/ops/generated/body_force
+    frontend/ops/generated/body_force/op
     frontend/ops/generated/laplace
     frontend/ops/generated/laplace/op
     frontend/ops/generated/linear_elasticity
@@ -181,6 +183,7 @@ if(SFEM_ENABLE_CUDA)
         # on the include path; the kernels below them include by relative path
         # and are swept up by the recursive glob further down.
         frontend/ops/generated/cuda
+        frontend/ops/generated/body_force/op/cuda
         frontend/ops/generated/laplace/op/cuda
         frontend/ops/generated/linear_elasticity/op/cuda
         frontend/ops/generated/neohookean_ogden/op/cuda
@@ -216,6 +219,17 @@ file(GLOB_RECURSE SFEM_GENERATED_SOURCES CONFIGURE_DEPENDS
      "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cpp")
 file(GLOB_RECURSE SFEM_GENERATED_HEADERS CONFIGURE_DEPENDS
      "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.hpp")
+
+# The device tree's wrappers are `.cpp` -- host C++ that launches device kernels
+# -- so this glob sweeps them up whether or not CUDA is enabled.  They cannot do
+# anything in a build without it: they allocate device buffers, stage to the
+# device and dispatch to `cu_` entry points that live in the `.cu` files the
+# glob below only collects when CUDA is on.  Compiling them anyway meant a
+# host-only build depended on the device runtime being on the include path.
+if(NOT SFEM_ENABLE_CUDA)
+    list(FILTER SFEM_GENERATED_SOURCES EXCLUDE REGEX "/generated/.*/cuda/")
+    list(FILTER SFEM_GENERATED_HEADERS EXCLUDE REGEX "/generated/.*/cuda/")
+endif()
 list(APPEND SFEM_SOURCES ${SFEM_GENERATED_SOURCES})
 list(APPEND SFEM_HEADERS ${SFEM_GENERATED_HEADERS})
 
