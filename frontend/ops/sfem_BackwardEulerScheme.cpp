@@ -71,6 +71,21 @@ namespace sfem {
         impl_->blas->copy(impl_->space->n_dofs(), x, impl_->u_n->data());
     }
 
+    void BackwardEulerScheme::reconstruct(const real_t *const x,
+                                          real_t *const       velocity,
+                                          real_t *const       acceleration) const {
+        if (acceleration) {
+            SFEM_ERROR(
+                    "BackwardEulerScheme is first order and defines no acceleration; "
+                    "ask has_acceleration() before requesting one\n");
+        }
+
+        // The same `shift * x + z` the material's kernels read, so an exported
+        // velocity cannot disagree with the derivative being solved for.
+        impl_->blas->zaxpby(
+                impl_->space->n_dofs(), impl_->shift, x, 1, impl_->z->data(), velocity);
+    }
+
     std::shared_ptr<Buffer<real_t>> BackwardEulerScheme::state() const { return impl_->u_n; }
 
 }  // namespace sfem

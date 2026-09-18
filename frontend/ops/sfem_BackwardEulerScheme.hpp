@@ -40,6 +40,14 @@ namespace sfem {
         void          begin_step(real_t t, real_t dt) override;
         void          advance(const real_t *const x) override;
 
+        /// The velocity `u_dot = (u - u_n)/dt`, which is `shift * x + z` like
+        /// every other scheme's.  There is no acceleration: a first-order
+        /// method defines none, so `acceleration` must be null and
+        /// `has_acceleration` stays false.
+        void reconstruct(const real_t *const x,
+                         real_t *const       velocity,
+                         real_t *const       acceleration) const override;
+
         /// The state carried between steps.  Writable, because the initial
         /// condition is the caller's to set.
         std::shared_ptr<Buffer<real_t>> state() const;

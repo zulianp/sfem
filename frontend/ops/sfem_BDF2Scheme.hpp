@@ -62,7 +62,13 @@ namespace sfem {
         /// The velocity and acceleration the method implies at an arbitrary
         /// state, without advancing the step.  See `NewmarkScheme::reconstruct`
         /// for why this is separate from `advance`.
-        void reconstruct(const real_t *const x, real_t *const velocity, real_t *const acceleration) const;
+        void reconstruct(const real_t *const x,
+                         real_t *const       velocity,
+                         real_t *const       acceleration) const override;
+
+        /// Both halves of the method are reported, so the exported
+        /// acceleration is the one `inertia_op` assembles.
+        bool has_acceleration() const override { return true; }
 
         /// The state the method carries between steps.  Writable, because the
         /// initial condition is the caller's to set.
