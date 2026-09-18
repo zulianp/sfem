@@ -5151,20 +5151,17 @@ def _coupled_case(element, block_size, setup_lines, body):
 
 
 def _has_time_rate(material):
-    """Whether this material's form carries a time derivative."""
-    return time_rate_shift_index(material.parameter_defaults) is not None
+    """Whether this material's form carries a time derivative.
 
-
-def time_rate_shift_index(defaults):
-    """Which material constant a `TimeScheme` supplies, or `None`.
-
-    `symbolic.fields.is_time_rate_shift` owns the question; this only finds the
-    slot, because the kernels take their constants positionally.
+    A material may have several -- poroelasticity takes a rate of the
+    displacement and of the pressure, so it declares `u_dt_shift` and
+    `p_dt_shift` -- and every one of them is supplied by the same scheme, which
+    is what makes them one time discretisation rather than two.  So the question
+    the wrapper asks is whether there is any, not which one: a per-field shift
+    would be a different scheme per field, and nothing expresses that.
+    `symbolic.fields.is_time_rate_shift` owns which names count.
     """
-    for index, (name, _default) in enumerate(defaults):
-        if is_time_rate_shift(name):
-            return index
-    return None
+    return any(is_time_rate_shift(name) for name, _default in material.parameter_defaults)
 
 
 #: Where a material constant comes from.  Most are per-block parameters a caller
