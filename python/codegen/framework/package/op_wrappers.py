@@ -70,6 +70,32 @@ def generate_op_files(material, elements, kernel_sources=None):
     elif equations[0].name:
         raise ValueError("single-equation generated Op wrappers require an unnamed equation")
     elif equations[0].is_energy:
+        # An energy system and a residual system take their merit from
+        # different places, and a scheme's separable term has to arrive by the
+        # matching route.  A residual system reduces node-wise, so
+        # `Function::value` is `0.5*||gradient||^2` and the term is already in
+        # it through the gradient the coupled wrapper forwards -- adding a
+        # potential there would be adding a potential to a norm.  An energy
+        # system reduces element-wise, so `Function::value` sums potentials and
+        # the term has to contribute *its* potential, through `value_steps`,
+        # which is what a line search evaluates at each trial step.
+        #
+        # The coupled wrapper forwards gradient, apply and hessian_bsr but no
+        # potential, because it is always node-wise and has none to forward.
+        # This wrapper would need that forwarding and does not have it yet, so
+        # the case is refused here rather than generated half-applied: the
+        # residual would carry the scheme and the energy would not, and a line
+        # search would minimise a merit that is not the residual's.
+        if _has_time_rate(material):
+            raise ValueError(
+                "%s is an energy system carrying a time rate, which is not "
+                "supported yet: the scheme's separable term contributes a "
+                "potential that this wrapper does not add to `value_steps`, so "
+                "the energy merit would be missing what the residual has. "
+                "Model it as a coupled energy/residual system, which takes the "
+                "node-wise merit and forwards the term through the gradient."
+                % material.name
+            )
         form_collections = _single_equation_form_collections(systems_by_dim, equations[0])
         header, source = _hyperelastic_op(
             material, elements, c_abi_header, form_collections, abi_sources
