@@ -551,6 +551,99 @@ int test_the_schemes_have_the_order_they_claim() {
     return SFEM_TEST_SUCCESS;
 }
 
+/// Whatever a driver exports has to be what the scheme is solving with.
+///
+/// This is the property `hyperelasticity_bdf2` broke: it wrote
+/// `(v - v_n)/dt` as "acceleration" while the inertia in its own residual used
+/// `9/(4 dt^2) * (u - u_hat)`.  Nothing fed the field back, so the trajectory
+/// was right and the output was a different quantity from the one being solved.
+///
+/// Both halves are checked against the thing itself rather than against a
+/// restatement of the method:
+///
+///   - the velocity must equal `shift * x + history`, which is what the
+///     material's kernels read, element for element;
+///   - the acceleration must be the one `inertia_op` assembles.  That is
+///     checked by assembling it: the inertia's gradient is `M * a`, and its
+///     Hessian action on `a / alpha` is `alpha * M * (a / alpha)`, the same
+///     vector.  If the reported acceleration were a different discretisation
+///     the two would part company.
+///
+/// Run over every scheme, so a scheme added later is covered by construction.
+int test_the_diagnostic_matches_the_scheme() {
+    auto         fixture = make_fixture();
+    const real_t dt      = real_t(0.05);
+
+    std::vector<std::shared_ptr<sfem::TimeScheme>> schemes;
+    {
+        auto newmark = std::make_shared<sfem::NewmarkScheme>(fixture.space);
+        newmark->set_density(real_t(2));
+        SFEM_TEST_ASSERT(newmark->initialize() == SFEM_SUCCESS);
+        seed_state(fixture.ndofs, 0, newmark->state()->data());
+        seed_state(fixture.ndofs, 1, newmark->velocity()->data());
+        seed_state(fixture.ndofs, 2, newmark->acceleration()->data());
+        schemes.push_back(newmark);
+
+        auto bdf2 = std::make_shared<sfem::BDF2Scheme>(fixture.space);
+        bdf2->set_density(real_t(2));
+        SFEM_TEST_ASSERT(bdf2->initialize() == SFEM_SUCCESS);
+        seed_state(fixture.ndofs, 0, bdf2->state()->data());
+        seed_state(fixture.ndofs, 1, bdf2->velocity()->data());
+        schemes.push_back(bdf2);
+
+        auto be = std::make_shared<sfem::BackwardEulerScheme>(fixture.space);
+        SFEM_TEST_ASSERT(be->initialize() == SFEM_SUCCESS);
+        seed_state(fixture.ndofs, 0, be->state()->data());
+        schemes.push_back(be);
+    }
+
+    auto x = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    seed_state(fixture.ndofs, 5, x->data());
+
+    for (const auto &scheme : schemes) {
+        scheme->begin_step(dt, dt);
+
+        auto v = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        auto a = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        scheme->reconstruct(x->data(), v->data(), scheme->has_acceleration() ? a->data() : nullptr);
+
+        // The velocity is the derivative the kernels read.
+        const real_t shift = scheme->shift();
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+            const real_t want = shift * x->data()[i] + scheme->history()[i];
+            SFEM_TEST_ASSERT(std::abs(v->data()[i] - want) <= 1e-14 * (1 + std::abs(want)));
+        }
+
+        // A scheme with no second derivative must say so rather than invent one.
+        SFEM_TEST_ASSERT(scheme->has_acceleration() == (scheme->inertia_op() != nullptr));
+        if (!scheme->has_acceleration()) continue;
+
+        // The acceleration is the one the inertia assembles.
+        auto inertia = scheme->inertia_op();
+        auto from_gradient = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        SFEM_TEST_ASSERT(inertia->gradient(x->data(), from_gradient->data()) == SFEM_SUCCESS);
+
+        const real_t alpha = scheme->weight("alpha_a");
+        SFEM_TEST_ASSERT(alpha != real_t(0));
+        auto scaled = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+            scaled->data()[i] = a->data()[i] / alpha;
+        }
+
+        auto from_apply = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        SFEM_TEST_ASSERT(inertia->apply(nullptr, scaled->data(), from_apply->data()) == SFEM_SUCCESS);
+
+        real_t scale = 0;
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) scale = std::max(scale, std::abs(from_gradient->data()[i]));
+        SFEM_TEST_ASSERT(scale > 0);
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+            SFEM_TEST_ASSERT(std::abs(from_gradient->data()[i] - from_apply->data()[i]) <= 1e-12 * scale);
+        }
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_the_material_reads_the_scheme_it_was_handed);
@@ -560,6 +653,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_a_first_order_scheme_runs_the_same_material);
     SFEM_RUN_TEST(test_bdf2_matches_the_hand_written_algebra);
     SFEM_RUN_TEST(test_the_schemes_have_the_order_they_claim);
+    SFEM_RUN_TEST(test_the_diagnostic_matches_the_scheme);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

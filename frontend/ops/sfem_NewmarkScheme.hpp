@@ -66,7 +66,13 @@ namespace sfem {
         /// at every Newton iterate, not once per step.  That is the same
         /// arithmetic `advance` ends with, which is why `advance` is this
         /// followed by a rotation rather than a second copy of it.
-        void reconstruct(const real_t *const x, real_t *const velocity, real_t *const acceleration) const;
+        void reconstruct(const real_t *const x,
+                         real_t *const       velocity,
+                         real_t *const       acceleration) const override;
+
+        /// Both halves of the method are reported, so the exported
+        /// acceleration is the one `inertia_op` assembles.
+        bool has_acceleration() const override { return true; }
 
         /// The state the method carries between steps.  Writable, because the
         /// initial condition is the caller's to set.

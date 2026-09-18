@@ -74,6 +74,35 @@ namespace sfem {
         /// states the method carries, then rotate them.
         virtual void advance(const real_t *const x) = 0;
 
+        /// The derived states this method implies at an arbitrary `x`, without
+        /// advancing the step.
+        ///
+        /// This is how a caller gets a velocity or an acceleration to export,
+        /// and it is on this interface rather than on the concrete schemes so
+        /// that the diagnostic follows whichever scheme was selected.  A driver
+        /// that spells the reconstruction itself is writing a second copy of
+        /// the method, and the two drift: `hyperelasticity_bdf2` exported
+        /// `(v - v_n)/dt` while the inertia in its own residual used the BDF2
+        /// acceleration `9/(4 dt^2) * (u - u_hat)`, so the field labelled
+        /// "acceleration" disagreed with the operator by O(dt) -- 8 percent by
+        /// the eighth step of a cantilever.  Nothing fed it back, so no
+        /// trajectory was wrong, but anyone reading the output was reading a
+        /// different quantity from the one being solved.
+        ///
+        /// `velocity` is required and is exactly `shift * x + history`, the
+        /// derivative the material's kernels read.  `acceleration` may be null,
+        /// and must be null for a scheme whose method defines none: a
+        /// first-order method has no second derivative to report, and
+        /// `has_acceleration` says which is which.
+        virtual void reconstruct(const real_t *const x,
+                                 real_t *const       velocity,
+                                 real_t *const       acceleration) const = 0;
+
+        /// Whether `reconstruct` can fill an acceleration.  True exactly when
+        /// the method carries a separable second-derivative term, which is the
+        /// same condition as `inertia_op` being non-null.
+        virtual bool has_acceleration() const { return false; }
+
         /// The separable term this method contributes to the residual, if it
         /// has one.  Called by the operator holding the scheme, not by the
         /// caller.
