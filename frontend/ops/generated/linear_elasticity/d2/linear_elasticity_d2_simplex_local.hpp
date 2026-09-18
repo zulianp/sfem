@@ -45,6 +45,10 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_objective_block(
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
@@ -52,34 +56,48 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_objective_block(
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
       s_t gu_ref0_values[VS];
+      s_t grad_h_ref0_values[VS];
       s_t gu_ref1_values[VS];
+      s_t grad_h_ref1_values[VS];
       s_t gu_ref2_values[VS];
+      s_t grad_h_ref2_values[VS];
       s_t gu_ref3_values[VS];
+      s_t grad_h_ref3_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         gu_ref0_values[lane] = s_t(0);
+        grad_h_ref0_values[lane] = s_t(0);
         gu_ref1_values[lane] = s_t(0);
+        grad_h_ref1_values[lane] = s_t(0);
         gu_ref2_values[lane] = s_t(0);
+        grad_h_ref2_values[lane] = s_t(0);
         gu_ref3_values[lane] = s_t(0);
+        grad_h_ref3_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref0_values[lane] += u_streams[2 * shape][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref0_values[lane] += h_streams[2 * shape][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref1_values[lane] += u_streams[2 * shape][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref1_values[lane] += h_streams[2 * shape][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref2_values[lane] += u_streams[2 * shape + 1][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref2_values[lane] += h_streams[2 * shape + 1][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref3_values[lane] += u_streams[2 * shape + 1][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref3_values[lane] += h_streams[2 * shape + 1][lane] * grad_ref_y[q * NS + shape];
         }
       }
+      s_t gu_base_v[4 * VS];
+      s_t trial_grad_v[4 * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
       const ptrdiff_t goff = q * geometry_stride + lane;
@@ -89,15 +107,35 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_objective_block(
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
       const s_t gu_ref0 = gu_ref0_values[lane];
+      const s_t grad_h_ref0 = grad_h_ref0_values[lane];
       const s_t gu_ref1 = gu_ref1_values[lane];
+      const s_t grad_h_ref1 = grad_h_ref1_values[lane];
       const s_t gu_ref2 = gu_ref2_values[lane];
+      const s_t grad_h_ref2 = grad_h_ref2_values[lane];
       const s_t gu_ref3 = gu_ref3_values[lane];
+      const s_t grad_h_ref3 = grad_h_ref3_values[lane];
     const s_t idet = s_t(1) / det_lane0;
-    const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
-    const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
-    const s_t gu2 = (gu_ref2 * adj_lane0 + gu_ref3 * adj_lane2) * idet;
-    const s_t gu3 = (gu_ref2 * adj_lane1 + gu_ref3 * adj_lane3) * idet;
-    value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu0 + gu3) + mu*(pow_2(gu0) + pow_2(gu3) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu1 + ((s_t(1) / s_t(2)))*gu2)));
+    gu_base_v[0 * VS + lane] = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
+    trial_grad_v[0 * VS + lane] = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane2) * idet;
+    gu_base_v[1 * VS + lane] = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
+    trial_grad_v[1 * VS + lane] = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane3) * idet;
+    gu_base_v[2 * VS + lane] = (gu_ref2 * adj_lane0 + gu_ref3 * adj_lane2) * idet;
+    trial_grad_v[2 * VS + lane] = (grad_h_ref2 * adj_lane0 + grad_h_ref3 * adj_lane2) * idet;
+    gu_base_v[3 * VS + lane] = (gu_ref2 * adj_lane1 + gu_ref3 * adj_lane3) * idet;
+    trial_grad_v[3 * VS + lane] = (grad_h_ref2 * adj_lane1 + grad_h_ref3 * adj_lane3) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const ptrdiff_t goff = q * geometry_stride + lane;
+          const s_t det_lane0 = det0[goff];
+          const s_t gu0 = gu_base_v[0 * VS + lane] + alpha * trial_grad_v[0 * VS + lane];
+          const s_t gu1 = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
+          const s_t gu2 = gu_base_v[2 * VS + lane] + alpha * trial_grad_v[2 * VS + lane];
+          const s_t gu3 = gu_base_v[3 * VS + lane] + alpha * trial_grad_v[3 * VS + lane];
+    value[step * value_stride + lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu0 + gu3) + mu*(pow_2(gu0) + pow_2(gu3) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu1 + ((s_t(1) / s_t(2)))*gu2)));
+        }
       }
     }
 }
@@ -115,12 +153,18 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_tri3_objective_block(
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     { const int q = 0;  // constant-P1 simplex
       const s_t qw = q_weight[q];
+      s_t gu_base_v[4 * VS];
+      s_t trial_grad_v[4 * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
       const ptrdiff_t goff = q * geometry_stride + lane;
@@ -130,15 +174,35 @@ static SFEM_INLINE void linear_elasticity_d2_simplex_tri3_objective_block(
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
       const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[2][lane];
+      const s_t grad_h_ref0 = -(h_streams[0][lane]) + h_streams[2][lane];
       const s_t gu_ref1 = -(u_streams[0][lane]) + u_streams[4][lane];
+      const s_t grad_h_ref1 = -(h_streams[0][lane]) + h_streams[4][lane];
       const s_t gu_ref2 = -(u_streams[1][lane]) + u_streams[3][lane];
+      const s_t grad_h_ref2 = -(h_streams[1][lane]) + h_streams[3][lane];
       const s_t gu_ref3 = -(u_streams[1][lane]) + u_streams[5][lane];
+      const s_t grad_h_ref3 = -(h_streams[1][lane]) + h_streams[5][lane];
       const s_t idet = s_t(1) / det_lane0;
-      const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
-      const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
-      const s_t gu2 = (gu_ref2 * adj_lane0 + gu_ref3 * adj_lane2) * idet;
-      const s_t gu3 = (gu_ref2 * adj_lane1 + gu_ref3 * adj_lane3) * idet;
-    value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu0 + gu3) + mu*(pow_2(gu0) + pow_2(gu3) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu1 + ((s_t(1) / s_t(2)))*gu2)));
+      gu_base_v[0 * VS + lane] = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
+      trial_grad_v[0 * VS + lane] = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane2) * idet;
+      gu_base_v[1 * VS + lane] = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
+      trial_grad_v[1 * VS + lane] = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane3) * idet;
+      gu_base_v[2 * VS + lane] = (gu_ref2 * adj_lane0 + gu_ref3 * adj_lane2) * idet;
+      trial_grad_v[2 * VS + lane] = (grad_h_ref2 * adj_lane0 + grad_h_ref3 * adj_lane2) * idet;
+      gu_base_v[3 * VS + lane] = (gu_ref2 * adj_lane1 + gu_ref3 * adj_lane3) * idet;
+      trial_grad_v[3 * VS + lane] = (grad_h_ref2 * adj_lane1 + grad_h_ref3 * adj_lane3) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const ptrdiff_t goff = q * geometry_stride + lane;
+          const s_t det_lane0 = det0[goff];
+          const s_t gu0 = gu_base_v[0 * VS + lane] + alpha * trial_grad_v[0 * VS + lane];
+          const s_t gu1 = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
+          const s_t gu2 = gu_base_v[2 * VS + lane] + alpha * trial_grad_v[2 * VS + lane];
+          const s_t gu3 = gu_base_v[3 * VS + lane] + alpha * trial_grad_v[3 * VS + lane];
+    value[step * value_stride + lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu0 + gu3) + mu*(pow_2(gu0) + pow_2(gu3) + s_t(2)*pow_2(((s_t(1) / s_t(2)))*gu1 + ((s_t(1) / s_t(2)))*gu2)));
+        }
       }
     }
 }

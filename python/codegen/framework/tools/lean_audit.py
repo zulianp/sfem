@@ -154,7 +154,20 @@ def unused_parameters(source):
                     break
             index += 1
         body = source[open_brace : index + 1]
-        for parameter in match.group("params").split(","):
+        # A constructor's member-initialiser list is part of its definition, and
+        # the parameter pattern above swallows it: `Impl(const T &space) :
+        # space(space) {}` parses as one parameter with an empty body, so the
+        # `space` the initialiser reads looks unread.  That is not what
+        # `-Wextra -Werror` sees -- the compiler counts the initialiser as a use
+        # -- and this audit exists to say what the compiler would.  Every
+        # generated `Op` has one such constructor, which is why every material
+        # contributed one entry per target to the count.
+        parameters = match.group("params")
+        separator = parameters.find(") :")
+        if separator >= 0:
+            body = parameters[separator:] + body
+            parameters = parameters[:separator]
+        for parameter in parameters.split(","):
             parameter = parameter.strip()
             if "=" in parameter or len(parameter.split()) < 2:
                 continue

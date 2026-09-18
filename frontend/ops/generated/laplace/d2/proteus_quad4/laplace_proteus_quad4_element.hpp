@@ -36,6 +36,7 @@ static SFEM_INLINE int laplace_proteus_quad4_energy_egeometry_soa(
     for (int lane = 0; lane < ne; ++lane) {
       bvalue[lane] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
     s_t badj2[NQ * VS];
@@ -61,7 +62,7 @@ static SFEM_INLINE int laplace_proteus_quad4_energy_egeometry_soa(
         bdet0_q[lane] = det_q[lane];
       }
     }
-    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bvalue);
+    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -91,6 +92,7 @@ static SFEM_INLINE int laplace_proteus_quad4_energy_ecoords_soa(
     for (int lane = 0; lane < ne; ++lane) {
       bvalue[lane] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       #pragma omp simd
@@ -108,7 +110,7 @@ static SFEM_INLINE int laplace_proteus_quad4_energy_ecoords_soa(
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bvalue);
+    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -138,6 +140,7 @@ static SFEM_INLINE int laplace_proteus_quad4_energy_esoa(
     for (int lane = 0; lane < ne; ++lane) {
       bvalue[lane] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       #pragma omp simd
@@ -155,7 +158,7 @@ static SFEM_INLINE int laplace_proteus_quad4_energy_esoa(
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bvalue);
+    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }

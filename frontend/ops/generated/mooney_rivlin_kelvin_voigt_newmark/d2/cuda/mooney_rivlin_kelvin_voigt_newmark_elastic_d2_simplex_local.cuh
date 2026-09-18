@@ -41,6 +41,10 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newma
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
@@ -48,29 +52,43 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newma
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
       s_t gu_ref0_values[VS];
+      s_t grad_h_ref0_values[VS];
       s_t gu_ref1_values[VS];
+      s_t grad_h_ref1_values[VS];
       s_t gu_ref2_values[VS];
+      s_t grad_h_ref2_values[VS];
       s_t gu_ref3_values[VS];
+      s_t grad_h_ref3_values[VS];
       {
         gu_ref0_values[0] = s_t(0);
+        grad_h_ref0_values[0] = s_t(0);
         gu_ref1_values[0] = s_t(0);
+        grad_h_ref1_values[0] = s_t(0);
         gu_ref2_values[0] = s_t(0);
+        grad_h_ref2_values[0] = s_t(0);
         gu_ref3_values[0] = s_t(0);
+        grad_h_ref3_values[0] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         {
           gu_ref0_values[0] += u_streams[2 * shape][0] * grad_ref_x[q * NS + shape];
+          grad_h_ref0_values[0] += h_streams[2 * shape][0] * grad_ref_x[q * NS + shape];
         }
         {
           gu_ref1_values[0] += u_streams[2 * shape][0] * grad_ref_y[q * NS + shape];
+          grad_h_ref1_values[0] += h_streams[2 * shape][0] * grad_ref_y[q * NS + shape];
         }
         {
           gu_ref2_values[0] += u_streams[2 * shape + 1][0] * grad_ref_x[q * NS + shape];
+          grad_h_ref2_values[0] += h_streams[2 * shape + 1][0] * grad_ref_x[q * NS + shape];
         }
         {
           gu_ref3_values[0] += u_streams[2 * shape + 1][0] * grad_ref_y[q * NS + shape];
+          grad_h_ref3_values[0] += h_streams[2 * shape + 1][0] * grad_ref_y[q * NS + shape];
         }
       }
+      s_t gu_base_v[4 * VS];
+      s_t trial_grad_v[4 * VS];
       {
       const ptrdiff_t goff = q * geometry_stride + 0;
       const s_t adj_value0 = adj0[goff];
@@ -79,14 +97,32 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newma
       const s_t adj_value3 = adj3[goff];
       const s_t det_value0 = det0[goff];
       const s_t gu_ref0 = gu_ref0_values[0];
+      const s_t grad_h_ref0 = grad_h_ref0_values[0];
       const s_t gu_ref1 = gu_ref1_values[0];
+      const s_t grad_h_ref1 = grad_h_ref1_values[0];
       const s_t gu_ref2 = gu_ref2_values[0];
+      const s_t grad_h_ref2 = grad_h_ref2_values[0];
       const s_t gu_ref3 = gu_ref3_values[0];
+      const s_t grad_h_ref3 = grad_h_ref3_values[0];
     const s_t idet = s_t(1) / det_value0;
-    const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
-    const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
-    const s_t gu2 = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
-    const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+    gu_base_v[0 * VS + 0] = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+    trial_grad_v[0 * VS + 0] = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
+    gu_base_v[1 * VS + 0] = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+    trial_grad_v[1 * VS + 0] = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
+    gu_base_v[2 * VS + 0] = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+    trial_grad_v[2 * VS + 0] = (grad_h_ref2 * adj_value0 + grad_h_ref3 * adj_value2) * idet;
+    gu_base_v[3 * VS + 0] = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+    trial_grad_v[3 * VS + 0] = (grad_h_ref2 * adj_value1 + grad_h_ref3 * adj_value3) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        {
+          const ptrdiff_t goff = q * geometry_stride + 0;
+          const s_t det_value0 = det0[goff];
+          const s_t gu0 = gu_base_v[0 * VS + 0] + alpha * trial_grad_v[0 * VS + 0];
+          const s_t gu1 = gu_base_v[1 * VS + 0] + alpha * trial_grad_v[1 * VS + 0];
+          const s_t gu2 = gu_base_v[2 * VS + 0] + alpha * trial_grad_v[2 * VS + 0];
+          const s_t gu3 = gu_base_v[3 * VS + 0] + alpha * trial_grad_v[3 * VS + 0];
     const s_t weak_obj_tmp0 = gu1*gu2;
     const s_t weak_obj_tmp1 = gu0 + s_t(1);
     const s_t weak_obj_tmp2 = gu3 + s_t(1);
@@ -96,7 +132,8 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newma
     const s_t weak_obj_tmp6 = pow_2(weak_obj_tmp2);
     const s_t weak_obj_tmp7 = weak_obj_tmp3 + weak_obj_tmp6;
     const s_t weak_obj_tmp8 = weak_obj_tmp4 + weak_obj_tmp5;
-    value[0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(-weak_obj_tmp0 + weak_obj_tmp1*weak_obj_tmp2 + s_t(-1)) + mu*(s_t(6)*weak_obj_tmp0 - s_t(6)*weak_obj_tmp1*weak_obj_tmp2 + s_t(2)*weak_obj_tmp3 + s_t(2)*weak_obj_tmp4 + s_t(2)*weak_obj_tmp5 + s_t(2)*weak_obj_tmp6 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp7 + weak_obj_tmp8) - pow_2(gu1*weak_obj_tmp1 + gu2*weak_obj_tmp2) + s_t(1)));
+    value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(-weak_obj_tmp0 + weak_obj_tmp1*weak_obj_tmp2 + s_t(-1)) + mu*(s_t(6)*weak_obj_tmp0 - s_t(6)*weak_obj_tmp1*weak_obj_tmp2 + s_t(2)*weak_obj_tmp3 + s_t(2)*weak_obj_tmp4 + s_t(2)*weak_obj_tmp5 + s_t(2)*weak_obj_tmp6 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp7 + weak_obj_tmp8) - pow_2(gu1*weak_obj_tmp1 + gu2*weak_obj_tmp2) + s_t(1)));
+        }
       }
     }
 }
@@ -114,12 +151,18 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newma
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 2],
+        const s_t *const RSTR h_streams[NS * 2],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     { const int q = 0;  // constant-P1 simplex
       const s_t qw = q_weight[q];
+      s_t gu_base_v[4 * VS];
+      s_t trial_grad_v[4 * VS];
       {
       const ptrdiff_t goff = q * geometry_stride + 0;
       const s_t adj_value0 = adj0[goff];
@@ -128,14 +171,32 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newma
       const s_t adj_value3 = adj3[goff];
       const s_t det_value0 = det0[goff];
       const s_t gu_ref0 = -(u_streams[0][0]) + u_streams[2][0];
+      const s_t grad_h_ref0 = -(h_streams[0][0]) + h_streams[2][0];
       const s_t gu_ref1 = -(u_streams[0][0]) + u_streams[4][0];
+      const s_t grad_h_ref1 = -(h_streams[0][0]) + h_streams[4][0];
       const s_t gu_ref2 = -(u_streams[1][0]) + u_streams[3][0];
+      const s_t grad_h_ref2 = -(h_streams[1][0]) + h_streams[3][0];
       const s_t gu_ref3 = -(u_streams[1][0]) + u_streams[5][0];
+      const s_t grad_h_ref3 = -(h_streams[1][0]) + h_streams[5][0];
       const s_t idet = s_t(1) / det_value0;
-      const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
-      const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
-      const s_t gu2 = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
-      const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+      gu_base_v[0 * VS + 0] = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+      trial_grad_v[0 * VS + 0] = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
+      gu_base_v[1 * VS + 0] = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+      trial_grad_v[1 * VS + 0] = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
+      gu_base_v[2 * VS + 0] = (gu_ref2 * adj_value0 + gu_ref3 * adj_value2) * idet;
+      trial_grad_v[2 * VS + 0] = (grad_h_ref2 * adj_value0 + grad_h_ref3 * adj_value2) * idet;
+      gu_base_v[3 * VS + 0] = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
+      trial_grad_v[3 * VS + 0] = (grad_h_ref2 * adj_value1 + grad_h_ref3 * adj_value3) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        {
+          const ptrdiff_t goff = q * geometry_stride + 0;
+          const s_t det_value0 = det0[goff];
+          const s_t gu0 = gu_base_v[0 * VS + 0] + alpha * trial_grad_v[0 * VS + 0];
+          const s_t gu1 = gu_base_v[1 * VS + 0] + alpha * trial_grad_v[1 * VS + 0];
+          const s_t gu2 = gu_base_v[2 * VS + 0] + alpha * trial_grad_v[2 * VS + 0];
+          const s_t gu3 = gu_base_v[3 * VS + 0] + alpha * trial_grad_v[3 * VS + 0];
     const s_t weak_obj_tmp0 = gu1*gu2;
     const s_t weak_obj_tmp1 = gu0 + s_t(1);
     const s_t weak_obj_tmp2 = gu3 + s_t(1);
@@ -145,7 +206,8 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newma
     const s_t weak_obj_tmp6 = pow_2(weak_obj_tmp2);
     const s_t weak_obj_tmp7 = weak_obj_tmp3 + weak_obj_tmp6;
     const s_t weak_obj_tmp8 = weak_obj_tmp4 + weak_obj_tmp5;
-    value[0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(-weak_obj_tmp0 + weak_obj_tmp1*weak_obj_tmp2 + s_t(-1)) + mu*(s_t(6)*weak_obj_tmp0 - s_t(6)*weak_obj_tmp1*weak_obj_tmp2 + s_t(2)*weak_obj_tmp3 + s_t(2)*weak_obj_tmp4 + s_t(2)*weak_obj_tmp5 + s_t(2)*weak_obj_tmp6 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp7 + weak_obj_tmp8) - pow_2(gu1*weak_obj_tmp1 + gu2*weak_obj_tmp2) + s_t(1)));
+    value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(-weak_obj_tmp0 + weak_obj_tmp1*weak_obj_tmp2 + s_t(-1)) + mu*(s_t(6)*weak_obj_tmp0 - s_t(6)*weak_obj_tmp1*weak_obj_tmp2 + s_t(2)*weak_obj_tmp3 + s_t(2)*weak_obj_tmp4 + s_t(2)*weak_obj_tmp5 + s_t(2)*weak_obj_tmp6 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp7 + weak_obj_tmp8) - pow_2(gu1*weak_obj_tmp1 + gu2*weak_obj_tmp2) + s_t(1)));
+        }
       }
     }
 }

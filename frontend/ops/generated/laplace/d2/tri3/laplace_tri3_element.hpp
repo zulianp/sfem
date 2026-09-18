@@ -36,6 +36,7 @@ static SFEM_INLINE int laplace_tri3_energy_egeometry_soa(
     for (int lane = 0; lane < ne; ++lane) {
       bvalue[lane] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
     s_t badj2[NQ * VS];
@@ -62,7 +63,7 @@ static SFEM_INLINE int laplace_tri3_energy_egeometry_soa(
         bdet0_q[lane] = det_q[lane];
       }
     }
-    laplace_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bvalue);
+    laplace_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -92,6 +93,7 @@ static SFEM_INLINE int laplace_tri3_energy_ecoords_soa(
     for (int lane = 0; lane < ne; ++lane) {
       bvalue[lane] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       #pragma omp simd
@@ -141,7 +143,7 @@ static SFEM_INLINE int laplace_tri3_energy_ecoords_soa(
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    laplace_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bvalue);
+    laplace_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -171,6 +173,7 @@ static SFEM_INLINE int laplace_tri3_energy_esoa(
     for (int lane = 0; lane < ne; ++lane) {
       bvalue[lane] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       #pragma omp simd
@@ -220,7 +223,7 @@ static SFEM_INLINE int laplace_tri3_energy_esoa(
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    laplace_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bvalue);
+    laplace_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y(), sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }

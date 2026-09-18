@@ -51,6 +51,10 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_ob
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 3],
+        const s_t *const RSTR h_streams[NS * 3],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
@@ -58,64 +62,93 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_ob
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
       s_t gu_ref0_values[VS];
+      s_t grad_h_ref0_values[VS];
       s_t gu_ref1_values[VS];
+      s_t grad_h_ref1_values[VS];
       s_t gu_ref2_values[VS];
+      s_t grad_h_ref2_values[VS];
       s_t gu_ref3_values[VS];
+      s_t grad_h_ref3_values[VS];
       s_t gu_ref4_values[VS];
+      s_t grad_h_ref4_values[VS];
       s_t gu_ref5_values[VS];
+      s_t grad_h_ref5_values[VS];
       s_t gu_ref6_values[VS];
+      s_t grad_h_ref6_values[VS];
       s_t gu_ref7_values[VS];
+      s_t grad_h_ref7_values[VS];
       s_t gu_ref8_values[VS];
+      s_t grad_h_ref8_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         gu_ref0_values[lane] = s_t(0);
+        grad_h_ref0_values[lane] = s_t(0);
         gu_ref1_values[lane] = s_t(0);
+        grad_h_ref1_values[lane] = s_t(0);
         gu_ref2_values[lane] = s_t(0);
+        grad_h_ref2_values[lane] = s_t(0);
         gu_ref3_values[lane] = s_t(0);
+        grad_h_ref3_values[lane] = s_t(0);
         gu_ref4_values[lane] = s_t(0);
+        grad_h_ref4_values[lane] = s_t(0);
         gu_ref5_values[lane] = s_t(0);
+        grad_h_ref5_values[lane] = s_t(0);
         gu_ref6_values[lane] = s_t(0);
+        grad_h_ref6_values[lane] = s_t(0);
         gu_ref7_values[lane] = s_t(0);
+        grad_h_ref7_values[lane] = s_t(0);
         gu_ref8_values[lane] = s_t(0);
+        grad_h_ref8_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref0_values[lane] += u_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref0_values[lane] += h_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref1_values[lane] += u_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref1_values[lane] += h_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref2_values[lane] += u_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
+          grad_h_ref2_values[lane] += h_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref3_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref3_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref4_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref4_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref5_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
+          grad_h_ref5_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref6_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref6_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref7_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref7_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref8_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
+          grad_h_ref8_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
         }
       }
+      s_t gu_base_v[9 * VS];
+      s_t trial_grad_v[9 * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
       const ptrdiff_t goff = q * geometry_stride + lane;
@@ -130,24 +163,58 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_ob
       const s_t adj_lane8 = adj8[goff];
       const s_t det_lane0 = det0[goff];
       const s_t gu_ref0 = gu_ref0_values[lane];
+      const s_t grad_h_ref0 = grad_h_ref0_values[lane];
       const s_t gu_ref1 = gu_ref1_values[lane];
+      const s_t grad_h_ref1 = grad_h_ref1_values[lane];
       const s_t gu_ref2 = gu_ref2_values[lane];
+      const s_t grad_h_ref2 = grad_h_ref2_values[lane];
       const s_t gu_ref3 = gu_ref3_values[lane];
+      const s_t grad_h_ref3 = grad_h_ref3_values[lane];
       const s_t gu_ref4 = gu_ref4_values[lane];
+      const s_t grad_h_ref4 = grad_h_ref4_values[lane];
       const s_t gu_ref5 = gu_ref5_values[lane];
+      const s_t grad_h_ref5 = grad_h_ref5_values[lane];
       const s_t gu_ref6 = gu_ref6_values[lane];
+      const s_t grad_h_ref6 = grad_h_ref6_values[lane];
       const s_t gu_ref7 = gu_ref7_values[lane];
+      const s_t grad_h_ref7 = grad_h_ref7_values[lane];
       const s_t gu_ref8 = gu_ref8_values[lane];
+      const s_t grad_h_ref8 = grad_h_ref8_values[lane];
     const s_t idet = s_t(1) / det_lane0;
-    const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
-    const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
-    const s_t gu2 = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;
-    const s_t gu3 = (gu_ref3 * adj_lane0 + gu_ref4 * adj_lane3 + gu_ref5 * adj_lane6) * idet;
-    const s_t gu4 = (gu_ref3 * adj_lane1 + gu_ref4 * adj_lane4 + gu_ref5 * adj_lane7) * idet;
-    const s_t gu5 = (gu_ref3 * adj_lane2 + gu_ref4 * adj_lane5 + gu_ref5 * adj_lane8) * idet;
-    const s_t gu6 = (gu_ref6 * adj_lane0 + gu_ref7 * adj_lane3 + gu_ref8 * adj_lane6) * idet;
-    const s_t gu7 = (gu_ref6 * adj_lane1 + gu_ref7 * adj_lane4 + gu_ref8 * adj_lane7) * idet;
-    const s_t gu8 = (gu_ref6 * adj_lane2 + gu_ref7 * adj_lane5 + gu_ref8 * adj_lane8) * idet;
+    gu_base_v[0 * VS + lane] = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
+    trial_grad_v[0 * VS + lane] = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane3 + grad_h_ref2 * adj_lane6) * idet;
+    gu_base_v[1 * VS + lane] = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
+    trial_grad_v[1 * VS + lane] = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane4 + grad_h_ref2 * adj_lane7) * idet;
+    gu_base_v[2 * VS + lane] = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;
+    trial_grad_v[2 * VS + lane] = (grad_h_ref0 * adj_lane2 + grad_h_ref1 * adj_lane5 + grad_h_ref2 * adj_lane8) * idet;
+    gu_base_v[3 * VS + lane] = (gu_ref3 * adj_lane0 + gu_ref4 * adj_lane3 + gu_ref5 * adj_lane6) * idet;
+    trial_grad_v[3 * VS + lane] = (grad_h_ref3 * adj_lane0 + grad_h_ref4 * adj_lane3 + grad_h_ref5 * adj_lane6) * idet;
+    gu_base_v[4 * VS + lane] = (gu_ref3 * adj_lane1 + gu_ref4 * adj_lane4 + gu_ref5 * adj_lane7) * idet;
+    trial_grad_v[4 * VS + lane] = (grad_h_ref3 * adj_lane1 + grad_h_ref4 * adj_lane4 + grad_h_ref5 * adj_lane7) * idet;
+    gu_base_v[5 * VS + lane] = (gu_ref3 * adj_lane2 + gu_ref4 * adj_lane5 + gu_ref5 * adj_lane8) * idet;
+    trial_grad_v[5 * VS + lane] = (grad_h_ref3 * adj_lane2 + grad_h_ref4 * adj_lane5 + grad_h_ref5 * adj_lane8) * idet;
+    gu_base_v[6 * VS + lane] = (gu_ref6 * adj_lane0 + gu_ref7 * adj_lane3 + gu_ref8 * adj_lane6) * idet;
+    trial_grad_v[6 * VS + lane] = (grad_h_ref6 * adj_lane0 + grad_h_ref7 * adj_lane3 + grad_h_ref8 * adj_lane6) * idet;
+    gu_base_v[7 * VS + lane] = (gu_ref6 * adj_lane1 + gu_ref7 * adj_lane4 + gu_ref8 * adj_lane7) * idet;
+    trial_grad_v[7 * VS + lane] = (grad_h_ref6 * adj_lane1 + grad_h_ref7 * adj_lane4 + grad_h_ref8 * adj_lane7) * idet;
+    gu_base_v[8 * VS + lane] = (gu_ref6 * adj_lane2 + gu_ref7 * adj_lane5 + gu_ref8 * adj_lane8) * idet;
+    trial_grad_v[8 * VS + lane] = (grad_h_ref6 * adj_lane2 + grad_h_ref7 * adj_lane5 + grad_h_ref8 * adj_lane8) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const ptrdiff_t goff = q * geometry_stride + lane;
+          const s_t det_lane0 = det0[goff];
+          const s_t gu0 = gu_base_v[0 * VS + lane] + alpha * trial_grad_v[0 * VS + lane];
+          const s_t gu1 = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
+          const s_t gu2 = gu_base_v[2 * VS + lane] + alpha * trial_grad_v[2 * VS + lane];
+          const s_t gu3 = gu_base_v[3 * VS + lane] + alpha * trial_grad_v[3 * VS + lane];
+          const s_t gu4 = gu_base_v[4 * VS + lane] + alpha * trial_grad_v[4 * VS + lane];
+          const s_t gu5 = gu_base_v[5 * VS + lane] + alpha * trial_grad_v[5 * VS + lane];
+          const s_t gu6 = gu_base_v[6 * VS + lane] + alpha * trial_grad_v[6 * VS + lane];
+          const s_t gu7 = gu_base_v[7 * VS + lane] + alpha * trial_grad_v[7 * VS + lane];
+          const s_t gu8 = gu_base_v[8 * VS + lane] + alpha * trial_grad_v[8 * VS + lane];
     const s_t weak_obj_tmp0 = gu8 + s_t(1);
     const s_t weak_obj_tmp1 = gu1*gu3*weak_obj_tmp0;
     const s_t weak_obj_tmp2 = gu4 + s_t(1);
@@ -158,7 +225,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_ob
     const s_t weak_obj_tmp7 = pow_2(gu2) + pow_2(gu5) + pow_2(weak_obj_tmp0);
     const s_t weak_obj_tmp8 = pow_2(gu3) + pow_2(gu6) + pow_2(weak_obj_tmp4);
     const s_t weak_obj_tmp9 = weak_obj_tmp6 + weak_obj_tmp7 + weak_obj_tmp8;
-    value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu1*gu5*gu6 + gu2*gu3*gu7 + weak_obj_tmp0*weak_obj_tmp2*weak_obj_tmp4 - weak_obj_tmp1 - weak_obj_tmp3 - weak_obj_tmp5 + s_t(-1)) + mu*(-s_t(6)*gu1*gu5*gu6 - s_t(6)*gu2*gu3*gu7 - s_t(6)*weak_obj_tmp0*weak_obj_tmp2*weak_obj_tmp4 + s_t(6)*weak_obj_tmp1 + s_t(6)*weak_obj_tmp3 + s_t(6)*weak_obj_tmp5 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp6) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp9) + weak_obj_tmp9 - pow_2(gu1*gu2 + gu5*weak_obj_tmp2 + gu7*weak_obj_tmp0) - pow_2(gu1*weak_obj_tmp4 + gu3*weak_obj_tmp2 + gu6*gu7) - pow_2(gu2*weak_obj_tmp4 + gu3*gu5 + gu6*weak_obj_tmp0)));
+    value[step * value_stride + lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu1*gu5*gu6 + gu2*gu3*gu7 + weak_obj_tmp0*weak_obj_tmp2*weak_obj_tmp4 - weak_obj_tmp1 - weak_obj_tmp3 - weak_obj_tmp5 + s_t(-1)) + mu*(-s_t(6)*gu1*gu5*gu6 - s_t(6)*gu2*gu3*gu7 - s_t(6)*weak_obj_tmp0*weak_obj_tmp2*weak_obj_tmp4 + s_t(6)*weak_obj_tmp1 + s_t(6)*weak_obj_tmp3 + s_t(6)*weak_obj_tmp5 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp6) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp9) + weak_obj_tmp9 - pow_2(gu1*gu2 + gu5*weak_obj_tmp2 + gu7*weak_obj_tmp0) - pow_2(gu1*weak_obj_tmp4 + gu3*weak_obj_tmp2 + gu6*gu7) - pow_2(gu2*weak_obj_tmp4 + gu3*gu5 + gu6*weak_obj_tmp0)));
+        }
       }
     }
 }
@@ -181,12 +249,18 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_te
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 3],
+        const s_t *const RSTR h_streams[NS * 3],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     { const int q = 0;  // constant-P1 simplex
       const s_t qw = q_weight[q];
+      s_t gu_base_v[9 * VS];
+      s_t trial_grad_v[9 * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
       const ptrdiff_t goff = q * geometry_stride + lane;
@@ -201,24 +275,58 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_te
       const s_t adj_lane8 = adj8[goff];
       const s_t det_lane0 = det0[goff];
       const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[3][lane];
+      const s_t grad_h_ref0 = -(h_streams[0][lane]) + h_streams[3][lane];
       const s_t gu_ref1 = -(u_streams[0][lane]) + u_streams[6][lane];
+      const s_t grad_h_ref1 = -(h_streams[0][lane]) + h_streams[6][lane];
       const s_t gu_ref2 = -(u_streams[0][lane]) + u_streams[9][lane];
+      const s_t grad_h_ref2 = -(h_streams[0][lane]) + h_streams[9][lane];
       const s_t gu_ref3 = -(u_streams[1][lane]) + u_streams[4][lane];
+      const s_t grad_h_ref3 = -(h_streams[1][lane]) + h_streams[4][lane];
       const s_t gu_ref4 = -(u_streams[1][lane]) + u_streams[7][lane];
+      const s_t grad_h_ref4 = -(h_streams[1][lane]) + h_streams[7][lane];
       const s_t gu_ref5 = -(u_streams[1][lane]) + u_streams[10][lane];
+      const s_t grad_h_ref5 = -(h_streams[1][lane]) + h_streams[10][lane];
       const s_t gu_ref6 = -(u_streams[2][lane]) + u_streams[5][lane];
+      const s_t grad_h_ref6 = -(h_streams[2][lane]) + h_streams[5][lane];
       const s_t gu_ref7 = -(u_streams[2][lane]) + u_streams[8][lane];
+      const s_t grad_h_ref7 = -(h_streams[2][lane]) + h_streams[8][lane];
       const s_t gu_ref8 = -(u_streams[2][lane]) + u_streams[11][lane];
+      const s_t grad_h_ref8 = -(h_streams[2][lane]) + h_streams[11][lane];
       const s_t idet = s_t(1) / det_lane0;
-      const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
-      const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
-      const s_t gu2 = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;
-      const s_t gu3 = (gu_ref3 * adj_lane0 + gu_ref4 * adj_lane3 + gu_ref5 * adj_lane6) * idet;
-      const s_t gu4 = (gu_ref3 * adj_lane1 + gu_ref4 * adj_lane4 + gu_ref5 * adj_lane7) * idet;
-      const s_t gu5 = (gu_ref3 * adj_lane2 + gu_ref4 * adj_lane5 + gu_ref5 * adj_lane8) * idet;
-      const s_t gu6 = (gu_ref6 * adj_lane0 + gu_ref7 * adj_lane3 + gu_ref8 * adj_lane6) * idet;
-      const s_t gu7 = (gu_ref6 * adj_lane1 + gu_ref7 * adj_lane4 + gu_ref8 * adj_lane7) * idet;
-      const s_t gu8 = (gu_ref6 * adj_lane2 + gu_ref7 * adj_lane5 + gu_ref8 * adj_lane8) * idet;
+      gu_base_v[0 * VS + lane] = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
+      trial_grad_v[0 * VS + lane] = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane3 + grad_h_ref2 * adj_lane6) * idet;
+      gu_base_v[1 * VS + lane] = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
+      trial_grad_v[1 * VS + lane] = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane4 + grad_h_ref2 * adj_lane7) * idet;
+      gu_base_v[2 * VS + lane] = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;
+      trial_grad_v[2 * VS + lane] = (grad_h_ref0 * adj_lane2 + grad_h_ref1 * adj_lane5 + grad_h_ref2 * adj_lane8) * idet;
+      gu_base_v[3 * VS + lane] = (gu_ref3 * adj_lane0 + gu_ref4 * adj_lane3 + gu_ref5 * adj_lane6) * idet;
+      trial_grad_v[3 * VS + lane] = (grad_h_ref3 * adj_lane0 + grad_h_ref4 * adj_lane3 + grad_h_ref5 * adj_lane6) * idet;
+      gu_base_v[4 * VS + lane] = (gu_ref3 * adj_lane1 + gu_ref4 * adj_lane4 + gu_ref5 * adj_lane7) * idet;
+      trial_grad_v[4 * VS + lane] = (grad_h_ref3 * adj_lane1 + grad_h_ref4 * adj_lane4 + grad_h_ref5 * adj_lane7) * idet;
+      gu_base_v[5 * VS + lane] = (gu_ref3 * adj_lane2 + gu_ref4 * adj_lane5 + gu_ref5 * adj_lane8) * idet;
+      trial_grad_v[5 * VS + lane] = (grad_h_ref3 * adj_lane2 + grad_h_ref4 * adj_lane5 + grad_h_ref5 * adj_lane8) * idet;
+      gu_base_v[6 * VS + lane] = (gu_ref6 * adj_lane0 + gu_ref7 * adj_lane3 + gu_ref8 * adj_lane6) * idet;
+      trial_grad_v[6 * VS + lane] = (grad_h_ref6 * adj_lane0 + grad_h_ref7 * adj_lane3 + grad_h_ref8 * adj_lane6) * idet;
+      gu_base_v[7 * VS + lane] = (gu_ref6 * adj_lane1 + gu_ref7 * adj_lane4 + gu_ref8 * adj_lane7) * idet;
+      trial_grad_v[7 * VS + lane] = (grad_h_ref6 * adj_lane1 + grad_h_ref7 * adj_lane4 + grad_h_ref8 * adj_lane7) * idet;
+      gu_base_v[8 * VS + lane] = (gu_ref6 * adj_lane2 + gu_ref7 * adj_lane5 + gu_ref8 * adj_lane8) * idet;
+      trial_grad_v[8 * VS + lane] = (grad_h_ref6 * adj_lane2 + grad_h_ref7 * adj_lane5 + grad_h_ref8 * adj_lane8) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const ptrdiff_t goff = q * geometry_stride + lane;
+          const s_t det_lane0 = det0[goff];
+          const s_t gu0 = gu_base_v[0 * VS + lane] + alpha * trial_grad_v[0 * VS + lane];
+          const s_t gu1 = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
+          const s_t gu2 = gu_base_v[2 * VS + lane] + alpha * trial_grad_v[2 * VS + lane];
+          const s_t gu3 = gu_base_v[3 * VS + lane] + alpha * trial_grad_v[3 * VS + lane];
+          const s_t gu4 = gu_base_v[4 * VS + lane] + alpha * trial_grad_v[4 * VS + lane];
+          const s_t gu5 = gu_base_v[5 * VS + lane] + alpha * trial_grad_v[5 * VS + lane];
+          const s_t gu6 = gu_base_v[6 * VS + lane] + alpha * trial_grad_v[6 * VS + lane];
+          const s_t gu7 = gu_base_v[7 * VS + lane] + alpha * trial_grad_v[7 * VS + lane];
+          const s_t gu8 = gu_base_v[8 * VS + lane] + alpha * trial_grad_v[8 * VS + lane];
     const s_t weak_obj_tmp0 = gu8 + s_t(1);
     const s_t weak_obj_tmp1 = gu1*gu3*weak_obj_tmp0;
     const s_t weak_obj_tmp2 = gu4 + s_t(1);
@@ -229,7 +337,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_te
     const s_t weak_obj_tmp7 = pow_2(gu2) + pow_2(gu5) + pow_2(weak_obj_tmp0);
     const s_t weak_obj_tmp8 = pow_2(gu3) + pow_2(gu6) + pow_2(weak_obj_tmp4);
     const s_t weak_obj_tmp9 = weak_obj_tmp6 + weak_obj_tmp7 + weak_obj_tmp8;
-    value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu1*gu5*gu6 + gu2*gu3*gu7 + weak_obj_tmp0*weak_obj_tmp2*weak_obj_tmp4 - weak_obj_tmp1 - weak_obj_tmp3 - weak_obj_tmp5 + s_t(-1)) + mu*(-s_t(6)*gu1*gu5*gu6 - s_t(6)*gu2*gu3*gu7 - s_t(6)*weak_obj_tmp0*weak_obj_tmp2*weak_obj_tmp4 + s_t(6)*weak_obj_tmp1 + s_t(6)*weak_obj_tmp3 + s_t(6)*weak_obj_tmp5 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp6) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp9) + weak_obj_tmp9 - pow_2(gu1*gu2 + gu5*weak_obj_tmp2 + gu7*weak_obj_tmp0) - pow_2(gu1*weak_obj_tmp4 + gu3*weak_obj_tmp2 + gu6*gu7) - pow_2(gu2*weak_obj_tmp4 + gu3*gu5 + gu6*weak_obj_tmp0)));
+    value[step * value_stride + lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(gu1*gu5*gu6 + gu2*gu3*gu7 + weak_obj_tmp0*weak_obj_tmp2*weak_obj_tmp4 - weak_obj_tmp1 - weak_obj_tmp3 - weak_obj_tmp5 + s_t(-1)) + mu*(-s_t(6)*gu1*gu5*gu6 - s_t(6)*gu2*gu3*gu7 - s_t(6)*weak_obj_tmp0*weak_obj_tmp2*weak_obj_tmp4 + s_t(6)*weak_obj_tmp1 + s_t(6)*weak_obj_tmp3 + s_t(6)*weak_obj_tmp5 - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp6) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp7) - (s_t(1) / s_t(2))*pow_2(weak_obj_tmp8) + ((s_t(1) / s_t(2)))*pow_2(weak_obj_tmp9) + weak_obj_tmp9 - pow_2(gu1*gu2 + gu5*weak_obj_tmp2 + gu7*weak_obj_tmp0) - pow_2(gu1*weak_obj_tmp4 + gu3*weak_obj_tmp2 + gu6*gu7) - pow_2(gu2*weak_obj_tmp4 + gu3*gu5 + gu6*weak_obj_tmp0)));
+        }
       }
     }
 }

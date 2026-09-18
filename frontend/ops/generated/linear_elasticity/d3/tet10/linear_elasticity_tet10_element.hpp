@@ -37,6 +37,7 @@ static SFEM_INLINE int linear_elasticity_tet10_energy_egeometry_soa(
     for (int lane = 0; lane < ne; ++lane) {
       bvalue[lane] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
     s_t badj2[NQ * VS];
@@ -82,7 +83,7 @@ static SFEM_INLINE int linear_elasticity_tet10_energy_egeometry_soa(
         bdet0_q[lane] = det_q[lane];
       }
     }
-    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -113,6 +114,7 @@ static SFEM_INLINE int linear_elasticity_tet10_energy_ecoords_soa(
     for (int lane = 0; lane < ne; ++lane) {
       bvalue[lane] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       #pragma omp simd
@@ -189,7 +191,7 @@ static SFEM_INLINE int linear_elasticity_tet10_energy_ecoords_soa(
             badj_streams, bdet0, q * VS + lane);
       }
     }
-    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -220,6 +222,7 @@ static SFEM_INLINE int linear_elasticity_tet10_energy_esoa(
     for (int lane = 0; lane < ne; ++lane) {
       bvalue[lane] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       #pragma omp simd
@@ -296,7 +299,7 @@ static SFEM_INLINE int linear_elasticity_tet10_energy_esoa(
             badj_streams, bdet0, q * VS + lane);
       }
     }
-    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }

@@ -36,6 +36,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_hex8_en
     {
       bvalue[0] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
     s_t badj2[NQ * VS];
@@ -80,7 +81,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_hex8_en
         bdet0_q[0] = det_q[0];
       }
     }
-    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bvalue);
+    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -110,6 +111,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_hex8_en
     {
       bvalue[0] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
@@ -132,7 +134,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_hex8_en
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bvalue);
+    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -162,6 +164,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_hex8_en
     {
       bvalue[0] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
@@ -184,7 +187,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_hex8_en
     tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(ne, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 2, coordinate_grad_ref + 2 * NQ * ND * VS);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bvalue);
+    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }

@@ -44,6 +44,10 @@ static SFEM_INLINE void laplace_d2_simplex_objective_block(
         const s_t *const RSTR q_weight,
         const s_t kappa,
         const s_t *const RSTR u_streams[NS * 1],
+        const s_t *const RSTR h_streams[NS * 1],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
@@ -51,22 +55,30 @@ static SFEM_INLINE void laplace_d2_simplex_objective_block(
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
       s_t gu_ref0_values[VS];
+      s_t grad_h_ref0_values[VS];
       s_t gu_ref1_values[VS];
+      s_t grad_h_ref1_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         gu_ref0_values[lane] = s_t(0);
+        grad_h_ref0_values[lane] = s_t(0);
         gu_ref1_values[lane] = s_t(0);
+        grad_h_ref1_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref0_values[lane] += u_streams[shape][lane] * grad_ref_x[q * NS + shape];
+          grad_h_ref0_values[lane] += h_streams[shape][lane] * grad_ref_x[q * NS + shape];
         }
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           gu_ref1_values[lane] += u_streams[shape][lane] * grad_ref_y[q * NS + shape];
+          grad_h_ref1_values[lane] += h_streams[shape][lane] * grad_ref_y[q * NS + shape];
         }
       }
+      s_t gu_base_v[2 * VS];
+      s_t trial_grad_v[2 * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
       const ptrdiff_t goff = q * geometry_stride + lane;
@@ -76,11 +88,25 @@ static SFEM_INLINE void laplace_d2_simplex_objective_block(
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
       const s_t gu_ref0 = gu_ref0_values[lane];
+      const s_t grad_h_ref0 = grad_h_ref0_values[lane];
       const s_t gu_ref1 = gu_ref1_values[lane];
+      const s_t grad_h_ref1 = grad_h_ref1_values[lane];
     const s_t idet = s_t(1) / det_lane0;
-    const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
-    const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
-    value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1)));
+    gu_base_v[0 * VS + lane] = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
+    trial_grad_v[0 * VS + lane] = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane2) * idet;
+    gu_base_v[1 * VS + lane] = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
+    trial_grad_v[1 * VS + lane] = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane3) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const ptrdiff_t goff = q * geometry_stride + lane;
+          const s_t det_lane0 = det0[goff];
+          const s_t gu0 = gu_base_v[0 * VS + lane] + alpha * trial_grad_v[0 * VS + lane];
+          const s_t gu1 = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
+    value[step * value_stride + lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1)));
+        }
       }
     }
 }
@@ -97,12 +123,18 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_objective_block(
         const s_t *const RSTR q_weight,
         const s_t kappa,
         const s_t *const RSTR u_streams[NS * 1],
+        const s_t *const RSTR h_streams[NS * 1],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     { const int q = 0;  // constant-P1 simplex
       const s_t qw = q_weight[q];
+      s_t gu_base_v[2 * VS];
+      s_t trial_grad_v[2 * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
       const ptrdiff_t goff = q * geometry_stride + lane;
@@ -112,11 +144,25 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_objective_block(
       const s_t adj_lane3 = adj3[goff];
       const s_t det_lane0 = det0[goff];
       const s_t gu_ref0 = -(u_streams[0][lane]) + u_streams[1][lane];
+      const s_t grad_h_ref0 = -(h_streams[0][lane]) + h_streams[1][lane];
       const s_t gu_ref1 = -(u_streams[0][lane]) + u_streams[2][lane];
+      const s_t grad_h_ref1 = -(h_streams[0][lane]) + h_streams[2][lane];
       const s_t idet = s_t(1) / det_lane0;
-      const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
-      const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
-    value[lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1)));
+      gu_base_v[0 * VS + lane] = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane2) * idet;
+      trial_grad_v[0 * VS + lane] = (grad_h_ref0 * adj_lane0 + grad_h_ref1 * adj_lane2) * idet;
+      gu_base_v[1 * VS + lane] = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
+      trial_grad_v[1 * VS + lane] = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane3) * idet;
+      }
+      for (int step = 0; step < nsteps; ++step) {
+        const s_t alpha = steps[step];
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const ptrdiff_t goff = q * geometry_stride + lane;
+          const s_t det_lane0 = det0[goff];
+          const s_t gu0 = gu_base_v[0 * VS + lane] + alpha * trial_grad_v[0 * VS + lane];
+          const s_t gu1 = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
+    value[step * value_stride + lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1)));
+        }
       }
     }
 }
@@ -131,21 +177,31 @@ static SFEM_INLINE void laplace_d2_simplex_tri3_metric_objective_block(
         const s_t *const RSTR q_weight,
         const s_t kappa,
         const s_t *const RSTR u_streams[NS * 1],
+        const s_t *const RSTR h_streams[NS * 1],
+        const int nsteps,
+        const s_t *const RSTR steps,
+        const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = lane;
-      const s_t geom_metric_lane0 = geom_metric0[goff];
-      const s_t geom_metric_lane1 = geom_metric1[goff];
-      const s_t geom_metric_lane2 = geom_metric2[goff];
-      const s_t t0 = -u_streams[0][lane] + u_streams[1][lane];
-      const s_t t1 = -u_streams[0][lane] + u_streams[2][lane];
-      const s_t t2 = geom_metric_lane0*t0 + geom_metric_lane1*t1;
-      const s_t t3 = geom_metric_lane1*t0 + geom_metric_lane2*t1;
-      value[lane] += ((s_t(1) / s_t(2)))*kappa*(t2*(-u_streams[0][lane] + u_streams[1][lane]) + t3*(-u_streams[0][lane] + u_streams[2][lane]));
+    for (int step = 0; step < nsteps; ++step) {
+      const s_t alpha = steps[step];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        const ptrdiff_t goff = lane;
+        const s_t geom_metric_lane0 = geom_metric0[goff];
+        const s_t geom_metric_lane1 = geom_metric1[goff];
+        const s_t geom_metric_lane2 = geom_metric2[goff];
+        const s_t u_step0 = u_streams[0][lane] + alpha * h_streams[0][lane];
+        const s_t u_step1 = u_streams[1][lane] + alpha * h_streams[1][lane];
+        const s_t u_step2 = u_streams[2][lane] + alpha * h_streams[2][lane];
+        const s_t t0 = -u_step0 + u_step1;
+        const s_t t1 = -u_step0 + u_step2;
+        const s_t t2 = geom_metric_lane0*t0 + geom_metric_lane1*t1;
+        const s_t t3 = geom_metric_lane1*t0 + geom_metric_lane2*t1;
+        value[step * value_stride + lane] += ((s_t(1) / s_t(2)))*kappa*(t2*(-u_step0 + u_step1) + t3*(-u_step0 + u_step2));
+      }
     }
 }
 

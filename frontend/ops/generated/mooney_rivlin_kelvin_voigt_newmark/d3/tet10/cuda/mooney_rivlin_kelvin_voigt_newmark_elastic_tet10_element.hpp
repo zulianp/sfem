@@ -36,6 +36,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_newmar
     {
       bvalue[0] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
     s_t badj2[NQ * VS];
@@ -80,7 +81,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_newmar
         bdet0_q[0] = det_q[0];
       }
     }
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -110,6 +111,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_newmar
     {
       bvalue[0] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
@@ -182,7 +184,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_newmar
             badj_streams, bdet0, q * VS + 0);
       }
     }
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -212,6 +214,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_newmar
     {
       bvalue[0] = s_t(0);
     }
+    const s_t objective_step = s_t(0);
     s_t bcoordinate_data[NDOFS][VS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
@@ -284,7 +287,7 @@ static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_newmar
             badj_streams, bdet0, q * VS + 0);
       }
     }
-    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bvalue);
+    mooney_rivlin_kelvin_voigt_newmark_elastic_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }

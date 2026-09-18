@@ -135,9 +135,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_a_msoa_impl(
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
-    s_t bu_base_data[NS * NC][VS];
     s_t bh_data[NS * NC][VS];
-    s_t bvalue[VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
@@ -154,6 +152,10 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bu_streams[stream] = bu_data[stream];
     }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
@@ -161,7 +163,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_a_msoa_impl(
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
           bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
         }
       }
@@ -198,27 +200,13 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_a_msoa_impl(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
     for (int step = 0; step < nsteps; ++step) {
-      const s_t alpha = steps[step];
-      for (int shape = 0; shape < NS; ++shape) {
-        for (int d = 0; d < NC; ++d) {
-          #pragma omp simd
-          for (int lane = 0; lane < ne; ++lane) {
-            bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
-          }
-        }
-      }
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        bvalue[lane] = s_t(0);
-      }
-
-      laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, kappa, bu_streams, bvalue);
-
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
+        value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
       }
     }
+
+    laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
   return SFEM_SUCCESS;
@@ -341,11 +329,10 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_a_msoa_impl(
       for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
         const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
         s_t bu_data[NS * NC][VS];
-        s_t bu_base_data[NS * NC][VS];
         s_t bh_data[NS * NC][VS];
-        s_t bvalue[VS];
 
         const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7]};
+        const s_t *bh_streams[NS * NC] = {bh_data[0], bh_data[1], bh_data[2], bh_data[3], bh_data[4], bh_data[5], bh_data[6], bh_data[7]};
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
@@ -353,7 +340,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_a_msoa_impl(
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
+              bu_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
               bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
             }
           }
@@ -391,27 +378,13 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_a_msoa_impl(
             ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
         for (int step = 0; step < nsteps; ++step) {
-          const s_t alpha = steps[step];
-          for (int shape = 0; shape < NS; ++shape) {
-            for (int d = 0; d < NC; ++d) {
-              #pragma omp simd
-              for (int lane = 0; lane < ne; ++lane) {
-                bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
-              }
-            }
-          }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            bvalue[lane] = s_t(0);
-          }
-
-          laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, kappa, bu_streams, bvalue);
-
-          #pragma omp simd
-          for (int lane = 0; lane < ne; ++lane) {
-            value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
+            value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
           }
         }
+
+        laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
       }
     }
   }
@@ -500,9 +473,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_i_msoa_impl(
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
-    s_t bu_base_data[NS * NC][VS];
     s_t bh_data[NS * NC][VS];
-    s_t bvalue[VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
@@ -541,6 +512,10 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_i_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bu_streams[stream] = bu_data[stream];
     }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
@@ -548,7 +523,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_i_msoa_impl(
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_base_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
           bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
         }
       }
@@ -570,27 +545,13 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_i_msoa_impl(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
     for (int step = 0; step < nsteps; ++step) {
-      const s_t alpha = steps[step];
-      for (int shape = 0; shape < NS; ++shape) {
-        for (int d = 0; d < NC; ++d) {
-          #pragma omp simd
-          for (int lane = 0; lane < ne; ++lane) {
-            bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
-          }
-        }
-      }
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        bvalue[lane] = s_t(0);
-      }
-
-      laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bvalue);
-
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
+        value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
       }
     }
+
+    laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
   return SFEM_SUCCESS;
@@ -713,9 +674,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_i_msoa_impl(
       for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
         const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
         s_t bu_data[NS * NC][VS];
-        s_t bu_base_data[NS * NC][VS];
         s_t bh_data[NS * NC][VS];
-        s_t bvalue[VS];
         s_t bcoordinate_data[NS * ND][VS];
         s_t badj0[NQ * VS];
         s_t badj1[NQ * VS];
@@ -730,6 +689,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_i_msoa_impl(
         s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
         const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7]};
+        const s_t *bh_streams[NS * NC] = {bh_data[0], bh_data[1], bh_data[2], bh_data[3], bh_data[4], bh_data[5], bh_data[6], bh_data[7]};
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
@@ -744,7 +704,7 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_i_msoa_impl(
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_base_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
+              bu_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
               bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
             }
           }
@@ -766,27 +726,13 @@ static SFEM_INLINE int laplace_proteus_hex8_objective_steps_packed_i_msoa_impl(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
         for (int step = 0; step < nsteps; ++step) {
-          const s_t alpha = steps[step];
-          for (int shape = 0; shape < NS; ++shape) {
-            for (int d = 0; d < NC; ++d) {
-              #pragma omp simd
-              for (int lane = 0; lane < ne; ++lane) {
-                bu_data[shape * NC + d][lane] = bu_base_data[shape * NC + d][lane] + alpha * bh_data[shape * NC + d][lane];
-              }
-            }
-          }
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
-            bvalue[lane] = s_t(0);
-          }
-
-          laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bvalue);
-
-          #pragma omp simd
-          for (int lane = 0; lane < ne; ++lane) {
-            value[(ptrdiff_t)step * nelements + evb + lane] = bvalue[lane];
+            value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
           }
         }
+
+        laplace_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
       }
     }
   }

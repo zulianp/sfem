@@ -129,9 +129,7 @@ __global__ void laplace_tet10_objective_steps_a_msoa_impl(
     const int ne = 1;
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
-    s_t bu_base_data[NS * NC][VS];
     s_t bh_data[NS * NC][VS];
-    s_t bvalue[VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
@@ -147,13 +145,17 @@ __global__ void laplace_tet10_objective_steps_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bu_streams[stream] = bu_data[stream];
     }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_base_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
           bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
         }
       }
@@ -190,24 +192,12 @@ __global__ void laplace_tet10_objective_steps_a_msoa_impl(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
     for (int step = 0; step < nsteps; ++step) {
-      const s_t alpha = steps[step];
-      for (int shape = 0; shape < NS; ++shape) {
-        for (int d = 0; d < NC; ++d) {
-          {
-            bu_data[shape * NC + d][0] = bu_base_data[shape * NC + d][0] + alpha * bh_data[shape * NC + d][0];
-          }
-        }
-      }
       {
-        bvalue[0] = s_t(0);
-      }
-
-      laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bvalue);
-
-      {
-        value[(ptrdiff_t)step * nelements + evb + 0] = bvalue[0];
+        value[(ptrdiff_t)step * nelements + evb + 0] = s_t(0);
       }
     }
+
+    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -294,9 +284,7 @@ __global__ void laplace_tet10_objective_steps_i_msoa_impl(
     const int ne = 1;
     idx_t ev[VS * NS];
     s_t bu_data[NS * NC][VS];
-    s_t bu_base_data[NS * NC][VS];
     s_t bh_data[NS * NC][VS];
-    s_t bvalue[VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
@@ -333,13 +321,17 @@ __global__ void laplace_tet10_objective_steps_i_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bu_streams[stream] = bu_data[stream];
     }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_base_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
           bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
         }
       }
@@ -400,24 +392,12 @@ __global__ void laplace_tet10_objective_steps_i_msoa_impl(
     }
 
     for (int step = 0; step < nsteps; ++step) {
-      const s_t alpha = steps[step];
-      for (int shape = 0; shape < NS; ++shape) {
-        for (int d = 0; d < NC; ++d) {
-          {
-            bu_data[shape * NC + d][0] = bu_base_data[shape * NC + d][0] + alpha * bh_data[shape * NC + d][0];
-          }
-        }
-      }
       {
-        bvalue[0] = s_t(0);
-      }
-
-      laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bvalue);
-
-      {
-        value[(ptrdiff_t)step * nelements + evb + 0] = bvalue[0];
+        value[(ptrdiff_t)step * nelements + evb + 0] = s_t(0);
       }
     }
+
+    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }

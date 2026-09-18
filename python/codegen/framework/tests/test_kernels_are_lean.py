@@ -130,13 +130,17 @@ UNUSED_CONSTANT_BUDGET = 0
 #: read it, exactly as its host twin does and is already counted for.  The tree
 #: grew a second target, so a defect that exists on both is now counted twice --
 #: which is the honest number, and the budget still only shrinks from here.
-#: 64 -> 66 with the `body_force` material.  Two, for the same reason the eight
-#: above were eight: one `space` in its host wrapper and one in its device twin,
-#: the same unread parameter every other material's wrapper already contributes.
-#: A new material pays the existing defect's rate; it does not introduce a new
-#: one.  Fixing it is one change in the wrapper template that would take all
-#: nine materials off the count at once.
-UNUSED_PARAMETER_BUDGET = 66
+#: 64 -> 66 with the `body_force` material: one `space` per target, the rate
+#: every other material's wrapper already paid.
+#: 66 -> 48, because those eighteen were never real.  `lean_audit` read a
+#: constructor's member-initialiser list as part of its parameter list and its
+#: body as empty, so `Impl(const T &space) : space(space) {}` -- which every
+#: generated `Op` has, on both targets -- looked like a parameter nothing reads.
+#: The compiler this audit speaks for counts an initialiser as a use, so the
+#: eighteen were the tool's mistake rather than the tree's, and the 64 recorded
+#: above was already sixteen too high.  What is left is the simplex local
+#: kernels described at the top, which are real.
+UNUSED_PARAMETER_BUDGET = 48
 
 #: Node-ordering permutations built inside a kernel.
 #:
