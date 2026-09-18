@@ -34,7 +34,11 @@ namespace sfem {
     /// a term the line search cannot see.
     class NewmarkScheme final : public TimeScheme {
     public:
-        explicit NewmarkScheme(const std::shared_ptr<FunctionSpace> &space);
+        /// `es` is where the caller's vectors live.  A driver that solves on
+        /// the device hands `advance` a device vector, so the state this
+        /// scheme carries has to live there too.
+        explicit NewmarkScheme(const std::shared_ptr<FunctionSpace> &space,
+                               ExecutionSpace es = EXECUTION_SPACE_HOST);
         ~NewmarkScheme() override;
 
         void set_beta(real_t beta);

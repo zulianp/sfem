@@ -146,7 +146,7 @@ int test_newmark_kv() {
         // Newmark lives in the scheme; this test drives the operator, not the
         // method.  beta = 1/4 and gamma = 1/2 are `NewmarkScheme`'s defaults,
         // which is what the literal 4/(dt*dt) and 2/dt here used to mean.
-        auto scheme = std::make_shared<sfem::NewmarkScheme>(fs);
+        auto scheme = std::make_shared<sfem::NewmarkScheme>(fs, es);
         SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
         auto            displacement = scheme->state();
         auto            velocity     = scheme->velocity();
@@ -278,7 +278,7 @@ int test_newmark_kv() {
         // Newmark lives in the scheme; this test drives the operator, not the
         // method.  beta = 1/4 and gamma = 1/2 are `NewmarkScheme`'s defaults,
         // which is what the literal 4/(dt*dt) and 2/dt here used to mean.
-        auto scheme = std::make_shared<sfem::NewmarkScheme>(fs);
+        auto scheme = std::make_shared<sfem::NewmarkScheme>(fs, es);
         SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
         auto            displacement = scheme->state();
         auto            velocity     = scheme->velocity();

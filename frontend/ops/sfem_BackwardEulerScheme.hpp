@@ -27,7 +27,9 @@ namespace sfem {
     /// the previous solution, so `advance` is a copy.
     class BackwardEulerScheme final : public TimeScheme {
     public:
-        explicit BackwardEulerScheme(const std::shared_ptr<FunctionSpace> &space);
+        /// `es` is where the caller's vectors live; see `NewmarkScheme`.
+        explicit BackwardEulerScheme(const std::shared_ptr<FunctionSpace> &space,
+                                     ExecutionSpace es = EXECUTION_SPACE_HOST);
         ~BackwardEulerScheme() override;
 
         int initialize();

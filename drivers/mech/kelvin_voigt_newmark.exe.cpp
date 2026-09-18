@@ -91,7 +91,7 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
     // those two named, and the hand-written `KelvinVoigtNewmark` operator below
     // is untouched -- it still takes the velocity and the acceleration as
     // fields, and still gets them at every Newton iterate.
-    auto scheme = std::make_shared<sfem::NewmarkScheme>(fs);
+    auto scheme = std::make_shared<sfem::NewmarkScheme>(fs, es);
     if (scheme->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }

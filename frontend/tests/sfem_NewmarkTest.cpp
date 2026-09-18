@@ -192,7 +192,7 @@ int test_newmark() {
     const ptrdiff_t ndofs        = fs->n_dofs();
     // beta = 1/4 and gamma = 1/2 -- `NewmarkScheme`'s defaults -- are what the
     // literal 4/(dt*dt) and 2/dt in this loop used to mean.
-    auto scheme = std::make_shared<sfem::NewmarkScheme>(fs);
+    auto scheme = std::make_shared<sfem::NewmarkScheme>(fs, es);
     SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
     auto            displacement = scheme->state();
     auto            velocity     = scheme->velocity();
