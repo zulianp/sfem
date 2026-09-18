@@ -3183,6 +3183,17 @@ int main(int argc, char **argv) {
         const ptrdiff_t n_bore  = smesh::Env::read<int>("SFEM_NOZZLE_NBORE", 2);
         const ptrdiff_t n_outer = smesh::Env::read<int>("SFEM_NOZZLE_NOUTER", 3);
         const std::string axial = smesh::Env::read_string("SFEM_NOZZLE_NAXIAL", "8 6 16 32");
+        // Mesh grading, both defaulting to 0, which is the ungraded mesh bit for bit -- so
+        // every recorded number on this geometry stands until one of these is set.
+        //
+        // SFEM_NOZZLE_GRADE_R clusters the ring layers toward the bore wall, where the boundary
+        // layer is. SFEM_NOZZLE_GRADE_X clusters each axial segment's planes toward its
+        // downstream break, which here means the throat and the expansion -- the two stations
+        // the FDA data is taken at and the two places the gradients are.
+        const smesh::geom_t grade_r =
+                (smesh::geom_t)smesh::Env::read<double>("SFEM_NOZZLE_GRADE_R", 0);
+        const smesh::geom_t grade_x =
+                (smesh::geom_t)smesh::Env::read<double>("SFEM_NOZZLE_GRADE_X", 0);
         long              na[4];
         if (std::sscanf(axial.c_str(), "%ld %ld %ld %ld", &na[0], &na[1], &na[2], &na[3]) != 4) {
             std::fprintf(stderr, "nozzle: SFEM_NOZZLE_NAXIAL must be four cell counts, got '%s'\n",
@@ -3197,7 +3208,7 @@ int main(int argc, char **argv) {
                 {(smesh::geom_t)g.r_inlet, (smesh::geom_t)g.r_inlet, (smesh::geom_t)g.r_throat,
                  (smesh::geom_t)g.r_throat, (smesh::geom_t)g.r_throat},
                 {(ptrdiff_t)na[0], (ptrdiff_t)na[1], (ptrdiff_t)na[2], (ptrdiff_t)na[3]},
-                3, (smesh::geom_t)g.r_inlet, n_core, n_bore, n_outer);
+                3, (smesh::geom_t)g.r_inlet, n_core, n_bore, n_outer, 0.5, grade_r, grade_x);
         // The same arguments, captured, so the lattice is warped onto exactly this nozzle.
         {
             const std::vector<smesh::geom_t> xb = {(smesh::geom_t)g.x_in, (smesh::geom_t)g.x_cone,
@@ -3208,8 +3219,15 @@ int main(int argc, char **argv) {
                                                    (smesh::geom_t)g.r_throat};
             const std::vector<ptrdiff_t>     nx = {(ptrdiff_t)na[0], (ptrdiff_t)na[1], (ptrdiff_t)na[2], (ptrdiff_t)na[3]};
             const smesh::geom_t              rx = (smesh::geom_t)g.r_inlet;
-            nozzle_warp = [xb, rb, nx, rx, n_core, n_bore, n_outer](const std::shared_ptr<smesh::Mesh> &ss) {
-                return smesh::Mesh::warp_semistructured_hex8_nozzle(ss, xb, rb, nx, 3, rx, n_core, n_bore, n_outer);
+            // The grading is captured with the rest: the warp places micro nodes by the
+            // generator's own map, so it has to be the SAME map. Warping an ungraded lattice
+            // onto a graded macro mesh would put every micro node on a chord of the graded
+            // nozzle, and the corner check inside the warp -- which matches against the graded
+            // plane positions -- would reject it.
+            nozzle_warp = [xb, rb, nx, rx, n_core, n_bore, n_outer, grade_r,
+                           grade_x](const std::shared_ptr<smesh::Mesh> &ss) {
+                return smesh::Mesh::warp_semistructured_hex8_nozzle(ss, xb, rb, nx, 3, rx, n_core, n_bore,
+                                                                    n_outer, 0.5, grade_r, grade_x);
             };
         }
         if (mesh)
@@ -3338,23 +3356,56 @@ int main(int argc, char **argv) {
     //   convective   du/dt + U_c du/dn = 0, the advective condition of Orlanski (1976) as
     //                used for incompressible flow by Sani and Gresho. Transient only, and
     //                implemented below as a Dirichlet value refreshed once per step.
-    const std::string step_outflow =
-            want_any_step ? smesh::Env::read_string("SFEM_STEP_OUTFLOW", "natural") : std::string("natural");
-    if (want_any_step && step_outflow != "natural" && step_outflow != "dirichlet" &&
-        step_outflow != "convective") {
-        std::fprintf(stderr,
-                     "invalid SFEM_STEP_OUTFLOW '%s' (expected natural, dirichlet or convective)\n",
-                     step_outflow.c_str());
+    // ONE KNOB FOR THE OUTLET, on every case that has one. SFEM_OUTLET already took two of
+    // these three values and is the name job scripts and the verification matrix already pass,
+    // so it takes the third rather than a new name being invented beside it. SFEM_OUTFLOW_MODE
+    // is a different axis entirely -- donothing against extrapolate, WITHIN the natural
+    // treatment -- and the two must not be conflated.
+    //
+    // The default is per case and reproduces exactly what each case did before: the nozzle and
+    // the step open (there is no outlet profile to prescribe on either), everything else
+    // Dirichlet. SFEM_STEP_OUTFLOW is the step's old spelling, still honoured so recorded
+    // invocations keep working, and refused rather than silently overridden when both are set
+    // and disagree -- a run whose outlet treatment depends on which of two names won is the
+    // failure this consolidation exists to remove.
+    const std::string outlet_default = (want_nozzle || want_any_step) ? "natural" : "dirichlet";
+    std::string       outlet_mode    = smesh::Env::read_string("SFEM_OUTLET", outlet_default);
+    if (want_any_step) {
+        const std::string legacy = smesh::Env::read_string("SFEM_STEP_OUTFLOW", "");
+        if (!legacy.empty()) {
+            if (std::getenv("SFEM_OUTLET") && legacy != outlet_mode) {
+                std::fprintf(stderr,
+                             "SFEM_OUTLET='%s' and SFEM_STEP_OUTFLOW='%s' disagree; set one\n",
+                             outlet_mode.c_str(), legacy.c_str());
+                return EXIT_FAILURE;
+            }
+            outlet_mode = legacy;
+        }
+    }
+    if (outlet_mode != "natural" && outlet_mode != "dirichlet" && outlet_mode != "convective") {
+        std::fprintf(stderr, "invalid SFEM_OUTLET '%s' (expected natural, dirichlet or convective)\n",
+                     outlet_mode.c_str());
         return EXIT_FAILURE;
     }
     // Both non-natural modes constrain the outlet velocity, so neither leaves the outflow
     // open. The pressure gauge follows on its own: fixes_pressure_level() goes false and the
     // zero-mean projection takes over, which is the treatment the closed cases already use.
-    const bool want_convective_outflow = want_any_step && step_outflow == "convective";
-    const bool want_natural_outlet =
-            want_nozzle ? true
-            : want_any_step ? step_outflow == "natural"
-                            : smesh::Env::read_string("SFEM_OUTLET", "dirichlet") == "natural";
+    const bool        want_convective_outflow = outlet_mode == "convective";
+    // OPEN, not traction-free. These are different questions and only one of them is about the
+    // boundary term.
+    //
+    // A convective outlet prescribes a velocity, so it is Dirichlet as far as the constraint
+    // machinery is concerned -- but it is still an OPEN end, and the two solver defaults below
+    // are properties of the flow leaving the domain rather than of the term the operator drops.
+    // Keying them on "is the outlet traction-free" instead would take omega back to 1 and
+    // re-enable the multiplicative sweep the moment the outlet became convective, so an A/B
+    // between the two outflow treatments would in fact be comparing two smoothers -- and by the
+    // table beside SFEM_VANKA_OMEGA below, comparing them at the setting that costs the nozzle
+    // 1,067 iterations against 502, and stalls core 4 outright.
+    const bool outlet_is_open = outlet_mode == "natural" || outlet_mode == "convective";
+    // Traction-free, which is narrower: only the do-nothing form drops (p I - tau).n, and that
+    // is what fixes the pressure gauge. The convective form must NOT drop it.
+    const bool want_natural_outlet = outlet_mode == "natural";
     // A traction or pressure condition names one of these sidesets, so they have to exist
     // whether or not the outlet is natural. Read here rather than where the operator is
     // configured, several hundred lines below, because the sidesets are built now and a
@@ -3376,7 +3427,10 @@ int main(int argc, char **argv) {
     // "outlet" is this driver's own name for the x = Lx plane, registered above from the
     // same plane the `outlet` predicate tests, so matching on the name is the correct test
     // here rather than a coincidence of naming.
-    const bool outlet_governed = want_natural_outlet || want_traction_sideset == "outlet" ||
+    // `outlet_is_open` rather than `want_natural_outlet`: a convective outlet carries its own
+    // velocity data, written by the time loop, so the general Dirichlet arm must leave it alone
+    // exactly as it leaves the traction-free one alone.
+    const bool outlet_governed = outlet_is_open || want_traction_sideset == "outlet" ||
                                  want_pressure_sideset == "outlet";
     // SFEM_DIAG_CSV names a file to write the flow diagnostics and the kinetic-energy budget
     // to, one row per time step (one row total for a steady solve). Empty -- the default --
@@ -3407,7 +3461,7 @@ int main(int argc, char **argv) {
     std::shared_ptr<smesh::Sideset> step_skin, step_outlet, step_inlet;
     // Kept so they survive to_semistructured, which builds a new Mesh and copies none.
     std::shared_ptr<smesh::Sideset> pump_skin, pump_port, pump_diaphragm;
-    if (!want_pump && (want_any_step || want_natural_outlet || want_named_bc || want_diag)) {
+    if (!want_pump && (want_any_step || outlet_is_open || want_named_bc || want_diag)) {
         step_skin = smesh::skin_sideset(mesh);
         // The nozzle's outlet is the plane x = x_out, not x = Lx: its bounding box starts at
         // x_in < 0. Its two ends are the only planes it has, so a plane selector is exact there.
@@ -3453,7 +3507,7 @@ int main(int argc, char **argv) {
         }
         // NOT widened to want_diag. This changes what the operator computes, and asking for a
         // diagnostic must not change the thing being diagnosed.
-        if (want_any_step || want_natural_outlet || want_named_bc) setenv("SFEM_BOUNDARY_MASK", "1", 0);
+        if (want_any_step || outlet_is_open || want_named_bc) setenv("SFEM_BOUNDARY_MASK", "1", 0);
     }
 
     // The pump's two openings, both derived from the SAME coordinate predicates the
@@ -3678,7 +3732,7 @@ int main(int argc, char **argv) {
     // masks gives the same 239 on the step, so this was not something the masks fixed: the gate
     // applied to multigrid cost the step a factor of ten from the start, and on the box and the
     // core 2 nozzle it was the whole of the "multigrid fails at an open outlet" failure.
-    if (want_natural_outlet && use_gmg != 1) setenv("SFEM_VANKA_MULT", "0", 0);
+    if (outlet_is_open && use_gmg != 1) setenv("SFEM_VANKA_MULT", "0", 0);
 
     // And inside a V-cycle an open outlet gets the smoother damped to 0.5 by default, because
     // undamped it can diverge there outright. Measured on the nozzle at macro core 4, level 2
@@ -3699,7 +3753,7 @@ int main(int argc, char **argv) {
     // 0.5 costs the closed Poiseuille regression a factor of ten), and the standalone Vanka
     // preconditioner keeps it too, since 0.5 has not been measured there. An explicit
     // SFEM_VANKA_OMEGA still wins.
-    if (want_natural_outlet && use_gmg == 1) setenv("SFEM_VANKA_OMEGA", "0.5", 0);
+    if (outlet_is_open && use_gmg == 1) setenv("SFEM_VANKA_OMEGA", "0.5", 0);
     if (want_natural_outlet && outflow_mode == "donothing") {
         // Do-nothing outflow at x = Lx. This drops (p I - tau).n there, which is what fixes
         // the pressure gauge -- so the pin must come off with it, or the system is
@@ -3773,7 +3827,7 @@ int main(int argc, char **argv) {
     std::vector<ptrdiff_t> conv_node;
     // The nozzle's wall and inflow nodes, per node in the operator's numbering. Built with the
     // constraints below and kept, because the wall-pressure profile reads the same wall.
-    std::vector<char> nozzle_inlet_node, nozzle_wall_node;
+    std::vector<char> nozzle_inlet_node, nozzle_wall_node, nozzle_outlet_node;
 
     // Built after op->initialize(), and that order is required rather than incidental:
     // initialize() renumbers the mesh nodes for the packed layout, so node indices taken
@@ -3807,7 +3861,7 @@ int main(int argc, char **argv) {
             mesh_coord_checksum = (double)(cx + cy + cz);
         }
 
-        const bool step_outflow_natural = step_outflow == "natural";
+        const bool step_outflow_natural = outlet_mode == "natural";
 
         // Which nodes lie on the domain skin. Topological, so the step faces are included.
         std::vector<char> skin_node((size_t)nnodes, 0);
@@ -3869,7 +3923,8 @@ int main(int argc, char **argv) {
                 for (ptrdiff_t k = 0; k < ns->size(); ++k) out[(size_t)ns->data()[k]] = 1;
                 return true;
             };
-            if (!flag(inlets.front(), nozzle_inlet_node) || !flag(wall, nozzle_wall_node)) {
+            if (!flag(inlets.front(), nozzle_inlet_node) || !flag(wall, nozzle_wall_node) ||
+                !flag(outlets.front(), nozzle_outlet_node)) {
                 std::fprintf(stderr, "nozzle: create_nodeset_from_sideset failed\n");
                 return EXIT_FAILURE;
             }
@@ -3965,9 +4020,24 @@ int main(int argc, char **argv) {
                 // which is also the profile's value there, so the two conditions agree on it.
                 const bool wall  = nozzle_wall_node[(size_t)i] != 0;
                 const bool inlet = nozzle_inlet_node[(size_t)i] != 0;
-                if (wall || inlet) {
+                // The outlet disc, when it is prescribed rather than left free. Its rim goes to
+                // the wall for the same reason the inlet's does: a node on both is a wall node,
+                // and no-slip is the value the two conditions agree on there.
+                const bool outflow = !wall && nozzle_outlet_node[(size_t)i] != 0;
+                if (wall || inlet || (outflow && !outlet_is_open)) {
                     uvw_nodes.push_back((idx_t)i);
                     uvw_ux.push_back(wall ? real_t(0) : cvfem_case::nozzle_inflow_ux<real_t>(nozzle, y, z, U));
+                    uvw_uy.push_back(real_t(0));
+                    uvw_uz.push_back(real_t(0));
+                } else if (outflow && want_convective_outflow) {
+                    // Same bookkeeping as the two step branches: the slot is recorded inside
+                    // the branch that pushes the node, so the two cannot drift apart. The
+                    // starting value is zero -- the jet has not reached the outlet at t = 0 --
+                    // and the first step's mass-balance correction gives it the right flux.
+                    conv_slot.push_back(uvw_nodes.size());
+                    conv_node.push_back(i);
+                    uvw_nodes.push_back((idx_t)i);
+                    uvw_ux.push_back(real_t(0));
                     uvw_uy.push_back(real_t(0));
                     uvw_uz.push_back(real_t(0));
                 }
@@ -4559,11 +4629,64 @@ int main(int argc, char **argv) {
         return 0;
     }
 
+    // What to do with a time step that exhausts its continuation retries.
+    //
+    // `abort` is the default and the only safe one to inherit: the behaviour it replaced was to
+    // accept the unconverged state and step on, which leaves no trace in the output. `cutback`
+    // restores the step's starting state, shrinks dt and retries -- the outer analogue of the
+    // continuation's own bisection, which retries a STAGE at an intermediate Reynolds number.
+    // When that inner budget is spent, the step size itself is the remaining parameter.
+    //
+    // Not the default, because a campaign that silently halves its way to dt_min has changed
+    // its own discretisation without saying so; a run that asks for cutback has accepted that.
+    //
+    // Read here rather than beside the restart knobs below because the step snapshot allocated
+    // a few lines down is conditional on it.
+    const std::string step_on_fail = smesh::Env::read_string("SFEM_STEP_ON_FAIL", "abort");
+    const bool        cutback_on   = step_on_fail == "cutback";
+    // How far each retry shrinks the step, how many retries a single step may spend, and how
+    // many consecutive converged steps it takes to earn the original size back.
+    //
+    // Recovery is not the CFL controller's job and does not fight it: when SFEM_CFL_TARGET is
+    // set, that controller owns dt_now and this leaves it alone. Recovery exists for the fixed
+    // step case, where nothing else would ever undo a cutback and a campaign that hit one hard
+    // instant would run its remaining 10^5 steps at half speed for no reason.
+    const real_t cutback_factor = smesh::Env::read<real_t>("SFEM_STEP_CUTBACK_FACTOR", real_t(0.5));
+    const int    cutback_max    = smesh::Env::read<int>("SFEM_STEP_MAX_CUTBACK", 4);
+    const int    recover_after  = smesh::Env::read<int>("SFEM_STEP_RECOVER_AFTER", 8);
+    if (cutback_on && (cutback_factor <= real_t(0) || cutback_factor >= real_t(1))) {
+        std::fprintf(stderr, "SFEM_STEP_CUTBACK_FACTOR must lie in (0,1); got %g\n",
+                     (double)cutback_factor);
+        return EXIT_FAILURE;
+    }
+    if (!cutback_on && step_on_fail != "abort") {
+        std::fprintf(stderr, "SFEM_STEP_ON_FAIL='%s' is not one of abort|cutback\n",
+                     step_on_fail.c_str());
+        return EXIT_FAILURE;
+    }
+    // Whether the step size has ever moved from SFEM_DT. Two things key on it and both are
+    // wrong if they ask "is the CFL controller on" instead, because a cutback varies dt with
+    // SFEM_CFL_TARGET unset: the absolute time below, which would otherwise report n*dt for
+    // instants the run never visited, and the restart's fixed-step flag, which would otherwise
+    // claim a checkpoint may be resumed at the env dt and silently undo every cutback taken.
+    bool dt_varies = cfl_target > real_t(0);
+
     std::vector<real_t> x_stage_start((size_t)ndof, real_t(0));
+    // The state a TIME STEP started from, for the cutback policy. Sized only when that policy
+    // is selected: it is an ndof copy per step, and across a campaign of 10^5 steps an unused
+    // one is pure waste in the inner loop. The stage snapshot above cannot serve instead --
+    // it is retaken at the top of every continuation stage, so on a multi-stage step it holds
+    // the last stage's entry state rather than the step's.
+    std::vector<real_t> x_step_start;
+    if (cutback_on) x_step_start.assign((size_t)ndof, real_t(0));
     // The last residual a TIME STEP reached, for the step-failure policy below: the stage
     // loop's own prev_rnorm and r_stage0 are declared inside it and are gone by the time a
     // failure is detected.
     real_t              step_last_rnorm = 0;
+    // Consecutive converged steps since the last cutback, and how far below the requested size
+    // the current one sits. Zero cutbacks means dt_now is the size the caller asked for.
+    int                 good_steps  = 0;
+    int                 cutbacks_in = 0;
     int                 re_retries = 0;
     real_t              step_f     = re_step;  // current continuation step factor
 
@@ -4689,12 +4812,6 @@ int main(int argc, char **argv) {
     const std::string restart_in    = smesh::Env::read_string("SFEM_RESTART_IN", "");
     const std::string restart_out   = smesh::Env::read_string("SFEM_RESTART_OUT", "");
     const int         restart_every = smesh::Env::read<int>("SFEM_RESTART_EVERY", 0);
-    // What to do with a time step that exhausts its continuation retries. `abort` is the only
-    // implemented policy and the only defensible default: the alternative this replaced was to
-    // accept the unconverged state and step on, which leaves no trace in the output. A `cutback`
-    // policy -- restore the step's starting state, halve dt, retry -- is the natural second
-    // option and is refused explicitly until it exists, rather than silently meaning `abort`.
-    const std::string step_on_fail = smesh::Env::read_string("SFEM_STEP_ON_FAIL", "abort");
     int               tstep0        = 0;
     real_t            t0            = 0;
     bool              resumed       = false;
@@ -4834,6 +4951,11 @@ int main(int argc, char **argv) {
     // Absolute, so a segmented run and a single one report the same instants and a frame
     // written in segment three is not labelled as though it were the third frame overall.
     const int    abs_step = tstep0 + tstep + 1;
+    // The instant this step lands on. Assigned inside the retry below, because a cutback
+    // changes the size this step takes and therefore the time it reaches, but declared out
+    // here because the frame writer, the diagnostics row and the restart all read it after
+    // the retry has settled on a step that converged.
+    real_t       t_abs    = 0;
     // Wall time of this step, reported as the diagnostics' t_step column. The cost model a
     // long campaign is planned from needs the per-step cost directly: t_solve is a run total,
     // and lin_it is cumulative, so both have to be differenced to say what one step cost --
@@ -4852,6 +4974,21 @@ int main(int argc, char **argv) {
     // coefficients need dt AND the previous dt: calling only on a change leaves the operator
     // holding a stale dt_prev on the step after one, which is exactly where the coefficients
     // matter most.
+    // The step's own retry loop. One pass unless SFEM_STEP_ON_FAIL=cutback and the step fails,
+    // in which case the state is restored, dt shrinks and the body runs again at the smaller
+    // size. Re-entering HERE rather than lower down is what makes the retry correct without a
+    // second copy of the step's set-up: set_time_step is re-called with the new size and the
+    // unchanged dt_prev_step that BDF2 needs, the convective outflow re-extrapolates with the
+    // size actually being attempted, and `have_guess` rebuilds the continuation schedule that
+    // the failed attempt's bisections had grown.
+    //
+    // The body is not re-indented for this loop. It is 1100 lines long and the file already
+    // keeps it at the enclosing level for exactly that reason.
+    int cutbacks_here = 0;
+    for (;;) {
+    if (cutback_on && dt_step > real_t(0)) std::copy(x, x + ndof, x_step_start.begin());
+    const real_t p_solved_at_step    = p_solved;
+    const int    p_ramp_left_at_step = p_ramp_left;
     dt_taken = dt_now;
     if (dt_step > real_t(0)) op->set_time_step(dt_taken, bdf_order, dt_prev_step);
     t_run += dt_taken;
@@ -4862,8 +4999,8 @@ int main(int argc, char **argv) {
     // seam and read 1.110223e-16 against 0.000000e+00 the moment this became a sum. For a
     // fixed step n*dt is also the more accurate answer, since it accumulates no error at all;
     // the sum is only needed when there is no single dt to multiply by.
-    const real_t t_abs    = (cfl_target > real_t(0)) ? (t0 + t_run)
-                                                     : (t0 + (real_t)(tstep + 1) * dt_step);
+    t_abs = dt_varies ? (t0 + t_run)
+                      : (t0 + (real_t)(tstep + 1) * dt_step);
     if (dt_step > real_t(0)) std::printf("=== step %d (segment %d/%d)  t = %g ===\n", abs_step, tstep + 1,
                                          nsteps, (double)t_abs);
     // ------------------------------------------------ the convective outflow, du/dt + U_c du/dn = 0
@@ -5983,22 +6120,50 @@ int main(int argc, char **argv) {
     // already on disk is the last step that did converge, so leaving it untouched is what
     // makes the campaign resumable from the last good state.
     if (dt_step > real_t(0) && !converged) {
+        // Cutback: put the step back exactly as it was found, shrink dt and try again.
+        //
+        // What has to be undone is short, because most of the step's state is rebuilt on
+        // re-entry: `have_guess` reassigns rho_schedule and clears rho_solved, re_retries and
+        // step_f, and dt_prev_step is only assigned at the bottom of the loop, so it still
+        // holds the last CONVERGED size that BDF2's variable-step coefficients want. What it
+        // does not rebuild is the pressure ramp -- p_solved and p_ramp_left advance per
+        // converged stage and would otherwise claim increments the restored state never took.
+        const real_t dt_next = dt_now * cutback_factor;
+        const bool   room    = cutbacks_here < cutback_max &&
+                             (dt_min <= real_t(0) || dt_next >= dt_min);
+        if (cutback_on && room) {
+            std::copy(x_step_start.begin(), x_step_start.end(), x);
+            p_solved    = p_solved_at_step;
+            p_ramp_left = p_ramp_left_at_step;
+            t_run -= dt_taken;
+            dt_now      = dt_next;
+            dt_varies   = true;
+            ++cutbacks_here;
+            ++cutbacks_in;
+            good_steps = 0;
+            std::printf("step %d did not converge at dt = %.6g -- cutback %d/%d to dt = %.6g\n",
+                        abs_step, (double)dt_taken, cutbacks_here, cutback_max, (double)dt_now);
+            continue;
+        }
         std::fprintf(stderr,
                      "step %d (t = %.17g) FAILED to converge: %d Newton iterations, ||R|| %.6e, "
                      "rel %.6e\n",
                      abs_step, (double)t_abs, newton_it, (double)step_last_rnorm,
                      (double)(r0 > 0 ? step_last_rnorm / r0 : step_last_rnorm));
+        if (cutback_on)
+            std::fprintf(stderr,
+                         "cutback exhausted after %d of %d retries at dt = %.6g%s\n",
+                         cutbacks_here, cutback_max, (double)dt_taken,
+                         (dt_min > real_t(0) && dt_next < dt_min)
+                                 ? " (the next size would fall below SFEM_DT_MIN)"
+                                 : "");
         if (!restart_out.empty())
             std::fprintf(stderr, "restart: resume from '%s', which still holds the last converged step\n",
                          restart_out.c_str());
-        if (step_on_fail != "abort") {
-            std::fprintf(stderr,
-                         "SFEM_STEP_ON_FAIL='%s' is not implemented yet; only 'abort' is. Refusing rather "
-                         "than continuing, because the alternative is the silent acceptance this replaces.\n",
-                         step_on_fail.c_str());
-        }
         return EXIT_FAILURE;
     }
+    break;
+    }  // step retry
 
     // Shift the history: u^{n-1} <- u^n, u^n <- the state just solved for. Done after the
     // step rather than before the next one so a run that stops early leaves the history
@@ -6259,13 +6424,32 @@ int main(int argc, char **argv) {
             // coefficients on the first step of every segment.
             meta << (double)dt_now << "\n"
                  << (double)dt_prev_step << "\n"
-                 << (cfl_target > real_t(0) ? 0 : 1) << "\n";
+                 << (dt_varies ? 0 : 1) << "\n";
             if (rc != SFEM_SUCCESS || !meta) {
                 std::fprintf(stderr, "restart: failed to write '%s'\n", restart_out.c_str());
                 return EXIT_FAILURE;
             }
             std::printf("restart: wrote step %d, t = %.17g to '%s'\n", abs_step, (double)t_abs,
                         restart_out.c_str());
+        }
+    }
+    // Earn the requested step size back after a run of converged steps.
+    //
+    // Only for a fixed step: with SFEM_CFL_TARGET set, dt_now is the controller's to choose and
+    // a second rule moving it would be two paths steering one quantity. Growth is by the same
+    // factor the cutback used, so the size walks back up the way it came rather than jumping,
+    // and it stops at the size the caller asked for -- this recovers from a cutback, it does
+    // not adapt beyond SFEM_DT.
+    if (dt_step > real_t(0) && cutback_on && cutbacks_in > 0 && cfl_target <= real_t(0)) {
+        if (++good_steps >= recover_after) {
+            const real_t want = std::min(dt_now / cutback_factor, dt_step);
+            if (want != dt_now) {
+                std::printf("step %d: %d converged steps since the last cutback -- dt %.6g to %.6g\n",
+                            abs_step, good_steps, (double)dt_now, (double)want);
+                dt_now = want;
+            }
+            if (dt_now >= dt_step) cutbacks_in = 0;
+            good_steps = 0;
         }
     }
     // The step just completed becomes the previous step for the next one's BDF2 coefficients.
