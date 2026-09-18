@@ -36,6 +36,16 @@ namespace sfem {
                         real_t *const        values) override;
         int hessian_diag(const real_t *const x, real_t *const values) override;
 
+        /// The block-diagonal, upper-triangle-packed format.
+        ///
+        /// A lumped mass times `alpha` is `alpha * m * I` on each node's block,
+        /// so only the packed diagonal entries take a contribution and the
+        /// off-diagonals are left alone.  It exists because an energy material
+        /// holding a scheme forwards every assembly to this operator, and a
+        /// format that quietly skipped the inertia would assemble a tangent
+        /// that does not match the residual beside it.
+        int hessian_block_diag_sym(const real_t *const x, real_t *const values) override;
+
         int gradient(const real_t *const x, real_t *const out) override;
         int apply(const real_t *const x, const real_t *const h, real_t *const out) override;
         int value(const real_t *x, real_t *const out) override;

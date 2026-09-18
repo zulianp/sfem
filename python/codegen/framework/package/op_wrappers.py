@@ -517,7 +517,8 @@ def _inexact_declarations(material):
     int inexact_apply(const real_t *const h, real_t *const out) override;"""
 
 
-def _header(material, residual, publishes_value_steps=None, node_wise=False):
+def _header(material, residual, publishes_value_steps=None, node_wise=False,
+            holds_time_scheme=None):
     """The Op's declared interface.
 
     ``publishes_value_steps`` says whether this Op offers the Newton
@@ -557,6 +558,13 @@ def _header(material, residual, publishes_value_steps=None, node_wise=False):
         """
     sfem::Op::ValueReduction value_reduction() const override;""" if node_wise else ""
     )
+    # A material with a rate must hold a scheme, because its kernels cannot be
+    # evaluated without the shift and the history.  An energy material may hold
+    # one without having a rate at all: the scheme's separable term is a
+    # potential, and adding it here is what makes `f->add_operator(material)`
+    # the whole of a dynamic problem instead of the half that forgets the
+    # inertia.
+    holds_scheme = _has_time_rate(material) if holds_time_scheme is None else holds_time_scheme
     matrix_methods = """
     int hessian_bsr(const real_t *const x,
             const count_t *const rowptr,
@@ -642,9 +650,9 @@ namespace sfem {
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "extra": extra,
-        "time_scheme_declaration": _HEADER_TIME_SCHEME_DECLARATION[_has_time_rate(material)],
-        "time_scheme_base": _HEADER_TIME_SCHEME_BASE[_has_time_rate(material)],
-        "time_scheme_include": _HEADER_TIME_SCHEME_INCLUDE[_has_time_rate(material)],
+        "time_scheme_declaration": _HEADER_TIME_SCHEME_DECLARATION[holds_scheme],
+        "time_scheme_base": _HEADER_TIME_SCHEME_BASE[holds_scheme],
+        "time_scheme_include": _HEADER_TIME_SCHEME_INCLUDE[holds_scheme],
         "value_steps": value_steps,
         "matrix_methods": matrix_methods,
         "inexact_methods": _inexact_declarations(material),
@@ -1332,6 +1340,15 @@ namespace sfem {
       }
     }
 
+    //! The part of the time discretisation that is not in this material's form:
+    //! the inertia.  It is a *potential* here, because this operator's 0-form
+    //! is one, so it reaches `value_steps` as well as `gradient` -- the energy
+    //! merit and the residual have to describe the same problem, or a line
+    //! search minimises something the Newton step is not solving.
+    std::shared_ptr<Op> time_scheme_term(const std::shared_ptr<TimeScheme> &scheme) {
+      return scheme ? scheme->inertia_op() : nullptr;
+    }
+
 %(yaml_helpers)s
 
     smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
@@ -1417,6 +1434,7 @@ namespace sfem {
 
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
+    std::shared_ptr<TimeScheme> time_scheme;
 %(element_scratch_fields)s
     bool objective_uses_affine{false};
     bool gradient_uses_affine{false};
@@ -1527,8 +1545,24 @@ namespace sfem {
     return SFEM_SUCCESS;
   }
 
+  void %(op)s::set_time_scheme(const std::shared_ptr<TimeScheme> &scheme) {
+    SFEM_TRACE_SCOPE("%(op)s::set_time_scheme");
+    if (impl_->time_scheme) {
+      impl_->time_scheme->release(this);
+    }
+    impl_->time_scheme = scheme;
+    if (scheme) {
+      scheme->claim(this);
+    }
+  }
+
   int %(op)s::gradient(const real_t *const x, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->gradient(x, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -1566,6 +1600,11 @@ namespace sfem {
                       const real_t *const h,
                       real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::apply");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->apply(x, h, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -1633,6 +1672,14 @@ namespace sfem {
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
     }
+    // The scheme's potential, at every trial step the line search asks about.
+    // `value` is `value_steps` at one step of length zero, so adding it here
+    // covers both and cannot let them disagree.
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->value_steps(x, h, nsteps, steps, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
@@ -1672,6 +1719,11 @@ namespace sfem {
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_crs");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_crs(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
 %(hessian_crs_current_prologue)s
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
@@ -1685,6 +1737,11 @@ namespace sfem {
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
 %(hessian_bsr_current_prologue)s
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
@@ -1699,6 +1756,11 @@ namespace sfem {
   int %(op)s::hessian_block_diag_sym(%(hessian_block_diag_sym_current_parameter)s,
                                        real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_block_diag_sym");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_block_diag_sym(x, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
 %(hessian_block_diag_sym_current_prologue)s
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
@@ -1967,7 +2029,7 @@ namespace sfem {
             inexact % {"op": _op_class_name(material)} + marker,
             1,
         )
-    return _header(material, False), source
+    return _header(material, False, holds_time_scheme=True), source
 
 
 def _residual_op(material, elements, c_abi_header=None, form_collections=None, kernel_sources=None):
@@ -9526,11 +9588,12 @@ def _hyperelastic_hessian_current_parameter(apply_dependencies_by_dim):
     `-Wextra -Werror` rejects, and the discard that used to silence it said the
     same thing twice.
     """
-    uses_current = any(
-        bool(getattr(dependencies, "current", False))
-        for dependencies in apply_dependencies_by_dim.values()
-    )
-    return "const real_t *const x" if uses_current else "const real_t *const"
+    # Every hessian in this wrapper forwards the state to the time scheme's
+    # term before assembling its own, so the parameter is always read and
+    # always named.  It used to be left anonymous where the material's own body
+    # ignored it, which `-Wextra -Werror` required.
+    del apply_dependencies_by_dim
+    return "const real_t *const x"
 
 
 def _hyperelastic_hessian_current_prologue(op_name, operation, apply_dependencies_by_dim):

@@ -27,4 +27,12 @@ namespace sfem {
                                          const real_t         alpha,
                                          real_t *const        values);
 
+    /// The block-diagonal, upper-triangle-packed format.  `alpha * m * I` on
+    /// each node's block, so only the packed diagonal entries are touched.
+    int cu_inertia_potential_hessian_block_diag_sym(const ptrdiff_t     n_nodes,
+                                                    const int           block_size,
+                                                    const real_t *const mass,
+                                                    const real_t        alpha,
+                                                    real_t *const       values);
+
 }  // namespace sfem

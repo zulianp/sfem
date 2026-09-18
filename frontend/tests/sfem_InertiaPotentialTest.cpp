@@ -211,6 +211,25 @@ int test_inertia_potential_device_matches_host() {
         }
     }
 
+    // The block-diagonal symmetric format, which is the third kernel.
+    {
+        const int       bs      = space->block_size();
+        const ptrdiff_t n_nodes = ndofs / bs;
+        const int       packed  = bs * (bs + 1) / 2;
+
+        auto host_sym = sfem::create_host_buffer<real_t>(n_nodes * packed);
+        SFEM_TEST_ASSERT(host_op.hessian_block_diag_sym(nullptr, host_sym->data()) == SFEM_SUCCESS);
+
+        auto d_sym = sfem::create_buffer<real_t>(n_nodes * packed, sfem::EXECUTION_SPACE_DEVICE);
+        SFEM_TEST_ASSERT(device_op.hessian_block_diag_sym(nullptr, d_sym->data()) == SFEM_SUCCESS);
+        auto back_sym = smesh::to_host(d_sym);
+
+        SFEM_TEST_ASSERT(host_sym->data()[0] != real_t(0));
+        for (ptrdiff_t k = 0; k < n_nodes * packed; ++k) {
+            SFEM_TEST_ASSERT(std::abs(host_sym->data()[k] - back_sym->data()[k]) <= 1e-12);
+        }
+    }
+
     return SFEM_TEST_SUCCESS;
 }
 #endif  // SFEM_ENABLE_CUDA

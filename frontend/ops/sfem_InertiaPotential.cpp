@@ -197,6 +197,38 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
+    int InertiaPotential::hessian_block_diag_sym(const real_t *const, real_t *const SFEM_RESTRICT values) {
+        SFEM_TRACE_SCOPE("InertiaPotential::hessian_block_diag_sym");
+
+        if (impl_->ensure_state() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+
+        const int       bs      = impl_->space->block_size();
+        const ptrdiff_t n_nodes = impl_->space->n_dofs() / bs;
+        const int       packed  = bs * (bs + 1) / 2;
+
+#ifdef SFEM_ENABLE_CUDA
+        if (impl_->es == EXECUTION_SPACE_DEVICE) {
+            return cu_inertia_potential_hessian_block_diag_sym(
+                    n_nodes, bs, impl_->mass->data(), impl_->alpha, values);
+        }
+#endif
+
+        const real_t *const SFEM_RESTRICT mass  = impl_->mass->data();
+        const real_t                      alpha = impl_->alpha;
+
+#pragma omp parallel for
+        for (ptrdiff_t node = 0; node < n_nodes; ++node) {
+            real_t *const block = &values[node * packed];
+            for (int d = 0; d < bs; ++d) {
+                // The packed index of entry (d, d) in the upper triangle.
+                block[d * bs - d * (d - 1) / 2] += alpha * mass[node * bs + d];
+            }
+        }
+        return SFEM_SUCCESS;
+    }
+
     int InertiaPotential::gradient(const real_t *const SFEM_RESTRICT x, real_t *const SFEM_RESTRICT out) {
         SFEM_TRACE_SCOPE("InertiaPotential::gradient");
 

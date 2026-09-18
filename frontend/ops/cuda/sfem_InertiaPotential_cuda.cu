@@ -57,6 +57,21 @@ namespace sfem {
             }
         }
 
+        __global__ void inertia_potential_block_diag_sym(const ptrdiff_t                   n_nodes,
+                                                         const int                         block_size,
+                                                         const real_t *const SFEM_RESTRICT mass,
+                                                         const real_t                      alpha,
+                                                         real_t *const SFEM_RESTRICT       values) {
+            const int packed = block_size * (block_size + 1) / 2;
+            for (ptrdiff_t node = blockIdx.x * blockDim.x + threadIdx.x; node < n_nodes;
+                 node += blockDim.x * gridDim.x) {
+                real_t *const block = &values[node * packed];
+                for (int d = 0; d < block_size; ++d) {
+                    block[d * block_size - d * (d - 1) / 2] += alpha * mass[node * block_size + d];
+                }
+            }
+        }
+
         ptrdiff_t grid_for(const ptrdiff_t n, const int block) {
             return std::max(ptrdiff_t(1), (n + block - 1) / block);
         }
@@ -91,6 +106,21 @@ namespace sfem {
         const int block = 128;
         inertia_potential_bsr_diagonal<<<grid_for(n_nodes, block), block>>>(
                 n_nodes, block_size, rowptr, colidx, mass, alpha, values);
+
+        SFEM_DEBUG_SYNCHRONIZE();
+        return SFEM_SUCCESS;
+    }
+
+    int cu_inertia_potential_hessian_block_diag_sym(const ptrdiff_t     n_nodes,
+                                                    const int           block_size,
+                                                    const real_t *const mass,
+                                                    const real_t        alpha,
+                                                    real_t *const       values) {
+        SFEM_DEBUG_SYNCHRONIZE();
+
+        const int block = 128;
+        inertia_potential_block_diag_sym<<<grid_for(n_nodes, block), block>>>(
+                n_nodes, block_size, mass, alpha, values);
 
         SFEM_DEBUG_SYNCHRONIZE();
         return SFEM_SUCCESS;
