@@ -15,6 +15,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_BackwardEulerScheme.hpp"
 #include "sfem_NewmarkScheme.hpp"
 #include "sfem_TimeScheme.hpp"
 
@@ -352,6 +353,66 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    /// The claim the whole arrangement exists to buy, stated across schemes of
+    /// two different families rather than two parameterisations of one.
+    ///
+    /// `BackwardEulerScheme` is first order and publishes no separable term;
+    /// `NewmarkScheme` is second order and publishes an inertia.  The material
+    /// is the same object in both cases, compiled once, and neither scheme is
+    /// named anywhere in its form.
+    int test_a_first_order_scheme_runs_the_same_material() {
+        auto fixture = make_fixture();
+        SFEM_TEST_ASSERT(fixture.op->initialize() == SFEM_SUCCESS);
+
+        auto steppable = std::dynamic_pointer_cast<sfem::TimeSteppable>(fixture.op);
+        SFEM_TEST_ASSERT(steppable != nullptr);
+
+        const real_t dt     = real_t(0.01);
+        auto         scheme = std::make_shared<sfem::BackwardEulerScheme>(fixture.space);
+        SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
+        seed_state(fixture.ndofs, 0, scheme->state()->data());
+        scheme->begin_step(0, dt);
+
+        // Backward Euler is `shift = 1/dt`, `z = -u_n/dt`, and nothing else.
+        SFEM_TEST_ASSERT(std::fabs(scheme->shift() - 1 / dt) <= 1e-12 / dt);
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+            const real_t expected = -scheme->state()->data()[i] / dt;
+            SFEM_TEST_ASSERT(std::fabs(scheme->history()[i] - expected) <=
+                             1e-12 * std::fabs(expected) + 1e-15);
+        }
+        // No separable term, so nothing is added to the material's residual.
+        SFEM_TEST_ASSERT(scheme->inertia_op() == nullptr);
+
+        auto x = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        seed_state(fixture.ndofs, 3, x->data());
+
+        // The same equality the Newmark cases assert: held equals the long-hand
+        // assembly.  With no separable term the two are bit for bit.
+        auto held = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        steppable->set_time_scheme(scheme);
+        SFEM_TEST_ASSERT(fixture.op->gradient(x->data(), held->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(has_nonzero(fixture.ndofs, held->data()));
+
+        auto history = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        std::copy(scheme->history(), scheme->history() + fixture.ndofs, history->data());
+        steppable->set_time_scheme(nullptr);
+        set_material_parameter(fixture.op, fixture.mesh, "u_dt_shift", scheme->shift());
+        fixture.op->set_field("previous", history, 0);
+
+        auto pushed = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        SFEM_TEST_ASSERT(fixture.op->gradient(x->data(), pushed->data()) == SFEM_SUCCESS);
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+            SFEM_TEST_ASSERT(held->data()[i] == pushed->data()[i]);
+        }
+
+        // And it carries the step: `advance` is the whole of its memory.
+        scheme->advance(x->data());
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+            SFEM_TEST_ASSERT(scheme->state()->data()[i] == x->data()[i]);
+        }
+        return SFEM_TEST_SUCCESS;
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -360,6 +421,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_a_second_scheme_needs_no_regeneration);
     SFEM_RUN_TEST(test_the_merit_reads_what_the_residual_reads);
     SFEM_RUN_TEST(test_advance_reconstructs_the_state);
+    SFEM_RUN_TEST(test_a_first_order_scheme_runs_the_same_material);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
