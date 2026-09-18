@@ -1365,7 +1365,7 @@ def _sfem_soa_block_function(
             else tuple(range(n_nodes))
         ),
         uses_current=form_reads_current(form, default=True),
-        uses_direction=form_reads_direction(form, default=form.has_direction),
+        uses_direction=_weak_form_reads_direction(form),
         source_builder=source_builder,
     )
     # Selected, not branched on.  Both take the same arguments now, so which
@@ -1382,6 +1382,196 @@ def _sfem_soa_block_function(
         use_shared_weak_local=use_shared_weak_local,
         constant_p1_gradient_expansion=constant_p1_gradient_expansion,
     )
+
+
+#: Whether a weak-form body forms the direction's gradient as well as the
+#: base's.  A form that contracts against a direction does, and so does a
+#: stepped objective, whose density mentions no direction at all: the alphas
+#: are inside the block now, so it is handed the base and the direction and
+#: combines them per step rather than being handed one combined field per
+#: alpha.  See `ObjectiveStepLoop`.
+_WEAK_FORM_READS_DIRECTION = {
+    True: lambda form: True,
+    False: lambda form: form_reads_direction(form, default=form.has_direction),
+}
+
+
+def _weak_form_reads_direction(form):
+    return _WEAK_FORM_READS_DIRECTION[publishes_objective_steps(form)](form)
+
+
+#: What a body calls the gradient it maps.  `gu` stays the name the energy
+#: density was printed against, so a stepped body renames what it maps -- that
+#: being the base of the combination rather than its value -- and leaves the
+#: expression alone.
+_WEAK_GRADIENT_NAME = {True: "gu_base", False: "gu"}
+
+
+def _weak_gradient_name(form):
+    return _WEAK_GRADIENT_NAME[publishes_objective_steps(form)]
+
+
+#: How a stepped objective spells `gu = gu_base + alpha * trial_grad`.  Two
+#: spellings because the bodies have two: the tensor-product body names its
+#: gradient as an array and the simplex bodies as scalars, which is the axis
+#: `scalar_temporaries` already carries through the substitutions.  A table
+#: rather than a test, so the choice reads as the body's own.
+_STEP_GRADIENT_COMBINATION = {
+    True: lambda components, indent, base, direction: [
+        "%sconst s_t gu%d = %s + alpha * %s;" % (indent, i, base(i), direction(i))
+        for i in range(components)
+    ],
+    False: lambda components, indent, base, direction: (
+        ["%ss_t gu[%d];" % (indent, components)]
+        + [
+            "%sgu[%d] = %s + alpha * %s;" % (indent, i, base(i), direction(i))
+            for i in range(components)
+        ]
+    ),
+}
+
+
+class ObjectiveStepLoop:
+    """The stepped objective's two work-item loops, and the alphas between them.
+
+    A line search asks for the energy at `x + alpha * h` for several alphas, and
+    the mesh kernel used to ask once per alpha: it rebuilt `u = u_base +
+    alpha * h` per shape function and called the block again, so every alpha
+    repeated the whole sum factorization and the whole geometric transform.
+    Both are linear, so the gradient of the base and of the direction can be
+    formed once, transformed once, and only their combination and the energy
+    density left inside the loop.  `nsteps` gradients become two, whatever the
+    line search asks for.
+
+    Where the loop goes is decided by the work item rather than by the
+    arithmetic.  Putting it inside the work-item loop is the obvious reading of
+    "hoist what does not depend on alpha", and on a CPU target it is wrong: the
+    work item is a SIMD lane, and a lane loop with another loop inside it is no
+    longer innermost, so it does not vectorise at all.  Measured on the HEX8
+    objective with `-Rpass=loop-vectorize`, clang reported the *step* loop
+    vectorised -- gathering `value[step * value_stride + lane]` across steps --
+    and said nothing about the lane loop.  So the alpha-independent gradients go
+    to lane-indexed buffers, the first loop closes, and the step loop opens a
+    second work-item loop that combines them with the lane innermost where it
+    belongs.
+    """
+
+    def __init__(self, components, scalar_temporaries, work_item, source_builder,
+                 geometry_lines, indent):
+        self.components = components
+        self.scalar_temporaries = scalar_temporaries
+        self.work_item = work_item
+        self.source_builder = source_builder
+        self.geometry_lines = tuple(geometry_lines)
+        self.indent = indent
+
+    def buffer_lines(self):
+        """Lane-indexed room for the two gradients, outside the first loop."""
+        return [
+            "%ss_t %s[%d * VS];" % (self.indent, name, self.components)
+            for name in ("gu_base_v", "trial_grad_v")
+        ]
+
+    def base(self, index):
+        return "gu_base_v[%d * VS + %s]" % (index, self.work_item)
+
+    def direction(self, index):
+        return "trial_grad_v[%d * VS + %s]" % (index, self.work_item)
+
+    def open_lines(self):
+        """Close the first work-item loop, open the step loop and the second."""
+        inner = self.indent + "  "
+        body = inner + "  "
+        lines = [
+            "%s}" % self.indent,
+            "%sfor (int step = 0; step < nsteps; ++step) {" % self.indent,
+            "%sconst s_t alpha = steps[step];" % inner,
+        ]
+        lines.extend(_work_item_loop_lines(self.source_builder, inner))
+        lines.extend("%s%s" % (body, line) for line in self.geometry_lines)
+        lines.extend(
+            _STEP_GRADIENT_COMBINATION[self.scalar_temporaries](
+                self.components, body, self.base, self.direction
+            )
+        )
+        return lines
+
+    def close_lines(self):
+        return ["%s  }" % self.indent, "%s}" % self.indent]
+
+
+#: That loop, or nothing when the form is the plain objective.
+_OBJECTIVE_STEP_LOOP = {
+    True: ObjectiveStepLoop,
+    False: lambda *_arguments: None,
+}
+
+
+def _objective_step_loop(form, weak_form, dim, scalar_temporaries, work_item,
+                         source_builder, geometry_lines, indent):
+    return _OBJECTIVE_STEP_LOOP[publishes_objective_steps(form)](
+        weak_form.n_field_components * dim,
+        scalar_temporaries,
+        work_item,
+        source_builder,
+        geometry_lines,
+        indent,
+    )
+
+
+#: The plain 0-form, spelled as the stepped one at a single step of zero.
+#:
+#: `plans.form_emission.objective_kernel_variants` already settled this one
+#: level up: `x + 0 * h` is `x` exactly in IEEE arithmetic for any finite
+#: increment, so the plain objective is the stepped objective with one alpha of
+#: zero, and the generated `Op`'s `value` forwards to `value_steps` for that
+#: reason.  The element API's energy asks the same question of the same block,
+#: so it gives the same answer here rather than keeping a second block that
+#: differs only in taking no alphas.
+#:
+#: The increment is the state itself, which is what makes it free of any
+#: buffer: nothing reads it, because the only thing multiplied by it is zero.
+_PLAIN_OBJECTIVE_STEP_ARGUMENTS = {
+    True: lambda direction_streams, value_stride: (
+        direction_streams,
+        "1",
+        "&objective_step",
+        value_stride,
+    ),
+    False: lambda direction_streams, value_stride: (),
+}
+
+#: And the zero it reads, declared where the element API's energy calls from.
+_PLAIN_OBJECTIVE_STEP_DECLARATION = {
+    True: ("    const s_t objective_step = s_t(0);",),
+    False: (),
+}
+
+
+def _plain_objective_step_arguments(form, direction_streams, value_stride):
+    return _PLAIN_OBJECTIVE_STEP_ARGUMENTS[publishes_objective_steps(form)](
+        direction_streams, value_stride
+    )
+
+
+#: The alphas a stepped objective evaluates at, and how its output is laid out.
+#: They are the block's because the step loop is the block's: see
+#: `ObjectiveStepLoop` for why the alphas moved inside.  The stride is the
+#: caller's -- a mesh kernel writes one element's column of a
+#: `nsteps x nelements` array -- so the block is told it rather than deriving it
+#: from a mesh it cannot see.
+_OBJECTIVE_STEP_PARAMETERS = {
+    True: (
+        "const int nsteps",
+        "const s_t *const RSTR steps",
+        "const ptrdiff_t value_stride",
+    ),
+    False: (),
+}
+
+
+def _objective_step_parameters(form):
+    return _OBJECTIVE_STEP_PARAMETERS[publishes_objective_steps(form)]
 
 
 def _sfem_soa_weak_form_block_function(
@@ -1422,6 +1612,7 @@ def _sfem_soa_weak_form_block_function(
             params.append(
                 "const s_t *const RSTR h_streams[NS * %d]" % n_field_components
             )
+        params.extend(_objective_step_parameters(form))
         params.append(
             _BLOCK_OUTPUT_PARAMETER[form_accumulation(form)](n_field_components)
         )
@@ -1436,6 +1627,7 @@ def _sfem_soa_weak_form_block_function(
                 "const s_t *const RSTR %s" % name
                 for name in _field_stream_names("h", n_field_components, n_nodes)
             )
+        params.extend(_objective_step_parameters(form))
         params.extend(
             "s_t *const RSTR %s" % name
             for name in _output_stream_names(form, n_field_components, n_nodes)
@@ -1779,17 +1971,18 @@ def _constant_p1_specialized_local_prefix(local_prefix, quadrature_rule):
 #: named.
 def _tensor_weak_scalar_tail(
     lines, form, weak_form, substitutions, dim, n_field_components,
-    work_item, geometry_value, out_streams, closing,
+    work_item, geometry_value, out_streams, closing, step_gradient=None,
 ):
     """A 0-form: weight the density and add it in.  Nothing to contract."""
     _append_weak_objective_accumulation(
-        lines, form, weak_form, substitutions, work_item, geometry_value, closing
+        lines, form, weak_form, substitutions, work_item, geometry_value, closing,
+        step_gradient=step_gradient,
     )
 
 
 def _tensor_weak_per_shape_tail(
     lines, form, weak_form, substitutions, dim, n_field_components,
-    work_item, geometry_value, out_streams, closing,
+    work_item, geometry_value, out_streams, closing, step_gradient=None,
 ):
     """A 1- or 2-form: form the loperand, then sum-factorise it onto the tests."""
     material = _weak_form_material_expression(
@@ -1843,7 +2036,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
     work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
     uses_current = form_reads_current(form, default=True)
-    uses_direction = form_reads_direction(form, default=form.has_direction)
+    uses_direction = _weak_form_reads_direction(form)
+    gradient_name = _weak_gradient_name(form)
     u_streams = "u_streams" if use_stream_arrays else "weak_u_streams"
     h_streams = "h_streams" if use_stream_arrays else "weak_h_streams"
     out_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
@@ -1901,6 +2095,21 @@ def _append_sfem_soa_tensor_weak_form_lines(
             % (component, component)
         )
     lines.append("    const s_t *const RSTR det_q0 = det0 + q * geometry_stride;")
+    step_loop = _objective_step_loop(
+        form,
+        weak_form,
+        dim,
+        False,
+        work_item,
+        source_builder,
+        # The density is scaled by the measure, so the second work-item loop
+        # reads the determinant again rather than carrying it across.
+        ["const s_t %s = det_q0[%s];"
+         % (_work_item_name(source_builder, "det", 0), work_item)],
+        "    ",
+    )
+    if step_loop is not None:
+        lines.extend(step_loop.buffer_lines())
     lines.extend(_work_item_loop_lines(source_builder, "    "))
     for component in range(dim * dim):
         lines.append(
@@ -1918,14 +2127,28 @@ def _append_sfem_soa_tensor_weak_form_lines(
     def geometry_value(name, component):
         return _work_item_name(source_builder, name, component)
 
-    if uses_current:
-        lines.append(
-            "      s_t gu[%d];" % (weak_form.n_field_components * dim)
-        )
-    if uses_direction:
-        lines.append(
-            "      s_t trial_grad[%d];" % (weak_form.n_field_components * dim)
-        )
+    # Where the two mapped gradients land: scalars in this loop for the plain
+    # objective, lane-indexed buffers for the stepped one, which reads them back
+    # in the loop the alphas open.
+    base_target = (
+        (lambda index: "%s[%d]" % (gradient_name, index))
+        if step_loop is None
+        else step_loop.base
+    )
+    direction_target = (
+        (lambda index: "trial_grad[%d]" % index)
+        if step_loop is None
+        else step_loop.direction
+    )
+    if step_loop is None:
+        if uses_current:
+            lines.append(
+                "      s_t %s[%d];" % (gradient_name, weak_form.n_field_components * dim)
+            )
+        if uses_direction:
+            lines.append(
+                "      s_t trial_grad[%d];" % (weak_form.n_field_components * dim)
+            )
 
     lines.append(
         "      const s_t idet = s_t(1) / %s;"
@@ -1944,8 +2167,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "      gu[%d] = (%s) * idet;"
-                    % (row * dim + col, " + ".join(terms))
+                    "      %s = (%s) * idet;"
+                    % (base_target(row * dim + col), " + ".join(terms))
                 )
             if uses_direction:
                 terms = [
@@ -1958,8 +2181,8 @@ def _append_sfem_soa_tensor_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "      trial_grad[%d] = (%s) * idet;"
-                    % (row * dim + col, " + ".join(terms))
+                    "      %s = (%s) * idet;"
+                    % (direction_target(row * dim + col), " + ".join(terms))
                 )
 
     deformation_gradient_substitutions = _weak_form_deformation_gradient_substitutions(
@@ -1976,7 +2199,10 @@ def _append_sfem_soa_tensor_weak_form_lines(
         work_item,
         geometry_value,
         out_streams,
-        ["    }", "  }"],
+        # The stepped tail closes the work-item loop itself, before the alphas:
+        # what is left here is the quadrature loop.
+        ["  }"] if step_loop is not None else ["    }", "  }"],
+        step_gradient=step_loop,
     )
 
 
@@ -2016,33 +2242,62 @@ def _constant_p1_field_gradient_expr(reference_gradients, dim, field_value, comp
     return _sum_cpp_terms(terms)
 
 
+#: Which field the metric contraction reads, when it reads one.
+_METRIC_CONTRACTED_FIELD = {True: "h", False: "u"}
+
+#: What the plan's degrees of freedom are bound to.  A stepped objective
+#: evaluates at `x + alpha * h`, so its are named inside the step loop rather
+#: than read from one field's stream; every other form contracts a single field
+#: and reads it directly.
+_METRIC_DOF_NAMES = {
+    True: lambda dim, stream, form: [
+        "u_step%d" % shape for shape in range(dim + 1)
+    ],
+    False: lambda dim, stream, form: [
+        stream(
+            _METRIC_CONTRACTED_FIELD[
+                form_reads_direction(form, default=form.has_direction)
+            ],
+            shape,
+        )
+        for shape in range(dim + 1)
+    ],
+}
+
+
 def _metric_plan_bindings(form, dim, source_builder, use_stream_arrays):
     """The plan's abstract `fff` and `u` bound to what this ABI calls them."""
     n_field_components = form_n_field_components(form, dim)
     work_item = _work_item_index(source_builder)
-    uses_direction = form_reads_direction(form, default=form.has_direction)
-    field = "h" if uses_direction else "u"
     stream_prefix = "" if use_stream_arrays else "weak_"
+
+    def stream(field, shape):
+        return "%s%s_streams[%s][%s]" % (
+            stream_prefix,
+            field,
+            c_product(shape, n_field_components),
+            work_item,
+        )
+
     bindings = {}
     for index, symbol in enumerate(metric_symbols(dim)):
         bindings[symbol] = sp.Symbol(
             _work_item_name(source_builder, "geom_metric", index)
         )
+    names = _METRIC_DOF_NAMES[publishes_objective_steps(form)](dim, stream, form)
     for shape, symbol in enumerate(dof_symbols(dim)):
-        bindings[symbol] = sp.Symbol(
-            "%s%s_streams[%s][%s]"
-            % (stream_prefix, field, c_product(shape, n_field_components), work_item)
-        )
-    return bindings, n_field_components, work_item
+        bindings[symbol] = sp.Symbol(names[shape])
+    return bindings, n_field_components, work_item, stream
 
 
 def _metric_scatter_lines(dim, metric, plan, bindings, n_field_components,
-                          work_item, use_stream_arrays):
+                          work_item, use_stream_arrays, value_index, indent):
     """A 1- or 2-form: one contribution per shape, scattered."""
     output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
     return [
-        "      %s[%s][%s] += %s;"
+        "%s%s[%s][%s] += %s;"
         % (
+            indent,
             output_streams,
             c_product(shape, n_field_components),
             work_item,
@@ -2053,7 +2308,7 @@ def _metric_scatter_lines(dim, metric, plan, bindings, n_field_components,
 
 
 def _metric_value_lines(dim, metric, plan, bindings, n_field_components,
-                        work_item, use_stream_arrays):
+                        work_item, use_stream_arrays, value_index, indent):
     """A 0-form: half the gradient contracted with its own flux, per element.
 
     `plan.outputs` after the first are the flux entries -- the first is minus
@@ -2066,8 +2321,8 @@ def _metric_value_lines(dim, metric, plan, bindings, n_field_components,
         gradient[d] * plan.outputs[d + 1] for d in range(dim)
     )
     return [
-        "      value[%s] += %s;"
-        % (work_item, _sfem_ccode(energy.xreplace(bindings)))
+        "%svalue[%s] += %s;"
+        % (indent, value_index, _sfem_ccode(energy.xreplace(bindings)))
     ]
 
 
@@ -2098,32 +2353,54 @@ def _append_constant_p1_metric_weak_form_lines(
     form reads nine and a determinant.
     """
     plan = p1_simplex_metric_apply_plan(dim)
-    bindings, n_field_components, work_item = _metric_plan_bindings(
+    steps = publishes_objective_steps(form)
+    bindings, n_field_components, work_item, stream = _metric_plan_bindings(
         form, dim, source_builder, use_stream_arrays
     )
-    lines.extend(_work_item_loop_lines(source_builder, "    "))
+    # Nothing this body computes is independent of the step -- the metric read
+    # is, and it is a load -- so the alphas go outside the work-item loop rather
+    # than inside it, which is where a SIMD lane has to stay innermost to
+    # vectorise.  `ObjectiveStepLoop` says the same thing where there is a
+    # gradient to hoist between the two loops.
+    value_index = work_item
+    loop_indent = "    "
+    if steps:
+        lines.append("    for (int step = 0; step < nsteps; ++step) {")
+        lines.append("      const s_t alpha = steps[step];")
+        value_index = "step * value_stride + %s" % work_item
+        loop_indent = "      "
+    indent = loop_indent + "  "
+    lines.extend(_work_item_loop_lines(source_builder, loop_indent))
     # A constant-P1 simplex has one quadrature point, so the offset is just the
     # work item: `q` is zero and the stride term vanishes.
     lines.append(
-        "      const ptrdiff_t goff = %s;" % work_item
+        "%sconst ptrdiff_t goff = %s;" % (indent, work_item)
     )
     for index in range(metric.metric_components):
         lines.append(
-            "      const s_t %s = geom_metric%d[goff];"
-            % (_work_item_name(source_builder, "geom_metric", index), index)
+            "%sconst s_t %s = geom_metric%d[goff];"
+            % (indent, _work_item_name(source_builder, "geom_metric", index), index)
         )
+    lines.extend(
+        "%sconst s_t u_step%d = %s + alpha * %s;"
+        % (indent, shape, stream("u", shape), stream("h", shape))
+        for shape in range(dim + 1)
+        if steps
+    )
     for symbol, expression in plan.temporaries:
         lines.append(
-            "      const s_t %s = %s;"
-            % (symbol, _sfem_ccode(expression.xreplace(bindings)))
+            "%sconst s_t %s = %s;"
+            % (indent, symbol, _sfem_ccode(expression.xreplace(bindings)))
         )
     lines.extend(
         _METRIC_BODY_BY_WRITES_PER_SHAPE[writes_per_shape(form)](
             dim, metric, plan, bindings, n_field_components,
-            work_item, use_stream_arrays,
+            work_item, use_stream_arrays, value_index, indent,
         )
     )
-    lines.append("    }")
+    lines.append("%s}" % loop_indent)
+    if steps:
+        lines.append("    }")
 
 
 #: The two tails A constant-P1 specialized body can have.  Both take the same arguments
@@ -2133,16 +2410,19 @@ def _append_constant_p1_metric_weak_form_lines(
 def _constant_p1_weak_scalar_tail(
     lines, form, weak_form, substitutions, dim, n_field_components,
     work_item, geometry_value, reference_gradients, use_stream_arrays, closing,
+    step_gradient=None,
 ):
     """A 0-form: weight the density and add it in."""
     _append_weak_objective_accumulation(
-        lines, form, weak_form, substitutions, work_item, geometry_value, closing
+        lines, form, weak_form, substitutions, work_item, geometry_value, closing,
+        step_gradient=step_gradient,
     )
 
 
 def _constant_p1_weak_per_shape_tail(
     lines, form, weak_form, substitutions, dim, n_field_components,
     work_item, geometry_value, reference_gradients, use_stream_arrays, closing,
+    step_gradient=None,
 ):
     """A 1- or 2-form: form the loperand and contract it onto the tests."""
     material = _weak_form_material_expression(
@@ -2204,7 +2484,8 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
     uses_current = form_reads_current(form, default=True)
-    uses_direction = form_reads_direction(form, default=form.has_direction)
+    uses_direction = _weak_form_reads_direction(form)
+    gradient_name = _weak_gradient_name(form)
 
     def field_value(field, row, shape):
         stream_prefix = "" if use_stream_arrays else "weak_"
@@ -2229,8 +2510,25 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     # loop has a single trip.  No strategy test is wanted here -- a
     # higher-order simplex never arrives, so a branch would describe a
     # case that cannot happen.
+    step_loop = _objective_step_loop(
+        form,
+        weak_form,
+        dim,
+        True,
+        work_item,
+        source_builder,
+        # The density is scaled by the measure, so the second work-item loop
+        # reads the determinant again rather than carrying it across.
+        [
+            "const ptrdiff_t goff = q * geometry_stride + %s;" % work_item,
+            "const s_t %s = det0[goff];" % geometry_value("det", 0),
+        ],
+        "      ",
+    )
     lines.append("    { const int q = 0;  // constant-P1 simplex")
     lines.append("      const s_t qw = q_weight[q];")
+    if step_loop is not None:
+        lines.extend(step_loop.buffer_lines())
     lines.extend(_work_item_loop_lines(source_builder, "      "))
     lines.append("      const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
@@ -2271,6 +2569,16 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                         ),
                     )
                 )
+    base_target = (
+        (lambda index: "const s_t %s%d" % (gradient_name, index))
+        if step_loop is None
+        else step_loop.base
+    )
+    direction_target = (
+        (lambda index: "const s_t trial_grad%d" % index)
+        if step_loop is None
+        else step_loop.direction
+    )
     lines.append(
         "      const s_t idet = s_t(1) / %s;"
         % geometry_value("det", 0)
@@ -2287,8 +2595,8 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "      const s_t gu%d = (%s) * idet;"
-                    % (row * dim + col, " + ".join(terms))
+                    "      %s = (%s) * idet;"
+                    % (base_target(row * dim + col), " + ".join(terms))
                 )
             if uses_direction:
                 terms = [
@@ -2300,8 +2608,8 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "      const s_t trial_grad%d = (%s) * idet;"
-                    % (row * dim + col, " + ".join(terms))
+                    "      %s = (%s) * idet;"
+                    % (direction_target(row * dim + col), " + ".join(terms))
                 )
 
     _CONSTANT_P1_WEAK_TAIL[form_accumulation(form)](
@@ -2315,7 +2623,8 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         geometry_value,
         reference_gradients,
         use_stream_arrays,
-        ["      }", "    }"],
+        ["    }"] if step_loop is not None else ["      }", "    }"],
+        step_gradient=step_loop,
     )
 
 
@@ -2326,16 +2635,19 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
 def _simplex_weak_scalar_tail(
     lines, form, weak_form, substitutions, dim, n_field_components,
     work_item, geometry_value, reference_gradient, source_builder, use_stream_arrays, closing,
+    step_gradient=None,
 ):
     """A 0-form: weight the density and add it in."""
     _append_weak_objective_accumulation(
-        lines, form, weak_form, substitutions, work_item, geometry_value, closing
+        lines, form, weak_form, substitutions, work_item, geometry_value, closing,
+        step_gradient=step_gradient,
     )
 
 
 def _simplex_weak_per_shape_tail(
     lines, form, weak_form, substitutions, dim, n_field_components,
     work_item, geometry_value, reference_gradient, source_builder, use_stream_arrays, closing,
+    step_gradient=None,
 ):
     """A 1- or 2-form: form the loperand and contract it onto the tests."""
     material = _weak_form_material_expression(
@@ -2417,7 +2729,8 @@ def _append_sfem_soa_weak_form_lines(
     work_item = _work_item_index(source_builder)
     weak_form = form.weak_form
     uses_current = form_reads_current(form, default=True)
-    uses_direction = form_reads_direction(form, default=form.has_direction)
+    uses_direction = _weak_form_reads_direction(form)
+    gradient_name = _weak_gradient_name(form)
     if weak_form.dim != dim:
         raise ValueError("weak form dim does not match SoA kernel dim")
     if form.name not in ("objective", "gradient", "apply"):
@@ -2509,6 +2822,23 @@ def _append_sfem_soa_weak_form_lines(
                 )
             lines.append("        }")
     lines.append("      }")
+    step_loop = _objective_step_loop(
+        form,
+        weak_form,
+        dim,
+        True,
+        work_item,
+        source_builder,
+        # The density is scaled by the measure, so the second work-item loop
+        # reads the determinant again rather than carrying it across.
+        [
+            "const ptrdiff_t goff = q * geometry_stride + %s;" % work_item,
+            "const s_t %s = det0[goff];" % _work_item_name(source_builder, "det", 0),
+        ],
+        "      ",
+    )
+    if step_loop is not None:
+        lines.extend(step_loop.buffer_lines())
     lines.extend(_work_item_loop_lines(source_builder, "      "))
     lines.append("      const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
     for component in range(dim * dim):
@@ -2527,6 +2857,16 @@ def _append_sfem_soa_weak_form_lines(
                 lines.append("      const s_t gu_ref%d = gu_ref%d_values[%s];" % (idx, idx, work_item))
             if uses_direction:
                 lines.append("      const s_t grad_h_ref%d = grad_h_ref%d_values[%s];" % (idx, idx, work_item))
+    base_target = (
+        (lambda index: "const s_t %s%d" % (gradient_name, index))
+        if step_loop is None
+        else step_loop.base
+    )
+    direction_target = (
+        (lambda index: "const s_t trial_grad%d" % index)
+        if step_loop is None
+        else step_loop.direction
+    )
     lines.append(
         "    const s_t idet = s_t(1) / %s;"
         % geometry_value("det", 0)
@@ -2543,8 +2883,8 @@ def _append_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "    const s_t gu%d = (%s) * idet;"
-                    % (row * dim + col, " + ".join(terms))
+                    "    %s = (%s) * idet;"
+                    % (base_target(row * dim + col), " + ".join(terms))
                 )
             if uses_direction:
                 terms = [
@@ -2556,8 +2896,8 @@ def _append_sfem_soa_weak_form_lines(
                     for k in range(dim)
                 ]
                 lines.append(
-                    "    const s_t trial_grad%d = (%s) * idet;"
-                    % (row * dim + col, " + ".join(terms))
+                    "    %s = (%s) * idet;"
+                    % (direction_target(row * dim + col), " + ".join(terms))
                 )
 
     _SIMPLEX_WEAK_TAIL[form_accumulation(form)](
@@ -2572,7 +2912,8 @@ def _append_sfem_soa_weak_form_lines(
         reference_gradient,
         source_builder,
         use_stream_arrays,
-        ["      }", "    }"],
+        ["    }"] if step_loop is not None else ["      }", "    }"],
+        step_gradient=step_loop,
     )
 
 
@@ -2698,7 +3039,8 @@ def _weak_form_material_expression(
 
 
 def _append_weak_objective_accumulation(
-    lines, form, weak_form, substitutions, work_item, geometry_value, closing
+    lines, form, weak_form, substitutions, work_item, geometry_value, closing,
+    step_gradient=None,
 ):
     """Accumulate the energy density into an objective's scalar output.
 
@@ -2713,17 +3055,28 @@ def _append_weak_objective_accumulation(
     ``geometry_value`` is passed in because each emitter defines its own: the
     determinant is spelled differently depending on how that kernel reaches its
     geometry, which is the caller's fact and not this block's.
+
+    ``step_gradient`` is the `ObjectiveStepLoop` when this is the stepped
+    objective, and this is the one place its alphas are opened.  It writes
+    ``gu``, which is the name the density was printed against, so the expression
+    below is unchanged by any of it.
     """
+    target = "value[%s] %s" % (work_item, output_assignment(form))
+    if step_gradient is not None:
+        lines.extend(step_gradient.open_lines())
+        target = "value[step * value_stride + %s] %s" % (
+            work_item,
+            output_assignment(form),
+        )
     _append_cse_array_assignments(
         lines,
         [weak_form.energy_density.xreplace(substitutions)],
-        [
-            "value[%s] %s"
-            % (work_item, output_assignment(form))
-        ],
+        [target],
         "weak_obj_tmp",
         scale="qw * %s" % geometry_value("det", 0),
     )
+    if step_gradient is not None:
+        lines.extend(step_gradient.close_lines())
     lines.extend(closing)
 
 def _append_cse_array_assignments(lines, expressions, targets, temporary_prefix, scale=None):
@@ -3845,9 +4198,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
                 "        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
                 "        s_t bu_data[NS * NC][VS];",
-                "        s_t bu_base_data[NS * NC][VS];",
                 "        s_t bh_data[NS * NC][VS];",
-                "        s_t bvalue[VS];",
             ]
         )
         if not is_affine:
@@ -3864,15 +4215,21 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         lines.extend(
             [
                 "",
-                "        const s_t *bu_streams[NS * NC] = {%s};"
-                % ", ".join(
-                    "bu_data[%d]" % stream
-                    for stream in streams_in_shape_order(
-                        tuple(range(n_field_components * n_nodes)),
-                        n_field_components,
-                        stream_shape_order,
+                *[
+                    "        const s_t *b%s_streams[NS * NC] = {%s};"
+                    % (
+                        field,
+                        ", ".join(
+                            "b%s_data[%d]" % (field, stream)
+                            for stream in streams_in_shape_order(
+                                tuple(range(n_field_components * n_nodes)),
+                                n_field_components,
+                                stream_shape_order,
+                            )
+                        ),
                     )
-                ),
+                    for field in ("u", "h")
+                ],
                 "",
                 "        for (int shape = 0; shape < NS; ++shape) {",
                 "          const uint16_t *const RSTR element_shape = elements[shape];",
@@ -3913,7 +4270,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 *_lane_loop_header_lines(source_builder, "            "),
                 "              const uint16_t packed_node = element_shape[%s];"
                 % _element_index(source_builder),
-                "              bu_base_data[shape * NC + d]%s = pk_u_base[d * max_nodes_per_pack + packed_node];"
+                "              bu_data[shape * NC + d]%s = pk_u_base[d * max_nodes_per_pack + packed_node];"
                 % _work_item_slot(source_builder),
                 "              bh_data[shape * NC + d]%s = pk_h[d * max_nodes_per_pack + packed_node];"
                 % _work_item_slot(source_builder),
@@ -3994,32 +4351,23 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             )
         call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
         call_args.extend(material_parameter_names)
-        call_args.extend(("bu_streams", "bvalue"))
+        # The packed half of the same arrangement the mesh kernel makes: the
+        # block owns the step loop, so this gathers once and calls once.
+        call_args.extend(
+            ("bu_streams", "bh_streams", "nsteps", "steps", "nelements", "&value[evb]")
+        )
         lines.extend(
             [
                 "",
                 "        for (int step = 0; step < nsteps; ++step) {",
-                "          const s_t alpha = steps[step];",
-                "          for (int shape = 0; shape < NS; ++shape) {",
-                "            for (int d = 0; d < NC; ++d) {",
-                *_lane_loop_header_lines(source_builder, "              "),
-                "                bu_data[shape * NC + d]%s = bu_base_data[shape * NC + d]%s + alpha * bh_data[shape * NC + d]%s;"
-                % ((_work_item_slot(source_builder),) * 3),
-                "              }",
-                "            }",
-                "          }",
                 *_lane_loop_header_lines(source_builder, "          "),
-                "            bvalue%s = s_t(0);" % _work_item_slot(source_builder),
-                "          }",
-                "",
-                "          %s<s_t, NQ, NS, VS>(%s);"
-                % (block_name, ", ".join(call_args)),
-                "",
-                *_lane_loop_header_lines(source_builder, "          "),
-                "            value[(ptrdiff_t)step * nelements + %s] = bvalue%s;"
-                % (_element_index(source_builder), _work_item_slot(source_builder)),
+                "            value[(ptrdiff_t)step * nelements + %s] = s_t(0);"
+                % _element_index(source_builder),
                 "          }",
                 "        }",
+                "",
+                "        %s<s_t, NQ, NS, VS>(%s);"
+                % (block_name, ", ".join(call_args)),
                 "      }",
             ]
         )
@@ -6330,9 +6678,7 @@ def _objective_steps_lines(
     compact_stream_buffers = use_stream_arrays
     if compact_stream_buffers:
         lines.append("    s_t bu_data[NS * NC][VS];")
-        lines.append("    s_t bu_base_data[NS * NC][VS];")
         lines.append("    s_t bh_data[NS * NC][VS];")
-        lines.append("    s_t bvalue[VS];")
         if compact_coordinate_buffers:
             lines.append("    s_t bcoordinate_data[NS * ND][VS];")
     elif compact_coordinate_buffers:
@@ -6348,10 +6694,8 @@ def _objective_steps_lines(
     if not compact_stream_buffers:
         for stream in _field_stream_names("u", n_field_components, n_nodes):
             lines.append("    s_t b%s[VS];" % stream)
-            lines.append("    s_t b%s_base[VS];" % stream)
         for stream in _field_stream_names("h", n_field_components, n_nodes):
             lines.append("    s_t b%s[VS];" % stream)
-        lines.append("    s_t bvalue[VS];")
 
     lines.extend(
         [
@@ -6414,6 +6758,14 @@ def _objective_steps_lines(
                     stream_shape_order,
                     "    ",
                 ),
+                *_ordered_stream_pointer_array_lines(
+                    "const s_t *",
+                    "bh_streams",
+                    "bh_data",
+                    n_field_components,
+                    stream_shape_order,
+                    "    ",
+                ),
             ]
         )
         lines.extend(
@@ -6424,7 +6776,7 @@ def _objective_steps_lines(
                 "      for (int d = 0; d < NC; ++d) {",
                 *_work_item_loop_lines(source_builder, "        "),
                 "          const idx_t node = ev_shape[%s];" % work_item,
-                "          bu_base_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item,
+                "          bu_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item,
                 "          bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item,
                 "        }",
                 "      }",
@@ -6432,26 +6784,28 @@ def _objective_steps_lines(
             ]
         )
     else:
-        lines.append(
-            "    const s_t *const bu_streams[NS * %d] = {%s};"
-            % (
-                n_field_components,
-                ", ".join(
-                    _BLOCK_FMT % stream
-                    for stream in streams_in_shape_order(
-                        _field_stream_names("u", n_field_components, n_nodes),
-                        n_field_components,
-                        stream_shape_order,
-                    )
-                ),
+        for field in ("u", "h"):
+            lines.append(
+                "    const s_t *const b%s_streams[NS * %d] = {%s};"
+                % (
+                    field,
+                    n_field_components,
+                    ", ".join(
+                        _BLOCK_FMT % stream
+                        for stream in streams_in_shape_order(
+                            _field_stream_names(field, n_field_components, n_nodes),
+                            n_field_components,
+                            stream_shape_order,
+                        )
+                    ),
+                )
             )
-        )
         lines.extend(["", *_work_item_loop_lines(source_builder, "    ")])
         for shape in range(n_nodes):
             for d in range(dim):
                 component = _component_name(d)
                 lines.append(
-                    "      bu%s%d_base[%s] = u%s[ev[%d * VS + %s] * u_stride];"
+                    "      bu%s%d[%s] = u%s[ev[%d * VS + %s] * u_stride];"
                     % (component, shape, work_item, component, shape, work_item)
                 )
                 lines.append(
@@ -6542,65 +6896,33 @@ def _objective_steps_lines(
     call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
     call_args.extend(material_parameter_names)
     if use_stream_arrays:
-        call_args.append("bu_streams")
+        call_args.extend(("bu_streams", "bh_streams"))
     else:
-        call_args.extend(_BLOCK_FMT % stream for stream in _field_stream_names("u", n_field_components, n_nodes))
-    call_args.append("bvalue")
+        call_args.extend(
+            _BLOCK_FMT % stream
+            for field in ("u", "h")
+            for stream in _field_stream_names(field, n_field_components, n_nodes)
+        )
+    # `nsteps` evaluations of one element block, in one call.  The block owns
+    # the step loop now (`_append_weak_objective_accumulation`), so it is handed
+    # the element's column of the `nsteps x nelements` output rather than a
+    # lane-wide scratch value this loop copied out per step.  What used to be
+    # repeated `nsteps` times -- the gather, the geometry and the whole sum
+    # factorization -- happens once.
+    call_args.extend(("nsteps", "steps", "nelements", "&value[evb]"))
 
     lines.extend(
         [
             "",
             "    for (int step = 0; step < nsteps; ++step) {",
-            "      const s_t alpha = steps[step];",
-        ]
-    )
-    if compact_stream_buffers:
-        lines.extend(
-            [
-                "      for (int shape = 0; shape < NS; ++shape) {",
-                "        for (int d = 0; d < NC; ++d) {",
-                *_work_item_loop_lines(source_builder, "          "),
-                "            bu_data[shape * NC + d][%s] = bu_base_data[shape * NC + d][%s] + alpha * bh_data[shape * NC + d][%s];"
-                % (work_item, work_item, work_item),
-                "          }",
-                "        }",
-                "      }",
-            ]
-        )
-    else:
-        lines.extend(_work_item_loop_lines(source_builder, "      "))
-        for shape in range(n_nodes):
-            for d in range(dim):
-                component = _component_name(d)
-                lines.append(
-                    "        bu%s%d[%s] = bu%s%d_base[%s] + alpha * bh%s%d[%s];"
-                    % (
-                        component,
-                        shape,
-                        work_item,
-                        component,
-                        shape,
-                        work_item,
-                        component,
-                        shape,
-                        work_item,
-                    )
-                )
-        lines.append("      }")
-    lines.extend(
-        [
             *_work_item_loop_lines(source_builder, "      "),
-            "        bvalue[%s] = s_t(0);" % work_item,
-            "      }",
-            "",
-            "      %s<s_t, NQ, NS, VS>(%s);"
-            % (block_name, ", ".join(call_args)),
-            "",
-            *_work_item_loop_lines(source_builder, "      "),
-            "        value[(ptrdiff_t)step * nelements + evb + %s] = bvalue[%s];"
-            % (work_item, work_item),
+            "        value[(ptrdiff_t)step * nelements + evb + %s] = s_t(0);"
+            % work_item,
             "      }",
             "    }",
+            "",
+            "    %s<s_t, NQ, NS, VS>(%s);"
+            % (block_name, ", ".join(call_args)),
             "  }",
             "",
             *source_builder.success_return_lines(),
@@ -10345,6 +10667,7 @@ def _sfem_soa_element_api_block_call(
         "b%s_streams" % stream_prefix
         for _role, stream_prefix in element_api_field_roles(form)
     )
+    args.extend(_plain_objective_step_arguments(form, "bu_streams", "0"))
     args.append(output_arg)
     return "%s<s_t, NQ, NS, VS>(%s);" % (
         block_name,
@@ -10389,6 +10712,7 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind, sour
         lines.extend(_element_api_lane_loop(source_builder, "    "))
         lines.append("      bvalue[%s] = s_t(0);" % item)
         lines.append("    }")
+        lines.extend(_PLAIN_OBJECTIVE_STEP_DECLARATION[publishes_objective_steps(form)])
     elif output_kind == "vector":
         lines.append("    s_t *bout_streams[NDOFS];")
         lines.append("    for (int stream = 0; stream < NDOFS; ++stream) {")

@@ -1,0 +1,16 @@
+# smesh mesh meta file
+spatial_dimension: 3
+elem_num_nodes: 4
+element_type: TET4
+n_elements: 12000
+n_nodes: 2331
+elements:
+- i0: i0.int32
+- i1: i1.int32
+- i2: i2.int32
+- i3: i3.int32
+points:
+- x: x.float32
+- y: y.float32
+- z: z.float32
+rpath: true

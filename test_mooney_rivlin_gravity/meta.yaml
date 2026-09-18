@@ -1,0 +1,20 @@
+# smesh mesh meta file
+spatial_dimension: 3
+elem_num_nodes: 8
+element_type: HEX8
+n_elements: 8
+n_nodes: 27
+elements:
+- i0: i0.int32
+- i1: i1.int32
+- i2: i2.int32
+- i3: i3.int32
+- i4: i4.int32
+- i5: i5.int32
+- i6: i6.int32
+- i7: i7.int32
+points:
+- x: x.float32
+- y: y.float32
+- z: z.float32
+rpath: true
