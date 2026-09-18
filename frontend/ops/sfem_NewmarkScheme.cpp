@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "sfem_API.hpp"
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_defs.hpp"
 #include "sfem_logger.hpp"
@@ -10,13 +11,16 @@ namespace sfem {
 
     class NewmarkScheme::Impl {
     public:
-        std::shared_ptr<FunctionSpace>            space;
+        std::shared_ptr<FunctionSpace>   space;
         std::shared_ptr<InertiaPotential> inertia;
+        ExecutionSpace                   es{EXECUTION_SPACE_HOST};
+        std::shared_ptr<BLAS<real_t>>    blas;
 
         std::shared_ptr<Buffer<real_t>> u_n;
         std::shared_ptr<Buffer<real_t>> v_n;
         std::shared_ptr<Buffer<real_t>> a_n;
         std::shared_ptr<Buffer<real_t>> z;
+        std::shared_ptr<Buffer<real_t>> u_hat;
 
         real_t beta{real_t(0.25)};
         real_t gamma{real_t(0.5)};
@@ -24,11 +28,12 @@ namespace sfem {
         real_t shift{0};
         real_t alpha_a{0};
 
-        explicit Impl(const std::shared_ptr<FunctionSpace> &sp) : space(sp) {}
+        Impl(const std::shared_ptr<FunctionSpace> &sp, const ExecutionSpace space_of)
+            : space(sp), es(space_of), blas(sfem::blas<real_t>(space_of)) {}
     };
 
-    NewmarkScheme::NewmarkScheme(const std::shared_ptr<FunctionSpace> &space)
-        : impl_(std::make_unique<Impl>(space)) {
+    NewmarkScheme::NewmarkScheme(const std::shared_ptr<FunctionSpace> &space, const ExecutionSpace es)
+        : impl_(std::make_unique<Impl>(space, es)) {
         impl_->inertia = std::make_shared<InertiaPotential>(space);
     }
 
@@ -46,12 +51,19 @@ namespace sfem {
             return SFEM_FAILURE;
         }
 
+        // The state follows the execution space the caller runs in: a driver
+        // that solves on the device holds device vectors and hands this one of
+        // them in `advance`, so the scheme's own state has to live there too.
         const ptrdiff_t ndofs = impl_->space->n_dofs();
-        impl_->u_n            = create_host_buffer<real_t>(ndofs);
-        impl_->v_n            = create_host_buffer<real_t>(ndofs);
-        impl_->a_n            = create_host_buffer<real_t>(ndofs);
-        impl_->z              = create_host_buffer<real_t>(ndofs);
+        impl_->u_n            = create_buffer<real_t>(ndofs, impl_->es);
+        impl_->v_n            = create_buffer<real_t>(ndofs, impl_->es);
+        impl_->a_n            = create_buffer<real_t>(ndofs, impl_->es);
+        impl_->z              = create_buffer<real_t>(ndofs, impl_->es);
+        impl_->u_hat          = create_buffer<real_t>(ndofs, impl_->es);
 
+        // One predictor, not two: the inertia operator reads the buffer this
+        // scheme writes, so the two cannot drift apart.
+        impl_->inertia->set_u_hat(impl_->u_hat);
         return impl_->inertia->initialize(block_names);
     }
 
@@ -78,23 +90,20 @@ namespace sfem {
 
         // Everything the solve reads is built here, from the state carried out
         // of the last step and never from the current iterate -- which is what
-        // lets the line search re-assemble the residual at nine trial step
+        // lets a line search re-assemble the residual at several trial step
         // lengths and compare merits that mean the same thing.
-        const real_t *const SFEM_RESTRICT u_n     = impl_->u_n->data();
-        const real_t *const SFEM_RESTRICT v_n     = impl_->v_n->data();
-        const real_t *const SFEM_RESTRICT a_n     = impl_->a_n->data();
-        real_t *const SFEM_RESTRICT       u_hat   = impl_->inertia->u_hat()->data();
-        real_t *const SFEM_RESTRICT       z       = impl_->z->data();
-        const real_t                      predict = dt * dt * (real_t(0.5) - impl_->beta);
-        const real_t                      a_scale = dt * (1 - impl_->gamma);
-        const real_t                      shift   = impl_->shift;
+        //
+        // Written in BLAS rather than as a loop so it runs wherever the
+        // caller's vectors live.
+        auto         blas    = impl_->blas;
+        const real_t predict = dt * dt * (real_t(0.5) - impl_->beta);
+        const real_t a_scale = dt * (1 - impl_->gamma);
 
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs; ++i) {
-            const real_t u_hat_i = u_n[i] + dt * v_n[i] + predict * a_n[i];
-            u_hat[i]             = u_hat_i;
-            z[i]                 = v_n[i] + a_scale * a_n[i] - shift * u_hat_i;
-        }
+        blas->zaxpby(ndofs, 1, impl_->u_n->data(), dt, impl_->v_n->data(), impl_->u_hat->data());
+        blas->axpy(ndofs, predict, impl_->a_n->data(), impl_->u_hat->data());
+
+        blas->zaxpby(ndofs, 1, impl_->v_n->data(), a_scale, impl_->a_n->data(), impl_->z->data());
+        blas->axpy(ndofs, -impl_->shift, impl_->u_hat->data(), impl_->z->data());
 
         impl_->inertia->set_alpha(impl_->alpha_a);
     }
@@ -102,18 +111,12 @@ namespace sfem {
     void NewmarkScheme::reconstruct(const real_t *const x,
                                     real_t *const       velocity,
                                     real_t *const       acceleration) const {
-        const ptrdiff_t                   ndofs   = impl_->space->n_dofs();
-        const real_t *const SFEM_RESTRICT u_hat   = impl_->inertia->u_hat()->data();
-        const real_t *const SFEM_RESTRICT z       = impl_->z->data();
-        const real_t                      alpha_a = impl_->alpha_a;
-        const real_t                      shift   = impl_->shift;
+        const ptrdiff_t ndofs   = impl_->space->n_dofs();
+        auto            blas    = impl_->blas;
+        const real_t    alpha_a = impl_->alpha_a;
 
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs; ++i) {
-            const real_t x_i = x[i];
-            acceleration[i]  = alpha_a * (x_i - u_hat[i]);
-            velocity[i]      = shift * x_i + z[i];
-        }
+        blas->zaxpby(ndofs, alpha_a, x, -alpha_a, impl_->u_hat->data(), acceleration);
+        blas->zaxpby(ndofs, impl_->shift, x, 1, impl_->z->data(), velocity);
     }
 
     void NewmarkScheme::advance(const real_t *const x) {
@@ -123,13 +126,7 @@ namespace sfem {
         // `u_hat` and `z` are the step's, not the iterate's, so neither is the
         // buffer being overwritten and the order of the two is free.
         reconstruct(x, impl_->v_n->data(), impl_->a_n->data());
-
-        const ptrdiff_t             ndofs = impl_->space->n_dofs();
-        real_t *const SFEM_RESTRICT u_n   = impl_->u_n->data();
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < ndofs; ++i) {
-            u_n[i] = x[i];
-        }
+        impl_->blas->copy(impl_->space->n_dofs(), x, impl_->u_n->data());
     }
 
     std::shared_ptr<Op> NewmarkScheme::inertia_op() const { return impl_->inertia; }
