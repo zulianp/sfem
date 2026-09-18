@@ -4141,6 +4141,7 @@ namespace sfem {
                              real_t *const values) {
 %(parameter_lines)s
     }
+%(scheme_term_helper)s
 
     //! Where this build's kernels read the connectivity from.
     //!
@@ -4313,7 +4314,7 @@ namespace sfem {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
 %(gradient_previous_check)s
     impl_->current = state;
-    auto mesh = impl_->space->mesh_ptr();
+%(scheme_gradient)s    auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const geom_t *const *adjugate = nullptr;
@@ -4347,6 +4348,7 @@ namespace sfem {
                       const real_t *const direction,
                       real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::apply");
+%(scheme_apply)s
     const real_t *const current = state ? state : impl_->current;
 %(apply_state_check)s
     auto mesh = impl_->space->mesh_ptr();
@@ -4480,6 +4482,7 @@ namespace sfem {
         "hessian_bsr_method": _coupled_hessian_bsr_method(
             _op_class_name(material),
             _COUPLED_SCHEME_ARGUMENT[_has_time_rate(material)],
+            _COUPLED_SCHEME_HESSIAN_BSR[_has_time_rate(material)],
             cases["hessian_bsr"],
         ),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -4492,6 +4495,9 @@ namespace sfem {
         # spellings at once, so it is asked once and each of them is a lookup.
         "scheme_parameter": _COUPLED_SCHEME_PARAMETER[_has_time_rate(material)],
         "scheme_argument": _COUPLED_SCHEME_ARGUMENT[_has_time_rate(material)],
+        "scheme_term_helper": _COUPLED_SCHEME_TERM_HELPER[_has_time_rate(material)],
+        "scheme_gradient": _COUPLED_SCHEME_GRADIENT[_has_time_rate(material)],
+        "scheme_apply": _COUPLED_SCHEME_APPLY[_has_time_rate(material)],
         "time_scheme_member": _COUPLED_SCHEME_MEMBER[_has_time_rate(material)],
         "previous_state_accessor": _COUPLED_PREVIOUS_STATE_ACCESSOR[_has_time_rate(material)],
         "set_time_scheme_method": _COUPLED_SET_TIME_SCHEME[_has_time_rate(material)]
@@ -5080,7 +5086,7 @@ def _coupled_cases(
     return cases
 
 
-def _coupled_hessian_bsr_method(op_name, scheme_argument, hessian_bsr_cases):
+def _coupled_hessian_bsr_method(op_name, scheme_argument, scheme_hessian_bsr, hessian_bsr_cases):
     """The assembled Jacobian of a coupled material, or a refusal.
 
     Both units contribute to the same matrix and both accumulate into `values`,
@@ -5108,7 +5114,7 @@ def _coupled_hessian_bsr_method(op_name, scheme_argument, hessian_bsr_cases):
       SFEM_ERROR("%(op)s::hessian_bsr requires current and previous states\\n");
       return SFEM_FAILURE;
     }
-    auto mesh = impl_->space->mesh_ptr();
+%(scheme_hessian_bsr)s    auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       real_t storage[MAX_PARAMETERS];
@@ -5126,6 +5132,7 @@ def _coupled_hessian_bsr_method(op_name, scheme_argument, hessian_bsr_cases):
 """ % {
         "op": op_name,
         "scheme_argument": scheme_argument,
+        "scheme_hessian_bsr": scheme_hessian_bsr,
         "cases": "\n".join(hessian_bsr_cases),
     }
 
@@ -5199,6 +5206,54 @@ _COUPLED_SCHEME_PARAMETER = {
 
 _COUPLED_SCHEME_ARGUMENT = {False: "", True: "impl_->time_scheme.get(), "}
 
+#: The part of the time discretisation that is not inside the material's form --
+#: the inertia, for Newmark.  The operator holds the scheme, so the operator
+#: contributes it, and `f->add_operator(material)` is then the whole of the
+#: time-discrete residual.  Handing the term to the caller instead would let it
+#: be forgotten, and a forgotten inertia is worse than a forgotten load: the
+#: shift and the history would still be in the residual, so the scheme would be
+#: half applied.
+_COUPLED_SCHEME_TERM_HELPER = {
+    False: "",
+    True: """
+    std::shared_ptr<Op> time_scheme_term(const std::shared_ptr<TimeScheme> &scheme) {
+      return scheme ? scheme->inertia_op() : nullptr;
+    }
+""",
+}
+
+#: Each contribution accumulates into the same output the material writes, so
+#: the order between them does not matter and is not chosen here.
+_COUPLED_SCHEME_GRADIENT = {
+    False: "",
+    True: """    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->gradient(state, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
+""",
+}
+
+_COUPLED_SCHEME_APPLY = {
+    False: "",
+    True: """    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->apply(state, direction, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
+""",
+}
+
+_COUPLED_SCHEME_HESSIAN_BSR = {
+    False: "",
+    True: """    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_bsr(current, rowptr, colidx, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
+""",
+}
+
 _COUPLED_SCHEME_MEMBER = {
     False: "",
     True: "    std::shared_ptr<TimeScheme> time_scheme;\n",
@@ -5225,7 +5280,13 @@ _COUPLED_SET_TIME_SCHEME = {
     True: """
   void %(op)s::set_time_scheme(const std::shared_ptr<TimeScheme> &scheme) {
     SFEM_TRACE_SCOPE("%(op)s::set_time_scheme");
+    if (impl_->time_scheme) {
+      impl_->time_scheme->release(this);
+    }
     impl_->time_scheme = scheme;
+    if (scheme) {
+      scheme->claim(this);
+    }
   }
 """,
 }

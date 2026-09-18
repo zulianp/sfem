@@ -5,6 +5,7 @@
 #include "sfem_ForwardDeclarations.hpp"
 #include "sfem_aliases.hpp"
 #include "sfem_base.hpp"
+#include "sfem_logger.hpp"
 
 namespace sfem {
 
@@ -43,9 +44,13 @@ namespace sfem {
     ///
     /// A scheme whose method contributes a separable term of its own -- the
     /// inertia of an elastodynamic problem, say -- publishes it through
-    /// `inertia_op`, and the caller adds that operator to the `Function`.  It
-    /// has to be an operator: the node-wise merit sees only what
-    /// `Function::gradient` assembles.
+    /// `inertia_op`, and the operator that holds the scheme contributes it.
+    /// It has to reach the residual somehow, because the node-wise merit sees
+    /// only what `Function::gradient` assembles; going through the holder is
+    /// what makes `f->add_operator(material)` the whole story.  Handing the
+    /// term to the caller instead would let it be forgotten, and a forgotten
+    /// inertia is worse than a forgotten load: the shift and the history are
+    /// still in the residual, so the scheme would be half applied.
     class TimeScheme {
     public:
         virtual ~TimeScheme() = default;
@@ -70,8 +75,34 @@ namespace sfem {
         virtual void advance(const real_t *const x) = 0;
 
         /// The separable term this method contributes to the residual, if it
-        /// has one, for the caller to add to the `Function`.
+        /// has one.  Called by the operator holding the scheme, not by the
+        /// caller.
         virtual std::shared_ptr<Op> inertia_op() const { return nullptr; }
+
+        /// Register the operator that holds this scheme.
+        ///
+        /// A scheme is sized for a whole function space, so one serves every
+        /// time-dependent material on it -- but the separable term reaches the
+        /// residual through the holder, and two holders would add it twice.
+        /// That is silently wrong rather than loudly wrong, so it is refused
+        /// here instead.
+        void claim(const void *const holder) {
+            if (holder_ && holder_ != holder) {
+                SFEM_ERROR(
+                        "a TimeScheme contributes its own term through the operator holding it, "
+                        "so it can be held by one operator only\n");
+            }
+            holder_ = holder;
+        }
+
+        void release(const void *const holder) {
+            if (holder_ == holder) {
+                holder_ = nullptr;
+            }
+        }
+
+    private:
+        const void *holder_{nullptr};
     };
 
     /// An `Op` whose form carries a time derivative, and can therefore be
