@@ -108,6 +108,8 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     const real_t SFEM_LSOLVE_RTOL       = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
     const real_t SFEM_NL_TOL            = smesh::Env::read("SFEM_NL_TOL", 1e-9);
     bool         SFEM_USE_ACTIVE_STRAIN = smesh::Env::read("SFEM_USE_ACTIVE_STRAIN", false);
+    const bool   SFEM_VISCO_REJECT_TRIAL = smesh::Env::read("SFEM_VISCO_REJECT_TRIAL", false);
+    const real_t SFEM_VISCO_REJECT_TRIAL_SCALE = smesh::Env::read("SFEM_VISCO_REJECT_TRIAL_SCALE", 1e-3);
 
     const real_t SFEM_ACTIVE_STRAIN_XX = smesh::Env::read("SFEM_ACTIVE_STRAIN_XX", 0.5);
 
@@ -205,6 +207,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     auto            increment         = sfem::create_buffer<real_t>(ndofs, es);
     auto            rhs               = sfem::create_buffer<real_t>(ndofs, es);
     auto            material_reaction = sfem::create_buffer<real_t>(ndofs, es);
+    auto            rejected_trial    = SFEM_VISCO_REJECT_TRIAL ? sfem::create_buffer<real_t>(ndofs, es) : nullptr;
     auto            constrained_mask  = sfem::create_host_buffer<mask_t>(mask_count(ndofs));
     std::memset(constrained_mask->data(), 0, size_t(mask_count(ndofs)) * sizeof(mask_t));
     if (f->constraints_mask(constrained_mask->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
@@ -284,6 +287,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
         const int    load_steps = std::max(1, smesh::Env::read("SFEM_LOAD_STEPS", 1));
         const real_t load_dt    = smesh::Env::read("SFEM_DT", 1.0);
+        const int    export_freq = std::max(1, smesh::Env::read("SFEM_EXPORT_FREQ", 1));
         int          steps      = std::max(rotate_conds ? rotate_conds->steps : 1, load_steps);
         dirichlet_conditions->set_time(0);
         f->apply_constraints(displacement->data());
@@ -319,6 +323,22 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
 
                 fill_active_strain_Fa(mesh, Fa_storage->data(), center_s, radius_s, SFEM_ACTIVE_STRAIN_XX, step, steps);
                 op->set_field("active_strain", Fa_storage, 0);
+            }
+
+            if (visco_op && rejected_trial && step == 1) {
+                blas->copy(ndofs, displacement->data(), rejected_trial->data());
+                auto points = mesh->points()->data();
+#pragma omp parallel for
+                for (ptrdiff_t node = 0; node < mesh->n_nodes(); ++node) {
+                    for (int d = 0; d < block_size; ++d) {
+                        rejected_trial->data()[node * block_size + d] +=
+                                SFEM_VISCO_REJECT_TRIAL_SCALE * points[d][node];
+                    }
+                }
+                blas->zeros(ndofs, material_reaction->data());
+                if (op->gradient(rejected_trial->data(), material_reaction->data()) != SFEM_SUCCESS)
+                    return SFEM_FAILURE;
+                if (!comm->rank()) printf("SFEM_VISCO_REJECTED_TRIAL\n");
             }
 
             bool converged = false;
@@ -413,19 +433,21 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 quantities << "        resultant: " << reaction << '\n';
             }
 
-            if (rotate_conds) {
-                out->write_time_step("rhs", step, smesh::to_host(rhs)->data());
-                out->write_time_step("disp", step, smesh::to_host(displacement)->data());
-                out->write_time_step("material_reaction", time, host_reaction->data());
-                out->log_time(time);
-            } else {
-                out->write("rhs", smesh::to_host(rhs)->data());
-                out->write("disp", smesh::to_host(displacement)->data());
-                if (steps > 1) {
+            if (step % export_freq == 0 || step == steps) {
+                if (rotate_conds) {
+                    out->write_time_step("rhs", step, smesh::to_host(rhs)->data());
+                    out->write_time_step("disp", step, smesh::to_host(displacement)->data());
                     out->write_time_step("material_reaction", time, host_reaction->data());
                     out->log_time(time);
                 } else {
-                    out->write("material_reaction", host_reaction->data());
+                    out->write("rhs", smesh::to_host(rhs)->data());
+                    out->write("disp", smesh::to_host(displacement)->data());
+                    if (steps > 1) {
+                        out->write_time_step("material_reaction", time, host_reaction->data());
+                        out->log_time(time);
+                    } else {
+                        out->write("material_reaction", host_reaction->data());
+                    }
                 }
             }
 

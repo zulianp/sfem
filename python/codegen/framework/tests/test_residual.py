@@ -729,6 +729,20 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 text=True,
             )
 
+    def test_proteus_quad4_keeps_cartesian_field_order(self):
+        system, _, _ = two_field_diffusion_system(2)
+        files = generate_coupled_residual_sfem_files(
+            system,
+            prefix="coupled_diffusion_proteus_quad4",
+            emission_plan=_element_emission_plan("PROTEUS_QUAD4"),
+        )
+        source_by_path = {generated.path: generated.source for generated in files}
+        operator_source = source_by_path[
+            "coupled_diffusion_proteus_quad4_operator.cpp"
+        ]
+
+        self.assertNotIn("field_elements", operator_source)
+
     def test_isoparametric_mesh_residual_and_action_match_python_reference(self):
         compiler = shutil.which("c++")
         if compiler is None:

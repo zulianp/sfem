@@ -1,0 +1,75 @@
+schema_version: 2
+id: finite_strain_kv_creep_2d
+name: Two-dimensional finite-strain Kelvin-Voigt creep
+kind: verification
+family: viscoelastic
+dimension: 2
+tier: fast
+
+source:
+  description: Homogeneous Mooney-Rivlin Kelvin-Voigt scalar creep equation
+  reference: README.md
+oracle:
+  type: analytical_ode
+  implementation: oracle.py
+
+geometry: {length: 1.0, height: 1.0}
+loading: {traction: 0.8, ramp_time: 0.2}
+time: {duration: 1.2, time_steps: [0.04, 0.02, 0.01]}
+material: {mu: 2.0, lambda: 5.0, eta_s: 4.0, eta_b: 0.0}
+material_parameter_map: {lambda: lmbda}
+
+mesh:
+  command: ["{python}", "{case_dir}/generate_mesh.py", "{mesh}", --element, "{element}", --nx, "{resolution_nx}", --ny, "{resolution_ny}"]
+inputs:
+  - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
+  - {template: neumann.yaml, output: "{output}/neumann.yaml"}
+verification:
+  command: ["{python}", "{case_dir}/verify.py", --case, "{resolved_case}", --output, "{output}", --report, "{output}/verification.json"]
+  report: "{output}/verification.json"
+  tolerances: &tolerances
+    stretch_history_relative_l2: 5.0e-3
+    final_stretch_relative: 2.0e-3
+    reaction_history_relative_l2: 1.0e-2
+    temporal_rate_deficit: 0.0
+    small_strain_limit_relative_l2: 1.0e-5
+
+variants:
+  - &base
+    id: tri3_shear_viscosity
+    operator: GeneratedMooneyRivlinKelvinVoigtNewmark
+    element: TRI3
+    resolution: {nx: 4, ny: 2, viscosity: shear}
+    driver: &driver
+      executable: "{python}"
+      arguments: ["{suite_dir}/common/run_kv_creep.py", --case, "{resolved_case}", --driver, "{build_dir}/mooney_rivlin_kelvin_voigt_newmark", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --neumann, "{output}/neumann.yaml", --output, "{output}/solution"]
+      environment: &environment
+        OMP_NUM_THREADS: 1
+        SFEM_MU: "{material_mu}"
+        SFEM_LAMBDA: "{material_lambda}"
+        SFEM_ETA_S: "{material_eta_s}"
+        SFEM_ETA_B: "{material_eta_b}"
+        SFEM_RHO: 0
+        SFEM_LOAD_SCALE: 1
+        SFEM_LOAD_RAMP_TIME: "{loading_ramp_time}"
+        SFEM_SMOOTH_LOAD_RAMP: 1
+        SFEM_NL_TOL: 1.0e-11
+        SFEM_LSOLVE_RTOL: 1.0e-12
+        SFEM_LSOLVE_ATOL: 1.0e-13
+    expected_output: &expected
+      required:
+        - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 3}
+        - {pattern: SFEM_KV_CREEP_COMPLETE, count: 1}
+      forbidden: [Newton did not converge, BiCGStab failed, "nan", "inf"]
+    tolerances: *tolerances
+  - <<: *base
+    id: quad4_shear_viscosity
+    element: QUAD4
+  - <<: *base
+    id: tri3_shear_bulk_viscosity
+    element: TRI3
+    material: {mu: 2.0, lambda: 5.0, eta_s: 4.0, eta_b: 2.0}
+  - <<: *base
+    id: quad4_shear_bulk_viscosity
+    element: QUAD4
+    material: {mu: 2.0, lambda: 5.0, eta_s: 4.0, eta_b: 2.0}
