@@ -106,9 +106,10 @@ variants:
         - simple_shear
         - isotropic_dilation
         - combined_nonsymmetric
-      environment:
+      environment: &generated_environment
         OMP_NUM_THREADS: 1
         SFEM_OPERATOR_CONFIG: "{output}/operator.yaml"
+        SFEM_OP_TYPE: MF
         SFEM_VERBOSE: 0
         SFEM_NL_TOL: 1.0e-11
         SFEM_NL_MAX_IT: 30
@@ -204,5 +205,85 @@ variants:
     element: HEX8
     resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
     driver: *legacy_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_neohookean_tet10
+    operator: GeneratedNeoHookeanOgden
+    element: TET10
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed, backend: matrix_free}
+    driver: &initialized_generated_driver
+      <<: *generated_driver
+      environment:
+        <<: *generated_environment
+        SFEM_AFFINE_INITIALIZE: 1
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_modified_mooney_rivlin_tet10
+    operator: GeneratedModifiedMooneyRivlin
+    element: TET10
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed, backend: matrix_free}
+    driver: *initialized_generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_saint_venant_kirchhoff_tet10
+    operator: GeneratedSaintVenantKirchhoff
+    element: TET10
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed, backend: matrix_free}
+    driver: *generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_neohookean_hex27
+    operator: GeneratedNeoHookeanOgden
+    element: HEX27
+    resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: matrix_free}
+    driver: *initialized_generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_modified_mooney_rivlin_hex27
+    operator: GeneratedModifiedMooneyRivlin
+    element: HEX27
+    resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: matrix_free}
+    driver: *initialized_generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_saint_venant_kirchhoff_hex27
+    operator: GeneratedSaintVenantKirchhoff
+    element: HEX27
+    resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: matrix_free}
+    driver: *generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_neohookean_proteus_hex8
+    operator: GeneratedNeoHookeanOgden
+    element: PROTEUS_HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned, backend: matrix_free}
+    driver: *generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_neohookean_proteus_hex27
+    operator: GeneratedNeoHookeanOgden
+    element: PROTEUS_HEX27
+    resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: semi_structured_matrix_free}
+    driver: *initialized_generated_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_neohookean_hex8_bsr
+    operator: GeneratedNeoHookeanOgden
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned, backend: bsr}
+    driver:
+      <<: *generated_driver
+      environment:
+        <<: *generated_environment
+        SFEM_OP_TYPE: BSR
     expected_output: *expected_output
     tolerances: *variant_tolerances

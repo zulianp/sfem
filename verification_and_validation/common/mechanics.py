@@ -6,6 +6,7 @@ import math
 
 import numpy as np
 
+from .mesh import Mesh
 from .sets import surface_geometry
 
 
@@ -69,6 +70,20 @@ def element_kinematics(mesh, displacement):
     displacement = np.asarray(displacement, dtype=np.float64)
     if displacement.shape != mesh.points.shape or not np.all(np.isfinite(displacement)):
         raise ValueError(f"displacement must be a finite array with shape {mesh.points.shape}")
+
+    corner_layouts = {
+        "TRI6": ("TRI3", (0, 1, 2)),
+        "TET10": ("TET4", (0, 1, 2, 3)),
+        "HEX27": ("HEX8", tuple(range(8))),
+        "PROTEUS_QUAD4": ("QUAD4", (0, 1, 3, 2)),
+        "PROTEUS_HEX8": ("HEX8", (0, 1, 3, 2, 4, 5, 7, 6)),
+        "PROTEUS_HEX27": ("HEX8", (0, 2, 8, 6, 18, 20, 26, 24)),
+    }
+    layout = corner_layouts.get(mesh.element_type)
+    if layout is not None:
+        linear_type, local_nodes = layout
+        linear_mesh = Mesh(mesh.points, mesh.elements[:, local_nodes], linear_type)
+        return element_kinematics(linear_mesh, displacement)
 
     shape_values, reference_gradients, reference_weights = _quadrature(mesh.element_type)
     coordinates = mesh.points[mesh.elements]

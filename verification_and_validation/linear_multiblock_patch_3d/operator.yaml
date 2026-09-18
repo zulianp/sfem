@@ -1,0 +1,5 @@
+operator:
+  type: GeneratedLinearElasticity
+  blocks:
+    - {name: left, mu: 2.0, lmbda: 3.0}
+    - {name: right, mu: 5.0, lmbda: 7.0}

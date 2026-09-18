@@ -1,0 +1,119 @@
+schema_version: 2
+id: active_strain_homogeneous_3d
+name: Three-dimensional homogeneous active strain
+kind: verification
+family: hyperelastic
+dimension: 3
+tier: extended
+
+source:
+  description: Independent multiplicative-decomposition energy and first Piola stress
+  reference: README.md
+
+oracle:
+  type: analytical
+  implementation: oracle.py
+
+material:
+  mu: 2.0
+  lambda: 5.0
+
+modes: [undeformed, compatible]
+
+mesh:
+  command:
+    - "{python}"
+    - "{case_dir}/generate_mesh.py"
+    - "{mesh}"
+    - --element
+    - "{element}"
+    - --nx
+    - "{resolution_nx}"
+    - --ny
+    - "{resolution_ny}"
+    - --nz
+    - "{resolution_nz}"
+
+inputs:
+  - {template: dirichlet_undeformed.yaml, output: "{output}/dirichlet_undeformed.yaml"}
+  - {template: dirichlet_compatible.yaml, output: "{output}/dirichlet_compatible.yaml"}
+
+verification:
+  command: ["{python}", "{case_dir}/verify.py", --case, "{resolved_case}", --output, "{output}", --report, "{output}/verification.json"]
+  report: "{output}/verification.json"
+  tolerances:
+    undeformed_displacement_relative_l2: 1.0e-9
+    undeformed_free_residual_normalized: 1.0e-9
+    undeformed_energy_relative: 1.0e-8
+    undeformed_reaction_relative_l2: 1.0e-8
+    compatible_displacement_relative_l2: 1.0e-9
+    compatible_free_residual_normalized: 1.0e-9
+    compatible_energy_relative: 1.0e-8
+    compatible_reaction_relative_l2: 1.0e-8
+
+variants:
+  - id: neohookean_hex8_matrix_free
+    operator: NeoHookeanOgdenActiveStrainPacked
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, backend: matrix_free}
+    driver: &neo_driver
+      executable: "{python}"
+      arguments: ["{suite_dir}/common/run_affine_modes.py", --kind, hyperelastic, --driver, "{build_dir}/hyperelasticy", --mesh, "{mesh}", --input-dir, "{output}", --output, "{output}/solution", undeformed, compatible]
+      environment: &neo_environment
+        OMP_NUM_THREADS: 1
+        SFEM_OPERATOR: NeoHookeanOgdenActiveStrainPacked
+        SFEM_USE_PACKED_MESH: 1
+        SFEM_ACTIVE_STRAIN_FILE: "{mesh}/fields/Fa.float64.raw"
+        SFEM_AFFINE_INITIALIZE: 1
+        SFEM_MU: "{material_lambda}"
+        SFEM_LAMBDA: "{material_mu}"
+        SFEM_OP_TYPE: MF
+        SFEM_VERBOSE: 0
+        SFEM_NL_TOL: 1.0e-11
+        SFEM_NL_MAX_IT: 30
+        SFEM_LSOLVE_RTOL: 1.0e-12
+        SFEM_ENABLE_LINE_SEARCH: 0
+    expected_output: &expected_output
+      required: [{pattern: SFEM_AFFINE_MODE_COMPLETE, count: 2}]
+      forbidden: [Newton did not converge, No progress made, "(max iterations)"]
+    tolerances: &variant_tolerances
+      undeformed_displacement_relative_l2: 1.0e-9
+
+  - id: neohookean_hex8_bsr
+    operator: NeoHookeanOgdenActiveStrainPacked
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, backend: bsr}
+    driver:
+      <<: *neo_driver
+      environment:
+        <<: *neo_environment
+        SFEM_OP_TYPE: BSR
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: mooney_rivlin_hex8_matrix_free
+    operator: MooneyRivlinActiveStrainPacked
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, backend: matrix_free}
+    driver: &mooney_driver
+      <<: *neo_driver
+      environment: &mooney_environment
+        <<: *neo_environment
+        SFEM_OPERATOR: MooneyRivlinActiveStrainPacked
+        SFEM_MU: "{material_lambda}"
+        SFEM_LAMBDA: "{material_mu}"
+        SFEM_LMDA: "{material_lambda}"
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: mooney_rivlin_hex8_bsr
+    operator: MooneyRivlinActiveStrainPacked
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, backend: bsr}
+    driver:
+      <<: *mooney_driver
+      environment:
+        <<: *mooney_environment
+        SFEM_OP_TYPE: BSR
+    expected_output: *expected_output
+    tolerances: *variant_tolerances

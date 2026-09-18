@@ -1,0 +1,71 @@
+schema_version: 2
+id: linear_multiblock_patch_3d
+name: Three-dimensional two-material linear patch
+kind: verification
+family: elastic
+dimension: 3
+tier: extended
+
+source:
+  description: Closed-form bonded two-material uniaxial-strain solution
+  reference: README.md
+
+oracle:
+  type: analytical
+  implementation: oracle.py
+
+material:
+  left_mu: 2.0
+  left_lambda: 3.0
+  right_mu: 5.0
+  right_lambda: 7.0
+
+mesh:
+  command: ["{python}", "{case_dir}/generate_mesh.py", "{mesh}", --element, "{element}", --nx, "{resolution_nx}", --ny, "{resolution_ny}", --nz, "{resolution_nz}"]
+
+inputs:
+  - {template: operator.yaml, output: "{output}/operator.yaml"}
+  - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
+
+verification:
+  command: ["{python}", "{case_dir}/verify.py", --case, "{resolved_case}", --output, "{output}", --report, "{output}/verification.json"]
+  report: "{output}/verification.json"
+  tolerances:
+    displacement_relative_l2: 1.0e-10
+    free_residual_normalized: 1.0e-10
+    energy_relative: 1.0e-9
+    reaction_relative_l2: 1.0e-9
+
+variants:
+  - id: generated_hex8_matrix_free
+    operator: GeneratedLinearElasticity
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, backend: matrix_free}
+    driver: &driver
+      executable: "{build_dir}/linear_elasticity"
+      arguments: ["{mesh}", "{output}/dirichlet.yaml", NONE, "{output}/operator.yaml", "{output}/solution"]
+      environment: &driver_environment
+        OMP_NUM_THREADS: 1
+        SFEM_REORDER: 0
+        SFEM_USE_PACKED_MESH: 0
+        SFEM_OP_TYPE: MF
+        SFEM_VERBOSE: 0
+        SFEM_RTOL: 1.0e-13
+        SFEM_MAX_IT: 20000
+    expected_output: &expected_output
+      required: []
+      forbidden: [No progress made, "(max iterations)"]
+    tolerances: &variant_tolerances
+      displacement_relative_l2: 1.0e-10
+
+  - id: generated_hex8_bsr
+    operator: GeneratedLinearElasticity
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, backend: bsr}
+    driver:
+      <<: *driver
+      environment:
+        <<: *driver_environment
+        SFEM_OP_TYPE: BSR
+    expected_output: *expected_output
+    tolerances: *variant_tolerances

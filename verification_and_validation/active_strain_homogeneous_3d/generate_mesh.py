@@ -4,38 +4,38 @@ import argparse
 from pathlib import Path
 import sys
 
+import numpy as np
+
 SUITE_DIR = Path(__file__).resolve().parents[1]
 if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
 
 from common.affine import generate_affine_mesh
-from oracle import deformation_gradients
+from common.mesh import read_mesh
+from common.raw import write_raw
+from oracle import active_gradient, deformation_gradients
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate the three-dimensional affine patch mesh")
+    parser = argparse.ArgumentParser(description="Generate the active-strain homogeneous cube")
     parser.add_argument("output", type=Path)
-    parser.add_argument(
-        "--element",
-        choices=("TET4", "TET10", "HEX8", "HEX27", "PROTEUS_HEX8", "PROTEUS_HEX27"),
-        required=True,
-    )
+    parser.add_argument("--element", choices=("HEX8",), required=True)
     parser.add_argument("--nx", type=int, required=True)
     parser.add_argument("--ny", type=int, required=True)
     parser.add_argument("--nz", type=int, required=True)
-    parser.add_argument("--transform", choices=("aligned", "skewed"), required=True)
     args = parser.parse_args()
+
     metadata = generate_affine_mesh(
         args.output,
         args.element,
         (args.nx, args.ny, args.nz),
         deformation_gradients(),
-        transform=args.transform,
+        transform="aligned",
     )
-    print(
-        f"Generated {metadata['element_type']} affine patch with "
-        f"{metadata['interior_nodes']} interior nodes ({metadata['transform']})"
-    )
+    mesh = read_mesh(args.output)
+    field = np.tile(active_gradient().reshape(-1), mesh.n_elements)
+    write_raw(args.output / "fields" / "Fa.float64.raw", field, np.float64, require_finite=True)
+    print(f"Generated {metadata['element_type']} active-strain cube with {mesh.n_elements} elements")
     return 0
 
 

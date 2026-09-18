@@ -15,7 +15,11 @@ from oracle import deformation_gradients
 def main():
     parser = argparse.ArgumentParser(description="Generate the three-dimensional hyperelastic affine mesh")
     parser.add_argument("output", type=Path)
-    parser.add_argument("--element", choices=("TET4", "HEX8"), required=True)
+    parser.add_argument(
+        "--element",
+        choices=("TET4", "TET10", "HEX8", "HEX27", "PROTEUS_HEX8", "PROTEUS_HEX27"),
+        required=True,
+    )
     parser.add_argument("--nx", type=int, required=True)
     parser.add_argument("--ny", type=int, required=True)
     parser.add_argument("--nz", type=int, required=True)

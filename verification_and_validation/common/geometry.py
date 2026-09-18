@@ -128,6 +128,84 @@ def box_mesh(width, height, depth, nx, ny, nz, element_type="HEX8", origin=(0.0,
     return Mesh(points, elements, element_type)
 
 
+def promote_simplex_mesh(mesh, element_type):
+    """Promote a TRI3 or TET4 mesh using globally shared edge midpoints."""
+
+    element_type = str(element_type).upper()
+    if mesh.element_type == "TRI3" and element_type == "TRI6":
+        local_edges = ((0, 1), (1, 2), (0, 2))
+    elif mesh.element_type == "TET4" and element_type == "TET10":
+        local_edges = ((0, 1), (1, 2), (0, 2), (0, 3), (1, 3), (2, 3))
+    else:
+        raise ValueError(f"cannot promote {mesh.element_type} to {element_type}")
+
+    edge_nodes = {}
+    points = [point.copy() for point in mesh.points]
+    promoted = np.empty((mesh.n_elements, len(mesh.elements[0]) + len(local_edges)), dtype=np.int64)
+    promoted[:, : mesh.elements.shape[1]] = mesh.elements
+    for element_index, element in enumerate(mesh.elements):
+        for edge_index, (left, right) in enumerate(local_edges):
+            edge = tuple(sorted((int(element[left]), int(element[right]))))
+            node = edge_nodes.get(edge)
+            if node is None:
+                node = len(points)
+                edge_nodes[edge] = node
+                points.append(0.5 * (mesh.points[edge[0]] + mesh.points[edge[1]]))
+            promoted[element_index, mesh.elements.shape[1] + edge_index] = node
+    return Mesh(np.asarray(points), promoted, element_type)
+
+
+def tensor_product_mesh(width, height, depth, nx, ny, nz, element_type, origin=(0.0, 0.0, 0.0)):
+    """Generate SFEM's standard or lexicographic tensor-product element layouts."""
+
+    element_type = _element_type(element_type, ("HEX27", "PROTEUS_HEX8", "PROTEUS_HEX27"))
+    if element_type == "PROTEUS_HEX8":
+        mesh = box_mesh(width, height, depth, nx, ny, nz, "HEX8", origin)
+        return Mesh(mesh.points, mesh.elements[:, (0, 1, 3, 2, 4, 5, 7, 6)], element_type)
+
+    width = _positive_float(width, "width")
+    height = _positive_float(height, "height")
+    depth = _positive_float(depth, "depth")
+    nx = _positive_int(nx, "nx")
+    ny = _positive_int(ny, "ny")
+    nz = _positive_int(nz, "nz")
+    origin = np.asarray(origin, dtype=np.float64)
+    if origin.shape != (3,) or not np.all(np.isfinite(origin)):
+        raise ValueError("origin must contain three finite coordinates")
+
+    nx2, ny2, nz2 = 2 * nx, 2 * ny, 2 * nz
+    x = np.linspace(origin[0], origin[0] + width, nx2 + 1)
+    y = np.linspace(origin[1], origin[1] + height, ny2 + 1)
+    z = np.linspace(origin[2], origin[2] + depth, nz2 + 1)
+    xx, yy, zz = np.meshgrid(x, y, z, indexing="xy")
+    points = np.column_stack((xx.ravel(), yy.ravel(), zz.ravel()))
+
+    def node(i, j, k):
+        return k + (nz2 + 1) * (i + (nx2 + 1) * j)
+
+    cartesian = []
+    for j in range(ny):
+        for i in range(nx):
+            for k in range(nz):
+                cartesian.append(
+                    [node(2 * i + dx, 2 * j + dy, 2 * k + dz)
+                     for dz in range(3) for dy in range(3) for dx in range(3)]
+                )
+    cartesian = np.asarray(cartesian, dtype=np.int64)
+    if element_type == "PROTEUS_HEX27":
+        elements = cartesian
+    else:
+        standard_order = (0, 2, 8, 6, 18, 20, 26, 24, 1, 5, 7, 3, 19, 23, 25, 21,
+                          9, 11, 17, 15, 10, 14, 16, 12, 4, 22, 13)
+        elements = cartesian[:, standard_order]
+    return Mesh(points, elements, element_type)
+
+
+def proteus_rectangle_mesh(width, height, nx, ny, origin=(0.0, 0.0)):
+    mesh = rectangle_mesh(width, height, nx, ny, "QUAD4", origin)
+    return Mesh(mesh.points, mesh.elements[:, (0, 1, 3, 2)], "PROTEUS_QUAD4")
+
+
 def _polar_mesh(inner_radius, outer_radius, radial_cells, angular_cells, angle_start, angle_end, periodic,
                 element_type):
     inner_radius = _positive_float(inner_radius, "inner_radius")

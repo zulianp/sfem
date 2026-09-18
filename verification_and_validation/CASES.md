@@ -28,7 +28,7 @@ solid-related source file.
 | Hyperelastic | `NeoHookeanOgden` | Legacy 3D `TET4`/`TET10`/`HEX8` paths | Run as 3D conformance variants against the same oracle as the generated operator. |
 | Hyperelastic | `NeoHookeanOgdenPacked` | Legacy packed 3D path with operation-dependent element support | Enable an element variant only after a driver capability check confirms all operations required by the solver. |
 | Hyperelastic | `MooneyRivlin`, `MooneyRivlinActiveStrainPacked` | Legacy packed 3D `HEX8` path | Pure-material mode belongs in the homogeneous case; active strain gets a separate case. |
-| Hyperelastic | `GeneratedSaintVenantKirchhoff` | Generated 2D/3D source and kernels are present, but the operator is not currently registered by `sfem_generated_ops_registration.cpp` | Activate before adding it as a required homogeneous-case variant. It must not be reported as covered until driver creation succeeds. |
+| Hyperelastic | `GeneratedSaintVenantKirchhoff` | Generated 2D/3D simplex and tensor-product families | Required in the homogeneous mode cases. |
 | Viscoelastic | `GeneratedMooneyRivlinKelvinVoigtNewmark` | Generated 2D and 3D element families | Canonical finite-strain Kelvin-Voigt target in both dimensions. |
 | Viscoelastic | `KelvinVoigtNewmark` | Legacy 3D `HEX8` and semi-structured hex only | Cover with the analytical damped-mode case. |
 | Viscoelastic | `MooneyRivlinVisco` | Legacy 3D `HEX8` only; Prony series and optional WLF shift | Cover with homogeneous relaxation and reduced-time WLF variants. |
@@ -58,8 +58,8 @@ outside this material-focused catalog.
 - **Type:** verification; fast gate.
 - **Target:** legacy `LinearElasticity` on `TRI3`, plus
   `GeneratedLinearElasticity` on `TRI3` and `QUAD4`. The legacy operator has no
-  `QUAD4` kernel; add `TRI6` and generated Proteus variants to the extended
-  lane.
+  `QUAD4` kernel; the extended lane adds generated `TRI6`, Proteus `QUAD4`, and
+  assembled BSR variants.
 - **Setup:** unit square with all boundary displacements prescribed from three
   affine fields: deviatoric extension, simple shear, and mixed volumetric
   strain. Include at least one non-axis-aligned mesh.
@@ -77,8 +77,8 @@ outside this material-focused catalog.
 
 - **Type:** verification; fast gate.
 - **Target:** `LinearElasticity` and `GeneratedLinearElasticity` on `TET4` and
-  `HEX8`; `TET10`, `HEX27`, semi-structured, and packed modes are extended
-  variants.
+  `HEX8`; generated `TET10`, `HEX27`, Proteus, semi-structured, and assembled
+  BSR paths are extended variants.
 - **Setup:** unit cube with affine deviatoric extension, simple shear, and
   triaxial volumetric strain. Use both an aligned tensor-product mesh and a
   skewed tetrahedral mesh.
@@ -132,7 +132,8 @@ outside this material-focused catalog.
 - **Type:** constitutive verification; fast gate.
 - **Target:** `GeneratedNeoHookeanOgden`,
   `GeneratedModifiedMooneyRivlin`, and `GeneratedSaintVenantKirchhoff`;
-  `TRI3` and `QUAD4` are required.
+  `TRI3` and `QUAD4` are required, with `TRI6`, Proteus `QUAD4`, and assembled
+  BSR paths in the extended lane.
 - **Setup:** a unit square subjected independently to finite uniaxial plane
   strain, simple shear, and uniform in-plane dilation. Prescribe the exact
   affine boundary field and solve for interior nodes.
@@ -150,8 +151,8 @@ outside this material-focused catalog.
 
 - **Type:** constitutive verification; fast gate.
 - **Target:** the generated hyperelastic operators on `TET4` and `HEX8`, plus
-  compatible legacy Neo-Hookean variants. Add packed paths, `TET10`, and
-  `HEX27` to the extended lane after the primary variants pass.
+  compatible legacy Neo-Hookean variants. The extended lane adds `TET10`,
+  `HEX27`, generated Proteus, semi-structured, and assembled BSR paths.
 - **Setup:** unit cube under finite uniaxial deformation, simple shear, and
   isotropic dilation. Add one combined nonsymmetric deformation gradient to
   exercise all off-diagonal terms.
@@ -285,8 +286,9 @@ outside this material-focused catalog.
   resultants.
 - **Pass conditions:** relative energy and reaction errors at or below `1e-8`
   and normalized interior residual at or below `1e-9`.
-- **Prerequisite:** file-backed active-strain fields in the driver. This case is
-  not required for the initial elastic/hyperelastic/viscoelastic coverage gate.
+- **Implementation:** `SFEM_ACTIVE_STRAIN_FILE` supplies one row-major `3 x 3`
+  `float64` active deformation gradient per element. Matrix-free and BSR
+  variants use the same field and tolerances.
 
 ## Element and Backend Policy
 
@@ -296,6 +298,8 @@ outside this material-focused catalog.
 - First-order CPU matrix-free variants form the required baseline. Second-order,
   packed, semi-structured, assembled BSR, and device variants reuse the same
   physical oracle as extended conformance runs.
+- `linear_multiblock_patch_3d` verifies per-block Lame parameters against a
+  bonded two-material extension with continuous interface traction.
 - Agreement between two SFEM operators or backends is useful diagnostic data,
   but it is not an oracle and cannot be the sole pass condition.
 - Spatial cases use at least three resolutions. Temporal cases use at least

@@ -91,10 +91,11 @@ variants:
         - deviatoric_extension
         - simple_shear
         - mixed_volumetric
-      environment:
+      environment: &driver_environment
         OMP_NUM_THREADS: 1
         SFEM_REORDER: 0
         SFEM_USE_PACKED_MESH: 0
+        SFEM_OP_TYPE: MF
         SFEM_VERBOSE: 0
         SFEM_RTOL: 1.0e-13
         SFEM_MAX_IT: 20000
@@ -124,3 +125,49 @@ variants:
     driver: *driver
     expected_output: *expected_output
     tolerances: *variant_tolerances
+
+  - id: generated_tri6
+    operator: GeneratedLinearElasticity
+    element: TRI6
+    resolution: {nx: 4, ny: 4, transform: skewed, backend: matrix_free}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_proteus_quad4
+    operator: GeneratedLinearElasticity
+    element: PROTEUS_QUAD4
+    resolution: {nx: 4, ny: 4, transform: aligned, backend: matrix_free}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_quad4_bsr
+    operator: GeneratedLinearElasticity
+    element: QUAD4
+    resolution: {nx: 4, ny: 4, transform: aligned, backend: bsr}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver:
+      <<: *driver
+      environment:
+        <<: *driver_environment
+        SFEM_OP_TYPE: BSR
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_quad4_cuda
+    operator: GeneratedLinearElasticity
+    element: QUAD4
+    resolution: {nx: 4, ny: 4, transform: aligned, backend: cuda}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver:
+      <<: *driver
+      environment:
+        <<: *driver_environment
+        SFEM_EXECUTION_SPACE: DEVICE
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+    skip:
+      reason: This build has SFEM_ENABLE_CUDA=OFF; no V&V-ready device operator is exposed.

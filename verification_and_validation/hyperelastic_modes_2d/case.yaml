@@ -96,9 +96,10 @@ variants:
         - uniaxial_extension
         - simple_shear
         - uniform_dilation
-      environment:
+      environment: &driver_environment
         OMP_NUM_THREADS: 1
         SFEM_OPERATOR_CONFIG: "{output}/operator.yaml"
+        SFEM_OP_TYPE: MF
         SFEM_VERBOSE: 0
         SFEM_NL_TOL: 1.0e-11
         SFEM_NL_MAX_IT: 30
@@ -151,5 +152,53 @@ variants:
     element: QUAD4
     resolution: {nx: 4, ny: 4, transform: aligned}
     driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_neohookean_tri6
+    operator: GeneratedNeoHookeanOgden
+    element: TRI6
+    resolution: {nx: 4, ny: 4, transform: skewed, backend: matrix_free}
+    driver: &initialized_driver
+      <<: *driver
+      environment:
+        <<: *driver_environment
+        SFEM_AFFINE_INITIALIZE: 1
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_modified_mooney_rivlin_tri6
+    operator: GeneratedModifiedMooneyRivlin
+    element: TRI6
+    resolution: {nx: 4, ny: 4, transform: skewed, backend: matrix_free}
+    driver: *initialized_driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_saint_venant_kirchhoff_tri6
+    operator: GeneratedSaintVenantKirchhoff
+    element: TRI6
+    resolution: {nx: 4, ny: 4, transform: skewed, backend: matrix_free}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_neohookean_proteus_quad4
+    operator: GeneratedNeoHookeanOgden
+    element: PROTEUS_QUAD4
+    resolution: {nx: 4, ny: 4, transform: aligned, backend: matrix_free}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_neohookean_quad4_bsr
+    operator: GeneratedNeoHookeanOgden
+    element: QUAD4
+    resolution: {nx: 4, ny: 4, transform: aligned, backend: bsr}
+    driver:
+      <<: *driver
+      environment:
+        <<: *driver_environment
+        SFEM_OP_TYPE: BSR
     expected_output: *expected_output
     tolerances: *variant_tolerances

@@ -8,6 +8,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import yaml
+
 SUITE_DIR = Path(__file__).resolve().parents[1]
 if str(SUITE_DIR) not in sys.path:
     sys.path.insert(0, str(SUITE_DIR))
@@ -26,7 +28,21 @@ def main():
     args = parser.parse_args()
 
     environment = os.environ.copy()
+    initialize_affine = args.kind == "hyperelastic" and environment.get(
+        "SFEM_AFFINE_INITIALIZE", "0"
+    ) not in ("", "0")
+    dimension = None
+    if initialize_affine:
+        metadata = yaml.safe_load((args.mesh / "meta.yaml").read_text(encoding="utf-8"))
+        dimension = int(metadata["spatial_dimension"])
     for mode in args.modes:
+        mode_environment = environment.copy()
+        if initialize_affine:
+            components = [
+                args.mesh / "initial_values" / f"{mode}.{component}.float64.raw"
+                for component in range(dimension)
+            ]
+            mode_environment["SFEM_INITIAL_DISPLACEMENT_COMPONENTS"] = ",".join(str(path) for path in components)
         mode_output = args.output / mode
         mode_output.mkdir(parents=True, exist_ok=True)
         dirichlet = args.input_dir / f"dirichlet_{mode}.yaml"
@@ -45,7 +61,7 @@ def main():
         print(f"--- affine mode: {mode} ---", flush=True)
         completed = subprocess.run(
             command,
-            env=environment,
+            env=mode_environment,
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,

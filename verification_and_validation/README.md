@@ -51,7 +51,10 @@ runner returns a non-zero status for failures or errors.
 The fast tier contains affine 2D and 3D linear-elastic patch tests and
 homogeneous 2D and 3D hyperelastic mode tests. These cases compare independent
 displacement, free residual, energy, face-reaction, and deformation-Jacobian
-oracles across legacy and generated simplex and tensor-product kernels.
+oracles across legacy and generated simplex and tensor-product kernels. The
+extended tier adds higher-order and generated Proteus meshes, matrix-free and
+BSR paths, active-strain packed operators, and a two-material block case while
+reusing the same physical tolerances.
 
 ## Driver inputs
 
@@ -104,6 +107,11 @@ drivers accept either one interleaved field or one file per component through
 `SFEM_INITIAL_DISPLACEMENT`, `SFEM_INITIAL_DISPLACEMENT_COMPONENTS`,
 `SFEM_INITIAL_VELOCITY`, and `SFEM_INITIAL_VELOCITY_COMPONENTS`. Component
 paths are comma-separated; all state files use `float64`.
+
+The hyperelastic driver accepts a file-backed active deformation through
+`SFEM_ACTIVE_STRAIN_FILE`. The file contains one row-major `3 x 3` `float64`
+tensor per element. File-backed active strain implies the active-strain path
+and remains fixed instead of invoking the procedural update.
 
 Static drivers write unconstrained `material_reaction` fields and
 `quantities.yaml`. The history-aware hyperelastic driver records time,

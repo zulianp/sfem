@@ -8,7 +8,13 @@ import numpy as np
 SUITE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SUITE_DIR))
 
-from common.geometry import box_mesh, rectangle_mesh  # noqa: E402
+from common.geometry import (  # noqa: E402
+    box_mesh,
+    promote_simplex_mesh,
+    proteus_rectangle_mesh,
+    rectangle_mesh,
+    tensor_product_mesh,
+)
 from common.mechanics import (  # noqa: E402
     boundary_resultant_from_stress,
     cauchy_from_first_piola,
@@ -26,9 +32,15 @@ class KinematicsTests(unittest.TestCase):
     def test_affine_gradient_is_exact_for_supported_elements(self):
         cases = (
             rectangle_mesh(2.0, 1.0, 2, 2, "TRI3"),
+            promote_simplex_mesh(rectangle_mesh(2.0, 1.0, 2, 2, "TRI3"), "TRI6"),
             rectangle_mesh(2.0, 1.0, 2, 2, "QUAD4"),
+            proteus_rectangle_mesh(2.0, 1.0, 2, 2),
             box_mesh(2.0, 1.0, 3.0, 2, 1, 2, "TET4"),
+            promote_simplex_mesh(box_mesh(2.0, 1.0, 3.0, 2, 1, 2, "TET4"), "TET10"),
             box_mesh(2.0, 1.0, 3.0, 2, 1, 2, "HEX8"),
+            tensor_product_mesh(2.0, 1.0, 3.0, 2, 1, 2, "HEX27"),
+            tensor_product_mesh(2.0, 1.0, 3.0, 2, 1, 2, "PROTEUS_HEX8"),
+            tensor_product_mesh(2.0, 1.0, 3.0, 2, 1, 2, "PROTEUS_HEX27"),
         )
         for mesh in cases:
             with self.subTest(element=mesh.element_type):
