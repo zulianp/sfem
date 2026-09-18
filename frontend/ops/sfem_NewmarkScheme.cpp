@@ -11,7 +11,7 @@ namespace sfem {
     class NewmarkScheme::Impl {
     public:
         std::shared_ptr<FunctionSpace>            space;
-        std::shared_ptr<NewmarkInertiaPotential> inertia;
+        std::shared_ptr<InertiaPotential> inertia;
 
         std::shared_ptr<Buffer<real_t>> u_n;
         std::shared_ptr<Buffer<real_t>> v_n;
@@ -29,7 +29,7 @@ namespace sfem {
 
     NewmarkScheme::NewmarkScheme(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>(space)) {
-        impl_->inertia = std::make_shared<NewmarkInertiaPotential>(space);
+        impl_->inertia = std::make_shared<InertiaPotential>(space);
     }
 
     NewmarkScheme::~NewmarkScheme() = default;

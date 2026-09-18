@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "sfem_API.hpp"
-#include "sfem_BDF2InertiaPotential.hpp"
+#include "sfem_InertiaPotential.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_NeumannConditions.hpp"
@@ -439,7 +439,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     set_material_parameters(env, elastic_op, mesh);
     f->add_operator(elastic_op);
 
-    auto inertia_op = std::make_shared<sfem::BDF2InertiaPotential>(fs);
+    auto inertia_op = std::make_shared<sfem::InertiaPotential>(fs);
     inertia_op->set_density(env.rho);
     if (inertia_op->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;

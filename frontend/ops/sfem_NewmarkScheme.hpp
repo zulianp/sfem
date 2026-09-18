@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "sfem_NewmarkInertiaPotential.hpp"
+#include "sfem_InertiaPotential.hpp"
 #include "sfem_TimeScheme.hpp"
 
 namespace sfem {
@@ -24,14 +24,14 @@ namespace sfem {
     ///
     /// The acceleration is the other half of the method and is separable, so it
     /// is not part of the material's form at all: it is
-    /// `a = (u - u_hat)/(beta*dt^2)`, and `NewmarkInertiaPotential` contributes
+    /// `a = (u - u_hat)/(beta*dt^2)`, and `InertiaPotential` contributes
     /// `M*a` to the residual.  This class composes one rather than deriving
     /// from it -- the arithmetic there is tested and unchanged -- keeps its
     /// `alpha` and its `u_hat` current, and publishes it through `inertia_op`
-    /// for the caller to add to the `Function`.  It has to go in the
-    /// `Function`: the node-wise merit is a norm of what `Function::gradient`
-    /// assembles, so a term that is not an operator is a term the line search
-    /// cannot see.
+    /// for the operator holding the scheme to contribute.  It has to reach the
+    /// residual somehow: the node-wise merit is a norm of what
+    /// `Function::gradient` assembles, so a term that no operator assembles is
+    /// a term the line search cannot see.
     class NewmarkScheme final : public TimeScheme {
     public:
         explicit NewmarkScheme(const std::shared_ptr<FunctionSpace> &space);
