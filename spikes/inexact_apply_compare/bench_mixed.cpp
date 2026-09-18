@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
     threads = omp_get_max_threads();
 #endif
     const double mu = 1.3, lmbda = 2.2, eta_s = 0.31, eta_b = 0.17, alpha = 0.9;
-    std::printf("mooney_rivlin_kelvin_voigt_newmark (elastic + viscous), %s, threads %d, best of %d\n\n",
+    std::printf("mooney_rivlin_kelvin_voigt (elastic + viscous), %s, threads %d, best of %d\n\n",
                 ELEMENT_NAME,
                 threads, repeats);
     std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s %9s",

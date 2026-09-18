@@ -138,8 +138,8 @@ list(APPEND SFEM_MODULES
     frontend/ops/generated/linear_elasticity/op
     frontend/ops/generated/neohookean_ogden
     frontend/ops/generated/neohookean_ogden/op
-    frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark
-    frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark/op
+    frontend/ops/generated/mooney_rivlin_kelvin_voigt
+    frontend/ops/generated/mooney_rivlin_kelvin_voigt/op
     frontend/ops/generated/two_phase_flow
     frontend/ops/generated/two_phase_flow/op
     frontend/mesh
@@ -187,7 +187,7 @@ if(SFEM_ENABLE_CUDA)
         frontend/ops/generated/laplace/op/cuda
         frontend/ops/generated/linear_elasticity/op/cuda
         frontend/ops/generated/neohookean_ogden/op/cuda
-        frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark/op/cuda
+        frontend/ops/generated/mooney_rivlin_kelvin_voigt/op/cuda
         frontend/ops/generated/two_phase_flow/op/cuda
     )
 

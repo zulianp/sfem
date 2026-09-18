@@ -116,7 +116,7 @@ int SFEM_KERNEL(laplace_quad4_gradient_i_msoa)(const int, const ptrdiff_t, const
     const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
 int SFEM_KERNEL(laplace_hex8_gradient_i_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *const *, const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
-int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa)(
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_viscous_tet4_residual_a_msoa)(
     const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
@@ -145,14 +145,14 @@ int SFEM_KERNEL(neohookean_ogden_hex8_apply_a_msoa)(const int, const ptrdiff_t, 
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
-int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_elastic_tet10_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const real_t, const real_t,
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
-int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_elastic_hex8_apply_a_msoa)(const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const real_t, const real_t,
@@ -167,7 +167,7 @@ int SFEM_KERNEL(laplace_hex8_gradient_a_msoa)(const int, const ptrdiff_t, const 
     idx_t **, const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const real_t, const ptrdiff_t, const void *, const ptrdiff_t, void * SFEM_STREAM_PARAM);
-int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa)(
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_elastic_tet4_apply_a_msoa)(
     const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
@@ -175,7 +175,7 @@ int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa)(
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, const void *, const void *, const void *,
     const ptrdiff_t, void *, void *, void * SFEM_STREAM_PARAM);
-int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa)(
+int SFEM_KERNEL(mooney_rivlin_kelvin_voigt_viscous_tet4_jacobian_action_a_msoa)(
     const int, const ptrdiff_t, const ptrdiff_t, idx_t **,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
     const geom_t *, const geom_t *, const geom_t *, const geom_t *, const geom_t *,
@@ -437,7 +437,7 @@ static void agree_residual_tet4() {
     u_old[c] = upload(random_field(nnodes));
     out[c] = upload(zero);
   }
-  SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa)(
+  SFEM_KERNEL(mooney_rivlin_kelvin_voigt_viscous_tet4_residual_a_msoa)(
       (int)sizeof(real_t), nelements, nnodes, elements,
       g_adj[0], g_adj[1], g_adj[2], g_adj[3], g_adj[4], g_adj[5], g_adj[6], g_adj[7], g_adj[8],
       g_det, 0.41, 0.73, 0.6,
@@ -449,7 +449,7 @@ static void agree_residual_tet4() {
   for (int c = 0; c < 3; ++c) {
     download(result, out[c]);
     std::snprintf(name, sizeof(name),
-                  "mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa_%c", "xyz"[c]);
+                  "mooney_rivlin_kelvin_voigt_viscous_tet4_residual_a_msoa_%c", "xyz"[c]);
     record(name, result);
   }
 }
@@ -777,8 +777,8 @@ static void bench_hyperelastic_elements(ptrdiff_t side, int repeats) {
         else if (c.n_shape == 10) { SFEM_APPLY(neohookean_ogden_tet10_apply_a_msoa); }
         else { SFEM_APPLY(neohookean_ogden_hex8_apply_a_msoa); }
       } else {
-        if (c.n_shape == 10) { SFEM_APPLY(mooney_rivlin_kelvin_voigt_newmark_elastic_tet10_apply_a_msoa); }
-        else { SFEM_APPLY(mooney_rivlin_kelvin_voigt_newmark_elastic_hex8_apply_a_msoa); }
+        if (c.n_shape == 10) { SFEM_APPLY(mooney_rivlin_kelvin_voigt_elastic_tet10_apply_a_msoa); }
+        else { SFEM_APPLY(mooney_rivlin_kelvin_voigt_elastic_hex8_apply_a_msoa); }
       }
 #undef SFEM_APPLY
       sync();
@@ -836,7 +836,7 @@ static void bench_mooney_rivlin(ptrdiff_t side, int repeats) {
   for (int r = 0; r <= repeats; ++r) {
     for (int c = 0; c < 3; ++c) clear(out[c], (size_t)lattice.nnodes);
     double t0 = seconds();
-    SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa)(
+    SFEM_KERNEL(mooney_rivlin_kelvin_voigt_elastic_tet4_apply_a_msoa)(
         (int)sizeof(real_t), nelements, lattice.nnodes, elements,
         adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
         0.77, 0.31, 1, u[0], u[1], u[2], 1, h[0], h[1], h[2],
@@ -846,7 +846,7 @@ static void bench_mooney_rivlin(ptrdiff_t side, int repeats) {
 
     for (int c = 0; c < 3; ++c) clear(out[c], (size_t)lattice.nnodes);
     t0 = seconds();
-    SFEM_KERNEL(mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa)(
+    SFEM_KERNEL(mooney_rivlin_kelvin_voigt_viscous_tet4_jacobian_action_a_msoa)(
         (int)sizeof(real_t), nelements, lattice.nnodes, elements,
         adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
         0.41, 0.73, 0.6, 1, u[0], u[1], u[2], 1, old[0], old[1], old[2],

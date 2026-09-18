@@ -175,7 +175,7 @@
       }
     }
   },
-  "mooney_rivlin_kelvin_voigt_newmark": {
+  "mooney_rivlin_kelvin_voigt": {
     "2": {
       "elastic": {
         "jacobian_action_blocks": [],

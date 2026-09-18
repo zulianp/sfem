@@ -10,7 +10,7 @@ Defaults:
   mesh        AUTO, creates a released 3D brick
   dirichlet  AUTO, fixed left face when mesh is AUTO
   neumann    AUTO, zero right-face traction when mesh is AUTO
-  output-dir workflows/mooney_rivlin_kelvin_voigt_newmark/output
+  output-dir workflows/mooney_rivlin_kelvin_voigt/output
 
 Useful environment:
   SFEM_BUILD_DIR       build directory, default: build64
@@ -39,10 +39,10 @@ Useful environment:
   SFEM_AUTO_TRACTION  default: [0.0, 0.0, 0.0]
 
 Examples:
-  workflows/mooney_rivlin_kelvin_voigt_newmark/run_and_export.sh
+  workflows/mooney_rivlin_kelvin_voigt/run_and_export.sh
 
   SFEM_STEPS=20 SFEM_DT=0.005 \
-    workflows/mooney_rivlin_kelvin_voigt_newmark/run_and_export.sh \
+    workflows/mooney_rivlin_kelvin_voigt/run_and_export.sh \
     workflows/hyperelasticity/geometry_hex8/box NONE NONE /tmp/mr_kv_box
 EOF
 }
@@ -55,12 +55,12 @@ fi
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd -P)"
 PYTHON="${PYTHON:-$ROOT_DIR/venv/bin/python}"
 BUILD_DIR="${SFEM_BUILD_DIR:-$ROOT_DIR/build64}"
-EXE="${SFEM_EXE:-$BUILD_DIR/mooney_rivlin_kelvin_voigt_newmark}"
+EXE="${SFEM_EXE:-$BUILD_DIR/mooney_rivlin_kelvin_voigt}"
 
 MESH="${1:-${SFEM_MESH:-AUTO}}"
 DIRICHLET="${2:-${SFEM_DIRICHLET:-NONE}}"
 NEUMANN="${3:-${SFEM_NEUMANN:-NONE}}"
-OUTPUT_DIR="${4:-${SFEM_OUTPUT_DIR:-$ROOT_DIR/workflows/mooney_rivlin_kelvin_voigt_newmark/output}}"
+OUTPUT_DIR="${4:-${SFEM_OUTPUT_DIR:-$ROOT_DIR/workflows/mooney_rivlin_kelvin_voigt/output}}"
 XDMF="${SFEM_XDMF:-$OUTPUT_DIR/output.xdmf}"
 
 if [[ ! -x "$PYTHON" ]]; then
@@ -69,12 +69,12 @@ if [[ ! -x "$PYTHON" ]]; then
 fi
 
 if [[ "${SFEM_SKIP_BUILD:-0}" != "1" ]]; then
-    cmake --build "$BUILD_DIR" --target mooney_rivlin_kelvin_voigt_newmark
+    cmake --build "$BUILD_DIR" --target mooney_rivlin_kelvin_voigt
 fi
 
 if [[ ! -x "$EXE" ]]; then
     echo "missing executable: $EXE" >&2
-    echo "build it with: cmake --build $BUILD_DIR --target mooney_rivlin_kelvin_voigt_newmark" >&2
+    echo "build it with: cmake --build $BUILD_DIR --target mooney_rivlin_kelvin_voigt" >&2
     exit 1
 fi
 

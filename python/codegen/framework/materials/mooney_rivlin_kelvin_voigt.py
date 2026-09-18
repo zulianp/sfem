@@ -75,10 +75,10 @@ for dim in (2, 3):
 
 
 material = gen.CodeGenerator(
-    "mooney_rivlin_kelvin_voigt_newmark",
+    "mooney_rivlin_kelvin_voigt",
     systems,
     elements=gen.sfem_default_element_types(),
-    op_name="GeneratedMooneyRivlinKelvinVoigtNewmark",
+    op_name="GeneratedMooneyRivlinKelvinVoigt",
     # Both units assemble: the elastic energy through the direct element-matrix
     # kernel and the viscous residual through its own.  A vector-valued problem
     # uses BSR and nothing else.

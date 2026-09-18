@@ -147,8 +147,8 @@ namespace {
 
 }  // namespace
 
-int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
-    SFEM_TRACE_SCOPE("solve_mooney_rivlin_kelvin_voigt_newmark");
+int solve_mooney_rivlin_kelvin_voigt(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
+    SFEM_TRACE_SCOPE("solve_mooney_rivlin_kelvin_voigt");
     if (argc != 5) {
         if (!comm->rank()) {
             std::fprintf(stderr, "usage: %s <mesh> <dirichlet.yaml|NONE> <neumann.yaml|NONE> <output>\n", argv[0]);
@@ -175,9 +175,9 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
         f->add_constraint(sfem::DirichletConditions::create_from_file(fs, dirichlet_path));
     }
 
-    auto material_op = sfem::create_op(fs, "GeneratedMooneyRivlinKelvinVoigtNewmark", sfem::EXECUTION_SPACE_HOST);
+    auto material_op = sfem::create_op(fs, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
     if (!material_op) {
-        SFEM_ERROR("Unable to create GeneratedMooneyRivlinKelvinVoigtNewmark\n");
+        SFEM_ERROR("Unable to create GeneratedMooneyRivlinKelvinVoigt\n");
         return SFEM_FAILURE;
     }
 
@@ -220,7 +220,7 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     // derivative is not `TimeSteppable` and there would be nothing to attach.
     auto steppable = std::dynamic_pointer_cast<sfem::TimeSteppable>(material_op);
     if (!steppable) {
-        SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigtNewmark does not take a time scheme\n");
+        SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigt does not take a time scheme\n");
         return SFEM_FAILURE;
     }
     steppable->set_time_scheme(scheme);
@@ -301,7 +301,7 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
 
             blas->zeros(ndofs, rhs->data());
             if (f->gradient(u->data(), rhs->data()) != SFEM_SUCCESS) {
-                std::fprintf(stderr, "mooney_rivlin_kelvin_voigt_newmark: gradient failed at step %d Newton iteration %d\n", step, it);
+                std::fprintf(stderr, "mooney_rivlin_kelvin_voigt: gradient failed at step %d Newton iteration %d\n", step, it);
                 return SFEM_FAILURE;
             }
             f->set_value_to_constrained_dofs(0, rhs->data());
@@ -326,7 +326,7 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
             }
             bcgs->set_op(linear_op);
             if (bcgs->apply(rhs->data(), incr->data()) != SFEM_SUCCESS) {
-                std::fprintf(stderr, "mooney_rivlin_kelvin_voigt_newmark: BiCGStab failed at step %d Newton iteration %d\n", step, it);
+                std::fprintf(stderr, "mooney_rivlin_kelvin_voigt: BiCGStab failed at step %d Newton iteration %d\n", step, it);
                 return SFEM_FAILURE;
             }
             total_linear_iterations += bcgs->iterations();
@@ -368,5 +368,5 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
 
 int main(int argc, char *argv[]) {
     auto ctx = sfem::initialize_serial(argc, argv);
-    return solve_mooney_rivlin_kelvin_voigt_newmark(ctx->communicator(), argc, argv);
+    return solve_mooney_rivlin_kelvin_voigt(ctx->communicator(), argc, argv);
 }

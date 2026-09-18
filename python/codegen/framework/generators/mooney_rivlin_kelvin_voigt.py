@@ -7,9 +7,9 @@ except ImportError:
 
 bootstrap_python_path(__file__, 3)
 
-from codegen.framework.materials.mooney_rivlin_kelvin_voigt_newmark import material  # noqa: E402
+from codegen.framework.materials.mooney_rivlin_kelvin_voigt import material  # noqa: E402
 from sfem import gen  # noqa: E402
 
 
 if __name__ == "__main__":
-    gen.run(material, generated_output_dir(__file__, "mooney_rivlin_kelvin_voigt_newmark", 4))
+    gen.run(material, generated_output_dir(__file__, "mooney_rivlin_kelvin_voigt", 4))

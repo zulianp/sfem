@@ -54,7 +54,7 @@ def _residual_reference():
     return material
 
 
-EXPANDED_MATERIAL = "mooney_rivlin_kelvin_voigt_newmark"
+EXPANDED_MATERIAL = "mooney_rivlin_kelvin_voigt"
 EXPANDED_ELEMENT = "TET4"
 
 
