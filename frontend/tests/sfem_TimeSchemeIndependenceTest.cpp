@@ -644,6 +644,93 @@ int test_the_diagnostic_matches_the_scheme() {
     return SFEM_TEST_SUCCESS;
 }
 
+/// A scheme's term is a *potential* when the system has an energy, and it has
+/// to be the potential of the very residual the scheme contributes.
+///
+/// The two merits in this library are not interchangeable.  An energy system
+/// reduces element-wise and `Function::value` sums each operator's potential;
+/// a residual system reduces node-wise and `Function::value` is
+/// `0.5*||gradient||^2`, which already contains every operator's contribution
+/// and to which a potential must never be added.  A scheme's separable term
+/// therefore has to behave correctly under *both*: it must declare
+/// ELEMENT_WISE so an energy system can add it, and its potential must
+/// differentiate to the gradient it contributes, or the two merits describe
+/// different problems and a line search on the energy walks away from the
+/// residual's root.
+///
+/// Checked as a derivative rather than against a formula: the directional
+/// derivative of the potential must equal the gradient contracted with the
+/// same direction.
+int test_the_schemes_potential_differentiates_to_its_residual() {
+    auto         fixture = make_fixture();
+    const real_t dt      = real_t(0.05);
+
+    auto newmark = std::make_shared<sfem::NewmarkScheme>(fixture.space);
+    newmark->set_density(real_t(2));
+    SFEM_TEST_ASSERT(newmark->initialize() == SFEM_SUCCESS);
+    seed_state(fixture.ndofs, 0, newmark->state()->data());
+    seed_state(fixture.ndofs, 1, newmark->velocity()->data());
+    seed_state(fixture.ndofs, 2, newmark->acceleration()->data());
+
+    auto bdf2 = std::make_shared<sfem::BDF2Scheme>(fixture.space);
+    bdf2->set_density(real_t(2));
+    SFEM_TEST_ASSERT(bdf2->initialize() == SFEM_SUCCESS);
+    seed_state(fixture.ndofs, 0, bdf2->state()->data());
+    seed_state(fixture.ndofs, 1, bdf2->velocity()->data());
+
+    std::vector<std::shared_ptr<sfem::TimeScheme>> schemes{newmark, bdf2};
+
+    auto x = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    auto d = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    seed_state(fixture.ndofs, 5, x->data());
+    seed_state(fixture.ndofs, 6, d->data());
+
+    for (const auto &scheme : schemes) {
+        scheme->begin_step(dt, dt);
+        auto inertia = scheme->inertia_op();
+        SFEM_TEST_ASSERT(inertia != nullptr);
+
+        // It must be addable to an energy, which is what ELEMENT_WISE means.
+        // NODE_WISE here would silently promote every Function holding this
+        // scheme to the residual merit.
+        SFEM_TEST_ASSERT(inertia->value_reduction() == sfem::Op::ValueReduction::ELEMENT_WISE);
+
+        auto g = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        SFEM_TEST_ASSERT(inertia->gradient(x->data(), g->data()) == SFEM_SUCCESS);
+
+        real_t slope = 0;
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) slope += g->data()[i] * d->data()[i];
+
+        // The potential is quadratic, so a central difference is exact up to
+        // round-off and no step-size study is needed.
+        const real_t eps = real_t(1e-4);
+        auto         xp  = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        auto         xm  = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+            xp->data()[i] = x->data()[i] + eps * d->data()[i];
+            xm->data()[i] = x->data()[i] - eps * d->data()[i];
+        }
+
+        real_t vp = 0, vm = 0;
+        SFEM_TEST_ASSERT(inertia->value(xp->data(), &vp) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(inertia->value(xm->data(), &vm) == SFEM_SUCCESS);
+
+        const real_t fd = (vp - vm) / (2 * eps);
+        SFEM_TEST_ASSERT(std::abs(slope) > 0);
+        SFEM_TEST_ASSERT(std::abs(fd - slope) <= real_t(1e-8) * std::abs(slope));
+
+        // And the line search's entry point has to agree with the scalar one:
+        // `value_steps` is what an energy system evaluates at each trial step.
+        real_t direct = 0, stepped = 0;
+        SFEM_TEST_ASSERT(inertia->value(xp->data(), &direct) == SFEM_SUCCESS);
+        const real_t step = eps;
+        SFEM_TEST_ASSERT(inertia->value_steps(x->data(), d->data(), 1, &step, &stepped) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(std::abs(direct - stepped) <= real_t(1e-12) * (1 + std::abs(direct)));
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_the_material_reads_the_scheme_it_was_handed);
@@ -654,6 +741,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_bdf2_matches_the_hand_written_algebra);
     SFEM_RUN_TEST(test_the_schemes_have_the_order_they_claim);
     SFEM_RUN_TEST(test_the_diagnostic_matches_the_scheme);
+    SFEM_RUN_TEST(test_the_schemes_potential_differentiates_to_its_residual);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
