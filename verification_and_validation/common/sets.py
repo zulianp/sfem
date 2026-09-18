@@ -12,8 +12,16 @@ from .raw import read_raw, write_raw
 
 LOCAL_SIDES = {
     "TRI3": ((0, 1), (1, 2), (2, 0)),
+    "TRI6": ((0, 1, 3), (1, 2, 4), (2, 0, 5)),
     "QUAD4": ((0, 1), (1, 2), (2, 3), (3, 0)),
+    "PROTEUS_QUAD4": ((0, 1), (1, 3), (3, 2), (2, 0)),
     "TET4": ((0, 1, 3), (1, 2, 3), (0, 3, 2), (0, 2, 1)),
+    "TET10": (
+        (0, 1, 3, 4, 8, 7),
+        (1, 2, 3, 5, 9, 8),
+        (0, 3, 2, 7, 9, 6),
+        (0, 2, 1, 6, 5, 4),
+    ),
     "HEX8": (
         (0, 1, 5, 4),
         (1, 2, 6, 5),
@@ -22,13 +30,43 @@ LOCAL_SIDES = {
         (3, 2, 1, 0),
         (4, 5, 6, 7),
     ),
+    "HEX27": (
+        (0, 1, 5, 4, 8, 17, 12, 16, 20),
+        (1, 2, 6, 5, 9, 18, 13, 17, 21),
+        (2, 3, 7, 6, 10, 19, 14, 18, 22),
+        (3, 0, 4, 7, 11, 16, 15, 19, 23),
+        (3, 2, 1, 0, 10, 9, 8, 11, 24),
+        (4, 5, 6, 7, 12, 13, 14, 15, 25),
+    ),
+    "PROTEUS_HEX8": (
+        (0, 1, 5, 4),
+        (1, 3, 7, 5),
+        (2, 6, 7, 3),
+        (0, 4, 6, 2),
+        (0, 2, 3, 1),
+        (4, 5, 7, 6),
+    ),
+    "PROTEUS_HEX27": (
+        (0, 2, 20, 18, 1, 11, 19, 9, 10),
+        (2, 8, 26, 20, 5, 17, 23, 11, 14),
+        (6, 24, 26, 8, 15, 25, 17, 7, 16),
+        (0, 18, 24, 6, 9, 21, 15, 3, 12),
+        (0, 6, 8, 2, 3, 7, 5, 1, 4),
+        (18, 20, 26, 24, 19, 23, 25, 21, 22),
+    ),
 }
 
 SIDE_ELEMENT_TYPE = {
     "TRI3": "EDGESHELL2",
+    "TRI6": "EDGESHELL3",
     "QUAD4": "EDGESHELL2",
+    "PROTEUS_QUAD4": "EDGESHELL2",
     "TET4": "TRISHELL3",
+    "TET10": "TRISHELL6",
     "HEX8": "QUADSHELL4",
+    "HEX27": "QUADSHELL9",
+    "PROTEUS_HEX8": "QUADSHELL4",
+    "PROTEUS_HEX27": "PROTEUS_QUADSHELL9",
 }
 
 
@@ -105,6 +143,15 @@ def nodeset_from_sideset(mesh, sideset):
 def surface_geometry(mesh, sideset):
     nodes = side_nodes(mesh, sideset)
     coordinates = mesh.points[nodes]
+    if mesh.dimension == 2:
+        corner_count = 2
+    elif coordinates.shape[1] in (3, 6):
+        corner_count = 3
+    elif coordinates.shape[1] in (4, 9):
+        corner_count = 4
+    else:
+        raise ValueError("unsupported boundary topology")
+    coordinates = coordinates[:, :corner_count]
     centroids = np.mean(coordinates, axis=1)
     if mesh.dimension == 2:
         tangents = coordinates[:, 1] - coordinates[:, 0]

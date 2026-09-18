@@ -13,9 +13,12 @@ from common.geometry import (  # noqa: E402
     annulus_mesh,
     box_mesh,
     cylindrical_sector_mesh,
+    promote_simplex_mesh,
+    proteus_rectangle_mesh,
     rectangle_mesh,
     spherical_shell_mesh,
     spherical_shell_octant_mesh,
+    tensor_product_mesh,
 )
 from common.mesh import Mesh  # noqa: E402
 from common.sets import (  # noqa: E402
@@ -39,6 +42,24 @@ class GeometryTests(unittest.TestCase):
         self.assertEqual((36, 3), hexahedron.points.shape)
         self.assertEqual((12, 8), hexahedron.elements.shape)
         self.assertEqual((72, 4), tetrahedron.elements.shape)
+
+    def test_higher_order_and_proteus_meshes_share_nodes(self):
+        tri6 = promote_simplex_mesh(rectangle_mesh(1.0, 1.0, 2, 2, "TRI3"), "TRI6")
+        tet10 = promote_simplex_mesh(box_mesh(1.0, 1.0, 1.0, 1, 1, 1, "TET4"), "TET10")
+        proteus_quad = proteus_rectangle_mesh(1.0, 1.0, 2, 2)
+        hex27 = tensor_product_mesh(1.0, 1.0, 1.0, 2, 1, 1, "HEX27")
+        proteus_hex27 = tensor_product_mesh(1.0, 1.0, 1.0, 2, 1, 1, "PROTEUS_HEX27")
+
+        self.assertEqual((8, 6), tri6.elements.shape)
+        self.assertEqual((6, 10), tet10.elements.shape)
+        self.assertEqual((4, 4), proteus_quad.elements.shape)
+        self.assertEqual((2, 27), hex27.elements.shape)
+        self.assertEqual((2, 27), proteus_hex27.elements.shape)
+        self.assertLess(len(np.unique(hex27.elements)), 2 * 27)
+        for mesh in (tri6, tet10, proteus_quad, hex27, proteus_hex27):
+            with self.subTest(element=mesh.element_type):
+                self.assertGreater(validate_sideset_orientation(mesh, boundary_sides(mesh))[
+                    "minimum_orientation_cosine"], 0.0)
 
     def test_curved_domain_generators_are_deterministic_and_outward(self):
         factories = (

@@ -17,10 +17,11 @@ int lsolve(const std::shared_ptr<sfem::Function>          &f,
            const std::shared_ptr<sfem::Op>                &material_op,
            const std::shared_ptr<sfem::NeumannConditions> &neumann_conditions,
            const smesh::Path                              &output_dir) {
-    auto es        = f->execution_space();
-    auto fs        = f->space();
-    auto m         = fs->mesh_ptr();
-    auto linear_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, nullptr, es);
+    auto              es           = f->execution_space();
+    auto              fs           = f->space();
+    auto              m            = fs->mesh_ptr();
+    const std::string SFEM_OP_TYPE = smesh::Env::read_string("SFEM_OP_TYPE", "MF");
+    auto linear_op = sfem::create_linear_operator(SFEM_OP_TYPE.c_str(), f, nullptr, es);
     auto cg        = sfem::create_cg<real_t>(linear_op, es);
 
     int    SFEM_MAX_IT             = smesh::Env::read<int>("SFEM_MAX_IT", 20000);

@@ -11,16 +11,28 @@ from .raw import dtype_from_path, read_raw, typed_raw_name, write_raw
 
 ELEMENT_NODES = {
     "TRI3": 3,
+    "TRI6": 6,
     "QUAD4": 4,
+    "PROTEUS_QUAD4": 4,
     "TET4": 4,
+    "TET10": 10,
     "HEX8": 8,
+    "HEX27": 27,
+    "PROTEUS_HEX8": 8,
+    "PROTEUS_HEX27": 27,
 }
 
 ELEMENT_DIMENSION = {
     "TRI3": 2,
+    "TRI6": 2,
     "QUAD4": 2,
+    "PROTEUS_QUAD4": 2,
     "TET4": 3,
+    "TET10": 3,
     "HEX8": 3,
+    "HEX27": 3,
+    "PROTEUS_HEX8": 3,
+    "PROTEUS_HEX27": 3,
 }
 
 COORDINATE_NAMES = ("x", "y", "z")

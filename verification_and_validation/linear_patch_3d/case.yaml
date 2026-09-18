@@ -93,10 +93,11 @@ variants:
         - deviatoric_extension
         - simple_shear
         - triaxial_dilation
-      environment:
+      environment: &driver_environment
         OMP_NUM_THREADS: 1
         SFEM_REORDER: 0
         SFEM_USE_PACKED_MESH: 0
+        SFEM_OP_TYPE: MF
         SFEM_VERBOSE: 0
         SFEM_RTOL: 1.0e-13
         SFEM_MAX_IT: 20000
@@ -133,5 +134,54 @@ variants:
     resolution: {nx: 4, ny: 4, nz: 4, transform: aligned}
     material_parameter_map: {mu: mu, lambda: lmbda}
     driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_tet10
+    operator: GeneratedLinearElasticity
+    element: TET10
+    resolution: {nx: 4, ny: 4, nz: 4, transform: skewed, backend: matrix_free}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_hex27
+    operator: GeneratedLinearElasticity
+    element: HEX27
+    resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: matrix_free}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_proteus_hex8
+    operator: GeneratedLinearElasticity
+    element: PROTEUS_HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned, backend: matrix_free}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_proteus_hex27
+    operator: GeneratedLinearElasticity
+    element: PROTEUS_HEX27
+    resolution: {nx: 3, ny: 3, nz: 3, transform: aligned, backend: semi_structured_matrix_free}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver: *driver
+    expected_output: *expected_output
+    tolerances: *variant_tolerances
+
+  - id: generated_hex8_bsr
+    operator: GeneratedLinearElasticity
+    element: HEX8
+    resolution: {nx: 4, ny: 4, nz: 4, transform: aligned, backend: bsr}
+    material_parameter_map: {mu: mu, lambda: lmbda}
+    driver:
+      <<: *driver
+      environment:
+        <<: *driver_environment
+        SFEM_OP_TYPE: BSR
     expected_output: *expected_output
     tolerances: *variant_tolerances

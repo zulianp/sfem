@@ -7,10 +7,16 @@ import numpy as np
 import yaml
 
 from .fields import write_boundary_values
-from .geometry import box_mesh, rectangle_mesh
+from .geometry import (
+    box_mesh,
+    promote_simplex_mesh,
+    proteus_rectangle_mesh,
+    rectangle_mesh,
+    tensor_product_mesh,
+)
 from .mesh import Mesh, read_mesh, write_mesh
 from .metrics import relative_l2_error
-from .raw import dtype_from_path, read_raw
+from .raw import dtype_from_path, read_raw, write_raw
 from .reporting import make_check
 from .sets import (
     Sideset,
@@ -25,7 +31,7 @@ from .sets import (
 )
 
 
-SIMPLEX_ELEMENTS = {"TRI3", "TET4"}
+TWO_DIMENSIONAL_ELEMENTS = {"TRI3", "TRI6", "QUAD4", "PROTEUS_QUAD4"}
 MODE_COMPLETION_MARKER = "SFEM_AFFINE_MODE_COMPLETE"
 
 
@@ -49,13 +55,23 @@ def generate_affine_mesh(output, element_type, resolution, deformation_gradients
         shutil.rmtree(output)
 
     element_type = str(element_type).upper()
-    dimension = 2 if element_type in ("TRI3", "QUAD4") else 3
+    dimension = 2 if element_type in TWO_DIMENSIONAL_ELEMENTS else 3
     if dimension == 2:
         nx, ny = (int(value) for value in resolution)
-        base_mesh = rectangle_mesh(1.0, 1.0, nx, ny, element_type=element_type)
+        if element_type == "TRI6":
+            base_mesh = promote_simplex_mesh(rectangle_mesh(1.0, 1.0, nx, ny, "TRI3"), "TRI6")
+        elif element_type == "PROTEUS_QUAD4":
+            base_mesh = proteus_rectangle_mesh(1.0, 1.0, nx, ny)
+        else:
+            base_mesh = rectangle_mesh(1.0, 1.0, nx, ny, element_type=element_type)
     else:
         nx, ny, nz = (int(value) for value in resolution)
-        base_mesh = box_mesh(1.0, 1.0, 1.0, nx, ny, nz, element_type=element_type)
+        if element_type == "TET10":
+            base_mesh = promote_simplex_mesh(box_mesh(1.0, 1.0, 1.0, nx, ny, nz, "TET4"), "TET10")
+        elif element_type in ("HEX27", "PROTEUS_HEX8", "PROTEUS_HEX27"):
+            base_mesh = tensor_product_mesh(1.0, 1.0, 1.0, nx, ny, nz, element_type)
+        else:
+            base_mesh = box_mesh(1.0, 1.0, 1.0, nx, ny, nz, element_type=element_type)
 
     coordinate_transform = _transform(dimension, transform)
     if np.linalg.det(coordinate_transform) <= 0:
@@ -63,6 +79,7 @@ def generate_affine_mesh(output, element_type, resolution, deformation_gradients
     points = base_mesh.points @ coordinate_transform.T
     mesh = Mesh(points, base_mesh.elements, element_type)
     write_mesh(output, mesh)
+    mesh = read_mesh(output)
 
     exterior = boundary_sides(mesh)
     orientation = validate_sideset_orientation(mesh, exterior)
@@ -92,6 +109,12 @@ def generate_affine_mesh(output, element_type, resolution, deformation_gradients
         gradient = deformation - np.eye(dimension)
         values = mesh.points @ gradient.T
         for component in range(dimension):
+            write_raw(
+                output / "initial_values" / f"{mode}.{component}.float64.raw",
+                values[:, component],
+                np.float64,
+                require_finite=True,
+            )
             write_boundary_values(
                 values_dir / f"{mode}.{component}.float64.raw",
                 mesh,

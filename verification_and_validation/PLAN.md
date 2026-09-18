@@ -167,7 +167,7 @@ machine-readable diagnostics, not only plots.
 pass, time arrays are complete and strictly increasing, and missing intermediate
 outputs fail report validation.
 
-## Phase 6: Extended Operator Coverage
+## Phase 6: Extended Operator Coverage (Complete)
 
 After the core physics cases are stable:
 
@@ -182,6 +182,11 @@ After the core physics cases are stable:
 
 These are conformance extensions. They must not duplicate oracle files or
 create backend-specific tolerances without a documented numerical reason.
+
+**Acceptance:** higher-order and generated Proteus variants pass the existing
+affine oracles, matrix-free and BSR paths pass identical tolerances, unavailable
+device coverage is reported as `SKIP`, and the active-strain and two-material
+cases reproduce their independent energy, residual, and reaction oracles.
 
 ## Reporting and Regression Policy
 
