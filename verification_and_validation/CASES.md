@@ -239,8 +239,8 @@ outside this material-focused catalog.
   variant.
 - **Setup:** rectangular bar with lateral displacement constrained and an
   initial axial mode `sin(pi x/L)`. Release it with no external load in the
-  underdamped regime. Generate the initial displacement and velocity fields as
-  case artifacts.
+  underdamped regime. Generate the initial displacement, velocity, and
+  consistent acceleration fields as case artifacts.
 - **Oracle:** the separated Kelvin-Voigt mode
   `q(t) = exp(-delta t) [q0 cos(omega_d t) +
   (v0 + delta q0)/omega_d sin(omega_d t)]`, with modal mass, stiffness, and

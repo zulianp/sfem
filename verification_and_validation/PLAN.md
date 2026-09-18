@@ -145,7 +145,7 @@ orientation each cause a clear failure.
 convergence behavior. The report includes sampled CSV profiles and compact
 machine-readable diagnostics, not only plots.
 
-## Phase 5: Time-Dependent Viscoelastic Cases
+## Phase 5: Time-Dependent Viscoelastic Cases (Complete)
 
 1. Implement `finite_strain_kv_creep_2d` and
    `finite_strain_kv_creep_3d` using the generated Mooney-Rivlin Kelvin-Voigt

@@ -1,0 +1,71 @@
+schema_version: 2
+id: linear_kv_damped_mode_3d
+name: Three-dimensional linear Kelvin-Voigt damped mode
+kind: verification
+family: viscoelastic
+dimension: 3
+tier: medium
+
+source:
+  description: Separated underdamped Kelvin-Voigt bar mode
+  reference: README.md
+oracle: {type: analytical, implementation: oracle.py}
+geometry: {length: 1.0, height: 1.0, depth: 1.0}
+initial_conditions: {modal_amplitude: 0.01, modal_velocity: 0.02}
+time: {duration: 1.2, time_steps: [0.02, 0.01, 0.005]}
+material: {shear_stiffness: 4.0, bulk_modulus: 8.0, damping: 0.05, density: 1.0}
+
+mesh:
+  command: ["{python}", "{case_dir}/generate_mesh.py", "{mesh}", --nx, "{resolution_nx}", --ny, "{resolution_ny}", --nz, "{resolution_nz}"]
+inputs:
+  - {template: dirichlet.yaml, output: "{output}/dirichlet.yaml"}
+verification:
+  command: ["{python}", "{case_dir}/verify.py", --case, "{resolved_case}", --output, "{output}", --report, "{output}/verification.json"]
+  report: "{output}/verification.json"
+  tolerances: &tolerances
+    amplitude_history_relative_l2: 5.0e-3
+    maximum_normalized_amplitude_error: 2.0e-3
+    frequency_relative_error: 1.0e-2
+    decay_relative_error: 1.0e-2
+    temporal_rate_deficit: 0.0
+
+variants:
+  - &base
+    id: hex8
+    operator: KelvinVoigtNewmark
+    element: HEX8
+    resolution: {nx: 64, ny: 1, nz: 1, refine_level: 0}
+    driver: &driver
+      executable: "{python}"
+      arguments: ["{suite_dir}/common/run_linear_kv_mode.py", --case, "{resolved_case}", --driver, "{build_dir}/kelvin_voigt_newmark", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --output, "{output}/solution"]
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_SHEAR_STIFFNESS_KV: "{material_shear_stiffness}"
+        SFEM_BULK_MODULUS: "{material_bulk_modulus}"
+        SFEM_DAMPING_RATIO: "{material_damping}"
+        SFEM_DENSITY: "{material_density}"
+        SFEM_ELEMENT_REFINE_LEVEL: "{resolution_refine_level}"
+        SFEM_USE_SSGMG: 0
+        SFEM_USE_BJACOBI: 1
+        SFEM_NLITER: 1
+    expected_output: &expected
+      required:
+        - {pattern: SFEM_TRANSIENT_LEVEL_COMPLETE, count: 3}
+        - {pattern: SFEM_LINEAR_KV_MODE_COMPLETE, count: 1}
+      forbidden: ["nan", "inf"]
+    tolerances: *tolerances
+  - <<: *base
+    id: sshex8_level2
+    element: SSHEX8
+    resolution: {nx: 32, ny: 1, nz: 1, refine_level: 2}
+    driver:
+      <<: *driver
+      environment:
+        OMP_NUM_THREADS: 1
+        SFEM_SHEAR_STIFFNESS_KV: "{material_shear_stiffness}"
+        SFEM_BULK_MODULUS: "{material_bulk_modulus}"
+        SFEM_DAMPING_RATIO: "{material_damping}"
+        SFEM_DENSITY: "{material_density}"
+        SFEM_ELEMENT_REFINE_LEVEL: "{resolution_refine_level}"
+        SFEM_USE_SSGMG: 0
+        SFEM_NLITER: 2

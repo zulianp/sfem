@@ -155,8 +155,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     const scalar_t *const affine_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
     const scalar_t *const affine_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
     const scalar_t *const affine_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
-    const idx_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -167,7 +165,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
         const scalar_t *const previous_components[N_FIELDS] = {u0_old, u1_old};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
             for (int field = 0; field < N_FIELDS; ++field) {
                 const int stream = shape * N_FIELDS + field;
                 #pragma omp simd
@@ -202,7 +200,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
 
         scalar_t *const output_components[N_FIELDS] = {u0_out, u1_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
             for (int field = 0; field < N_FIELDS; ++field) {
                 const int stream = shape * N_FIELDS + field;
                 scalar_t *const SFEM_RESTRICT out = output_components[field];
@@ -301,8 +299,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     const scalar_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
     const scalar_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
     const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    const idx_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -328,7 +324,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
         const scalar_t *const previous_components[N_FIELDS] = {u0_old, u1_old};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
             for (int field = 0; field < N_FIELDS; ++field) {
                 const int stream = shape * N_FIELDS + field;
                 #pragma omp simd
@@ -365,7 +361,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
 
         scalar_t *const output_components[N_FIELDS] = {u0_out, u1_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
             for (int field = 0; field < N_FIELDS; ++field) {
                 const int stream = shape * N_FIELDS + field;
                 scalar_t *const SFEM_RESTRICT out = output_components[field];
@@ -523,8 +519,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     const scalar_t *const affine_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
     const scalar_t *const affine_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
     const scalar_t *const affine_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
-    const idx_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -537,7 +531,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
         const scalar_t *const direction_components[N_FIELDS] = {u0_direction, u1_direction};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
             for (int field = 0; field < N_FIELDS; ++field) {
                 const int stream = shape * N_FIELDS + field;
                 #pragma omp simd
@@ -573,7 +567,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
 
         scalar_t *const output_components[N_FIELDS] = {u0_out, u1_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
             for (int field = 0; field < N_FIELDS; ++field) {
                 const int stream = shape * N_FIELDS + field;
                 scalar_t *const SFEM_RESTRICT out = output_components[field];
@@ -681,8 +675,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     const scalar_t *const isoparametric_shape_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
     const scalar_t *const isoparametric_grad_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
     const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    const idx_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
         const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
@@ -710,7 +702,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
         const scalar_t *const direction_components[N_FIELDS] = {u0_direction, u1_direction};
 
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
             for (int field = 0; field < N_FIELDS; ++field) {
                 const int stream = shape * N_FIELDS + field;
                 #pragma omp simd
@@ -748,7 +740,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
 
         scalar_t *const output_components[N_FIELDS] = {u0_out, u1_out};
         for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
+            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
             for (int field = 0; field < N_FIELDS; ++field) {
                 const int stream = shape * N_FIELDS + field;
                 scalar_t *const SFEM_RESTRICT out = output_components[field];

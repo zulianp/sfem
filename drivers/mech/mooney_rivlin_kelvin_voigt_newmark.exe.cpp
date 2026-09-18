@@ -39,6 +39,7 @@ namespace {
         real_t load_scale;
         real_t load_ramp_time;
         real_t load_pulse_time;
+        bool   smooth_load_ramp;
         real_t initial_disp_y;
         real_t initial_disp_z;
         std::string initial_displacement;
@@ -69,6 +70,7 @@ namespace {
             ret.load_scale      = smesh::Env::read("SFEM_LOAD_SCALE", 1.0);
             ret.load_ramp_time  = smesh::Env::read("SFEM_LOAD_RAMP_TIME", 0.0);
             ret.load_pulse_time = smesh::Env::read("SFEM_LOAD_PULSE_TIME", 0.0);
+            ret.smooth_load_ramp = smesh::Env::read("SFEM_SMOOTH_LOAD_RAMP", false);
             ret.initial_disp_y  = smesh::Env::read("SFEM_INITIAL_DISP_Y", 0.0);
             ret.initial_disp_z  = smesh::Env::read("SFEM_INITIAL_DISP_Z", 0.0);
             ret.initial_displacement = smesh::Env::read_string("SFEM_INITIAL_DISPLACEMENT", "");
@@ -99,7 +101,11 @@ namespace {
             return env.load_scale * std::sin(pi * t / env.load_pulse_time);
         }
 
-        const real_t ramp = env.load_ramp_time > 0 ? std::min<real_t>(t / env.load_ramp_time, 1) : 1;
+        real_t ramp = env.load_ramp_time > 0 ? std::min<real_t>(t / env.load_ramp_time, 1) : 1;
+        if (env.smooth_load_ramp && ramp < 1) {
+            const real_t pi = std::acos(real_t(-1));
+            ramp            = real_t(0.5) * (1 - std::cos(pi * ramp));
+        }
         return env.load_scale * ramp;
     }
 
@@ -238,11 +244,6 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
         return SFEM_FAILURE;
     }
 
-    set_material_parameter(material_op, mesh, "mu", env.mu);
-    set_material_parameter(material_op, mesh, "lmbda", env.lambda);
-    set_material_parameter(material_op, mesh, "eta_s", env.eta_s);
-    set_material_parameter(material_op, mesh, "eta_b", env.eta_b);
-
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            blas  = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
@@ -255,6 +256,7 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     auto z     = sfem::create_host_buffer<real_t>(ndofs);
     auto rhs   = sfem::create_host_buffer<real_t>(ndofs);
     auto incr  = sfem::create_host_buffer<real_t>(ndofs);
+    auto material_reaction = sfem::create_host_buffer<real_t>(ndofs);
 
     blas->zeros(ndofs, u->data());
     blas->zeros(ndofs, u_n->data());
@@ -265,6 +267,7 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     blas->zeros(ndofs, z->data());
     blas->zeros(ndofs, rhs->data());
     blas->zeros(ndofs, incr->data());
+    blas->zeros(ndofs, material_reaction->data());
     initialize_cantilever_bend(mesh, env.initial_disp_y, env.initial_disp_z, u_n->data());
     if (read_initial_state(mesh, env.initial_displacement, env.initial_displacement_components, u_n->data()) != SFEM_SUCCESS)
         return SFEM_FAILURE;
@@ -273,20 +276,31 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     if (dirichlet_conditions && dirichlet_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
     f->apply_constraints(u_n->data());
 
-    auto inertia_op = std::make_shared<sfem::NewmarkInertiaPotential>(fs);
-    inertia_op->set_density(env.rho);
-    if (inertia_op->initialize() != SFEM_SUCCESS) {
-        return SFEM_FAILURE;
+    std::shared_ptr<sfem::NewmarkInertiaPotential> inertia_op;
+    sfem::SharedBuffer<real_t>                     u_hat;
+    if (env.rho != 0) {
+        inertia_op = std::make_shared<sfem::NewmarkInertiaPotential>(fs);
+        inertia_op->set_density(env.rho);
+        if (inertia_op->initialize() != SFEM_SUCCESS) {
+            return SFEM_FAILURE;
+        }
+        u_hat = inertia_op->u_hat();
+    } else {
+        u_hat = sfem::create_host_buffer<real_t>(ndofs);
+        blas->zeros(ndofs, u_hat->data());
     }
-    auto u_hat = inertia_op->u_hat();
 
     material_op->set_field("previous", z, 0);
     if (material_op->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
+    set_material_parameter(material_op, mesh, "mu", env.mu);
+    set_material_parameter(material_op, mesh, "lmbda", env.lambda);
+    set_material_parameter(material_op, mesh, "eta_s", env.eta_s);
+    set_material_parameter(material_op, mesh, "eta_b", env.eta_b);
 
     f->add_operator(material_op);
-    f->add_operator(inertia_op);
+    if (inertia_op) f->add_operator(inertia_op);
 
     std::shared_ptr<sfem::NeumannConditions> neumann_conditions;
     if (neumann_path.to_string() != "NONE") {
@@ -309,15 +323,18 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     auto out = f->output();
     out->set_output_dir(output_path / "out");
     out->enable_AoS_to_SoA(true);
-    out->write_time_step("disp", 0, u_n->data());
-    out->write_time_step("velocity", 0, v_n->data());
-    out->write_time_step("acceleration", 0, a_n->data());
-    out->log_time(0);
 
     const real_t alpha_a = 1 / (env.beta * env.dt * env.dt);
     const real_t alpha_v = env.gamma / (env.beta * env.dt);
-    inertia_op->set_alpha(alpha_a);
+    if (inertia_op) inertia_op->set_alpha(alpha_a);
     set_material_parameter(material_op, mesh, "newmark_velocity_alpha", alpha_v);
+
+    if (material_op->gradient(u_n->data(), material_reaction->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
+    out->write_time_step("disp", 0, u_n->data());
+    out->write_time_step("velocity", 0, v_n->data());
+    out->write_time_step("acceleration", 0, a_n->data());
+    out->write_time_step("material_reaction", 0, material_reaction->data());
+    out->log_time(0);
 
     if (!comm->rank()) {
         std::printf("Solving Mooney-Rivlin Kelvin-Voigt Newmark: ndofs=%td, dt=%g, steps=%d\n",
@@ -387,9 +404,12 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
         newmark_update(ndofs, alpha_a, alpha_v, u->data(), u_hat->data(), z->data(), v->data(), a->data());
 
         if (step % env.export_freq == 0 || step == env.n_steps) {
+            blas->zeros(ndofs, material_reaction->data());
+            if (material_op->gradient(u->data(), material_reaction->data()) != SFEM_SUCCESS) return SFEM_FAILURE;
             out->write_time_step("disp", t, u->data());
             out->write_time_step("velocity", t, v->data());
             out->write_time_step("acceleration", t, a->data());
+            out->write_time_step("material_reaction", t, material_reaction->data());
             out->log_time(t);
         }
 

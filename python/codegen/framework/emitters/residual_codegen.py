@@ -1394,7 +1394,10 @@ def _mixed_tensor_product_field_stream_order(
         )
         shape_order = (
             tuple(range(n_shape))
-            if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
+            if (
+                sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
+                or sfem_tensor_product_quad_uses_cartesian_ordering(element_type)
+            )
             else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
         )
         order.extend(layout.stream_index(field_index, shape) for shape in shape_order)
@@ -1421,7 +1424,10 @@ def _mixed_field_shape_orders(
         )
         orders.append(
             tuple(range(n_shape))
-            if sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
+            if (
+                sfem_tensor_product_hex_uses_cartesian_ordering(element_type)
+                or sfem_tensor_product_quad_uses_cartesian_ordering(element_type)
+            )
             else tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
         )
     return tuple(orders)
@@ -5421,7 +5427,10 @@ def _mesh_operator_source(
     omit_simplex_reference_basis_inputs = gradient_metric is not None
     shape_order = (
         tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        if (
+            sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+            or sfem_tensor_product_quad_uses_cartesian_ordering(rule.element_type)
+        )
         else tensor_product_cartesian_shape_order(dim, n_shape)
         if tensor_product
         else tuple(range(n_shape))
@@ -6327,7 +6336,10 @@ def _scalar_crs_matrix_assembly_source(
     column_streams = _compatible_matrix_stream_indices(column_fields, n_shape)
     shape_order = (
         tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        if (
+            sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+            or sfem_tensor_product_quad_uses_cartesian_ordering(rule.element_type)
+        )
         else tensor_product_cartesian_shape_order(dim, n_shape)
         if tensor_product
         else tuple(range(n_shape))
@@ -7382,7 +7394,10 @@ def _scalar_coo_triplet_matrix_assembly_source(
     tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
     shape_order = (
         tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        if (
+            sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+            or sfem_tensor_product_quad_uses_cartesian_ordering(rule.element_type)
+        )
         else tensor_product_cartesian_shape_order(dim, n_shape)
         if tensor_product
         else tuple(range(n_shape))
@@ -7851,7 +7866,10 @@ def _scalar_dia_matrix_assembly_source(
     tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
     shape_order = (
         tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        if (
+            sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+            or sfem_tensor_product_quad_uses_cartesian_ordering(rule.element_type)
+        )
         else tensor_product_cartesian_shape_order(dim, n_shape)
         if tensor_product
         else tuple(range(n_shape))
@@ -8142,7 +8160,10 @@ def _isoparametric_mesh_operator_source(
     gradient_metric = None
     shape_order = (
         tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        if (
+            sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+            or sfem_tensor_product_quad_uses_cartesian_ordering(rule.element_type)
+        )
         else tensor_product_cartesian_shape_order(dim, n_shape)
         if tensor_product
         else tuple(range(n_shape))
@@ -8489,7 +8510,10 @@ def _scalar_packed_jacobian_action_source(
     tensor_product_geometry = _is_tensor_product_family(rule, geometry_family)
     shape_order = (
         tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        if (
+            sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+            or sfem_tensor_product_quad_uses_cartesian_ordering(rule.element_type)
+        )
         else tensor_product_cartesian_shape_order(dim, n_shape)
         if tensor_product
         else tuple(range(n_shape))
@@ -9566,7 +9590,10 @@ def _scalar_packed_affine_jacobian_action_source(
     omit_simplex_reference_basis_inputs = gradient_metric is not None
     shape_order = (
         tuple(range(n_shape))
-        if sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+        if (
+            sfem_tensor_product_hex_uses_cartesian_ordering(rule.element_type)
+            or sfem_tensor_product_quad_uses_cartesian_ordering(rule.element_type)
+        )
         else tensor_product_cartesian_shape_order(dim, n_shape)
         if tensor_product
         else tuple(range(n_shape))
