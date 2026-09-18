@@ -82,8 +82,11 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
-    /// The residual with the scheme attached, and the residual with the shift
-    /// and the history set by hand to what the scheme holds.
+    /// The residual of the one operator that holds the scheme, and the same
+    /// thing assembled the long way: the material with the shift and the
+    /// history set by hand, plus the scheme's own separable term added
+    /// separately.  They have to agree, which is the statement that holding
+    /// the scheme loses nothing and adds nothing.
     int gradients_held_and_pushed(const Fixture                              &fixture,
                                    const std::shared_ptr<sfem::NewmarkScheme> &scheme,
                                    const real_t *const                         x,
@@ -108,6 +111,8 @@ namespace {
 
         std::fill(pushed, pushed + fixture.ndofs, real_t(0));
         SFEM_TEST_ASSERT(fixture.op->gradient(x, pushed) == SFEM_SUCCESS);
+        // The separable half, which the held form gets through the operator.
+        SFEM_TEST_ASSERT(scheme->inertia_op()->gradient(x, pushed) == SFEM_SUCCESS);
         return SFEM_TEST_SUCCESS;
     }
 
@@ -137,10 +142,11 @@ namespace {
                          SFEM_TEST_SUCCESS);
 
         SFEM_TEST_ASSERT(has_nonzero(fixture.ndofs, held->data()));
-        // Bit for bit: the operator pulled exactly the shift and the history
-        // the scheme holds, and did nothing else with them.
+        // To rounding, not bit for bit: the two assemblies add the material's
+        // contribution and the scheme's in the opposite order.
         for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
-            SFEM_TEST_ASSERT(held->data()[i] == pushed->data()[i]);
+            SFEM_TEST_ASSERT(std::fabs(held->data()[i] - pushed->data()[i]) <=
+                             1e-12 * std::fabs(pushed->data()[i]) + 1e-15);
         }
         return SFEM_TEST_SUCCESS;
     }
@@ -180,7 +186,8 @@ namespace {
                                                    second_pushed->data()) == SFEM_TEST_SUCCESS);
 
         for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
-            SFEM_TEST_ASSERT(second_held->data()[i] == second_pushed->data()[i]);
+            SFEM_TEST_ASSERT(std::fabs(second_held->data()[i] - second_pushed->data()[i]) <=
+                             1e-12 * std::fabs(second_pushed->data()[i]) + 1e-15);
         }
 
         // And the two schemes really do give different answers, or the test
@@ -204,12 +211,10 @@ namespace {
         SFEM_TEST_ASSERT(steppable != nullptr);
         steppable->set_time_scheme(scheme);
 
+        // One operator.  The scheme's own term rides in the material's
+        // residual, because the material is what holds the scheme.
         auto f = sfem::Function::create(fixture.space);
         f->add_operator(fixture.op);
-        f->add_operator(scheme->inertia_op());
-        // The material mixes an energy with a residual, so the whole Function
-        // reduces node-wise: `value` is a norm of what `gradient` assembles,
-        // and the inertia is in it only because it is an operator.
         SFEM_TEST_ASSERT(f->reduces_node_wise());
 
         auto x = sfem::create_host_buffer<real_t>(fixture.ndofs);
@@ -257,6 +262,29 @@ namespace {
         real_t again = 0;
         SFEM_TEST_ASSERT(f->value(x->data(), &again) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(again == merit);
+
+        // The inertia really is inside that residual, and not merely absent
+        // without anyone noticing.  Detaching the scheme has to remove exactly
+        // the separable term the scheme publishes -- which is the assertion
+        // that would fail if the operator stopped forwarding to it.
+        auto inertia = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        SFEM_TEST_ASSERT(scheme->inertia_op()->gradient(x->data(), inertia->data()) ==
+                         SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(has_nonzero(fixture.ndofs, inertia->data()));
+
+        steppable->set_time_scheme(nullptr);
+        set_material_parameter(fixture.op, fixture.mesh, "u_dt_shift", scheme->shift());
+        auto history = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        std::copy(scheme->history(), scheme->history() + fixture.ndofs, history->data());
+        fixture.op->set_field("previous", history, 0);
+
+        auto without = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        SFEM_TEST_ASSERT(f->gradient(x->data(), without->data()) == SFEM_SUCCESS);
+        for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+            const real_t expected = without->data()[i] + inertia->data()[i];
+            SFEM_TEST_ASSERT(std::fabs(residual->data()[i] - expected) <=
+                             1e-10 * std::fabs(expected) + 1e-14);
+        }
         return SFEM_TEST_SUCCESS;
     }
 

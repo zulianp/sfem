@@ -215,6 +215,11 @@ namespace sfem {
                                 : parameters.require_real_value("u_dt_shift");
     }
 
+    std::shared_ptr<Op> time_scheme_term(const std::shared_ptr<TimeScheme> &scheme) {
+      return scheme ? scheme->inertia_op() : nullptr;
+    }
+
+
     //! Where this build's kernels read the connectivity from.
     //!
     //! One function rather than the same expression at every call site, because
@@ -552,6 +557,11 @@ namespace sfem {
       return SFEM_FAILURE;
     }
     impl_->current = state;
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->gradient(state, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -632,6 +642,12 @@ namespace sfem {
                       const real_t *const direction,
                       real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigtNewmark::apply");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->apply(state, direction, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
+
     const real_t *const current = state ? state : impl_->current;
     if (!current || !impl_->previous_state()) {
       SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigtNewmark requires current and previous states\n");
@@ -750,7 +766,13 @@ namespace sfem {
 
   void GeneratedMooneyRivlinKelvinVoigtNewmark::set_time_scheme(const std::shared_ptr<TimeScheme> &scheme) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigtNewmark::set_time_scheme");
+    if (impl_->time_scheme) {
+      impl_->time_scheme->release(this);
+    }
     impl_->time_scheme = scheme;
+    if (scheme) {
+      scheme->claim(this);
+    }
   }
 
   void GeneratedMooneyRivlinKelvinVoigtNewmark::set_option(const std::string &name, const bool val) {
@@ -872,6 +894,11 @@ namespace sfem {
     if (!current || !impl_->previous_state()) {
       SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigtNewmark::hessian_bsr requires current and previous states\n");
       return SFEM_FAILURE;
+    }
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_bsr(current, rowptr, colidx, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
     }
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);

@@ -228,8 +228,11 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
         return SFEM_FAILURE;
     }
 
+    // One operator.  The material holds the scheme, so the scheme's own term --
+    // the inertia -- is in the material's residual, and therefore in the
+    // node-wise merit, without this driver having to know Newmark has a
+    // separable half.
     f->add_operator(material_op);
-    f->add_operator(scheme->inertia_op());
 
     std::shared_ptr<sfem::NeumannConditions> neumann_conditions;
     std::vector<real_t>                      neumann_base_values;
