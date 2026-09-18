@@ -2,9 +2,10 @@
 
 #include "sfem_Op.hpp"
 #include "sfem_NeumannConditions.hpp"
+#include "sfem_TimeScheme.hpp"
 
 namespace sfem {
-  class GeneratedMooneyRivlinKelvinVoigtNewmark final : public Op {
+  class GeneratedMooneyRivlinKelvinVoigtNewmark final : public Op, public TimeSteppable {
   public:
     static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
@@ -37,6 +38,13 @@ namespace sfem {
     void set_field(const char *name,
                        const std::shared_ptr<Buffer<real_t>> &values,
                        int component) override;
+    //! The integration scheme this material's time derivative reads.
+    //!
+    //! The scheme is held rather than pushed into: `gradient` and the
+    //! node-wise merit assemble the same residual twice, so both ask this one
+    //! object for the shift and the history instead of agreeing only while
+    //! nothing re-set a parameter between them.
+    void set_time_scheme(const std::shared_ptr<TimeScheme> &scheme) override;
     int gradient(const real_t *const x, real_t *const out) override;
     int apply(const real_t *const x,
                   const real_t *const h,

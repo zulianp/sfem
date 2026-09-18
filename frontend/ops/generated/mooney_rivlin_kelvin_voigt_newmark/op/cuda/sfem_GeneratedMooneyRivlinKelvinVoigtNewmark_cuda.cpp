@@ -25,7 +25,7 @@ namespace sfem {
       parameters.set_value("mu", 1);
       parameters.set_value("eta_s", 0.10000000000000001);
       parameters.set_value("eta_b", 0);
-      parameters.set_value("newmark_velocity_alpha", 1);
+      parameters.set_value("u_dt_shift", 1);
     }
 
     void seed_material(MultiDomainOp &domains) {
@@ -70,7 +70,7 @@ namespace sfem {
 #ifdef SFEM_ENABLE_RYAML
     constexpr int N_DEFINED_MATERIAL_PARAMETERS = 5;
     constexpr int N_MATERIAL_PARAMETERS = 5;
-    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"lmbda", "mu", "eta_s", "eta_b", "newmark_velocity_alpha"};
+    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"lmbda", "mu", "eta_s", "eta_b", "u_dt_shift"};
 
     bool yaml_read_real(const ryml::ConstNodeRef &node,
               const char *const key,
@@ -206,12 +206,14 @@ namespace sfem {
     }
 
     void parameter_array(const Parameters &parameters,
+                             const TimeScheme *const time_scheme,
                              real_t *const values) {
       values[0] = parameters.require_real_value("lmbda");
       values[1] = parameters.require_real_value("mu");
       values[2] = parameters.require_real_value("eta_s");
       values[3] = parameters.require_real_value("eta_b");
-      values[4] = parameters.require_real_value("newmark_velocity_alpha");
+      values[4] = time_scheme ? time_scheme->shift()
+                                : parameters.require_real_value("u_dt_shift");
     }
 
     //! Where this build's kernels read the connectivity from.
@@ -258,11 +260,19 @@ namespace sfem {
     int step_capacity{0};
     const real_t *previous{nullptr};
     const real_t *current{nullptr};
+    std::shared_ptr<TimeScheme> time_scheme;
     bool objective_uses_affine{false};
     bool gradient_uses_affine{false};
     bool apply_uses_affine{false};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
+
+    //! The history the form reads: the scheme's when one is attached, and the
+    //! buffer a caller set otherwise.
+    const real_t *previous_state() const {
+      return time_scheme ? time_scheme->history() : previous;
+    }
+
   };
 
   std::unique_ptr<Op> GPUGeneratedMooneyRivlinKelvinVoigtNewmark::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -543,7 +553,7 @@ namespace sfem {
 
   int GPUGeneratedMooneyRivlinKelvinVoigtNewmark::gradient(const real_t *const state, real_t *const out) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinKelvinVoigtNewmark::gradient");
-    if (!impl_->previous) {
+    if (!impl_->previous_state()) {
       SFEM_ERROR("GPUGeneratedMooneyRivlinKelvinVoigtNewmark requires a previous state\n");
       return SFEM_FAILURE;
     }
@@ -566,8 +576,8 @@ namespace sfem {
             jacobian->jacobian_determinant()->data());
       }
       real_t storage[MAX_PARAMETERS];
-      parameter_array(*domain.parameters, storage);
-      const real_t *const previous = impl_->previous;
+      parameter_array(*domain.parameters, impl_->time_scheme.get(), storage);
+      const real_t *const previous = impl_->previous_state();
       switch (domain.element_type) {
         case smesh::TRI3: {
           static constexpr ptrdiff_t FIELD_STRIDE = 2;
@@ -629,7 +639,7 @@ namespace sfem {
                       real_t *const out) {
     SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinKelvinVoigtNewmark::apply");
     const real_t *const current = state ? state : impl_->current;
-    if (!current || !impl_->previous) {
+    if (!current || !impl_->previous_state()) {
       SFEM_ERROR("GPUGeneratedMooneyRivlinKelvinVoigtNewmark requires current and previous states\n");
       return SFEM_FAILURE;
     }
@@ -651,8 +661,8 @@ namespace sfem {
             jacobian->jacobian_determinant()->data());
       }
       real_t storage[MAX_PARAMETERS];
-      parameter_array(*domain.parameters, storage);
-      const real_t *const previous = impl_->previous;
+      parameter_array(*domain.parameters, impl_->time_scheme.get(), storage);
+      const real_t *const previous = impl_->previous_state();
       switch (domain.element_type) {
         case smesh::TRI3: {
           static constexpr ptrdiff_t FIELD_STRIDE = 2;
@@ -742,6 +752,11 @@ namespace sfem {
     }
     impl_->previous_buffer = values;
     impl_->previous = values->data();
+  }
+
+  void GPUGeneratedMooneyRivlinKelvinVoigtNewmark::set_time_scheme(const std::shared_ptr<TimeScheme> &scheme) {
+    SFEM_TRACE_SCOPE("GPUGeneratedMooneyRivlinKelvinVoigtNewmark::set_time_scheme");
+    impl_->time_scheme = scheme;
   }
 
   void GPUGeneratedMooneyRivlinKelvinVoigtNewmark::set_option(const std::string &name, const bool val) {

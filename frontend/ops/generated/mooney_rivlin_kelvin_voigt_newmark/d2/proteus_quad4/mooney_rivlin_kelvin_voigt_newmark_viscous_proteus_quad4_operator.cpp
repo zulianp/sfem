@@ -56,16 +56,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
     const void *const RSTR previous[8],
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     void *const RSTR output[8]
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_residual_block<double, 4, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, newmark_velocity_alpha, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_residual_block<double, 4, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_residual_block<float, 4, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, newmark_velocity_alpha, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_residual_block<float, 4, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -89,7 +89,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     const g_t *const RSTR g_det0,
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     const ptrdiff_t current_stride,
     const s_t *const RSTR u0,
     const s_t *const RSTR u1,
@@ -149,7 +149,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[4], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, newmark_velocity_alpha, boutput);
+    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[4], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -183,7 +183,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -196,10 +196,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
     }
     default:
       break;
@@ -218,7 +218,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     const geom_t *const *const RSTR points,
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     const ptrdiff_t current_stride,
     const s_t *const RSTR u0,
     const s_t *const RSTR u1,
@@ -296,7 +296,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
 
     const s_t *const badjugate[4] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_residual_block_contiguous<s_t, NQ, NS, VS>(ne, VS, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, newmark_velocity_alpha, boutput);
+    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_residual_block_contiguous<s_t, NQ, NS, VS>(ne, VS, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -326,7 +326,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
     const geom_t *const *const RSTR points,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -339,10 +339,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
     }
     default:
       break;
@@ -385,16 +385,16 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
     const void *const RSTR direction[8],
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     void *const RSTR output[8]
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block<double, 4, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, newmark_velocity_alpha, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block<double, 4, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block<float, 4, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, newmark_velocity_alpha, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block<float, 4, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -418,7 +418,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     const g_t *const RSTR g_det0,
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     const ptrdiff_t current_stride,
     const s_t *const RSTR u0,
     const s_t *const RSTR u1,
@@ -484,7 +484,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[4], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, newmark_velocity_alpha, boutput);
+    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[4], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -518,7 +518,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -534,10 +534,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
     }
     default:
       break;
@@ -556,7 +556,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     const geom_t *const *const RSTR points,
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     const ptrdiff_t current_stride,
     const s_t *const RSTR u0,
     const s_t *const RSTR u1,
@@ -640,7 +640,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
 
     const s_t *const badjugate[4] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, VS, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, newmark_velocity_alpha, boutput);
+    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, VS, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -670,7 +670,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
     const geom_t *const *const RSTR points,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -686,10 +686,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
     }
     default:
       break;
@@ -785,7 +785,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
     const geom_t *const *const RSTR points,
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     const ptrdiff_t current_stride,
     const s_t *const RSTR u0,
     const s_t *const RSTR u1,
@@ -845,7 +845,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_hessian_block<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, newmark_velocity_alpha, element_matrix);
+    mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_hessian_block<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, u_dt_shift, element_matrix);
 
     mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_crs_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
   }
@@ -864,7 +864,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_
     const geom_t *const *const RSTR points,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -877,10 +877,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-      return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_crs_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, rowptr, colidx, (double *)values);
+      return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_crs_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, rowptr, colidx, (double *)values);
     }
     case (int)sizeof(float): {
-      return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_crs_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, newmark_velocity_alpha, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, rowptr, colidx, (float *)values);
+      return sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_hessian_crs_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, rowptr, colidx, (float *)values);
     }
     default:
       break;

@@ -11,7 +11,7 @@
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_NeumannConditions.hpp"
-#include "sfem_NewmarkInertiaPotential.hpp"
+#include "sfem_NewmarkScheme.hpp"
 #include "sfem_defs.hpp"
 #include "smesh_env.hpp"
 
@@ -145,50 +145,6 @@ namespace {
         }
     }
 
-    void newmark_predictor(const ptrdiff_t n,
-                           const real_t    dt,
-                           const real_t    beta,
-                           const real_t   *const SFEM_RESTRICT u,
-                           const real_t   *const SFEM_RESTRICT v,
-                           const real_t   *const SFEM_RESTRICT a,
-                           real_t         *const SFEM_RESTRICT u_hat) {
-        const real_t dt2_scale = dt * dt * (real_t(0.5) - beta);
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            u_hat[i] = u[i] + dt * v[i] + dt2_scale * a[i];
-        }
-    }
-
-    void newmark_velocity_shift(const ptrdiff_t n,
-                                const real_t    dt,
-                                const real_t    gamma,
-                                const real_t    alpha_v,
-                                const real_t   *const SFEM_RESTRICT v,
-                                const real_t   *const SFEM_RESTRICT a,
-                                const real_t   *const SFEM_RESTRICT u_hat,
-                                real_t         *const SFEM_RESTRICT z) {
-        const real_t a_scale = dt * (1 - gamma);
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            z[i] = v[i] + a_scale * a[i] - alpha_v * u_hat[i];
-        }
-    }
-
-    void newmark_update(const ptrdiff_t n,
-                        const real_t    alpha_a,
-                        const real_t    alpha_v,
-                        const real_t   *const SFEM_RESTRICT u,
-                        const real_t   *const SFEM_RESTRICT u_hat,
-                        const real_t   *const SFEM_RESTRICT z,
-                        real_t         *const SFEM_RESTRICT v,
-                        real_t         *const SFEM_RESTRICT a) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            a[i] = alpha_a * (u[i] - u_hat[i]);
-            v[i] = alpha_v * u[i] + z[i];
-        }
-    }
-
 }  // namespace
 
 int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
@@ -234,41 +190,46 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     auto            blas  = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
     auto u     = sfem::create_host_buffer<real_t>(ndofs);
-    auto u_n   = sfem::create_host_buffer<real_t>(ndofs);
-    auto v_n   = sfem::create_host_buffer<real_t>(ndofs);
-    auto a_n   = sfem::create_host_buffer<real_t>(ndofs);
-    auto v     = sfem::create_host_buffer<real_t>(ndofs);
-    auto a     = sfem::create_host_buffer<real_t>(ndofs);
-    auto z     = sfem::create_host_buffer<real_t>(ndofs);
     auto rhs   = sfem::create_host_buffer<real_t>(ndofs);
     auto incr  = sfem::create_host_buffer<real_t>(ndofs);
 
     blas->zeros(ndofs, u->data());
-    blas->zeros(ndofs, u_n->data());
-    blas->zeros(ndofs, v_n->data());
-    blas->zeros(ndofs, a_n->data());
-    blas->zeros(ndofs, v->data());
-    blas->zeros(ndofs, a->data());
-    blas->zeros(ndofs, z->data());
     blas->zeros(ndofs, rhs->data());
     blas->zeros(ndofs, incr->data());
+
+    // The scheme, and the only three numbers this driver knows about it.  The
+    // predictor, the velocity shift and the history rotation are Newmark's and
+    // live with Newmark.
+    auto scheme = std::make_shared<sfem::NewmarkScheme>(fs);
+    scheme->set_beta(env.beta);
+    scheme->set_gamma(env.gamma);
+    scheme->set_density(env.rho);
+    if (scheme->initialize() != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+    }
+
+    auto u_n = scheme->state();
+    auto v_n = scheme->velocity();
+    auto a_n = scheme->acceleration();
     initialize_cantilever_bend(mesh, env.initial_disp_y, env.initial_disp_z, u_n->data());
     f->apply_constraints(u_n->data());
 
-    auto inertia_op = std::make_shared<sfem::NewmarkInertiaPotential>(fs);
-    inertia_op->set_density(env.rho);
-    if (inertia_op->initialize() != SFEM_SUCCESS) {
+    // Held, not pushed: `gradient` and the node-wise merit both ask the scheme
+    // for the shift and the history, so they cannot read different ones.  The
+    // cast is also the question -- an operator whose form carries no time
+    // derivative is not `TimeSteppable` and there would be nothing to attach.
+    auto steppable = std::dynamic_pointer_cast<sfem::TimeSteppable>(material_op);
+    if (!steppable) {
+        SFEM_ERROR("GeneratedMooneyRivlinKelvinVoigtNewmark does not take a time scheme\n");
         return SFEM_FAILURE;
     }
-    auto u_hat = inertia_op->u_hat();
-
-    material_op->set_field("previous", z, 0);
+    steppable->set_time_scheme(scheme);
     if (material_op->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
 
     f->add_operator(material_op);
-    f->add_operator(inertia_op);
+    f->add_operator(scheme->inertia_op());
 
     std::shared_ptr<sfem::NeumannConditions> neumann_conditions;
     std::vector<real_t>                      neumann_base_values;
@@ -310,11 +271,6 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
     out->write_time_step("acceleration", 0, a_n->data());
     out->log_time(0);
 
-    const real_t alpha_a = 1 / (env.beta * env.dt * env.dt);
-    const real_t alpha_v = env.gamma / (env.beta * env.dt);
-    inertia_op->set_alpha(alpha_a);
-    set_material_parameter(material_op, mesh, "newmark_velocity_alpha", alpha_v);
-
     if (!comm->rank()) {
         std::printf("Solving Mooney-Rivlin Kelvin-Voigt Newmark: ndofs=%td, dt=%g, steps=%d\n",
                     ndofs,
@@ -331,8 +287,7 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
         const real_t t = step * env.dt;
         scale_neumann_values(neumann_conditions, neumann_base_values, load_factor(env, t));
 
-        newmark_predictor(ndofs, env.dt, env.beta, u_n->data(), v_n->data(), a_n->data(), u_hat->data());
-        newmark_velocity_shift(ndofs, env.dt, env.gamma, alpha_v, v_n->data(), a_n->data(), u_hat->data(), z->data());
+        scheme->begin_step(t, env.dt);
 
         blas->copy(ndofs, u_n->data(), u->data());
         f->apply_constraints(u->data());
@@ -386,18 +341,14 @@ int solve_mooney_rivlin_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communi
             return SFEM_FAILURE;
         }
 
-        newmark_update(ndofs, alpha_a, alpha_v, u->data(), u_hat->data(), z->data(), v->data(), a->data());
+        scheme->advance(u->data());
 
         if (step % env.export_freq == 0 || step == env.n_steps) {
-            out->write_time_step("disp", t, u->data());
-            out->write_time_step("velocity", t, v->data());
-            out->write_time_step("acceleration", t, a->data());
+            out->write_time_step("disp", t, u_n->data());
+            out->write_time_step("velocity", t, v_n->data());
+            out->write_time_step("acceleration", t, a_n->data());
             out->log_time(t);
         }
-
-        blas->copy(ndofs, u->data(), u_n->data());
-        blas->copy(ndofs, v->data(), v_n->data());
-        blas->copy(ndofs, a->data(), a_n->data());
     }
 
     if (!comm->rank()) {

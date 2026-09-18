@@ -48,7 +48,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     const s_t *const RSTR previous[3 * NS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR output[3 * NS]
 ) {
   static constexpr int NC = 3;
@@ -231,23 +231,23 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
       const s_t residual_tmp9 = residual_tmp0 - residual_tmp4;
       const s_t residual_tmp10 = pow_m1(residual_tmp0*u2_grad_2 + residual_tmp1*u1_grad_2 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9);
       const s_t residual_tmp11 = -u0_grad_1*u1_grad_2 + u0_grad_2*u1_grad_1 + u0_grad_2;
-      const s_t residual_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
-      const s_t residual_tmp13 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+      const s_t residual_tmp12 = u0_grad_0*u_dt_shift + u0_old_grad_0;
+      const s_t residual_tmp13 = u0_grad_1*u_dt_shift + u0_old_grad_1;
       const s_t residual_tmp14 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
-      const s_t residual_tmp15 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+      const s_t residual_tmp15 = u2_grad_1*u_dt_shift + u2_old_grad_1;
       const s_t residual_tmp16 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
-      const s_t residual_tmp17 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+      const s_t residual_tmp17 = u2_grad_2*u_dt_shift + u2_old_grad_2;
       const s_t residual_tmp18 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
-      const s_t residual_tmp19 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
+      const s_t residual_tmp19 = u0_grad_2*u_dt_shift + u0_old_grad_2;
       const s_t residual_tmp20 = residual_tmp9 + u0_grad_0 + u1_grad_1 + s_t(1);
-      const s_t residual_tmp21 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+      const s_t residual_tmp21 = u2_grad_0*u_dt_shift + u2_old_grad_0;
       const s_t residual_tmp22 = residual_tmp6 + residual_tmp8;
       const s_t residual_tmp23 = residual_tmp11*residual_tmp12 + residual_tmp13*residual_tmp14 + residual_tmp15*residual_tmp16 + residual_tmp17*residual_tmp18 - residual_tmp19*residual_tmp20 - residual_tmp21*residual_tmp22;
       const s_t residual_tmp24 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
       const s_t residual_tmp25 = -residual_tmp1 + u0_grad_0*u2_grad_1 + u2_grad_1;
-      const s_t residual_tmp26 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
-      const s_t residual_tmp27 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
-      const s_t residual_tmp28 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp26 = u1_grad_1*u_dt_shift + u1_old_grad_1;
+      const s_t residual_tmp27 = u1_grad_2*u_dt_shift + u1_old_grad_2;
+      const s_t residual_tmp28 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp29 = residual_tmp12*residual_tmp24 - residual_tmp13*residual_tmp7 + residual_tmp16*residual_tmp26 + residual_tmp18*residual_tmp27 + residual_tmp19*residual_tmp25 - residual_tmp22*residual_tmp28;
       const s_t residual_tmp30 = residual_tmp24*residual_tmp28;
       const s_t residual_tmp31 = residual_tmp25*residual_tmp27;
@@ -325,7 +325,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
     const s_t previous[3 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t output[3 * NS][VS]
 ) {
   static constexpr int NC = 3;
@@ -508,23 +508,23 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_re
       const s_t residual_tmp9 = residual_tmp0 - residual_tmp4;
       const s_t residual_tmp10 = pow_m1(residual_tmp0*u2_grad_2 + residual_tmp1*u1_grad_2 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9);
       const s_t residual_tmp11 = -u0_grad_1*u1_grad_2 + u0_grad_2*u1_grad_1 + u0_grad_2;
-      const s_t residual_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
-      const s_t residual_tmp13 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+      const s_t residual_tmp12 = u0_grad_0*u_dt_shift + u0_old_grad_0;
+      const s_t residual_tmp13 = u0_grad_1*u_dt_shift + u0_old_grad_1;
       const s_t residual_tmp14 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
-      const s_t residual_tmp15 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+      const s_t residual_tmp15 = u2_grad_1*u_dt_shift + u2_old_grad_1;
       const s_t residual_tmp16 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
-      const s_t residual_tmp17 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+      const s_t residual_tmp17 = u2_grad_2*u_dt_shift + u2_old_grad_2;
       const s_t residual_tmp18 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
-      const s_t residual_tmp19 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
+      const s_t residual_tmp19 = u0_grad_2*u_dt_shift + u0_old_grad_2;
       const s_t residual_tmp20 = residual_tmp9 + u0_grad_0 + u1_grad_1 + s_t(1);
-      const s_t residual_tmp21 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+      const s_t residual_tmp21 = u2_grad_0*u_dt_shift + u2_old_grad_0;
       const s_t residual_tmp22 = residual_tmp6 + residual_tmp8;
       const s_t residual_tmp23 = residual_tmp11*residual_tmp12 + residual_tmp13*residual_tmp14 + residual_tmp15*residual_tmp16 + residual_tmp17*residual_tmp18 - residual_tmp19*residual_tmp20 - residual_tmp21*residual_tmp22;
       const s_t residual_tmp24 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
       const s_t residual_tmp25 = -residual_tmp1 + u0_grad_0*u2_grad_1 + u2_grad_1;
-      const s_t residual_tmp26 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
-      const s_t residual_tmp27 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
-      const s_t residual_tmp28 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp26 = u1_grad_1*u_dt_shift + u1_old_grad_1;
+      const s_t residual_tmp27 = u1_grad_2*u_dt_shift + u1_old_grad_2;
+      const s_t residual_tmp28 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp29 = residual_tmp12*residual_tmp24 - residual_tmp13*residual_tmp7 + residual_tmp16*residual_tmp26 + residual_tmp18*residual_tmp27 + residual_tmp19*residual_tmp25 - residual_tmp22*residual_tmp28;
       const s_t residual_tmp30 = residual_tmp24*residual_tmp28;
       const s_t residual_tmp31 = residual_tmp25*residual_tmp27;
@@ -602,7 +602,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t *const RSTR previous[3 * NS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR output[3 * NS]
 ) {
   for (int q = 0; q < NQ; ++q) {
@@ -667,23 +667,23 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp9 = residual_tmp0 - residual_tmp4;
       const s_t residual_tmp10 = pow_m1(residual_tmp0*u2_grad_2 + residual_tmp1*u1_grad_2 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9);
       const s_t residual_tmp11 = -u0_grad_1*u1_grad_2 + u0_grad_2*u1_grad_1 + u0_grad_2;
-      const s_t residual_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
-      const s_t residual_tmp13 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+      const s_t residual_tmp12 = u0_grad_0*u_dt_shift + u0_old_grad_0;
+      const s_t residual_tmp13 = u0_grad_1*u_dt_shift + u0_old_grad_1;
       const s_t residual_tmp14 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
-      const s_t residual_tmp15 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+      const s_t residual_tmp15 = u2_grad_1*u_dt_shift + u2_old_grad_1;
       const s_t residual_tmp16 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
-      const s_t residual_tmp17 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+      const s_t residual_tmp17 = u2_grad_2*u_dt_shift + u2_old_grad_2;
       const s_t residual_tmp18 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
-      const s_t residual_tmp19 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
+      const s_t residual_tmp19 = u0_grad_2*u_dt_shift + u0_old_grad_2;
       const s_t residual_tmp20 = residual_tmp9 + u0_grad_0 + u1_grad_1 + s_t(1);
-      const s_t residual_tmp21 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+      const s_t residual_tmp21 = u2_grad_0*u_dt_shift + u2_old_grad_0;
       const s_t residual_tmp22 = residual_tmp6 + residual_tmp8;
       const s_t residual_tmp23 = residual_tmp11*residual_tmp12 + residual_tmp13*residual_tmp14 + residual_tmp15*residual_tmp16 + residual_tmp17*residual_tmp18 - residual_tmp19*residual_tmp20 - residual_tmp21*residual_tmp22;
       const s_t residual_tmp24 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
       const s_t residual_tmp25 = -residual_tmp1 + u0_grad_0*u2_grad_1 + u2_grad_1;
-      const s_t residual_tmp26 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
-      const s_t residual_tmp27 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
-      const s_t residual_tmp28 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp26 = u1_grad_1*u_dt_shift + u1_old_grad_1;
+      const s_t residual_tmp27 = u1_grad_2*u_dt_shift + u1_old_grad_2;
+      const s_t residual_tmp28 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp29 = residual_tmp12*residual_tmp24 - residual_tmp13*residual_tmp7 + residual_tmp16*residual_tmp26 + residual_tmp18*residual_tmp27 + residual_tmp19*residual_tmp25 - residual_tmp22*residual_tmp28;
       const s_t residual_tmp30 = residual_tmp24*residual_tmp28;
       const s_t residual_tmp31 = residual_tmp25*residual_tmp27;
@@ -763,7 +763,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t previous[3 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t output[3 * NS][VS]
 ) {
   for (int q = 0; q < NQ; ++q) {
@@ -828,23 +828,23 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp9 = residual_tmp0 - residual_tmp4;
       const s_t residual_tmp10 = pow_m1(residual_tmp0*u2_grad_2 + residual_tmp1*u1_grad_2 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9);
       const s_t residual_tmp11 = -u0_grad_1*u1_grad_2 + u0_grad_2*u1_grad_1 + u0_grad_2;
-      const s_t residual_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
-      const s_t residual_tmp13 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+      const s_t residual_tmp12 = u0_grad_0*u_dt_shift + u0_old_grad_0;
+      const s_t residual_tmp13 = u0_grad_1*u_dt_shift + u0_old_grad_1;
       const s_t residual_tmp14 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
-      const s_t residual_tmp15 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+      const s_t residual_tmp15 = u2_grad_1*u_dt_shift + u2_old_grad_1;
       const s_t residual_tmp16 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
-      const s_t residual_tmp17 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+      const s_t residual_tmp17 = u2_grad_2*u_dt_shift + u2_old_grad_2;
       const s_t residual_tmp18 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
-      const s_t residual_tmp19 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
+      const s_t residual_tmp19 = u0_grad_2*u_dt_shift + u0_old_grad_2;
       const s_t residual_tmp20 = residual_tmp9 + u0_grad_0 + u1_grad_1 + s_t(1);
-      const s_t residual_tmp21 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+      const s_t residual_tmp21 = u2_grad_0*u_dt_shift + u2_old_grad_0;
       const s_t residual_tmp22 = residual_tmp6 + residual_tmp8;
       const s_t residual_tmp23 = residual_tmp11*residual_tmp12 + residual_tmp13*residual_tmp14 + residual_tmp15*residual_tmp16 + residual_tmp17*residual_tmp18 - residual_tmp19*residual_tmp20 - residual_tmp21*residual_tmp22;
       const s_t residual_tmp24 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
       const s_t residual_tmp25 = -residual_tmp1 + u0_grad_0*u2_grad_1 + u2_grad_1;
-      const s_t residual_tmp26 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
-      const s_t residual_tmp27 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
-      const s_t residual_tmp28 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp26 = u1_grad_1*u_dt_shift + u1_old_grad_1;
+      const s_t residual_tmp27 = u1_grad_2*u_dt_shift + u1_old_grad_2;
+      const s_t residual_tmp28 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp29 = residual_tmp12*residual_tmp24 - residual_tmp13*residual_tmp7 + residual_tmp16*residual_tmp26 + residual_tmp18*residual_tmp27 + residual_tmp19*residual_tmp25 - residual_tmp22*residual_tmp28;
       const s_t residual_tmp30 = residual_tmp24*residual_tmp28;
       const s_t residual_tmp31 = residual_tmp25*residual_tmp27;
@@ -925,7 +925,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     const s_t *const RSTR direction[3 * NS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR output[3 * NS]
 ) {
   static constexpr int NC = 3;
@@ -1181,23 +1181,23 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
       const s_t residual_tmp11 = pow_m1(residual_tmp10);
       const s_t residual_tmp12 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
-      const s_t residual_tmp13 = newmark_velocity_alpha*residual_tmp7;
-      const s_t residual_tmp14 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+      const s_t residual_tmp13 = residual_tmp7*u_dt_shift;
+      const s_t residual_tmp14 = u1_grad_2*u_dt_shift + u1_old_grad_2;
       const s_t residual_tmp15 = residual_tmp14*u2_grad_1;
-      const s_t residual_tmp16 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp16 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp17 = residual_tmp16*residual_tmp6;
       const s_t residual_tmp18 = residual_tmp15 - residual_tmp17;
       const s_t residual_tmp19 = -residual_tmp13 - residual_tmp18;
       const s_t residual_tmp20 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
-      const s_t residual_tmp21 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+      const s_t residual_tmp21 = u2_grad_1*u_dt_shift + u2_old_grad_1;
       const s_t residual_tmp22 = residual_tmp21*residual_tmp6;
-      const s_t residual_tmp23 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+      const s_t residual_tmp23 = u2_grad_2*u_dt_shift + u2_old_grad_2;
       const s_t residual_tmp24 = residual_tmp23*u2_grad_1;
-      const s_t residual_tmp25 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
-      const s_t residual_tmp26 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+      const s_t residual_tmp25 = u0_grad_2*u_dt_shift + u0_old_grad_2;
+      const s_t residual_tmp26 = u0_grad_1*u_dt_shift + u0_old_grad_1;
       const s_t residual_tmp27 = residual_tmp25*u0_grad_1 - residual_tmp26*u0_grad_2;
       const s_t residual_tmp28 = residual_tmp22 - residual_tmp24 + residual_tmp27;
-      const s_t residual_tmp29 = newmark_velocity_alpha*residual_tmp12;
+      const s_t residual_tmp29 = residual_tmp12*u_dt_shift;
       const s_t residual_tmp30 = residual_tmp23*u0_grad_1;
       const s_t residual_tmp31 = residual_tmp21*u0_grad_2;
       const s_t residual_tmp32 = residual_tmp29 + residual_tmp30 - residual_tmp31;
@@ -1210,17 +1210,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp39 = residual_tmp37 + residual_tmp38*(s_t(2)*residual_tmp26*residual_tmp6 - residual_tmp32 - s_t(2)*residual_tmp34);
       const s_t residual_tmp40 = ((s_t(1) / s_t(3)))*residual_tmp7;
       const s_t residual_tmp41 = pow_m2(residual_tmp10);
-      const s_t residual_tmp42 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+      const s_t residual_tmp42 = u0_grad_0*u_dt_shift + u0_old_grad_0;
       const s_t residual_tmp43 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
       const s_t residual_tmp44 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
       const s_t residual_tmp45 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
       const s_t residual_tmp46 = u1_grad_1 + s_t(1);
       const s_t residual_tmp47 = residual_tmp46 + residual_tmp9 + u0_grad_0;
-      const s_t residual_tmp48 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+      const s_t residual_tmp48 = u2_grad_0*u_dt_shift + u2_old_grad_0;
       const s_t residual_tmp49 = residual_tmp20*residual_tmp42 + residual_tmp21*residual_tmp44 + residual_tmp23*residual_tmp45 - residual_tmp25*residual_tmp47 + residual_tmp26*residual_tmp43 - residual_tmp48*residual_tmp7;
       const s_t residual_tmp50 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
       const s_t residual_tmp51 = residual_tmp6 + residual_tmp8;
-      const s_t residual_tmp52 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp52 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp53 = residual_tmp12*residual_tmp42 + residual_tmp14*residual_tmp45 + residual_tmp16*residual_tmp44 + residual_tmp25*residual_tmp50 - residual_tmp26*residual_tmp51 - residual_tmp52*residual_tmp7;
       const s_t residual_tmp54 = residual_tmp12*residual_tmp52;
       const s_t residual_tmp55 = residual_tmp14*residual_tmp50;
@@ -1243,7 +1243,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp72 = -residual_tmp13 - residual_tmp71;
       const s_t residual_tmp73 = -residual_tmp14*residual_tmp46 + residual_tmp16*u1_grad_2;
       const s_t residual_tmp74 = -residual_tmp27 - residual_tmp73;
-      const s_t residual_tmp75 = newmark_velocity_alpha*residual_tmp20;
+      const s_t residual_tmp75 = residual_tmp20*u_dt_shift;
       const s_t residual_tmp76 = residual_tmp16*u0_grad_2;
       const s_t residual_tmp77 = residual_tmp14*u0_grad_1;
       const s_t residual_tmp78 = residual_tmp75 + residual_tmp76 - residual_tmp77;
@@ -1261,7 +1261,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp90 = residual_tmp36*(-residual_tmp88 - residual_tmp89);
       const s_t residual_tmp91 = residual_tmp38*(-s_t(2)*residual_tmp13 - residual_tmp18 - residual_tmp71) + residual_tmp90;
       const s_t residual_tmp92 = -residual_tmp7;
-      const s_t residual_tmp93 = newmark_velocity_alpha*residual_tmp44;
+      const s_t residual_tmp93 = residual_tmp44*u_dt_shift;
       const s_t residual_tmp94 = residual_tmp23*u1_grad_0;
       const s_t residual_tmp95 = residual_tmp48*u1_grad_2;
       const s_t residual_tmp96 = residual_tmp93 + residual_tmp94 - residual_tmp95;
@@ -1272,12 +1272,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp101 = -residual_tmp97 + residual_tmp98;
       const s_t residual_tmp102 = -residual_tmp94 + residual_tmp95;
       const s_t residual_tmp103 = residual_tmp100 + residual_tmp38*(residual_tmp101 + residual_tmp102 + s_t(2)*residual_tmp93);
-      const s_t residual_tmp104 = newmark_velocity_alpha*residual_tmp43;
+      const s_t residual_tmp104 = residual_tmp43*u_dt_shift;
       const s_t residual_tmp105 = residual_tmp25*u1_grad_0;
       const s_t residual_tmp106 = residual_tmp42*u1_grad_2;
       const s_t residual_tmp107 = residual_tmp105 - residual_tmp106;
       const s_t residual_tmp108 = residual_tmp104 + residual_tmp107;
-      const s_t residual_tmp109 = newmark_velocity_alpha*residual_tmp51;
+      const s_t residual_tmp109 = residual_tmp51*u_dt_shift;
       const s_t residual_tmp110 = residual_tmp25*u2_grad_0;
       const s_t residual_tmp111 = residual_tmp42*residual_tmp6;
       const s_t residual_tmp112 = residual_tmp110 - residual_tmp111;
@@ -1285,7 +1285,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp114 = residual_tmp49*u1_grad_2;
       const s_t residual_tmp115 = -residual_tmp114;
       const s_t residual_tmp116 = residual_tmp53*residual_tmp6;
-      const s_t residual_tmp117 = newmark_velocity_alpha*residual_tmp45;
+      const s_t residual_tmp117 = residual_tmp45*u_dt_shift;
       const s_t residual_tmp118 = residual_tmp46*residual_tmp48;
       const s_t residual_tmp119 = residual_tmp21*u1_grad_0;
       const s_t residual_tmp120 = residual_tmp117 + residual_tmp118 - residual_tmp119;
@@ -1296,12 +1296,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp125 = -residual_tmp121 + residual_tmp122;
       const s_t residual_tmp126 = -residual_tmp118 + residual_tmp119;
       const s_t residual_tmp127 = residual_tmp124 + residual_tmp38*(s_t(2)*residual_tmp117 + residual_tmp125 + residual_tmp126);
-      const s_t residual_tmp128 = newmark_velocity_alpha*residual_tmp50;
+      const s_t residual_tmp128 = residual_tmp50*u_dt_shift;
       const s_t residual_tmp129 = residual_tmp26*u2_grad_0;
       const s_t residual_tmp130 = residual_tmp42*u2_grad_1;
       const s_t residual_tmp131 = residual_tmp129 - residual_tmp130;
       const s_t residual_tmp132 = residual_tmp128 + residual_tmp131;
-      const s_t residual_tmp133 = newmark_velocity_alpha*residual_tmp47;
+      const s_t residual_tmp133 = residual_tmp47*u_dt_shift;
       const s_t residual_tmp134 = residual_tmp26*u1_grad_0;
       const s_t residual_tmp135 = residual_tmp42*residual_tmp46;
       const s_t residual_tmp136 = residual_tmp134 - residual_tmp135;
@@ -1506,7 +1506,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
     const s_t direction[3 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t output[3 * NS][VS]
 ) {
   static constexpr int NC = 3;
@@ -1762,23 +1762,23 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
       const s_t residual_tmp11 = pow_m1(residual_tmp10);
       const s_t residual_tmp12 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
-      const s_t residual_tmp13 = newmark_velocity_alpha*residual_tmp7;
-      const s_t residual_tmp14 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+      const s_t residual_tmp13 = residual_tmp7*u_dt_shift;
+      const s_t residual_tmp14 = u1_grad_2*u_dt_shift + u1_old_grad_2;
       const s_t residual_tmp15 = residual_tmp14*u2_grad_1;
-      const s_t residual_tmp16 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp16 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp17 = residual_tmp16*residual_tmp6;
       const s_t residual_tmp18 = residual_tmp15 - residual_tmp17;
       const s_t residual_tmp19 = -residual_tmp13 - residual_tmp18;
       const s_t residual_tmp20 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
-      const s_t residual_tmp21 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+      const s_t residual_tmp21 = u2_grad_1*u_dt_shift + u2_old_grad_1;
       const s_t residual_tmp22 = residual_tmp21*residual_tmp6;
-      const s_t residual_tmp23 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+      const s_t residual_tmp23 = u2_grad_2*u_dt_shift + u2_old_grad_2;
       const s_t residual_tmp24 = residual_tmp23*u2_grad_1;
-      const s_t residual_tmp25 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
-      const s_t residual_tmp26 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+      const s_t residual_tmp25 = u0_grad_2*u_dt_shift + u0_old_grad_2;
+      const s_t residual_tmp26 = u0_grad_1*u_dt_shift + u0_old_grad_1;
       const s_t residual_tmp27 = residual_tmp25*u0_grad_1 - residual_tmp26*u0_grad_2;
       const s_t residual_tmp28 = residual_tmp22 - residual_tmp24 + residual_tmp27;
-      const s_t residual_tmp29 = newmark_velocity_alpha*residual_tmp12;
+      const s_t residual_tmp29 = residual_tmp12*u_dt_shift;
       const s_t residual_tmp30 = residual_tmp23*u0_grad_1;
       const s_t residual_tmp31 = residual_tmp21*u0_grad_2;
       const s_t residual_tmp32 = residual_tmp29 + residual_tmp30 - residual_tmp31;
@@ -1791,17 +1791,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp39 = residual_tmp37 + residual_tmp38*(s_t(2)*residual_tmp26*residual_tmp6 - residual_tmp32 - s_t(2)*residual_tmp34);
       const s_t residual_tmp40 = ((s_t(1) / s_t(3)))*residual_tmp7;
       const s_t residual_tmp41 = pow_m2(residual_tmp10);
-      const s_t residual_tmp42 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+      const s_t residual_tmp42 = u0_grad_0*u_dt_shift + u0_old_grad_0;
       const s_t residual_tmp43 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
       const s_t residual_tmp44 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
       const s_t residual_tmp45 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
       const s_t residual_tmp46 = u1_grad_1 + s_t(1);
       const s_t residual_tmp47 = residual_tmp46 + residual_tmp9 + u0_grad_0;
-      const s_t residual_tmp48 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+      const s_t residual_tmp48 = u2_grad_0*u_dt_shift + u2_old_grad_0;
       const s_t residual_tmp49 = residual_tmp20*residual_tmp42 + residual_tmp21*residual_tmp44 + residual_tmp23*residual_tmp45 - residual_tmp25*residual_tmp47 + residual_tmp26*residual_tmp43 - residual_tmp48*residual_tmp7;
       const s_t residual_tmp50 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
       const s_t residual_tmp51 = residual_tmp6 + residual_tmp8;
-      const s_t residual_tmp52 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp52 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp53 = residual_tmp12*residual_tmp42 + residual_tmp14*residual_tmp45 + residual_tmp16*residual_tmp44 + residual_tmp25*residual_tmp50 - residual_tmp26*residual_tmp51 - residual_tmp52*residual_tmp7;
       const s_t residual_tmp54 = residual_tmp12*residual_tmp52;
       const s_t residual_tmp55 = residual_tmp14*residual_tmp50;
@@ -1824,7 +1824,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp72 = -residual_tmp13 - residual_tmp71;
       const s_t residual_tmp73 = -residual_tmp14*residual_tmp46 + residual_tmp16*u1_grad_2;
       const s_t residual_tmp74 = -residual_tmp27 - residual_tmp73;
-      const s_t residual_tmp75 = newmark_velocity_alpha*residual_tmp20;
+      const s_t residual_tmp75 = residual_tmp20*u_dt_shift;
       const s_t residual_tmp76 = residual_tmp16*u0_grad_2;
       const s_t residual_tmp77 = residual_tmp14*u0_grad_1;
       const s_t residual_tmp78 = residual_tmp75 + residual_tmp76 - residual_tmp77;
@@ -1842,7 +1842,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp90 = residual_tmp36*(-residual_tmp88 - residual_tmp89);
       const s_t residual_tmp91 = residual_tmp38*(-s_t(2)*residual_tmp13 - residual_tmp18 - residual_tmp71) + residual_tmp90;
       const s_t residual_tmp92 = -residual_tmp7;
-      const s_t residual_tmp93 = newmark_velocity_alpha*residual_tmp44;
+      const s_t residual_tmp93 = residual_tmp44*u_dt_shift;
       const s_t residual_tmp94 = residual_tmp23*u1_grad_0;
       const s_t residual_tmp95 = residual_tmp48*u1_grad_2;
       const s_t residual_tmp96 = residual_tmp93 + residual_tmp94 - residual_tmp95;
@@ -1853,12 +1853,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp101 = -residual_tmp97 + residual_tmp98;
       const s_t residual_tmp102 = -residual_tmp94 + residual_tmp95;
       const s_t residual_tmp103 = residual_tmp100 + residual_tmp38*(residual_tmp101 + residual_tmp102 + s_t(2)*residual_tmp93);
-      const s_t residual_tmp104 = newmark_velocity_alpha*residual_tmp43;
+      const s_t residual_tmp104 = residual_tmp43*u_dt_shift;
       const s_t residual_tmp105 = residual_tmp25*u1_grad_0;
       const s_t residual_tmp106 = residual_tmp42*u1_grad_2;
       const s_t residual_tmp107 = residual_tmp105 - residual_tmp106;
       const s_t residual_tmp108 = residual_tmp104 + residual_tmp107;
-      const s_t residual_tmp109 = newmark_velocity_alpha*residual_tmp51;
+      const s_t residual_tmp109 = residual_tmp51*u_dt_shift;
       const s_t residual_tmp110 = residual_tmp25*u2_grad_0;
       const s_t residual_tmp111 = residual_tmp42*residual_tmp6;
       const s_t residual_tmp112 = residual_tmp110 - residual_tmp111;
@@ -1866,7 +1866,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp114 = residual_tmp49*u1_grad_2;
       const s_t residual_tmp115 = -residual_tmp114;
       const s_t residual_tmp116 = residual_tmp53*residual_tmp6;
-      const s_t residual_tmp117 = newmark_velocity_alpha*residual_tmp45;
+      const s_t residual_tmp117 = residual_tmp45*u_dt_shift;
       const s_t residual_tmp118 = residual_tmp46*residual_tmp48;
       const s_t residual_tmp119 = residual_tmp21*u1_grad_0;
       const s_t residual_tmp120 = residual_tmp117 + residual_tmp118 - residual_tmp119;
@@ -1877,12 +1877,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_ja
       const s_t residual_tmp125 = -residual_tmp121 + residual_tmp122;
       const s_t residual_tmp126 = -residual_tmp118 + residual_tmp119;
       const s_t residual_tmp127 = residual_tmp124 + residual_tmp38*(s_t(2)*residual_tmp117 + residual_tmp125 + residual_tmp126);
-      const s_t residual_tmp128 = newmark_velocity_alpha*residual_tmp50;
+      const s_t residual_tmp128 = residual_tmp50*u_dt_shift;
       const s_t residual_tmp129 = residual_tmp26*u2_grad_0;
       const s_t residual_tmp130 = residual_tmp42*u2_grad_1;
       const s_t residual_tmp131 = residual_tmp129 - residual_tmp130;
       const s_t residual_tmp132 = residual_tmp128 + residual_tmp131;
-      const s_t residual_tmp133 = newmark_velocity_alpha*residual_tmp47;
+      const s_t residual_tmp133 = residual_tmp47*u_dt_shift;
       const s_t residual_tmp134 = residual_tmp26*u1_grad_0;
       const s_t residual_tmp135 = residual_tmp42*residual_tmp46;
       const s_t residual_tmp136 = residual_tmp134 - residual_tmp135;
@@ -2087,7 +2087,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t *const RSTR direction[3 * NS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR output[3 * NS]
 ) {
   for (int q = 0; q < NQ; ++q) {
@@ -2171,23 +2171,23 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
       const s_t residual_tmp11 = pow_m1(residual_tmp10);
       const s_t residual_tmp12 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
-      const s_t residual_tmp13 = newmark_velocity_alpha*residual_tmp7;
-      const s_t residual_tmp14 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+      const s_t residual_tmp13 = residual_tmp7*u_dt_shift;
+      const s_t residual_tmp14 = u1_grad_2*u_dt_shift + u1_old_grad_2;
       const s_t residual_tmp15 = residual_tmp14*u2_grad_1;
-      const s_t residual_tmp16 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp16 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp17 = residual_tmp16*residual_tmp6;
       const s_t residual_tmp18 = residual_tmp15 - residual_tmp17;
       const s_t residual_tmp19 = -residual_tmp13 - residual_tmp18;
       const s_t residual_tmp20 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
-      const s_t residual_tmp21 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+      const s_t residual_tmp21 = u2_grad_1*u_dt_shift + u2_old_grad_1;
       const s_t residual_tmp22 = residual_tmp21*residual_tmp6;
-      const s_t residual_tmp23 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+      const s_t residual_tmp23 = u2_grad_2*u_dt_shift + u2_old_grad_2;
       const s_t residual_tmp24 = residual_tmp23*u2_grad_1;
-      const s_t residual_tmp25 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
-      const s_t residual_tmp26 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+      const s_t residual_tmp25 = u0_grad_2*u_dt_shift + u0_old_grad_2;
+      const s_t residual_tmp26 = u0_grad_1*u_dt_shift + u0_old_grad_1;
       const s_t residual_tmp27 = residual_tmp25*u0_grad_1 - residual_tmp26*u0_grad_2;
       const s_t residual_tmp28 = residual_tmp22 - residual_tmp24 + residual_tmp27;
-      const s_t residual_tmp29 = newmark_velocity_alpha*residual_tmp12;
+      const s_t residual_tmp29 = residual_tmp12*u_dt_shift;
       const s_t residual_tmp30 = residual_tmp23*u0_grad_1;
       const s_t residual_tmp31 = residual_tmp21*u0_grad_2;
       const s_t residual_tmp32 = residual_tmp29 + residual_tmp30 - residual_tmp31;
@@ -2200,17 +2200,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp39 = residual_tmp37 + residual_tmp38*(s_t(2)*residual_tmp26*residual_tmp6 - residual_tmp32 - s_t(2)*residual_tmp34);
       const s_t residual_tmp40 = ((s_t(1) / s_t(3)))*residual_tmp7;
       const s_t residual_tmp41 = pow_m2(residual_tmp10);
-      const s_t residual_tmp42 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+      const s_t residual_tmp42 = u0_grad_0*u_dt_shift + u0_old_grad_0;
       const s_t residual_tmp43 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
       const s_t residual_tmp44 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
       const s_t residual_tmp45 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
       const s_t residual_tmp46 = u1_grad_1 + s_t(1);
       const s_t residual_tmp47 = residual_tmp46 + residual_tmp9 + u0_grad_0;
-      const s_t residual_tmp48 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+      const s_t residual_tmp48 = u2_grad_0*u_dt_shift + u2_old_grad_0;
       const s_t residual_tmp49 = residual_tmp20*residual_tmp42 + residual_tmp21*residual_tmp44 + residual_tmp23*residual_tmp45 - residual_tmp25*residual_tmp47 + residual_tmp26*residual_tmp43 - residual_tmp48*residual_tmp7;
       const s_t residual_tmp50 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
       const s_t residual_tmp51 = residual_tmp6 + residual_tmp8;
-      const s_t residual_tmp52 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp52 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp53 = residual_tmp12*residual_tmp42 + residual_tmp14*residual_tmp45 + residual_tmp16*residual_tmp44 + residual_tmp25*residual_tmp50 - residual_tmp26*residual_tmp51 - residual_tmp52*residual_tmp7;
       const s_t residual_tmp54 = residual_tmp12*residual_tmp52;
       const s_t residual_tmp55 = residual_tmp14*residual_tmp50;
@@ -2233,7 +2233,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp72 = -residual_tmp13 - residual_tmp71;
       const s_t residual_tmp73 = -residual_tmp14*residual_tmp46 + residual_tmp16*u1_grad_2;
       const s_t residual_tmp74 = -residual_tmp27 - residual_tmp73;
-      const s_t residual_tmp75 = newmark_velocity_alpha*residual_tmp20;
+      const s_t residual_tmp75 = residual_tmp20*u_dt_shift;
       const s_t residual_tmp76 = residual_tmp16*u0_grad_2;
       const s_t residual_tmp77 = residual_tmp14*u0_grad_1;
       const s_t residual_tmp78 = residual_tmp75 + residual_tmp76 - residual_tmp77;
@@ -2251,7 +2251,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp90 = residual_tmp36*(-residual_tmp88 - residual_tmp89);
       const s_t residual_tmp91 = residual_tmp38*(-s_t(2)*residual_tmp13 - residual_tmp18 - residual_tmp71) + residual_tmp90;
       const s_t residual_tmp92 = -residual_tmp7;
-      const s_t residual_tmp93 = newmark_velocity_alpha*residual_tmp44;
+      const s_t residual_tmp93 = residual_tmp44*u_dt_shift;
       const s_t residual_tmp94 = residual_tmp23*u1_grad_0;
       const s_t residual_tmp95 = residual_tmp48*u1_grad_2;
       const s_t residual_tmp96 = residual_tmp93 + residual_tmp94 - residual_tmp95;
@@ -2262,12 +2262,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp101 = -residual_tmp97 + residual_tmp98;
       const s_t residual_tmp102 = -residual_tmp94 + residual_tmp95;
       const s_t residual_tmp103 = residual_tmp100 + residual_tmp38*(residual_tmp101 + residual_tmp102 + s_t(2)*residual_tmp93);
-      const s_t residual_tmp104 = newmark_velocity_alpha*residual_tmp43;
+      const s_t residual_tmp104 = residual_tmp43*u_dt_shift;
       const s_t residual_tmp105 = residual_tmp25*u1_grad_0;
       const s_t residual_tmp106 = residual_tmp42*u1_grad_2;
       const s_t residual_tmp107 = residual_tmp105 - residual_tmp106;
       const s_t residual_tmp108 = residual_tmp104 + residual_tmp107;
-      const s_t residual_tmp109 = newmark_velocity_alpha*residual_tmp51;
+      const s_t residual_tmp109 = residual_tmp51*u_dt_shift;
       const s_t residual_tmp110 = residual_tmp25*u2_grad_0;
       const s_t residual_tmp111 = residual_tmp42*residual_tmp6;
       const s_t residual_tmp112 = residual_tmp110 - residual_tmp111;
@@ -2275,7 +2275,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp114 = residual_tmp49*u1_grad_2;
       const s_t residual_tmp115 = -residual_tmp114;
       const s_t residual_tmp116 = residual_tmp53*residual_tmp6;
-      const s_t residual_tmp117 = newmark_velocity_alpha*residual_tmp45;
+      const s_t residual_tmp117 = residual_tmp45*u_dt_shift;
       const s_t residual_tmp118 = residual_tmp46*residual_tmp48;
       const s_t residual_tmp119 = residual_tmp21*u1_grad_0;
       const s_t residual_tmp120 = residual_tmp117 + residual_tmp118 - residual_tmp119;
@@ -2286,12 +2286,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp125 = -residual_tmp121 + residual_tmp122;
       const s_t residual_tmp126 = -residual_tmp118 + residual_tmp119;
       const s_t residual_tmp127 = residual_tmp124 + residual_tmp38*(s_t(2)*residual_tmp117 + residual_tmp125 + residual_tmp126);
-      const s_t residual_tmp128 = newmark_velocity_alpha*residual_tmp50;
+      const s_t residual_tmp128 = residual_tmp50*u_dt_shift;
       const s_t residual_tmp129 = residual_tmp26*u2_grad_0;
       const s_t residual_tmp130 = residual_tmp42*u2_grad_1;
       const s_t residual_tmp131 = residual_tmp129 - residual_tmp130;
       const s_t residual_tmp132 = residual_tmp128 + residual_tmp131;
-      const s_t residual_tmp133 = newmark_velocity_alpha*residual_tmp47;
+      const s_t residual_tmp133 = residual_tmp47*u_dt_shift;
       const s_t residual_tmp134 = residual_tmp26*u1_grad_0;
       const s_t residual_tmp135 = residual_tmp42*residual_tmp46;
       const s_t residual_tmp136 = residual_tmp134 - residual_tmp135;
@@ -2498,7 +2498,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t direction[3 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t output[3 * NS][VS]
 ) {
   for (int q = 0; q < NQ; ++q) {
@@ -2582,23 +2582,23 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
       const s_t residual_tmp11 = pow_m1(residual_tmp10);
       const s_t residual_tmp12 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
-      const s_t residual_tmp13 = newmark_velocity_alpha*residual_tmp7;
-      const s_t residual_tmp14 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+      const s_t residual_tmp13 = residual_tmp7*u_dt_shift;
+      const s_t residual_tmp14 = u1_grad_2*u_dt_shift + u1_old_grad_2;
       const s_t residual_tmp15 = residual_tmp14*u2_grad_1;
-      const s_t residual_tmp16 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp16 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp17 = residual_tmp16*residual_tmp6;
       const s_t residual_tmp18 = residual_tmp15 - residual_tmp17;
       const s_t residual_tmp19 = -residual_tmp13 - residual_tmp18;
       const s_t residual_tmp20 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
-      const s_t residual_tmp21 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+      const s_t residual_tmp21 = u2_grad_1*u_dt_shift + u2_old_grad_1;
       const s_t residual_tmp22 = residual_tmp21*residual_tmp6;
-      const s_t residual_tmp23 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+      const s_t residual_tmp23 = u2_grad_2*u_dt_shift + u2_old_grad_2;
       const s_t residual_tmp24 = residual_tmp23*u2_grad_1;
-      const s_t residual_tmp25 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
-      const s_t residual_tmp26 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+      const s_t residual_tmp25 = u0_grad_2*u_dt_shift + u0_old_grad_2;
+      const s_t residual_tmp26 = u0_grad_1*u_dt_shift + u0_old_grad_1;
       const s_t residual_tmp27 = residual_tmp25*u0_grad_1 - residual_tmp26*u0_grad_2;
       const s_t residual_tmp28 = residual_tmp22 - residual_tmp24 + residual_tmp27;
-      const s_t residual_tmp29 = newmark_velocity_alpha*residual_tmp12;
+      const s_t residual_tmp29 = residual_tmp12*u_dt_shift;
       const s_t residual_tmp30 = residual_tmp23*u0_grad_1;
       const s_t residual_tmp31 = residual_tmp21*u0_grad_2;
       const s_t residual_tmp32 = residual_tmp29 + residual_tmp30 - residual_tmp31;
@@ -2611,17 +2611,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp39 = residual_tmp37 + residual_tmp38*(s_t(2)*residual_tmp26*residual_tmp6 - residual_tmp32 - s_t(2)*residual_tmp34);
       const s_t residual_tmp40 = ((s_t(1) / s_t(3)))*residual_tmp7;
       const s_t residual_tmp41 = pow_m2(residual_tmp10);
-      const s_t residual_tmp42 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+      const s_t residual_tmp42 = u0_grad_0*u_dt_shift + u0_old_grad_0;
       const s_t residual_tmp43 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
       const s_t residual_tmp44 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
       const s_t residual_tmp45 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
       const s_t residual_tmp46 = u1_grad_1 + s_t(1);
       const s_t residual_tmp47 = residual_tmp46 + residual_tmp9 + u0_grad_0;
-      const s_t residual_tmp48 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+      const s_t residual_tmp48 = u2_grad_0*u_dt_shift + u2_old_grad_0;
       const s_t residual_tmp49 = residual_tmp20*residual_tmp42 + residual_tmp21*residual_tmp44 + residual_tmp23*residual_tmp45 - residual_tmp25*residual_tmp47 + residual_tmp26*residual_tmp43 - residual_tmp48*residual_tmp7;
       const s_t residual_tmp50 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
       const s_t residual_tmp51 = residual_tmp6 + residual_tmp8;
-      const s_t residual_tmp52 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp52 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp53 = residual_tmp12*residual_tmp42 + residual_tmp14*residual_tmp45 + residual_tmp16*residual_tmp44 + residual_tmp25*residual_tmp50 - residual_tmp26*residual_tmp51 - residual_tmp52*residual_tmp7;
       const s_t residual_tmp54 = residual_tmp12*residual_tmp52;
       const s_t residual_tmp55 = residual_tmp14*residual_tmp50;
@@ -2644,7 +2644,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp72 = -residual_tmp13 - residual_tmp71;
       const s_t residual_tmp73 = -residual_tmp14*residual_tmp46 + residual_tmp16*u1_grad_2;
       const s_t residual_tmp74 = -residual_tmp27 - residual_tmp73;
-      const s_t residual_tmp75 = newmark_velocity_alpha*residual_tmp20;
+      const s_t residual_tmp75 = residual_tmp20*u_dt_shift;
       const s_t residual_tmp76 = residual_tmp16*u0_grad_2;
       const s_t residual_tmp77 = residual_tmp14*u0_grad_1;
       const s_t residual_tmp78 = residual_tmp75 + residual_tmp76 - residual_tmp77;
@@ -2662,7 +2662,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp90 = residual_tmp36*(-residual_tmp88 - residual_tmp89);
       const s_t residual_tmp91 = residual_tmp38*(-s_t(2)*residual_tmp13 - residual_tmp18 - residual_tmp71) + residual_tmp90;
       const s_t residual_tmp92 = -residual_tmp7;
-      const s_t residual_tmp93 = newmark_velocity_alpha*residual_tmp44;
+      const s_t residual_tmp93 = residual_tmp44*u_dt_shift;
       const s_t residual_tmp94 = residual_tmp23*u1_grad_0;
       const s_t residual_tmp95 = residual_tmp48*u1_grad_2;
       const s_t residual_tmp96 = residual_tmp93 + residual_tmp94 - residual_tmp95;
@@ -2673,12 +2673,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp101 = -residual_tmp97 + residual_tmp98;
       const s_t residual_tmp102 = -residual_tmp94 + residual_tmp95;
       const s_t residual_tmp103 = residual_tmp100 + residual_tmp38*(residual_tmp101 + residual_tmp102 + s_t(2)*residual_tmp93);
-      const s_t residual_tmp104 = newmark_velocity_alpha*residual_tmp43;
+      const s_t residual_tmp104 = residual_tmp43*u_dt_shift;
       const s_t residual_tmp105 = residual_tmp25*u1_grad_0;
       const s_t residual_tmp106 = residual_tmp42*u1_grad_2;
       const s_t residual_tmp107 = residual_tmp105 - residual_tmp106;
       const s_t residual_tmp108 = residual_tmp104 + residual_tmp107;
-      const s_t residual_tmp109 = newmark_velocity_alpha*residual_tmp51;
+      const s_t residual_tmp109 = residual_tmp51*u_dt_shift;
       const s_t residual_tmp110 = residual_tmp25*u2_grad_0;
       const s_t residual_tmp111 = residual_tmp42*residual_tmp6;
       const s_t residual_tmp112 = residual_tmp110 - residual_tmp111;
@@ -2686,7 +2686,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp114 = residual_tmp49*u1_grad_2;
       const s_t residual_tmp115 = -residual_tmp114;
       const s_t residual_tmp116 = residual_tmp53*residual_tmp6;
-      const s_t residual_tmp117 = newmark_velocity_alpha*residual_tmp45;
+      const s_t residual_tmp117 = residual_tmp45*u_dt_shift;
       const s_t residual_tmp118 = residual_tmp46*residual_tmp48;
       const s_t residual_tmp119 = residual_tmp21*u1_grad_0;
       const s_t residual_tmp120 = residual_tmp117 + residual_tmp118 - residual_tmp119;
@@ -2697,12 +2697,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
       const s_t residual_tmp125 = -residual_tmp121 + residual_tmp122;
       const s_t residual_tmp126 = -residual_tmp118 + residual_tmp119;
       const s_t residual_tmp127 = residual_tmp124 + residual_tmp38*(s_t(2)*residual_tmp117 + residual_tmp125 + residual_tmp126);
-      const s_t residual_tmp128 = newmark_velocity_alpha*residual_tmp50;
+      const s_t residual_tmp128 = residual_tmp50*u_dt_shift;
       const s_t residual_tmp129 = residual_tmp26*u2_grad_0;
       const s_t residual_tmp130 = residual_tmp42*u2_grad_1;
       const s_t residual_tmp131 = residual_tmp129 - residual_tmp130;
       const s_t residual_tmp132 = residual_tmp128 + residual_tmp131;
-      const s_t residual_tmp133 = newmark_velocity_alpha*residual_tmp47;
+      const s_t residual_tmp133 = residual_tmp47*u_dt_shift;
       const s_t residual_tmp134 = residual_tmp26*u1_grad_0;
       const s_t residual_tmp135 = residual_tmp42*residual_tmp46;
       const s_t residual_tmp136 = residual_tmp134 - residual_tmp135;
@@ -2903,7 +2903,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t previous[3 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR element_matrix
 ) {
   const int q = 0;
@@ -2981,29 +2981,29 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t element_matrix_tmp10 = element_matrix_tmp0*u2_grad_2 + element_matrix_tmp1*u2_grad_0 + element_matrix_tmp2*u1_grad_0 - element_matrix_tmp3*u0_grad_0 - element_matrix_tmp4*u2_grad_2 - element_matrix_tmp5*u1_grad_1 + element_matrix_tmp7 + element_matrix_tmp8 + element_matrix_tmp9;
     const s_t element_matrix_tmp11 = pow_m1(element_matrix_tmp10);
     const s_t element_matrix_tmp12 = -element_matrix_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
-    const s_t element_matrix_tmp13 = element_matrix_tmp12*newmark_velocity_alpha;
-    const s_t element_matrix_tmp14 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+    const s_t element_matrix_tmp13 = element_matrix_tmp12*u_dt_shift;
+    const s_t element_matrix_tmp14 = u0_grad_1*u_dt_shift + u0_old_grad_1;
     const s_t element_matrix_tmp15 = element_matrix_tmp14*u1_grad_2;
     const s_t element_matrix_tmp16 = u1_grad_1 + s_t(1);
-    const s_t element_matrix_tmp17 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
+    const s_t element_matrix_tmp17 = u0_grad_2*u_dt_shift + u0_old_grad_2;
     const s_t element_matrix_tmp18 = element_matrix_tmp16*element_matrix_tmp17;
     const s_t element_matrix_tmp19 = element_matrix_tmp15 - element_matrix_tmp18;
     const s_t element_matrix_tmp20 = element_matrix_tmp13 + element_matrix_tmp19;
     const s_t element_matrix_tmp21 = -element_matrix_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
-    const s_t element_matrix_tmp22 = element_matrix_tmp21*newmark_velocity_alpha;
+    const s_t element_matrix_tmp22 = element_matrix_tmp21*u_dt_shift;
     const s_t element_matrix_tmp23 = element_matrix_tmp17*u2_grad_1;
     const s_t element_matrix_tmp24 = element_matrix_tmp14*element_matrix_tmp6;
     const s_t element_matrix_tmp25 = element_matrix_tmp23 - element_matrix_tmp24;
     const s_t element_matrix_tmp26 = element_matrix_tmp22 + element_matrix_tmp25;
-    const s_t element_matrix_tmp27 = element_matrix_tmp7*newmark_velocity_alpha;
-    const s_t element_matrix_tmp28 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+    const s_t element_matrix_tmp27 = element_matrix_tmp7*u_dt_shift;
+    const s_t element_matrix_tmp28 = u2_grad_2*u_dt_shift + u2_old_grad_2;
     const s_t element_matrix_tmp29 = element_matrix_tmp16*element_matrix_tmp28;
-    const s_t element_matrix_tmp30 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+    const s_t element_matrix_tmp30 = u2_grad_1*u_dt_shift + u2_old_grad_1;
     const s_t element_matrix_tmp31 = element_matrix_tmp30*u1_grad_2;
     const s_t element_matrix_tmp32 = element_matrix_tmp27 + element_matrix_tmp29 - element_matrix_tmp31;
-    const s_t element_matrix_tmp33 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+    const s_t element_matrix_tmp33 = u1_grad_1*u_dt_shift + u1_old_grad_1;
     const s_t element_matrix_tmp34 = element_matrix_tmp33*element_matrix_tmp6;
-    const s_t element_matrix_tmp35 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+    const s_t element_matrix_tmp35 = u1_grad_2*u_dt_shift + u1_old_grad_2;
     const s_t element_matrix_tmp36 = element_matrix_tmp35*u2_grad_1;
     const s_t element_matrix_tmp37 = element_matrix_tmp34 - element_matrix_tmp36;
     const s_t element_matrix_tmp38 = s_t(3)*eta_b;
@@ -3015,16 +3015,16 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t element_matrix_tmp44 = ((s_t(1) / s_t(3)))*element_matrix_tmp7;
     const s_t element_matrix_tmp45 = -element_matrix_tmp7;
     const s_t element_matrix_tmp46 = pow_m2(element_matrix_tmp10);
-    const s_t element_matrix_tmp47 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+    const s_t element_matrix_tmp47 = u0_grad_0*u_dt_shift + u0_old_grad_0;
     const s_t element_matrix_tmp48 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
     const s_t element_matrix_tmp49 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
     const s_t element_matrix_tmp50 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
     const s_t element_matrix_tmp51 = element_matrix_tmp16 + element_matrix_tmp9 + u0_grad_0;
-    const s_t element_matrix_tmp52 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+    const s_t element_matrix_tmp52 = u2_grad_0*u_dt_shift + u2_old_grad_0;
     const s_t element_matrix_tmp53 = element_matrix_tmp12*element_matrix_tmp47 + element_matrix_tmp14*element_matrix_tmp48 - element_matrix_tmp17*element_matrix_tmp51 + element_matrix_tmp28*element_matrix_tmp50 + element_matrix_tmp30*element_matrix_tmp49 - element_matrix_tmp52*element_matrix_tmp7;
     const s_t element_matrix_tmp54 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
     const s_t element_matrix_tmp55 = element_matrix_tmp6 + element_matrix_tmp8;
-    const s_t element_matrix_tmp56 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+    const s_t element_matrix_tmp56 = u1_grad_0*u_dt_shift + u1_old_grad_0;
     const s_t element_matrix_tmp57 = -element_matrix_tmp14*element_matrix_tmp55 + element_matrix_tmp17*element_matrix_tmp54 + element_matrix_tmp21*element_matrix_tmp47 + element_matrix_tmp33*element_matrix_tmp49 + element_matrix_tmp35*element_matrix_tmp50 - element_matrix_tmp56*element_matrix_tmp7;
     const s_t element_matrix_tmp58 = element_matrix_tmp21*element_matrix_tmp56;
     const s_t element_matrix_tmp59 = element_matrix_tmp35*element_matrix_tmp54;
@@ -3042,7 +3042,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t element_matrix_tmp71 = -element_matrix_tmp70;
     const s_t element_matrix_tmp72 = element_matrix_tmp46*(element_matrix_tmp44*element_matrix_tmp71 + eta_s*(element_matrix_tmp12*element_matrix_tmp53 + element_matrix_tmp21*element_matrix_tmp57));
     const s_t element_matrix_tmp73 = element_matrix_tmp11*(-element_matrix_tmp43*element_matrix_tmp44 + eta_s*(element_matrix_tmp12*element_matrix_tmp20 + element_matrix_tmp21*element_matrix_tmp26)) + element_matrix_tmp45*element_matrix_tmp72;
-    const s_t element_matrix_tmp74 = element_matrix_tmp49*newmark_velocity_alpha;
+    const s_t element_matrix_tmp74 = element_matrix_tmp49*u_dt_shift;
     const s_t element_matrix_tmp75 = element_matrix_tmp28*u1_grad_0;
     const s_t element_matrix_tmp76 = element_matrix_tmp52*u1_grad_2;
     const s_t element_matrix_tmp77 = element_matrix_tmp74 + element_matrix_tmp75 - element_matrix_tmp76;
@@ -3053,12 +3053,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t element_matrix_tmp82 = -element_matrix_tmp78 + element_matrix_tmp79;
     const s_t element_matrix_tmp83 = -element_matrix_tmp75 + element_matrix_tmp76;
     const s_t element_matrix_tmp84 = element_matrix_tmp42*(s_t(2)*element_matrix_tmp74 + element_matrix_tmp82 + element_matrix_tmp83) + element_matrix_tmp81;
-    const s_t element_matrix_tmp85 = element_matrix_tmp48*newmark_velocity_alpha;
+    const s_t element_matrix_tmp85 = element_matrix_tmp48*u_dt_shift;
     const s_t element_matrix_tmp86 = element_matrix_tmp17*u1_grad_0;
     const s_t element_matrix_tmp87 = element_matrix_tmp47*u1_grad_2;
     const s_t element_matrix_tmp88 = element_matrix_tmp86 - element_matrix_tmp87;
     const s_t element_matrix_tmp89 = element_matrix_tmp85 + element_matrix_tmp88;
-    const s_t element_matrix_tmp90 = element_matrix_tmp55*newmark_velocity_alpha;
+    const s_t element_matrix_tmp90 = element_matrix_tmp55*u_dt_shift;
     const s_t element_matrix_tmp91 = element_matrix_tmp17*u2_grad_0;
     const s_t element_matrix_tmp92 = element_matrix_tmp47*element_matrix_tmp6;
     const s_t element_matrix_tmp93 = element_matrix_tmp91 - element_matrix_tmp92;
@@ -3067,7 +3067,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t element_matrix_tmp96 = -element_matrix_tmp95;
     const s_t element_matrix_tmp97 = element_matrix_tmp57*element_matrix_tmp6;
     const s_t element_matrix_tmp98 = element_matrix_tmp11*(-element_matrix_tmp44*element_matrix_tmp84 + eta_s*(element_matrix_tmp12*element_matrix_tmp89 + element_matrix_tmp21*element_matrix_tmp94 + element_matrix_tmp96 + element_matrix_tmp97)) + element_matrix_tmp49*element_matrix_tmp72;
-    const s_t element_matrix_tmp99 = element_matrix_tmp50*newmark_velocity_alpha;
+    const s_t element_matrix_tmp99 = element_matrix_tmp50*u_dt_shift;
     const s_t element_matrix_tmp100 = element_matrix_tmp16*element_matrix_tmp52;
     const s_t element_matrix_tmp101 = element_matrix_tmp30*u1_grad_0;
     const s_t element_matrix_tmp102 = element_matrix_tmp100 - element_matrix_tmp101 + element_matrix_tmp99;
@@ -3078,12 +3078,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_te
     const s_t element_matrix_tmp107 = -element_matrix_tmp103 + element_matrix_tmp104;
     const s_t element_matrix_tmp108 = -element_matrix_tmp100 + element_matrix_tmp101;
     const s_t element_matrix_tmp109 = element_matrix_tmp106 + element_matrix_tmp42*(element_matrix_tmp107 + element_matrix_tmp108 + s_t(2)*element_matrix_tmp99);
-    const s_t element_matrix_tmp110 = element_matrix_tmp54*newmark_velocity_alpha;
+    const s_t element_matrix_tmp110 = element_matrix_tmp54*u_dt_shift;
     const s_t element_matrix_tmp111 = element_matrix_tmp14*u2_grad_0;
     const s_t element_matrix_tmp112 = element_matrix_tmp47*u2_grad_1;
     const s_t element_matrix_tmp113 = element_matrix_tmp111 - element_matrix_tmp112;
     const s_t element_matrix_tmp114 = element_matrix_tmp110 + element_matrix_tmp113;
-    const s_t element_matrix_tmp115 = element_matrix_tmp51*newmark_velocity_alpha;
+    const s_t element_matrix_tmp115 = element_matrix_tmp51*u_dt_shift;
     const s_t element_matrix_tmp116 = element_matrix_tmp14*u1_grad_0;
     const s_t element_matrix_tmp117 = element_matrix_tmp16*element_matrix_tmp47;
     const s_t element_matrix_tmp118 = element_matrix_tmp116 - element_matrix_tmp117;
@@ -3597,7 +3597,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
     const s_t previous[3 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR element_matrix
 ) {
   static constexpr int NC = 3;
@@ -3788,21 +3788,21 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
         const s_t residual_tmp11 = pow_m1(residual_tmp10);
         const s_t residual_tmp12 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
-        const s_t residual_tmp13 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
+        const s_t residual_tmp13 = u0_grad_1*u_dt_shift + u0_old_grad_1;
         const s_t residual_tmp14 = u1_grad_1 + s_t(1);
-        const s_t residual_tmp15 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
-        const s_t residual_tmp16 = newmark_velocity_alpha*residual_tmp12 + residual_tmp13*u1_grad_2 - residual_tmp14*residual_tmp15;
+        const s_t residual_tmp15 = u0_grad_2*u_dt_shift + u0_old_grad_2;
+        const s_t residual_tmp16 = residual_tmp12*u_dt_shift + residual_tmp13*u1_grad_2 - residual_tmp14*residual_tmp15;
         const s_t residual_tmp17 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
-        const s_t residual_tmp18 = newmark_velocity_alpha*residual_tmp17 - residual_tmp13*residual_tmp6 + residual_tmp15*u2_grad_1;
-        const s_t residual_tmp19 = newmark_velocity_alpha*residual_tmp7;
-        const s_t residual_tmp20 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
+        const s_t residual_tmp18 = -residual_tmp13*residual_tmp6 + residual_tmp15*u2_grad_1 + residual_tmp17*u_dt_shift;
+        const s_t residual_tmp19 = residual_tmp7*u_dt_shift;
+        const s_t residual_tmp20 = u2_grad_2*u_dt_shift + u2_old_grad_2;
         const s_t residual_tmp21 = residual_tmp14*residual_tmp20;
-        const s_t residual_tmp22 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+        const s_t residual_tmp22 = u2_grad_1*u_dt_shift + u2_old_grad_1;
         const s_t residual_tmp23 = residual_tmp22*u1_grad_2;
         const s_t residual_tmp24 = residual_tmp19 + residual_tmp21 - residual_tmp23;
-        const s_t residual_tmp25 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+        const s_t residual_tmp25 = u1_grad_1*u_dt_shift + u1_old_grad_1;
         const s_t residual_tmp26 = residual_tmp25*residual_tmp6;
-        const s_t residual_tmp27 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+        const s_t residual_tmp27 = u1_grad_2*u_dt_shift + u1_old_grad_2;
         const s_t residual_tmp28 = residual_tmp27*u2_grad_1;
         const s_t residual_tmp29 = residual_tmp26 - residual_tmp28;
         const s_t residual_tmp30 = s_t(3)*eta_b;
@@ -3812,16 +3812,16 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp34 = ((s_t(1) / s_t(3)))*residual_tmp7;
         const s_t residual_tmp35 = -residual_tmp7;
         const s_t residual_tmp36 = pow_m2(residual_tmp10);
-        const s_t residual_tmp37 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+        const s_t residual_tmp37 = u0_grad_0*u_dt_shift + u0_old_grad_0;
         const s_t residual_tmp38 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
         const s_t residual_tmp39 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
         const s_t residual_tmp40 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
         const s_t residual_tmp41 = residual_tmp14 + residual_tmp9 + u0_grad_0;
-        const s_t residual_tmp42 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+        const s_t residual_tmp42 = u2_grad_0*u_dt_shift + u2_old_grad_0;
         const s_t residual_tmp43 = residual_tmp12*residual_tmp37 + residual_tmp13*residual_tmp38 - residual_tmp15*residual_tmp41 + residual_tmp20*residual_tmp40 + residual_tmp22*residual_tmp39 - residual_tmp42*residual_tmp7;
         const s_t residual_tmp44 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
         const s_t residual_tmp45 = residual_tmp6 + residual_tmp8;
-        const s_t residual_tmp46 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+        const s_t residual_tmp46 = u1_grad_0*u_dt_shift + u1_old_grad_0;
         const s_t residual_tmp47 = -residual_tmp13*residual_tmp45 + residual_tmp15*residual_tmp44 + residual_tmp17*residual_tmp37 + residual_tmp25*residual_tmp39 + residual_tmp27*residual_tmp40 - residual_tmp46*residual_tmp7;
         const s_t residual_tmp48 = residual_tmp17*residual_tmp46;
         const s_t residual_tmp49 = residual_tmp27*residual_tmp44;
@@ -3837,19 +3837,19 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp59 = residual_tmp30*(residual_tmp56 + residual_tmp58);
         const s_t residual_tmp60 = residual_tmp32*(s_t(2)*residual_tmp13*residual_tmp39 + s_t(2)*residual_tmp15*residual_tmp40 - residual_tmp56 - s_t(2)*residual_tmp57) + residual_tmp59;
         const s_t residual_tmp61 = residual_tmp36*(eta_s*(residual_tmp12*residual_tmp43 + residual_tmp17*residual_tmp47) - residual_tmp34*residual_tmp60);
-        const s_t residual_tmp62 = newmark_velocity_alpha*residual_tmp39;
-        const s_t residual_tmp63 = residual_tmp20*u1_grad_0;
+        const s_t residual_tmp62 = residual_tmp20*u1_grad_0;
+        const s_t residual_tmp63 = residual_tmp39*u_dt_shift;
         const s_t residual_tmp64 = residual_tmp42*u1_grad_2;
         const s_t residual_tmp65 = residual_tmp62 + residual_tmp63 - residual_tmp64;
         const s_t residual_tmp66 = residual_tmp46*residual_tmp6;
         const s_t residual_tmp67 = residual_tmp27*u2_grad_0;
         const s_t residual_tmp68 = residual_tmp66 - residual_tmp67;
         const s_t residual_tmp69 = residual_tmp30*(residual_tmp65 + residual_tmp68);
-        const s_t residual_tmp70 = residual_tmp32*(s_t(2)*residual_tmp62 - residual_tmp63 + residual_tmp64 - residual_tmp66 + residual_tmp67) + residual_tmp69;
-        const s_t residual_tmp71 = newmark_velocity_alpha*residual_tmp38 + residual_tmp15*u1_grad_0 - residual_tmp37*u1_grad_2;
-        const s_t residual_tmp72 = -newmark_velocity_alpha*residual_tmp45 - residual_tmp15*u2_grad_0 + residual_tmp37*residual_tmp6;
+        const s_t residual_tmp70 = residual_tmp32*(-residual_tmp62 + s_t(2)*residual_tmp63 + residual_tmp64 - residual_tmp66 + residual_tmp67) + residual_tmp69;
+        const s_t residual_tmp71 = residual_tmp15*u1_grad_0 - residual_tmp37*u1_grad_2 + residual_tmp38*u_dt_shift;
+        const s_t residual_tmp72 = -residual_tmp15*u2_grad_0 + residual_tmp37*residual_tmp6 - residual_tmp45*u_dt_shift;
         const s_t residual_tmp73 = residual_tmp43*u1_grad_2;
-        const s_t residual_tmp74 = newmark_velocity_alpha*residual_tmp40;
+        const s_t residual_tmp74 = residual_tmp40*u_dt_shift;
         const s_t residual_tmp75 = residual_tmp14*residual_tmp42;
         const s_t residual_tmp76 = residual_tmp22*u1_grad_0;
         const s_t residual_tmp77 = residual_tmp74 + residual_tmp75 - residual_tmp76;
@@ -3858,8 +3858,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp80 = residual_tmp78 - residual_tmp79;
         const s_t residual_tmp81 = residual_tmp30*(residual_tmp77 + residual_tmp80);
         const s_t residual_tmp82 = residual_tmp32*(s_t(2)*residual_tmp74 - residual_tmp75 + residual_tmp76 - residual_tmp78 + residual_tmp79) + residual_tmp81;
-        const s_t residual_tmp83 = newmark_velocity_alpha*residual_tmp44 + residual_tmp13*u2_grad_0 - residual_tmp37*u2_grad_1;
-        const s_t residual_tmp84 = -newmark_velocity_alpha*residual_tmp41 - residual_tmp13*u1_grad_0 + residual_tmp14*residual_tmp37;
+        const s_t residual_tmp83 = residual_tmp13*u2_grad_0 - residual_tmp37*u2_grad_1 + residual_tmp44*u_dt_shift;
+        const s_t residual_tmp84 = -residual_tmp13*u1_grad_0 + residual_tmp14*residual_tmp37 - residual_tmp41*u_dt_shift;
         const s_t residual_tmp85 = residual_tmp47*u2_grad_1;
         const s_t residual_tmp86 = residual_tmp36*(-eta_s*(-residual_tmp38*residual_tmp43 + residual_tmp45*residual_tmp47) + ((s_t(1) / s_t(3)))*residual_tmp39*residual_tmp60);
         const s_t residual_tmp87 = residual_tmp43*u1_grad_0 - residual_tmp47*u2_grad_0;
@@ -3885,7 +3885,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp107 = residual_tmp31 + residual_tmp32*(residual_tmp19 - s_t(2)*residual_tmp21 + s_t(2)*residual_tmp23 + residual_tmp29);
         const s_t residual_tmp108 = residual_tmp32*(s_t(2)*residual_tmp12*residual_tmp42 + s_t(2)*residual_tmp22*residual_tmp38 - residual_tmp48 - residual_tmp49 - residual_tmp53 - s_t(2)*residual_tmp54 - residual_tmp58) + residual_tmp59;
         const s_t residual_tmp109 = residual_tmp36*(-eta_s*(-residual_tmp17*residual_tmp91 + residual_tmp43*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp108*residual_tmp12);
-        const s_t residual_tmp110 = residual_tmp32*(s_t(2)*residual_tmp20*u1_grad_0 - residual_tmp62 - s_t(2)*residual_tmp64 - residual_tmp68) + residual_tmp69;
+        const s_t residual_tmp110 = residual_tmp32*(s_t(2)*residual_tmp20*u1_grad_0 - residual_tmp63 - s_t(2)*residual_tmp64 - residual_tmp68) + residual_tmp69;
         const s_t residual_tmp111 = residual_tmp6*residual_tmp91;
         const s_t residual_tmp112 = ((s_t(1) / s_t(3)))*residual_tmp108;
         const s_t residual_tmp113 = residual_tmp112*u1_grad_2;
@@ -4002,17 +4002,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
         const s_t residual_tmp11 = pow_m1(residual_tmp10);
         const s_t residual_tmp12 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
-        const s_t residual_tmp13 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
-        const s_t residual_tmp14 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
-        const s_t residual_tmp15 = -newmark_velocity_alpha*residual_tmp7 - residual_tmp13*u2_grad_1 + residual_tmp14*residual_tmp6;
+        const s_t residual_tmp13 = u1_grad_2*u_dt_shift + u1_old_grad_2;
+        const s_t residual_tmp14 = u1_grad_1*u_dt_shift + u1_old_grad_1;
+        const s_t residual_tmp15 = -residual_tmp13*u2_grad_1 + residual_tmp14*residual_tmp6 - residual_tmp7*u_dt_shift;
         const s_t residual_tmp16 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
-        const s_t residual_tmp17 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
-        const s_t residual_tmp18 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
-        const s_t residual_tmp19 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
-        const s_t residual_tmp20 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
+        const s_t residual_tmp17 = u0_grad_2*u_dt_shift + u0_old_grad_2;
+        const s_t residual_tmp18 = u0_grad_1*u_dt_shift + u0_old_grad_1;
+        const s_t residual_tmp19 = u2_grad_2*u_dt_shift + u2_old_grad_2;
+        const s_t residual_tmp20 = u2_grad_1*u_dt_shift + u2_old_grad_1;
         const s_t residual_tmp21 = residual_tmp17*u0_grad_1 - residual_tmp18*u0_grad_2 - residual_tmp19*u2_grad_1 + residual_tmp20*residual_tmp6;
-        const s_t residual_tmp22 = newmark_velocity_alpha*residual_tmp12;
-        const s_t residual_tmp23 = residual_tmp19*u0_grad_1;
+        const s_t residual_tmp22 = residual_tmp19*u0_grad_1;
+        const s_t residual_tmp23 = residual_tmp12*u_dt_shift;
         const s_t residual_tmp24 = residual_tmp20*u0_grad_2;
         const s_t residual_tmp25 = residual_tmp22 + residual_tmp23 - residual_tmp24;
         const s_t residual_tmp26 = residual_tmp18*residual_tmp6;
@@ -4024,17 +4024,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp32 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp18*residual_tmp6 - residual_tmp25 - s_t(2)*residual_tmp27);
         const s_t residual_tmp33 = ((s_t(1) / s_t(3)))*residual_tmp7;
         const s_t residual_tmp34 = pow_m2(residual_tmp10);
-        const s_t residual_tmp35 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+        const s_t residual_tmp35 = u0_grad_0*u_dt_shift + u0_old_grad_0;
         const s_t residual_tmp36 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
         const s_t residual_tmp37 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
         const s_t residual_tmp38 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
         const s_t residual_tmp39 = u0_grad_0 + s_t(1);
         const s_t residual_tmp40 = residual_tmp39 + residual_tmp9 + u1_grad_1;
-        const s_t residual_tmp41 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+        const s_t residual_tmp41 = u2_grad_0*u_dt_shift + u2_old_grad_0;
         const s_t residual_tmp42 = residual_tmp16*residual_tmp35 - residual_tmp17*residual_tmp40 + residual_tmp18*residual_tmp36 + residual_tmp19*residual_tmp38 + residual_tmp20*residual_tmp37 - residual_tmp41*residual_tmp7;
         const s_t residual_tmp43 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
         const s_t residual_tmp44 = residual_tmp6 + residual_tmp8;
-        const s_t residual_tmp45 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+        const s_t residual_tmp45 = u1_grad_0*u_dt_shift + u1_old_grad_0;
         const s_t residual_tmp46 = residual_tmp12*residual_tmp35 + residual_tmp13*residual_tmp38 + residual_tmp14*residual_tmp37 + residual_tmp17*residual_tmp43 - residual_tmp18*residual_tmp44 - residual_tmp45*residual_tmp7;
         const s_t residual_tmp47 = residual_tmp12*residual_tmp45;
         const s_t residual_tmp48 = residual_tmp13*residual_tmp43;
@@ -4051,7 +4051,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp59 = residual_tmp31*(s_t(2)*residual_tmp17*residual_tmp38 + s_t(2)*residual_tmp18*residual_tmp37 - residual_tmp55 - s_t(2)*residual_tmp56) + residual_tmp58;
         const s_t residual_tmp60 = -residual_tmp59;
         const s_t residual_tmp61 = residual_tmp34*(eta_s*(residual_tmp12*residual_tmp46 + residual_tmp16*residual_tmp42) + residual_tmp33*residual_tmp60);
-        const s_t residual_tmp62 = newmark_velocity_alpha*residual_tmp43;
+        const s_t residual_tmp62 = residual_tmp43*u_dt_shift;
         const s_t residual_tmp63 = residual_tmp20*residual_tmp39;
         const s_t residual_tmp64 = residual_tmp41*u0_grad_1;
         const s_t residual_tmp65 = residual_tmp62 + residual_tmp63 - residual_tmp64;
@@ -4060,12 +4060,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp68 = residual_tmp66 - residual_tmp67;
         const s_t residual_tmp69 = residual_tmp29*(residual_tmp65 + residual_tmp68);
         const s_t residual_tmp70 = residual_tmp31*(s_t(2)*residual_tmp35*u2_grad_1 - residual_tmp65 - s_t(2)*residual_tmp67) + residual_tmp69;
-        const s_t residual_tmp71 = newmark_velocity_alpha*residual_tmp38 - residual_tmp14*u2_grad_0 + residual_tmp45*u2_grad_1;
+        const s_t residual_tmp71 = -residual_tmp14*u2_grad_0 + residual_tmp38*u_dt_shift + residual_tmp45*u2_grad_1;
         const s_t residual_tmp72 = residual_tmp18*residual_tmp39 - residual_tmp20*u2_grad_0 - residual_tmp35*u0_grad_1 + residual_tmp41*u2_grad_1;
         const s_t residual_tmp73 = residual_tmp42*u0_grad_1;
         const s_t residual_tmp74 = ((s_t(1) / s_t(3)))*residual_tmp60;
         const s_t residual_tmp75 = -residual_tmp44;
-        const s_t residual_tmp76 = newmark_velocity_alpha*residual_tmp44;
+        const s_t residual_tmp76 = residual_tmp44*u_dt_shift;
         const s_t residual_tmp77 = residual_tmp19*residual_tmp39;
         const s_t residual_tmp78 = residual_tmp41*u0_grad_2;
         const s_t residual_tmp79 = residual_tmp76 + residual_tmp77 - residual_tmp78;
@@ -4074,7 +4074,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp82 = residual_tmp80 - residual_tmp81;
         const s_t residual_tmp83 = residual_tmp29*(-residual_tmp79 - residual_tmp82);
         const s_t residual_tmp84 = residual_tmp31*(residual_tmp79 - s_t(2)*residual_tmp80 + s_t(2)*residual_tmp81) + residual_tmp83;
-        const s_t residual_tmp85 = newmark_velocity_alpha*residual_tmp37 + residual_tmp13*u2_grad_0 - residual_tmp45*residual_tmp6;
+        const s_t residual_tmp85 = residual_tmp13*u2_grad_0 + residual_tmp37*u_dt_shift - residual_tmp45*residual_tmp6;
         const s_t residual_tmp86 = -residual_tmp17*residual_tmp39 + residual_tmp19*u2_grad_0 + residual_tmp35*u0_grad_2 - residual_tmp41*residual_tmp6;
         const s_t residual_tmp87 = residual_tmp42*u0_grad_2;
         const s_t residual_tmp88 = residual_tmp34*(-eta_s*(-residual_tmp36*residual_tmp42 + residual_tmp44*residual_tmp46) + ((s_t(1) / s_t(3)))*residual_tmp37*residual_tmp59);
@@ -4082,22 +4082,22 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp90 = ((s_t(1) / s_t(3)))*residual_tmp59;
         const s_t residual_tmp91 = residual_tmp90*u2_grad_0;
         const s_t residual_tmp92 = residual_tmp34*(-eta_s*(residual_tmp40*residual_tmp42 - residual_tmp43*residual_tmp46) + ((s_t(1) / s_t(3)))*residual_tmp38*residual_tmp59);
-        const s_t residual_tmp93 = newmark_velocity_alpha*residual_tmp16 + residual_tmp13*u0_grad_1 - residual_tmp14*u0_grad_2;
-        const s_t residual_tmp94 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp22 - residual_tmp23 + residual_tmp24 - residual_tmp26 + residual_tmp27);
+        const s_t residual_tmp93 = residual_tmp13*u0_grad_1 - residual_tmp14*u0_grad_2 + residual_tmp16*u_dt_shift;
+        const s_t residual_tmp94 = residual_tmp30 + residual_tmp31*(-residual_tmp22 + s_t(2)*residual_tmp23 + residual_tmp24 - residual_tmp26 + residual_tmp27);
         const s_t residual_tmp95 = residual_tmp12*residual_tmp41 - residual_tmp13*residual_tmp40 + residual_tmp14*residual_tmp36 + residual_tmp16*residual_tmp45 + residual_tmp19*residual_tmp43 - residual_tmp20*residual_tmp44;
         const s_t residual_tmp96 = residual_tmp31*(s_t(2)*residual_tmp12*residual_tmp45 + s_t(2)*residual_tmp13*residual_tmp43 - residual_tmp49 - residual_tmp50 - s_t(2)*residual_tmp51 - residual_tmp54 - residual_tmp57) + residual_tmp58;
         const s_t residual_tmp97 = residual_tmp34*(-eta_s*(-residual_tmp16*residual_tmp95 + residual_tmp46*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp12*residual_tmp96);
         const s_t residual_tmp98 = residual_tmp31*(s_t(2)*residual_tmp62 - residual_tmp63 + residual_tmp64 - residual_tmp66 + residual_tmp67) + residual_tmp69;
-        const s_t residual_tmp99 = -newmark_velocity_alpha*residual_tmp40 + residual_tmp14*residual_tmp39 - residual_tmp45*u0_grad_1;
+        const s_t residual_tmp99 = residual_tmp14*residual_tmp39 - residual_tmp40*u_dt_shift - residual_tmp45*u0_grad_1;
         const s_t residual_tmp100 = -residual_tmp46*u2_grad_1 + residual_tmp95*u0_grad_1;
         const s_t residual_tmp101 = residual_tmp31*(-s_t(2)*residual_tmp76 + residual_tmp77 - residual_tmp78 + residual_tmp80 - residual_tmp81) + residual_tmp83;
-        const s_t residual_tmp102 = newmark_velocity_alpha*residual_tmp36 - residual_tmp13*residual_tmp39 + residual_tmp45*u0_grad_2;
+        const s_t residual_tmp102 = -residual_tmp13*residual_tmp39 + residual_tmp36*u_dt_shift + residual_tmp45*u0_grad_2;
         const s_t residual_tmp103 = residual_tmp95*u0_grad_2;
         const s_t residual_tmp104 = ((s_t(1) / s_t(3)))*residual_tmp44;
         const s_t residual_tmp105 = residual_tmp34*(eta_s*(residual_tmp36*residual_tmp95 + residual_tmp37*residual_tmp46) - residual_tmp104*residual_tmp96);
         const s_t residual_tmp106 = residual_tmp46*u2_grad_0;
         const s_t residual_tmp107 = residual_tmp34*(-eta_s*(-residual_tmp38*residual_tmp46 + residual_tmp40*residual_tmp95) + ((s_t(1) / s_t(3)))*residual_tmp43*residual_tmp96);
-        const s_t residual_tmp108 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp19*u0_grad_1 - residual_tmp22 - s_t(2)*residual_tmp24 - residual_tmp28);
+        const s_t residual_tmp108 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp19*u0_grad_1 - residual_tmp23 - s_t(2)*residual_tmp24 - residual_tmp28);
         const s_t residual_tmp109 = residual_tmp31*(s_t(2)*residual_tmp16*residual_tmp41 + s_t(2)*residual_tmp20*residual_tmp36 - residual_tmp47 - residual_tmp48 - residual_tmp52 - s_t(2)*residual_tmp53 - residual_tmp57) + residual_tmp58;
         const s_t residual_tmp110 = residual_tmp34*(-eta_s*(-residual_tmp12*residual_tmp95 + residual_tmp42*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp109*residual_tmp16);
         const s_t residual_tmp111 = residual_tmp31*(s_t(2)*residual_tmp20*residual_tmp39 - residual_tmp62 - s_t(2)*residual_tmp64 - residual_tmp68) + residual_tmp69;
@@ -4217,17 +4217,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp10 = residual_tmp0*u2_grad_2 + residual_tmp1*u2_grad_0 + residual_tmp2*u1_grad_0 - residual_tmp3*u0_grad_0 - residual_tmp4*u2_grad_2 - residual_tmp5*u1_grad_1 + residual_tmp7 + residual_tmp8 + residual_tmp9;
         const s_t residual_tmp11 = pow_m1(residual_tmp10);
         const s_t residual_tmp12 = -residual_tmp1 + u0_grad_2*u1_grad_1 + u0_grad_2;
-        const s_t residual_tmp13 = newmark_velocity_alpha*u2_grad_1 + u2_old_grad_1;
-        const s_t residual_tmp14 = newmark_velocity_alpha*u2_grad_2 + u2_old_grad_2;
-        const s_t residual_tmp15 = -newmark_velocity_alpha*residual_tmp7 - residual_tmp13*u1_grad_2 + residual_tmp14*residual_tmp6;
+        const s_t residual_tmp13 = u2_grad_1*u_dt_shift + u2_old_grad_1;
+        const s_t residual_tmp14 = u2_grad_2*u_dt_shift + u2_old_grad_2;
+        const s_t residual_tmp15 = -residual_tmp13*u1_grad_2 + residual_tmp14*residual_tmp6 - residual_tmp7*u_dt_shift;
         const s_t residual_tmp16 = -residual_tmp2 + u0_grad_1*u2_grad_2 + u0_grad_1;
-        const s_t residual_tmp17 = newmark_velocity_alpha*u0_grad_2 + u0_old_grad_2;
-        const s_t residual_tmp18 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
-        const s_t residual_tmp19 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
-        const s_t residual_tmp20 = newmark_velocity_alpha*u1_grad_2 + u1_old_grad_2;
+        const s_t residual_tmp17 = u0_grad_2*u_dt_shift + u0_old_grad_2;
+        const s_t residual_tmp18 = u1_grad_1*u_dt_shift + u1_old_grad_1;
+        const s_t residual_tmp19 = u0_grad_1*u_dt_shift + u0_old_grad_1;
+        const s_t residual_tmp20 = u1_grad_2*u_dt_shift + u1_old_grad_2;
         const s_t residual_tmp21 = -residual_tmp17*u0_grad_1 - residual_tmp18*u1_grad_2 + residual_tmp19*u0_grad_2 + residual_tmp20*residual_tmp6;
-        const s_t residual_tmp22 = newmark_velocity_alpha*residual_tmp12;
-        const s_t residual_tmp23 = residual_tmp18*u0_grad_2;
+        const s_t residual_tmp22 = residual_tmp18*u0_grad_2;
+        const s_t residual_tmp23 = residual_tmp12*u_dt_shift;
         const s_t residual_tmp24 = residual_tmp20*u0_grad_1;
         const s_t residual_tmp25 = residual_tmp22 + residual_tmp23 - residual_tmp24;
         const s_t residual_tmp26 = residual_tmp17*residual_tmp6;
@@ -4239,17 +4239,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp32 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp17*residual_tmp6 - residual_tmp25 - s_t(2)*residual_tmp27);
         const s_t residual_tmp33 = ((s_t(1) / s_t(3)))*residual_tmp7;
         const s_t residual_tmp34 = pow_m2(residual_tmp10);
-        const s_t residual_tmp35 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+        const s_t residual_tmp35 = u0_grad_0*u_dt_shift + u0_old_grad_0;
         const s_t residual_tmp36 = u0_grad_0*u1_grad_2 - u0_grad_2*u1_grad_0 + u1_grad_2;
         const s_t residual_tmp37 = u1_grad_0*u2_grad_2 + u1_grad_0 - u1_grad_2*u2_grad_0;
         const s_t residual_tmp38 = -u1_grad_0*u2_grad_1 + u1_grad_1*u2_grad_0 + u2_grad_0;
         const s_t residual_tmp39 = residual_tmp6 + residual_tmp9;
-        const s_t residual_tmp40 = newmark_velocity_alpha*u2_grad_0 + u2_old_grad_0;
+        const s_t residual_tmp40 = u2_grad_0*u_dt_shift + u2_old_grad_0;
         const s_t residual_tmp41 = residual_tmp12*residual_tmp35 + residual_tmp13*residual_tmp37 + residual_tmp14*residual_tmp38 - residual_tmp17*residual_tmp39 + residual_tmp19*residual_tmp36 - residual_tmp40*residual_tmp7;
         const s_t residual_tmp42 = u0_grad_0*u2_grad_1 - u0_grad_1*u2_grad_0 + u2_grad_1;
         const s_t residual_tmp43 = u0_grad_0 + s_t(1);
         const s_t residual_tmp44 = residual_tmp43 + residual_tmp8 + u2_grad_2;
-        const s_t residual_tmp45 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+        const s_t residual_tmp45 = u1_grad_0*u_dt_shift + u1_old_grad_0;
         const s_t residual_tmp46 = residual_tmp16*residual_tmp35 + residual_tmp17*residual_tmp42 + residual_tmp18*residual_tmp37 - residual_tmp19*residual_tmp44 + residual_tmp20*residual_tmp38 - residual_tmp45*residual_tmp7;
         const s_t residual_tmp47 = residual_tmp16*residual_tmp45;
         const s_t residual_tmp48 = residual_tmp20*residual_tmp42;
@@ -4266,7 +4266,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp59 = residual_tmp31*(s_t(2)*residual_tmp17*residual_tmp38 + s_t(2)*residual_tmp19*residual_tmp37 - residual_tmp55 - s_t(2)*residual_tmp56) + residual_tmp58;
         const s_t residual_tmp60 = -residual_tmp59;
         const s_t residual_tmp61 = residual_tmp34*(eta_s*(residual_tmp12*residual_tmp41 + residual_tmp16*residual_tmp46) + residual_tmp33*residual_tmp60);
-        const s_t residual_tmp62 = newmark_velocity_alpha*residual_tmp36;
+        const s_t residual_tmp62 = residual_tmp36*u_dt_shift;
         const s_t residual_tmp63 = residual_tmp20*residual_tmp43;
         const s_t residual_tmp64 = residual_tmp45*u0_grad_2;
         const s_t residual_tmp65 = residual_tmp62 + residual_tmp63 - residual_tmp64;
@@ -4275,12 +4275,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp68 = residual_tmp66 - residual_tmp67;
         const s_t residual_tmp69 = residual_tmp29*(residual_tmp65 + residual_tmp68);
         const s_t residual_tmp70 = residual_tmp31*(s_t(2)*residual_tmp35*u1_grad_2 - residual_tmp65 - s_t(2)*residual_tmp67) + residual_tmp69;
-        const s_t residual_tmp71 = newmark_velocity_alpha*residual_tmp37 - residual_tmp14*u1_grad_0 + residual_tmp40*u1_grad_2;
+        const s_t residual_tmp71 = -residual_tmp14*u1_grad_0 + residual_tmp37*u_dt_shift + residual_tmp40*u1_grad_2;
         const s_t residual_tmp72 = residual_tmp17*residual_tmp43 - residual_tmp20*u1_grad_0 - residual_tmp35*u0_grad_2 + residual_tmp45*u1_grad_2;
         const s_t residual_tmp73 = residual_tmp46*u0_grad_2;
         const s_t residual_tmp74 = ((s_t(1) / s_t(3)))*residual_tmp60;
         const s_t residual_tmp75 = -residual_tmp39;
-        const s_t residual_tmp76 = newmark_velocity_alpha*residual_tmp39;
+        const s_t residual_tmp76 = residual_tmp39*u_dt_shift;
         const s_t residual_tmp77 = residual_tmp18*residual_tmp43;
         const s_t residual_tmp78 = residual_tmp45*u0_grad_1;
         const s_t residual_tmp79 = residual_tmp76 + residual_tmp77 - residual_tmp78;
@@ -4289,7 +4289,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp82 = residual_tmp80 - residual_tmp81;
         const s_t residual_tmp83 = residual_tmp29*(-residual_tmp79 - residual_tmp82);
         const s_t residual_tmp84 = residual_tmp31*(residual_tmp79 - s_t(2)*residual_tmp80 + s_t(2)*residual_tmp81) + residual_tmp83;
-        const s_t residual_tmp85 = newmark_velocity_alpha*residual_tmp38 + residual_tmp13*u1_grad_0 - residual_tmp40*residual_tmp6;
+        const s_t residual_tmp85 = residual_tmp13*u1_grad_0 + residual_tmp38*u_dt_shift - residual_tmp40*residual_tmp6;
         const s_t residual_tmp86 = residual_tmp18*u1_grad_0 - residual_tmp19*residual_tmp43 + residual_tmp35*u0_grad_1 - residual_tmp45*residual_tmp6;
         const s_t residual_tmp87 = residual_tmp46*u0_grad_1;
         const s_t residual_tmp88 = residual_tmp34*(-eta_s*(-residual_tmp36*residual_tmp41 + residual_tmp44*residual_tmp46) + ((s_t(1) / s_t(3)))*residual_tmp37*residual_tmp59);
@@ -4297,17 +4297,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp90 = residual_tmp43*residual_tmp46;
         const s_t residual_tmp91 = residual_tmp89*u1_grad_0;
         const s_t residual_tmp92 = residual_tmp34*(-eta_s*(residual_tmp39*residual_tmp41 - residual_tmp42*residual_tmp46) + ((s_t(1) / s_t(3)))*residual_tmp38*residual_tmp59);
-        const s_t residual_tmp93 = newmark_velocity_alpha*residual_tmp16 + residual_tmp13*u0_grad_2 - residual_tmp14*u0_grad_1;
-        const s_t residual_tmp94 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp18*u0_grad_2 - residual_tmp22 - s_t(2)*residual_tmp24 - residual_tmp28);
+        const s_t residual_tmp93 = residual_tmp13*u0_grad_2 - residual_tmp14*u0_grad_1 + residual_tmp16*u_dt_shift;
+        const s_t residual_tmp94 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp18*u0_grad_2 - residual_tmp23 - s_t(2)*residual_tmp24 - residual_tmp28);
         const s_t residual_tmp95 = residual_tmp12*residual_tmp45 - residual_tmp13*residual_tmp44 + residual_tmp14*residual_tmp42 + residual_tmp16*residual_tmp40 + residual_tmp18*residual_tmp36 - residual_tmp20*residual_tmp39;
         const s_t residual_tmp96 = residual_tmp31*(s_t(2)*residual_tmp16*residual_tmp45 + s_t(2)*residual_tmp20*residual_tmp42 - residual_tmp49 - residual_tmp50 - s_t(2)*residual_tmp51 - residual_tmp54 - residual_tmp57) + residual_tmp58;
         const s_t residual_tmp97 = residual_tmp34*(-eta_s*(-residual_tmp12*residual_tmp95 + residual_tmp46*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp16*residual_tmp96);
         const s_t residual_tmp98 = residual_tmp31*(s_t(2)*residual_tmp20*residual_tmp43 - residual_tmp62 - s_t(2)*residual_tmp64 - residual_tmp68) + residual_tmp69;
-        const s_t residual_tmp99 = -newmark_velocity_alpha*residual_tmp44 + residual_tmp14*residual_tmp43 - residual_tmp40*u0_grad_2;
+        const s_t residual_tmp99 = residual_tmp14*residual_tmp43 - residual_tmp40*u0_grad_2 - residual_tmp44*u_dt_shift;
         const s_t residual_tmp100 = residual_tmp46*u1_grad_2;
         const s_t residual_tmp101 = ((s_t(1) / s_t(3)))*residual_tmp96;
         const s_t residual_tmp102 = residual_tmp31*(residual_tmp76 - s_t(2)*residual_tmp77 + s_t(2)*residual_tmp78 + residual_tmp82) + residual_tmp83;
-        const s_t residual_tmp103 = newmark_velocity_alpha*residual_tmp42 - residual_tmp13*residual_tmp43 + residual_tmp40*u0_grad_1;
+        const s_t residual_tmp103 = -residual_tmp13*residual_tmp43 + residual_tmp40*u0_grad_1 + residual_tmp42*u_dt_shift;
         const s_t residual_tmp104 = residual_tmp46*residual_tmp6;
         const s_t residual_tmp105 = residual_tmp101*u0_grad_1;
         const s_t residual_tmp106 = ((s_t(1) / s_t(3)))*residual_tmp44;
@@ -4315,7 +4315,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_he
         const s_t residual_tmp108 = residual_tmp34*(eta_s*(residual_tmp36*residual_tmp95 + residual_tmp37*residual_tmp46) + residual_tmp107*residual_tmp44);
         const s_t residual_tmp109 = residual_tmp46*u1_grad_0;
         const s_t residual_tmp110 = residual_tmp34*(-eta_s*(-residual_tmp38*residual_tmp46 + residual_tmp39*residual_tmp95) + ((s_t(1) / s_t(3)))*residual_tmp42*residual_tmp96);
-        const s_t residual_tmp111 = residual_tmp30 + residual_tmp31*(s_t(2)*residual_tmp22 - residual_tmp23 + residual_tmp24 - residual_tmp26 + residual_tmp27);
+        const s_t residual_tmp111 = residual_tmp30 + residual_tmp31*(-residual_tmp22 + s_t(2)*residual_tmp23 + residual_tmp24 - residual_tmp26 + residual_tmp27);
         const s_t residual_tmp112 = residual_tmp31*(s_t(2)*residual_tmp12*residual_tmp40 + s_t(2)*residual_tmp13*residual_tmp36 - residual_tmp47 - residual_tmp48 - residual_tmp52 - s_t(2)*residual_tmp53 - residual_tmp57) + residual_tmp58;
         const s_t residual_tmp113 = residual_tmp34*(-eta_s*(-residual_tmp16*residual_tmp95 + residual_tmp41*residual_tmp7) + ((s_t(1) / s_t(3)))*residual_tmp112*residual_tmp12);
         const s_t residual_tmp114 = residual_tmp31*(s_t(2)*residual_tmp62 - residual_tmp63 + residual_tmp64 - residual_tmp66 + residual_tmp67) + residual_tmp69;

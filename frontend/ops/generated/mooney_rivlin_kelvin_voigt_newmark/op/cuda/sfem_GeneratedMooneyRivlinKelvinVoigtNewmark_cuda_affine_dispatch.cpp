@@ -439,7 +439,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacob
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -466,7 +466,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_acti
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -493,7 +493,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_actio
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -525,7 +525,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_actio
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -561,7 +561,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobi
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -597,7 +597,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_acti
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -633,7 +633,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_actio
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -664,7 +664,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_resid
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -688,7 +688,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_ms
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -712,7 +712,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_a_mso
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -741,7 +741,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_a_mso
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -773,7 +773,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residu
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -805,7 +805,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_a_ms
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -837,7 +837,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_mso
     const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
-    const real_t newmark_velocity_alpha,
+    const real_t u_dt_shift,
     const ptrdiff_t current_stride,
     const void *const RSTR u0,
     const void *const RSTR u1,
@@ -1128,7 +1128,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_v
         const geom_t *const RSTR g_det0,
         const real_t eta_b,
         const real_t eta_s,
-        const real_t newmark_velocity_alpha,
+        const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
         const void *const RSTR u1,
@@ -1149,11 +1149,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_v
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
     case smesh::QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
     case smesh::TRI3:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
     default:
       break;
   }
@@ -1179,7 +1179,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_v
         const geom_t *const RSTR g_det0,
         const real_t eta_b,
         const real_t eta_s,
-        const real_t newmark_velocity_alpha,
+        const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
         const void *const RSTR u1,
@@ -1204,13 +1204,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_v
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::TET10:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::TET4:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
     default:
       break;
   }
@@ -1231,7 +1231,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_v
         const geom_t *const RSTR g_det0,
         const real_t eta_b,
         const real_t eta_s,
-        const real_t newmark_velocity_alpha,
+        const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
         const void *const RSTR u1,
@@ -1249,11 +1249,11 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_v
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
     case smesh::QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_quad4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
     case smesh::TRI3:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tri3_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
     default:
       break;
   }
@@ -1279,7 +1279,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_v
         const geom_t *const RSTR g_det0,
         const real_t eta_b,
         const real_t eta_s,
-        const real_t newmark_velocity_alpha,
+        const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
         const void *const RSTR u1,
@@ -1300,13 +1300,13 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_newmark_v
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_proteus_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::TET10:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet10_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::TET4:
-      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, newmark_velocity_alpha, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_newmark_viscous_tet4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
     default:
       break;
   }

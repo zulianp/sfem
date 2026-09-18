@@ -44,7 +44,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t *const RSTR previous[2 * NS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR output[2 * NS]
 ) {
   static constexpr int NC = 2;
@@ -130,11 +130,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj3) / det;
       const s_t residual_tmp0 = u1_grad_1 + s_t(1);
       const s_t residual_tmp1 = pow_m1(residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0);
-      const s_t residual_tmp2 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
-      const s_t residual_tmp3 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp2 = u0_grad_0*u_dt_shift + u0_old_grad_0;
+      const s_t residual_tmp3 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp4 = u0_grad_0 + s_t(1);
-      const s_t residual_tmp5 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
-      const s_t residual_tmp6 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp5 = u0_grad_1*u_dt_shift + u0_old_grad_1;
+      const s_t residual_tmp6 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp7 = eta_s*(-residual_tmp0*residual_tmp6 + residual_tmp2*u0_grad_1 + residual_tmp3*u1_grad_0 - residual_tmp4*residual_tmp5);
       const s_t residual_tmp8 = residual_tmp5*u1_grad_0;
       const s_t residual_tmp9 = residual_tmp0*residual_tmp2;
@@ -183,7 +183,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t previous[2 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t output[2 * NS][VS]
 ) {
   static constexpr int NC = 2;
@@ -269,11 +269,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj3) / det;
       const s_t residual_tmp0 = u1_grad_1 + s_t(1);
       const s_t residual_tmp1 = pow_m1(residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0);
-      const s_t residual_tmp2 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
-      const s_t residual_tmp3 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp2 = u0_grad_0*u_dt_shift + u0_old_grad_0;
+      const s_t residual_tmp3 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp4 = u0_grad_0 + s_t(1);
-      const s_t residual_tmp5 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
-      const s_t residual_tmp6 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp5 = u0_grad_1*u_dt_shift + u0_old_grad_1;
+      const s_t residual_tmp6 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp7 = eta_s*(-residual_tmp0*residual_tmp6 + residual_tmp2*u0_grad_1 + residual_tmp3*u1_grad_0 - residual_tmp4*residual_tmp5);
       const s_t residual_tmp8 = residual_tmp5*u1_grad_0;
       const s_t residual_tmp9 = residual_tmp0*residual_tmp2;
@@ -322,7 +322,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t *const RSTR previous[2 * NS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR output[2 * NS]
 ) {
   for (int q = 0; q < NQ; ++q) {
@@ -351,11 +351,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj3) / det;
       const s_t residual_tmp0 = u1_grad_1 + s_t(1);
       const s_t residual_tmp1 = pow_m1(residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0);
-      const s_t residual_tmp2 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
-      const s_t residual_tmp3 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp2 = u0_grad_0*u_dt_shift + u0_old_grad_0;
+      const s_t residual_tmp3 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp4 = u0_grad_0 + s_t(1);
-      const s_t residual_tmp5 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
-      const s_t residual_tmp6 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp5 = u0_grad_1*u_dt_shift + u0_old_grad_1;
+      const s_t residual_tmp6 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp7 = eta_s*(-residual_tmp0*residual_tmp6 + residual_tmp2*u0_grad_1 + residual_tmp3*u1_grad_0 - residual_tmp4*residual_tmp5);
       const s_t residual_tmp8 = residual_tmp5*u1_grad_0;
       const s_t residual_tmp9 = residual_tmp0*residual_tmp2;
@@ -402,7 +402,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t previous[2 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t output[2 * NS][VS]
 ) {
   for (int q = 0; q < NQ; ++q) {
@@ -431,11 +431,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj3) / det;
       const s_t residual_tmp0 = u1_grad_1 + s_t(1);
       const s_t residual_tmp1 = pow_m1(residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0);
-      const s_t residual_tmp2 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
-      const s_t residual_tmp3 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp2 = u0_grad_0*u_dt_shift + u0_old_grad_0;
+      const s_t residual_tmp3 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp4 = u0_grad_0 + s_t(1);
-      const s_t residual_tmp5 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
-      const s_t residual_tmp6 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+      const s_t residual_tmp5 = u0_grad_1*u_dt_shift + u0_old_grad_1;
+      const s_t residual_tmp6 = u1_grad_0*u_dt_shift + u1_old_grad_0;
       const s_t residual_tmp7 = eta_s*(-residual_tmp0*residual_tmp6 + residual_tmp2*u0_grad_1 + residual_tmp3*u1_grad_0 - residual_tmp4*residual_tmp5);
       const s_t residual_tmp8 = residual_tmp5*u1_grad_0;
       const s_t residual_tmp9 = residual_tmp0*residual_tmp2;
@@ -483,7 +483,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t *const RSTR direction[2 * NS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR output[2 * NS]
 ) {
   static constexpr int NC = 2;
@@ -604,19 +604,19 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t residual_tmp0 = u1_grad_1 + s_t(1);
       const s_t residual_tmp1 = residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0;
       const s_t residual_tmp2 = pow_m1(residual_tmp1);
-      const s_t residual_tmp3 = newmark_velocity_alpha*residual_tmp0;
-      const s_t residual_tmp4 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp3 = residual_tmp0*u_dt_shift;
+      const s_t residual_tmp4 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp5 = -residual_tmp3 + residual_tmp4;
       const s_t residual_tmp6 = eta_s*residual_tmp5;
       const s_t residual_tmp7 = eta_s*u0_old_grad_1;
-      const s_t residual_tmp8 = newmark_velocity_alpha*u0_grad_1;
+      const s_t residual_tmp8 = u0_grad_1*u_dt_shift;
       const s_t residual_tmp9 = eta_b*(s_t(2)*residual_tmp8 + u0_old_grad_1);
       const s_t residual_tmp10 = residual_tmp7 + residual_tmp9;
       const s_t residual_tmp11 = pow_m2(residual_tmp1);
-      const s_t residual_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+      const s_t residual_tmp12 = u0_grad_0*u_dt_shift + u0_old_grad_0;
       const s_t residual_tmp13 = u0_grad_0 + s_t(1);
       const s_t residual_tmp14 = residual_tmp8 + u0_old_grad_1;
-      const s_t residual_tmp15 = newmark_velocity_alpha*u1_grad_0;
+      const s_t residual_tmp15 = u1_grad_0*u_dt_shift;
       const s_t residual_tmp16 = residual_tmp15 + u1_old_grad_0;
       const s_t residual_tmp17 = eta_s*(-residual_tmp0*residual_tmp16 + residual_tmp12*u0_grad_1 - residual_tmp13*residual_tmp14 + residual_tmp4*u1_grad_0);
       const s_t residual_tmp18 = residual_tmp14*u1_grad_0;
@@ -630,7 +630,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t residual_tmp26 = -residual_tmp5;
       const s_t residual_tmp27 = -eta_s*residual_tmp26 + residual_tmp25;
       const s_t residual_tmp28 = -residual_tmp0;
-      const s_t residual_tmp29 = newmark_velocity_alpha*residual_tmp13;
+      const s_t residual_tmp29 = residual_tmp13*u_dt_shift;
       const s_t residual_tmp30 = residual_tmp12 - residual_tmp29;
       const s_t residual_tmp31 = eta_s*residual_tmp30;
       const s_t residual_tmp32 = eta_b*(s_t(2)*residual_tmp15 + u1_old_grad_0);
@@ -689,7 +689,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t direction[2 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t output[2 * NS][VS]
 ) {
   static constexpr int NC = 2;
@@ -810,19 +810,19 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t residual_tmp0 = u1_grad_1 + s_t(1);
       const s_t residual_tmp1 = residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0;
       const s_t residual_tmp2 = pow_m1(residual_tmp1);
-      const s_t residual_tmp3 = newmark_velocity_alpha*residual_tmp0;
-      const s_t residual_tmp4 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp3 = residual_tmp0*u_dt_shift;
+      const s_t residual_tmp4 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp5 = -residual_tmp3 + residual_tmp4;
       const s_t residual_tmp6 = eta_s*residual_tmp5;
       const s_t residual_tmp7 = eta_s*u0_old_grad_1;
-      const s_t residual_tmp8 = newmark_velocity_alpha*u0_grad_1;
+      const s_t residual_tmp8 = u0_grad_1*u_dt_shift;
       const s_t residual_tmp9 = eta_b*(s_t(2)*residual_tmp8 + u0_old_grad_1);
       const s_t residual_tmp10 = residual_tmp7 + residual_tmp9;
       const s_t residual_tmp11 = pow_m2(residual_tmp1);
-      const s_t residual_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+      const s_t residual_tmp12 = u0_grad_0*u_dt_shift + u0_old_grad_0;
       const s_t residual_tmp13 = u0_grad_0 + s_t(1);
       const s_t residual_tmp14 = residual_tmp8 + u0_old_grad_1;
-      const s_t residual_tmp15 = newmark_velocity_alpha*u1_grad_0;
+      const s_t residual_tmp15 = u1_grad_0*u_dt_shift;
       const s_t residual_tmp16 = residual_tmp15 + u1_old_grad_0;
       const s_t residual_tmp17 = eta_s*(-residual_tmp0*residual_tmp16 + residual_tmp12*u0_grad_1 - residual_tmp13*residual_tmp14 + residual_tmp4*u1_grad_0);
       const s_t residual_tmp18 = residual_tmp14*u1_grad_0;
@@ -836,7 +836,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t residual_tmp26 = -residual_tmp5;
       const s_t residual_tmp27 = -eta_s*residual_tmp26 + residual_tmp25;
       const s_t residual_tmp28 = -residual_tmp0;
-      const s_t residual_tmp29 = newmark_velocity_alpha*residual_tmp13;
+      const s_t residual_tmp29 = residual_tmp13*u_dt_shift;
       const s_t residual_tmp30 = residual_tmp12 - residual_tmp29;
       const s_t residual_tmp31 = eta_s*residual_tmp30;
       const s_t residual_tmp32 = eta_b*(s_t(2)*residual_tmp15 + u1_old_grad_0);
@@ -895,7 +895,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t *const RSTR direction[2 * NS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR output[2 * NS]
 ) {
   for (int q = 0; q < NQ; ++q) {
@@ -933,19 +933,19 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t residual_tmp0 = u1_grad_1 + s_t(1);
       const s_t residual_tmp1 = residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0;
       const s_t residual_tmp2 = pow_m1(residual_tmp1);
-      const s_t residual_tmp3 = newmark_velocity_alpha*residual_tmp0;
-      const s_t residual_tmp4 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp3 = residual_tmp0*u_dt_shift;
+      const s_t residual_tmp4 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp5 = -residual_tmp3 + residual_tmp4;
       const s_t residual_tmp6 = eta_s*residual_tmp5;
       const s_t residual_tmp7 = eta_s*u0_old_grad_1;
-      const s_t residual_tmp8 = newmark_velocity_alpha*u0_grad_1;
+      const s_t residual_tmp8 = u0_grad_1*u_dt_shift;
       const s_t residual_tmp9 = eta_b*(s_t(2)*residual_tmp8 + u0_old_grad_1);
       const s_t residual_tmp10 = residual_tmp7 + residual_tmp9;
       const s_t residual_tmp11 = pow_m2(residual_tmp1);
-      const s_t residual_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+      const s_t residual_tmp12 = u0_grad_0*u_dt_shift + u0_old_grad_0;
       const s_t residual_tmp13 = u0_grad_0 + s_t(1);
       const s_t residual_tmp14 = residual_tmp8 + u0_old_grad_1;
-      const s_t residual_tmp15 = newmark_velocity_alpha*u1_grad_0;
+      const s_t residual_tmp15 = u1_grad_0*u_dt_shift;
       const s_t residual_tmp16 = residual_tmp15 + u1_old_grad_0;
       const s_t residual_tmp17 = eta_s*(-residual_tmp0*residual_tmp16 + residual_tmp12*u0_grad_1 - residual_tmp13*residual_tmp14 + residual_tmp4*u1_grad_0);
       const s_t residual_tmp18 = residual_tmp14*u1_grad_0;
@@ -959,7 +959,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t residual_tmp26 = -residual_tmp5;
       const s_t residual_tmp27 = -eta_s*residual_tmp26 + residual_tmp25;
       const s_t residual_tmp28 = -residual_tmp0;
-      const s_t residual_tmp29 = newmark_velocity_alpha*residual_tmp13;
+      const s_t residual_tmp29 = residual_tmp13*u_dt_shift;
       const s_t residual_tmp30 = residual_tmp12 - residual_tmp29;
       const s_t residual_tmp31 = eta_s*residual_tmp30;
       const s_t residual_tmp32 = eta_b*(s_t(2)*residual_tmp15 + u1_old_grad_0);
@@ -1016,7 +1016,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t direction[2 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t output[2 * NS][VS]
 ) {
   for (int q = 0; q < NQ; ++q) {
@@ -1054,19 +1054,19 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t residual_tmp0 = u1_grad_1 + s_t(1);
       const s_t residual_tmp1 = residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0;
       const s_t residual_tmp2 = pow_m1(residual_tmp1);
-      const s_t residual_tmp3 = newmark_velocity_alpha*residual_tmp0;
-      const s_t residual_tmp4 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+      const s_t residual_tmp3 = residual_tmp0*u_dt_shift;
+      const s_t residual_tmp4 = u1_grad_1*u_dt_shift + u1_old_grad_1;
       const s_t residual_tmp5 = -residual_tmp3 + residual_tmp4;
       const s_t residual_tmp6 = eta_s*residual_tmp5;
       const s_t residual_tmp7 = eta_s*u0_old_grad_1;
-      const s_t residual_tmp8 = newmark_velocity_alpha*u0_grad_1;
+      const s_t residual_tmp8 = u0_grad_1*u_dt_shift;
       const s_t residual_tmp9 = eta_b*(s_t(2)*residual_tmp8 + u0_old_grad_1);
       const s_t residual_tmp10 = residual_tmp7 + residual_tmp9;
       const s_t residual_tmp11 = pow_m2(residual_tmp1);
-      const s_t residual_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+      const s_t residual_tmp12 = u0_grad_0*u_dt_shift + u0_old_grad_0;
       const s_t residual_tmp13 = u0_grad_0 + s_t(1);
       const s_t residual_tmp14 = residual_tmp8 + u0_old_grad_1;
-      const s_t residual_tmp15 = newmark_velocity_alpha*u1_grad_0;
+      const s_t residual_tmp15 = u1_grad_0*u_dt_shift;
       const s_t residual_tmp16 = residual_tmp15 + u1_old_grad_0;
       const s_t residual_tmp17 = eta_s*(-residual_tmp0*residual_tmp16 + residual_tmp12*u0_grad_1 - residual_tmp13*residual_tmp14 + residual_tmp4*u1_grad_0);
       const s_t residual_tmp18 = residual_tmp14*u1_grad_0;
@@ -1080,7 +1080,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
       const s_t residual_tmp26 = -residual_tmp5;
       const s_t residual_tmp27 = -eta_s*residual_tmp26 + residual_tmp25;
       const s_t residual_tmp28 = -residual_tmp0;
-      const s_t residual_tmp29 = newmark_velocity_alpha*residual_tmp13;
+      const s_t residual_tmp29 = residual_tmp13*u_dt_shift;
       const s_t residual_tmp30 = residual_tmp12 - residual_tmp29;
       const s_t residual_tmp31 = eta_s*residual_tmp30;
       const s_t residual_tmp32 = eta_b*(s_t(2)*residual_tmp15 + u1_old_grad_0);
@@ -1132,7 +1132,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t previous[2 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR element_matrix
 ) {
   const int q = 0;
@@ -1169,19 +1169,19 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t element_matrix_tmp1 = element_matrix_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0;
     const s_t element_matrix_tmp2 = pow_m1(element_matrix_tmp1);
     const s_t element_matrix_tmp3 = eta_s*u0_old_grad_1;
-    const s_t element_matrix_tmp4 = element_matrix_tmp0*newmark_velocity_alpha;
-    const s_t element_matrix_tmp5 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+    const s_t element_matrix_tmp4 = element_matrix_tmp0*u_dt_shift;
+    const s_t element_matrix_tmp5 = u1_grad_1*u_dt_shift + u1_old_grad_1;
     const s_t element_matrix_tmp6 = eta_b*(-element_matrix_tmp4 - element_matrix_tmp5);
     const s_t element_matrix_tmp7 = -element_matrix_tmp4 + element_matrix_tmp5;
     const s_t element_matrix_tmp8 = -element_matrix_tmp7;
     const s_t element_matrix_tmp9 = element_matrix_tmp6 - element_matrix_tmp8*eta_s;
     const s_t element_matrix_tmp10 = -element_matrix_tmp0;
     const s_t element_matrix_tmp11 = pow_m2(element_matrix_tmp1);
-    const s_t element_matrix_tmp12 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+    const s_t element_matrix_tmp12 = u0_grad_0*u_dt_shift + u0_old_grad_0;
     const s_t element_matrix_tmp13 = u0_grad_0 + s_t(1);
-    const s_t element_matrix_tmp14 = newmark_velocity_alpha*u0_grad_1;
+    const s_t element_matrix_tmp14 = u0_grad_1*u_dt_shift;
     const s_t element_matrix_tmp15 = element_matrix_tmp14 + u0_old_grad_1;
-    const s_t element_matrix_tmp16 = newmark_velocity_alpha*u1_grad_0;
+    const s_t element_matrix_tmp16 = u1_grad_0*u_dt_shift;
     const s_t element_matrix_tmp17 = element_matrix_tmp16 + u1_old_grad_0;
     const s_t element_matrix_tmp18 = eta_s*(-element_matrix_tmp0*element_matrix_tmp17 + element_matrix_tmp12*u0_grad_1 - element_matrix_tmp13*element_matrix_tmp15 + element_matrix_tmp5*u1_grad_0);
     const s_t element_matrix_tmp19 = element_matrix_tmp15*u1_grad_0;
@@ -1192,7 +1192,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t element_matrix_tmp24 = element_matrix_tmp22 - element_matrix_tmp23;
     const s_t element_matrix_tmp25 = element_matrix_tmp11*(-element_matrix_tmp0*element_matrix_tmp24 + element_matrix_tmp18*u0_grad_1);
     const s_t element_matrix_tmp26 = element_matrix_tmp10*element_matrix_tmp25 + element_matrix_tmp2*(-element_matrix_tmp0*element_matrix_tmp9 - element_matrix_tmp3*u0_grad_1);
-    const s_t element_matrix_tmp27 = element_matrix_tmp13*newmark_velocity_alpha;
+    const s_t element_matrix_tmp27 = element_matrix_tmp13*u_dt_shift;
     const s_t element_matrix_tmp28 = element_matrix_tmp12 - element_matrix_tmp27;
     const s_t element_matrix_tmp29 = element_matrix_tmp28*eta_s;
     const s_t element_matrix_tmp30 = eta_b*(s_t(2)*element_matrix_tmp16 + u1_old_grad_0);
@@ -1305,7 +1305,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
     const s_t previous[2 * NS][VS],
     const s_t eta_b,
     const s_t eta_s,
-    const s_t newmark_velocity_alpha,
+    const s_t u_dt_shift,
     s_t *const RSTR element_matrix
 ) {
   static constexpr int NC = 2;
@@ -1399,17 +1399,17 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
         const s_t residual_tmp1 = residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0;
         const s_t residual_tmp2 = pow_m1(residual_tmp1);
         const s_t residual_tmp3 = eta_s*u0_grad_1;
-        const s_t residual_tmp4 = newmark_velocity_alpha*residual_tmp0;
-        const s_t residual_tmp5 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
+        const s_t residual_tmp4 = residual_tmp0*u_dt_shift;
+        const s_t residual_tmp5 = u1_grad_1*u_dt_shift + u1_old_grad_1;
         const s_t residual_tmp6 = eta_b*(-residual_tmp4 - residual_tmp5);
         const s_t residual_tmp7 = residual_tmp4 - residual_tmp5;
         const s_t residual_tmp8 = -eta_s*residual_tmp7 + residual_tmp6;
         const s_t residual_tmp9 = -residual_tmp0;
         const s_t residual_tmp10 = pow_m2(residual_tmp1);
-        const s_t residual_tmp11 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+        const s_t residual_tmp11 = u0_grad_0*u_dt_shift + u0_old_grad_0;
         const s_t residual_tmp12 = u0_grad_0 + s_t(1);
-        const s_t residual_tmp13 = newmark_velocity_alpha*u0_grad_1 + u0_old_grad_1;
-        const s_t residual_tmp14 = newmark_velocity_alpha*u1_grad_0;
+        const s_t residual_tmp13 = u0_grad_1*u_dt_shift + u0_old_grad_1;
+        const s_t residual_tmp14 = u1_grad_0*u_dt_shift;
         const s_t residual_tmp15 = residual_tmp14 + u1_old_grad_0;
         const s_t residual_tmp16 = eta_s*(-residual_tmp0*residual_tmp15 + residual_tmp11*u0_grad_1 - residual_tmp12*residual_tmp13 + residual_tmp5*u1_grad_0);
         const s_t residual_tmp17 = residual_tmp13*u1_grad_0;
@@ -1419,7 +1419,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
         const s_t residual_tmp21 = eta_s*(-residual_tmp17 + residual_tmp18 + residual_tmp19);
         const s_t residual_tmp22 = residual_tmp20 - residual_tmp21;
         const s_t residual_tmp23 = residual_tmp10*(-residual_tmp0*residual_tmp22 + residual_tmp16*u0_grad_1);
-        const s_t residual_tmp24 = -newmark_velocity_alpha*residual_tmp12 + residual_tmp11;
+        const s_t residual_tmp24 = residual_tmp11 - residual_tmp12*u_dt_shift;
         const s_t residual_tmp25 = eta_b*(s_t(2)*residual_tmp14 + u1_old_grad_0);
         const s_t residual_tmp26 = -eta_s*u1_old_grad_0 + residual_tmp25;
         const s_t residual_tmp27 = eta_s*residual_tmp12;
@@ -1482,18 +1482,18 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
         const s_t residual_tmp0 = u1_grad_1 + s_t(1);
         const s_t residual_tmp1 = residual_tmp0 + u0_grad_0*u1_grad_1 + u0_grad_0 - u0_grad_1*u1_grad_0;
         const s_t residual_tmp2 = pow_m1(residual_tmp1);
-        const s_t residual_tmp3 = newmark_velocity_alpha*u1_grad_1 + u1_old_grad_1;
-        const s_t residual_tmp4 = -newmark_velocity_alpha*residual_tmp0 + residual_tmp3;
+        const s_t residual_tmp3 = u1_grad_1*u_dt_shift + u1_old_grad_1;
+        const s_t residual_tmp4 = -residual_tmp0*u_dt_shift + residual_tmp3;
         const s_t residual_tmp5 = eta_s*u0_grad_1;
         const s_t residual_tmp6 = eta_s*u0_old_grad_1;
-        const s_t residual_tmp7 = newmark_velocity_alpha*u0_grad_1;
+        const s_t residual_tmp7 = u0_grad_1*u_dt_shift;
         const s_t residual_tmp8 = eta_b*(s_t(2)*residual_tmp7 + u0_old_grad_1);
         const s_t residual_tmp9 = residual_tmp6 + residual_tmp8;
         const s_t residual_tmp10 = pow_m2(residual_tmp1);
-        const s_t residual_tmp11 = newmark_velocity_alpha*u0_grad_0 + u0_old_grad_0;
+        const s_t residual_tmp11 = u0_grad_0*u_dt_shift + u0_old_grad_0;
         const s_t residual_tmp12 = u0_grad_0 + s_t(1);
         const s_t residual_tmp13 = residual_tmp7 + u0_old_grad_1;
-        const s_t residual_tmp14 = newmark_velocity_alpha*u1_grad_0 + u1_old_grad_0;
+        const s_t residual_tmp14 = u1_grad_0*u_dt_shift + u1_old_grad_0;
         const s_t residual_tmp15 = eta_s*(-residual_tmp0*residual_tmp14 + residual_tmp11*u0_grad_1 - residual_tmp12*residual_tmp13 + residual_tmp3*u1_grad_0);
         const s_t residual_tmp16 = residual_tmp13*u1_grad_0;
         const s_t residual_tmp17 = residual_tmp0*residual_tmp11;
@@ -1502,7 +1502,7 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_newmark_visc
         const s_t residual_tmp20 = eta_s*(-residual_tmp16 + residual_tmp17 + residual_tmp18);
         const s_t residual_tmp21 = residual_tmp19 - residual_tmp20;
         const s_t residual_tmp22 = residual_tmp10*(-residual_tmp0*residual_tmp21 + residual_tmp15*u0_grad_1);
-        const s_t residual_tmp23 = newmark_velocity_alpha*residual_tmp12;
+        const s_t residual_tmp23 = residual_tmp12*u_dt_shift;
         const s_t residual_tmp24 = residual_tmp11 - residual_tmp23;
         const s_t residual_tmp25 = eta_b*(-residual_tmp11 - residual_tmp23);
         const s_t residual_tmp26 = -eta_s*residual_tmp24 + residual_tmp25;

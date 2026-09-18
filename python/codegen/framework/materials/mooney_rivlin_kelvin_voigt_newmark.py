@@ -10,7 +10,6 @@ mu = gen.material_parameter("mu")
 lmbda = gen.material_parameter("lmbda")
 eta_s = gen.material_parameter("eta_s")
 eta_b = gen.material_parameter("eta_b")
-newmark_velocity_alpha = gen.material_parameter("newmark_velocity_alpha")
 element = gen.VectorElement("Lagrange", degree=1)
 V = gen.FunctionSpace(element)
 
@@ -31,11 +30,16 @@ def _mooney_rivlin_energy(F, dim):
 
 def _kelvin_voigt_residual(u, v, dim):
     grad_u = gen.grad(u)
-    grad_z = gen.grad(gen.old(u))
     F = gen.Identity(dim) + grad_u
     J = gen.det(F)
     Finv = gen.inv(F)
-    Fdot = newmark_velocity_alpha * grad_u + grad_z
+    # The strain rate, and no integration scheme.  `gen.dt` carries the time
+    # derivative as a weighted sum a `TimeScheme` fills in at run time, so this
+    # form is the Kelvin-Voigt material and nothing about how it is stepped.
+    # It also has to reach here rather than ride an additive inertia operator:
+    # `Fdot` enters through `Finv` and `J`, so the rate is inside the
+    # constitutive law, not beside it.
+    Fdot = gen.grad(gen.dt(u))
     L = Fdot * Finv
     D = sp.Rational(1, 2) * (L + L.T)
     trD = sum(D[i, i] for i in range(dim))
@@ -84,7 +88,7 @@ material = gen.CodeGenerator(
         ("mu", 1.0),
         ("eta_s", 0.1),
         ("eta_b", 0.0),
-        ("newmark_velocity_alpha", 1.0),
+        ("u_dt_shift", 1.0),
     ),
     # Off because of what it costs to generate, now measured per element rather
     # than as one number: TET4 74 s, HEX8 1380 s, TET10 1456 s.  The two curved

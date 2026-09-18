@@ -58,7 +58,7 @@ namespace {
         set_material_parameter(op, mesh, "lmbda", lambda);
         set_material_parameter(op, mesh, "eta_s", eta_s);
         set_material_parameter(op, mesh, "eta_b", eta_b);
-        set_material_parameter(op, mesh, "newmark_velocity_alpha", alpha_v);
+        set_material_parameter(op, mesh, "u_dt_shift", alpha_v);
 
         const ptrdiff_t ndofs    = space->n_dofs();
         auto            current  = sfem::create_host_buffer<real_t>(ndofs);
@@ -152,7 +152,7 @@ namespace {
         set_material_parameter(op, mesh, "lmbda", lambda_value);
         set_material_parameter(op, mesh, "eta_s", eta_s_value);
         set_material_parameter(op, mesh, "eta_b", eta_b_value);
-        set_material_parameter(op, mesh, "newmark_velocity_alpha", 3.25);
+        set_material_parameter(op, mesh, "u_dt_shift", 3.25);
         function->add_operator(op);
 
         const ptrdiff_t ndofs    = space->n_dofs();

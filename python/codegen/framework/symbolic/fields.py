@@ -469,6 +469,121 @@ class PreviousFunction(SymbolicArgument):
         super().__init__(field, PREVIOUS_ARGUMENT, name or "%s_old" % field.name)
 
 
+def time_rate_shift_name(field):
+    """What a scheme's weight on the unknown is called, spelled in one place.
+
+    Shaped like `%s_old`: the suffix follows the field, so a coupled system gets
+    one shift per field rather than one for the system.
+    """
+    return "%s_dt_shift" % field.name
+
+
+def is_time_rate_shift(name):
+    """Whether a material constant is a rate's shift, asked of the spelling.
+
+    `time_rate_shift_name` is the only thing that produces this suffix, so the
+    question has one owner and nothing downstream matches a name of its own.
+    """
+    return str(name).endswith("_dt_shift")
+
+
+class TimeRate:
+    """A field's time derivative, carried as a sum rather than discretised.
+
+    `dt(u)` is a symbol in the material's form and stays one through the form
+    layer, which is what keeps the integration scheme out of the material: the
+    form says what the physics is, and the weights that make it a time step
+    arrive at run time.  The discretisation is held as `(weight, argument)`
+    pairs summed on use --
+
+        u_dot = shift * u + 1 * u_old
+
+    -- so a one-step scheme is two terms, and the shift and the history vector
+    are exactly the two things a `TimeScheme` has to supply.  PETSc's TS calls
+    the first of those the shift and forms `sigma * F_u_dot + F_u` from it; the
+    same Jacobian falls out here with nothing added, because `shift` is an
+    ordinary scalar coefficient and the chain rule runs through it.
+
+    Summing a sequence rather than adding two named members is what leaves room
+    for a stage-coupled Runge-Kutta scheme, whose rate at stage `i` is
+    `sum_j a_ij * k_j`: more pairs, the same consumers.
+
+    The history argument is literally the one `old(u)` builds.  That is
+    deliberate -- the emitted symbols stay `u_old` and `u_old_grad`, so the
+    kernel ABI learns no new name and a first-order rate needs no new data
+    stream.  It also means the two spellings must not be mixed on one field:
+    under `old()` that buffer holds the previous state, under `dt()` it holds a
+    combination of the whole history, and a form reading both would be reading
+    one buffer two ways.  Nothing here detects that, because after construction
+    the two are the same object; it is a property of what the caller fills the
+    buffer with.
+    """
+
+    __slots__ = ("field", "shift", "previous", "terms")
+
+    def __init__(self, field, name=None):
+        if not isinstance(field, SymbolicField):
+            raise TypeError("time_rate(...) requires a symbolic field")
+        self.field = field
+        self.shift = sp.Symbol(time_rate_shift_name(field))
+        self.previous = previous_function(field, name)
+        self.terms = ((self.shift, field), (sp.Integer(1), self.previous))
+
+    @property
+    def shape(self):
+        return self.field.shape
+
+    @property
+    def rank(self):
+        return self.field.rank
+
+    @property
+    def is_scalar(self):
+        return self.field.is_scalar
+
+    @property
+    def is_vector(self):
+        return self.field.is_vector
+
+    @property
+    def is_tensor(self):
+        return self.field.is_tensor
+
+    @property
+    def value(self):
+        return _sum_time_rate_terms(self.terms, lambda argument: argument.value)
+
+    @property
+    def free_symbols(self):
+        symbols = {self.shift}
+        for _weight, argument in self.terms:
+            symbols |= set(argument.free_symbols)
+        return symbols
+
+    def _sympy_(self):
+        if not self.is_scalar:
+            raise TypeError("only scalar time rates coerce to SymPy expressions")
+        return self.value
+
+
+def _sum_time_rate_terms(terms, of_argument):
+    """Fold the weighted terms.
+
+    Written as a fold rather than `sum(...)`, whose zero start is an integer and
+    does not add to a `Matrix` -- and a rate of a vector field is a Matrix.
+    """
+    terms = iter(terms)
+    weight, argument = next(terms)
+    total = weight * of_argument(argument)
+    for weight, argument in terms:
+        total = total + weight * of_argument(argument)
+    return total
+
+
+def time_rate(field, name=None):
+    return TimeRate(field, name)
+
+
 def scalar_field(name, family="", metadata=None):
     return ScalarField(name, family, metadata)
 
@@ -639,6 +754,10 @@ __all__ = [
     "TensorField",
     "PreviousFunction",
     "TestFunction",
+    "TimeRate",
+    "is_time_rate_shift",
+    "time_rate",
+    "time_rate_shift_name",
     "TRIAL_ARGUMENT",
     "TrialFunction",
     "VectorField",
