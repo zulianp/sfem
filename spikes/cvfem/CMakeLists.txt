@@ -240,6 +240,20 @@ add_test(NAME cvfem_cutback
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_cutback_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
 
+# The transient multigrid/Vanka path, which nothing else exercised: cvfem_restart and
+# cvfem_cutback both pin SFEM_GMG=0 SFEM_PRECOND=direct, so every transient number this spike
+# gated came out of the dense coarse solve. A preconditioner decides how a system is solved and
+# never what it solves, so the V-cycle must reach the same answer as the direct arm.
+#
+# N=4 at refine level 2 is the cheapest configuration that is both semi-structured (SFEM_GMG needs
+# a refine level > 1) and carries the pump's exact swept-volume identity. The direct arm costs
+# 36 s there against 1 s for multigrid; at N=8 the same arm costs 689 s, the dense coarse
+# factorisation being cubic in a problem that grew 8x under refinement.
+add_test(NAME cvfem_mg_transient
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_mg_transient_test.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
+set_tests_properties(cvfem_mg_transient PROPERTIES TIMEOUT 300)
+
 # ------------------------------------------------ generated headers match their generators
 #
 # The three headers under src/generated/ and src/cases/ are committed artifacts compiled as
@@ -279,6 +293,31 @@ if(CVFEM_PYTHON)
     endif()
 else()
     message(STATUS "cvfem: generator checks skipped -- no python found")
+endif()
+
+# The temporal order of the scheme, end to end through the driver. cvfem_ss_transient_test proves
+# the BDF term is first- and second-order in isolation; it cannot see the Newton loop, FGMRES, the
+# preconditioner, the time-varying boundary condition or the pressure gauge, any of which can cap
+# the order while the term stays perfect.
+#
+# Guarded on numpy for the same reason the generator checks are guarded on sympy: the fit compares
+# the solution FIELDS the restart writer drops, and a test that silently passed because numpy was
+# missing would be worse than no test.
+#
+# Labelled slow -- it is three solves per scheme, measured at 121.6 s under ctest, and together
+# with cvfem_mg_transient it adds about 152 s to a ~570 s suite. `ctest -LE slow` excludes it.
+if(CVFEM_PYTHON)
+    execute_process(COMMAND ${CVFEM_PYTHON} -c "import numpy"
+                    RESULT_VARIABLE _cvfem_no_numpy OUTPUT_QUIET ERROR_QUIET)
+    if(_cvfem_no_numpy EQUAL 0)
+        add_test(NAME cvfem_richardson
+                 COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_richardson_test.sh
+                         $<TARGET_FILE:cvfem_hex8_ns_ssgmg> ${CVFEM_PYTHON})
+        set_tests_properties(cvfem_richardson PROPERTIES TIMEOUT 900 LABELS slow)
+        message(STATUS "cvfem: temporal-order gate enabled (${CVFEM_PYTHON})")
+    else()
+        message(STATUS "cvfem: temporal-order gate skipped -- ${CVFEM_PYTHON} has no numpy")
+    endif()
 endif()
 
 # Guards the guards, and so is the one target that must not go through
