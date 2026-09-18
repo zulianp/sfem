@@ -99,27 +99,36 @@ namespace sfem {
         impl_->inertia->set_alpha(impl_->alpha_a);
     }
 
-    void NewmarkScheme::advance(const real_t *const x) {
-        SFEM_TRACE_SCOPE("NewmarkScheme::advance");
-
+    void NewmarkScheme::reconstruct(const real_t *const x,
+                                    real_t *const       velocity,
+                                    real_t *const       acceleration) const {
         const ptrdiff_t                   ndofs   = impl_->space->n_dofs();
         const real_t *const SFEM_RESTRICT u_hat   = impl_->inertia->u_hat()->data();
         const real_t *const SFEM_RESTRICT z       = impl_->z->data();
-        real_t *const SFEM_RESTRICT       u_n     = impl_->u_n->data();
-        real_t *const SFEM_RESTRICT       v_n     = impl_->v_n->data();
-        real_t *const SFEM_RESTRICT       a_n     = impl_->a_n->data();
         const real_t                      alpha_a = impl_->alpha_a;
         const real_t                      shift   = impl_->shift;
 
-        // Reconstruct and rotate in one pass: the new velocity and acceleration
-        // are read from `x`, `u_hat` and `z`, none of which is the state being
-        // overwritten.
 #pragma omp parallel for
         for (ptrdiff_t i = 0; i < ndofs; ++i) {
             const real_t x_i = x[i];
-            a_n[i]           = alpha_a * (x_i - u_hat[i]);
-            v_n[i]           = shift * x_i + z[i];
-            u_n[i]           = x_i;
+            acceleration[i]  = alpha_a * (x_i - u_hat[i]);
+            velocity[i]      = shift * x_i + z[i];
+        }
+    }
+
+    void NewmarkScheme::advance(const real_t *const x) {
+        SFEM_TRACE_SCOPE("NewmarkScheme::advance");
+
+        // Reconstruct into the carried state and then take the state itself.
+        // `u_hat` and `z` are the step's, not the iterate's, so neither is the
+        // buffer being overwritten and the order of the two is free.
+        reconstruct(x, impl_->v_n->data(), impl_->a_n->data());
+
+        const ptrdiff_t             ndofs = impl_->space->n_dofs();
+        real_t *const SFEM_RESTRICT u_n   = impl_->u_n->data();
+#pragma omp parallel for
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            u_n[i] = x[i];
         }
     }
 

@@ -8,6 +8,7 @@
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
+#include "sfem_NewmarkScheme.hpp"
 #include "smesh_env.hpp"
 
 #include "sfem_ssgmg.hpp"
@@ -84,19 +85,25 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
         printf("Refine level: %d\n", SFEM_ELEMENT_REFINE_LEVEL);
     }
 
-    // Create state vectors
-    auto displacement = sfem::create_buffer<real_t>(ndofs, es);
-    auto velocity     = sfem::create_buffer<real_t>(ndofs, es);
-    auto acceleration = sfem::create_buffer<real_t>(ndofs, es);
+    // The scheme carries the state between steps.  Newmark's algebra used to
+    // be written out here in BLAS calls with beta = 1/4 and gamma = 1/2 folded
+    // into literal 4/(dt*dt) and 2/dt; `NewmarkScheme` is the same method with
+    // those two named, and the hand-written `KelvinVoigtNewmark` operator below
+    // is untouched -- it still takes the velocity and the acceleration as
+    // fields, and still gets them at every Newton iterate.
+    auto scheme = std::make_shared<sfem::NewmarkScheme>(fs);
+    if (scheme->initialize() != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+    }
+    auto displacement = scheme->state();
+    auto velocity     = scheme->velocity();
+    auto acceleration = scheme->acceleration();
     auto increment    = sfem::create_buffer<real_t>(ndofs, es);
     auto temp_vel     = sfem::create_buffer<real_t>(ndofs, es);
     auto solution     = sfem::create_buffer<real_t>(ndofs, es);
     auto g            = sfem::create_buffer<real_t>(ndofs, es);
 
     // Initialize all buffers to zero
-    blas->zeros(ndofs, displacement->data());
-    blas->zeros(ndofs, velocity->data());
-    blas->zeros(ndofs, acceleration->data());
     blas->zeros(ndofs, solution->data());
     blas->zeros(ndofs, increment->data());
     blas->zeros(ndofs, temp_vel->data());
@@ -185,18 +192,16 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
 
     // Time loop
     while (t < T) {
-        for (int k = 0; k < nliter; k++) {
-            // Use increment as temp buffer
-            blas->zeros(ndofs, increment->data());
-            blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
-            blas->axpy(ndofs, -dt, velocity->data(), increment->data());
-            blas->scal(ndofs, 4 / (dt * dt), increment->data());
-            blas->axpy(ndofs, -1, acceleration->data(), increment->data());
+        // Build the step's predictor and history once, from the state carried
+        // out of the last step.  Everything the Newton loop below reads is
+        // fixed here and does not move under it.
+        scheme->begin_step(t, dt);
 
-            blas->zeros(ndofs, temp_vel->data());
-            blas->copy(ndofs, increment->data(), temp_vel->data());
-            blas->zaxpby(ndofs, dt / 2, temp_vel->data(), dt / 2, acceleration->data(), temp_vel->data());
-            blas->axpy(ndofs, 1, velocity->data(), temp_vel->data());
+        for (int k = 0; k < nliter; k++) {
+            // The velocity and acceleration Newmark implies at this iterate.
+            // The operator takes them as fields, so they are refreshed every
+            // Newton iteration rather than once per step.
+            scheme->reconstruct(solution->data(), temp_vel->data(), increment->data());
 
             blas->zeros(ndofs, g->data());
             // Adds material gradient computation to g
@@ -207,21 +212,9 @@ int solve_kelvin_voigt_newmark(const std::shared_ptr<sfem::Communicator> &comm, 
             blas->axpy(ndofs, -1, increment->data(), solution->data());
         }
 
-        ////////////////////////////////
-        // Update all quantities
-        ////////////////////////////////
-
-        // acceleration
-        blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
-        blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
-        blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
-
-        // velocity
-        blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
-        blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
-
-        // displacement
-        blas->copy(ndofs, solution->data(), displacement->data());
+        // Close the step: reconstruct the velocity and acceleration at the
+        // solution and rotate the state.
+        scheme->advance(solution->data());
 
         t += dt;
         if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
