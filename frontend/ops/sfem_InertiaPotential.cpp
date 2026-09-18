@@ -1,4 +1,4 @@
-#include "sfem_NewmarkInertiaPotential.hpp"
+#include "sfem_InertiaPotential.hpp"
 
 #include "sfem_FunctionSpace.hpp"
 #include "sfem_LumpedMass.hpp"
@@ -13,7 +13,7 @@
 
 namespace sfem {
 
-    class NewmarkInertiaPotential::Impl {
+    class InertiaPotential::Impl {
     public:
         std::shared_ptr<FunctionSpace>  space;
         std::shared_ptr<Buffer<real_t>> mass;
@@ -25,13 +25,13 @@ namespace sfem {
 
         int ensure_state() const {
             if (!mass || !u_hat) {
-                SFEM_ERROR("NewmarkInertiaPotential: mass and u_hat must be initialized");
+                SFEM_ERROR("InertiaPotential: mass and u_hat must be initialized");
                 return SFEM_FAILURE;
             }
 
             const ptrdiff_t ndofs = space->n_dofs();
             if (mass->size() != static_cast<size_t>(ndofs) || u_hat->size() != static_cast<size_t>(ndofs)) {
-                SFEM_ERROR("NewmarkInertiaPotential: incompatible mass/u_hat sizes");
+                SFEM_ERROR("InertiaPotential: incompatible mass/u_hat sizes");
                 return SFEM_FAILURE;
             }
 
@@ -39,21 +39,21 @@ namespace sfem {
         }
     };
 
-    std::unique_ptr<Op> NewmarkInertiaPotential::create(const std::shared_ptr<FunctionSpace> &space) {
-        return std::make_unique<NewmarkInertiaPotential>(space);
+    std::unique_ptr<Op> InertiaPotential::create(const std::shared_ptr<FunctionSpace> &space) {
+        return std::make_unique<InertiaPotential>(space);
     }
 
-    NewmarkInertiaPotential::NewmarkInertiaPotential(const std::shared_ptr<FunctionSpace> &space)
+    InertiaPotential::InertiaPotential(const std::shared_ptr<FunctionSpace> &space)
         : impl_(std::make_unique<Impl>(space)) {}
 
-    NewmarkInertiaPotential::~NewmarkInertiaPotential() = default;
+    InertiaPotential::~InertiaPotential() = default;
 
-    ptrdiff_t NewmarkInertiaPotential::n_dofs_domain() const { return impl_->space->n_dofs(); }
+    ptrdiff_t InertiaPotential::n_dofs_domain() const { return impl_->space->n_dofs(); }
 
-    ptrdiff_t NewmarkInertiaPotential::n_dofs_image() const { return impl_->space->n_dofs(); }
+    ptrdiff_t InertiaPotential::n_dofs_image() const { return impl_->space->n_dofs(); }
 
-    int NewmarkInertiaPotential::initialize(const std::vector<std::string> &block_names) {
-        SFEM_TRACE_SCOPE("NewmarkInertiaPotential::initialize");
+    int InertiaPotential::initialize(const std::vector<std::string> &block_names) {
+        SFEM_TRACE_SCOPE("InertiaPotential::initialize");
 
         const ptrdiff_t ndofs = impl_->space->n_dofs();
 
@@ -85,11 +85,11 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int NewmarkInertiaPotential::hessian_crs(const real_t *const,
+    int InertiaPotential::hessian_crs(const real_t *const,
                                           const count_t *const SFEM_RESTRICT rowptr,
                                           const idx_t *const SFEM_RESTRICT   colidx,
                                           real_t *const SFEM_RESTRICT        values) {
-        SFEM_TRACE_SCOPE("NewmarkInertiaPotential::hessian_crs");
+        SFEM_TRACE_SCOPE("InertiaPotential::hessian_crs");
 
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
@@ -114,11 +114,11 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int NewmarkInertiaPotential::hessian_bsr(const real_t *const,
+    int InertiaPotential::hessian_bsr(const real_t *const,
                                           const count_t *const SFEM_RESTRICT rowptr,
                                           const idx_t *const SFEM_RESTRICT   colidx,
                                           real_t *const SFEM_RESTRICT        values) {
-        SFEM_TRACE_SCOPE("NewmarkInertiaPotential::hessian_bsr");
+        SFEM_TRACE_SCOPE("InertiaPotential::hessian_bsr");
 
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
@@ -148,8 +148,8 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int NewmarkInertiaPotential::hessian_diag(const real_t *const, real_t *const SFEM_RESTRICT values) {
-        SFEM_TRACE_SCOPE("NewmarkInertiaPotential::hessian_diag");
+    int InertiaPotential::hessian_diag(const real_t *const, real_t *const SFEM_RESTRICT values) {
+        SFEM_TRACE_SCOPE("InertiaPotential::hessian_diag");
 
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
@@ -167,8 +167,8 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int NewmarkInertiaPotential::gradient(const real_t *const SFEM_RESTRICT x, real_t *const SFEM_RESTRICT out) {
-        SFEM_TRACE_SCOPE("NewmarkInertiaPotential::gradient");
+    int InertiaPotential::gradient(const real_t *const SFEM_RESTRICT x, real_t *const SFEM_RESTRICT out) {
+        SFEM_TRACE_SCOPE("InertiaPotential::gradient");
 
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
@@ -187,8 +187,8 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int NewmarkInertiaPotential::apply(const real_t *const, const real_t *const SFEM_RESTRICT h, real_t *const SFEM_RESTRICT out) {
-        SFEM_TRACE_SCOPE("NewmarkInertiaPotential::apply");
+    int InertiaPotential::apply(const real_t *const, const real_t *const SFEM_RESTRICT h, real_t *const SFEM_RESTRICT out) {
+        SFEM_TRACE_SCOPE("InertiaPotential::apply");
 
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
@@ -206,8 +206,8 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int NewmarkInertiaPotential::value(const real_t *const SFEM_RESTRICT x, real_t *const out) {
-        SFEM_TRACE_SCOPE("NewmarkInertiaPotential::value");
+    int InertiaPotential::value(const real_t *const SFEM_RESTRICT x, real_t *const out) {
+        SFEM_TRACE_SCOPE("InertiaPotential::value");
 
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
@@ -229,12 +229,12 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    int NewmarkInertiaPotential::value_steps(const real_t *const SFEM_RESTRICT x,
+    int InertiaPotential::value_steps(const real_t *const SFEM_RESTRICT x,
                                           const real_t *const SFEM_RESTRICT h,
                                           const int                         nsteps,
                                           const real_t *const SFEM_RESTRICT steps,
                                           real_t *const SFEM_RESTRICT       out) {
-        SFEM_TRACE_SCOPE("NewmarkInertiaPotential::value_steps");
+        SFEM_TRACE_SCOPE("InertiaPotential::value_steps");
 
         if (impl_->ensure_state() != SFEM_SUCCESS) {
             return SFEM_FAILURE;
@@ -279,8 +279,8 @@ namespace sfem {
         return SFEM_SUCCESS;
     }
 
-    std::shared_ptr<Op> NewmarkInertiaPotential::clone() const {
-        auto ret            = std::make_shared<NewmarkInertiaPotential>(impl_->space);
+    std::shared_ptr<Op> InertiaPotential::clone() const {
+        auto ret            = std::make_shared<InertiaPotential>(impl_->space);
         ret->impl_->mass    = impl_->mass;
         ret->impl_->u_hat   = impl_->u_hat;
         ret->impl_->alpha   = impl_->alpha;
@@ -288,15 +288,15 @@ namespace sfem {
         return ret;
     }
 
-    void NewmarkInertiaPotential::set_alpha(const real_t alpha) { impl_->alpha = alpha; }
+    void InertiaPotential::set_alpha(const real_t alpha) { impl_->alpha = alpha; }
 
-    void NewmarkInertiaPotential::set_density(const real_t density) { impl_->density = density; }
+    void InertiaPotential::set_density(const real_t density) { impl_->density = density; }
 
-    void NewmarkInertiaPotential::set_u_hat(const std::shared_ptr<Buffer<real_t>> &u_hat) { impl_->u_hat = u_hat; }
+    void InertiaPotential::set_u_hat(const std::shared_ptr<Buffer<real_t>> &u_hat) { impl_->u_hat = u_hat; }
 
-    void NewmarkInertiaPotential::set_mass(const std::shared_ptr<Buffer<real_t>> &mass) { impl_->mass = mass; }
+    void InertiaPotential::set_mass(const std::shared_ptr<Buffer<real_t>> &mass) { impl_->mass = mass; }
 
-    void NewmarkInertiaPotential::set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &values, const int) {
+    void InertiaPotential::set_field(const char *name, const std::shared_ptr<Buffer<real_t>> &values, const int) {
         if (!strcmp(name, "u_hat")) {
             impl_->u_hat = values;
         } else if (!strcmp(name, "mass")) {
@@ -304,7 +304,7 @@ namespace sfem {
         }
     }
 
-    void NewmarkInertiaPotential::set_value_in_block(const std::string &, const std::string &var_name, const real_t value) {
+    void InertiaPotential::set_value_in_block(const std::string &, const std::string &var_name, const real_t value) {
         if (var_name == "alpha") {
             impl_->alpha = value;
         } else if (var_name == "density") {
@@ -312,8 +312,8 @@ namespace sfem {
         }
     }
 
-    std::shared_ptr<Buffer<real_t>> NewmarkInertiaPotential::mass() const { return impl_->mass; }
+    std::shared_ptr<Buffer<real_t>> InertiaPotential::mass() const { return impl_->mass; }
 
-    std::shared_ptr<Buffer<real_t>> NewmarkInertiaPotential::u_hat() const { return impl_->u_hat; }
+    std::shared_ptr<Buffer<real_t>> InertiaPotential::u_hat() const { return impl_->u_hat; }
 
 }  // namespace sfem

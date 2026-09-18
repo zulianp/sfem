@@ -1,7 +1,7 @@
 #include "sfem_test.hpp"
 
 #include "sfem_API.hpp"
-#include "sfem_BDF2InertiaPotential.hpp"
+#include "sfem_InertiaPotential.hpp"
 #include "sfem_Function.hpp"
 
 #include <cmath>
@@ -42,7 +42,7 @@ int test_bdf2_inertia_potential_derivatives() {
         h->data()[i]     = real_t(0.005) * ((i % 13) - 6);
     }
 
-    sfem::BDF2InertiaPotential op(space);
+    sfem::InertiaPotential op(space);
     op.set_alpha(7.25);
     op.set_mass(mass);
     op.set_u_hat(u_hat);

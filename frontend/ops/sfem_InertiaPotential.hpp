@@ -4,15 +4,15 @@
 
 namespace sfem {
 
-    class BDF2InertiaPotential final : public Op {
+    class InertiaPotential final : public Op {
     public:
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
-        explicit BDF2InertiaPotential(const std::shared_ptr<FunctionSpace> &space);
-        ~BDF2InertiaPotential() override;
+        explicit InertiaPotential(const std::shared_ptr<FunctionSpace> &space);
+        ~InertiaPotential() override;
 
-        const char *name() const override { return "BDF2InertiaPotential"; }
-        bool        is_linear() const override { return false; }
+        const char *name() const override { return "InertiaPotential"; }
+        bool        is_linear() const override { return true; }
 
         ptrdiff_t n_dofs_domain() const override;
         ptrdiff_t n_dofs_image() const override;
