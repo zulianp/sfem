@@ -20,8 +20,14 @@ DRIVER=${1:?usage: cvfem_restart_test.sh <cvfem_hex8_ns_ssgmg>}
 WORK=$(mktemp -d 2>/dev/null || mktemp -d -t cvfem_restart)
 trap 'rm -rf "$WORK"' EXIT
 
+# SFEM_STATS=1 so the running moments cross the seam under exactly the conditions above. They
+# are the one piece of restart state that is not the solution: the solution is checked by the
+# identities below, but a mean accumulated over a window can be wrong in ways the instantaneous
+# state cannot show -- a sample dropped where the segments meet, one counted twice, or moments
+# resumed against a window that did not come with them.
 COMMON="SFEM_CASE=pump SFEM_N=8 SFEM_MU=0.05 SFEM_U=1 SFEM_GMG=0 SFEM_PRECOND=direct
-        SFEM_NL_MAX_IT=20 SFEM_DT=0.1 SFEM_PUMP_PERIOD=1 SFEM_BDF_ORDER=2 SFEM_ENABLE_OUTPUT=0"
+        SFEM_NL_MAX_IT=20 SFEM_DT=0.1 SFEM_PUMP_PERIOD=1 SFEM_BDF_ORDER=2 SFEM_ENABLE_OUTPUT=0
+        SFEM_STATS=1"
 
 fail=0
 say() { printf '%-58s %s\n' "$1" "$2"; [ "$2" = OK ] || fail=1; }
@@ -51,7 +57,19 @@ grep -q "BDF2 history" "$WORK/b.log" && say "the second history level came back 
 grep -q "=== step 6 (segment 3/3)" "$WORK/b.log" && say "steps are numbered absolutely across segments" OK \
     || say "steps are numbered absolutely across segments" FAIL
 
-for what in "u_linf" "pump: swept" "pump: |port - swept|"; do
+# The moments came back with their window. Checked separately from the equality below because
+# the failure it catches is specific: moments restored against a default-zero window would give
+# the first step of the new segment the entire weight of everything averaged before it.
+grep -q "restart: resumed statistics, window .* over 3 samples" "$WORK/b.log" \
+    && say "the averaging window came back with the moments" OK \
+    || say "the averaging window came back with the moments" FAIL
+
+# The statistics line joins the identities below. Equality here is EXACT and not approximate:
+# a run cut in two performs the same Welford updates on the same states in the same order, the
+# moments round-trip through float64 losslessly, and the window round-trips through restart.txt
+# at 17 significant digits -- which is what makes a double exact in text. Anything less than a
+# character-for-character match is a real defect, not accumulated round-off.
+for what in "u_linf" "pump: swept" "pump: |port - swept|" "stats: window"; do
     a=$(grep -F "$what" "$WORK/one.log" | tail -1)
     b=$(grep -F "$what" "$WORK/b.log"   | tail -1)
     if [ -n "$a" ] && [ "$a" = "$b" ]; then

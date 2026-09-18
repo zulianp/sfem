@@ -4804,6 +4804,34 @@ int main(int argc, char **argv) {
     // works unchanged inside a step. With SFEM_DT = 0 the loop runs exactly once and the
     // operator has no time term, which is bit-for-bit the steady solve.
     std::vector<real_t> u_hist, u_hist2;
+    // ------------------------------------------------------------------- running statistics
+    //
+    // Time-averaged first and second moments of the state, for the averaging window a DNS is
+    // actually judged on. Three choices here are deliberate and none of them is free:
+    //
+    // WEIGHTED, by the step actually taken. With SFEM_CFL_TARGET the step size moves, so an
+    // unweighted mean over samples is a mean over STEPS and not over TIME -- it overweights
+    // whatever part of the flow forced the controller to take small steps, which is precisely
+    // the energetic part one is trying to measure.
+    //
+    // WELFORD, not raw sums. In the jet core u_rms is orders below u_mean, so
+    // mean-of-squares minus square-of-mean cancels away exactly the digits the fluctuation
+    // lives in. Welford's update never forms either of those products.
+    //
+    // DOUBLE, whatever real_t is. These accumulate over 10^5 steps; in single precision the
+    // increment w*(v-mean) falls below the mean's last bit long before the window closes and
+    // the average silently stops moving.
+    const int stats_on    = smesh::Env::read<int>("SFEM_STATS", 0);
+    // Skips the start-up transient, exactly as SFEM_WRITE_STEPS_FIRST does for frames: an
+    // average that includes the initial ramp is not an average of the flow.
+    const int stats_first = smesh::Env::read<int>("SFEM_STATS_FIRST", 0);
+    double              stats_w = 0;  // sum of weights, i.e. the window length in seconds
+    long long           stats_n = 0;  // samples in it, reported so a window can be read back
+    std::vector<double> stats_mean, stats_m2;
+    if (stats_on && dt_step > real_t(0)) {
+        stats_mean.assign((size_t)ndof, 0.0);
+        stats_m2.assign((size_t)ndof, 0.0);
+    }
     // Segmented runs. A long transient does not have to fit one allocation: SFEM_RESTART_OUT
     // writes the state every SFEM_RESTART_EVERY steps and at the end of the segment, and
     // SFEM_RESTART_IN picks it up. `tstep0` and `t0` are the absolute step and time the
@@ -4859,6 +4887,14 @@ int main(int argc, char **argv) {
             double    m_dt_now = 0, m_dt_prev = 0;
             int       m_dt_fixed = 1;
             const bool have_dt_state = static_cast<bool>(meta >> m_dt_now >> m_dt_prev >> m_dt_fixed);
+            // The averaging window. Read HERE, immediately after the dt fields, because these
+            // are positional trailing fields in one stream: consuming them anywhere else in
+            // the sequence would take the dt values into the statistics or leave the stream
+            // mid-record. The moments themselves load further down with the other arrays, and
+            // the window is applied only if they do, so the two can never resume out of step.
+            double     m_stats_w = 0;
+            long long  m_stats_n = 0;
+            const bool have_stats_w = static_cast<bool>(meta >> m_stats_w >> m_stats_n);
             if (have_dt_state && !m_dt_fixed) {
                 // An adapted run: the env dt is only where it started, so the guard below --
                 // which compares the env value -- cannot speak for it. Resume at the size the
@@ -4903,6 +4939,27 @@ int main(int argc, char **argv) {
                 u_hist2.assign((size_t)nnodes * 3, real_t(0));
                 std::copy(h2->data(), h2->data() + nnodes * 3, u_hist2.begin());
             }
+            // The moments, when this run is accumulating them AND the checkpoint carries
+            // them. Missing files are not an error in either direction: from_file returns
+            // null for a checkpoint written before statistics existed, or by a segment that
+            // ran with SFEM_STATS off, and such a run resumes with an empty window -- which is
+            // the truth, it has averaged nothing yet. The window is taken only alongside the
+            // arrays, so weight and moments can never be resumed out of step with each other.
+            if (!stats_mean.empty()) {
+                auto sm = smesh::Buffer<double>::from_file(smesh::Path(restart_in) / "stats_mean.float64");
+                auto s2 = smesh::Buffer<double>::from_file(smesh::Path(restart_in) / "stats_m2.float64");
+                if (sm && s2 && (ptrdiff_t)sm->size() == ndof && (ptrdiff_t)s2->size() == ndof &&
+                    have_stats_w && m_stats_w > 0) {
+                    std::copy(sm->data(), sm->data() + ndof, stats_mean.begin());
+                    std::copy(s2->data(), s2->data() + ndof, stats_m2.begin());
+                    stats_w = m_stats_w;
+                    stats_n = m_stats_n;
+                    std::printf("restart: resumed statistics, window %.6g s over %lld samples\n", stats_w,
+                                stats_n);
+                } else {
+                    std::printf("restart: no statistics in '%s'; averaging starts here\n", restart_in.c_str());
+                }
+            }
             // BDF2 from the first step of the segment when the second level came back: a
             // resumed run is mid-sequence, not starting up, and dropping to BDF1 for one step
             // would put a first-order error into the middle of a second-order run.
@@ -4946,6 +5003,70 @@ int main(int argc, char **argv) {
     // the first frame a segment writes is rarely its first step: a stride, or a resumed
     // segment, both start elsewhere, and frames without the mesh beside them are unreadable.
     bool                  wrote_step_mesh = false;
+
+    // A monitor point, sampled every step into the diagnostics row. Stage 2 wanted this and the
+    // driver did not have it: the nozzle stations and nozzle_centerline.csv are written once,
+    // after the loop, so nothing recorded what happened at a FIXED place as a function of time --
+    // which is the only form in which an outflow condition's reflection can be seen at all.
+    //
+    // SFEM_MON_X selects it, with SFEM_MON_Y/Z defaulting to 0 -- which is the axis on the nozzle
+    // and an EDGE of the domain on a box case like the pump, where the nearest node is a no-slip
+    // wall and the sampled velocity is identically zero. Resolved ONCE here rather
+    // than per step: a nearest-node search is O(nnodes), and at 7M dof inside a 10^5-step
+    // campaign that is the same inner-loop waste the Vanka freeze exists to remove.
+    //
+    // The node's ACTUAL coordinates are printed, not the requested ones. The nearest node is in
+    // general not the point asked for, and a probe whose true position is unrecorded cannot be
+    // compared against a second run, a finer mesh, or an experiment.
+    ptrdiff_t mon_node = -1;
+    if (!smesh::Env::read_string("SFEM_MON_X", "").empty()) {
+        const double      mx  = (double)smesh::Env::read<real_t>("SFEM_MON_X", real_t(0));
+        const double      my  = (double)smesh::Env::read<real_t>("SFEM_MON_Y", real_t(0));
+        const double      mz  = (double)smesh::Env::read<real_t>("SFEM_MON_Z", real_t(0));
+        const auto *const mpx = mesh->points()->data()[0];
+        const auto *const mpy = mesh->points()->data()[1];
+        const auto *const mpz = mesh->points()->data()[2];
+        double            best = 0;
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const double dx = (double)mpx[i] - mx, dy = (double)mpy[i] - my, dz = (double)mpz[i] - mz;
+            const double d2 = dx * dx + dy * dy + dz * dz;
+            if (mon_node < 0 || d2 < best) {
+                best     = d2;
+                mon_node = i;
+            }
+        }
+        if (mon_node >= 0)
+            std::printf("monitor: requested (%.6g %.6g %.6g), using node %td at (%.6g %.6g %.6g), "
+                        "distance %.3e\n",
+                        mx, my, mz, mon_node, (double)mpx[mon_node], (double)mpy[mon_node],
+                        (double)mpz[mon_node], std::sqrt(best));
+        // A monitor on a CONSTRAINED node reports the boundary condition rather than the flow.
+        // Its velocity is pinned, so mon_ux reads exactly zero for every step of the campaign --
+        // which is indistinguishable from "no disturbance ever arrived", and that is the one
+        // signal this probe exists to detect. Measured on the pump with the default y = z = 0:
+        // mon_ux was 0 at every step while mon_p varied, because the point is a no-slip edge.
+        //
+        // Warned and not refused: wall PRESSURE is a legitimate thing to sample -- the FDA
+        // benchmark reports it -- so the run is allowed to proceed knowing what it is getting.
+        //
+        // sfem::constraints_mask is the tree's own query for this; the alternative of pushing a
+        // sentinel vector through apply_constraints and diffing it would be inventing a second
+        // way to ask a question SFEM already answers.
+        if (mon_node >= 0) {
+            std::vector<sfem::mask_t> cmask((size_t)sfem::mask_count(ndof), 0);
+            if (f->constraints_mask(cmask.data()) == SFEM_SUCCESS) {
+                int nfixed = 0;
+                for (int d = 0; d < 3; ++d)
+                    nfixed += sfem::mask_get(mon_node * 4 + d, cmask.data()) != 0;
+                if (nfixed > 0)
+                    std::printf("monitor: WARNING -- %d of 3 velocity components at this node are "
+                                "constrained, so mon_ux reports the boundary condition and not the "
+                                "flow. Move the point off the boundary unless wall pressure is what "
+                                "was wanted.\n",
+                                nfixed);
+            }
+        }
+    }
 
     for (int tstep = 0; tstep < (dt_step > real_t(0) ? nsteps : 1); ++tstep) {
     // Absolute, so a segmented run and a single one report the same instants and a frame
@@ -6179,6 +6300,28 @@ int main(int argc, char **argv) {
         op->set_velocity_history(u_hist.data(), bdf_order >= 2 && h2_ready ? u_hist2.data() : nullptr);
     }
 
+    // The statistics, here because this is where the step is committed: the retry loop has
+    // closed above, so a step that was cut back and retried contributes ONCE, at the size it
+    // finally converged with. Accumulating inside the loop would count every abandoned
+    // attempt, weighted by a step the run did not take.
+    //
+    // dt_taken, not dt_now: dt_now is already the size proposed for the NEXT step.
+    if (!stats_mean.empty() && abs_step >= stats_first && dt_taken > real_t(0)) {
+        const double w = (double)dt_taken;
+        stats_w += w;
+        ++stats_n;
+        // West's weighted form: mean moves by (w/W)(v - mean), and M2 takes the product of
+        // the deviations from the OLD and NEW means, which is what keeps it non-negative
+        // without ever squaring a large number.
+        const double inv = w / stats_w;
+        for (ptrdiff_t i = 0; i < ndof; ++i) {
+            const double v     = (double)x[i];
+            const double d_old = v - stats_mean[(size_t)i];
+            stats_mean[(size_t)i] += inv * d_old;
+            stats_m2[(size_t)i] += w * d_old * (v - stats_mean[(size_t)i]);
+        }
+    }
+
     // A transient run's whole point is the sequence, and the writer at the end of this file
     // only ever sees the last state. SFEM_WRITE_STEPS writes each one into its own
     // step_NNNN/ under the output folder, which python/create_xdmf.py turns into a temporal
@@ -6316,28 +6459,64 @@ int main(int argc, char **argv) {
                     // 24 hours survived. The header goes in only when the file is empty, so a
                     // resumed segment continues the table rather than restarting it.
                     const bool append = !restart_in.empty();
+                    // The column set has to be the same in every segment of a campaign, because
+                    // the header is written once and the later segments only append rows. Change
+                    // SFEM_MON_X between segments and the rows stop matching the header -- and it
+                    // is silent, since every consumer resolves columns by NAME from the header and
+                    // would read a shifted or missing field rather than fail. Refused for the same
+                    // reason the restart refuses a mesh or a timestep it does not belong to.
+                    if (append) {
+                        std::ifstream hdr_in(diag_csv.c_str());
+                        std::string   first;
+                        if (hdr_in && std::getline(hdr_in, first) && !first.empty()) {
+                            const bool had_mon = first.find("mon_ux") != std::string::npos;
+                            if (had_mon != (mon_node >= 0)) {
+                                std::fprintf(stderr,
+                                             "diag: '%s' was written %s a monitor column, and this "
+                                             "segment has %s. The appended rows would not match the "
+                                             "header.\n",
+                                             diag_csv.c_str(), had_mon ? "with" : "without",
+                                             mon_node >= 0 ? "one" : "none");
+                                return EXIT_FAILURE;
+                            }
+                        }
+                    }
                     diag_fh           = std::fopen(diag_csv.c_str(), append ? "a" : "w");
                     if (diag_fh) {
                         std::fseek(diag_fh, 0, SEEK_END);
-                        if (std::ftell(diag_fh) <= 0)
+                        if (std::ftell(diag_fh) <= 0) {
                             std::fprintf(diag_fh,
                                          "step,t,ndof,E,dEdt,P_in,P_out,eps_visc,eps_num,closure,"
                                          "enstrophy,omega_max,div_l2,div_inf,cfl_max,u_max,"
                                          "newton_it,lin_it,t_step,have_in,have_out,budget_valid,"
-                                         "mdot_in,mdot_out\n");
+                                         "mdot_in,mdot_out");
+                            // Appended only when a monitor point is configured, which is safe
+                            // because every consumer of this file builds a name-to-index map from
+                            // the header row rather than counting columns.
+                            if (mon_node >= 0) std::fprintf(diag_fh, ",mon_ux,mon_p");
+                            std::fprintf(diag_fh, "\n");
+                        }
                     }
                 }
                 if (diag_fh) {
                     std::fprintf(diag_fh,
                                  "%d,%.17g,%td,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,"
                                  "%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%d,%d,%.6f,%d,%d,%d,"
-                                 "%.17g,%.17g\n",
+                                 "%.17g,%.17g",
                                  abs_step, (double)t_abs, (ptrdiff_t)ndof, st.E, b.dEdt, b.p_in,
                                  b.p_out, b.eps_visc, b.eps_num, b.closure, st.enstrophy,
                                  st.omega_max, st.div_l2, st.div_inf, st.cfl_max, st.u_max,
                                  newton_it, lin_it_total, smesh::time_seconds() - t_step_wall0,
                                  have_in ? 1 : 0, have_out ? 1 : 0, budget_valid,
                                  (double)mdot_in, (double)mdot_out);
+                    // The state at the monitor point, as it stands at the end of this step. The
+                    // velocity and the pressure together, because a reflection shows in the
+                    // pressure first and in the velocity only once it has arrived.
+                    if (mon_node >= 0)
+                        std::fprintf(diag_fh, ",%.17g,%.17g",
+                                     (double)x[(size_t)mon_node * 4 + 0],
+                                     (double)x[(size_t)mon_node * 4 + 3]);
+                    std::fprintf(diag_fh, "\n");
                     std::fflush(diag_fh);
                 }
                 // Echoed as well as written, because a long run whose only output appears at
@@ -6402,6 +6581,19 @@ int main(int argc, char **argv) {
                 std::copy(u_hist2.begin(), u_hist2.end(), h2->data());
                 rc |= h2->to_file(smesh::Path(restart_out) / ("u_prev2." + ext));
             }
+            // The statistics travel with the state, or a campaign cut into segments reports
+            // an average of its LAST segment while looking exactly like an average of the
+            // whole run. The extension is the literal float64 rather than `ext`: the
+            // accumulator is double whatever real_t is, so naming it after real_t would write
+            // a double array under a float32 name on a single-precision build.
+            if (!stats_mean.empty()) {
+                auto sm = smesh::create_host_buffer<double>(ndof);
+                auto s2 = smesh::create_host_buffer<double>(ndof);
+                std::copy(stats_mean.begin(), stats_mean.end(), sm->data());
+                std::copy(stats_m2.begin(), stats_m2.end(), s2->data());
+                rc |= sm->to_file(smesh::Path(restart_out) / "stats_mean.float64");
+                rc |= s2->to_file(smesh::Path(restart_out) / "stats_m2.float64");
+            }
             // The metadata last, so a folder whose restart.txt is present and complete is a
             // folder whose arrays are too. A job killed mid-write then leaves a restart that
             // fails to load rather than one that loads a half-written state.
@@ -6425,6 +6617,11 @@ int main(int argc, char **argv) {
             meta << (double)dt_now << "\n"
                  << (double)dt_prev_step << "\n"
                  << (dt_varies ? 0 : 1) << "\n";
+            // The averaging window, appended after those for the same reason they were
+            // appended after the original six. Without it the moments would resume with the
+            // right values and a zero weight, and the first step of the new segment would be
+            // given the entire weight of everything averaged before it.
+            meta << (double)stats_w << "\n" << stats_n << "\n";
             if (rc != SFEM_SUCCESS || !meta) {
                 std::fprintf(stderr, "restart: failed to write '%s'\n", restart_out.c_str());
                 return EXIT_FAILURE;
@@ -6538,6 +6735,53 @@ int main(int argc, char **argv) {
         }
         std::printf("output: wrote mesh and solution to %s (vel.0 vel.1 vel.2 = u, p = pressure)\n",
                     out_folder.c_str());
+        // The averaged fields beside the instantaneous one, through the SAME writer and the
+        // same .3 -> pressure rename documented above: a mean state is a state, and there is
+        // no reason for it to reach disk by a second route that create_xdmf.py would have to
+        // learn about separately.
+        //
+        // Converted to real_t only at the last moment. The accumulator has to be double to
+        // accumulate at all, but what lands on disk is a nodal field like any other.
+        if (!stats_mean.empty() && stats_w > 0) {
+            std::vector<real_t> fld((size_t)ndof, 0);
+            auto                emit = [&](const char *name, const char *pname) {
+                output->write(name, fld.data());
+                const std::string f4 = std::string(out_folder) + "/" + name + ".3." + ext;
+                const std::string t4 = std::string(out_folder) + "/" + pname + "." + ext;
+                std::remove(t4.c_str());
+                if (std::rename(f4.c_str(), t4.c_str()) != 0)
+                    std::fprintf(stderr, "output: could not rename %s -> %s\n", f4.c_str(), t4.c_str());
+            };
+            for (ptrdiff_t i = 0; i < ndof; ++i) fld[(size_t)i] = (real_t)stats_mean[(size_t)i];
+            emit("vel_mean", "p_mean");
+            // sqrt(M2 / W) is the weighted standard deviation. The fmax guards the one case
+            // that can make the argument negative: a window of a single sample, where M2 is
+            // analytically zero and rounding can leave it a few ulp below it.
+            for (ptrdiff_t i = 0; i < ndof; ++i)
+                fld[(size_t)i] = (real_t)std::sqrt(std::fmax(stats_m2[(size_t)i] / stats_w, 0.0));
+            emit("vel_rms", "p_rms");
+            std::printf("stats: wrote vel_mean/p_mean and vel_rms/p_rms\n");
+        }
+    }
+
+    // The averaging window itself, reported whatever SFEM_ENABLE_OUTPUT is set to. It is a
+    // property of the run and not of the files the run happened to write -- and the restart
+    // test sets SFEM_ENABLE_OUTPUT=0 on purpose, so that it compares the driver's own numbers
+    // rather than diffing fields, which means a summary buried in the output block would be
+    // invisible exactly where it is most worth checking.
+    //
+    // The two sums are what make a resumed average falsifiable. A run cut in two performs the
+    // same Welford updates on the same states in the same order, so these must agree with the
+    // uninterrupted run to every digit printed; a sample dropped at the seam, one counted
+    // twice, or a window resumed out of step with its moments each move them.
+    if (!stats_mean.empty()) {
+        double s_mean = 0, s_m2 = 0;
+        for (ptrdiff_t i = 0; i < ndof; ++i) {
+            s_mean += stats_mean[(size_t)i];
+            s_m2 += stats_m2[(size_t)i];
+        }
+        std::printf("stats: window %.17g s over %lld samples, mean sum %.17g, m2 sum %.17g\n", stats_w,
+                    stats_n, s_mean, s_m2);
     }
 
     // Verification against the analytic profile, on the free nodes only, matching what
@@ -6775,6 +7019,102 @@ int main(int argc, char **argv) {
             }
             if (fc) std::fclose(fc);
             if (fw) std::fclose(fw);
+
+            // ------------------------------------------------------------- axisymmetry rays
+            //
+            // Four radial rays, at azimuth 0, 90, 180 and 270 degrees. The flow is nominally
+            // axisymmetric, so the four must agree; what they disagree by is an error bar that
+            // costs nothing to collect, and it measures the mesh's own asymmetry rather than
+            // anything the benchmark supplies.
+            //
+            // Four rays and not azimuthal bins, because the bore is a square-to-circle blend:
+            // an intermediate ring has no constant-radius node set to bin, so a bin would be
+            // an interpolation dressed as a measurement.
+            //
+            // ONLY THE +y RAY IS EXACT, which is worth stating because the obvious predicate is
+            // wrong. ring() takes cy = cos(th), cz = sin(th) with th = -pi/4 + (pi/2) m / n; the
+            // four rays land on integer m, so the nodes are all there, but M_PI is not pi and
+            // so cos(M_PI/2) = 6.1e-17 and sin(M_PI) = 1.2e-16 -- 3.7e-19 m on this geometry.
+            // A `py[i] == 0` test would therefore have selected NOTHING on the two z rays and
+            // reported a spread over an empty set, which reads exactly like a quiet one.
+            //
+            // cvfem_case::on_plane is what selects them: the predicate the boundary tests
+            // already use, rather than a second tolerance private to this file. Its 1e-8 m is
+            // absolute below a 1 m domain, so it clears the residual by 2.7e10 and sits 609x
+            // below the finest bore spacing at level 16 -- but only 305x at level 32, since the
+            // cells shrink with refinement and the tolerance does not.
+            struct RaySample {
+                double x, r, ux, ux_mean;
+            };
+            std::array<std::vector<RaySample>, 4> rays;
+            const char *const ray_name[4] = {"+y", "+z", "-y", "-z"};
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                const double yy = (double)py[i], zz = (double)pz[i];
+                const bool   on_z = cvfem_case::on_plane((real_t)pz[i], real_t(0), Lz);
+                const bool   on_y = cvfem_case::on_plane((real_t)py[i], real_t(0), Ly);
+                // The axis node satisfies both planes but neither sign test, so it stays with
+                // the centreline above and is not double-counted into a ray.
+                int k = -1;
+                if (on_z && yy > 0) k = 0;
+                else if (on_y && zz > 0) k = 1;
+                else if (on_z && yy < 0) k = 2;
+                else if (on_y && zz < 0) k = 3;
+                if (k < 0) continue;
+                const double r  = (k == 0 || k == 2) ? std::fabs(yy) : std::fabs(zz);
+                const double um = stats_mean.empty() ? 0.0 : stats_mean[(size_t)i * 4 + 0];
+                rays[(size_t)k].push_back({(double)px[i], r, (double)x[(size_t)i * 4 + 0], um});
+            }
+            for (auto &v : rays)
+                std::sort(v.begin(), v.end(), [](const RaySample &a, const RaySample &b) {
+                    return a.x != b.x ? a.x < b.x : a.r < b.r;
+                });
+            const size_t nr0 = rays[0].size();
+            const bool   rays_match =
+                    nr0 > 0 && rays[1].size() == nr0 && rays[2].size() == nr0 && rays[3].size() == nr0;
+            std::printf("nozzle: axisymmetry rays %s %zu / %s %zu / %s %zu / %s %zu\n", ray_name[0],
+                        rays[0].size(), ray_name[1], rays[1].size(), ray_name[2], rays[2].size(),
+                        ray_name[3], rays[3].size());
+            if (!rays_match) {
+                // Reported rather than tolerated. Equal counts is what makes the element-wise
+                // comparison below meaningful, and unequal ones mean a ray missed nodes -- which
+                // is a selection defect, not an asymmetry in the flow.
+                std::printf("nozzle: ray node counts differ; no axisymmetry spread reported\n");
+            } else {
+                // ray_spread rather than spread: `spread` is already a mesh-warp lambda further
+                // up this function, and a diagnostics scalar shadowing it would compile while
+                // reading as though the two were related.
+                double ray_spread = 0, ray_spread_mean = 0, u_scale = 0;
+                for (size_t q = 0; q < nr0; ++q) {
+                    double lo = rays[0][q].ux, hi = lo, lom = rays[0][q].ux_mean, him = lom;
+                    for (int k = 1; k < 4; ++k) {
+                        lo  = std::fmin(lo, rays[(size_t)k][q].ux);
+                        hi  = std::fmax(hi, rays[(size_t)k][q].ux);
+                        lom = std::fmin(lom, rays[(size_t)k][q].ux_mean);
+                        him = std::fmax(him, rays[(size_t)k][q].ux_mean);
+                    }
+                    ray_spread      = std::fmax(ray_spread, hi - lo);
+                    ray_spread_mean = std::fmax(ray_spread_mean, him - lom);
+                    u_scale         = std::fmax(u_scale, std::fabs(hi));
+                }
+                // Relative to the largest axial velocity the rays see, so the number is
+                // readable as a percentage of the jet rather than in m/s.
+                std::printf("nozzle: axisymmetry spread %.3e (%.3e relative)%s\n", ray_spread,
+                            u_scale > 0 ? ray_spread / u_scale : 0.0,
+                            stats_mean.empty() ? "" : " [instantaneous]");
+                if (!stats_mean.empty())
+                    std::printf("nozzle: axisymmetry spread of the MEAN %.3e (%.3e relative)\n",
+                                ray_spread_mean, u_scale > 0 ? ray_spread_mean / u_scale : 0.0);
+            }
+            FILE *fr = ec ? nullptr : std::fopen((out_folder + "/nozzle_rays.csv").c_str(), "w");
+            if (fr) {
+                std::fprintf(fr, "ray,x,r,ux,ux_mean\n");
+                for (int k = 0; k < 4; ++k)
+                    for (const auto &s : rays[(size_t)k])
+                        std::fprintf(fr, "%s,%.9e,%.9e,%.9e,%.9e\n", ray_name[k], s.x, s.r, s.ux,
+                                     s.ux_mean);
+                std::fclose(fr);
+                std::printf("nozzle: wrote %s/nozzle_rays.csv\n", out_folder.c_str());
+            }
 
             std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
             if (!converged) {
