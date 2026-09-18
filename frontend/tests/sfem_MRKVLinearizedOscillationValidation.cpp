@@ -109,7 +109,7 @@ namespace {
         set_material_parameter(op, mesh, "lmbda", real_t(0));
         set_material_parameter(op, mesh, "eta_s", real_t(0));
         set_material_parameter(op, mesh, "eta_b", real_t(0));
-        set_material_parameter(op, mesh, "newmark_velocity_alpha", real_t(0));
+        set_material_parameter(op, mesh, "u_dt_shift", real_t(0));
 
         std::fill(prev->data(), prev->data() + ndofs, real_t(0));
         scale_field(ndofs, amp, phi->data(), state->data());
@@ -123,7 +123,7 @@ namespace {
         set_material_parameter(op, mesh, "lmbda", real_t(0));
         set_material_parameter(op, mesh, "eta_s", eta_s);
         set_material_parameter(op, mesh, "eta_b", real_t(0));
-        set_material_parameter(op, mesh, "newmark_velocity_alpha", real_t(0));
+        set_material_parameter(op, mesh, "u_dt_shift", real_t(0));
 
         std::fill(state->data(), state->data() + ndofs, real_t(0));
         scale_field(ndofs, v_amp, phi->data(), prev->data());

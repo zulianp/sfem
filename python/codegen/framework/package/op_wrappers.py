@@ -23,6 +23,7 @@ import os
 import re
 
 from codegen.framework.emitters.cprinter import parameter_list_lines
+from codegen.framework.symbolic.fields import is_time_rate_shift
 from codegen.framework.plans.form_transformations import (
     symmetric_metric_component_count,
 )
@@ -546,9 +547,9 @@ def _header(material, residual, publishes_value_steps=None, node_wise=False):
 
 #include "sfem_Op.hpp"
 #include "sfem_NeumannConditions.hpp"
-
+%(time_scheme_include)s
 namespace sfem {
-  class %(op)s final : public Op {
+  class %(op)s final : public Op%(time_scheme_base)s {
   public:
     static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
@@ -575,7 +576,7 @@ namespace sfem {
     size_t memory_traffic_bytes_gradient() const override;
     size_t memory_traffic_bytes_apply() const override;
 
-    int initialize(const std::vector<std::string> &block_names = {}) override;%(extra)s
+    int initialize(const std::vector<std::string> &block_names = {}) override;%(extra)s%(time_scheme_declaration)s
     int gradient(const real_t *const x, real_t *const out) override;
     int apply(const real_t *const x,
                   const real_t *const h,
@@ -615,6 +616,9 @@ namespace sfem {
         "header_stem": _op_file_stem(material),
         "stream_member": _op_stream_member(),
         "extra": extra,
+        "time_scheme_declaration": _HEADER_TIME_SCHEME_DECLARATION[_has_time_rate(material)],
+        "time_scheme_base": _HEADER_TIME_SCHEME_BASE[_has_time_rate(material)],
+        "time_scheme_include": _HEADER_TIME_SCHEME_INCLUDE[_has_time_rate(material)],
         "value_steps": value_steps,
         "matrix_methods": matrix_methods,
         "inexact_methods": _inexact_declarations(material),
@@ -4133,7 +4137,7 @@ namespace sfem {
       return SFEM_SUCCESS;
     }
 
-    void parameter_array(const Parameters &parameters,
+    void parameter_array(const Parameters &parameters,%(scheme_parameter)s
                              real_t *const values) {
 %(parameter_lines)s
     }
@@ -4177,11 +4181,12 @@ namespace sfem {
 %(element_scratch_fields)s
     const real_t *previous{nullptr};
     const real_t *current{nullptr};
-    bool objective_uses_affine{false};
+%(time_scheme_member)s    bool objective_uses_affine{false};
     bool gradient_uses_affine{false};
     bool apply_uses_affine{false};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
+%(previous_state_accessor)s
   };
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
@@ -4326,7 +4331,7 @@ namespace sfem {
             jacobian->jacobian_determinant()->data());
       }
       real_t storage[MAX_PARAMETERS];
-      parameter_array(*domain.parameters, storage);
+      parameter_array(*domain.parameters, %(scheme_argument)sstorage);
 %(gradient_previous_alias)s
       switch (domain.element_type) {
 %(gradient_cases)s
@@ -4362,7 +4367,7 @@ namespace sfem {
             jacobian->jacobian_determinant()->data());
       }
       real_t storage[MAX_PARAMETERS];
-      parameter_array(*domain.parameters, storage);
+      parameter_array(*domain.parameters, %(scheme_argument)sstorage);
 %(apply_previous_alias)s
       switch (domain.element_type) {
 %(apply_cases)s
@@ -4386,7 +4391,7 @@ namespace sfem {
     impl_->previous_buffer = values;
     impl_->previous = values->data();
   }
-
+%(set_time_scheme_method)s
   void %(op)s::set_option(const std::string &name, const bool val) {
     SFEM_TRACE_SCOPE("%(op)s::set_option");
     AffineOption options[] = {
@@ -4474,6 +4479,7 @@ namespace sfem {
         "stream_member": _op_stream_member(),
         "hessian_bsr_method": _coupled_hessian_bsr_method(
             _op_class_name(material),
+            _COUPLED_SCHEME_ARGUMENT[_has_time_rate(material)],
             cases["hessian_bsr"],
         ),
         "c_abi_include": '#include "%s"' % c_abi_header if c_abi_header else "",
@@ -4482,6 +4488,14 @@ namespace sfem {
         "defaults": defaults,
         "yaml_helpers": _yaml_helpers(material.parameter_defaults),
         "parameter_lines": _coupled_parameter_array_lines(material.parameter_defaults),
+        # Whether this material's form carries a time derivative decides five
+        # spellings at once, so it is asked once and each of them is a lookup.
+        "scheme_parameter": _COUPLED_SCHEME_PARAMETER[_has_time_rate(material)],
+        "scheme_argument": _COUPLED_SCHEME_ARGUMENT[_has_time_rate(material)],
+        "time_scheme_member": _COUPLED_SCHEME_MEMBER[_has_time_rate(material)],
+        "previous_state_accessor": _COUPLED_PREVIOUS_STATE_ACCESSOR[_has_time_rate(material)],
+        "set_time_scheme_method": _COUPLED_SET_TIME_SCHEME[_has_time_rate(material)]
+        % {"op": _op_class_name(material)},
         "element_connectivity": _element_connectivity_expression(),
         "execution_space": current_target().execution_space(),
         "points_accessor": _points_accessor_expression(),
@@ -4489,7 +4503,7 @@ namespace sfem {
         "block_size_lines": _coupled_block_size_lines(systems_by_dim),
         "performance_methods": _performance_methods(_op_class_name(material), material.name, elements, cases["performance"]),
         "gradient_previous_check": (
-            "    if (!impl_->previous) {\n"
+            "    if (!impl_->previous_state()) {\n"
             '      SFEM_ERROR("%s requires a previous state\\n");\n'
             "      return SFEM_FAILURE;\n"
             "    }" % _op_class_name(material)
@@ -4497,7 +4511,7 @@ namespace sfem {
             else ""
         ),
         "gradient_previous_alias": (
-            "      const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = impl_->previous_state();"
             if dependency_flags["gradient_previous"]
             else ""
         ),
@@ -4507,7 +4521,7 @@ namespace sfem {
             dependency_flags["apply_previous"],
         ),
         "apply_previous_alias": (
-            "      const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = impl_->previous_state();"
             if dependency_flags["apply_previous"]
             else ""
         ),
@@ -4576,7 +4590,7 @@ def _coupled_apply_state_check(op_name, uses_current, uses_previous):
     if uses_current:
         conditions.append("!current")
     if uses_previous:
-        conditions.append("!impl_->previous")
+        conditions.append("!impl_->previous_state()")
     if not conditions:
         return ""
     requirement = (
@@ -5066,7 +5080,7 @@ def _coupled_cases(
     return cases
 
 
-def _coupled_hessian_bsr_method(op_name, hessian_bsr_cases):
+def _coupled_hessian_bsr_method(op_name, scheme_argument, hessian_bsr_cases):
     """The assembled Jacobian of a coupled material, or a refusal.
 
     Both units contribute to the same matrix and both accumulate into `values`,
@@ -5090,7 +5104,7 @@ def _coupled_hessian_bsr_method(op_name, hessian_bsr_cases):
               real_t *const values) {
     SFEM_TRACE_SCOPE("%(op)s::hessian_bsr");
     const real_t *const current = state ? state : impl_->current;
-    if (!current || !impl_->previous) {
+    if (!current || !impl_->previous_state()) {
       SFEM_ERROR("%(op)s::hessian_bsr requires current and previous states\\n");
       return SFEM_FAILURE;
     }
@@ -5098,8 +5112,8 @@ def _coupled_hessian_bsr_method(op_name, hessian_bsr_cases):
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
       real_t storage[MAX_PARAMETERS];
-      parameter_array(*domain.parameters, storage);
-      const real_t *const previous = impl_->previous;
+      parameter_array(*domain.parameters, %(scheme_argument)sstorage);
+      const real_t *const previous = impl_->previous_state();
       switch (domain.element_type) {
 %(cases)s
         default:
@@ -5109,7 +5123,11 @@ def _coupled_hessian_bsr_method(op_name, hessian_bsr_cases):
       }
     });
   }
-""" % {"op": op_name, "cases": "\n".join(hessian_bsr_cases)}
+""" % {
+        "op": op_name,
+        "scheme_argument": scheme_argument,
+        "cases": "\n".join(hessian_bsr_cases),
+    }
 
 
 def _coupled_case(element, block_size, setup_lines, body):
@@ -5125,16 +5143,112 @@ def _coupled_case(element, block_size, setup_lines, body):
     }
 
 
+def _has_time_rate(material):
+    """Whether this material's form carries a time derivative."""
+    return time_rate_shift_index(material.parameter_defaults) is not None
+
+
+def time_rate_shift_index(defaults):
+    """Which material constant a `TimeScheme` supplies, or `None`.
+
+    `symbolic.fields.is_time_rate_shift` owns the question; this only finds the
+    slot, because the kernels take their constants positionally.
+    """
+    for index, (name, _default) in enumerate(defaults):
+        if is_time_rate_shift(name):
+            return index
+    return None
+
+
+#: Where a material constant comes from.  Most are per-block parameters a caller
+#: sets; a rate's shift is the weight the attached `TimeScheme` holds now, so it
+#: is pulled from the scheme rather than pushed into the parameters ahead of
+#: time -- which is what keeps the residual and the node-wise merit reading one
+#: number, instead of agreeing only while nothing re-pushes between them.  The
+#: parameter still answers when no scheme is attached, so a material carrying a
+#: rate stays usable without one.
+_COUPLED_PARAMETER_SOURCE = {
+    False: lambda index, name: (
+        '      values[%d] = parameters.require_real_value("%s");' % (index, name)
+    ),
+    True: lambda index, name: (
+        "      values[%d] = time_scheme ? time_scheme->shift()\n"
+        '                                : parameters.require_real_value("%s");'
+        % (index, name)
+    ),
+}
+
+
 def _coupled_parameter_array_lines(defaults):
     lines = []
     for index, (name, _) in enumerate(defaults):
-        lines.append(
-            '      values[%d] = parameters.require_real_value("%s");'
-            % (index, name)
-        )
+        lines.append(_COUPLED_PARAMETER_SOURCE[is_time_rate_shift(name)](index, name))
     if not lines:
         lines.append("      values[0] = 0;")
     return "\n".join(lines)
+
+
+#: The scheme reaches `parameter_array` as an argument because that function is
+#: a free one in an anonymous namespace and has no `impl_`.  It is declared only
+#: when the material has a rate: a parameter no body reads is what
+#: `test_kernels_are_lean` counts, and every other material's would go unread.
+_COUPLED_SCHEME_PARAMETER = {
+    False: "",
+    True: "\n                             const TimeScheme *const time_scheme,",
+}
+
+_COUPLED_SCHEME_ARGUMENT = {False: "", True: "impl_->time_scheme.get(), "}
+
+_COUPLED_SCHEME_MEMBER = {
+    False: "",
+    True: "    std::shared_ptr<TimeScheme> time_scheme;\n",
+}
+
+#: Reading the history through one accessor is the same argument as reading the
+#: shift through the scheme: the residual and the merit assemble the same
+#: quantity twice, and they can only agree if both ask the same object.
+_COUPLED_PREVIOUS_STATE_ACCESSOR = {
+    False: """
+    const real_t *previous_state() const { return previous; }
+""",
+    True: """
+    //! The history the form reads: the scheme's when one is attached, and the
+    //! buffer a caller set otherwise.
+    const real_t *previous_state() const {
+      return time_scheme ? time_scheme->history() : previous;
+    }
+""",
+}
+
+_COUPLED_SET_TIME_SCHEME = {
+    False: "",
+    True: """
+  void %(op)s::set_time_scheme(const std::shared_ptr<TimeScheme> &scheme) {
+    SFEM_TRACE_SCOPE("%(op)s::set_time_scheme");
+    impl_->time_scheme = scheme;
+  }
+""",
+}
+
+#: The declaration, and the header it needs.  A material without a rate declares
+#: neither, so no `Op` in the tree grows a method that answers nothing.
+_HEADER_TIME_SCHEME_DECLARATION = {
+    False: "",
+    True: """
+    //! The integration scheme this material's time derivative reads.
+    //!
+    //! The scheme is held rather than pushed into: `gradient` and the
+    //! node-wise merit assemble the same residual twice, so both ask this one
+    //! object for the shift and the history instead of agreeing only while
+    //! nothing re-set a parameter between them.
+    void set_time_scheme(const std::shared_ptr<TimeScheme> &scheme) override;""",
+}
+
+_HEADER_TIME_SCHEME_INCLUDE = {False: "", True: '#include "sfem_TimeScheme.hpp"\n'}
+
+#: `TimeSteppable` is what a caller casts to in order to attach a scheme, so an
+#: operator inherits it exactly when its form has a rate to discretise.
+_HEADER_TIME_SCHEME_BASE = {False: "", True: ", public TimeSteppable"}
 
 
 def _op_stream_member():
