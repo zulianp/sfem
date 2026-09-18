@@ -8,10 +8,17 @@ namespace sfem {
     public:
         static std::unique_ptr<Op> create(const std::shared_ptr<FunctionSpace> &space);
 
-        explicit InertiaPotential(const std::shared_ptr<FunctionSpace> &space);
+        /// `es` is where the caller's vectors live.  Everything this operator
+        /// does to a vector goes through `sfem::blas<real_t>(es)`, so it runs
+        /// on whichever side the caller solves on.
+        explicit InertiaPotential(const std::shared_ptr<FunctionSpace> &space,
+                                  ExecutionSpace es = EXECUTION_SPACE_HOST);
         ~InertiaPotential() override;
 
         const char *name() const override { return "InertiaPotential"; }
+        //! Where this operator runs, so `Function` allocates the buffers it
+        //! writes on the same side.
+        ExecutionSpace execution_space() const override;
         bool        is_linear() const override { return true; }
 
         ptrdiff_t n_dofs_domain() const override;
