@@ -233,6 +233,13 @@ add_test(NAME cvfem_restart
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_restart_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
 
+# A step that will not converge is either the end of the run or a smaller step, never a step
+# that is quietly accepted. Both policies are driven against one forced failure, because the
+# thing worth testing is that they disagree in exactly the intended way.
+add_test(NAME cvfem_cutback
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_cutback_test.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
+
 # ------------------------------------------------ generated headers match their generators
 #
 # The three headers under src/generated/ and src/cases/ are committed artifacts compiled as
