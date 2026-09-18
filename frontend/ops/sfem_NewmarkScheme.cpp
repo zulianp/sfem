@@ -34,7 +34,7 @@ namespace sfem {
 
     NewmarkScheme::NewmarkScheme(const std::shared_ptr<FunctionSpace> &space, const ExecutionSpace es)
         : impl_(std::make_unique<Impl>(space, es)) {
-        impl_->inertia = std::make_shared<InertiaPotential>(space);
+        impl_->inertia = std::make_shared<InertiaPotential>(space, es);
     }
 
     NewmarkScheme::~NewmarkScheme() = default;
