@@ -45,7 +45,7 @@ namespace {
     int check_homogeneous_deformation(const smesh::ElemType element_type) {
         auto mesh  = sfem::Mesh::create_cube(sfem::Communicator::self(), element_type, 2, 2, 2, 0, 0, 0, 1, 1, 1);
         auto space = sfem::FunctionSpace::create(mesh, 3);
-        auto op    = sfem::create_op(space, "GeneratedMooneyRivlinKelvinVoigtNewmark", sfem::EXECUTION_SPACE_HOST);
+        auto op    = sfem::create_op(space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(op != nullptr);
 
         constexpr real_t mu      = 2.5;
@@ -144,7 +144,7 @@ namespace {
         auto mesh     = sfem::Mesh::create_cube(sfem::Communicator::self(), element_type, 3, 3, 3, 0, 0, 0, 1, 1, 1);
         auto space    = sfem::FunctionSpace::create(mesh, 3);
         auto function = sfem::Function::create(space);
-        auto op       = sfem::create_op(space, "GeneratedMooneyRivlinKelvinVoigtNewmark", sfem::EXECUTION_SPACE_HOST);
+        auto op       = sfem::create_op(space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(op != nullptr);
 
         SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);

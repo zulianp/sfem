@@ -102,7 +102,7 @@ namespace {
         std::fill(mass->data(), mass->data() + ndofs, real_t(0));
         SFEM_TEST_ASSERT(lumped_mass->hessian_diag(nullptr, mass->data()) == SFEM_SUCCESS);
 
-        auto op = sfem::create_op(space, "GeneratedMooneyRivlinKelvinVoigtNewmark", sfem::EXECUTION_SPACE_HOST);
+        auto op = sfem::create_op(space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(op != nullptr);
 
         set_material_parameter(op, mesh, "mu", mu);

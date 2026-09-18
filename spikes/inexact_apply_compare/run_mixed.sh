@@ -14,7 +14,7 @@
 # so a slow run is distinguishable from a stuck one.
 set -euo pipefail
 
-MATERIAL=mooney_rivlin_kelvin_voigt_newmark
+MATERIAL=mooney_rivlin_kelvin_voigt
 ELEMENT="${1:-TET4}"
 REPEATS="${2:-5}"
 LOWER="$(echo "$ELEMENT" | tr '[:upper:]' '[:lower:]')"
@@ -59,7 +59,7 @@ if [ ! -f "$KGEN/${ELASTIC}_${KLOWER}_inexact_apply_inline.hpp" ]; then
 import dataclasses, sys
 out, name, element = sys.argv[1], sys.argv[2], sys.argv[3]
 from sfem import gen
-from codegen.framework.materials.mooney_rivlin_kelvin_voigt_newmark import material
+from codegen.framework.materials.mooney_rivlin_kelvin_voigt import material
 gen.generate(dataclasses.replace(material, inexact_apply=True),
              "%s/%s" % (out, name), elements=(element,), clean=False)
 PY

@@ -1,6 +1,6 @@
 // One material, several schemes, no regeneration.
 //
-// `mooney_rivlin_kelvin_voigt_newmark` used to name Newmark in its own form: it
+// `mooney_rivlin_kelvin_voigt` used to name Newmark in its own form: it
 // declared a material parameter called `newmark_velocity_alpha` and multiplied
 // the displacement gradient by it.  It now writes `gen.dt(u)` and names no
 // scheme at all, which lowers to `u_dot = u_dt_shift * u + u_old`.  What fills
@@ -45,7 +45,7 @@ namespace {
         Fixture fixture;
         fixture.mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
         fixture.space = sfem::FunctionSpace::create(fixture.mesh, 3);
-        fixture.op    = sfem::Factory::create_op(fixture.space, "GeneratedMooneyRivlinKelvinVoigtNewmark");
+        fixture.op    = sfem::Factory::create_op(fixture.space, "GeneratedMooneyRivlinKelvinVoigt");
         fixture.ndofs = fixture.space->n_dofs();
 
         set_material_parameter(fixture.op, fixture.mesh, "mu", real_t(3));

@@ -1474,7 +1474,7 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
     <div class="rail"></div><div class="num">OP 9</div>
     <div class="body">
       <div class="op-title">Untracked files the branch depends on <span class="chip c-ok">closed</span></div>
-      <p>The <code>mooney_rivlin_kelvin_voigt_newmark</code> material and generator, <code>scripts/</code>, <code>retired/KERNELS.md</code>, <code>retired/M11.md</code>, <code>docs/</code> and <code>twophaseflow/run_m43.sh</code> are now tracked on this branch. A fresh clone can run its own tests: <code>scripts/</code> is imported by the matrix-format tests and the mooney material is part of the set the snapshot regenerates.</p>
+      <p>The <code>mooney_rivlin_kelvin_voigt</code> material and generator, <code>scripts/</code>, <code>retired/KERNELS.md</code>, <code>retired/M11.md</code>, <code>docs/</code> and <code>twophaseflow/run_m43.sh</code> are now tracked on this branch. A fresh clone can run its own tests: <code>scripts/</code> is imported by the matrix-format tests and the mooney material is part of the set the snapshot regenerates.</p>
       <p>Only the repository-root <code>CLAUDE.md</code> is still untracked — tooling configuration rather than framework code, and yours to place.</p>
       <div class="op-facts"><span><i>added</i> 292 LOC of code + 4 documents</span></div>
     </div>
@@ -1594,7 +1594,7 @@ const scalar_t e1 = -fff0 * u0 + fff0 * u1 + fff1 * u2 + fff2 * u3 - x3 - x4;</c
         <tr><td>stokes</td><td>simplex</td><td class="n">360 / 2,616</td><td class="n"><b>13.8%</b></td></tr>
         <tr><td>two_phase_flow</td><td>simplex</td><td class="n">448 / 4,672</td><td class="n">9.6%</td></tr>
         <tr><td>two_phase_flow</td><td>tensor-product</td><td class="n">168 / 1,784</td><td class="n">9.4%</td></tr>
-        <tr><td>mooney_rivlin_kelvin_voigt_newmark</td><td>both</td><td class="n">32 / 4,834</td><td class="n">0.7%</td></tr>
+        <tr><td>mooney_rivlin_kelvin_voigt</td><td>both</td><td class="n">32 / 4,834</td><td class="n">0.7%</td></tr>
         <tr><td>the five hyperelastic materials</td><td>both</td><td class="n">0</td><td class="n">0.0%</td></tr>
       </table>
       <p><code>residual_tmp</code> accounts for 596 of the 1,508 — CSE temporaries, not the single shape-function load the first look suggested. So the opportunity is real and worth measuring rather than reasoning about.</p>

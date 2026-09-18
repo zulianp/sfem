@@ -159,14 +159,14 @@ beside `op_name`, so the abbreviation is a specification fact rather than a tabl
 guesses from.
 
 ```
-was     mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float   109
-today   mooney_rivlin_kelvin_voigt_newmark_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa_float                      93
-target  mrkvn_elastic_phex8_gradient_pk_2p_i_msoa_float                                                                   46
+was     mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_gradient_packed_two_pass_isoparametric_mesh_soa_float   101
+today   mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_gradient_packed_two_pass_i_msoa_float                      85
+target  mrkv_elastic_phex8_gradient_pk_2p_i_msoa_float                                                             46
 ```
 
 The longest published name is the one worth quoting, because it is where every slot is
 occupied at once. The 16 characters between the first two lines are the geometry and the
-level; the remaining 47 are the four rows of the table that have not moved yet.
+level; the remaining 39 are the four rows of the table that have not moved yet.
 
 ## Temporaries
 

@@ -11,7 +11,7 @@
 #include "sfem_GeneratedNeoHookeanOgden.hpp"
 #include "sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
 #include "sfem_GeneratedBodyForce.hpp"
-#include "sfem_GeneratedMooneyRivlinKelvinVoigtNewmark.hpp"
+#include "sfem_GeneratedMooneyRivlinKelvinVoigt.hpp"
 #include "sfem_GeneratedTwoPhaseFlow.hpp"
 #include "sfem_GeneratedTwoPhaseFlow_c_abi.hpp"
 #include "smesh_sideset.hpp"
@@ -166,7 +166,7 @@ int test_node_wise_merit_includes_the_forcing() {
     // anything else, so the interior operator has to share that space.
     auto space = sfem::FunctionSpace::create(mesh, 3);
 
-    auto interior = sfem::Factory::create_op(space, "GeneratedMooneyRivlinKelvinVoigtNewmark");
+    auto interior = sfem::Factory::create_op(space, "GeneratedMooneyRivlinKelvinVoigt");
     SFEM_TEST_ASSERT(interior != nullptr);
     SFEM_TEST_ASSERT(interior->value_reduction() == sfem::Op::ValueReduction::NODE_WISE);
 

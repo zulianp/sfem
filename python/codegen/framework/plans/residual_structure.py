@@ -98,7 +98,7 @@ def publishes_scalar_jacobian_action(system, dependencies):
     This answers False for everything currently generated.  Instrumenting both
     call sites across a full regeneration recorded 148 entries and not one True:
     every residual material still in the tree -- navier_stokes, two_phase_flow,
-    mooney_rivlin_kelvin_voigt_newmark -- reaches this emitter through paths
+    mooney_rivlin_kelvin_voigt -- reaches this emitter through paths
     where the field count is not one, and the single-field residuals that would
     have taken it, laplace among them, are written as energies now and never
     arrive here at all.

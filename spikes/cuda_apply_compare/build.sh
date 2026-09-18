@@ -9,7 +9,7 @@
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$ROOT"
-MATERIALS=(laplace linear_elasticity neohookean_ogden mooney_rivlin_kelvin_voigt_newmark neumann)
+MATERIALS=(laplace linear_elasticity neohookean_ogden mooney_rivlin_kelvin_voigt neumann)
 rm -rf build && mkdir -p build
 
 # The inexact-apply operator needs SFEM's own compressed-tangent aliases at

@@ -1,0 +1,726 @@
+{
+  "c_abi": [
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_apply_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_apply_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_elastic_apply_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_apply_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_apply_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_elastic_apply_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_apply_packed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_packed_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_apply_packed_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_packed_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_apply_packed_two_pass_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_packed_two_pass_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_apply_packed_two_pass_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_apply_packed_two_pass_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_gradient_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_gradient_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_elastic_gradient_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_gradient_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_gradient_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_elastic_gradient_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_gradient_packed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_packed_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_gradient_packed_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_packed_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_gradient_packed_two_pass_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_packed_two_pass_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_gradient_packed_two_pass_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_gradient_packed_two_pass_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_hessian_bsr_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_hessian_bsr_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_hessian_bsr_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_hessian_bsr_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_elastic_objective_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_objective_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *mooney_rivlin_kelvin_voigt_elastic_objective_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_objective_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_objective_steps_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_objective_steps_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_objective_steps_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_objective_steps_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_objective_steps_packed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_packed_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_objective_steps_packed_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_packed_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t direction_stride,\n        const void *const RSTR u0_direction,\n        const void *const RSTR u1_direction,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        const void *const RSTR current,\n        const void *const RSTR previous,\n        const void *const RSTR direction,\n        void *const RSTR output\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t direction_stride,\n        const void *const RSTR u0_direction,\n        const void *const RSTR u1_direction,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const ptrdiff_t direction_stride,\n        const void *const RSTR u0_direction,\n        const void *const RSTR u1_direction,\n        const void *const RSTR u2_direction,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        const void *const RSTR current,\n        const void *const RSTR previous,\n        const void *const RSTR direction,\n        void *const RSTR output\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const ptrdiff_t direction_stride,\n        const void *const RSTR u0_direction,\n        const void *const RSTR u1_direction,\n        const void *const RSTR u2_direction,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_residual_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_residual_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        const void *const RSTR current,\n        const void *const RSTR previous,\n        void *const RSTR output\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_residual_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_residual_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        const void *const RSTR current,\n        const void *const RSTR previous,\n        void *const RSTR output\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_assembly_variant(const int variant);",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_assembly_variant_count();",
+      "name": "mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_assembly_variant_count"
+    }
+  ],
+  "factory": {
+    "class": "sfem::GeneratedMooneyRivlinKelvinVoigt",
+    "create": "sfem::GeneratedMooneyRivlinKelvinVoigt::create",
+    "create_from_yaml": "sfem::GeneratedMooneyRivlinKelvinVoigt::create_from_yaml"
+  },
+  "generated_include_paths": [
+    ".",
+    "d2",
+    "d2/proteus_quad4",
+    "d2/quad4",
+    "d2/tri3",
+    "d3",
+    "d3/hex8",
+    "d3/proteus_hex8",
+    "d3/tet10",
+    "d3/tet4",
+    "op",
+    "reference"
+  ],
+  "header_api": [
+    {
+      "gather_scatter": "external",
+      "header": "d2/proteus_quad4/mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d2/quad4/mooney_rivlin_kelvin_voigt_elastic_quad4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d2/tri3/mooney_rivlin_kelvin_voigt_elastic_tri3_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/hex8/mooney_rivlin_kelvin_voigt_elastic_hex8_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/proteus_hex8/mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/tet10/mooney_rivlin_kelvin_voigt_elastic_tet10_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/tet4/mooney_rivlin_kelvin_voigt_elastic_tet4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    }
+  ],
+  "material": "mooney_rivlin_kelvin_voigt",
+  "matrix_formats": [
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/proteus_quad4/mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/proteus_quad4/mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/quad4/mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/quad4/mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/tri3/mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/tri3/mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/hex8/mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/hex8/mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/proteus_hex8/mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/proteus_hex8/mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet10/mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet10/mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet4/mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet4/mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_format_operator.cpp"
+    }
+  ],
+  "op_name": "GeneratedMooneyRivlinKelvinVoigt",
+  "registration": {
+    "function": "sfem::register_GeneratedMooneyRivlinKelvinVoigt_generated_op",
+    "operator_name": "GeneratedMooneyRivlinKelvinVoigt",
+    "source": "op/sfem_GeneratedMooneyRivlinKelvinVoigt_registration.cpp"
+  },
+  "runtime_operations": [
+    {
+      "name": "apply",
+      "variants": [
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_apply_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_apply_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_apply_packed_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_apply_packed_two_pass_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_apply_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_apply_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_apply_packed_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_apply_packed_two_pass_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "gradient",
+      "variants": [
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_gradient_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_gradient_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_gradient_packed_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_gradient_packed_two_pass_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_gradient_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_gradient_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_gradient_packed_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_gradient_packed_two_pass_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "hessian_bsr",
+      "variants": [
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_hessian_bsr_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_hessian_bsr_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "jacobian_action",
+      "variants": [
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "objective_steps",
+      "variants": [
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_packed_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_elastic_objective_steps_packed_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_elastic",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "residual",
+      "variants": [
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_residual_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_residual_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_viscous",
+          "variant": "isoparametric"
+        }
+      ]
+    }
+  ],
+  "schema": "sfem.generated_op_manifest.v1",
+  "target": "openmp",
+  "wrapper": {
+    "c_abi_header": "op/sfem_GeneratedMooneyRivlinKelvinVoigt_c_abi.hpp",
+    "header": "op/sfem_GeneratedMooneyRivlinKelvinVoigt.hpp",
+    "source": "op/sfem_GeneratedMooneyRivlinKelvinVoigt.cpp"
+  }
+}

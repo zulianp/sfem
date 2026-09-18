@@ -944,52 +944,52 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
     CASES = (
         {
             'element': 'TET4',
-            'header': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_local.hpp',
             'dim': 3,
             'n_fields': 3,
             'n_qp': 1,
             'n_shape': 4,
-            'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_tet4_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_tet4_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_tet4_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_tet4_jacobian_action_block_contiguous',
             'reference': 'ref_tet4_q1',
             'quadrature': 'quad_tet_q1',
             'includes': ('tet4_q1.hpp', 'quad_tet_q1.hpp'),
         },
         {
             'element': 'TET10',
-            'header': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_local.hpp',
             'dim': 3,
             'n_fields': 3,
             'n_qp': 11,
             'n_shape': 10,
-            'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_simplex_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_jacobian_action_block_contiguous',
             'reference': 'ref_tet10_q11',
             'quadrature': 'quad_tet_q11',
             'includes': ('tet10_q11.hpp', 'quad_tet_q11.hpp'),
         },
         {
             'element': 'PROTEUS_HEX8',
-            'header': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_local.hpp',
             'dim': 3,
             'n_fields': 3,
             'n_qp': 8,
             'n_shape': 8,
-            'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d3_tensor_product_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_jacobian_action_block_contiguous',
             'reference': 'ref_line_p1_q2',
             'quadrature': 'quad_line_q2',
             'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),
         },
         {
             'element': 'PROTEUS_QUAD4',
-            'header': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_viscous_d2_tensor_product_local.hpp',
             'dim': 2,
             'n_fields': 2,
             'n_qp': 4,
             'n_shape': 4,
-            'assembly': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_newmark_viscous_d2_tensor_product_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d2_tensor_product_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d2_tensor_product_jacobian_action_block_contiguous',
             'reference': 'ref_line_p1_q2',
             'quadrature': 'quad_line_q2',
             'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),
@@ -1009,11 +1009,11 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
         if compiler is None:
             self.skipTest("C++ compiler is not available")
         tree = self._shipped_tree()
-        material = tree / "mooney_rivlin_kelvin_voigt_newmark"
+        material = tree / "mooney_rivlin_kelvin_voigt"
         if not material.is_dir():
             self.skipTest("the material is not in the shipped tree")
 
-        from codegen.framework.materials import mooney_rivlin_kelvin_voigt_newmark
+        from codegen.framework.materials import mooney_rivlin_kelvin_voigt
 
         for case in self.CASES:
             with self.subTest(element=case["element"]):
@@ -1021,7 +1021,7 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
                     case,
                     material / ("d%d" % case["dim"]),
                     tree,
-                    mooney_rivlin_kelvin_voigt_newmark.material,
+                    mooney_rivlin_kelvin_voigt.material,
                 )
 
     @staticmethod

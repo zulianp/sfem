@@ -25,7 +25,7 @@ export PYTHONPATH="$ROOT_DIR/python${PYTHONPATH:+:$PYTHONPATH}"
 # sympy caches its expression constructors, and the default ceiling of 1000
 # entries is far below what a hyperelastic material needs: the caches sit full
 # and evict entries that are about to be asked for again.  Raising it is worth
-# about a fifth of the wall time on mooney_rivlin_kelvin_voigt_newmark, for
+# about a fifth of the wall time on mooney_rivlin_kelvin_voigt, for
 # byte-identical output, and it saturates well below this value.
 export SYMPY_CACHE_SIZE="${SYMPY_CACHE_SIZE:-100000}"
 
@@ -103,7 +103,7 @@ generate_materials() {
     run_generator codegen.framework.generators.linear_elasticity "$@"
     run_generator codegen.framework.generators.laplace "$@"
     run_generator codegen.framework.generators.neohookean_ogden "$@"
-    run_generator codegen.framework.generators.mooney_rivlin_kelvin_voigt_newmark "$@"
+    run_generator codegen.framework.generators.mooney_rivlin_kelvin_voigt "$@"
     run_generator codegen.framework.generators.body_force "$@"
     run_generator codegen.framework.generators.neumann "$@"
     # shellcheck disable=SC2086

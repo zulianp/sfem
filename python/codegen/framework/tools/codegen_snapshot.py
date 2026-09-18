@@ -62,7 +62,7 @@ MATERIALS = (
     "linear_elasticity",
     "laplace",
     "neohookean_ogden",
-    "mooney_rivlin_kelvin_voigt_newmark",
+    "mooney_rivlin_kelvin_voigt",
     "body_force",
     "neumann",
     "neumann_general",

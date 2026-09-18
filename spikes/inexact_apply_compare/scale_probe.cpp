@@ -10,14 +10,14 @@
 #include "sfem_base.hpp"
 #include <omp.h>
 #include "kernel_math.hpp"
-#include "mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_inline.hpp"
+#include "mooney_rivlin_kelvin_voigt_elastic_tet4_inexact_apply_inline.hpp"
 #define ELEMENT_TET4
 #include "element_mesh.inc"
 #define TC 45
 
 #include "generated_abi.inc"
 
-extern "C" int mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_elastic_tet4_apply_a_msoa(
     const int,
     const ptrdiff_t, const ptrdiff_t, idx_t **const,
     const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
         hx[v]=0.05*std::sin(2*x+z); hy[v]=0.05*std::sin(y+2*z); hz[v]=0.05*std::sin(x+2*y); }
     std::vector<double> S((size_t)CS*TC);
     const geom_t *A[9]; for(int i=0;i<9;++i) A[i]=m.adj[i].data();
-    sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_tangent_a_msoa_impl<double,geom_t,double,16>(
+    sfem::codegen::mooney_rivlin_kelvin_voigt_elastic_tet4_inexact_apply_tangent_a_msoa_impl<double,geom_t,double,16>(
         EC, m.evp.data(), A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
         2.2, 1.3, 1, ux.data(),uy.data(),uz.data(), CS, S.data());
 
@@ -57,12 +57,12 @@ int main(int argc, char **argv) {
     std::printf("threads %d, %ld elements, ndof %ld, %d reps (timed region is the kernel only)\n",
                 omp_get_max_threads(), (long)EC, (long)ndof, reps);
     timed("exact", [&]{
-        mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_apply_a_msoa(SFEM_CODEGEN_F64,
+        mooney_rivlin_kelvin_voigt_elastic_tet4_apply_a_msoa(SFEM_CODEGEN_F64,
             EC, N, m.evp.data(), A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
             2.2, 1.3, 1, ux.data(),uy.data(),uz.data(), 1, hx.data(),hy.data(),hz.data(),
             1, ox.data(),oy.data(),oz.data()); });
     timed("stored f64", [&]{
-        sfem::codegen::mooney_rivlin_kelvin_voigt_newmark_elastic_tet4_inexact_apply_stored_a_msoa_impl<double,double,16>(
+        sfem::codegen::mooney_rivlin_kelvin_voigt_elastic_tet4_inexact_apply_stored_a_msoa_impl<double,double,16>(
             EC, m.evp.data(), CS, S.data(), 1, hx.data(),hy.data(),hz.data(),
             1, ox.data(),oy.data(),oz.data()); });
     return 0;

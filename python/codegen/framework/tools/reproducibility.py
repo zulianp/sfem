@@ -91,7 +91,7 @@ SKIPPED_BUDGET = {}
 MATERIALS = (
     "laplace",
     "linear_elasticity",
-    "mooney_rivlin_kelvin_voigt_newmark",
+    "mooney_rivlin_kelvin_voigt",
     "neohookean_ogden",
     "two_phase_flow",
 )
@@ -1539,6 +1539,28 @@ def _packed_parity(measured):
     return disagreements
 
 
+def _renamed_owner(name, digest):
+    """Carry a record's owning material across a rename of that material.
+
+    A kernel name begins with its material's, so renaming the material renames
+    every one of its kernels -- and the record also stores the material it came
+    from, which `_is_maintained` checks against `MATERIALS`.  Rewriting only the
+    keys leaves that field naming a material that no longer generates, so every
+    renamed record reads as belonging to nothing and the gate reports the whole
+    population as vanished and reappeared: the exact failure `--rename-map`
+    exists to avoid, one level down.
+
+    Re-derived from the new key rather than taken from the map's values,
+    because the map speaks about kernels and this is a fact about the material.
+    """
+    if not isinstance(digest, dict) or digest.get("material") in MATERIALS:
+        return digest
+    owners = [material for material in MATERIALS if name.startswith(material)]
+    if not owners:
+        return digest
+    return dict(digest, material=max(owners, key=len))
+
+
 def _is_maintained(name, digest):
     """Whether this baseline entry belongs to a material that still generates.
 
@@ -1890,7 +1912,10 @@ def main(argv=None):
             for name in collisions[:20]:
                 sys.stderr.write("    %s\n" % name)
             return 1
-        recorded = {renames.get(name, name): digest for name, digest in recorded.items()}
+        recorded = {
+            renames.get(name, name): _renamed_owner(renames.get(name, name), digest)
+            for name, digest in recorded.items()
+        }
         key_scope = {renames.get(name, name) for name in key_scope}
         print("rename map applied to %d baseline entries" % len(renames))
 
