@@ -1,0 +1,11 @@
+Correction: the set_initial_guess_zero mismatch described in this message was NOT pre-existing.
+
+The method was added to algebra/sfem_Multigrid.hpp on 2026-09-15 ("algebra: Multigrid tells
+its smoothers when pre-smoothing starts from zero"). The local build failed only because
+spikes/cvfem/build resolved SFEM_DIR against an INSTALLED prefix whose headers were dated
+17 Aug -- a month stale -- and the spike is standalone by design, always compiling against an
+installed SFEM rather than the working tree. Rebuilding and reinstalling SFEM resolves it.
+
+The same shape applies on Alps, but only partly: there the installed sfem_Multigrid.hpp is
+current (15 Sep, has the method), and only smesh_mesh.hpp is stale (14 Sep, no radial_grading),
+so that side needs a smesh reinstall rather than a full SFEM rebuild.
