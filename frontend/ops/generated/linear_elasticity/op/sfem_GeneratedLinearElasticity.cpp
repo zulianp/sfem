@@ -30,6 +30,15 @@ namespace sfem {
       }
     }
 
+    //! The part of the time discretisation that is not in this material's form:
+    //! the inertia.  It is a *potential* here, because this operator's 0-form
+    //! is one, so it reaches `value_steps` as well as `gradient` -- the energy
+    //! merit and the residual have to describe the same problem, or a line
+    //! search minimises something the Newton step is not solving.
+    std::shared_ptr<Op> time_scheme_term(const std::shared_ptr<TimeScheme> &scheme) {
+      return scheme ? scheme->inertia_op() : nullptr;
+    }
+
         struct AffineOption {
       const char *name;
       bool       *flag;
@@ -258,6 +267,7 @@ namespace sfem {
 
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
+    std::shared_ptr<TimeScheme> time_scheme;
     std::unique_ptr<real_t[]> element_values;
     ptrdiff_t element_capacity{0};
     bool objective_uses_affine{false};
@@ -570,8 +580,24 @@ namespace sfem {
     return SFEM_SUCCESS;
   }
 
+  void GeneratedLinearElasticity::set_time_scheme(const std::shared_ptr<TimeScheme> &scheme) {
+    SFEM_TRACE_SCOPE("GeneratedLinearElasticity::set_time_scheme");
+    if (impl_->time_scheme) {
+      impl_->time_scheme->release(this);
+    }
+    impl_->time_scheme = scheme;
+    if (scheme) {
+      scheme->claim(this);
+    }
+  }
+
   int GeneratedLinearElasticity::gradient(const real_t *const x, real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedLinearElasticity::gradient");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->gradient(x, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -667,6 +693,11 @@ namespace sfem {
                       const real_t *const h,
                       real_t *const out) {
     SFEM_TRACE_SCOPE("GeneratedLinearElasticity::apply");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->apply(x, h, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
@@ -784,6 +815,14 @@ namespace sfem {
     if (nsteps <= 0) {
       return SFEM_SUCCESS;
     }
+    // The scheme's potential, at every trial step the line search asks about.
+    // `value` is `value_steps` at one step of length zero, so adding it here
+    // covers both and cannot let them disagree.
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->value_steps(x, h, nsteps, steps, out) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
     return impl_->domains->iterate([&](const OpDomain &domain) {
       const ptrdiff_t nelements = domain.block->n_elements();
       const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
@@ -874,11 +913,16 @@ namespace sfem {
     });
   }
 
-  int GeneratedLinearElasticity::hessian_crs(const real_t *const,
+  int GeneratedLinearElasticity::hessian_crs(const real_t *const x,
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_crs");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_crs(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
 
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
@@ -897,11 +941,16 @@ namespace sfem {
     });
   }
 
-  int GeneratedLinearElasticity::hessian_bsr(const real_t *const,
+  int GeneratedLinearElasticity::hessian_bsr(const real_t *const x,
               const count_t *const rowptr,
               const idx_t *const colidx,
               real_t *const values) {
     SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_bsr");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_bsr(x, rowptr, colidx, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
 
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
@@ -921,9 +970,14 @@ namespace sfem {
 
 
 
-  int GeneratedLinearElasticity::hessian_block_diag_sym(const real_t *const,
+  int GeneratedLinearElasticity::hessian_block_diag_sym(const real_t *const x,
                                        real_t *const values) {
     SFEM_TRACE_SCOPE("GeneratedLinearElasticity::hessian_block_diag_sym");
+    if (auto term = time_scheme_term(impl_->time_scheme)) {
+      if (term->hessian_block_diag_sym(x, values) != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+      }
+    }
 
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);

@@ -731,6 +731,110 @@ int test_the_schemes_potential_differentiates_to_its_residual() {
     return SFEM_TEST_SUCCESS;
 }
 
+/// An energy material carries the scheme's potential, not just its residual.
+///
+/// `hyperelasticity_bdf2` adds the elastic energy and the inertia to the
+/// `Function` as two operators, and that works only because the driver
+/// remembers to.  A material that holds the scheme contributes the term
+/// itself, and for an energy system the term is a *potential*: it has to
+/// appear in `value` and in `value_steps`, or the merit a line search
+/// minimises is not the functional whose stationary point the Newton step is
+/// looking for.
+///
+/// Checked three ways against the same operator with no scheme attached: the
+/// energy grows by exactly the inertia's potential, the residual grows by
+/// exactly its gradient, and the two stay each other's derivative.
+int test_an_energy_material_carries_the_schemes_potential() {
+    auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto space = sfem::FunctionSpace::create(mesh, 3);
+    auto op    = sfem::Factory::create_op(space, "GeneratedNeoHookeanOgden");
+    SFEM_TEST_ASSERT(op != nullptr);
+    for (const auto &block : mesh->blocks()) {
+        op->set_value_in_block(block->name(), "mu", real_t(3));
+        op->set_value_in_block(block->name(), "lmbda", real_t(1));
+    }
+
+    const ptrdiff_t ndofs = space->n_dofs();
+    const real_t    dt    = real_t(0.05);
+
+    auto steppable = std::dynamic_pointer_cast<sfem::TimeSteppable>(op);
+    SFEM_TEST_ASSERT(steppable != nullptr);
+
+    auto scheme = std::make_shared<sfem::NewmarkScheme>(space);
+    scheme->set_density(real_t(2));
+    SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
+    seed_state(ndofs, 0, scheme->state()->data());
+    seed_state(ndofs, 1, scheme->velocity()->data());
+    seed_state(ndofs, 2, scheme->acceleration()->data());
+    scheme->begin_step(dt, dt);
+
+    auto x = sfem::create_host_buffer<real_t>(ndofs);
+    auto d = sfem::create_host_buffer<real_t>(ndofs);
+    seed_state(ndofs, 5, x->data());
+    seed_state(ndofs, 6, d->data());
+
+    // Without the scheme: the material alone.
+    real_t bare_value = 0;
+    auto   bare_grad  = sfem::create_host_buffer<real_t>(ndofs);
+    SFEM_TEST_ASSERT(op->value(x->data(), &bare_value) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op->gradient(x->data(), bare_grad->data()) == SFEM_SUCCESS);
+
+    // The term on its own.
+    auto   inertia    = scheme->inertia_op();
+    real_t term_value = 0;
+    auto   term_grad  = sfem::create_host_buffer<real_t>(ndofs);
+    SFEM_TEST_ASSERT(inertia->value(x->data(), &term_value) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(inertia->gradient(x->data(), term_grad->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(term_value != real_t(0));
+
+    // With the scheme held: both halves must have arrived.
+    steppable->set_time_scheme(scheme);
+
+    real_t held_value = 0;
+    auto   held_grad  = sfem::create_host_buffer<real_t>(ndofs);
+    SFEM_TEST_ASSERT(op->value(x->data(), &held_value) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op->gradient(x->data(), held_grad->data()) == SFEM_SUCCESS);
+
+    SFEM_TEST_ASSERT(std::abs(held_value - (bare_value + term_value)) <=
+                     real_t(1e-12) * (1 + std::abs(held_value)));
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        const real_t want = bare_grad->data()[i] + term_grad->data()[i];
+        SFEM_TEST_ASSERT(std::abs(held_grad->data()[i] - want) <= real_t(1e-12) * (1 + std::abs(want)));
+    }
+
+    // `value` is `value_steps` at one step of length zero, and a line search
+    // uses the latter, so the potential has to be in both.
+    real_t       stepped = 0;
+    const real_t step    = real_t(1e-3);
+    SFEM_TEST_ASSERT(op->value_steps(x->data(), d->data(), 1, &step, &stepped) == SFEM_SUCCESS);
+
+    auto xs = sfem::create_host_buffer<real_t>(ndofs);
+    for (ptrdiff_t i = 0; i < ndofs; ++i) xs->data()[i] = x->data()[i] + step * d->data()[i];
+    real_t direct = 0;
+    SFEM_TEST_ASSERT(op->value(xs->data(), &direct) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(std::abs(direct - stepped) <= real_t(1e-10) * (1 + std::abs(direct)));
+
+    // And the merit is still the potential of the residual the Newton step uses.
+    real_t slope = 0;
+    for (ptrdiff_t i = 0; i < ndofs; ++i) slope += held_grad->data()[i] * d->data()[i];
+
+    const real_t eps = real_t(1e-6);
+    real_t       vp = 0, vm = 0;
+    auto         xp = sfem::create_host_buffer<real_t>(ndofs);
+    auto         xm = sfem::create_host_buffer<real_t>(ndofs);
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        xp->data()[i] = x->data()[i] + eps * d->data()[i];
+        xm->data()[i] = x->data()[i] - eps * d->data()[i];
+    }
+    SFEM_TEST_ASSERT(op->value(xp->data(), &vp) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(op->value(xm->data(), &vm) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(std::abs(slope) > 0);
+    SFEM_TEST_ASSERT(std::abs((vp - vm) / (2 * eps) - slope) <= real_t(1e-5) * std::abs(slope));
+
+    steppable->set_time_scheme(nullptr);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_the_material_reads_the_scheme_it_was_handed);
@@ -742,6 +846,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_the_schemes_have_the_order_they_claim);
     SFEM_RUN_TEST(test_the_diagnostic_matches_the_scheme);
     SFEM_RUN_TEST(test_the_schemes_potential_differentiates_to_its_residual);
+    SFEM_RUN_TEST(test_an_energy_material_carries_the_schemes_potential);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
