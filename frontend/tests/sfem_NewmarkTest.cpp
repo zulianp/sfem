@@ -4,6 +4,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_NewmarkScheme.hpp"
 
 std::shared_ptr<sfem::Function> create_elasticity_function() {
     auto     es   = sfem::EXECUTION_SPACE_HOST;
@@ -189,9 +190,16 @@ int test_newmark() {
     auto blas = sfem::blas<real_t>(es);
 
     const ptrdiff_t ndofs        = fs->n_dofs();
-    auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
-    auto            velocity     = sfem::create_buffer<real_t>(ndofs, es);
-    auto            acceleration = sfem::create_buffer<real_t>(ndofs, es);
+    // beta = 1/4 and gamma = 1/2 -- `NewmarkScheme`'s defaults -- are what the
+    // literal 4/(dt*dt) and 2/dt in this loop used to mean.
+    auto scheme = std::make_shared<sfem::NewmarkScheme>(fs);
+    SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
+    auto            displacement = scheme->state();
+    auto            velocity     = scheme->velocity();
+    auto            acceleration = scheme->acceleration();
+    // Somewhere to put the velocity the reconstruction also produces; this
+    // test's inertia is mass times acceleration and does not read it.
+    auto            rate         = sfem::create_buffer<real_t>(ndofs, es);
 
     auto increment = sfem::create_buffer<real_t>(ndofs, es);
     auto solution  = sfem::create_buffer<real_t>(ndofs, es);
@@ -217,6 +225,9 @@ int test_newmark() {
     }
 
     while (t < T) {
+        scheme->begin_step(t, dt);
+        const real_t alpha_a = scheme->weight("alpha_a");
+
         for (int k = 0; k < nliter; k++) {
             // This could be put out of the loop since the operator is linear.
             // We will do nonlinear materials next, so we keep it here.
@@ -228,7 +239,7 @@ int test_newmark() {
                         {
                             SFEM_TRACE_SCOPE("Newmark::hessian_apply_integr");
                             blas->xypaz(ndofs, x, mass_vector->data(), 0, y);
-                            blas->scal(ndofs, 4 / (dt * dt), y);
+                            blas->scal(ndofs, alpha_a, y);
                         }
                         material_op->apply(x, y);
                     },
@@ -237,12 +248,9 @@ int test_newmark() {
             auto solver     = sfem::create_cg<real_t>(linear_op, es);
             solver->verbose = false;
 
-            // Use increment as temp buffer
-            blas->zeros(ndofs, increment->data());
-            blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
-            blas->axpy(ndofs, -dt, velocity->data(), increment->data());
-            blas->scal(ndofs, 4 / (dt * dt), increment->data());
-            blas->axpy(ndofs, -1, acceleration->data(), increment->data());
+            // The acceleration Newmark implies at this iterate, times the
+            // lumped mass: this test carries its own inertia term.
+            scheme->reconstruct(solution->data(), rate->data(), increment->data());
             blas->xypaz(ndofs, increment->data(), mass_vector->data(), 0, g->data());
 
             // Adds material gradient computation to g
@@ -253,21 +261,7 @@ int test_newmark() {
             blas->axpy(ndofs, -1, increment->data(), solution->data());
         }
 
-        ////////////////////////////////
-        // Update all quantities
-        ////////////////////////////////
-
-        // acceleration
-        blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
-        blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
-        blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
-
-        // velocity
-        blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
-        blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
-
-        // displacement
-        blas->copy(ndofs, solution->data(), displacement->data());
+        scheme->advance(solution->data());
 
         t += dt;
         if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
