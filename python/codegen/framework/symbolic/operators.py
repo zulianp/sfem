@@ -61,7 +61,12 @@ def _time_rate_gradient(rate, dim):
 
 
 def div(expr, dim=None):
-    if isinstance(expr, (SymbolicField, SymbolicArgument)):
+    # A rate goes through `grad` like a field does: `grad` knows how to sum a
+    # `TimeRate`'s terms, and the divergence is the trace of what comes back.
+    # Without this a rate reached `value` instead and arrived here as a column,
+    # which reads as "not a gradient" -- the error a poroelastic material writing
+    # `div(dt(u))` got.
+    if isinstance(expr, (SymbolicField, SymbolicArgument, TimeRate)):
         expr = grad(expr, dim)
     else:
         expr = value(expr)
