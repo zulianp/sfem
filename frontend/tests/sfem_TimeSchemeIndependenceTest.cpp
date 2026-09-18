@@ -15,6 +15,7 @@
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_BDF2Scheme.hpp"
 #include "sfem_BackwardEulerScheme.hpp"
 #include "sfem_NewmarkScheme.hpp"
 #include "sfem_TimeScheme.hpp"
@@ -415,6 +416,141 @@ namespace {
 
 }  // namespace
 
+/// BDF2 reproduces the algebra `hyperelasticity_bdf2` folded into its own step
+/// loop as literal constants.
+///
+/// The driver predicted with `4/3 u_n - 1/3 u_nm1 + 8/9 dt v_n - 2/9 dt v_nm1`,
+/// set the inertia's alpha to `9/(4 dt^2)`, and reconstructed the velocity as
+/// `(3u - 4u_n + u_nm1)/(2dt)`, with a backward-Euler first step because BDF2
+/// is not self-starting.  Every one of those is checked here against a value
+/// written out by hand, because the point of moving them into a scheme is that
+/// the driver stops restating them -- and a move is only safe if what arrives
+/// is the same arithmetic.
+int test_bdf2_matches_the_hand_written_algebra() {
+    auto         fixture = make_fixture();
+    const real_t dt      = real_t(0.05);
+
+    auto scheme = std::make_shared<sfem::BDF2Scheme>(fixture.space);
+    scheme->set_density(real_t(2));
+    SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
+
+    auto u0 = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    auto v0 = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    seed_state(fixture.ndofs, 0, u0->data());
+    seed_state(fixture.ndofs, 1, v0->data());
+    std::copy(u0->data(), u0->data() + fixture.ndofs, scheme->state()->data());
+    std::copy(v0->data(), v0->data() + fixture.ndofs, scheme->velocity()->data());
+
+    // Step one is backward Euler: v = (u - u_n)/dt, a = (v - v_n)/dt.
+    scheme->begin_step(dt, dt);
+    SFEM_TEST_ASSERT(std::abs(scheme->shift() - 1 / dt) <= 1e-12);
+    SFEM_TEST_ASSERT(std::abs(scheme->weight("alpha_a") - 1 / (dt * dt)) <= 1e-12);
+    SFEM_TEST_ASSERT(scheme->weight("order") == real_t(1));
+    for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+        SFEM_TEST_ASSERT(std::abs(scheme->history()[i] - (-u0->data()[i] / dt)) <= 1e-12);
+    }
+
+    auto x1 = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    seed_state(fixture.ndofs, 3, x1->data());
+
+    auto v1 = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    auto a1 = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    scheme->reconstruct(x1->data(), v1->data(), a1->data());
+    for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+        const real_t v_be = (x1->data()[i] - u0->data()[i]) / dt;
+        const real_t u_hat = u0->data()[i] + dt * v0->data()[i];
+        SFEM_TEST_ASSERT(std::abs(v1->data()[i] - v_be) <= 1e-12);
+        SFEM_TEST_ASSERT(std::abs(a1->data()[i] - (x1->data()[i] - u_hat) / (dt * dt)) <= 1e-12);
+    }
+
+    scheme->advance(x1->data());
+
+    // Step two, and every step after it, is BDF2 proper.
+    scheme->begin_step(2 * dt, dt);
+    SFEM_TEST_ASSERT(std::abs(scheme->shift() - real_t(1.5) / dt) <= 1e-12);
+    SFEM_TEST_ASSERT(std::abs(scheme->weight("alpha_a") - real_t(2.25) / (dt * dt)) <= 1e-12);
+    SFEM_TEST_ASSERT(scheme->weight("order") == real_t(2));
+
+    auto x2 = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    seed_state(fixture.ndofs, 4, x2->data());
+
+    auto v2 = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    auto a2 = sfem::create_host_buffer<real_t>(fixture.ndofs);
+    scheme->reconstruct(x2->data(), v2->data(), a2->data());
+    for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+        // The driver's `bdf2_predictor` and `update_velocity_bdf2`, written out.
+        const real_t u_n = x1->data()[i], u_nm1 = u0->data()[i];
+        const real_t v_n = v1->data()[i], v_nm1 = v0->data()[i];
+        const real_t u_hat = real_t(4.0 / 3.0) * u_n - real_t(1.0 / 3.0) * u_nm1 +
+                             real_t(8.0 / 9.0) * dt * v_n - real_t(2.0 / 9.0) * dt * v_nm1;
+        const real_t v_bdf2 = (3 * x2->data()[i] - 4 * u_n + u_nm1) / (2 * dt);
+        const real_t a_bdf2 = real_t(2.25) / (dt * dt) * (x2->data()[i] - u_hat);
+
+        SFEM_TEST_ASSERT(std::abs(scheme->history()[i] - (-2 * u_n + real_t(0.5) * u_nm1) / dt) <= 1e-12);
+        SFEM_TEST_ASSERT(std::abs(v2->data()[i] - v_bdf2) <= 1e-12);
+        SFEM_TEST_ASSERT(std::abs(a2->data()[i] - a_bdf2) <= 1e-12);
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
+/// The two schemes are of different order, and the published interface is
+/// enough to show it.
+///
+/// `shift` and `history` are all a material is given, so integrating a problem
+/// with them is exactly what a kernel does.  On `u' = -u` the discrete equation
+/// `shift*u + z = -u` closes in one line, and the error at t=1 under halving dt
+/// has to fall by 2 for backward Euler and by 4 for BDF2.  That is the claim
+/// that makes having two schemes worth anything: they are not two spellings of
+/// the same method.
+int test_the_schemes_have_the_order_they_claim() {
+    auto fixture = make_fixture();
+
+    auto error_at_one = [&](const bool second_order, const int n_steps) -> real_t {
+        const real_t dt = real_t(1) / n_steps;
+
+        std::shared_ptr<sfem::TimeScheme> scheme;
+        std::shared_ptr<sfem::Buffer<real_t>> state;
+        if (second_order) {
+            auto s = std::make_shared<sfem::BDF2Scheme>(fixture.space);
+            s->set_density(real_t(1));
+            if (s->initialize() != SFEM_SUCCESS) return real_t(-1);
+            state  = s->state();
+            scheme = s;
+        } else {
+            auto s = std::make_shared<sfem::BackwardEulerScheme>(fixture.space);
+            if (s->initialize() != SFEM_SUCCESS) return real_t(-1);
+            state  = s->state();
+            scheme = s;
+        }
+
+        std::fill(state->data(), state->data() + fixture.ndofs, real_t(1));
+
+        auto x = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        for (int step = 1; step <= n_steps; ++step) {
+            scheme->begin_step(step * dt, dt);
+            // u' = -u  =>  shift*u + z = -u  =>  u = -z/(shift + 1).
+            const real_t s = scheme->shift();
+            for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+                x->data()[i] = -scheme->history()[i] / (s + 1);
+            }
+            scheme->advance(x->data());
+        }
+        return std::abs(x->data()[0] - std::exp(real_t(-1)));
+    };
+
+    for (int second = 0; second < 2; ++second) {
+        const real_t coarse = error_at_one(second != 0, 40);
+        const real_t fine   = error_at_one(second != 0, 80);
+        SFEM_TEST_ASSERT(coarse > 0 && fine > 0);
+        const real_t rate   = std::log2(coarse / fine);
+        const real_t want   = second ? real_t(2) : real_t(1);
+        SFEM_TEST_ASSERT(std::abs(rate - want) < real_t(0.15));
+    }
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_the_material_reads_the_scheme_it_was_handed);
@@ -422,6 +558,8 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_the_merit_reads_what_the_residual_reads);
     SFEM_RUN_TEST(test_advance_reconstructs_the_state);
     SFEM_RUN_TEST(test_a_first_order_scheme_runs_the_same_material);
+    SFEM_RUN_TEST(test_bdf2_matches_the_hand_written_algebra);
+    SFEM_RUN_TEST(test_the_schemes_have_the_order_they_claim);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

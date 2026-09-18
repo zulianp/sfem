@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "sfem_API.hpp"
-#include "sfem_InertiaPotential.hpp"
+#include "sfem_BDF2Scheme.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_NeumannConditions.hpp"
@@ -242,68 +242,6 @@ namespace {
         return ret;
     }
 
-    void bdf2_predictor_be(const ptrdiff_t     n,
-                           const real_t        dt,
-                           const real_t *const u_n,
-                           const real_t *const v_n,
-                           real_t *const       u_hat) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            u_hat[i] = u_n[i] + dt * v_n[i];
-        }
-    }
-
-    void bdf2_predictor(const ptrdiff_t     n,
-                        const real_t        dt,
-                        const real_t *const u_n,
-                        const real_t *const u_nm1,
-                        const real_t *const v_n,
-                        const real_t *const v_nm1,
-                        real_t *const       u_hat) {
-        const real_t a0 = real_t(4.0 / 3.0);
-        const real_t a1 = real_t(-1.0 / 3.0);
-        const real_t b0 = real_t(8.0 / 9.0) * dt;
-        const real_t b1 = real_t(-2.0 / 9.0) * dt;
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            u_hat[i] = a0 * u_n[i] + a1 * u_nm1[i] + b0 * v_n[i] + b1 * v_nm1[i];
-        }
-    }
-
-    void update_velocity_be(const ptrdiff_t     n,
-                            const real_t        inv_dt,
-                            const real_t *const u_np1,
-                            const real_t *const u_n,
-                            real_t *const       v_np1) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            v_np1[i] = inv_dt * (u_np1[i] - u_n[i]);
-        }
-    }
-
-    void update_velocity_bdf2(const ptrdiff_t     n,
-                              const real_t        inv_2dt,
-                              const real_t *const u_np1,
-                              const real_t *const u_n,
-                              const real_t *const u_nm1,
-                              real_t *const       v_np1) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            v_np1[i] = inv_2dt * (3 * u_np1[i] - 4 * u_n[i] + u_nm1[i]);
-        }
-    }
-
-    void update_acceleration(const ptrdiff_t     n,
-                             const real_t        inv_dt,
-                             const real_t *const v_np1,
-                             const real_t *const v_n,
-                             real_t *const       a_np1) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            a_np1[i] = inv_dt * (v_np1[i] - v_n[i]);
-        }
-    }
 
     idx_t nearest_node(const std::shared_ptr<sfem::Mesh> &mesh, const geom_t target[3]) {
         const int       dim    = mesh->spatial_dimension();
@@ -439,12 +377,16 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     set_material_parameters(env, elastic_op, mesh);
     f->add_operator(elastic_op);
 
-    auto inertia_op = std::make_shared<sfem::InertiaPotential>(fs);
-    inertia_op->set_density(env.rho);
-    if (inertia_op->initialize() != SFEM_SUCCESS) {
+    // BDF2 as an object rather than as constants in the step loop below.  The
+    // elastic material here has no rate of its own -- the dynamics are entirely
+    // the method's inertia -- so there is no `TimeSteppable` to hand the scheme
+    // to, and the separable term is added here directly.
+    auto scheme = std::make_shared<sfem::BDF2Scheme>(fs);
+    scheme->set_density(env.rho);
+    if (scheme->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
-    f->add_operator(inertia_op);
+    f->add_operator(scheme->inertia_op());
 
     if (dirichlet_path.to_string() != "NONE") {
         auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
@@ -470,19 +412,15 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            blas  = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
-    auto u_nm1 = sfem::create_host_buffer<real_t>(ndofs);
-    auto u_n   = sfem::create_host_buffer<real_t>(ndofs);
+    auto u_n   = scheme->state();
     auto u     = sfem::create_host_buffer<real_t>(ndofs);
-    auto v_nm1 = sfem::create_host_buffer<real_t>(ndofs);
-    auto v_n   = sfem::create_host_buffer<real_t>(ndofs);
+    auto v_n   = scheme->velocity();
     auto v     = sfem::create_host_buffer<real_t>(ndofs);
     auto a     = sfem::create_host_buffer<real_t>(ndofs);
     auto rhs   = sfem::create_host_buffer<real_t>(ndofs);
     auto incr  = sfem::create_host_buffer<real_t>(ndofs);
 
-    auto u_hat = inertia_op->u_hat();
     f->apply_constraints(u_n->data());
-    f->apply_constraints(u_nm1->data());
     f->apply_constraints(u->data());
 
     // Whether the linear operator reads a stored tangent decides whether the
@@ -568,13 +506,10 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
         scale_neumann_values(neumann_conditions, neumann_base_values, load_factor(env, t));
 
-        if (step == 1) {
-            inertia_op->set_alpha(1 / (env.dt * env.dt));
-            bdf2_predictor_be(ndofs, env.dt, u_n->data(), v_n->data(), u_hat->data());
-        } else {
-            inertia_op->set_alpha(real_t(9.0 / 4.0) / (env.dt * env.dt));
-            bdf2_predictor(ndofs, env.dt, u_n->data(), u_nm1->data(), v_n->data(), v_nm1->data(), u_hat->data());
-        }
+        // The predictor, the shift and the inertia's alpha, including the
+        // backward-Euler first step BDF2 needs to start.  All of it belongs to
+        // the method, so none of it is spelled here any more.
+        scheme->begin_step(t, env.dt);
 
         blas->copy(ndofs, u_n->data(), u->data());
         f->apply_constraints(u->data());
@@ -694,12 +629,9 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             }
         }
 
-        if (step == 1) {
-            update_velocity_be(ndofs, 1 / env.dt, u->data(), u_n->data(), v->data());
-        } else {
-            update_velocity_bdf2(ndofs, 1 / (2 * env.dt), u->data(), u_n->data(), u_nm1->data(), v->data());
-        }
-        update_acceleration(ndofs, 1 / env.dt, v->data(), v_n->data(), a->data());
+        // Read the derived states before advancing, because `advance` rotates
+        // the history they are reconstructed from.
+        scheme->reconstruct(u->data(), v->data(), a->data());
 
         if (step % env.export_freq == 0 || step == env.n_steps) {
             out->write_time_step("disp", t, u->data());
@@ -710,10 +642,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
         write_control_point(control_csv, t, block_size, control_node, u->data(), v->data(), a->data());
 
-        blas->copy(ndofs, u_n->data(), u_nm1->data());
-        blas->copy(ndofs, u->data(), u_n->data());
-        blas->copy(ndofs, v_n->data(), v_nm1->data());
-        blas->copy(ndofs, v->data(), v_n->data());
+        scheme->advance(u->data());
     }
 
     if (!comm->rank()) {
