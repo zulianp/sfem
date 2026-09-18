@@ -63,6 +63,7 @@ MATERIALS = (
     "laplace",
     "neohookean_ogden",
     "mooney_rivlin_kelvin_voigt_newmark",
+    "body_force",
     "neumann",
     "neumann_general",
     "two_phase_flow",

@@ -3,7 +3,12 @@
 
 #include <stddef.h>
 #include <cstdio>
+#if defined(__has_include)
+#if __has_include(<cuda_runtime.h>)
 #include <cuda_runtime.h>
+#define SFEM_CODEGEN_HAS_DEVICE_RUNTIME
+#endif
+#endif
 
 #ifndef SFEM_SUCCESS
 #define SFEM_SUCCESS 0
@@ -43,6 +48,7 @@ static SFEM_CODEGEN_HOST_INLINE int unsupported_dispatch(
   return SFEM_FAILURE;
 }
 
+#ifdef SFEM_CODEGEN_HAS_DEVICE_RUNTIME
 //! Reports a kernel launch that did not start.
 //!
 //! Without this an entry point returns `SFEM_SUCCESS` for a launch it
@@ -56,6 +62,7 @@ static SFEM_CODEGEN_HOST_INLINE int launch_status(const char *const name) {
   }
   return SFEM_SUCCESS;
 }
+#endif
 
 struct KernelDiagnostics {
   const char *kernel_name;

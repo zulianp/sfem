@@ -104,6 +104,7 @@ generate_materials() {
     run_generator codegen.framework.generators.laplace "$@"
     run_generator codegen.framework.generators.neohookean_ogden "$@"
     run_generator codegen.framework.generators.mooney_rivlin_kelvin_voigt_newmark "$@"
+    run_generator codegen.framework.generators.body_force "$@"
     run_generator codegen.framework.generators.neumann "$@"
     # shellcheck disable=SC2086
     run_generator codegen.framework.generators.neumann_general ${SFEM_NEUMANN_GENERAL_ARGS:-} "$@"

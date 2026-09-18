@@ -16,6 +16,7 @@ driver included.
 """
 
 from codegen.framework.forms.forms import FormOrder
+from codegen.framework.plans.dependencies import publishes_kernel
 from codegen.framework.plans.generation import (
     BlockPlan,
     LocalPhase,
@@ -110,6 +111,35 @@ def publishes_scalar_jacobian_action(system, dependencies):
     still works.
     """
     return len(system.fields) == 1 and bool(dependencies.direction)
+
+
+def published_jacobian_blocks(system, action_dependencies):
+    """The Jacobian blocks this system actually publishes a kernel for.
+
+    `CoupledResidualSystem.jacobian_blocks` enumerates the full cross product of
+    the fields, because that is the shape a Jacobian has.  Whether any of them
+    is *emitted* is a different question, and `plans.dependencies.publishes_kernel`
+    already answers it -- a form that contracts nothing onto the test functions
+    has no kernel, "and the local block, the element entry point, the mesh
+    kernels, their diagnostics record and their C ABI entries all follow from
+    that".
+
+    The diagnostics half of that sentence had no implementation.  A residual
+    that is linear in the test function reads no trial field at all -- a body
+    force `-rho * g . v` is the example -- so its Jacobian is identically zero,
+    no block kernel is emitted, and the lowering drops the blocks from the form
+    metadata the diagnostics plan is built from.  The emitter went on asking for
+    a record per block anyway, and generation refused with "diagnostics plan is
+    missing entries" before writing a file.
+
+    One helper rather than the same test at each site, because the two sites
+    have to agree: the list the plan is asked to carry and the list the source
+    advertises are the same list, or validating one against the other says
+    nothing.
+    """
+    if not publishes_kernel(action_dependencies):
+        return ()
+    return tuple(system.jacobian_blocks())
 
 
 def jacobian_block_plan(block):

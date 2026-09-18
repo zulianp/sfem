@@ -1,0 +1,110 @@
+{
+  "c_abi": [
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *body_force_jacobian_action_2d_esoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "body_force_jacobian_action_2d_esoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *body_force_jacobian_action_3d_esoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "body_force_jacobian_action_3d_esoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int body_force_residual_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_det0,\n        const real_t density,\n        const real_t g0,\n        const real_t g1,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "body_force_residual_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *body_force_residual_2d_esoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "body_force_residual_2d_esoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int body_force_residual_2d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        void *const RSTR output\n);",
+      "name": "body_force_residual_2d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int body_force_residual_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t density,\n        const real_t g0,\n        const real_t g1,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "body_force_residual_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int body_force_residual_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_det0,\n        const real_t density,\n        const real_t g0,\n        const real_t g1,\n        const real_t g2,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "body_force_residual_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *body_force_residual_3d_esoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "body_force_residual_3d_esoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int body_force_residual_3d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        void *const RSTR output\n);",
+      "name": "body_force_residual_3d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int body_force_residual_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t density,\n        const real_t g0,\n        const real_t g1,\n        const real_t g2,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "body_force_residual_3d_i_msoa"
+    }
+  ],
+  "factory": {
+    "class": "sfem::GeneratedBodyForce",
+    "create": "sfem::GeneratedBodyForce::create",
+    "create_from_yaml": "sfem::GeneratedBodyForce::create_from_yaml"
+  },
+  "generated_include_paths": [
+    ".",
+    "d2",
+    "d2/proteus_quad4",
+    "d2/quad4",
+    "d2/tri3",
+    "d3",
+    "d3/hex8",
+    "d3/proteus_hex8",
+    "d3/tet10",
+    "d3/tet4",
+    "op",
+    "reference"
+  ],
+  "header_api": [],
+  "material": "body_force",
+  "matrix_formats": [],
+  "op_name": "GeneratedBodyForce",
+  "registration": {
+    "function": "sfem::register_GeneratedBodyForce_generated_op",
+    "operator_name": "GeneratedBodyForce",
+    "source": "op/sfem_GeneratedBodyForce_registration.cpp"
+  },
+  "runtime_operations": [
+    {
+      "name": "residual",
+      "variants": [
+        {
+          "function": "body_force_residual_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "body_force",
+          "variant": "affine"
+        },
+        {
+          "function": "body_force_residual_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "body_force",
+          "variant": "affine"
+        },
+        {
+          "function": "body_force_residual_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "body_force",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "body_force_residual_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "body_force",
+          "variant": "isoparametric"
+        }
+      ]
+    }
+  ],
+  "schema": "sfem.generated_op_manifest.v1",
+  "target": "openmp",
+  "wrapper": {
+    "c_abi_header": "op/sfem_GeneratedBodyForce_c_abi.hpp",
+    "header": "op/sfem_GeneratedBodyForce.hpp",
+    "source": "op/sfem_GeneratedBodyForce.cpp"
+  }
+}

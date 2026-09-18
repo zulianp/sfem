@@ -10,6 +10,7 @@
 #include "generated/neumann_general/op/sfem_GeneratedNeumannGeneral_c_abi.hpp"
 #include "sfem_GeneratedNeoHookeanOgden.hpp"
 #include "sfem_GeneratedNeoHookeanOgden_c_abi.hpp"
+#include "sfem_GeneratedBodyForce.hpp"
 #include "sfem_GeneratedMooneyRivlinKelvinVoigtNewmark.hpp"
 #include "sfem_GeneratedTwoPhaseFlow.hpp"
 #include "sfem_GeneratedTwoPhaseFlow_c_abi.hpp"
@@ -283,6 +284,78 @@ int test_forcing_operator_reports_its_linear_work() {
     return SFEM_TEST_SUCCESS;
 }
 
+
+// A body force is `rho * g` weighted by `int(phi_i)`, and row-sum lumping of the
+// mass matrix gives exactly that integral: `M_ii = sum_j int(phi_i phi_j) =
+// int(phi_i * sum_j phi_j) = int(phi_i)` by partition of unity.  So for a
+// constant force the consistent load vector this operator assembles and the
+// lumped construction the drivers built by hand are the same vector, not merely
+// close -- which is why replacing the hand-rolled gravity with this operator
+// moves no number.  Asserting it here is what keeps that true.
+int test_body_force_matches_the_lumped_construction() {
+    auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto space = sfem::FunctionSpace::create(mesh, 3);
+
+    const real_t density = 1300.0;
+    const real_t gravity[3] = {0.0, 0.0, -9.81};
+
+    auto base = sfem::Factory::create_op(space, "GeneratedBodyForce");
+    SFEM_TEST_ASSERT(base != nullptr);
+    auto op = std::shared_ptr<sfem::Op>(std::move(base));
+    for (auto &block : mesh->blocks()) {
+        op->set_value_in_block(block->name(), "density", density);
+        op->set_value_in_block(block->name(), "g0", gravity[0]);
+        op->set_value_in_block(block->name(), "g1", gravity[1]);
+        op->set_value_in_block(block->name(), "g2", gravity[2]);
+    }
+
+    const ptrdiff_t ndofs = space->n_dofs();
+    auto            load  = sfem::create_host_buffer<real_t>(ndofs);
+    std::fill(load->data(), load->data() + ndofs, static_cast<real_t>(0));
+    SFEM_TEST_ASSERT(op->gradient(nullptr, load->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(finite_vector(load->data(), ndofs));
+    SFEM_TEST_ASSERT(has_nonzero(load->data(), ndofs));
+
+    // The construction the gravity driver does by hand: rho * M_lumped * g.
+    auto mass = sfem::create_op(space, "LumpedMass", sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(mass != nullptr);
+    SFEM_TEST_ASSERT(mass->initialize() == SFEM_SUCCESS);
+    auto mass_diag = sfem::create_host_buffer<real_t>(ndofs);
+    std::fill(mass_diag->data(), mass_diag->data() + ndofs, static_cast<real_t>(0));
+    SFEM_TEST_ASSERT(mass->hessian_diag(nullptr, mass_diag->data()) == SFEM_SUCCESS);
+
+    // `gradient` assembles `-F_ext`, the convention every forcing operator here
+    // uses, so the lumped vector is negated to match.
+    double worst = 0;
+    double scale = 0;
+    for (ptrdiff_t node = 0; node < ndofs / 3; ++node) {
+        for (int component = 0; component < 3; ++component) {
+            const ptrdiff_t i = node * 3 + component;
+            const double expected = -density * mass_diag->data()[i] * gravity[component];
+            worst = std::max(worst, std::fabs(load->data()[i] - expected));
+            scale = std::max(scale, std::fabs(expected));
+        }
+    }
+    SFEM_TEST_ASSERT(scale > 0);
+    SFEM_TEST_ASSERT(worst <= 1e-10 * scale);
+
+    // And the potential is the linear work, the identity the traction already
+    // pins: `value(x) == gradient(x) . x`, accumulating rather than assigning.
+    auto state = sfem::create_host_buffer<real_t>(ndofs);
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        state->data()[i] = 1e-3 * ((i % 5) + 1);
+    }
+    double expected_work = 0;
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        expected_work += load->data()[i] * state->data()[i];
+    }
+    SFEM_TEST_ASSERT(expected_work != 0);
+    real_t value = 0;
+    SFEM_TEST_ASSERT(op->value(state->data(), &value) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(std::fabs(value - expected_work) <= 1e-10 * std::fabs(expected_work));
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_generated_wrapper_headers_compile);
@@ -292,6 +365,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_generated_boundary_wrapper_executes);
     SFEM_RUN_TEST(test_node_wise_merit_includes_the_forcing);
     SFEM_RUN_TEST(test_forcing_operator_reports_its_linear_work);
+    SFEM_RUN_TEST(test_body_force_matches_the_lumped_construction);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
