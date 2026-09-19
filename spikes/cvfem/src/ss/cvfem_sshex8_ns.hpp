@@ -638,10 +638,18 @@ inline void sscvfem_build_grad_weight(SSMeshData &d) {
 // applied in a pass of its own, exactly as the flat twin does it, because the average is
 // linear in its numerator: (owned + ghost) * w is owned * w + ghost * w. That removes a full
 // read-modify-write over three nodal arrays from every call.
+// apply_weight=false leaves the reconstruction UNNORMALISED, for the caller to divide once at
+// the end. That is what lets a second sweep add to this one: the weight is per node, so
+// folding it in here would normalise this pass's contribution and then the remainder's
+// contribution would be normalised a second time when the caller finished the job.
+//
+// The default folds it into the drain as before -- one pass over the nodes saved, which is
+// the whole reason the packed path beats the scatter one -- and multiplying by an exact 1
+// otherwise, so the default path is unchanged bit for bit rather than merely equivalent.
 inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
                                       const scalar_t *const SFEM_RESTRICT src, const int stride,
                                       std::vector<scalar_t> &ogx, std::vector<scalar_t> &ogy,
-                                      std::vector<scalar_t> &ogz) {
+                                      std::vector<scalar_t> &ogz, const bool apply_weight = true) {
     sscvfem_build_grad_weight(d);
 
     // The owned ranges tile [0, nnodes) exactly, so every entry is written and there is
@@ -679,7 +687,15 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
             const ptrdiff_t e_start      = pack * p.n_elements_per_pack;
-            const ptrdiff_t e_end        = MIN(d.nmacro, (pack + 1) * p.n_elements_per_pack);
+            // Bounded by the PACKED element count, not by the block's.
+            //
+            // p.elems is sized to the elements the packs cover. Those used to be all of them,
+            // so bounding by d.nmacro was harmless; on a distributed mesh the packs span only
+            // the owned-not-shared prefix, and the last pack then walks this array past its
+            // allocation. The fallback keeps the old bound for any caller that has not filled
+            // the field in.
+            const ptrdiff_t e_limit      = p.n_packed_elements > 0 ? p.n_packed_elements : d.nmacro;
+            const ptrdiff_t e_end        = MIN(e_limit, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
             const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
@@ -742,7 +758,7 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
             }
 
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const scalar_t wi = w[owned + k];
+                const scalar_t wi = apply_weight ? w[owned + k] : scalar_t(1);
                 gx_out[owned + k] = pack_out[k * 3 + 0] * wi;
                 gy_out[owned + k] = pack_out[k * 3 + 1] * wi;
                 gz_out[owned + k] = pack_out[k * 3 + 2] * wi;
@@ -774,7 +790,7 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
             sy += by[idx];
             sz += bz[idx];
         }
-        const scalar_t wi = w[dest];
+        const scalar_t wi = apply_weight ? w[dest] : scalar_t(1);
         gx_out[dest] += sx * wi;
         gy_out[dest] += sy * wi;
         gz_out[dest] += sz * wi;
@@ -803,6 +819,31 @@ inline bool sscvfem_pack_covers_all_elements(const SSMeshData &d, const PackedDa
            p.owned_nodes_ptr[p.n_packs] == d.nnodes;
 }
 
+// The denominator, folded into one pass over the nodes instead of accumulated in the
+// sweep and divided out in another. The flat twin folds it into the pack drain and has no
+// pass at all; that needs the packed staging this path does not have, so one pass is the
+// floor here.
+//
+// Its own function now because two different sweeps can feed it: whichever combination of
+// passes produced the raw sums, the division happens once, here, at the end.
+inline void sscvfem_nodal_grad_normalize(SSMeshData &d, std::vector<scalar_t> &ogx,
+                                         std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz) {
+    const scalar_t *const SFEM_RESTRICT winv = d.grad_w_inv.data();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t s = winv[(size_t)i];
+        ogx[(size_t)i] *= s;
+        ogy[(size_t)i] *= s;
+        ogz[(size_t)i] *= s;
+    }
+}
+
+// Defined below, declared here because sscvfem_nodal_grad_strided calls it.
+inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
+                                             const int stride, std::vector<scalar_t> &ogx,
+                                             std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz,
+                                             const ptrdiff_t e_begin, const ptrdiff_t e_end);
+
 inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
                                        const int stride, std::vector<scalar_t> &ogx,
                                        std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz) {
@@ -811,24 +852,64 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
     // nodes staged instead of half. Same operator either way; the summation order differs, so
     // the two agree to round-off rather than bit for bit.
     //
-    // Guarded on the packing actually covering the mesh. A serial mesh always satisfies
-    // that, so this path is entered exactly as before and the fast case is unchanged bit for
-    // bit; a distributed mesh does not, and falls through to the sweep below, which bounds
-    // itself by d.nmacro and so reconstructs from every local macro element. That is slower
-    // than a completed packed sweep would be and is the honest starting point rather than
-    // the destination: the packed path wants a remainder sweep over the unpacked elements,
-    // and that wants measuring against this once a distributed solve exists to measure it on.
+    // Guarded on the packing actually covering the mesh. A serial mesh always satisfies that,
+    // so this path is entered exactly as before and the fast case is unchanged bit for bit.
+    // A distributed mesh does not, and takes the two-pass path below.
     if (d.packed && sscvfem_pack_covers_all_elements(d, *d.packed)) {
         sscvfem_nodal_grad_packed(d, *d.packed, src, stride, ogx, ogy, ogz);
         return;
     }
+
+    // Two passes where the packing covers only part of the mesh, rather than abandoning the
+    // packed path for all of it.
+    //
+    // The packs span the owned-not-shared element prefix on a distributed mesh, so falling
+    // back to the scatter sweep for everything threw away the packed reconstruction on the
+    // large majority of elements to handle the minority the packs do not reach. Instead:
+    // the packed sweep takes [0, n_packed), the scatter sweep takes [n_packed, nmacro), and
+    // one normalisation finishes both.
+    //
+    // The two are composable because the ranges are DISJOINT and every write is additive:
+    // sums over disjoint element sets add, and the reduce accumulates into dst rather than
+    // assigning. Both passes therefore leave raw, unnormalised sums, and the single pass at
+    // the end divides once -- which is also why the packed pass is asked not to fold the
+    // weight into its drain here.
+    //
+    // Serial never reaches this: it satisfies covers_all and returns above, on the untouched
+    // fast path. So the byte-compared verification matrix is unaffected by any of it.
+    if (d.packed) {
+        PackedData     &p        = *d.packed;
+        const ptrdiff_t n_packed = p.n_packed_elements > 0 ? p.n_packed_elements : 0;
+        // Zeroes the outputs itself, since it cannot own all of them here.
+        sscvfem_nodal_grad_packed(d, p, src, stride, ogx, ogy, ogz, /*apply_weight=*/false);
+        sscvfem_nodal_grad_scatter_range(d, src, stride, ogx, ogy, ogz, n_packed, d.nmacro);
+        sscvfem_nodal_grad_normalize(d, ogx, ogy, ogz);
+        return;
+    }
+
     // Geometry, cached. Everything below is then about the field alone.
     sscvfem_build_grad_weight(d);
-    const scalar_t *const SFEM_RESTRICT winv = d.grad_w_inv.data();
 
     ogx.assign((size_t)d.nnodes, 0);
     ogy.assign((size_t)d.nnodes, 0);
     ogz.assign((size_t)d.nnodes, 0);
+
+    sscvfem_nodal_grad_scatter_range(d, src, stride, ogx, ogy, ogz, 0, d.nmacro);
+    sscvfem_nodal_grad_normalize(d, ogx, ogy, ogz);
+}
+
+// The scatter sweep over one element range, accumulating RAW into ogx/ogy/ogz.
+//
+// The caller zeroes the outputs and normalises afterwards, because this is now used twice:
+// once for the whole mesh, and once for the elements the packs do not cover. Everything it
+// writes is additive -- exclusive nodes go straight out with +=, shared ones through the
+// staged reduce, which also accumulates -- so a partial range adds to whatever is already
+// there instead of replacing it.
+inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
+                                             const int stride, std::vector<scalar_t> &ogx,
+                                             std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz,
+                                             const ptrdiff_t e_begin, const ptrdiff_t e_end) {
+    if (e_begin >= e_end) return;
 
     const int L = d.level;
     int       off[8];
@@ -840,6 +921,19 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
     // traffic of each spent re-deriving a quantity that does not change.
     static constexpr int NG = 3;
 
+    // A partial sweep writes only the staging slots of the elements it visits, and s.stage is
+    // zeroed once when the scatter is BUILT rather than per call. So the slots belonging to
+    // elements the packed pass handled would still hold values from the previous call, and the
+    // reduce below would add them in -- silently, and looking like a convergence problem rather
+    // than a stale read. Zero them here.
+    //
+    // Skipped for a full range, where every slot is written before it is read and this would be
+    // pure cost on the path that runs in serial.
+    if (sc && e_begin > 0 && sc->n_slots > 0) {
+        scalar_t *const stage = const_cast<scalar_t *>(sc->stage.data());
+        std::fill(stage, stage + (size_t)sc->n_slots * NG, scalar_t(0));
+    }
+
 #pragma omp parallel
     {
         std::vector<scalar_t>     lp((size_t)d.nxe);
@@ -847,7 +941,7 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
         std::vector<scalar_t>     lacc((size_t)d.nxe * NG);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+        for (ptrdiff_t e = e_begin; e < e_end; ++e) {
             if (sc) std::fill(lacc.begin(), lacc.end(), scalar_t(0));
             // Only the field. The coordinates used to be gathered for every node of the
             // macro-element -- three arrays of (L+1)^3 -- to feed a geometry computation that
@@ -930,17 +1024,8 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
         sscvfem_reduce_shared_soa_w<NG>(*sc, dst);
     }
 
-    // The denominator, folded into one pass over the nodes instead of accumulated in the
-    // sweep and divided out in another. The flat twin folds it into the pack drain and has no
-    // pass at all; that needs the packed staging this path does not have, so one pass is the
-    // floor here.
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        const scalar_t s = winv[(size_t)i];
-        ogx[(size_t)i] *= s;
-        ogy[(size_t)i] *= s;
-        ogz[(size_t)i] *= s;
-    }
+    // No normalisation here: the caller divides once, after whichever passes it ran. See
+    // sscvfem_nodal_grad_normalize.
 }
 
 inline void sscvfem_nodal_p_grad(SSMeshData &d) {
