@@ -456,14 +456,21 @@ namespace sfem {
         const ptrdiff_t     ndofs = space->n_dofs();
         const real_t *const g     = temp->data();
 
+        // The work is linear in the state, so `g . (x + s h)` is
+        // `g.x + s * g.h` and two dots serve every step.  This used to sweep
+        // the vector once per step, which is `nsteps` passes over `ndofs` for a
+        // quantity that is affine in `s` -- the identity `GeneratedNeumann`
+        // already used and this one did not.
+        real_t gx = 0;
+        real_t gh = 0;
+#pragma omp parallel for reduction(+ : gx, gh)
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            gx += g[i] * x[i];
+            gh += g[i] * h[i];
+        }
+
         for (int s = 0; s < nsteps; ++s) {
-            const real_t step = steps[s];
-            real_t       acc  = 0;
-#pragma omp parallel for reduction(+ : acc)
-            for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                acc += g[i] * (x[i] + step * h[i]);
-            }
-            out[s] += acc;
+            out[s] += gx + steps[s] * gh;
         }
 
         return SFEM_SUCCESS;
