@@ -36,6 +36,11 @@ struct PackedData {
     std::shared_ptr<smesh::PackedMesh<pack_idx_t>> packed;
     ptrdiff_t                                      n_packs{0};
     ptrdiff_t                                      n_elements_per_pack{0};
+    // Elements the packs cover. Not n_packs * n_elements_per_pack -- the last pack is short,
+    // and on a distributed mesh the packs span only the owned-not-shared prefix of the block,
+    // so the packed element array is shorter than the block. Anything walking p.elems has to
+    // stop here or it reads past the allocation.
+    ptrdiff_t                                      n_packed_elements{0};
     ptrdiff_t                                      max_nodes_per_pack{0};
     pack_idx_t                                   **elems{nullptr};
     const ptrdiff_t                               *owned_nodes_ptr{nullptr};
@@ -105,6 +110,7 @@ static PackedData make_packed(const std::shared_ptr<smesh::Mesh> &mesh, const in
     p.packed              = smesh::PackedMesh<pack_idx_t>::create(mesh, {}, true, pack_size);
     p.n_packs             = p.packed->n_packs(0);
     p.n_elements_per_pack = p.packed->n_elements_per_pack(0);
+    p.n_packed_elements   = p.packed->n_packed_elements(0);
     p.max_nodes_per_pack  = p.packed->max_nodes_per_pack();
     p.elems               = p.packed->elements(0)->data();
     p.owned_nodes_ptr     = p.packed->owned_nodes_ptr(0)->data();
