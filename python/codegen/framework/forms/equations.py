@@ -676,6 +676,78 @@ def total_residual_weak_coefficients(system):
     )
 
 
+def total_residual_collection(system, orders=(FormOrder.ONE,)):
+    """The system's whole residual as an ordinary residual `FormCollection`.
+
+    `total_residual_weak_coefficients` states that every unit's 1-form sums;
+    this puts the sum back into the shape a residual material arrives in, by
+    building a `CoupledResidualSystem` that holds it and running the identical
+    pipeline `_build_form_collection` runs for a hand-written residual.  The
+    result is not a special case downstream: dependencies, blocks, jacobian
+    blocks and the emitters all see a residual unit and cannot tell that the
+    material was written as an energy plus a residual.
+
+    That is the property the residual merit needs.  A merit squares a node's
+    complete value, so it has to be contracted by one kernel over one form; a
+    material whose units each publish their own kernels has no such kernel, and
+    inventing one at the emitter would mean carrying two local-block ABIs
+    through a single traversal.
+    """
+    dim = system.dim
+    coefficients = total_residual_weak_coefficients(system)
+    residual_system = CoupledResidualSystem(dim)
+    fields = tuple(
+        residual_system.add_field(entry.row_field) for entry in coefficients
+    )
+
+    # Register the material constants before the expressions are read, so the
+    # dependency scan classifies them as parameters.  Anything left over would
+    # be taken for field data, which is a runtime failure rather than a wrong
+    # number: the kernel would ask for a stream that does not exist.
+    reserved = set()
+    for field in fields:
+        reserved.update(field.current_symbols)
+        reserved.update(field.previous_symbols)
+        reserved.update(field.test_symbols)
+        reserved.update(field.direction_symbols)
+    parameters = []
+    for entry in coefficients:
+        for expression in (entry.value,) + tuple(entry.gradient):
+            for symbol in sorted(sp.sympify(expression).free_symbols, key=str):
+                if symbol not in reserved and symbol not in parameters:
+                    parameters.append(symbol)
+    if parameters:
+        residual_system.add_parameters(*parameters)
+
+    for field, entry in zip(fields, coefficients):
+        residual_system.add_residual(
+            field,
+            sp.sympify(entry.value) * field.test_value
+            + sum(
+                (
+                    sp.sympify(entry.gradient[direction]) * field.test_gradient[direction]
+                    for direction in range(dim)
+                ),
+                sp.S.Zero,
+            ),
+        )
+
+    return _residual_collection_from_system(
+        TOTAL_RESIDUAL_UNIT_NAME,
+        residual_system,
+        tuple(orders),
+        equation_fields=tuple(
+            field for equation in system.equations for field in equation.fields
+        ),
+        measure="dx",
+    )
+
+
+#: The unit name the combined residual is emitted under.  Named after the
+#: kernel family rather than the mathematics, like every other unit here.
+TOTAL_RESIDUAL_UNIT_NAME = "residual_merit"
+
+
 def _build_form_collection(system, equation, orders):
     if equation.is_energy:
         variables = tuple(equation.variables)
@@ -707,89 +779,114 @@ def _build_form_collection(system, equation, orders):
     if equation.is_residual:
         residual_system = CoupledResidualSystem(system.dim)
         equation.define(residual_system)
-        residual_vector = sp.Matrix(
-            [
-                residual_system.residual_expression(field)
-                for field in residual_system.fields
-            ]
-        )
-        variables = tuple(
-            symbol
-            for field in residual_system.fields
-            for symbol in field.variables
-        )
-        directions = tuple(
-            symbol
-            for field in residual_system.fields
-            for symbol in field.directions
-        )
-        evaluation = residual_form_pipeline(
-            residual_vector,
-            variables,
-            directions,
-        ).evaluate(orders)
-        residual_metadata = []
-        if FormOrder.ZERO in orders:
-            residual_metadata.append(FormMetadata(FormOrder.ZERO))
-        if FormOrder.ONE in orders:
-            blocks = _residual_row_blocks(residual_system, equation.fields)
-            residual_metadata.append(
-                FormMetadata(
-                    FormOrder.ONE,
-                    coefficients=coupled_residual_weak_coefficients(
-                        residual_system,
-                        False,
-                    ),
-                    dependencies=residual_system.residual_dependencies(),
-                    blocks=blocks,
-                )
-            )
-        if FormOrder.TWO in orders:
-            blocks = _residual_jacobian_blocks(residual_system, equation.fields)
-            residual_metadata.append(
-                FormMetadata(
-                    FormOrder.TWO,
-                    coefficients=coupled_residual_weak_coefficients(
-                        residual_system,
-                        True,
-                    ),
-                    dependencies=residual_system.jacobian_action_dependencies(),
-                    blocks=blocks,
-                )
-            )
-        blocks = tuple(
-            block
-            for metadata in residual_metadata
-            for block in metadata.blocks
-        )
-        return FormCollection.from_evaluation(
+        return _residual_collection_from_system(
             equation.name,
-            evaluation,
+            residual_system,
+            orders,
+            equation_fields=equation.fields,
             measure=equation.measure,
-            fields=equation.fields,
-            variables=variables,
-            directions=directions,
-            coefficients=tuple(
-                metadata.coefficients
-                for metadata in residual_metadata
-                if metadata.coefficients
-            ),
-            dependencies=residual_system.residual_dependencies()
-            if FormOrder.ONE in orders
-            else None,
-            blocks=blocks,
             qualifiers=_equation_qualifiers(equation),
-            residual_fields=tuple(residual_system.fields),
-            residual_expressions=tuple(
-                residual_system.residual_expression(field)
-                for field in residual_system.fields
-            ),
-            jacobian_action_blocks=tuple(residual_system.jacobian_blocks()),
-            parameters=tuple(residual_system.parameters or ()),
-            metadata=tuple(residual_metadata),
         )
     raise TypeError("unsupported equation form %s" % equation.form)
 
+
+def _residual_collection_from_system(
+    name,
+    residual_system,
+    orders,
+    *,
+    equation_fields,
+    measure="dx",
+    qualifiers=(),
+):
+    """A residual `CoupledResidualSystem`, lowered to its `FormCollection`.
+
+    Extracted from `_build_form_collection` so the combined residual of a
+    multi-unit material goes through the same lowering a hand-written residual
+    does, rather than a second one written beside it.  The only thing the
+    caller supplies beyond the system is what the collection is labelled with.
+    """
+    residual_vector = sp.Matrix(
+        [
+            residual_system.residual_expression(field)
+            for field in residual_system.fields
+        ]
+    )
+    variables = tuple(
+        symbol
+        for field in residual_system.fields
+        for symbol in field.variables
+    )
+    directions = tuple(
+        symbol
+        for field in residual_system.fields
+        for symbol in field.directions
+    )
+    evaluation = residual_form_pipeline(
+        residual_vector,
+        variables,
+        directions,
+    ).evaluate(orders)
+    residual_metadata = []
+    if FormOrder.ZERO in orders:
+        residual_metadata.append(FormMetadata(FormOrder.ZERO))
+    if FormOrder.ONE in orders:
+        blocks = _residual_row_blocks(residual_system, equation_fields)
+        residual_metadata.append(
+            FormMetadata(
+                FormOrder.ONE,
+                coefficients=coupled_residual_weak_coefficients(
+                    residual_system,
+                    False,
+                ),
+                dependencies=residual_system.residual_dependencies(),
+                blocks=blocks,
+            )
+        )
+    if FormOrder.TWO in orders:
+        blocks = _residual_jacobian_blocks(residual_system, equation_fields)
+        residual_metadata.append(
+            FormMetadata(
+                FormOrder.TWO,
+                coefficients=coupled_residual_weak_coefficients(
+                    residual_system,
+                    True,
+                ),
+                dependencies=residual_system.jacobian_action_dependencies(),
+                blocks=blocks,
+            )
+        )
+    blocks = tuple(
+        block
+        for metadata in residual_metadata
+        for block in metadata.blocks
+    )
+    return FormCollection.from_evaluation(
+        name,
+        evaluation,
+        measure=measure,
+        fields=equation_fields,
+        variables=variables,
+        directions=directions,
+        coefficients=tuple(
+            metadata.coefficients
+            for metadata in residual_metadata
+            if metadata.coefficients
+        ),
+        dependencies=residual_system.residual_dependencies()
+        if FormOrder.ONE in orders
+        else None,
+        blocks=blocks,
+        qualifiers=qualifiers,
+        residual_fields=tuple(residual_system.fields),
+        residual_expressions=tuple(
+            residual_system.residual_expression(field)
+            for field in residual_system.fields
+        ),
+        jacobian_action_blocks=tuple(residual_system.jacobian_blocks()),
+        parameters=tuple(residual_system.parameters or ()),
+        metadata=tuple(residual_metadata),
+    )
 
 def _residual_row_blocks(residual_system, equation_fields):
     return tuple(

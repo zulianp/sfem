@@ -143,3 +143,48 @@ def test_one_row_per_lowered_field_component():
     assert tuple(entry.row_field for entry in coefficients) == ("u0", "u1", "u2")
     for entry in coefficients:
         assert len(entry.gradient) == DIM
+
+
+def test_the_combined_collection_carries_the_combined_residual():
+    """The sum, lowered the way a hand-written residual is lowered.
+
+    `total_residual_collection` exists so the rest of the pipeline sees an
+    ordinary residual unit.  This checks the two halves of that: the collection
+    reports the combined residual, and it reports it through the same
+    `residual_expressions` / `coefficients` surface a residual material fills.
+    """
+    from codegen.framework.forms.equations import total_residual_collection
+
+    system = _build_system(DIM)
+    collection = total_residual_collection(system)
+    point = _random_point(37)
+
+    assert len(collection.residual_expressions) == DIM
+    lowered = sum(
+        (sp.sympify(row) for row in collection.residual_expressions), sp.S.Zero
+    )
+
+    elastic = _evaluate(_elastic_weak_form(), point)
+    viscous = _evaluate(_viscous_weak_form(system), point)
+    assert sp.simplify(_evaluate(lowered, point) - (elastic + viscous)) == 0
+
+    # The material constants have to arrive as parameters; anything left
+    # unclassified would be taken for field data and asked for as a stream.
+    names = set(map(str, collection.parameters))
+    assert {"mu", "lmbda", "eta_s", "eta_b", "u_dt_shift"} <= names
+
+
+def test_the_combined_collection_reads_the_previous_state():
+    """Kelvin-Voigt has a rate, so the combined unit must keep its history.
+
+    A combiner that built fields without a previous state would drop the
+    viscous term's `u_old` silently -- the expressions would still evaluate,
+    just against symbols nothing supplies.
+    """
+    from codegen.framework.forms.equations import total_residual_collection
+
+    system = _build_system(DIM)
+    collection = total_residual_collection(system)
+    dependencies = collection.dependencies
+    assert dependencies.previous
+    assert dependencies.current
