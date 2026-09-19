@@ -33,9 +33,23 @@ static PackColoring cvfem_build_pack_coloring(const ptrdiff_t  n_packs,
     PackColoring c;
     if (n_packs <= 0) return c;
 
+    // -1 when no pack on this rank owns the node.
+    //
+    // The owned ranges tile [0, owned_nodes_ptr[n_packs]). Until packing became
+    // partition-aware that was the entire node range, so every ghost_idx entry fell inside
+    // it and the search could not fail. On a distributed mesh the packs cover only the
+    // owned-not-shared prefix, so ghost_idx legitimately carries ids at or above
+    // owned_nodes_ptr[n_packs]: nodes shared with, or owned by, another rank.
+    //
+    // Without the bound this returned n_packs for those -- one past the last pack -- which
+    // was then used to index adj, a vector sized n_packs. The out-of-bounds write corrupted
+    // an adjacent vector's header, and the run died later and elsewhere with
+    // std::length_error, nowhere near the mistake. Measured: the cavity at N=4 over two
+    // ranks aborted in setup, while the same case with packing off ran clean.
     auto owner_of = [&](const IdxT node) -> ptrdiff_t {
-        const ptrdiff_t *const it = std::upper_bound(owned_nodes_ptr, owned_nodes_ptr + n_packs + 1, (ptrdiff_t)node);
-        return (it - owned_nodes_ptr) - 1;
+        const ptrdiff_t *const it   = std::upper_bound(owned_nodes_ptr, owned_nodes_ptr + n_packs + 1, (ptrdiff_t)node);
+        const ptrdiff_t        pack = (it - owned_nodes_ptr) - 1;
+        return (pack >= 0 && pack < n_packs) ? pack : -1;
     };
 
     std::vector<std::vector<ptrdiff_t>> adj((size_t)n_packs);
@@ -58,7 +72,11 @@ static PackColoring cvfem_build_pack_coloring(const ptrdiff_t  n_packs,
         }
         for (size_t i = 0; i < shared.size(); ++i) {
             auto &pk = node_packs[i];
-            pk.push_back(owner_of(shared[i]));
+            // Only if a local pack owns it. A node owned by another rank still makes every
+            // pack that ghosts it conflict with the others -- recorded just above -- but
+            // there is no owning pack here to add to that set.
+            const ptrdiff_t owner = owner_of(shared[i]);
+            if (owner >= 0) pk.push_back(owner);
             std::sort(pk.begin(), pk.end());
             pk.erase(std::unique(pk.begin(), pk.end()), pk.end());
             for (size_t a = 0; a < pk.size(); ++a) {
