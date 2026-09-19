@@ -168,7 +168,9 @@ int test_node_wise_merit_includes_the_forcing() {
 
     auto interior = sfem::Factory::create_op(space, "GeneratedMooneyRivlinKelvinVoigt");
     SFEM_TEST_ASSERT(interior != nullptr);
-    SFEM_TEST_ASSERT(interior->value_reduction() == sfem::Op::ValueReduction::NODE_WISE);
+    // No potential, so it mandates the residual merit and is the operator
+    // that reduces it.
+    SFEM_TEST_ASSERT(!interior->energy_or_potential_based());
 
     const ptrdiff_t ndofs    = space->n_dofs();
     auto            previous = sfem::create_host_buffer<real_t>(ndofs);
@@ -197,10 +199,10 @@ int test_node_wise_merit_includes_the_forcing() {
     auto f = sfem::Function::create(space);
     f->add_operator(interior);
     f->add_operator(forcing);
-    SFEM_TEST_ASSERT(f->reduces_node_wise());
+    SFEM_TEST_ASSERT(!f->has_energy_merit());
 
     real_t value = 0;
-    SFEM_TEST_ASSERT(f->value(current->data(), &value) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(f->residual_merit(current->data(), &value) == SFEM_SUCCESS);
 
     auto residual = sfem::create_host_buffer<real_t>(ndofs);
     std::fill(residual->data(), residual->data() + ndofs, static_cast<real_t>(0));

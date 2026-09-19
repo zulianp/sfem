@@ -16,6 +16,10 @@ namespace sfem {
         ~InertiaPotential() override;
 
         const char *name() const override { return "InertiaPotential"; }
+
+        //! 1/2 alpha (x - u_hat)^T M (x - u_hat)
+
+        bool energy_or_potential_based() const override { return true; }
         //! Where this operator runs, so `Function` allocates the buffers it
         //! writes on the same side.
         ExecutionSpace execution_space() const override;

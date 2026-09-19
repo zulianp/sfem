@@ -134,29 +134,63 @@ namespace sfem {
                   const real_t *const h,
                   real_t *const       out,
                   const ElementScope  scope = ElementScope::ALL);
-        int value(const real_t *x, real_t *const out, const ElementScope scope = ElementScope::ALL);
+        /**
+         * @brief The sum of the operators' potentials at each trial step.
+         *
+         * Exists only when every operator is `energy_or_potential_based()`;
+         * otherwise it refuses, naming the operator that has no potential,
+         * because a squared residual norm and an energy are not terms of one
+         * sum.  Appending a potential -- an inertia beside a static energy --
+         * is how a material without transient terms becomes transient, and
+         * this is the merit that stays available when you do.
+         */
+        int energy_merit(const real_t       *x,
+                         const real_t       *h,
+                         const int           nsteps,
+                         const real_t *const steps,
+                         real_t *const       out);
 
         /**
-         * @brief Whether this Function's 0-form reduces node-wise.
+         * @brief `1/2 * ||R||^2` over the residual this Function assembles, at
+         *        each trial step.
          *
-         * True as soon as one operator's does. An energy and a squared residual
-         * norm are not terms of one sum, and a norm is not additive over
-         * operators, so a mixture reduces node-wise throughout.
+         * Always available: every system has a residual.  The operators whose
+         * `gradient` ignores the state are assembled **once** into an
+         * accumulator, and the one operator that moves with the state is handed
+         * that accumulator and asked to finish the sum at every step -- so a
+         * twelve-point sampling line search costs close to one classical step
+         * rather than twelve assemblies of everything.
+         *
+         * The overload taking `accumulator` lets a caller own the buffer; the
+         * other allocates one lazily and keeps it.  It must hold `n_dofs()` and
+         * live in this Function's execution space.
          */
-        bool reduces_node_wise() const;
+        int residual_merit(const real_t       *x,
+                           const real_t       *h,
+                           const int           nsteps,
+                           const real_t *const steps,
+                           real_t *const       out);
 
+        int residual_merit(const real_t       *x,
+                           const real_t       *h,
+                           const int           nsteps,
+                           const real_t *const steps,
+                           real_t *const       accumulator,
+                           real_t *const       out);
+
+        //! The merit at `x` itself: one trial step of length zero.  Both
+        //! accumulate into `out` rather than assigning, as every 0-form here
+        //! does, so a caller may sum several.
         /**
-         * @brief `1/2 * ||R||^2` over the residual this Function assembles.
+         * @brief Whether every operator has a potential, so `energy_merit` exists.
          *
-         * The only place the system's merit can be computed: an operator norms
-         * its own residual, which omits every other operator's contribution --
-         * a Neumann traction is its own Op, so its forcing is absent from the
-         * interior operator's residual and the result is not zero at the
-         * solution of the combined system.
+         * A question, not a default: the caller still names the merit it wants.
+         * `residual_merit` needs no such guard -- every system has a residual.
          */
-        int node_wise_merit(const real_t *x, real_t *const out, const ElementScope scope = ElementScope::ALL);
+        bool has_energy_merit() const;
 
-        int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out);
+        int energy_merit(const real_t *x, real_t *const out);
+        int residual_merit(const real_t *x, real_t *const out);
 
         int apply_constraints(real_t *const x);
         int constraints_gradient(const real_t *const x, real_t *const g);

@@ -735,10 +735,6 @@ namespace sfem {
   }
 
 
-  sfem::Op::ValueReduction GeneratedMooneyRivlinKelvinVoigt::value_reduction() const {
-    return sfem::Op::ValueReduction::NODE_WISE;
-  }
-
   int GeneratedMooneyRivlinKelvinVoigt::value(const real_t *, real_t *const) {
     SFEM_TRACE_SCOPE("GeneratedMooneyRivlinKelvinVoigt::value");
     // `Op::value` is pure virtual, so this has to exist -- but there is no

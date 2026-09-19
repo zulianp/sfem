@@ -541,8 +541,6 @@ def _header(material, residual, publishes_value_steps=None, node_wise=False,
     # `value_steps` here would be norming its own residual instead.
     if publishes_value_steps is None:
         publishes_value_steps = not residual
-    if node_wise:
-        publishes_value_steps = False
     extra = """
     int update(const real_t *const x) override;
     int update(const real_t *const previous, const real_t *const current) override;
@@ -554,9 +552,13 @@ def _header(material, residual, publishes_value_steps=None, node_wise=False,
             const real_t *h,
             const int nsteps,
             const real_t *const steps,
-            real_t *const out) override;""" if publishes_value_steps else (
-        """
-    sfem::Op::ValueReduction value_reduction() const override;""" if node_wise else ""
+            real_t *const out) override;""" if publishes_value_steps else ""
+    # Every operator answers, because `Op::energy_or_potential_based` is pure:
+    # both answers are common and a wrong one is silent.  A system whose 0-form
+    # is a norm has no potential to add to anyone's sum; every other kind does.
+    value_steps += """
+    bool energy_or_potential_based() const override { return %s; }""" % (
+        "false" if node_wise else "true"
     )
     # A material with a rate must hold a scheme, because its kernels cannot be
     # evaluated without the shift and the history.  An energy material may hold
@@ -4028,6 +4030,13 @@ def _boundary_header(material, linear_work=False):
             const int nsteps,
             const real_t *const steps,
             real_t *const out) override;""" if linear_work else ""
+    # The work a forcing does is linear in the state, so it is a potential; and
+    # its `gradient` does not read the state at all, which is the promise that
+    # keeps it out of the line search -- assembled once into the accumulator
+    # rather than at every trial step.
+    value_steps += """
+    bool energy_or_potential_based() const override { return true; }
+    bool residual_depends_on_state() const override { return false; }"""
     return """#pragma once
 
 #include "sfem_NeumannConditions.hpp"
@@ -4758,10 +4767,6 @@ def _residual_merit_methods(op_name):
     squared residual norm.
     """
     return """
-  sfem::Op::ValueReduction %(op)s::value_reduction() const {
-    return sfem::Op::ValueReduction::NODE_WISE;
-  }
-
   int %(op)s::value(const real_t *, real_t *const) {
     SFEM_TRACE_SCOPE("%(op)s::value");
     // `Op::value` is pure virtual, so this has to exist -- but there is no

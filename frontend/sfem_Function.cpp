@@ -209,6 +209,9 @@ namespace sfem {
         std::shared_ptr<FunctionSpace>           space;
         std::vector<std::shared_ptr<Op>>         ops;
         std::vector<std::shared_ptr<Constraint>> constraints;
+        //! Reused across `residual_merit` calls so a line search allocates
+        //! nothing; a caller may supply its own through the overload.
+        SharedBuffer<real_t>                     merit_accumulator;
 
         std::shared_ptr<Output> output;
         bool                    handle_constraints{true};
@@ -259,7 +262,32 @@ namespace sfem {
         impl_->ops.erase(it);
     }
 
-    void Function::add_operator(const std::shared_ptr<Op> &op) { impl_->ops.push_back(op); }
+    void Function::add_operator(const std::shared_ptr<Op> &op) {
+        // An operator with no potential mandates the residual merit, and that
+        // merit is a norm of the whole assembled residual -- so it is the one
+        // that finishes the sum, and it is kept last for `merit_contractor` to
+        // find.  Two of them cannot be composed: `1/2*||R_a + R_b||^2` is
+        // neither operator's number, and neither can compute it alone.
+        const bool mandates_reduction = !op->energy_or_potential_based();
+
+        if (mandates_reduction && !impl_->ops.empty() && !impl_->ops.back()->energy_or_potential_based()) {
+            SFEM_ERROR(
+                    "Function::add_operator: \"%s\" has no potential and neither does \"%s\", so "
+                    "both would have to reduce the same residual; compose them into one operator\n",
+                    op->name(),
+                    impl_->ops.back()->name());
+            return;
+        }
+
+        if (!mandates_reduction && !impl_->ops.empty() && !impl_->ops.back()->energy_or_potential_based()) {
+            // The reducing operator stays last whatever order the caller adds
+            // in, so a driver does not have to know the rule.
+            impl_->ops.insert(impl_->ops.end() - 1, op);
+            return;
+        }
+
+        impl_->ops.push_back(op);
+    }
     void Function::add_constraint(const std::shared_ptr<Constraint> &c) { impl_->constraints.push_back(c); }
 
     void Function::clear_constraints() { impl_->constraints.clear(); }
@@ -599,146 +627,47 @@ namespace sfem {
                 this->execution_space());
     }
 
-    /// Whether any operator's 0-form reduces node-wise, which promotes the whole
-    /// Function to the node-wise merit: an energy and a squared residual norm
-    /// are not terms of one sum, and a norm is not additive over operators.
-    bool Function::reduces_node_wise() const {
-        for (auto &op : impl_->ops) {
-            if (op->value_reduction() == Op::ValueReduction::NODE_WISE) {
-                return true;
+    /// The one operator that moves with the state, or null when the count is
+    /// anything but one.
+    ///
+    /// One is the case worth having: everything else is assembled once into the
+    /// accumulator and this operator is asked to finish the sum at every trial
+    /// step.  With none, the residual does not move and the merit is one number.
+    /// With several, no single operator can be handed the rest -- each would
+    /// need the others evaluated at the same step -- so the caller falls back to
+    /// assembling everything per step, which is correct and slow.  It is not an
+    /// error: such a `Function` is usually built for its gradient, or for the
+    /// energy merit, and refusing it here would refuse those too.
+    static std::shared_ptr<Op> merit_contractor(const std::vector<std::shared_ptr<Op>> &ops) {
+        std::shared_ptr<Op> found;
+        for (auto &op : ops) {
+            if (!op->residual_depends_on_state()) {
+                continue;
             }
+            if (found) {
+                return nullptr;
+            }
+            found = op;
         }
-        return false;
+        return found;
     }
 
-    /// `1/2 * ||R||^2` over the residual this Function assembles, squared per
-    /// node.  Every operator contributes to `gradient`, so the forcing an
-    /// individual operator does not own -- a Neumann traction is its own Op --
-    /// is included here and cannot be included anywhere else.
-    int Function::node_wise_merit(const real_t *x, real_t *const out, const ElementScope scope) {
-        const ptrdiff_t      ndofs = impl_->space->n_dofs();
-        const ExecutionSpace es    = execution_space();
-
-        // The residual has to live where the operators write it.  A host
-        // `std::vector` handed to a device `gradient` is device kernels writing
-        // through a host pointer, so the buffer follows the execution space.
-        auto residual = create_buffer<real_t>(ndofs, es);
-        if (gradient(x, residual->data(), scope) != SFEM_SUCCESS) {
-            return SFEM_FAILURE;
-        }
-
-        if (es == EXECUTION_SPACE_DEVICE) {
-            // The device's own reduction.  It is not the deterministic one
-            // below -- a GPU dot product sums in whatever order its blocks
-            // retire -- but reading the vector back to reduce it on the host
-            // would cost more than the merit itself.
-            // The operators' kernels are still in flight on their own
-            // streams; the reduction below is the library's and is not ordered
-            // against them.  Reading early gives a different wrong number every
-            // call from a buffer whose contents are exact once the kernels have
-            // finished -- and because the memory is valid and initialised,
-            // neither `memcheck` nor `initcheck` says a word.
-            sfem::device_synchronize();
-            // `norm2`, not `dot(r, r)`.  The two are the same arithmetic and
-            // not the same call: passing one pointer as both cuBLAS operands
-            // aliases `x` and `y`, which cuBLAS does not support in general,
-            // and the library is free to return anything.  `norm2` is the
-            // interface's name for this quantity and takes one vector.
-            auto         blas = sfem::blas<real_t>(es);
-            const real_t norm = blas->norm2(ndofs, residual->data());
-            *out += real_t(0.5) * norm * norm;
-            return SFEM_SUCCESS;
-        }
-
-        const real_t *const values = residual->data();
-
-        // Node-wise: a node's components are contracted together, after every
-        // operator has contributed to it.  That ordering is not a detail --
-        // squaring earlier, inside an element kernel or inside one operator,
-        // squares a partial sum, and element residuals cancel when they are
-        // scattered while their squares do not.
-        //
-        // Deterministic, too.  The packed traversal that assembles the residual
-        // is deterministic by design; a flat `reduction(+ : acc)` over the dofs
-        // would add the same numbers in whatever order the threads happened to
-        // finish and hand that property straight back, which matters here
-        // because a line search compares these values across runs.  Nodes are
-        // grouped into fixed chunks, each chunk is summed by one thread, and the
-        // chunk partials are added in index order -- so the answer does not
-        // depend on the thread count.
-        const int       block_size = impl_->space->block_size();
-        const bool      blocked    = block_size > 0 && (ndofs % block_size) == 0;
-        const ptrdiff_t nnodes     = blocked ? ndofs / block_size : ndofs;
-        const int       components = blocked ? block_size : 1;
-
-        static constexpr ptrdiff_t nodes_per_chunk = 4096;
-        const ptrdiff_t            n_chunks = (nnodes + nodes_per_chunk - 1) / nodes_per_chunk;
-        std::vector<real_t>        partial(n_chunks > 0 ? n_chunks : 1, 0);
-
-#pragma omp parallel for schedule(static)
-        for (ptrdiff_t chunk = 0; chunk < n_chunks; ++chunk) {
-            const ptrdiff_t begin = chunk * nodes_per_chunk;
-            const ptrdiff_t end   = std::min(begin + nodes_per_chunk, nnodes);
-            real_t          sum   = 0;
-            for (ptrdiff_t node = begin; node < end; ++node) {
-                for (int component = 0; component < components; ++component) {
-                    const real_t r = values[node * components + component];
-                    sum += r * r;
-                }
-            }
-            partial[chunk] = sum;
-        }
-
-        real_t acc = 0;
-        for (ptrdiff_t chunk = 0; chunk < n_chunks; ++chunk) {
-            acc += partial[chunk];
-        }
-        *out += real_t(0.5) * acc;
-        return SFEM_SUCCESS;
-    }
-
-    int Function::value(const real_t *x, real_t *const out, const ElementScope scope) {
-        SFEM_TRACE_SCOPE("Function::value");
-
-        if (reduces_node_wise()) {
-            return node_wise_merit(x, out, scope);
-        }
+    int Function::energy_merit(const real_t       *x,
+                               const real_t       *h,
+                               const int           nsteps,
+                               const real_t *const steps,
+                               real_t *const       out) {
+        SFEM_TRACE_SCOPE("Function::energy_merit");
 
         for (auto &op : impl_->ops) {
-            if (op->value(x, out, scope) != SFEM_SUCCESS) {
-                std::cerr << "Failed value in op: " << op->name() << "\n";
+            if (!op->energy_or_potential_based()) {
+                // Named, because the caller's next question is always which one.
+                SFEM_ERROR(
+                        "Function::energy_merit: operator \"%s\" has no potential, so this system "
+                        "has no energy to sum; use residual_merit instead\n",
+                        op->name());
                 return SFEM_FAILURE;
             }
-        }
-
-        if (scope == ElementScope::ALL) {
-            for (auto &c : impl_->constraints) {
-                c->value(x, out);
-            }
-        }
-
-        return SFEM_SUCCESS;
-    }
-
-    int Function::value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out) {
-        SFEM_TRACE_SCOPE("Function::value_steps");
-
-        if (reduces_node_wise()) {
-            // The merit at each step, from the residual assembled there.  The
-            // per-operator `value_steps` are not called at all: each would
-            // norm its own residual, which is not the system's.
-            const ptrdiff_t       ndofs = impl_->space->n_dofs();
-            std::vector<real_t>   stepped(ndofs);
-            for (int step = 0; step < nsteps; ++step) {
-                const real_t alpha = steps[step];
-                for (ptrdiff_t i = 0; i < ndofs; ++i) {
-                    stepped[i] = x[i] + alpha * h[i];
-                }
-                if (node_wise_merit(stepped.data(), &out[step]) != SFEM_SUCCESS) {
-                    return SFEM_FAILURE;
-                }
-            }
-            return SFEM_SUCCESS;
         }
 
         for (auto &op : impl_->ops) {
@@ -749,9 +678,127 @@ namespace sfem {
         }
 
         for (auto &c : impl_->constraints) {
-            c->value_steps(x, h, nsteps, steps, out);
+            if (c->value_steps(x, h, nsteps, steps, out) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
         }
+
         return SFEM_SUCCESS;
+    }
+
+    bool Function::has_energy_merit() const {
+        for (auto &op : impl_->ops) {
+            if (!op->energy_or_potential_based()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    int Function::energy_merit(const real_t *x, real_t *const out) {
+        // `x` stands in for the direction: at a step of length zero the
+        // increment is unused and `x + 0 * x` is `x` exactly in IEEE.
+        const real_t at_x = 0;
+        return energy_merit(x, x, 1, &at_x, out);
+    }
+
+    int Function::residual_merit(const real_t *x, real_t *const out) {
+        const real_t at_x = 0;
+        return residual_merit(x, x, 1, &at_x, out);
+    }
+
+    int Function::residual_merit(const real_t       *x,
+                                 const real_t       *h,
+                                 const int           nsteps,
+                                 const real_t *const steps,
+                                 real_t *const       out) {
+        const ptrdiff_t ndofs = impl_->space->n_dofs();
+        if (!impl_->merit_accumulator || impl_->merit_accumulator->size() != (size_t)ndofs) {
+            impl_->merit_accumulator = create_buffer<real_t>(ndofs, execution_space());
+        }
+        return residual_merit(x, h, nsteps, steps, impl_->merit_accumulator->data(), out);
+    }
+
+    int Function::residual_merit(const real_t       *x,
+                                 const real_t       *h,
+                                 const int           nsteps,
+                                 const real_t *const steps,
+                                 real_t *const       accumulator,
+                                 real_t *const       out) {
+        SFEM_TRACE_SCOPE("Function::residual_merit");
+
+        const ptrdiff_t      ndofs = impl_->space->n_dofs();
+        const ExecutionSpace es    = execution_space();
+        auto                 blas  = sfem::blas<real_t>(es);
+
+        // Explicitly, not by relying on the allocator: a caller's buffer is
+        // reused across steps and a `create_buffer` one is zero only on its
+        // first use.
+        blas->zeros(ndofs, accumulator);
+
+        auto contractor = merit_contractor(impl_->ops);
+
+        if (!contractor && !impl_->ops.empty()) {
+            bool any_moves = false;
+            for (auto &op : impl_->ops) {
+                any_moves = any_moves || op->residual_depends_on_state();
+            }
+            if (any_moves) {
+                // Several operators move with the state, so nothing can be
+                // hoisted: assemble the whole residual at each step.  Correct,
+                // and the shape this interface exists to avoid.
+                auto residual = create_buffer<real_t>(ndofs, es);
+                auto stepped  = create_buffer<real_t>(ndofs, es);
+                for (int step = 0; step < nsteps; ++step) {
+                    blas->zeros(ndofs, residual->data());
+                    blas->zaxpby(ndofs, 1, x, steps[step], h, stepped->data());
+                    if (gradient(stepped->data(), residual->data()) != SFEM_SUCCESS) {
+                        return SFEM_FAILURE;
+                    }
+                    if (es == EXECUTION_SPACE_DEVICE) {
+                        sfem::device_synchronize();
+                        const real_t norm = blas->norm2(ndofs, residual->data());
+                        out[step] += real_t(0.5) * norm * norm;
+                    } else {
+                        out[step] += real_t(0.5) *
+                                     squared_residual_norm(ndofs, impl_->space->block_size(), residual->data());
+                    }
+                }
+                return SFEM_SUCCESS;
+            }
+        }
+
+        // Everything that does not move with the state, once.  This is the
+        // saving: today every operator is re-assembled at every trial step, and
+        // a traction does not depend on the step at all.
+        for (auto &op : impl_->ops) {
+            if (op == contractor) {
+                continue;
+            }
+            if (op->gradient(x, accumulator) != SFEM_SUCCESS) {
+                std::cerr << "Failed gradient in op: " << op->name() << "\n";
+                return SFEM_FAILURE;
+            }
+        }
+
+        if (impl_->handle_constraints) {
+            if (constraints_gradient(x, accumulator) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+        }
+
+        if (!contractor) {
+            // Nothing moves with the state, so the residual is the accumulator
+            // at every step and the merit is one number repeated.
+            const real_t merit =
+                    real_t(0.5) * squared_residual_norm(ndofs, impl_->space->block_size(), accumulator);
+            for (int step = 0; step < nsteps; ++step) {
+                out[step] += merit;
+            }
+            return SFEM_SUCCESS;
+        }
+
+        return contractor->residual_merit_steps(x, h, nsteps, steps, accumulator, out);
     }
 
     int Function::apply_constraints(real_t *const x) {

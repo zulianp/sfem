@@ -17,6 +17,8 @@ namespace sfem {
     class LumpedMass final : public Op {
     public:
         const char *name() const override { return "LumpedMass"; }
+        //! a lumped mass is still the Hessian of a quadratic
+        bool energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         inline ptrdiff_t n_dofs_domain() const override;
         inline ptrdiff_t n_dofs_image() const override;

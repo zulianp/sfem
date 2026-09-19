@@ -52,14 +52,14 @@ namespace {
                       real_t                                &value_out) {
         for (int i = 0; i < warmup; ++i) {
             real_t warm = 0;
-            f->value(x, &warm);
+            if (f->has_energy_merit()) f->energy_merit(x, &warm); else f->residual_merit(x, &warm);
         }
         sfem::device_synchronize();
         const double t0 = MPI_Wtime();
         real_t       value = 0;
         for (int i = 0; i < repeat; ++i) {
             value = 0;
-            f->value(x, &value);
+            if (f->has_energy_merit()) f->energy_merit(x, &value); else f->residual_merit(x, &value);
         }
         sfem::device_synchronize();
         const double elapsed = MPI_Wtime() - t0;
@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
             f->update(x_host->data());
         }
         const double elapsed = time_value(f, x_host->data(), warmup, repeat, host_value);
-        print_rate(f->reduces_node_wise() ? "host_node_wise_merit" : "host_element_wise_merit",
+        print_rate(f->has_energy_merit() ? "host_energy_merit" : "host_residual_merit",
                    elapsed, nelements, ndofs, repeat, host_value);
         host_gradient = gradient_norm(f, x_host->data(), sfem::EXECUTION_SPACE_HOST);
         printf("%-34s %12s %14s %14s %26.17g\n", "host_gradient_norm", "", "", "", host_gradient);
@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
 
             real_t       device_value = 0;
             const double elapsed      = time_value(f, x_device->data(), warmup, repeat, device_value);
-            print_rate(f->reduces_node_wise() ? "device_node_wise_merit" : "device_element_wise_merit",
+            print_rate(f->has_energy_merit() ? "device_energy_merit" : "device_residual_merit",
                        elapsed, nelements, ndofs, repeat, device_value);
 
             // The device reduction is the vendor's dot product for the node-wise
@@ -310,7 +310,7 @@ int main(int argc, char *argv[]) {
             if (smesh::Env::read("SFEM_DUMP_REPEATS", 0)) {
                 for (int i = 0; i < 8; ++i) {
                     real_t v = 0;
-                    f->value(x_device->data(), &v);
+                    if (f->has_energy_merit()) f->energy_merit(x_device->data(), &v); else f->residual_merit(x_device->data(), &v);
                     sfem::device_synchronize();
                     const real_t g = gradient_norm(f, x_device->data(), sfem::EXECUTION_SPACE_DEVICE);
                     printf("# repeat %d  merit %26.17g  gradient %26.17g\n",

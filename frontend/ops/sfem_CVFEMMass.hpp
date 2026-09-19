@@ -7,6 +7,8 @@ namespace sfem {
         std::shared_ptr<FunctionSpace> space;
         smesh::ElemType                  element_type { smesh::INVALID };
         const char                    *name() const override { return "CVFEMMass"; }
+        //! a mass matrix is the Hessian of 1/2 x^T M x
+        bool energy_or_potential_based() const override { return true; }
         inline bool                    is_linear() const override { return true; }
         inline ptrdiff_t                      n_dofs_domain() const override { return space->n_dofs(); }
         inline ptrdiff_t                      n_dofs_image() const override { return space->n_dofs(); }

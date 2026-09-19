@@ -968,10 +968,6 @@ namespace sfem {
   }
 
 
-  sfem::Op::ValueReduction GPUGeneratedTwoPhaseFlow::value_reduction() const {
-    return sfem::Op::ValueReduction::NODE_WISE;
-  }
-
   int GPUGeneratedTwoPhaseFlow::value(const real_t *, real_t *const) {
     SFEM_TRACE_SCOPE("GPUGeneratedTwoPhaseFlow::value");
     // `Op::value` is pure virtual, so this has to exist -- but there is no
