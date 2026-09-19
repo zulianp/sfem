@@ -309,27 +309,77 @@ namespace sfem {
         }
 
         /**
-         * @brief Over what this operator's 0-form reduces to a scalar.
+         * @brief Whether this operator's 0-form is a potential that may be summed.
          *
-         * An energy or a recovered potential is an element integral:
-         * ELEMENT_WISE. Each element contributes a number, the numbers sum, and
-         * the total adds across operators -- which is what lets `value` be a
-         * term in the sum `Function::value` accumulates.
+         * An energy or a recovered potential is an element integral: each
+         * element contributes a number, the numbers sum, and the total adds
+         * across operators -- which is what lets `value` be a term in a sum.
+         * Appending such a term is how a material without transient terms
+         * becomes transient: an inertia potential beside a static energy is
+         * one more term, not a different problem.
          *
-         * A residual that is the gradient of nothing has no such integral. Its
-         * merit is `1/2 * ||R||^2`, squared per node once every element
-         * touching that node has contributed: NODE_WISE. It is *not* additive
-         * over operators, so no operator can report it for the system --
-         * `1/2*||sum_op R_op||^2` is not `sum_op 1/2*||R_op||^2`, and the
-         * forcing an operator does not own is missing from its own residual.
-         * `Function` reduces it instead, over the residual it assembles.
+         * A residual that is the gradient of nothing has no such integral, and
+         * answers false.  It is not a statement that the operator has no
+         * merit -- the residual merit always exists -- only that its 0-form is
+         * not additive: `1/2*||sum_op R_op||^2` is not `sum_op 1/2*||R_op||^2`.
          *
-         * A `Function` mixing the two reduces node-wise throughout: an energy
-         * and a squared residual norm are not terms of one sum.
+         * Pure, with no default, because both answers are common and a wrong
+         * one is silent: an operator that wrongly claims a potential has its
+         * number added to a sum it does not belong in.
          */
-        enum class ValueReduction { ELEMENT_WISE, NODE_WISE };
+        virtual bool energy_or_potential_based() const = 0;
 
-        virtual ValueReduction value_reduction() const { return ValueReduction::ELEMENT_WISE; }
+        /**
+         * @brief Whether `gradient` reads the state at all.
+         *
+         * False is a promise that it does not -- a traction, a body force --
+         * so the operator is assembled once into the accumulator instead of
+         * once per trial step.  That promise is what takes the external terms
+         * out of the line search, and it is the cheap half of the saving.
+         *
+         * True is the safe answer and the default: an operator that reads `x`
+         * must be re-assembled wherever `x` moves.
+         */
+        virtual bool residual_depends_on_state() const { return true; }
+
+        /**
+         * @brief Whether this operator samples the merit itself.
+         *
+         * True means it implements `residual_merit_steps` as one pass over the
+         * mesh with the steps as an inner loop, and so should be handed the
+         * accumulator and asked to finish the sum.  Default false: an operator
+         * that has not been given such a kernel is served by the base
+         * implementation, correctly and slowly.
+         *
+         * At most one operator in a `Function` may answer true, since two
+         * norms cannot be composed.  It is not what `add_operator` refuses,
+         * though -- that rule is about operators with no potential, which
+         * mandate this merit rather than merely accelerate it.
+         */
+        virtual bool contracts_residual_merit() const { return false; }
+
+        /**
+         * @brief `out[step] += 1/2 * ||accumulator + gradient(x + steps[step]*h)||^2`.
+         *
+         * Every step in one pass over the mesh.  `accumulator` already holds
+         * every other operator's contribution, signs included, exactly as
+         * `Function::gradient` builds it, so this finishes a sum rather than
+         * starting one.
+         *
+         * The shape exists so the alpha-independent work -- geometry, the
+         * gathers, the reference tables -- is done once and the steps are an
+         * inner loop over values already in cache, which is what makes a
+         * twelve-point sampling line search cost about what one step costs.
+         * The square is node-wise and cannot be taken element-locally, so an
+         * implementation accumulates the steps' residuals into node storage
+         * before squaring; the packed layout makes that local to a pack.
+         */
+        virtual int residual_merit_steps(const real_t *const       x,
+                                         const real_t *const       h,
+                                         const int                 nsteps,
+                                         const real_t *const       steps,
+                                         const real_t *const       accumulator,
+                                         real_t *const             out);
 
         /**
          * @brief Compute the value/energy of the operator
@@ -443,6 +493,12 @@ namespace sfem {
     public:
         const char *name() const override { return "NoOp"; }
         bool        is_linear() const override { return true; }
+        //! It contributes nothing, so nothing of it belongs in either merit.
+        //! `true` keeps it summable: adding zero to a potential is still a
+        //! potential, while claiming it moves with the state would make it a
+        //! contractor and refuse a real one beside it.
+        bool energy_or_potential_based() const override { return true; }
+        bool contracts_residual_merit() const override { return false; }
         int         hessian_crs(const real_t *const /*x*/,
                                 const count_t *const /*rowptr*/,
                                 const idx_t *const /*colidx*/,
@@ -486,5 +542,12 @@ namespace sfem {
      * @return Shared pointer to a NoOp instance
      */
     std::shared_ptr<Op> no_op();
+
+    /// `sum_i r_i^2` over an assembled residual, summed in a fixed order.
+    ///
+    /// Shared by `Op::residual_merit_steps` and `Function`, so the two cannot
+    /// reduce the same vector differently.  Deterministic because a line search
+    /// compares these numbers across runs.
+    real_t squared_residual_norm(const ptrdiff_t ndofs, const int block_size, const real_t *const values);
 
 }  // namespace sfem

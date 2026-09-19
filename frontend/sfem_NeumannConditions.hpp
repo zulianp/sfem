@@ -43,6 +43,14 @@ namespace sfem {
         std::shared_ptr<Op> derefine_op(const std::shared_ptr<FunctionSpace> &derefined_space) override;
 
         const char *name() const override;
+        //! The work a traction does, `-g . x`, is linear in the state and so a
+        //! potential like any other.
+        bool energy_or_potential_based() const override { return true; }
+        //! Its `gradient` ignores `x` -- the traction is integrated over the
+        //! sideset and does not move with the state -- so it is assembled once
+        //! into the accumulator rather than at every trial step.  This promise
+        //! is what takes the forcing out of the line search.
+        bool residual_depends_on_state() const override { return false; }
 
         NeumannConditions(const std::shared_ptr<FunctionSpace> &space);
         ~NeumannConditions();

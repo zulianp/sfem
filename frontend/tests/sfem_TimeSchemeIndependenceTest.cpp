@@ -217,13 +217,13 @@ namespace {
         // residual, because the material is what holds the scheme.
         auto f = sfem::Function::create(fixture.space);
         f->add_operator(fixture.op);
-        SFEM_TEST_ASSERT(f->reduces_node_wise());
+        SFEM_TEST_ASSERT(!f->has_energy_merit());
 
         auto x = sfem::create_host_buffer<real_t>(fixture.ndofs);
         seed_state(fixture.ndofs, 3, x->data());
 
         real_t merit = 0;
-        SFEM_TEST_ASSERT(f->value(x->data(), &merit) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(f->residual_merit(x->data(), &merit) == SFEM_SUCCESS);
 
         auto residual = sfem::create_host_buffer<real_t>(fixture.ndofs);
         SFEM_TEST_ASSERT(f->gradient(x->data(), residual->data()) == SFEM_SUCCESS);
@@ -246,7 +246,7 @@ namespace {
         const real_t        steps[] = {real_t(0), real_t(-0.5), real_t(0.25), real_t(1)};
         const int           nsteps  = 4;
         std::vector<real_t> stepped(nsteps, real_t(0));
-        SFEM_TEST_ASSERT(f->value_steps(x->data(), h->data(), nsteps, steps, stepped.data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(f->residual_merit(x->data(), h->data(), nsteps, steps, stepped.data()) == SFEM_SUCCESS);
 
         auto trial = sfem::create_host_buffer<real_t>(fixture.ndofs);
         for (int step = 0; step < nsteps; ++step) {
@@ -254,7 +254,7 @@ namespace {
                 trial->data()[i] = x->data()[i] + steps[step] * h->data()[i];
             }
             real_t at_trial = 0;
-            SFEM_TEST_ASSERT(f->value(trial->data(), &at_trial) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(f->residual_merit(trial->data(), &at_trial) == SFEM_SUCCESS);
             SFEM_TEST_ASSERT(std::fabs(stepped[step] - at_trial) <=
                              1e-10 * std::fabs(at_trial) + 1e-14);
         }
@@ -262,7 +262,7 @@ namespace {
         // And the merit at the original state is unchanged by having visited
         // the others, which is the same freezing property read backwards.
         real_t again = 0;
-        SFEM_TEST_ASSERT(f->value(x->data(), &again) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(f->residual_merit(x->data(), &again) == SFEM_SUCCESS);
         SFEM_TEST_ASSERT(again == merit);
 
         // The inertia really is inside that residual, and not merely absent
@@ -693,7 +693,7 @@ int test_the_schemes_potential_differentiates_to_its_residual() {
         // It must be addable to an energy, which is what ELEMENT_WISE means.
         // NODE_WISE here would silently promote every Function holding this
         // scheme to the residual merit.
-        SFEM_TEST_ASSERT(inertia->value_reduction() == sfem::Op::ValueReduction::ELEMENT_WISE);
+        SFEM_TEST_ASSERT(inertia->energy_or_potential_based());
 
         auto g = sfem::create_host_buffer<real_t>(fixture.ndofs);
         SFEM_TEST_ASSERT(inertia->gradient(x->data(), g->data()) == SFEM_SUCCESS);
@@ -893,8 +893,8 @@ int test_holding_the_scheme_equals_adding_its_operator() {
     seed_state(ndofs, 6, d->data());
 
     real_t held_value = 0, pushed_value = 0;
-    SFEM_TEST_ASSERT(held->value(x->data(), &held_value) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(pushed->value(x->data(), &pushed_value) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(held->energy_merit(x->data(), &held_value) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(pushed->energy_merit(x->data(), &pushed_value) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(pushed_value != real_t(0));
     SFEM_TEST_ASSERT(std::abs(held_value - pushed_value) <= real_t(1e-12) * (1 + std::abs(pushed_value)));
 
@@ -984,8 +984,8 @@ int test_holding_the_scheme_equals_adding_its_operator() {
     // And at a trial step, which is where a line search reads the energy.
     const real_t step = real_t(1e-3);
     real_t       held_step = 0, pushed_step = 0;
-    SFEM_TEST_ASSERT(held->value_steps(x->data(), d->data(), 1, &step, &held_step) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(pushed->value_steps(x->data(), d->data(), 1, &step, &pushed_step) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(held->energy_merit(x->data(), d->data(), 1, &step, &held_step) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(pushed->energy_merit(x->data(), d->data(), 1, &step, &pushed_step) == SFEM_SUCCESS);
     SFEM_TEST_ASSERT(std::abs(held_step - pushed_step) <= real_t(1e-12) * (1 + std::abs(pushed_step)));
 
     return SFEM_TEST_SUCCESS;

@@ -531,7 +531,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
         f->apply_constraints(u->data());
 
         real_t energy = 0;
-        f->value(u->data(), &energy);
+        f->energy_merit(u->data(), &energy);
 
         real_t gnorm_0 = 0;
         for (int it = 0; it < env.nl_max_it; ++it) {
@@ -613,7 +613,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
                                            real_t(-1.0 / 512.0) * env.newton_alpha,
                                            0};
                 std::vector<real_t> energies(alphas.size(), 0);
-                if (f->value_steps(u->data(), incr->data(), (int)alphas.size(), alphas.data(), energies.data()) != SFEM_SUCCESS) {
+                if (f->energy_merit(u->data(), incr->data(), (int)alphas.size(), alphas.data(), energies.data()) != SFEM_SUCCESS) {
                     return SFEM_FAILURE;
                 }
 
@@ -643,7 +643,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
             if (!env.enable_line_search) {
                 energy = 0;
-                f->value(u->data(), &energy);
+                f->energy_merit(u->data(), &energy);
             }
 
             char status[96] = "";

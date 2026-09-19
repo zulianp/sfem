@@ -447,7 +447,7 @@ int test_generated_neohookean_hessian_action_matrix_formats() {
     std::vector<real_t> value_steps_reference(n_value_steps, 0);
     std::vector<real_t> value_steps_packed(n_value_steps, 0);
     std::vector<real_t> packed_step_element_values(n_value_steps * nelements, 0);
-    SFEM_TEST_ASSERT(function->value_steps(state.data(),
+    SFEM_TEST_ASSERT(function->energy_merit(state.data(),
                                            direction.data(),
                                            n_value_steps,
                                            steps,
@@ -575,7 +575,7 @@ int test_generated_linear_elasticity_packed_gradient_value_steps() {
     std::vector<real_t> value_steps_reference(n_value_steps, 0);
     std::vector<real_t> value_steps_packed(n_value_steps, 0);
     std::vector<real_t> packed_step_element_values(n_value_steps * nelements, 0);
-    SFEM_TEST_ASSERT(function->value_steps(state.data(),
+    SFEM_TEST_ASSERT(function->energy_merit(state.data(),
                                            direction.data(),
                                            n_value_steps,
                                            steps,

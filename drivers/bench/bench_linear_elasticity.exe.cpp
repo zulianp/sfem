@@ -174,7 +174,7 @@ namespace {
         const double t0 = MPI_Wtime();
         for (int i = 0; i < repeat; ++i) {
             value = 0;
-            f->value(x, &value);
+            f->energy_merit(x, &value);
         }
         sfem::device_synchronize();
         const double elapsed = MPI_Wtime() - t0;
@@ -217,7 +217,7 @@ namespace {
         const double t0 = MPI_Wtime();
         for (int i = 0; i < repeat; ++i) {
             std::fill(energies.begin(), energies.end(), (real_t)0);
-            f->value_steps(x, h, (int)alphas.size(), alphas.data(), energies.data());
+            f->energy_merit(x, h, (int)alphas.size(), alphas.data(), energies.data());
         }
         sfem::device_synchronize();
         const double elapsed = MPI_Wtime() - t0;
