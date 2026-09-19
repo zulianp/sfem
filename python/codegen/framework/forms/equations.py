@@ -29,6 +29,7 @@ from codegen.framework.symbolic.fields import (
     VectorFunction,
     TensorFunction,
     _family_from_qualifier,
+    is_previous_symbol,
     scalar_field,
     geometric_dimension_context,
     tensor_field,
@@ -858,14 +859,22 @@ def _expression_dependencies(expression, *, variables=(), directions=()):
     free_set = set(free_symbols)
     current_symbols = tuple(symbol for symbol in _symbols_from_variables(variables) if symbol in free_set)
     direction_symbols = tuple(symbol for symbol in _symbols_from_variables(directions) if symbol in free_set)
+    # The history stream, when the form carries a `gen.dt`.  Everything left
+    # over is a material constant, so without this the previous state's symbols
+    # would be classified as scalars a caller sets per block -- which is a
+    # runtime failure asking `require_real_value` for `u_old_grad[0]`.
+    previous_symbols = tuple(symbol for symbol in free_symbols if is_previous_symbol(symbol))
     categorized = set(current_symbols)
     categorized.update(direction_symbols)
+    categorized.update(previous_symbols)
     parameters = tuple(symbol for symbol in free_symbols if symbol not in categorized)
     return FormDependencies(
         current=bool(current_symbols),
+        previous=bool(previous_symbols),
         direction=bool(direction_symbols),
         parameters=parameters,
         current_symbols=current_symbols,
+        previous_symbols=previous_symbols,
         direction_symbols=direction_symbols,
         symbols=free_symbols,
     )
