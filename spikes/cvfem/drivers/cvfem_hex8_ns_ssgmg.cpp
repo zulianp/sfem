@@ -1772,7 +1772,20 @@ private:
     // the loop, still eliminates below such a pivot; that is harmless when the near-null pivots
     // are the last ones factored -- where partial pivoting puts a rank deficiency of the
     // trailing Schur complement -- and a dropped pivot anywhere else is reported.
-    class DenseLU final : public sfem::Operator<real_t> {
+    // What the coarsest level's solver owes its caller beyond an apply: which directions the
+    // factorisation could not resolve. Both forms report it -- the per-rank one over its own
+    // matrix, the global one over the whole coarse problem -- so the diagnostic below reads
+    // the same either way instead of switching on the concrete type.
+    class CoarseFactorization : public sfem::Operator<real_t> {
+    public:
+        virtual ptrdiff_t                     n_dropped() const      = 0;
+        virtual const std::vector<ptrdiff_t> &dropped() const        = 0;
+        /// The order actually factorised: LOCAL for the per-rank form, GLOBAL for the
+        /// redundant one, so a dropped count is reported against what was factored.
+        virtual ptrdiff_t                     factored_order() const = 0;
+    };
+
+    class DenseLU final : public CoarseFactorization {
         static void getrf(const int n, double *a, int *ipiv, int *info) { dgetrf_(&n, &n, a, &n, ipiv, info); }
         static void getrf(const int n, float *a, int *ipiv, int *info) { sgetrf_(&n, &n, a, &n, ipiv, info); }
         static void trsv(const char uplo, const char diag, const int n, const double *a, double *x) {
@@ -1837,8 +1850,9 @@ private:
         sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
 
         // Number of coarse directions the factorisation could not resolve.
-        ptrdiff_t                     n_dropped() const { return n_dropped_; }
-        const std::vector<ptrdiff_t> &dropped() const { return dropped_; }
+        ptrdiff_t                     n_dropped() const override { return n_dropped_; }
+        const std::vector<ptrdiff_t> &dropped() const override { return dropped_; }
+        ptrdiff_t                     factored_order() const override { return n_; }
 
     private:
         ptrdiff_t              n_;
@@ -1859,7 +1873,7 @@ private:
     // and it grows as n * cost(apply) -- so it gets worse in exactly the regime where a
     // larger terminal problem is wanted. Reading the blocks is O(nnz) and does not touch the
     // operator at all.
-    std::shared_ptr<DenseLU> make_dense_lu_from_bsr(const std::shared_ptr<GmgLevels::BSR_t> &a,
+    std::shared_ptr<CoarseFactorization> make_dense_lu_from_bsr(const std::shared_ptr<GmgLevels::BSR_t> &a,
                                                     const ptrdiff_t                          n) {
         std::vector<real_t>        dense((size_t)n * (size_t)n, real_t(0));
         const sfem::count_t *const rp = a->row_ptr->data();
@@ -1876,6 +1890,140 @@ private:
                                 vd[(size_t)k * 16 + (size_t)(i * N_FIELDS + j)];
             }
         return std::make_shared<DenseLU>(n, std::move(dense));
+    }
+
+    // owned prefix is [node_offsets[rank], node_offsets[rank + 1]) and the ghost and aura
+    // slots carry their owners' ids. So one lookup translates both the row and the column of
+    // every block, and because every rank ends up holding the whole solution, the apply can
+    // fill its entire local vector -- owned, ghosts and aura -- with no exchange afterwards.
+    class GlobalDenseLU final : public CoarseFactorization {
+    public:
+        GlobalDenseLU(std::shared_ptr<DenseLU>                  lu,
+                      const std::shared_ptr<smesh::Communicator> comm,
+                      std::vector<smesh::large_idx_t>            local_to_global,
+                      const ptrdiff_t                            n_local_dofs,
+                      const ptrdiff_t                            n_owned_dofs,
+                      const ptrdiff_t                            n_global_dofs)
+            : lu_(std::move(lu)),
+              comm_(comm),
+              l2g_(std::move(local_to_global)),
+              n_local_(n_local_dofs),
+              n_owned_(n_owned_dofs),
+              n_global_(n_global_dofs),
+              gb_((size_t)n_global_dofs),
+              gx_((size_t)n_global_dofs) {
+            const int size = comm_->size();
+            counts_.resize((size_t)size);
+            displs_.resize((size_t)size);
+            const int mine = (int)n_owned_;
+            comm_->allgather(&mine, counts_.data(), 1);
+            int at = 0;
+            for (int r = 0; r < size; ++r) {
+                displs_[(size_t)r] = at;
+                at += counts_[(size_t)r];
+            }
+        }
+
+        int apply(const real_t *const b, real_t *const x) override {
+            SFEM_TRACE_SCOPE("GlobalDenseLU::apply");
+            // The owned prefix of b is this rank's contribution, and the owned blocks tile
+            // the global vector in rank order, so the gather needs no index translation.
+            std::fill(gb_.begin(), gb_.end(), real_t(0));
+            std::fill(gx_.begin(), gx_.end(), real_t(0));
+            comm_->allgatherv(b, (int)n_owned_, gb_.data(), counts_.data(), displs_.data());
+
+            // Every rank solves the same system and gets the same answer, so there is nothing
+            // to exchange afterwards.
+            lu_->apply(gb_.data(), gx_.data());
+
+            // Fill the whole local range, not just the owned prefix: the prolongation reads
+            // this vector over its local length, ghost and aura slots included.
+            for (ptrdiff_t i = 0; i < n_local_ / N_FIELDS; ++i) {
+                const ptrdiff_t g = (ptrdiff_t)l2g_[(size_t)i];
+                for (int c = 0; c < N_FIELDS; ++c)
+                    x[i * N_FIELDS + c] += gx_[(size_t)(g * N_FIELDS + c)];
+            }
+            return SFEM_SUCCESS;
+        }
+
+        // The LOCAL size, deliberately. Multigrid sizes this level's buffers from the
+        // smoother when the coarse operator is not a ParallelOperator, and those buffers are
+        // local-length; the global extent is an implementation detail of the factorisation.
+        ptrdiff_t            rows() const override { return n_local_; }
+        ptrdiff_t            cols() const override { return n_local_; }
+        sfem::ExecutionSpace execution_space() const override { return sfem::EXECUTION_SPACE_HOST; }
+
+        ptrdiff_t                     n_dropped() const override { return lu_->n_dropped(); }
+        const std::vector<ptrdiff_t> &dropped() const override { return lu_->dropped(); }
+        ptrdiff_t                     factored_order() const override { return n_global_; }
+
+    private:
+        std::shared_ptr<DenseLU>              lu_;
+        std::shared_ptr<smesh::Communicator>  comm_;
+        std::vector<smesh::large_idx_t>       l2g_;
+        ptrdiff_t                             n_local_, n_owned_, n_global_;
+        std::vector<real_t>                   gb_, gx_;
+        std::vector<int>                      counts_, displs_;
+    };
+
+    // Densify the OWNED block rows into the global matrix, then let every rank factorise it.
+    std::shared_ptr<CoarseFactorization> make_dense_lu_from_bsr_global(
+            const std::shared_ptr<GmgLevels::BSR_t>    &a,
+            const std::shared_ptr<sfem::FunctionSpace> &space,
+            const ptrdiff_t                             n_local_dofs) {
+        auto mesh = space->mesh_ptr();
+        if (!mesh->is_distributed() || mesh->comm()->size() == 1) {
+            // One rank: the local matrix IS the global one, and this is the old code.
+            return make_dense_lu_from_bsr(a, n_local_dofs);
+        }
+
+        auto            dist     = mesh->distributed();
+        const auto      l2g      = dist->node_mapping()->data();
+        const ptrdiff_t n_owned_nodes = dist->n_nodes_owned();
+        const ptrdiff_t n_local_nodes = dist->n_nodes_local();
+        const ptrdiff_t n_global      = space->n_dofs_global();
+
+        // Only the owned rows are complete; the ghost and aura rows this rank also stores are
+        // partial sums belonging to their owners, and including them would double-count.
+        std::vector<real_t>        dense((size_t)n_global * (size_t)n_global, real_t(0));
+        const sfem::count_t *const rp = a->row_ptr->data();
+        const sfem::idx_t *const   ci = a->col_idx->data();
+        const real_t *const        vd = a->values->data();
+
+        for (ptrdiff_t r = 0; r < n_owned_nodes; ++r) {
+            const ptrdiff_t gr = (ptrdiff_t)l2g[r];
+            for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k) {
+                const ptrdiff_t gc = (ptrdiff_t)l2g[(ptrdiff_t)ci[k]];
+                for (int i = 0; i < N_FIELDS; ++i)
+                    for (int j = 0; j < N_FIELDS; ++j)
+                        dense[(size_t)(gc * N_FIELDS + j) * (size_t)n_global +
+                              (size_t)(gr * N_FIELDS + i)] =  // column-major, as above
+                                vd[(size_t)k * 16 + (size_t)(i * N_FIELDS + j)];
+            }
+        }
+
+        // Each rank wrote only its own rows; summing makes every rank hold the whole matrix.
+        // The blocks are disjoint by ownership, so the sum is an assembly, not an average.
+        // Communicator::sum takes an int count and this buffer is n_global^2, so the assembly
+        // stops being representable above n_global ~ 46340. The caller gates long before that,
+        // but a silent overflow would corrupt the coarse operator rather than fail.
+        if ((double)n_global * (double)n_global > 2147483647.0) {
+            SFEM_ERROR("make_dense_lu_from_bsr_global: coarse order %td needs an n^2 allreduce past "
+                       "the int count MPI takes; lower SFEM_GMG_DENSE_LU_BELOW or deepen the hierarchy\n",
+                       n_global);
+        }
+        mesh->comm()->sum(dense.data(), (int)dense.size(), smesh::TypeToEnum<real_t>::value());
+
+        std::vector<smesh::large_idx_t> l2g_copy((size_t)n_local_nodes);
+        for (ptrdiff_t i = 0; i < n_local_nodes; ++i) l2g_copy[(size_t)i] = l2g[i];
+
+        auto lu = std::make_shared<DenseLU>(n_global, std::move(dense));
+        return std::make_shared<GlobalDenseLU>(lu,
+                                               mesh->comm(),
+                                               std::move(l2g_copy),
+                                               n_local_dofs,
+                                               space->n_owned_dofs(),
+                                               n_global);
     }
 
     // Write a densified operator out so its spectrum can be examined offline.
@@ -1898,7 +2046,7 @@ private:
         std::printf("dump_dense: wrote %td x %td to %s\n", n, n, path);
     }
 
-    std::shared_ptr<DenseLU> make_dense_lu(const std::shared_ptr<sfem::Operator<real_t>> &op,
+    std::shared_ptr<CoarseFactorization> make_dense_lu(const std::shared_ptr<sfem::Operator<real_t>> &op,
                                            const ptrdiff_t                                n) {
         std::vector<real_t> a((size_t)n * (size_t)n, real_t(0));
         std::vector<real_t> e((size_t)n, real_t(0)), col((size_t)n, real_t(0));
@@ -2848,12 +2996,16 @@ private:
                 // caps it for the cases where that is not yet possible.
                 const ptrdiff_t lu_max =
                         (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DENSE_LU_BELOW", 1 << 30);
-                if (nd_coarse <= lu_max) {
+                // Gated on the GLOBAL count as well: the factorisation is of the whole coarse
+                // problem now, so this rank's local dof count says nothing about what it costs.
+                const ptrdiff_t nd_coarse_global = fi->space()->n_dofs_global();
+                if (nd_coarse <= lu_max && nd_coarse_global <= lu_max) {
                     // Prefer the assembled matrix when there is one; fall back to probing
                     // only for a level that has no matrix form.
                     const double t_lu = smesh::time_seconds();
-                    auto lu = g.Amat[(size_t)i] ? make_dense_lu_from_bsr(g.Amat[(size_t)i], nd_coarse)
-                                                : make_dense_lu(lop, nd_coarse);
+                    auto lu = g.Amat[(size_t)i]
+                                      ? make_dense_lu_from_bsr_global(g.Amat[(size_t)i], fi->space(), nd_coarse)
+                                      : make_dense_lu(lop, nd_coarse);
                     phase_add("coarse_factor", smesh::time_seconds() - t_lu);
                     {
                         const std::string dpath =
@@ -2883,7 +3035,7 @@ private:
                         std::printf(
                                 "coarse LU: %td of %td directions dropped as null  "
                                 "(first %zu by component: ux %d  uy %d  uz %d  p %d)\n",
-                                lu->n_dropped(), (ptrdiff_t)nd_coarse, lu->dropped().size(),
+                                lu->n_dropped(), lu->factored_order(), lu->dropped().size(),
                                 by_comp[0], by_comp[1], by_comp[2], by_comp[3]);
                     }
 
