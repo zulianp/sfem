@@ -802,6 +802,30 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
+        // The sampling contraction closes the node sums inside a patch of
+        // elements, and a patch is built within one mesh block.  A node on a
+        // block boundary therefore has incident elements the patch never sees,
+        // so its residual is still partial when the square is taken -- which is
+        // silently wrong rather than loudly wrong, the merit simply coming out
+        // too small.  Inter-block patches are the general answer and are not
+        // built yet; until they are, abort rather than return a number that
+        // looks like a merit.  Checked before the call, so the generated kernel
+        // carries no test for it.
+        //
+        // Asked of the contractor and not of the space, because only a
+        // patch-wise contraction has the problem: an operator that answers
+        // false assembles the whole residual at each trial step through
+        // `Op::gradient`, which spans blocks like any other assembly, and a
+        // multi-block mesh must keep working there.
+        if (contractor->contracts_residual_merit() && impl_->space->is_multi_block()) {
+            SFEM_ERROR(
+                    "Function::residual_merit: the sampled residual merit contracts patch-wise "
+                    "and patches do not span mesh blocks, so a node shared between the %zu blocks "
+                    "of this space would be squared before its sum is complete; inter-block "
+                    "patches are not implemented yet\n",
+                    impl_->space->n_blocks());
+        }
+
         return contractor->residual_merit_steps(x, h, nsteps, steps, accumulator, out);
     }
 
