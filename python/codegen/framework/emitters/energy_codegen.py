@@ -30,6 +30,7 @@ from codegen.framework.plans.affine_element_kernel import (
     metric_symbols,
     p1_simplex_metric_apply_plan,
 )
+from codegen.framework.plans.form_transformations import stabilise_constant_cancellation
 from codegen.framework.plans.geometry_variants import geometry_variant_plan
 from codegen.framework.emitters.kernel_diagnostics_record import (
     STRUCT_NAME,
@@ -3080,6 +3081,9 @@ def _append_weak_objective_accumulation(
     lines.extend(closing)
 
 def _append_cse_array_assignments(lines, expressions, targets, temporary_prefix, scale=None):
+    # Before elimination, not after: the rewrite needs to see the `+ 1` that
+    # elimination is about to hide behind a temporary.
+    expressions = tuple(stabilise_constant_cancellation(expression) for expression in expressions)
     temps, reduced = sp.cse(
         tuple(expressions),
         symbols=sp.numbered_symbols("%s" % temporary_prefix),

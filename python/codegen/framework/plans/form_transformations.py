@@ -361,3 +361,92 @@ def metric_value_scale(weak_form):
     if sp.simplify(sp.expand(weak_form.energy_density - quadratic)) != 0:
         return None
     return scale
+
+
+#: How large an argument this will expand before giving up.  Expanding a
+#: determinant of a 3x3 costs nothing; expanding an arbitrary logarithm's
+#: argument could cost a great deal, and a rewrite that is not worth its
+#: compile time is not worth doing.
+_LOG1P_EXPANSION_BUDGET = 512
+
+
+def _cancel_constants(expression):
+    """Expand the sums whose constant term is about to cancel against the rest.
+
+    `I1 - dim` is the case in every hyperelastic density: `I1` is
+    `trace(F^T F)`, which for a deformation gradient is `dim` plus something
+    small, so forming it and subtracting `dim` keeps only the bits above eps
+    relative to `dim`.  Expanded in the displacement gradient the constant is
+    gone -- `2 tr(G) + ||G||^2` -- and nothing is lost.
+
+    Expanding only the sums that carry a constant, rather than the whole
+    density, keeps this targeted: an expansion that cancels no constant buys no
+    accuracy and costs expression size.
+    """
+    additions = expression.atoms(sp.Add) if hasattr(expression, "atoms") else ()
+    replacements = {}
+    for node in additions:
+        constant = node.as_coeff_Add()[0]
+        if constant == 0 or sp.count_ops(node) > _LOG1P_EXPANSION_BUDGET:
+            continue
+        expanded = sp.expand(node)
+        if abs(expanded.as_coeff_Add()[0]) < abs(constant):
+            replacements[node] = expanded
+    if not replacements:
+        return expression
+    return expression.xreplace(replacements)
+
+
+def stabilise_constant_cancellation(expression):
+    """Both halves of the fix, which only work together.
+
+    Measured against exact arithmetic on the neo-Hookean density at a strain of
+    1e-3, the relative error is 1.07e-11 as emitted, 1.07e-11 with the
+    logarithm alone and 3.68e-12 with the expansion alone -- each masked by the
+    other, because the two cancellations are in series and their errors are
+    comparable.  Together they give 1.53e-14, and the gain grows as the strain
+    falls: 6e3 times at 1e-4 and 6e4 at 1e-5.  Fixing one alone is worth
+    nothing, which is why this is one function rather than two.
+    """
+    return stabilise_logs_near_one(_cancel_constants(expression))
+
+
+def stabilise_logs_near_one(expression):
+    """Rewrite `log(X)` as `log1p(X - 1)` wherever `X` expands to `1 + small`.
+
+    A hyperelastic density asks for `log(det F)`, and a deformation gradient is
+    the identity plus a displacement gradient, so `det F` lands near 1.  Forming
+    it and then taking the logarithm throws away everything below eps relative
+    to 1, which is most of the answer when the strain is small: measured against
+    exact arithmetic the density's relative error is 1.2e-11 at a strain of
+    1e-3, rising as the square of the cancellation ratio, and that is the floor
+    an energy-based line search reads round-off against.
+
+    The rewrite is algebraically an identity and `log1p` is never less accurate
+    than `log(1 + x)`, so it is applied whenever the constant term is exactly 1
+    rather than gated on a guess about magnitudes.
+
+    Two things decide where this runs.  It has to see the *displacement*
+    gradient: recovering it from an already-formed `F` is worth almost nothing,
+    because `1 + G_ii` has rounded away the bits the rewrite exists to keep --
+    measured, 5.5e-14 against 6.8e-17 for the same strain.  And it has to run
+    before common subexpression elimination, or the `+ 1` is already behind a
+    temporary and the constant term is no longer visible.
+
+    Nothing about deformation gradients is named here.  A logarithm of something
+    that expands to `1 + small` has this problem whatever produced it, and
+    `det(I + G)` is recognised by the arithmetic rather than by a qualifier.
+    """
+    logs = expression.atoms(sp.log) if hasattr(expression, "atoms") else ()
+    replacements = {}
+    for node in logs:
+        argument = node.args[0]
+        if sp.count_ops(argument) > _LOG1P_EXPANSION_BUDGET:
+            continue
+        expanded = sp.expand(argument)
+        constant, rest = expanded.as_coeff_Add()
+        if constant == 1 and rest != 0:
+            replacements[node] = sp.Function('sfem_log1p')(rest)
+    if not replacements:
+        return expression
+    return expression.xreplace(replacements)

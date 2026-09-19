@@ -57,6 +57,7 @@ from codegen.framework.emitters.quadrature_codegen import (
     tensor_product_quadrature_weight_expr,
 )
 from codegen.framework.plans.conventions import inexact_apply_name
+from codegen.framework.plans.form_transformations import stabilise_constant_cancellation
 from codegen.framework.plans.kernel_signature import (
     PACKED_MESH_REDUCE_ONLY_ARGUMENTS,
 )
@@ -520,7 +521,11 @@ def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
     if not assignments:
         return []
     symbols = [symbol for symbol, _expression in assignments]
-    expressions = [expression for _symbol, expression in assignments]
+    # Before elimination, for the same reason as the energy emitter: afterwards
+    # the `+ 1` is behind a temporary and the constant term cannot be seen.
+    expressions = [
+        stabilise_constant_cancellation(expression) for _symbol, expression in assignments
+    ]
     temporaries, reduced = sp.cse(
         expressions, symbols=sp.numbered_symbols("%s_t" % prefix)
     )

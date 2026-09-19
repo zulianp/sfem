@@ -44,6 +44,10 @@ def _sfem_math_inline_source_lines(
     define_sfem_inline=True,
 ):
     lines = [
+        # The math helpers call `std::log` and `std::fabs`, and this emitter
+        # writes them into a translation unit that includes nothing else.
+        "#include <cmath>",
+        "",
     ]
     if define_sfem_inline:
         lines.extend(
