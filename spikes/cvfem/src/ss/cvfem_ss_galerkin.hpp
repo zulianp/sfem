@@ -616,6 +616,19 @@ namespace cvfem_ss {
         g.gid.assign((size_t)g.nmacro * (size_t)g.nc, 0);
         for (ptrdiff_t e = 0; e < g.nmacro; ++e)
             for (int a = 0; a < g.nc; ++a) g.gid[(size_t)e * g.nc + a] = rows[(size_t)a][e];
+
+        // Every consumer sizes its arrays from n_coarse and then indexes them by a gid without
+        // a bound of its own: galerkin_build_pattern's cnt[gid + 1]++ and
+        // galerkin_build_node_reduce's ptr[gid + 1]++ are both unguarded writes. So an id at or
+        // past n_coarse corrupts the heap, and what surfaces is a damaged pattern somewhere
+        // else entirely -- a column missing from a row it was inserted into two loops earlier,
+        // or a segfault on a neighbouring rank -- rather than the id that caused it.
+        ptrdiff_t max_gid = -1;
+        for (size_t k = 0; k < g.gid.size(); ++k)
+            if ((ptrdiff_t)g.gid[k] > max_gid) max_gid = (ptrdiff_t)g.gid[k];
+        if (max_gid >= n_coarse)
+            SFEM_ERROR("galerkin_gid_from_rows: coarse id %lld is outside n_coarse=%lld (nmacro=%lld, nc=%d)\n",
+                       (long long)max_gid, (long long)n_coarse, (long long)g.nmacro, g.nc);
     }
 
     inline void galerkin_gid_from_spaces(const std::shared_ptr<sfem::FunctionSpace> &from_space,  // coarse
@@ -644,12 +657,20 @@ namespace cvfem_ss {
         if (from_space->has_semi_structured_mesh()) {
             for (int a = 0; a < g.nc; ++a) rows[(size_t)a] = from_b->elements()->data()[a];
         } else {
-            for (int k = 0; k < 2; ++k)
-                for (int j = 0; j < 2; ++j)
-                    for (int i = 0; i < 2; ++i)
-                        rows[(size_t)smesh::sshex8_lidx(1, i, j, k)] =
-                                to_b->elements()->data()[smesh::sshex8_lidx(to_level, i * to_level, j * to_level,
-                                                                            k * to_level)];
+            // The coarse space is unstructured HEX8 here, and the ids come from the coarse
+            // block's OWN element table -- not from the fine macro-corner slots. Serially the two
+            // agree, because SSHEX8 numbers macro corners first and the coarse ids are then the
+            // leading block of the fine numbering. Under a partition the local order is
+            // [owned-not-shared | shared | ghosts | aura], which scatters those corners across the
+            // whole local range: measured at 2 ranks the fine corner ids reached 348 and 429
+            // against coarse extents of 75 and 100, and every consumer sizes its arrays from the
+            // coarse extent. The earlier attempt at reading this array failed on ordering alone --
+            // HEX8 corner order is not the lattice order sshex8_lidx produces -- and smesh already
+            // owns that reindexing, so it is taken from there rather than re-derived here.
+            (void)to_b;
+            smesh::idx_t *corner_rows[8];
+            smesh::hex8_elements_as_sshex8_level1(from_b->elements()->data(), corner_rows);
+            for (int a = 0; a < 8; ++a) rows[(size_t)a] = corner_rows[a];
         }
 
         galerkin_gid_from_rows(rows, g.n_coarse, g);
