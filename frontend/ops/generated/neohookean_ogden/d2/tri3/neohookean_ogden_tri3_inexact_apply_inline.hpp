@@ -98,7 +98,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_inexact_apply_tangent_a_msoa_impl(
       const s_t tangent_t6 = pow_m2(tangent_t5);
       const s_t tangent_t7 = pow_2(gu_1_0)*tangent_t6;
       const s_t tangent_t8 = lmbda*tangent_t7;
-      const s_t tangent_t9 = log(tangent_t5);
+      const s_t tangent_t9 = sfem_log1p(gu_0_0*gu_1_1 + gu_0_0 + gu_1_1 - tangent_t2);
       const s_t tangent_t10 = mu*tangent_t7 + mu - tangent_t8*tangent_t9 + tangent_t8;
       const s_t tangent_t11 = adjugate0*adjugate1;
       const s_t tangent_t12 = tangent_t4*tangent_t6;

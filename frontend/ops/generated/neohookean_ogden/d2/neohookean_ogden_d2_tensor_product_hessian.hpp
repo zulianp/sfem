@@ -106,7 +106,7 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_direct_hessian_tensor
         const s_t weak_hess_tmp4 = pow_m2(weak_hess_tmp3);
         const s_t weak_hess_tmp5 = weak_hess_tmp0*weak_hess_tmp4;
         const s_t weak_hess_tmp6 = gu2*weak_hess_tmp5;
-        const s_t weak_hess_tmp7 = log(weak_hess_tmp3);
+        const s_t weak_hess_tmp7 = sfem_log1p(gu0*gu3 + gu0 + gu3 - weak_hess_tmp1);
         const s_t weak_hess_tmp8 = gu2*lmbda*weak_hess_tmp0*weak_hess_tmp4*weak_hess_tmp7 - lmbda*weak_hess_tmp6 - mu*weak_hess_tmp6;
         const s_t weak_hess_tmp9 = gu1*weak_hess_tmp5;
         const s_t weak_hess_tmp10 = gu1*lmbda*weak_hess_tmp0*weak_hess_tmp4*weak_hess_tmp7 - lmbda*weak_hess_tmp9 - mu*weak_hess_tmp9;

@@ -123,10 +123,8 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_obje
           const s_t gu1 = gu_base_v[1 * VS + 0] + alpha * trial_grad_v[1 * VS + 0];
           const s_t gu2 = gu_base_v[2 * VS + 0] + alpha * trial_grad_v[2 * VS + 0];
           const s_t gu3 = gu_base_v[3 * VS + 0] + alpha * trial_grad_v[3 * VS + 0];
-    const s_t weak_obj_tmp0 = gu0 + s_t(1);
-    const s_t weak_obj_tmp1 = gu3 + s_t(1);
-    const s_t weak_obj_tmp2 = log(-gu1*gu2 + weak_obj_tmp0*weak_obj_tmp1);
-    value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(weak_obj_tmp2) - mu*weak_obj_tmp2 + ((s_t(1) / s_t(2)))*mu*(pow_2(gu1) + pow_2(gu2) + pow_2(weak_obj_tmp0) + pow_2(weak_obj_tmp1) + s_t(-2)));
+    const s_t weak_obj_tmp0 = sfem_log1p(gu0*gu3 + gu0 - gu1*gu2 + gu3);
+    value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(weak_obj_tmp0) - mu*weak_obj_tmp0 + ((s_t(1) / s_t(2)))*mu*(pow_2(gu0) + s_t(2)*gu0 + pow_2(gu1) + pow_2(gu2) + pow_2(gu3) + s_t(2)*gu3));
         }
       }
     }
@@ -191,10 +189,8 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_tri3
           const s_t gu1 = gu_base_v[1 * VS + 0] + alpha * trial_grad_v[1 * VS + 0];
           const s_t gu2 = gu_base_v[2 * VS + 0] + alpha * trial_grad_v[2 * VS + 0];
           const s_t gu3 = gu_base_v[3 * VS + 0] + alpha * trial_grad_v[3 * VS + 0];
-    const s_t weak_obj_tmp0 = gu0 + s_t(1);
-    const s_t weak_obj_tmp1 = gu3 + s_t(1);
-    const s_t weak_obj_tmp2 = log(-gu1*gu2 + weak_obj_tmp0*weak_obj_tmp1);
-    value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(weak_obj_tmp2) - mu*weak_obj_tmp2 + ((s_t(1) / s_t(2)))*mu*(pow_2(gu1) + pow_2(gu2) + pow_2(weak_obj_tmp0) + pow_2(weak_obj_tmp1) + s_t(-2)));
+    const s_t weak_obj_tmp0 = sfem_log1p(gu0*gu3 + gu0 - gu1*gu2 + gu3);
+    value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(weak_obj_tmp0) - mu*weak_obj_tmp0 + ((s_t(1) / s_t(2)))*mu*(pow_2(gu0) + s_t(2)*gu0 + pow_2(gu1) + pow_2(gu2) + pow_2(gu3) + s_t(2)*gu3));
         }
       }
     }
@@ -267,14 +263,14 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_grad
     const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
     const s_t weak_mat_tmp0 = gu0 + s_t(1);
     const s_t weak_mat_tmp1 = mu*weak_mat_tmp0;
-    const s_t weak_mat_tmp2 = gu3 + s_t(1);
-    const s_t weak_mat_tmp3 = -gu1*gu2 + weak_mat_tmp0*weak_mat_tmp2;
-    const s_t weak_mat_tmp4 = pow_m1(weak_mat_tmp3);
-    const s_t weak_mat_tmp5 = mu*weak_mat_tmp2;
-    const s_t weak_mat_tmp6 = lmbda*weak_mat_tmp4*log(weak_mat_tmp3);
+    const s_t weak_mat_tmp2 = gu1*gu2;
+    const s_t weak_mat_tmp3 = gu3 + s_t(1);
+    const s_t weak_mat_tmp4 = pow_m1(weak_mat_tmp0*weak_mat_tmp3 - weak_mat_tmp2);
+    const s_t weak_mat_tmp5 = mu*weak_mat_tmp3;
+    const s_t weak_mat_tmp6 = lmbda*weak_mat_tmp4*sfem_log1p(gu0*gu3 + gu0 + gu3 - weak_mat_tmp2);
     const s_t weak_mat_tmp7 = gu1*mu;
     const s_t weak_mat_tmp8 = gu2*mu;
-    const s_t material0 = weak_mat_tmp1 + weak_mat_tmp2*weak_mat_tmp6 - weak_mat_tmp4*weak_mat_tmp5;
+    const s_t material0 = weak_mat_tmp1 + weak_mat_tmp3*weak_mat_tmp6 - weak_mat_tmp4*weak_mat_tmp5;
     const s_t material1 = -gu2*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp8 + weak_mat_tmp7;
     const s_t material2 = -gu1*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp7 + weak_mat_tmp8;
     const s_t material3 = weak_mat_tmp0*weak_mat_tmp6 - weak_mat_tmp1*weak_mat_tmp4 + weak_mat_tmp5;
@@ -335,14 +331,14 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_tri3
       const s_t gu3 = (gu_ref2 * adj_value1 + gu_ref3 * adj_value3) * idet;
     const s_t weak_mat_tmp0 = gu0 + s_t(1);
     const s_t weak_mat_tmp1 = mu*weak_mat_tmp0;
-    const s_t weak_mat_tmp2 = gu3 + s_t(1);
-    const s_t weak_mat_tmp3 = -gu1*gu2 + weak_mat_tmp0*weak_mat_tmp2;
-    const s_t weak_mat_tmp4 = pow_m1(weak_mat_tmp3);
-    const s_t weak_mat_tmp5 = mu*weak_mat_tmp2;
-    const s_t weak_mat_tmp6 = lmbda*weak_mat_tmp4*log(weak_mat_tmp3);
+    const s_t weak_mat_tmp2 = gu1*gu2;
+    const s_t weak_mat_tmp3 = gu3 + s_t(1);
+    const s_t weak_mat_tmp4 = pow_m1(weak_mat_tmp0*weak_mat_tmp3 - weak_mat_tmp2);
+    const s_t weak_mat_tmp5 = mu*weak_mat_tmp3;
+    const s_t weak_mat_tmp6 = lmbda*weak_mat_tmp4*sfem_log1p(gu0*gu3 + gu0 + gu3 - weak_mat_tmp2);
     const s_t weak_mat_tmp7 = gu1*mu;
     const s_t weak_mat_tmp8 = gu2*mu;
-    const s_t material0 = weak_mat_tmp1 + weak_mat_tmp2*weak_mat_tmp6 - weak_mat_tmp4*weak_mat_tmp5;
+    const s_t material0 = weak_mat_tmp1 + weak_mat_tmp3*weak_mat_tmp6 - weak_mat_tmp4*weak_mat_tmp5;
     const s_t material1 = -gu2*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp8 + weak_mat_tmp7;
     const s_t material2 = -gu1*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp7 + weak_mat_tmp8;
     const s_t material3 = weak_mat_tmp0*weak_mat_tmp6 - weak_mat_tmp1*weak_mat_tmp4 + weak_mat_tmp5;
@@ -453,7 +449,7 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_appl
     const s_t weak_mat_tmp4 = pow_m2(weak_mat_tmp3);
     const s_t weak_mat_tmp5 = weak_mat_tmp0*weak_mat_tmp4;
     const s_t weak_mat_tmp6 = gu2*weak_mat_tmp5;
-    const s_t weak_mat_tmp7 = log(weak_mat_tmp3);
+    const s_t weak_mat_tmp7 = sfem_log1p(gu0*gu3 + gu0 + gu3 - weak_mat_tmp1);
     const s_t weak_mat_tmp8 = gu2*lmbda*weak_mat_tmp0*weak_mat_tmp4*weak_mat_tmp7 - lmbda*weak_mat_tmp6 - mu*weak_mat_tmp6;
     const s_t weak_mat_tmp9 = gu1*weak_mat_tmp5;
     const s_t weak_mat_tmp10 = gu1*lmbda*weak_mat_tmp0*weak_mat_tmp4*weak_mat_tmp7 - lmbda*weak_mat_tmp9 - mu*weak_mat_tmp9;
@@ -550,7 +546,7 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_tri3
     const s_t weak_mat_tmp4 = pow_m2(weak_mat_tmp3);
     const s_t weak_mat_tmp5 = weak_mat_tmp0*weak_mat_tmp4;
     const s_t weak_mat_tmp6 = gu2*weak_mat_tmp5;
-    const s_t weak_mat_tmp7 = log(weak_mat_tmp3);
+    const s_t weak_mat_tmp7 = sfem_log1p(gu0*gu3 + gu0 + gu3 - weak_mat_tmp1);
     const s_t weak_mat_tmp8 = gu2*lmbda*weak_mat_tmp0*weak_mat_tmp4*weak_mat_tmp7 - lmbda*weak_mat_tmp6 - mu*weak_mat_tmp6;
     const s_t weak_mat_tmp9 = gu1*weak_mat_tmp5;
     const s_t weak_mat_tmp10 = gu1*lmbda*weak_mat_tmp0*weak_mat_tmp4*weak_mat_tmp7 - lmbda*weak_mat_tmp9 - mu*weak_mat_tmp9;

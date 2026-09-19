@@ -109,10 +109,8 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_objective_block(
         gu[1] = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
         gu[2] = gu_base_v[2 * VS + lane] + alpha * trial_grad_v[2 * VS + lane];
         gu[3] = gu_base_v[3 * VS + lane] + alpha * trial_grad_v[3 * VS + lane];
-    const s_t weak_obj_tmp0 = gu[0] + s_t(1);
-    const s_t weak_obj_tmp1 = gu[3] + s_t(1);
-    const s_t weak_obj_tmp2 = log(-gu[1]*gu[2] + weak_obj_tmp0*weak_obj_tmp1);
-    value[step * value_stride + lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(weak_obj_tmp2) - mu*weak_obj_tmp2 + ((s_t(1) / s_t(2)))*mu*(pow_2(gu[1]) + pow_2(gu[2]) + pow_2(weak_obj_tmp0) + pow_2(weak_obj_tmp1) + s_t(-2)));
+    const s_t weak_obj_tmp0 = sfem_log1p(gu[0]*gu[3] + gu[0] - gu[1]*gu[2] + gu[3]);
+    value[step * value_stride + lane] += qw * det_lane0 * (((s_t(1) / s_t(2)))*lmbda*pow_2(weak_obj_tmp0) - mu*weak_obj_tmp0 + ((s_t(1) / s_t(2)))*mu*(pow_2(gu[0]) + s_t(2)*gu[0] + pow_2(gu[1]) + pow_2(gu[2]) + pow_2(gu[3]) + s_t(2)*gu[3]));
       }
     }
   }
@@ -179,14 +177,14 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_gradient_block(
     s_t material[4];
     const s_t weak_mat_tmp0 = gu[0] + s_t(1);
     const s_t weak_mat_tmp1 = mu*weak_mat_tmp0;
-    const s_t weak_mat_tmp2 = gu[3] + s_t(1);
-    const s_t weak_mat_tmp3 = -gu[1]*gu[2] + weak_mat_tmp0*weak_mat_tmp2;
-    const s_t weak_mat_tmp4 = pow_m1(weak_mat_tmp3);
-    const s_t weak_mat_tmp5 = mu*weak_mat_tmp2;
-    const s_t weak_mat_tmp6 = lmbda*weak_mat_tmp4*log(weak_mat_tmp3);
+    const s_t weak_mat_tmp2 = gu[1]*gu[2];
+    const s_t weak_mat_tmp3 = gu[3] + s_t(1);
+    const s_t weak_mat_tmp4 = pow_m1(weak_mat_tmp0*weak_mat_tmp3 - weak_mat_tmp2);
+    const s_t weak_mat_tmp5 = mu*weak_mat_tmp3;
+    const s_t weak_mat_tmp6 = lmbda*weak_mat_tmp4*sfem_log1p(gu[0]*gu[3] + gu[0] + gu[3] - weak_mat_tmp2);
     const s_t weak_mat_tmp7 = gu[1]*mu;
     const s_t weak_mat_tmp8 = gu[2]*mu;
-    material[0] = weak_mat_tmp1 + weak_mat_tmp2*weak_mat_tmp6 - weak_mat_tmp4*weak_mat_tmp5;
+    material[0] = weak_mat_tmp1 + weak_mat_tmp3*weak_mat_tmp6 - weak_mat_tmp4*weak_mat_tmp5;
     material[1] = -gu[2]*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp8 + weak_mat_tmp7;
     material[2] = -gu[1]*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp7 + weak_mat_tmp8;
     material[3] = weak_mat_tmp0*weak_mat_tmp6 - weak_mat_tmp1*weak_mat_tmp4 + weak_mat_tmp5;
@@ -283,7 +281,7 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_apply_block(
     const s_t weak_mat_tmp4 = pow_m2(weak_mat_tmp3);
     const s_t weak_mat_tmp5 = weak_mat_tmp0*weak_mat_tmp4;
     const s_t weak_mat_tmp6 = gu[2]*weak_mat_tmp5;
-    const s_t weak_mat_tmp7 = log(weak_mat_tmp3);
+    const s_t weak_mat_tmp7 = sfem_log1p(gu[0]*gu[3] + gu[0] + gu[3] - weak_mat_tmp1);
     const s_t weak_mat_tmp8 = gu[2]*lmbda*weak_mat_tmp0*weak_mat_tmp4*weak_mat_tmp7 - lmbda*weak_mat_tmp6 - mu*weak_mat_tmp6;
     const s_t weak_mat_tmp9 = gu[1]*weak_mat_tmp5;
     const s_t weak_mat_tmp10 = gu[1]*lmbda*weak_mat_tmp0*weak_mat_tmp4*weak_mat_tmp7 - lmbda*weak_mat_tmp9 - mu*weak_mat_tmp9;

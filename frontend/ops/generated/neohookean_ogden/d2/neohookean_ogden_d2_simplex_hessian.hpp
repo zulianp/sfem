@@ -100,7 +100,7 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_direct_hessian_reference_ele
         const s_t weak_hess_tmp4 = pow_m2(weak_hess_tmp3);
         const s_t weak_hess_tmp5 = weak_hess_tmp0*weak_hess_tmp4;
         const s_t weak_hess_tmp6 = gu2*weak_hess_tmp5;
-        const s_t weak_hess_tmp7 = log(weak_hess_tmp3);
+        const s_t weak_hess_tmp7 = sfem_log1p(gu0*gu3 + gu0 + gu3 - weak_hess_tmp1);
         const s_t weak_hess_tmp8 = gu2*lmbda*weak_hess_tmp0*weak_hess_tmp4*weak_hess_tmp7 - lmbda*weak_hess_tmp6 - mu*weak_hess_tmp6;
         const s_t weak_hess_tmp9 = gu1*weak_hess_tmp5;
         const s_t weak_hess_tmp10 = gu1*lmbda*weak_hess_tmp0*weak_hess_tmp4*weak_hess_tmp7 - lmbda*weak_hess_tmp9 - mu*weak_hess_tmp9;
@@ -181,7 +181,7 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_tri3_direct_hessian_element_
   const s_t hessian_tmp4 = pow_m2(hessian_tmp3);
   const s_t hessian_tmp5 = pow_2(gu2)*hessian_tmp4;
   const s_t hessian_tmp6 = hessian_tmp5*lmbda;
-  const s_t hessian_tmp7 = log(hessian_tmp3);
+  const s_t hessian_tmp7 = sfem_log1p(gu0*gu3 + gu0 + gu3 - hessian_tmp0);
   const s_t hessian_tmp8 = hessian_tmp5*mu - hessian_tmp6*hessian_tmp7 + hessian_tmp6 + mu;
   const s_t hessian_tmp9 = idet*(-adj_lane1 - adj_lane3);
   const s_t hessian_tmp10 = hessian_tmp2*hessian_tmp4;

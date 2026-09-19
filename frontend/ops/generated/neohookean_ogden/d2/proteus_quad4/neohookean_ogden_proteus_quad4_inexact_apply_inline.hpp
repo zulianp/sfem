@@ -126,7 +126,7 @@ static SFEM_INLINE int neohookean_ogden_proteus_quad4_inexact_apply_tangent_a_ms
             const s_t integrand_t6 = pow_m2(integrand_t5);
             const s_t integrand_t7 = pow_2(gu_1_0)*integrand_t6;
             const s_t integrand_t8 = integrand_t7*lmbda;
-            const s_t integrand_t9 = log(integrand_t5);
+            const s_t integrand_t9 = sfem_log1p(gu_0_0*gu_1_1 + gu_0_0 + gu_1_1 - integrand_t2);
             const s_t integrand_t10 = integrand_t7*mu - integrand_t8*integrand_t9 + integrand_t8 + mu;
             const s_t integrand_t11 = adjugate0*adjugate1;
             const s_t integrand_t12 = integrand_t4*integrand_t6;
