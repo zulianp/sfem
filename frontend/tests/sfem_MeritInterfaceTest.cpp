@@ -278,6 +278,50 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    /// A gravity line search used to abort.
+    ///
+    /// `energy_merit` asks every operator for its stepped 0-form, and the volume
+    /// forcing declared only `value`, so it reached `Op::value_steps` and its
+    /// `SFEM_ERROR`.  The work is linear in the state, so one assembly and two
+    /// dots serve every step -- the same identity the traction uses -- and the
+    /// test holds both that it runs and that the identity is exact.
+    int test_a_body_force_can_be_line_searched() {
+        auto fixture = make_fixture();
+        auto op      = sfem::Factory::create_op(fixture.space, "GeneratedBodyForce");
+        SFEM_TEST_ASSERT(op != nullptr);
+        for (auto &block : fixture.mesh->blocks()) {
+            op->set_value_in_block(block->name(), "density", real_t(1300));
+            op->set_value_in_block(block->name(), "g0", real_t(0));
+            op->set_value_in_block(block->name(), "g1", real_t(0));
+            op->set_value_in_block(block->name(), "g2", real_t(-9.81));
+        }
+
+        auto f = sfem::Function::create(fixture.space);
+        f->add_operator(op);
+        SFEM_TEST_ASSERT(f->has_energy_merit());
+
+        auto x = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        auto h = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        seed(fixture.ndofs, 4, x->data());
+        seed(fixture.ndofs, 5, h->data());
+
+        std::vector<real_t> stepped(4, 0);
+        SFEM_TEST_ASSERT(f->energy_merit(x->data(), h->data(), 4, kSteps, stepped.data()) == SFEM_SUCCESS);
+
+        // Against the value at each point formed explicitly: the split is exact,
+        // not an approximation that happens to be close.
+        for (int step = 0; step < 4; ++step) {
+            auto point = sfem::create_host_buffer<real_t>(fixture.ndofs);
+            for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+                point->data()[i] = x->data()[i] + kSteps[step] * h->data()[i];
+            }
+            real_t direct = 0;
+            SFEM_TEST_ASSERT(f->energy_merit(point->data(), &direct) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(std::abs(stepped[step] - direct) <= real_t(1e-12) * (1 + std::abs(direct)));
+        }
+        return SFEM_TEST_SUCCESS;
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -288,6 +332,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_the_caller_may_own_the_accumulator);
     SFEM_RUN_TEST(test_a_system_without_a_potential_refuses_the_energy);
     SFEM_RUN_TEST(test_an_energy_system_offers_both_merits);
+    SFEM_RUN_TEST(test_a_body_force_can_be_line_searched);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

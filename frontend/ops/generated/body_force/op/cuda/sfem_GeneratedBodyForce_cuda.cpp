@@ -862,6 +862,32 @@ namespace sfem {
   }
 
 
+  int GPUGeneratedBodyForce::value_steps(const real_t *x,
+              const real_t *h,
+              const int nsteps,
+              const real_t *const steps,
+              real_t *const out) {
+    SFEM_TRACE_SCOPE("GPUGeneratedBodyForce::value_steps");
+    // The work is linear in the state, so `g` is the same at every step and one
+    // gradient serves all of them.
+    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    std::vector<real_t> work(ndofs, 0);
+    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    real_t gx = 0;
+    real_t gh = 0;
+#pragma omp parallel for reduction(+ : gx, gh)
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+      gx += work[i] * x[i];
+      gh += work[i] * h[i];
+    }
+    for (int step = 0; step < nsteps; ++step) {
+      out[step] += gx + steps[step] * gh;
+    }
+    return SFEM_SUCCESS;
+  }
+
   int GPUGeneratedBodyForce::value(const real_t *x, real_t *const out) {
     SFEM_TRACE_SCOPE("GPUGeneratedBodyForce::value");
     // `-rho * g . u`, from the load vector this operator's own gradient

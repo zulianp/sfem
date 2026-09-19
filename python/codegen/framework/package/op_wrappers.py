@@ -3419,7 +3419,10 @@ namespace sfem {
             else ""
         ),
     }
-    return _header(material, True, node_wise=emits_merit), source
+    # A volume forcing publishes the stepped 0-form too, now that the energy
+    # merit asks every operator for it.
+    return _header(material, True, publishes_value_steps=emits_linear_work,
+                   node_wise=emits_merit), source
 
 
 def _linear_work_value_method(op_name):
@@ -3436,10 +3439,40 @@ def _linear_work_value_method(op_name):
     `Function` and then refuse to contribute to its energy -- the same hole the
     Neumann operator had before it was given this identity.
 
-    Only `value`, because the volume header declares only `value`; the stepped
-    form is the boundary path's and stays there until a volume forcing needs it.
+    The stepped form comes with it now that a volume forcing needs it: the energy
+    merit asks every operator for `value_steps`, so a body force in a line search
+    used to reach `Op::value_steps` and abort.  One assembly and two dots serve
+    every step, because the work splits exactly -- `g . (x + alpha*h)` is
+    `g.x + alpha * g.h` -- which is the same identity the traction uses and the
+    reason neither pays for `nsteps` assemblies.
     """
     return """
+  int %(op)s::value_steps(const real_t *x,
+              const real_t *h,
+              const int nsteps,
+              const real_t *const steps,
+              real_t *const out) {
+    SFEM_TRACE_SCOPE("%(op)s::value_steps");
+    // The work is linear in the state, so `g` is the same at every step and one
+    // gradient serves all of them.
+    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    std::vector<real_t> work(ndofs, 0);
+    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    real_t gx = 0;
+    real_t gh = 0;
+#pragma omp parallel for reduction(+ : gx, gh)
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+      gx += work[i] * x[i];
+      gh += work[i] * h[i];
+    }
+    for (int step = 0; step < nsteps; ++step) {
+      out[step] += gx + steps[step] * gh;
+    }
+    return SFEM_SUCCESS;
+  }
+
   int %(op)s::value(const real_t *x, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::value");
     // `-rho * g . u`, from the load vector this operator's own gradient
