@@ -46,6 +46,7 @@ namespace {
 
         int    nl_max_it;
         real_t nl_tol;
+        real_t nl_rtol;
         real_t lsolve_rtol;
         real_t newton_alpha;
         bool   enable_line_search;
@@ -96,6 +97,12 @@ namespace {
 
             ret.nl_max_it          = smesh::Env::read("SFEM_NL_MAX_IT", 30);
             ret.nl_tol             = smesh::Env::read("SFEM_NL_TOL", 1e-9);
+            // Relative, because the absolute one alone is not reachable.  The
+            // residual of this problem starts around 1e3, so an absolute 1e-9
+            // asks for twelve digits, and the energy line search below cannot
+            // steer that far: it stops resolving a decrease once the decrease
+            // falls under the energy's own evaluation noise.
+            ret.nl_rtol            = smesh::Env::read("SFEM_NL_RTOL", 1e-8);
             ret.lsolve_rtol        = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
             ret.newton_alpha       = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
             ret.enable_line_search = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
@@ -142,6 +149,7 @@ namespace {
             os << "  export_freq: " << export_freq << std::endl;
             os << "  nl_max_it: " << nl_max_it << std::endl;
             os << "  nl_tol: " << nl_tol << std::endl;
+            os << "  nl_rtol: " << nl_rtol << std::endl;
             os << "  lsolve_rtol: " << lsolve_rtol << std::endl;
             os << "  newton_alpha: " << newton_alpha << std::endl;
             os << "  enable_line_search: " << enable_line_search << std::endl;
@@ -525,6 +533,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
         real_t energy = 0;
         f->value(u->data(), &energy);
 
+        real_t gnorm_0 = 0;
         for (int it = 0; it < env.nl_max_it; ++it) {
             f->update(u->data());
             if (env.use_preconditioner) {
@@ -548,7 +557,10 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             f->set_value_to_constrained_dofs(0, rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
-            if (gnorm < env.nl_tol) {
+            if (it == 0) {
+                gnorm_0 = gnorm;
+            }
+            if (gnorm < env.nl_tol || (gnorm_0 > 0 && gnorm < env.nl_rtol * gnorm_0)) {
                 if (!comm->rank()) {
                     printf("%-8d %-10d %-5d %-14.4e %-14.4e %-10.4g (converged)\n",
                            step,
@@ -584,8 +596,9 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             last_iterations = cg->iterations();
             total_linear_iterations += last_iterations;
 
-            real_t selected_alpha = -env.newton_alpha;
-            bool   no_progress    = false;
+            real_t selected_alpha             = -env.newton_alpha;
+            bool   no_progress                = false;
+            bool   line_search_at_resolution  = false;
             if (env.enable_line_search) {
                 std::vector<real_t> alphas{-2 * env.newton_alpha,
                                            -env.newton_alpha,
@@ -610,6 +623,18 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
                 if (selected_alpha == 0) {
                     no_progress = true;
+                    // Distinguish the two ways this happens.  An energy line
+                    // search can only see a decrease while the decrease is
+                    // larger than the noise in evaluating the energy, and near
+                    // the solution it is not: the decrease falls off with the
+                    // square of the step while the noise does not move.  That
+                    // is a resolution limit rather than a failure, and saying
+                    // so is the difference between a converged answer and an
+                    // error message.
+                    const real_t predicted = -blas->dot(ndofs, rhs->data(), incr->data());
+                    const real_t floor     = 64 * std::numeric_limits<real_t>::epsilon() *
+                                         std::max(std::abs(energies.back()), real_t(1));
+                    line_search_at_resolution = std::abs(predicted) < floor;
                 }
             }
 
@@ -621,18 +646,35 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
                 f->value(u->data(), &energy);
             }
 
+            char status[96] = "";
+            if (line_search_at_resolution) {
+                // Say how far it got, because "stopped" and "stopped at the
+                // best the merit can see" are different answers.
+                snprintf(status,
+                         sizeof(status),
+                         " (energy-limited, |r|/|r0|=%.2e)",
+                         (double)(gnorm_0 > 0 ? gnorm / gnorm_0 : 0));
+            }
             if (!comm->rank()) {
-                printf("%-8d %-10d %-5d %-14.4e %-14.4e %-10.4g\n",
+                printf("%-8d %-10d %-5d %-14.4e %-14.4e %-10.4g%s\n",
                        step,
                        it,
                        last_iterations,
                        (double)gnorm,
                        (double)energy,
-                       (double)selected_alpha);
+                       (double)selected_alpha,
+                       status);
             }
 
             if (no_progress) {
-                fprintf(stderr, "No progress made, stopping Newton iteration\n");
+                if (!line_search_at_resolution) {
+                    fprintf(stderr,
+                            "No progress made at step %d, Newton iteration %d: the line search "
+                            "found no energy decrease although one larger than the energy's "
+                            "resolution was predicted\n",
+                            step,
+                            it);
+                }
                 break;
             }
         }
