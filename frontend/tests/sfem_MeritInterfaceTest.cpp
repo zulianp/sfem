@@ -34,9 +34,11 @@ namespace {
         ptrdiff_t                            ndofs{0};
     };
 
-    Fixture make_fixture() {
+    /// `mesh` lets a test choose the block structure; the default is the
+    /// single-block cube every other test here wants.
+    Fixture make_fixture(const std::shared_ptr<sfem::Mesh> &mesh = nullptr) {
         Fixture fixture;
-        fixture.mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
+        fixture.mesh  = mesh ? mesh : sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
         fixture.space = sfem::FunctionSpace::create(fixture.mesh, 3);
         fixture.ndofs = fixture.space->n_dofs();
         return fixture;
@@ -369,6 +371,48 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    /// A multi-block mesh must keep getting its merit while inter-block
+    /// patches are missing.
+    ///
+    /// `Function::residual_merit` aborts on a multi-block space when the
+    /// contractor samples the merit patch-wise, because a patch is built within
+    /// one block and a node on a block boundary would be squared before its sum
+    /// is complete.  That guard is asked of the *contractor*, not of the space,
+    /// so an operator that assembles the whole residual at each trial step --
+    /// which spans blocks like any other assembly -- is untouched.  This pins
+    /// the scoping: on a two-block mesh the merit is still the norm of the
+    /// residual the `Function` assembles.
+    ///
+    /// The abort itself is not exercised here.  It ends the process, the
+    /// harness has no death test, and no operator answers
+    /// `contracts_residual_merit()` true yet, so the branch is unreachable from
+    /// a unit test.  It becomes testable when the sampling kernel lands.
+    int test_a_multi_block_mesh_still_gets_its_merit() {
+        auto fixture = make_fixture(
+                sfem::Mesh::create_hex8_checkerboard_cube(sfem::Communicator::self(), 2, 2, 2));
+        SFEM_TEST_ASSERT(fixture.space->n_blocks() == (size_t)2);
+        SFEM_TEST_ASSERT(fixture.space->is_multi_block());
+
+        auto f = make_residual_system(fixture, /*material_first=*/true);
+
+        auto x = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        auto h = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        seed(fixture.ndofs, 1, x->data());
+        seed(fixture.ndofs, 2, h->data());
+
+        std::vector<real_t> merits(4, 0);
+        SFEM_TEST_ASSERT(f->residual_merit(x->data(), h->data(), 4, kSteps, merits.data()) ==
+                         SFEM_SUCCESS);
+
+        for (int step = 0; step < 4; ++step) {
+            const real_t reference =
+                    merit_the_long_way(f, fixture.ndofs, x->data(), h->data(), kSteps[step]);
+            SFEM_TEST_ASSERT(reference > 0);
+            SFEM_TEST_ASSERT(std::abs(merits[step] - reference) <= real_t(1e-10) * reference);
+        }
+        return SFEM_TEST_SUCCESS;
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -381,6 +425,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_an_energy_system_offers_both_merits);
     SFEM_RUN_TEST(test_a_body_force_can_be_line_searched);
     SFEM_RUN_TEST(test_a_traction_steps_match_the_stepped_value);
+    SFEM_RUN_TEST(test_a_multi_block_mesh_still_gets_its_merit);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
