@@ -487,6 +487,25 @@ def is_time_rate_shift(name):
     return str(name).endswith("_dt_shift")
 
 
+def is_previous_symbol(name):
+    """Whether a free symbol belongs to the history stream, asked of the spelling.
+
+    `PreviousFunction` is the only thing that produces this suffix -- `u_old` for
+    the value and `u_old_grad[i]` for the gradient -- so, like
+    `is_time_rate_shift`, the question has one owner here rather than a pattern
+    repeated in whichever layer needs it next.
+
+    The form layer needs it because an energy form classifies every free symbol
+    that is neither the current state nor the direction as a *material
+    parameter*.  Without this, a `gen.dt(u)` inside an energy would send
+    `u_old_grad[0]` to `require_real_value`, which is a runtime failure looking
+    for a scalar that is really a field.
+    """
+    text = str(name)
+    suffix = "_%s" % PREVIOUS_ARGUMENT
+    return text.endswith(suffix) or ("%s_grad" % suffix) in text
+
+
 class TimeRate:
     """A field's time derivative, carried as a sum rather than discretised.
 
