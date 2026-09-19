@@ -17,6 +17,7 @@ verification_and_validation/run_all.py --family hyperelastic --dimension 2
 verification_and_validation/run_all.py --tier fast --operator GeneratedLinearElasticity
 verification_and_validation/run_all.py --variant cylindrical_pressure_vessel/default
 verification_and_validation/run_all.py --build-dir build64 --output-dir /tmp/sfem-vv
+verification_and_validation/run_all.py --tier fast --strict-skips
 verification_and_validation/run_all.py --verbose
 ```
 
@@ -46,7 +47,24 @@ Each case declares:
 The suite writes one isolated output directory and log per variant plus
 `report.yaml` at the output root. Results use `PASS`, `FAIL`, `ERROR`, and
 `SKIP`; skipped variants require a reason and do not count as covered. The
-runner returns a non-zero status for failures or errors.
+runner returns a non-zero status for failures, errors, or coverage-policy
+violations.
+
+## Continuous regression
+
+The repository CI runs unit tests and the `fast` V&V tier for GCC pull-request
+and main-branch builds. A nightly and manually dispatched lane runs all tiers.
+Both lanes use `--strict-skips` and upload `report.yaml`, per-variant oracle
+reports, and run logs as a retained workflow artifact. Generated meshes and
+solution fields stay out of artifact storage. The Clang matrix job continues to
+provide an independent build and CTest result without duplicating the numerical
+suite.
+
+Capability-dependent variants use manifest `requires` entries. The runner
+records detected capabilities and skip classifications in `report.yaml`;
+unconditional manifest skips violate the CI policy. Use `--fail-on-skip` for a
+runner expected to provide complete coverage, or `--require-capability` to
+enforce a specific device lane.
 
 The fast tier contains affine 2D and 3D linear-elastic patch tests and
 homogeneous 2D and 3D hyperelastic mode tests. These cases compare independent

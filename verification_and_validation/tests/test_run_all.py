@@ -136,6 +136,22 @@ class ManifestTests(unittest.TestCase):
         with self.assertRaisesRegex(run_all.ManifestError, "oracle provenance"):
             run_all.validate_case(case)
 
+    def test_capability_requirements_are_validated_and_normalized(self):
+        case = valid_v2_case()
+        case["variants"][0]["requires"] = ["cuda_device"]
+        run_all.validate_case(case)
+        variant = run_all.normalized_variants(case)[0]
+        self.assertEqual(["cuda_device"], variant["requires"])
+
+        case["variants"][0]["requires"] = ["cuda_device", "cuda_device"]
+        with self.assertRaisesRegex(run_all.ManifestError, "duplicate capability"):
+            run_all.validate_case(case)
+
+        case["variants"][0]["requires"] = ["cuda_device"]
+        case["variants"][0]["skip"] = {"reason": "disabled"}
+        with self.assertRaisesRegex(run_all.ManifestError, "either skip or requires"):
+            run_all.validate_case(case)
+
     def test_discovery_validates_every_manifest_before_execution(self):
         invalid = valid_v2_case()
         del invalid["verification"]["tolerances"]
@@ -196,6 +212,59 @@ class SelectionTests(unittest.TestCase):
             run_all.validate_filter_values(self.discovered, {"variants": {"missing"}})
 
 
+class CapabilityTests(unittest.TestCase):
+    def test_cuda_capabilities_follow_build_and_host(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            build = Path(temp_dir)
+            cache = build / "CMakeCache.txt"
+            cache.write_text("SFEM_ENABLE_CUDA:BOOL=OFF\n", encoding="utf-8")
+            probe = mock.Mock(return_value=(True, "GPU 0"))
+            capabilities = run_all.detect_capabilities(build, cuda_probe=probe)
+            self.assertEqual([], capabilities["available"])
+            self.assertEqual("SFEM_ENABLE_CUDA is OFF", capabilities["details"]["cuda_device"]["reason"])
+            probe.assert_not_called()
+
+            cache.write_text("SFEM_ENABLE_CUDA:BOOL=ON\n", encoding="utf-8")
+            capabilities = run_all.detect_capabilities(build, cuda_probe=probe)
+            self.assertEqual(["cuda_build", "cuda_device"], capabilities["available"])
+            self.assertEqual("GPU 0", capabilities["details"]["cuda_device"]["reason"])
+
+    def test_command_line_capability_overrides_take_precedence(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            build = Path(temp_dir)
+            (build / "CMakeCache.txt").write_text("SFEM_ENABLE_CUDA:BOOL=OFF\n", encoding="utf-8")
+            capabilities = run_all.detect_capabilities(
+                build,
+                forced_available=("cuda_device", "custom_backend"),
+                forced_unavailable=("custom_backend",),
+            )
+            self.assertIn("cuda_device", capabilities["available"])
+            self.assertNotIn("custom_backend", capabilities["available"])
+
+    def test_missing_capability_skips_without_running_stages(self):
+        case = valid_v2_case()
+        case["variants"][0]["requires"] = ["cuda_device"]
+        run_all.validate_case(case)
+        entry = {
+            "path": Path("linear_patch_2d/case.yaml"),
+            "case": case,
+            "variants": run_all.normalized_variants(case),
+        }
+        capabilities = {
+            "available": [],
+            "details": {"cuda_device": {"available": False, "reason": "no device", "source": "test"}},
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with mock.patch.object(run_all, "run_stage") as run_stage:
+                result = run_all.run_case(entry, Path(temp_dir) / "build", Path(temp_dir) / "out", False,
+                                          capabilities)
+            run_stage.assert_not_called()
+        variant = result["variants"][0]
+        self.assertEqual("SKIP", variant["status"])
+        self.assertEqual("capability", variant["skip_kind"])
+        self.assertEqual(["cuda_device"], variant["missing_capabilities"])
+
+
 class ResultTests(unittest.TestCase):
     def test_suite_report_is_yaml_and_preserves_scalar_types(self):
         report = {
@@ -238,6 +307,37 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(1, coverage["variants"]["covered"])
         self.assertEqual(1, coverage["variants"]["skip"])
         self.assertEqual(0, coverage["cases"]["covered"])
+
+    def test_strict_skip_policy_allows_capabilities_but_rejects_manifest_skips(self):
+        case = valid_v2_case()
+        variant = run_all.normalized_variants(case)[0]
+        capability_skip = run_all._skipped_variant_result(
+            case, variant, "no device", "capability", ("cuda_device",)
+        )
+        result = run_all._case_result(case, [capability_skip])
+        capabilities = {"available": [], "details": {}}
+        self.assertTrue(run_all.evaluate_policy([result], capabilities, strict_skips=True)["passed"])
+
+        manifest_skip = run_all._skipped_variant_result(case, variant, "disabled", "manifest")
+        result = run_all._case_result(case, [manifest_skip])
+        policy = run_all.evaluate_policy([result], capabilities, strict_skips=True)
+        self.assertFalse(policy["passed"])
+        self.assertIn("manifest skip", policy["violations"][0])
+
+    def test_fail_on_skip_and_required_capability_are_policy_failures(self):
+        case = valid_v2_case()
+        variant = run_all.normalized_variants(case)[0]
+        skipped = run_all._skipped_variant_result(case, variant, "no device", "capability")
+        result = run_all._case_result(case, [skipped])
+        capabilities = {
+            "available": [],
+            "details": {"cuda_device": {"reason": "no device"}},
+        }
+        policy = run_all.evaluate_policy(
+            [result], capabilities, fail_on_skip=True, required_capabilities=("cuda_device",)
+        )
+        self.assertFalse(policy["passed"])
+        self.assertEqual(2, len(policy["violations"]))
 
     def test_oracle_report_rejects_inconsistent_pass_flag(self):
         report = {

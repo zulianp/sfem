@@ -22,6 +22,7 @@ TIERS = ("fast", "medium", "extended")
 STATUS_ORDER = ("PASS", "FAIL", "ERROR", "SKIP")
 IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 RESOLUTION_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+CMAKE_TRUE_VALUES = {"1", "ON", "TRUE", "YES", "Y"}
 
 
 class ManifestError(ValueError):
@@ -43,6 +44,86 @@ def expand(value, variables):
     if isinstance(value, dict):
         return {key: expand(item, variables) for key, item in value.items()}
     return value
+
+
+def _read_cmake_cache(build_dir):
+    cache_path = Path(build_dir) / "CMakeCache.txt"
+    values = {}
+    if not cache_path.is_file():
+        return values
+    for line in cache_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line or line.startswith(("//", "#")) or "=" not in line or ":" not in line:
+            continue
+        key_and_type, value = line.split("=", 1)
+        key, _ = key_and_type.split(":", 1)
+        values[key] = value
+    return values
+
+
+def _probe_cuda_device(environment=None):
+    environment = os.environ if environment is None else environment
+    for variable in ("CUDA_VISIBLE_DEVICES", "NVIDIA_VISIBLE_DEVICES"):
+        value = environment.get(variable)
+        if value is not None and value.strip().lower() in ("", "-1", "none", "void"):
+            return False, f"{variable} disables device visibility"
+
+    executable = shutil.which("nvidia-smi")
+    if executable is None:
+        return False, "nvidia-smi is unavailable"
+    try:
+        completed = subprocess.run(
+            [executable, "-L"],
+            env=environment,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return False, f"CUDA device probe failed: {error}"
+    if completed.returncode or not completed.stdout.strip():
+        return False, "nvidia-smi did not report a CUDA device"
+    return True, completed.stdout.splitlines()[0].strip()
+
+
+def detect_capabilities(build_dir, forced_available=(), forced_unavailable=(), environment=None, cuda_probe=None):
+    cache = _read_cmake_cache(build_dir)
+    cuda_build = cache.get("SFEM_ENABLE_CUDA", "OFF").upper() in CMAKE_TRUE_VALUES
+    details = {
+        "cuda_build": {
+            "available": cuda_build,
+            "reason": "SFEM_ENABLE_CUDA is ON" if cuda_build else "SFEM_ENABLE_CUDA is OFF",
+            "source": "CMakeCache.txt",
+        }
+    }
+
+    if cuda_build:
+        probe = cuda_probe or _probe_cuda_device
+        cuda_device, reason = probe(environment)
+    else:
+        cuda_device, reason = False, "SFEM_ENABLE_CUDA is OFF"
+    details["cuda_device"] = {
+        "available": cuda_device,
+        "reason": reason,
+        "source": "host probe" if cuda_build else "CMakeCache.txt",
+    }
+
+    for capability in forced_available:
+        details[capability] = {
+            "available": True,
+            "reason": "enabled by command line",
+            "source": "override",
+        }
+    for capability in forced_unavailable:
+        details[capability] = {
+            "available": False,
+            "reason": "disabled by command line",
+            "source": "override",
+        }
+
+    available = sorted(name for name, detail in details.items() if detail["available"])
+    return {"available": available, "details": details}
 
 
 def run_stage(name, command, environment, log_file, verbose):
@@ -329,6 +410,17 @@ def _validate_v2(data, path):
         if "skip" in variant:
             skip = _require_mapping(variant["skip"], f"{variant_path}.skip", nonempty=True)
             _require_string(skip.get("reason"), f"{variant_path}.skip.reason")
+        if "requires" in variant:
+            requirements = _require_list(variant["requires"], f"{variant_path}.requires", nonempty=True)
+            seen_requirements = set()
+            for requirement_index, requirement in enumerate(requirements):
+                requirement_path = f"{variant_path}.requires[{requirement_index}]"
+                requirement = _require_identifier(requirement, requirement_path)
+                if requirement in seen_requirements:
+                    _error(requirement_path, f"duplicate capability '{requirement}'")
+                seen_requirements.add(requirement)
+        if "skip" in variant and "requires" in variant:
+            _error(variant_path, "declare either skip or requires, not both")
 
 
 def validate_case(data, path="case.yaml"):
@@ -390,6 +482,7 @@ def normalized_variants(case):
                 "verification": verification,
                 "tolerances": copy.deepcopy(verification["tolerances"]),
                 "skip": None,
+                "requires": [],
                 "schema_version": 1,
             }
         ]
@@ -421,6 +514,7 @@ def normalized_variants(case):
                     item.get("material_parameter_map", case.get("material_parameter_map", {}))
                 ),
                 "skip": copy.deepcopy(item.get("skip")),
+                "requires": copy.deepcopy(item.get("requires", [])),
                 "schema_version": 2,
             }
         )
@@ -536,6 +630,7 @@ def _result_metadata(case, variant):
         "element": variant["element"],
         "resolution": variant["resolution"],
         "oracle_type": variant["oracle_type"],
+        "requires": copy.deepcopy(variant.get("requires", [])),
         "schema_version": variant["schema_version"],
         "case_id": case["id"],
     }
@@ -701,9 +796,38 @@ def _case_result(case, variant_results):
     }
 
 
-def run_case(entry, build_dir, output_root, verbose):
+def _skipped_variant_result(case, variant, reason, skip_kind, missing_capabilities=()):
+    return {
+        **_result_metadata(case, variant),
+        "status": "SKIP",
+        "covered": False,
+        "duration_seconds": 0.0,
+        "checks_passed": 0,
+        "checks_total": 0,
+        "skip_reason": reason,
+        "skip_kind": skip_kind,
+        "missing_capabilities": list(missing_capabilities),
+        "log": None,
+    }
+
+
+def _capability_skip(variant, capabilities):
+    available = set(capabilities.get("available", ()))
+    missing = [requirement for requirement in variant.get("requires", ()) if requirement not in available]
+    if not missing:
+        return None
+    details = capabilities.get("details", {})
+    reasons = []
+    for requirement in missing:
+        detail = details.get(requirement, {})
+        reasons.append(f"{requirement} ({detail.get('reason', 'capability was not detected')})")
+    return missing, "required capability unavailable: " + ", ".join(reasons)
+
+
+def run_case(entry, build_dir, output_root, verbose, capabilities=None):
     case_path = entry["path"]
     case = entry["case"]
+    capabilities = capabilities or {"available": [], "details": {}}
     case_output = (output_root.resolve() / case["id"]).resolve()
     if case_output.parent != output_root.resolve():
         raise ValueError(f"refusing unsafe case output path: {case_output}")
@@ -721,17 +845,14 @@ def run_case(entry, build_dir, output_root, verbose):
 
         if variant["skip"]:
             variant_results.append(
-                {
-                    **_result_metadata(case, variant),
-                    "status": "SKIP",
-                    "covered": False,
-                    "duration_seconds": 0.0,
-                    "checks_passed": 0,
-                    "checks_total": 0,
-                    "skip_reason": variant["skip"]["reason"],
-                    "log": None,
-                }
+                _skipped_variant_result(case, variant, variant["skip"]["reason"], "manifest")
             )
+            continue
+
+        capability_skip = _capability_skip(variant, capabilities)
+        if capability_skip:
+            missing, reason = capability_skip
+            variant_results.append(_skipped_variant_result(case, variant, reason, "capability", missing))
             continue
 
         print(f"Running {case['id']}/{variant['id']} ...", flush=True)
@@ -809,26 +930,61 @@ def coverage_summary(discovered, case_results):
     }
 
 
+def evaluate_policy(case_results, capabilities, strict_skips=False, fail_on_skip=False,
+                    required_capabilities=()):
+    violations = []
+    available = set(capabilities.get("available", ()))
+    for capability in required_capabilities:
+        if capability not in available:
+            detail = capabilities.get("details", {}).get(capability, {})
+            reason = detail.get("reason", "capability was not detected")
+            violations.append(f"required capability {capability} is unavailable: {reason}")
+
+    for case in case_results:
+        for variant in case["variants"]:
+            if variant["status"] != "SKIP":
+                continue
+            qualified = f"{case['id']}/{variant['id']}"
+            if fail_on_skip:
+                violations.append(f"{qualified} was skipped: {variant.get('skip_reason', 'no reason')}")
+            elif strict_skips and variant.get("skip_kind") != "capability":
+                violations.append(f"{qualified} uses a manifest skip instead of a capability requirement")
+
+    return {
+        "strict_skips": bool(strict_skips),
+        "fail_on_skip": bool(fail_on_skip),
+        "required_capabilities": sorted(required_capabilities),
+        "passed": not violations,
+        "violations": violations,
+    }
+
+
 def _format_resolution(resolution):
     if isinstance(resolution, dict):
         return ",".join(f"{key}={value}" for key, value in sorted(resolution.items()))
     return str(resolution)
 
 
-def print_listing(selected):
+def print_listing(selected, capabilities=None):
+    available = set((capabilities or {}).get("available", ()))
     for entry in selected:
         case = entry["case"]
         for variant in entry["variants"]:
             skip = f" skip={variant['skip']['reason']}" if variant["skip"] else ""
+            requires = ""
+            if variant.get("requires"):
+                missing = [item for item in variant["requires"] if item not in available]
+                state = "available" if not missing else "unavailable=" + ",".join(missing)
+                requires = f" requires={','.join(variant['requires'])}({state})"
             print(
                 f"{case['id']}/{variant['id']}: {case['name']} "
                 f"family={variant['family']} dimension={variant['dimension']} tier={variant['tier']} "
                 f"operator={variant['operator']} element={variant['element']} "
-                f"resolution={_format_resolution(variant['resolution'])}{skip}"
+                f"resolution={_format_resolution(variant['resolution'])}{requires}{skip}"
             )
 
 
-def print_summary(results, report_path):
+def print_summary(results, report_path, policy=None):
     print("\nSFEM verification and validation")
     print("=" * 84)
     print(f"{'STATUS':<8} {'CASE':<34} {'VARIANTS':>10} {'CHECKS':>10} {'TIME':>10}")
@@ -856,6 +1012,9 @@ def print_summary(results, report_path):
         f"{counts['pass']} passed, {counts['fail']} failed, {counts['error']} errors, "
         f"{counts['skip']} skipped, {counts['selected']} total"
     )
+    if policy and not policy["passed"]:
+        for violation in policy["violations"]:
+            print(f"POLICY   {violation}")
     print(f"Report: {report_path}")
 
 
@@ -895,6 +1054,15 @@ def build_parser():
                         help="select a variant id or case_id/variant_id; may be repeated")
     parser.add_argument("--build-dir", type=Path, default=ROOT_DIR / "build64")
     parser.add_argument("--output-dir", type=Path, default=SUITE_DIR / "output")
+    parser.add_argument("--capability", action="append", default=[],
+                        help="force a host/build capability available; may be repeated")
+    parser.add_argument("--disable-capability", action="append", default=[],
+                        help="force a host/build capability unavailable; may be repeated")
+    parser.add_argument("--require-capability", action="append", default=[],
+                        help="fail the run when this capability is unavailable; may be repeated")
+    parser.add_argument("--strict-skips", action="store_true",
+                        help="fail hard-coded manifest skips; unavailable capability skips remain allowed")
+    parser.add_argument("--fail-on-skip", action="store_true", help="fail when any selected variant is skipped")
     parser.add_argument("--list", action="store_true", help="list selected case variants without running them")
     parser.add_argument("--verbose", action="store_true", help="show driver and postprocessor output")
     return parser
@@ -906,6 +1074,21 @@ def main(argv=None):
 
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    capability_arguments = {
+        "--capability": args.capability,
+        "--disable-capability": args.disable_capability,
+        "--require-capability": args.require_capability,
+    }
+    for option, values in capability_arguments.items():
+        for value in values:
+            if not isinstance(value, str) or not IDENTIFIER_RE.fullmatch(value):
+                parser.error(f"{option} expects a capability identifier")
+    conflicting_capabilities = set(args.capability).intersection(args.disable_capability)
+    if conflicting_capabilities:
+        parser.error(
+            "capabilities cannot be both enabled and disabled: " + ", ".join(sorted(conflicting_capabilities))
+        )
 
     try:
         discovered = discover_cases(SUITE_DIR, yaml)
@@ -919,8 +1102,13 @@ def main(argv=None):
         parser.error("no verification cases discovered")
     if not selected:
         parser.error("no case variants match the requested filters")
+    capabilities = detect_capabilities(
+        args.build_dir,
+        forced_available=args.capability,
+        forced_unavailable=args.disable_capability,
+    )
     if args.list:
-        print_listing(selected)
+        print_listing(selected, capabilities)
         return 0
 
     output_root = args.output_dir.resolve()
@@ -932,23 +1120,34 @@ def main(argv=None):
     for entry in selected:
         start = time.monotonic()
         try:
-            result = run_case(entry, args.build_dir, output_root, args.verbose)
+            result = run_case(entry, args.build_dir, output_root, args.verbose, capabilities)
         except Exception as error:
             result = _case_error_result(entry, error, time.monotonic() - start)
         results.append(result)
     status = _aggregate_status([result["status"] for result in results])
+    policy = evaluate_policy(
+        results,
+        capabilities,
+        strict_skips=args.strict_skips,
+        fail_on_skip=args.fail_on_skip,
+        required_capabilities=args.require_capability,
+    )
+    if not policy["passed"] and status != "ERROR":
+        status = "FAIL"
     report = {
         "schema_version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "repository": str(ROOT_DIR.resolve()),
         "build_directory": str(args.build_dir.resolve()),
         "selection": _selection_report(filters),
+        "capabilities": capabilities,
+        "policy": policy,
         "status": status,
         "coverage": coverage_summary(discovered, results),
         "cases": results,
     }
     report_path = write_suite_report(output_root, report, yaml)
-    print_summary(results, report_path)
+    print_summary(results, report_path, policy)
     return 1 if status in ("FAIL", "ERROR") else 0
 
 
