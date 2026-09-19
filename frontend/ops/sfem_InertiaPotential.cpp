@@ -292,18 +292,33 @@ namespace sfem {
             return SFEM_SUCCESS;
         }
 
-        // The merit at `x + step * h` for each step, as the same weighted dot
-        // the 0-form above is, once per step.  The vector work goes through
-        // BLAS so a device caller gets device reductions.
+        // The potential is a quadratic in the step, so the steps need no vector
+        // work at all.  With `o = x - u_hat`,
+        //
+        //   1/2 a (o + s h)^T M (o + s h) = A + s B + s^2 C
+        //
+        // with `A = 1/2 a o^T M o`, `B = a o^T M h` and `C = 1/2 a h^T M h`.
+        // Three weighted dots are computed once and every step is then a
+        // polynomial: a twelve-point line search costs what one point costs,
+        // where it used to cost three vector passes and a dot per step.
         const ptrdiff_t ndofs = impl_->space->n_dofs();
         auto            blas  = impl_->blas;
         const real_t    half  = real_t(0.5) * impl_->alpha;
 
         blas->zaxpby(ndofs, 1, x, -1, impl_->u_hat->data(), impl_->offset->data());
+
+        // `M o` and `M h`, each once.  `weighted` and `scaled` are this
+        // operator's own scratch, so no allocation happens here.
+        blas->xypaz(ndofs, impl_->mass->data(), impl_->offset->data(), 0, impl_->weighted->data());
+        const real_t a_term = half * blas->dot(ndofs, impl_->offset->data(), impl_->weighted->data());
+        const real_t b_term = impl_->alpha * blas->dot(ndofs, h, impl_->weighted->data());
+
+        blas->xypaz(ndofs, impl_->mass->data(), h, 0, impl_->scaled->data());
+        const real_t c_term = half * blas->dot(ndofs, h, impl_->scaled->data());
+
         for (int step = 0; step < nsteps; ++step) {
-            blas->zaxpby(ndofs, 1, impl_->offset->data(), steps[step], h, impl_->scaled->data());
-            blas->xypaz(ndofs, impl_->mass->data(), impl_->scaled->data(), 0, impl_->weighted->data());
-            out[step] += half * blas->dot(ndofs, impl_->scaled->data(), impl_->weighted->data());
+            const real_t s = steps[step];
+            out[step] += a_term + s * b_term + s * s * c_term;
         }
 
         return SFEM_SUCCESS;
