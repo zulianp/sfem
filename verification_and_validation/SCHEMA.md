@@ -134,21 +134,31 @@ Each variant must declare:
 | `expected_output.forbidden` | List of forbidden substrings. |
 | `tolerances` | Nonempty overrides merged over case-level tolerances. |
 | `material_parameter_map` | Optional mapping from physical names to operator YAML keys. Generated elasticity variants map `lambda` to `lmbda`; legacy variants map it to `lambda`. |
+| `requires` | Optional nonempty list of build/host capabilities required to execute the variant. |
 
 A variant may override `family`, `dimension`, `tier`, `mesh`, `inputs`, or the
 verification command/report. Metadata overrides are intended for a shared
 physical case that legitimately spans those fields, not for grouping unrelated
 benchmarks.
 
-An unavailable optional variant may declare:
+An optional variant tied to a build or host capability declares the requirement
+instead of hard-coding a skip:
 
 ```yaml
-skip:
-  reason: CUDA support is not enabled in this build
+requires: [cuda_device]
 ```
 
-It is reported as `SKIP`, never executed, and never counted as covered. Do not
-use a skip to hide a missing required implementation.
+The runner derives `cuda_build` from `CMakeCache.txt` and probes
+`cuda_device` only when CUDA was enabled. Missing requirements produce a
+capability-classified `SKIP`, are never counted as covered, and include the
+detection reason in `report.yaml`. `--capability` and `--disable-capability`
+provide explicit overrides for controlled runners.
+
+The legacy `skip.reason` form remains readable but cannot be combined with
+`requires`. CI uses `--strict-skips`, which rejects these unconditional manifest
+skips while allowing declared unavailable capabilities. `--fail-on-skip`
+requires complete selected coverage, and `--require-capability NAME` makes a
+missing host/build capability a policy failure.
 
 ## Template Variables
 
@@ -200,6 +210,10 @@ An empty report or a smoke-only check is rejected. Check names and tolerance
 values must match the resolved manifest one-for-one; a verifier cannot add,
 remove, or weaken a declared tolerance.
 
+The aggregate YAML also records `capabilities.available`, per-capability
+detection details, and the selected skip `policy`. Every skipped variant records
+`skip_kind`; capability skips additionally list `missing_capabilities`.
+
 ## Status and Coverage
 
 - `PASS`: all physical checks for the variant passed.
@@ -207,11 +221,13 @@ remove, or weaken a declared tolerance.
   exceeded tolerance.
 - `ERROR`: setup, execution, convergence-output checks, or report validation
   failed.
-- `SKIP`: the manifest declared a machine-readable skip reason.
+- `SKIP`: a declared capability was unavailable, or a legacy manifest skip was
+  selected.
 
 `SKIP` is non-fatal for the process but never contributes to coverage. A case
 is fully covered only when every selected variant is `PASS`. The runner exits
-nonzero when any selected case is `FAIL` or `ERROR`.
+nonzero when any selected case is `FAIL` or `ERROR`, or when the requested skip
+policy is violated.
 
 ## Version 1 Compatibility
 

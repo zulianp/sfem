@@ -169,5 +169,4 @@ variants:
         SFEM_EXECUTION_SPACE: DEVICE
     expected_output: *expected_output
     tolerances: *variant_tolerances
-    skip:
-      reason: This build has SFEM_ENABLE_CUDA=OFF; no V&V-ready device operator is exposed.
+    requires: [cuda_device]

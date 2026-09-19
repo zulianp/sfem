@@ -188,6 +188,22 @@ affine oracles, matrix-free and BSR paths pass identical tolerances, unavailable
 device coverage is reported as `SKIP`, and the active-strain and two-material
 cases reproduce their independent energy, residual, and reaction oracles.
 
+## Phase 7: Continuous Regression Operations (Complete)
+
+- run infrastructure tests and the fast tier on GCC pull-request and
+  main-branch builds while retaining the independent Clang build/CTest lane;
+- run the complete suite nightly and through manual workflow dispatch;
+- upload `report.yaml`, oracle reports, and run logs for every numerical CI
+  lane without retaining generated meshes and fields;
+- detect build and host capabilities at run time and replace build-specific
+  hard-coded skips with manifest `requires` declarations;
+- classify skips in the YAML report and provide strict and complete-coverage
+  policies for CPU and device runners.
+
+**Acceptance:** CPU CI permits only capability-driven device skips, unexpected
+manifest skips fail policy, reports are retained even after a numerical
+failure, and a device runner can require complete CUDA coverage explicitly.
+
 ## Reporting and Regression Policy
 
 The terminal summary should remain compact: one row per case and a short list
@@ -206,10 +222,11 @@ A regression is any of the following:
 - an oracle or tolerance changes without a corresponding reviewed source
   change.
 
-The top-level process returns nonzero for `FAIL` or `ERROR`. Optional extended
-variants may be skipped only for declared unavailable build capabilities. The
-suite remains outside `workflows`; any later automation should invoke
-`verification_and_validation/run_all.py` rather than duplicate case logic.
+The top-level process returns nonzero for `FAIL`, `ERROR`, or a skip-policy
+violation. Optional extended variants may be skipped only for declared
+unavailable build or host capabilities. The suite remains outside `workflows`;
+automation invokes `verification_and_validation/run_all.py` rather than
+duplicate case logic.
 
 ## Proposed Delivery Order
 
@@ -222,6 +239,7 @@ suite remains outside `workflows`; any later automation should invoke
 | M5 | Finite-strain Kelvin-Voigt creep in 2D/3D | Full histories and temporal rates pass. |
 | M6 | Legacy Kelvin-Voigt and Prony/WLF histories | All active viscoelastic implementations have an independent transient oracle. |
 | M7 | Higher-order, packed, semi-structured, assembled, and device variants | Extended coverage is reported without weakening core tolerances. |
+| M8 | Pull-request and scheduled regression lanes | Fast checks gate changes; full YAML reports and logs are retained nightly. |
 
 ## Definition of Done for a Case
 
