@@ -661,8 +661,12 @@ namespace sfem {
 
         for (auto &op : impl_->ops) {
             if (!op->energy_or_potential_based()) {
-                // Named, because the caller's next question is always which one.
-                SFEM_ERROR(
+                // Reported and refused rather than aborted: asking whether a
+                // system has an energy is a fair question, and a caller that
+                // asked wrongly can fall back to `residual_merit`, which every
+                // system has.  Named, because the caller's next question is
+                // always which operator.
+                fprintf(stderr,
                         "Function::energy_merit: operator \"%s\" has no potential, so this system "
                         "has no energy to sum; use residual_merit instead\n",
                         op->name());
