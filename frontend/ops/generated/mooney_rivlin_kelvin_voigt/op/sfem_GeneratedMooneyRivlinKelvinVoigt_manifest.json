@@ -205,6 +205,54 @@
       "name": "mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_variant_count"
     },
     {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t lmbda,\n        const real_t mu,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t direction_stride,\n        const void *const RSTR u0_direction,\n        const void *const RSTR u1_direction,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        const void *const RSTR current,\n        const void *const RSTR previous,\n        const void *const RSTR direction,\n        void *const RSTR output\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t lmbda,\n        const real_t mu,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t direction_stride,\n        const void *const RSTR u0_direction,\n        const void *const RSTR u1_direction,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t lmbda,\n        const real_t mu,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const ptrdiff_t direction_stride,\n        const void *const RSTR u0_direction,\n        const void *const RSTR u1_direction,\n        const void *const RSTR u2_direction,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        const void *const RSTR current,\n        const void *const RSTR previous,\n        const void *const RSTR direction,\n        void *const RSTR output\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t lmbda,\n        const real_t mu,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const ptrdiff_t direction_stride,\n        const void *const RSTR u0_direction,\n        const void *const RSTR u1_direction,\n        const void *const RSTR u2_direction,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t lmbda,\n        const real_t mu,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        const void *const RSTR current,\n        const void *const RSTR previous,\n        void *const RSTR output\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t lmbda,\n        const real_t mu,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t lmbda,\n        const real_t mu,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_maos(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR parameters,\n        const void *const RSTR current,\n        const void *const RSTR previous,\n        void *const RSTR output\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_maos"
+    },
+    {
+      "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t lmbda,\n        const real_t mu,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const void *const RSTR u2,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const void *const RSTR u2_old,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
+      "name": "mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_msoa"
+    },
+    {
       "declaration": "extern \"C\" int mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t eta_b,\n        const real_t eta_s,\n        const real_t u_dt_shift,\n        const ptrdiff_t current_stride,\n        const void *const RSTR u0,\n        const void *const RSTR u1,\n        const ptrdiff_t previous_stride,\n        const void *const RSTR u0_old,\n        const void *const RSTR u1_old,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
       "name": "mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_2d_i_msoa"
     },
@@ -620,6 +668,18 @@
       "name": "jacobian_action",
       "variants": [
         {
+          "function": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_residual_merit",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_residual_merit",
+          "variant": "affine"
+        },
+        {
           "function": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_a_msoa",
           "scalar_type": "real_t",
           "target": "mooney_rivlin_kelvin_voigt_viscous",
@@ -630,6 +690,18 @@
           "scalar_type": "real_t",
           "target": "mooney_rivlin_kelvin_voigt_viscous",
           "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_residual_merit",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt_residual_merit",
+          "variant": "isoparametric"
         },
         {
           "function": "mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_msoa",
@@ -690,6 +762,18 @@
       "name": "residual",
       "variants": [
         {
+          "function": "mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt",
+          "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt",
+          "variant": "affine"
+        },
+        {
           "function": "mooney_rivlin_kelvin_voigt_viscous_residual_2d_a_msoa",
           "scalar_type": "real_t",
           "target": "mooney_rivlin_kelvin_voigt_viscous",
@@ -700,6 +784,18 @@
           "scalar_type": "real_t",
           "target": "mooney_rivlin_kelvin_voigt_viscous",
           "variant": "affine"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "mooney_rivlin_kelvin_voigt",
+          "variant": "isoparametric"
         },
         {
           "function": "mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_msoa",

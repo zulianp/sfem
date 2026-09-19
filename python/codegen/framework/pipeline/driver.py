@@ -95,6 +95,8 @@ from codegen.framework.forms.equations import (
     EquationSystem,
     EquationSystemBuilder,
     EquationSystems,
+    TOTAL_RESIDUAL_UNIT_NAME,
+    total_residual_collection,
 )
 from codegen.framework.symbolic.fields import (
     FiniteElement,
@@ -1039,6 +1041,17 @@ def _evaluate_forms(user_input):
         )
         if not units:
             raise ValueError("material '%s' did not define any equations" % user_input.material.name)
+        combined = _total_residual_unit(
+            material_system,
+            mixed_order=any(
+                isinstance(element, SfemCompatibleElement)
+                and element.is_mixed_order
+                and _element_dim(element) == dim
+                for element in user_input.elements
+            ),
+        )
+        if combined is not None:
+            units = units + (combined,)
         by_dim[dim] = DimensionFormEvaluation(dim, units)
     return UnifiedFormEvaluation(
         user_input.material,
@@ -2245,6 +2258,51 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
             "single-equation generated Op wrappers require an unnamed equation"
         )
     return generate_op_files(material, selected, kernel_sources)
+
+
+def _total_residual_unit(material_system, mixed_order=False):
+    """One more unit carrying the material's whole residual, where it needs one.
+
+    A residual merit squares a node's complete value, so it has to be
+    contracted by a single kernel over a single form.  A material written as
+    several units has no such form until they are summed, which is what
+    `total_residual_collection` does.
+
+    Absent for a material that already is its own total residual.  A single
+    unit's residual *is* the material's, so emitting a second unit computing
+    the same thing would be a redundant path -- two kernels that must agree,
+    with nothing making them.  So this is exactly the multi-unit case, and
+    materials like navier_stokes, written as one coupled residual, are
+    untouched.
+    """
+    equations = material_system.equations
+    if len(equations) < 2:
+        return None
+    if not any(equation.is_residual for equation in equations):
+        return None
+    if mixed_order:
+        # Not yet.  A mixed-order system's fields do not share a shape count,
+        # so its kernels are emitted per field element type, and the combined
+        # residual arrives as lowered components -- `u0`, `u1`, `u2` -- with no
+        # record of which element each came from.  The emitter asks for exactly
+        # that map and refuses without it.  Carrying the grouping through the
+        # lowering is the fix and it is a separate piece of work; until then a
+        # Taylor-Hood material keeps every kernel it has, and its residual
+        # merit falls back to assembling per trial step, which is correct and
+        # slow rather than absent.
+        return None
+    return LoweredEquationEvaluation(
+        TOTAL_RESIDUAL_UNIT_NAME,
+        # Both orders, because a residual unit in this pipeline always carries
+        # its Jacobian: `_validate_residual_plan` requires metadata for ONE and
+        # TWO.  Only the residual is published as a kernel -- `kernels` decides
+        # that -- so the tangent is lowered but not emitted twice.
+        total_residual_collection(
+            material_system, orders=(FormOrder.ONE, FormOrder.TWO)
+        ),
+        kernels=("gradient",),
+        diagnostics=False,
+    )
 
 
 def _evaluate_equation(dim, equation, form_collection, matrix_format_plan=None):
