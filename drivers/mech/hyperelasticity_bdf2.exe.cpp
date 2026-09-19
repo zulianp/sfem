@@ -375,18 +375,26 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
         elastic_op->set_option("ASSUME_AFFINE", true);
     }
     set_material_parameters(env, elastic_op, mesh);
-    f->add_operator(elastic_op);
 
     // BDF2 as an object rather than as constants in the step loop below.  The
-    // elastic material here has no rate of its own -- the dynamics are entirely
-    // the method's inertia -- so there is no `TimeSteppable` to hand the scheme
-    // to, and the separable term is added here directly.
+    // material holds it and contributes the method's inertia itself -- as a
+    // potential, because this material's 0-form is one -- so adding the
+    // material is the whole of the time-discrete problem and the inertia
+    // cannot be left out of either the residual or the energy.
     auto scheme = std::make_shared<sfem::BDF2Scheme>(fs);
     scheme->set_density(env.rho);
     if (scheme->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
-    f->add_operator(scheme->inertia_op());
+
+    auto steppable = std::dynamic_pointer_cast<sfem::TimeSteppable>(elastic_op);
+    if (!steppable) {
+        SFEM_ERROR("%s cannot be handed a time scheme\n", env.operator_name.c_str());
+        return SFEM_FAILURE;
+    }
+    steppable->set_time_scheme(scheme);
+
+    f->add_operator(elastic_op);
 
     if (dirichlet_path.to_string() != "NONE") {
         auto dirichlet_conditions = sfem::DirichletConditions::create_from_file(fs, dirichlet_path);
