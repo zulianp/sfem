@@ -51,7 +51,10 @@ namespace {
 }  // namespace
 
 int main(int argc, char **argv) {
-    auto ctx = sfem::initialize(argc, argv);
+    // initialize_serial, not initialize: this is a single-process throughput benchmark, and it
+    // is also the standing packed-matrix-free performance gate. A second rank would have each
+    // rank time its own share of a partitioned mesh and report it as the whole.
+    auto ctx = sfem::initialize_serial(argc, argv);
 
     const int    reps   = smesh::Env::read<int>("SFEM_BENCH_REPS", 10);
     const int    warmup = smesh::Env::read<int>("SFEM_BENCH_WARMUP", 3);

@@ -36,6 +36,13 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 find_package(OpenMP COMPONENTS CXX)
+
+# Wanted for MPIEXEC_EXECUTABLE alone, so the multi-rank refusal can be gated on a launcher
+# actually existing. MPI itself arrives transitively through matrixio's interface link
+# libraries and is not requested here; QUIET because a machine with no launcher skips that one
+# test rather than failing to configure.
+find_package(MPI QUIET COMPONENTS CXX)
+
 enable_testing()
 
 # ---------------------------------------------------------------------- options
@@ -318,6 +325,33 @@ if(CVFEM_PYTHON)
     else()
         message(STATUS "cvfem: temporal-order gate skipped -- ${CVFEM_PYTHON} has no numpy")
     endif()
+endif()
+
+# ----------------------------------------------------------------- the multi-rank refusal
+#
+# This spike is a one-socket code -- every measurement in the workstream is 72 threads at
+# --ntasks=1 -- but nothing stopped it launching under mpirun, and at -n 2 it partitioned the
+# mesh for real before dying inside sfem_Op.hpp. That abort was luck. The quantities that are
+# wrong without an exchange are reductions (FGMRES dot and norm, the pressure gauge, the Newton
+# and Armijo tests, the CFL maximum), and a rank evaluates each over its own slice without
+# noticing it is partial -- so the failure a missing guard leaves open is a run that converges
+# and reports a per-rank answer, not a crash.
+#
+# Registered only when a launcher exists, and the script itself reports SKIP (77) when the
+# launcher is present but cannot place two ranks here, which is a property of the machine
+# rather than of the code. The benchmark target is passed too: the bench drivers refuse through
+# smesh's own initialize_serial rather than a second copy of the guard, and this checks that
+# wiring is live.
+if(MPIEXEC_EXECUTABLE)
+    add_test(NAME cvfem_mpi_guard
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_mpi_guard_test.sh
+                     $<TARGET_FILE:cvfem_hex8_ns_ssgmg>
+                     ${MPIEXEC_EXECUTABLE}
+                     $<TARGET_FILE:cvfem_sshex8_bench>)
+    set_tests_properties(cvfem_mpi_guard PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
+    message(STATUS "cvfem: MPI guard gate enabled (${MPIEXEC_EXECUTABLE})")
+else()
+    message(STATUS "cvfem: MPI guard gate skipped -- no MPI launcher found")
 endif()
 
 # Guards the guards, and so is the one target that must not go through

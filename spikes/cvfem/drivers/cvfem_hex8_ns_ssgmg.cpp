@@ -24,6 +24,7 @@
 #include "sfem_Function.hpp"
 #include "sfem_GeometricMultigrid.hpp"
 #include "sfem_Multigrid.hpp"
+#include "sfem_ParallelOperator.hpp"
 #include "sfem_context.hpp"
 #include "sfem_mask.hpp"
 
@@ -425,14 +426,27 @@ private:
         const int       mx  = omp_get_max_threads();
         int             n   = (int)std::min<ptrdiff_t>(mx, std::max<ptrdiff_t>(1, ndofs / std::max<ptrdiff_t>(1, per)));
         if (n >= mx) return op;  // big enough to use the machine as configured
-        return sfem::make_op<real_t>(
-                op->rows(), op->cols(),
-                [op, n, mx](const real_t *const x, real_t *const y) {
-                    omp_set_num_threads(n);
-                    op->apply(x, y);
-                    omp_set_num_threads(mx);
-                },
-                sfem::EXECUTION_SPACE_HOST);
+        auto fn = [op, n, mx](const real_t *const x, real_t *const y) {
+            omp_set_num_threads(n);
+            op->apply(x, y);
+            omp_set_num_threads(mx);
+        };
+
+        // Same reasoning as in timed(): this wrapper is applied to multigrid levels too, and
+        // make_op would erase the ParallelOperator face that Multigrid casts for. Note this
+        // function returns `op` untouched on every path above, so it only erases anything
+        // when the clamp actually engages -- which, with SFEM_GMG_DOFS_PER_THREAD defaulting
+        // to 0, is currently never. That is exactly why it would have been easy to miss.
+        if (auto pop = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(op)) {
+            return sfem::make_parallel_op<real_t>(pop->comm(),
+                                                  pop->rows(),
+                                                  pop->cols(),
+                                                  pop->row_allocation_size(),
+                                                  pop->col_allocation_size(),
+                                                  fn,
+                                                  pop->execution_space());
+        }
+        return sfem::make_op<real_t>(op->rows(), op->cols(), fn, sfem::EXECUTION_SPACE_HOST);
     }
 
     // A timed solver stays a solver. Multigrid hints its smoothers that pre-smoothing starts
@@ -472,14 +486,41 @@ private:
         if (!op) return op;
         if (auto s = std::dynamic_pointer_cast<sfem::MatrixFreeLinearSolver<real_t>>(op))
             return std::make_shared<TimedSolver>(name, s);
-        return sfem::make_op<real_t>(
-                op->rows(), op->cols(),
-                [op, name](const real_t *const x, real_t *const y) {
-                    const double t0 = smesh::time_seconds();
-                    op->apply(x, y);
-                    phase_add(name, smesh::time_seconds() - t0);
-                },
-                sfem::EXECUTION_SPACE_HOST);
+        auto fn = [op, name](const real_t *const x, real_t *const y) {
+            const double t0 = smesh::time_seconds();
+            op->apply(x, y);
+            phase_add(name, smesh::time_seconds() - t0);
+        };
+
+        // Keep the parallel face if the wrapped operator has one.
+        //
+        // make_op returns a plain Operator, and that erases ParallelOperator -- which is the
+        // face Multigrid asks for by dynamic_pointer_cast. reduce_norm2 uses it to decide
+        // whether to allreduce the dot, verbose_rank0 to decide who prints, and level_owned
+        // to decide whether a level's dof count means owned or local. EVERY multigrid level
+        // in this driver is wrapped here, so erasing it would make all three take the serial
+        // branch on a distributed run. level_owned is the one that matters: taking the serial
+        // branch there does not merely mislabel a diagnostic, it reduces over the wrong
+        // number of dofs.
+        //
+        // make_parallel_op is the factory the library already uses to rebuild this face
+        // (sfem_ShiftedPenaltyMultigrid.hpp, shifted_op), so this reuses it instead of
+        // inventing a second way to do the same thing. The allocation sizes are carried
+        // across rather than recomputed: they are the range and domain capacities INCLUDING
+        // ghosts and aura, which rows()/cols() deliberately do not count.
+        //
+        // The same fn goes to both factories, so the timed path cannot drift from the plain
+        // one. At one rank there is no ParallelOperator to find and this is the old code.
+        if (auto pop = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(op)) {
+            return sfem::make_parallel_op<real_t>(pop->comm(),
+                                                  pop->rows(),
+                                                  pop->cols(),
+                                                  pop->row_allocation_size(),
+                                                  pop->col_allocation_size(),
+                                                  fn,
+                                                  pop->execution_space());
+        }
+        return sfem::make_op<real_t>(op->rows(), op->cols(), fn, sfem::EXECUTION_SPACE_HOST);
     }
 
     // Some phases contain others: precond_total wraps the whole V-cycle, so the smoothers,
@@ -2946,6 +2987,42 @@ int main(int argc, char **argv) {
         usage(argv[0]);
         return EXIT_FAILURE;
     }
+
+    // Multi-rank is refused, not attempted -- and the refusal is placed after the argv
+    // handling above so that `mpirun -n 4 <driver> --help` still prints usage.
+    //
+    // This driver does run under mpirun today, which is the problem. Measured at -n 2: the
+    // mesh genuinely partitions (each rank reports its own elements_per_pack), both ranks
+    // build their operator, and the run then dies inside sfem_Op.hpp with "cvfem:NavierStokes
+    // does not support ElementScope other than ALL". That abort is luck rather than a check.
+    // The quantities that are wrong without an exchange are all reductions -- the FGMRES dot
+    // and norm, the pressure gauge's two projections, the Newton and Armijo acceptance tests,
+    // the CFL maximum -- and a rank evaluates every one of them over its own slice without
+    // ever noticing the slice is partial. So the failure a missing guard leaves open is not a
+    // crash: it is a run that converges, writes output, and reports a per-rank answer.
+    //
+    // SFEM_ALLOW_MPI is the opt-in the parallel stages grow into, so each of those reductions
+    // can be made collective and tested against this same binary rather than a forked one.
+    //
+    // Every rank evaluates this identically and returns non-zero, so the refusal is itself
+    // collective: no rank is left waiting in a barrier for one that has already exited, and
+    // ~Context calls MPI_Finalize as the shared_ptr unwinds. Only rank 0 prints, or a full
+    // node says this 288 times.
+    const int comm_size = ctx->communicator()->size();
+    if (comm_size > 1 && !smesh::Env::read<int>("SFEM_ALLOW_MPI", 0)) {
+        if (ctx->communicator()->rank() == 0) {
+            fprintf(stderr,
+                    "%s: refusing to run on %d ranks.\n"
+                    "  This driver is not distributed yet. Its reductions are local, so a\n"
+                    "  multi-rank run would not fail -- it would converge to a per-rank\n"
+                    "  answer. Use one rank and give the cores to OMP_NUM_THREADS.\n"
+                    "  SFEM_ALLOW_MPI=1 proceeds anyway, for work on the parallel path.\n",
+                    argv[0],
+                    comm_size);
+        }
+        return EXIT_FAILURE;
+    }
+
     const std::string out_folder = argv[1];
 
     const std::string case_name  = smesh::Env::read_string("SFEM_CASE", "");
