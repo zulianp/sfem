@@ -222,6 +222,58 @@ int main(int argc, char *argv[]) {
                    elapsed, nelements, ndofs, repeat, host_value);
         host_gradient = gradient_norm(f, x_host->data(), sfem::EXECUTION_SPACE_HOST);
         printf("%-34s %12s %14s %14s %26.17g\n", "host_gradient_norm", "", "", "", host_gradient);
+
+        // A line search evaluates several trial steps, and the claim the merit
+        // interface makes is that it should not cost several line searches.
+        // Sweeping the count is how that is read: an implementation that
+        // samples is near-flat in `nsteps`, one that re-assembles is linear in
+        // it.  The ratio against one step is printed so the shape is visible
+        // without dividing by hand.
+        {
+            auto   h_host = sfem::create_host_buffer<real_t>(ndofs);
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                h_host->data()[i] = real_t(1e-4) * std::sin(real_t(0.5 * (i + 1)));
+            }
+            const int  counts[] = {1, 2, 4, 8, 12, 20};
+            double     first    = 0;
+            printf("# line search sweep: %s\n",
+                   f->has_energy_merit() ? "energy_merit" : "residual_merit");
+            for (const int nsteps : counts) {
+                std::vector<real_t> steps(nsteps);
+                for (int k = 0; k < nsteps; ++k) {
+                    steps[k] = real_t(-1) / real_t(k + 1);
+                }
+                std::vector<real_t> values(nsteps, 0);
+                // Warm, then timed, the same shape the single-point path uses.
+                for (int r = 0; r < warmup; ++r) {
+                    std::fill(values.begin(), values.end(), real_t(0));
+                    if (f->has_energy_merit()) {
+                        f->energy_merit(x_host->data(), h_host->data(), nsteps, steps.data(), values.data());
+                    } else {
+                        f->residual_merit(x_host->data(), h_host->data(), nsteps, steps.data(), values.data());
+                    }
+                }
+                const double t0 = MPI_Wtime();
+                for (int r = 0; r < repeat; ++r) {
+                    std::fill(values.begin(), values.end(), real_t(0));
+                    if (f->has_energy_merit()) {
+                        f->energy_merit(x_host->data(), h_host->data(), nsteps, steps.data(), values.data());
+                    } else {
+                        f->residual_merit(x_host->data(), h_host->data(), nsteps, steps.data(), values.data());
+                    }
+                }
+                const double per_call = (MPI_Wtime() - t0) / repeat;
+                if (first == 0) {
+                    first = per_call;
+                }
+                printf("%-34s %12d %14.6e %14.3f %26.17g\n",
+                       "host_line_search",
+                       nsteps,
+                       per_call,
+                       first > 0 ? per_call / first : 0.0,
+                       values[0]);
+            }
+        }
     }
 
 #ifdef SFEM_ENABLE_CUDA
