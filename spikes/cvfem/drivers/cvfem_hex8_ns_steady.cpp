@@ -1,7 +1,11 @@
 #include "cvfem_hex8_ns_core.hpp"
 
 int main(int argc, char **argv) {
-    auto ctx = sfem::initialize(argc, argv);
+    // initialize_serial, not initialize: this driver's solve is not distributed, and under a
+    // second rank it would partition the mesh and converge to a per-rank answer rather than
+    // fail. The refusal already exists in smesh and aborts collectively, so it is reused here
+    // instead of being written out again.
+    auto ctx = sfem::initialize_serial(argc, argv);
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady");
 
     if (argc == 2 && (std::string(argv[1]) == "-h" || std::string(argv[1]) == "--help")) {

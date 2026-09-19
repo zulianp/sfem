@@ -42,7 +42,10 @@ namespace {
 }  // namespace
 
 int main(int argc, char **argv) {
-    auto ctx = sfem::initialize(argc, argv);
+    // initialize_serial, not initialize: this is a single-process throughput benchmark. Under a
+    // second rank each rank would time its own share of a partitioned mesh and report it as the
+    // whole, which is a wrong number that looks like a right one.
+    auto ctx = sfem::initialize_serial(argc, argv);
 
     const int         reps      = smesh::Env::read<int>("SFEM_BENCH_REPS", 20);
     const int         warmup    = smesh::Env::read<int>("SFEM_BENCH_WARMUP", 3);
