@@ -471,7 +471,38 @@ namespace sfem {
         // the global arrays as `owned_nodes_ptr[pack] + k`, which is only a valid node id
         // because each pack's owned nodes were made contiguous. Capturing elems/points
         // before this leaves them pointing at the pre-renumbering arrays.
-        if (to_geom_kind(geom) == GeomKind::Affine && pack_size > 0) {
+        // NOT on a distributed mesh, and the reason is a gap in THIS path rather than in the
+        // packing.
+        //
+        // Packing is partition-aware: on a distributed mesh the packs cover only the
+        // owned-not-shared element prefix, because a node's position inside its owner's owned
+        // block is a number the neighbouring ranks have recorded and permuting anything else
+        // silently redirects their gathers. That leaves the shared and aura elements in no
+        // pack at all, so every consumer has to sweep them separately.
+        //
+        // The semi-structured nodal gradient does: it runs the packed sweep over [0, n_packed)
+        // and a scatter sweep over the remainder, and that path matches serial exactly at two
+        // ranks (9.057110e-03 on the cavity at N=4, level 2). The FLAT kernels here do not --
+        // residual, Jacobian action, colored assembly and block diagonal each carry their own
+        // pack loop bounded by d.nelements -- so they would silently skip the remainder.
+        // Measured: Newton's first residual read 6.131693e-03 against a serial 8.100926e-03,
+        // the deficit being exactly the contributions of the unpacked elements.
+        //
+        // So this declines to pack rather than compute a wrong answer quickly. The atomic
+        // kernels below cover every local element and were measured to reproduce serial
+        // exactly at two ranks; the cost is roughly 10% on this case at N=32, and the
+        // campaign never runs this path anyway -- its jobs are all semi-structured at refine
+        // level 8 or a swept level, with the flat path used only by small verification cases.
+        //
+        // Splitting all four flat kernels is the way to get the packing back, and it is worth
+        // doing when a distributed flat solve is actually wanted. It is not silent: this
+        // prints, because every defect in this sequence has been a quiet fallback.
+        const bool pack_flat = to_geom_kind(geom) == GeomKind::Affine && pack_size > 0;
+        if (pack_flat && d.mesh->is_distributed()) {
+            std::printf(
+                    "cvfem: flat packing disabled on a distributed mesh -- the flat kernels have "
+                    "no sweep for the elements outside the packs; using the atomic path\n");
+        } else if (pack_flat) {
             impl_->packed   = make_packed(d.mesh, pack_size);
             d.packed        = &impl_->packed;
             impl_->coloring = cvfem_build_pack_coloring(impl_->packed.n_packs,
