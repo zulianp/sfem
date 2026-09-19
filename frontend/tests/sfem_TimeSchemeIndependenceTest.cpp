@@ -835,6 +835,99 @@ int test_an_energy_material_carries_the_schemes_potential() {
     return SFEM_TEST_SUCCESS;
 }
 
+/// Holding the scheme and adding its term as a second operator are the same
+/// problem, which is why a driver should do only the first.
+///
+/// `hyperelasticity_bdf2` used to build the inertia and call
+/// `f->add_operator(scheme->inertia_op())` beside the material, because the
+/// energy wrapper had no way to hold a scheme.  Now it has, and the hand-added
+/// operator is a second path to the same term -- the kind that drifts.  This
+/// pins the two together so removing the hand-added one is a refactor rather
+/// than a hope: a `Function` holding the material alone must assemble exactly
+/// what a `Function` holding the material and the inertia does, in the energy
+/// as well as in the residual and the tangent action.
+int test_holding_the_scheme_equals_adding_its_operator() {
+    auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 2, 2, 2);
+    auto space = sfem::FunctionSpace::create(mesh, 3);
+
+    const ptrdiff_t ndofs = space->n_dofs();
+    const real_t    dt    = real_t(0.05);
+
+    auto make_material = [&]() {
+        auto op = sfem::Factory::create_op(space, "GeneratedNeoHookeanOgden");
+        for (const auto &block : mesh->blocks()) {
+            op->set_value_in_block(block->name(), "mu", real_t(3));
+            op->set_value_in_block(block->name(), "lmbda", real_t(1));
+        }
+        return op;
+    };
+
+    auto make_scheme = [&]() -> std::shared_ptr<sfem::BDF2Scheme> {
+        auto scheme = std::make_shared<sfem::BDF2Scheme>(space);
+        scheme->set_density(real_t(2));
+        if (scheme->initialize() != SFEM_SUCCESS) return nullptr;
+        seed_state(ndofs, 0, scheme->state()->data());
+        seed_state(ndofs, 1, scheme->velocity()->data());
+        scheme->begin_step(dt, dt);
+        return scheme;
+    };
+
+    // One Function holds the scheme through the material.
+    auto held_scheme = make_scheme();
+    SFEM_TEST_ASSERT(held_scheme != nullptr);
+    auto held_op     = make_material();
+    std::dynamic_pointer_cast<sfem::TimeSteppable>(held_op)->set_time_scheme(held_scheme);
+    auto held = sfem::Function::create(space);
+    held->add_operator(held_op);
+
+    // The other adds the term itself, the way the driver used to.
+    auto pushed_scheme = make_scheme();
+    SFEM_TEST_ASSERT(pushed_scheme != nullptr);
+    auto pushed        = sfem::Function::create(space);
+    pushed->add_operator(make_material());
+    pushed->add_operator(pushed_scheme->inertia_op());
+
+    auto x = sfem::create_host_buffer<real_t>(ndofs);
+    auto d = sfem::create_host_buffer<real_t>(ndofs);
+    seed_state(ndofs, 5, x->data());
+    seed_state(ndofs, 6, d->data());
+
+    real_t held_value = 0, pushed_value = 0;
+    SFEM_TEST_ASSERT(held->value(x->data(), &held_value) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(pushed->value(x->data(), &pushed_value) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(pushed_value != real_t(0));
+    SFEM_TEST_ASSERT(std::abs(held_value - pushed_value) <= real_t(1e-12) * (1 + std::abs(pushed_value)));
+
+    auto held_grad   = sfem::create_host_buffer<real_t>(ndofs);
+    auto pushed_grad = sfem::create_host_buffer<real_t>(ndofs);
+    SFEM_TEST_ASSERT(held->gradient(x->data(), held_grad->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(pushed->gradient(x->data(), pushed_grad->data()) == SFEM_SUCCESS);
+
+    auto held_apply   = sfem::create_host_buffer<real_t>(ndofs);
+    auto pushed_apply = sfem::create_host_buffer<real_t>(ndofs);
+    SFEM_TEST_ASSERT(held->apply(x->data(), d->data(), held_apply->data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(pushed->apply(x->data(), d->data(), pushed_apply->data()) == SFEM_SUCCESS);
+
+    real_t scale = 0;
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        scale = std::max(scale, std::abs(pushed_grad->data()[i]));
+    }
+    SFEM_TEST_ASSERT(scale > 0);
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        SFEM_TEST_ASSERT(std::abs(held_grad->data()[i] - pushed_grad->data()[i]) <= real_t(1e-12) * scale);
+        SFEM_TEST_ASSERT(std::abs(held_apply->data()[i] - pushed_apply->data()[i]) <= real_t(1e-10) * (1 + std::abs(pushed_apply->data()[i])));
+    }
+
+    // And at a trial step, which is where a line search reads the energy.
+    const real_t step = real_t(1e-3);
+    real_t       held_step = 0, pushed_step = 0;
+    SFEM_TEST_ASSERT(held->value_steps(x->data(), d->data(), 1, &step, &held_step) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(pushed->value_steps(x->data(), d->data(), 1, &step, &pushed_step) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(std::abs(held_step - pushed_step) <= real_t(1e-12) * (1 + std::abs(pushed_step)));
+
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_the_material_reads_the_scheme_it_was_handed);
@@ -847,6 +940,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_the_diagnostic_matches_the_scheme);
     SFEM_RUN_TEST(test_the_schemes_potential_differentiates_to_its_residual);
     SFEM_RUN_TEST(test_an_energy_material_carries_the_schemes_potential);
+    SFEM_RUN_TEST(test_holding_the_scheme_equals_adding_its_operator);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
