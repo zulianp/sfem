@@ -234,9 +234,70 @@ int test_inertia_potential_device_matches_host() {
 }
 #endif  // SFEM_ENABLE_CUDA
 
+/// The stepped 0-form must be the 0-form at the stepped point.
+///
+/// It is now computed as a quadratic in the step -- `A + s B + s^2 C` from
+/// three weighted dots taken once -- rather than by re-forming `x + s h` and
+/// reducing per step, so a twelve-point line search costs what one point costs.
+/// That is only worth having if it is exact, and this is where that is held:
+/// the device test beside it compares host against device and would agree with
+/// itself if the formula were wrong in both.
+///
+/// The steps deliberately include zero, a negative, and a magnitude past one,
+/// because a dropped quadratic term is invisible at small `s`.
+int test_inertia_potential_steps_match_the_stepped_value() {
+    auto mesh  = sfem::Mesh::create_hex8_cube(sfem::Communicator::self(), 1, 1, 1);
+    auto space = sfem::FunctionSpace::create(mesh, 3);
+
+    const ptrdiff_t ndofs = space->n_dofs();
+    auto            mass  = sfem::create_host_buffer<real_t>(ndofs);
+    auto            u_hat = sfem::create_host_buffer<real_t>(ndofs);
+    auto            x     = sfem::create_host_buffer<real_t>(ndofs);
+    auto            h     = sfem::create_host_buffer<real_t>(ndofs);
+    auto            point = sfem::create_host_buffer<real_t>(ndofs);
+
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+        mass->data()[i]  = 1 + real_t(0.125) * ((i % 5) + 1);
+        u_hat->data()[i] = real_t(0.01) * ((i % 7) - 3);
+        x->data()[i]     = real_t(0.02) * ((i % 11) - 5);
+        h->data()[i]     = real_t(0.005) * ((i % 13) - 6);
+    }
+
+    sfem::InertiaPotential op(space);
+    op.set_alpha(7.25);
+    op.set_mass(mass);
+    op.set_u_hat(u_hat);
+    SFEM_TEST_ASSERT(op.initialize() == SFEM_SUCCESS);
+
+    const real_t        steps[] = {real_t(0), real_t(-0.5), real_t(0.25), real_t(-2), real_t(3)};
+    const int           nsteps  = 5;
+    std::vector<real_t> stepped(nsteps, 0);
+    SFEM_TEST_ASSERT(op.value_steps(x->data(), h->data(), nsteps, steps, stepped.data()) ==
+                     SFEM_SUCCESS);
+
+    for (int s = 0; s < nsteps; ++s) {
+        for (ptrdiff_t i = 0; i < ndofs; ++i) {
+            point->data()[i] = x->data()[i] + steps[s] * h->data()[i];
+        }
+        real_t direct = 0;
+        SFEM_TEST_ASSERT(op.value(point->data(), &direct) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(std::abs(stepped[s] - direct) <= 1e-12 * (1 + std::abs(direct)));
+    }
+
+    // And it accumulates rather than assigns, as every 0-form here does.
+    std::vector<real_t> twice(stepped);
+    SFEM_TEST_ASSERT(op.value_steps(x->data(), h->data(), nsteps, steps, twice.data()) ==
+                     SFEM_SUCCESS);
+    for (int s = 0; s < nsteps; ++s) {
+        SFEM_TEST_ASSERT(std::abs(twice[s] - 2 * stepped[s]) <= 1e-12 * (1 + std::abs(stepped[s])));
+    }
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_bdf2_inertia_potential_derivatives);
+    SFEM_RUN_TEST(test_inertia_potential_steps_match_the_stepped_value);
 #ifdef SFEM_ENABLE_CUDA
     SFEM_RUN_TEST(test_inertia_potential_device_matches_host);
 #endif
