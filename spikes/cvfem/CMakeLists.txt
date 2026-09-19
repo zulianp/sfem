@@ -349,6 +349,25 @@ if(MPIEXEC_EXECUTABLE)
                      ${MPIEXEC_EXECUTABLE}
                      $<TARGET_FILE:cvfem_sshex8_bench>)
     set_tests_properties(cvfem_mpi_guard PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
+
+    # That the distributed SETUP describes the same problem as the serial one: same global
+    # node, element and constrained-dof counts, and the decomposition's own record of those
+    # agreeing with what the owned ranges sum to.
+    #
+    # Everything before the solve is meant to be correct multi-rank already, and nothing
+    # checked it. The failure it catches is quiet: mesh->n_nodes() is the LOCAL count on a
+    # distributed mesh, so anything summed over it counts shared, ghost and aura entries once
+    # per rank holding them and grows with the rank count while the problem does not.
+    #
+    # Integers only. The coordinate checksum is deliberately excluded -- floating-point
+    # addition does not associate, so a partitioned sum need not match a sequential one bit for
+    # bit even when both are right.
+    add_test(NAME cvfem_distributed_setup
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_distributed_setup_test.sh
+                     $<TARGET_FILE:cvfem_hex8_ns_ssgmg>
+                     ${MPIEXEC_EXECUTABLE})
+    set_tests_properties(cvfem_distributed_setup PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
+
     message(STATUS "cvfem: MPI guard gate enabled (${MPIEXEC_EXECUTABLE})")
 else()
     message(STATUS "cvfem: MPI guard gate skipped -- no MPI launcher found")

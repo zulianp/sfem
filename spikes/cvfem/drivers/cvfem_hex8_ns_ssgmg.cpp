@@ -14,6 +14,7 @@
 #include "cvfem_hex8_ns_op.hpp"
 #include "cvfem_flow_diagnostics.hpp"
 #include "cvfem_fgmres.hpp"
+#include "cvfem_parallel.hpp"
 #include "cvfem_ss_transfer.hpp"
 #include "cvfem_ss_galerkin_api.hpp"
 
@@ -23,6 +24,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_GeometricMultigrid.hpp"
+#include "sfem_ElementScope.hpp"
 #include "sfem_Multigrid.hpp"
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_context.hpp"
@@ -3873,6 +3875,17 @@ int main(int argc, char **argv) {
     if (!op->pressure_sideset.empty())
         op->pressure_value = smesh::Env::read<real_t>("SFEM_PRESSURE", real_t(0));
     if (op->initialize() != SFEM_SUCCESS) return EXIT_FAILURE;
+
+    // Checked here rather than assumed, and checked AFTER initialize() because that is what
+    // renumbers the nodes for the packed layout.
+    //
+    // The scoped apply paths index per-block element ranges directly, so they require the
+    // block layout to be [owned-not-shared | shared | aura] with n_elements == owned+ghosts.
+    // A mesh that does not satisfy it produces no error of its own: the ranges simply address
+    // the wrong elements. This is the library's own predicate rather than a second opinion --
+    // sfem_ParallelMatrixFreeOperator calls it for the same reason -- and it returns
+    // immediately on a serial mesh, so it costs a branch here.
+    sfem::assert_mesh_supports_distributed_element_scopes(*mesh);
     // The Newton loop below evaluates the residual immediately after every step and
     // before the linear solve, which is the condition this option asks for: the nodal
     // pressure gradient is then current for the whole Krylov sweep and need not be
@@ -3883,6 +3896,29 @@ int main(int argc, char **argv) {
 
     const ptrdiff_t     nnodes = mesh->n_nodes();
     const ptrdiff_t     ndof   = nnodes * N_FIELDS;
+
+    // mesh->n_nodes() is the LOCAL count on a distributed mesh -- owned plus ghosts plus
+    // aura -- so nnodes and ndof above already mean "local", and every existing use of them
+    // is an allocation or an index, which is what local is for. What is missing is the other
+    // half: a reduction has to run over the OWNED range, or every shared, ghost and aura
+    // entry is counted once per rank that holds it.
+    //
+    // Measured on the cavity at N=2 over two ranks: the ranks report 27 and 18 local nodes
+    // against a serial 27, and each prints its own coordinate checksum -- 13.5/13.5/13.5 and
+    // 9/9/13.5. Neither is the mesh's checksum and summing them is not either.
+    //
+    // Only the setup-stage quantities are converted here. The solve path -- the Krylov
+    // workspace, the Newton tests, the gauge -- is a hundred-odd further uses and belongs to
+    // the stages that make those reductions collective; splitting them here would be a large
+    // unverifiable diff and would put the byte-compared serial results at risk for no gain.
+    //
+    // At one rank n_owned_nodes == nnodes and every loop below is unchanged.
+    cvfem::Domain domain;
+    domain.comm                     = ctx->communicator();
+    const ptrdiff_t n_owned_nodes   = mesh->is_distributed() ? mesh->distributed()->n_nodes_owned() : nnodes;
+    const ptrdiff_t ndof_owned      = n_owned_nodes * N_FIELDS;
+    domain.n_owned                  = ndof_owned;
+    domain.n_local                  = ndof;
     std::vector<real_t> p_exact;
     ptrdiff_t           pin_node = 0;  // pressure pin, needed again by the MMS diagnostics
     // The pressure level the initial state already carries ON THE PORT. A prescribed pressure
@@ -3922,20 +3958,38 @@ int main(int argc, char **argv) {
         {
             // Checksum the mesh coordinates. p_exact is a serial function of these, so if
             // it varies between runs, they do. It doubles as the restart's identity guard.
+            // Over the OWNED nodes, then reduced. Summing to nnodes would add every ghost and
+            // aura node once per rank holding it; measured at two ranks on the N=2 cavity, the
+            // two ranks produced 13.5/13.5/13.5 and 9/9/13.5 and neither was the mesh's.
+            //
+            // This stays a guard against the NUMBERING changing between runs at the same rank
+            // count, which is what a restart needs and what the comment above describes. It is
+            // deliberately not offered as a value that matches across rank counts: floating
+            // point addition does not associate, so a four-way partial-sum tree and a
+            // sequential sum need not agree in the last bits even when both are correct.
+            // The gate compares integer counts for that reason.
+            //
+            // n_owned_nodes == nnodes at one rank, so the loop and the sum are unchanged.
             long double cx = 0, cy = 0, cz = 0;
-            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            for (ptrdiff_t i = 0; i < n_owned_nodes; ++i) {
                 cx += (long double)px[i];
                 cy += (long double)py[i];
                 cz += (long double)pz[i];
             }
-            std::printf("mesh coords checksum: %.17g %.17g %.17g\n", (double)cx, (double)cy, (double)cz);
+            const double gcx = cvfem::sum_kahan(domain, cx);
+            const double gcy = cvfem::sum_kahan(domain, cy);
+            const double gcz = cvfem::sum_kahan(domain, cz);
+            // One line per run, not one per rank: a full node would otherwise print this 288
+            // times. is_root() is true at one rank, so serial output is unchanged.
+            if (domain.is_root())
+                std::printf("mesh coords checksum: %.17g %.17g %.17g\n", gcx, gcy, gcz);
             // Kept, because it is exactly the guard a restart needs. Reading a state back
             // into a different node numbering is silent: every array is the right LENGTH, so
             // nothing fails, and the run continues from a scrambled field. SFC::reorder and
             // op->initialize() both renumber, so the numbering is a function of the mesh, the
             // resolution and a handful of environment variables -- and this sum over the
             // coordinates in node order changes if any of them do.
-            mesh_coord_checksum = (double)(cx + cy + cz);
+            mesh_coord_checksum = gcx + gcy + gcz;
         }
 
         const bool step_outflow_natural = outlet_mode == "natural";
@@ -4339,6 +4393,31 @@ int main(int argc, char **argv) {
         }
     }
     std::printf("nnodes: %td  nelements: %td  ndof: %td\n", nnodes, mesh->n_elements(0), ndof);
+    // Left exactly as it was, deliberately: scripts/dns_cost_model.py and the tracked
+    // verification reports parse that line, and these are LOCAL counts, which is what a
+    // per-rank line should say. The global picture goes on its own line and only when there
+    // is one to report, so a serial run's output is byte-identical.
+    if (domain.distributed()) {
+        auto dist = mesh->distributed();
+        // Two independent sources for the same number, printed together on purpose. The left
+        // pair is what smesh recorded when it built the decomposition; the right is what this
+        // rank set actually sums to over the owned ranges. They must agree, and a disagreement
+        // means the ownership metadata does not describe the mesh -- the exact failure S1 was
+        // about, which no single-rank check can see.
+        const ptrdiff_t owned_elements =
+                mesh->block(0)->n_elements_owned() ? mesh->block(0)->n_elements_owned() : mesh->n_elements(0);
+        const ptrdiff_t summed_nodes    = cvfem::sum(domain, n_owned_nodes);
+        const ptrdiff_t summed_elements = cvfem::sum(domain, owned_elements);
+        if (domain.is_root())
+            // No parentheses around the summed values, deliberately: the gate splits this line
+            // on whitespace, and "(summed 123)" would hand it a token with a trailing paren.
+            std::printf("global: nnodes %td summed %td nelements %td summed %td ranks %d\n",
+                        dist->n_nodes_global(),
+                        summed_nodes,
+                        dist->n_elements_global(),
+                        summed_elements,
+                        domain.size());
+    }
     if (flow == cvfem_case::FlowCase::MMS) {
         // Two different quantities would otherwise both be printed as "Re": the driver's
         // flow Reynolds number rho*U*Ly/mu, and the manufactured solution's own parameter
@@ -4441,6 +4520,44 @@ int main(int argc, char **argv) {
 
     std::vector<mask_t> cmask(mask_count(ndof), 0);
     f->constraints_mask(cmask.data());
+
+    // How many dofs the constraints actually pin, globally.
+    //
+    // Counted over the OWNED range and then reduced. cmask covers the local range, so a
+    // shared node's constrained dofs appear on every rank holding that node; counting to ndof
+    // and summing would report a number that grows with the rank count while the problem does
+    // not change. Owned ranges partition the global dofs exactly once, which is the whole
+    // reason to reduce over them.
+    //
+    // Reported because it is the cheapest quantity that proves the constraint set survived
+    // partitioning: it is an integer, so unlike the coordinate checksum it can be compared
+    // across rank counts EXACTLY, with no floating-point association to argue about.
+    //
+    // ndof_owned == ndof at one rank, so this is the serial count and the line is new output
+    // on its own row rather than a change to any line a parser already reads.
+    {
+        ptrdiff_t n_constrained = 0;
+        for (ptrdiff_t k = 0; k < ndof_owned; ++k)
+            if (mask_get(k, cmask.data())) n_constrained++;
+        const ptrdiff_t global_constrained = cvfem::sum(domain, n_constrained);
+        if (domain.is_root()) std::printf("constrained dofs: %td\n", global_constrained);
+    }
+
+    // Stop after setup, before the solve.
+    //
+    // This exists so the distributed setup can be gated at all. A multi-rank run cannot reach
+    // a solve yet -- the operator has no scoped apply, so it aborts there -- but everything
+    // above IS meant to be correct multi-rank already: the decomposition, the ownership
+    // metadata, the constraints, the counts. SFEM_SETUP_ONLY lets a 1-vs-4 comparison of those
+    // run to a clean exit instead of being buried under the abort that follows.
+    //
+    // Deliberately placed after the constraint count and before the hierarchy build, so it
+    // covers the mesh, the operator's initialize, and the constraints, and nothing that needs
+    // a working parallel apply.
+    if (smesh::Env::read<int>("SFEM_SETUP_ONLY", 0)) {
+        if (domain.is_root()) std::printf("setup only: stopping before the solve\n");
+        return EXIT_SUCCESS;
+    }
 
     // Outlet nodes, for the active-set trace in the Newton loop. Empty for every case that
     // has no outlet, which is what switches the trace off for them.
