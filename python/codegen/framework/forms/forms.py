@@ -377,16 +377,22 @@ class FormMetadata:
 
 
 class FormPipeline:
-    def __init__(self, kind, zero_form, variables, directions=None, *, merit=None):
+    def __init__(self, kind, zero_form, variables, directions=None, *, merit=None,
+                 variable_groups=()):
         self.kind = FormKind(kind)
         self.zero_form = sp.sympify(zero_form)
         self.variables = tuple(variables)
+        # Only an energy with a rate has more than one, and only then does the
+        # flux become a weighted sum; everything else leaves this empty and
+        # takes the single-group path unchanged.
+        self.variable_groups = tuple(variable_groups)
         self.directions = None if directions is None else tuple(directions)
         self._merit = None if merit is None else sp.sympify(merit)
 
     @classmethod
-    def energy(cls, energy, variables, directions=None):
-        return cls(FormKind.ENERGY, energy, variables, directions)
+    def energy(cls, energy, variables, directions=None, variable_groups=()):
+        return cls(FormKind.ENERGY, energy, variables, directions,
+                   variable_groups=variable_groups)
 
     @classmethod
     def residual(cls, residual, variables, directions=None, *, merit=None):
@@ -676,16 +682,22 @@ class FormMetadata:
 
 
 class FormPipeline:
-    def __init__(self, kind, zero_form, variables, directions=None, *, merit=None):
+    def __init__(self, kind, zero_form, variables, directions=None, *, merit=None,
+                 variable_groups=()):
         self.kind = FormKind(kind)
         self.zero_form = sp.sympify(zero_form)
         self.variables = tuple(variables)
+        # Only an energy carrying a rate has more than one group, and only then
+        # is the flux a weighted sum; everything else leaves this empty and
+        # takes the single-group path unchanged.
+        self.variable_groups = tuple(variable_groups)
         self.directions = None if directions is None else tuple(directions)
         self._merit = None if merit is None else sp.sympify(merit)
 
     @classmethod
-    def energy(cls, energy, variables, directions=None):
-        return cls(FormKind.ENERGY, energy, variables, directions)
+    def energy(cls, energy, variables, directions=None, variable_groups=()):
+        return cls(FormKind.ENERGY, energy, variables, directions,
+                   variable_groups=variable_groups)
 
     @classmethod
     def residual(cls, residual, variables, directions=None, *, merit=None):
@@ -738,24 +750,41 @@ class FormPipeline:
                 "energy",
                 self.zero_form,
             )
+        factors = energy_variable_factors(self.variable_groups)
         if order is FormOrder.ONE:
+            flux = gradient_from_energy(self.zero_form, self.variables)
+            if factors is not None:
+                flux = _weighted_group_sum(list(flux), self.variable_groups, factors)
             return UnifiedForm(
                 FormKind.ENERGY,
                 order,
                 ExpressionRole.GRADIENT,
                 "gradient",
-                gradient_from_energy(self.zero_form, self.variables),
+                flux,
             )
+        directions = self._require_directions()
+        if factors is None:
+            action = hessian_action_from_energy(self.zero_form, self.variables, directions)
+        else:
+            # Both ends carry the weight.  The flux is a weighted sum over the
+            # groups, and each group moves with the field by its own factor, so
+            # the direction handed to group j is that factor times the one
+            # direction the field actually has.  Contracting the two gives the
+            # factor_k * factor_j pairs the chain rule asks for.
+            groups = tuple(self.variable_groups)
+            width = len(directions) // len(groups)
+            shared = tuple(directions)[:width]
+            scaled = []
+            for factor in factors:
+                scaled.extend(factor * direction for direction in shared)
+            action = hessian_action_from_energy(self.zero_form, self.variables, scaled)
+            action = _weighted_group_sum(list(action), self.variable_groups, factors)
         return UnifiedForm(
             FormKind.ENERGY,
             order,
             ExpressionRole.HESSIAN_ACTION,
             "hessian_action",
-            hessian_action_from_energy(
-                self.zero_form,
-                self.variables,
-                self._require_directions(),
-            ),
+            action,
         )
 
     def _residual_form(self, order):
@@ -946,8 +975,92 @@ class FormPipeline:
         return sp.simplify(sp.integrate(sp.expand(integrand), (parameter, 0, 1)))
 
 
-def energy_form_pipeline(energy, variables, directions=None):
-    return FormPipeline.energy(energy, variables, directions)
+def energy_variable_factors(variables):
+    """How each differentiating group depends on the field, as one scalar each.
+
+    An energy is usually differentiated against a single staged quantity -- the
+    deformation gradient -- and the flux it produces contracts straight against
+    the test gradient, because `dF = grad(du)`.  A form that also carries a rate
+    has a second group, `Fdot = shift * grad(u) + grad(u_old)`, whose dependence
+    on the same unknown is `shift` rather than 1.  The chain rule then makes the
+    flux a weighted sum, and these are the weights.
+
+    The weight is read off each group's recorded definition rather than declared
+    by the material, so writing `gen.variable(gen.grad(gen.dt(u)), name="Fdot")`
+    is all a material does.  The first group fixes which field symbol each entry
+    is built from, and every group is differentiated against that same symbol.
+
+    `None` when there is one group, which is every material in the tree today
+    and the path that must stay untouched.
+    """
+    groups = tuple(variables)
+    if len(groups) < 2:
+        return None
+
+    reference = getattr(groups[0], "definition", None)
+    if reference is None:
+        raise ValueError(
+            "an energy with several differentiating groups needs each group's "
+            "definition; the first group was built without one"
+        )
+
+    reference_entries = list(reference)
+    factors = []
+    for group in groups:
+        definition = getattr(group, "definition", None)
+        if definition is None:
+            raise ValueError(
+                "an energy with several differentiating groups needs each group's "
+                "definition"
+            )
+        entries = list(definition)
+        if len(entries) != len(reference_entries):
+            raise ValueError(
+                "energy variable groups must have the same shape to be summed"
+            )
+        group_factor = None
+        for entry, reference_entry in zip(entries, reference_entries):
+            field_symbols = tuple(sp.sympify(reference_entry).free_symbols)
+            if len(field_symbols) != 1:
+                raise ValueError(
+                    "the first energy variable group must be built from one field "
+                    "quantity per entry, got %s" % (field_symbols,)
+                )
+            factor = sp.simplify(sp.diff(sp.sympify(entry), field_symbols[0]))
+            if group_factor is None:
+                group_factor = factor
+            elif sp.simplify(factor - group_factor) != 0:
+                # A group whose dependence varies entry by entry is not a scalar
+                # multiple of the field, and the flux would not be a weighted
+                # sum at all.  Refusing is better than summing the wrong thing.
+                raise ValueError(
+                    "an energy variable group must depend on the field by one "
+                    "scalar, got %s and %s" % (group_factor, factor)
+                )
+        factors.append(group_factor)
+    return tuple(factors)
+
+
+def _weighted_group_sum(per_variable, variables, factors):
+    """Fold the per-group derivatives into the single flux the form publishes.
+
+    Nothing below the form layer learns that there was more than one group: the
+    result has exactly the shape a single-group energy produces, which is what
+    keeps the plans, the emitters and the ABI unchanged.
+    """
+    groups = tuple(variables)
+    width = len(per_variable) // len(groups)
+    entries = []
+    for index in range(width):
+        total = sp.Integer(0)
+        for group_index, factor in enumerate(factors):
+            total += factor * per_variable[group_index * width + index]
+        entries.append(total)
+    return sp.Matrix(width, 1, entries)
+
+
+def energy_form_pipeline(energy, variables, directions=None, variable_groups=()):
+    return FormPipeline.energy(energy, variables, directions, variable_groups=variable_groups)
 
 
 def residual_form_pipeline(residual, variables, directions=None, *, merit=None):

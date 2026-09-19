@@ -83,6 +83,11 @@ class Equation:
     define: object
     fields: tuple = ()
     variables: tuple = ()
+    #: The differentiating groups as the material declared them, before they
+    #: were flattened into `variables`.  An energy carrying a rate has more than
+    #: one, and the flux is then a weighted sum over them; the weights are read
+    #: from each group's recorded definition, which only survives here.
+    variable_groups: tuple = ()
     directions: tuple = ()
     kernels: tuple = ()
     diagnostics: bool = True
@@ -197,6 +202,7 @@ class EquationSystem:
             define,
             fields=tuple(fields),
             variables=_symbols_from_variables(variables),
+            variable_groups=tuple(variables) if isinstance(variables, (tuple, list)) else (),
             directions=_symbols_from_variables(directions),
             kernels=tuple(kernels),
             diagnostics=diagnostics,
@@ -585,6 +591,7 @@ def _build_form_collection(system, equation, orders):
             equation.define,
             variables,
             directions or None,
+            variable_groups=tuple(equation.variable_groups),
         ).evaluate(orders)
         metadata = _evaluation_metadata(
             evaluation,
@@ -896,10 +903,16 @@ def _validate_energy_variable_groups(fields, variables):
     variable_groups = tuple(variables) if isinstance(variables, (tuple, list)) else None
     if variable_groups is None:
         raise TypeError("energy variables must be a tuple/list with one entry per field")
-    if len(variable_groups) != len(field_groups):
+    if len(variable_groups) < len(field_groups):
         raise ValueError(
-            "energy variables must provide one differentiating variable group per field"
+            "energy variables must provide at least one differentiating variable "
+            "group per field"
         )
+    # More groups than fields is how a rate is carried: an energy written with
+    # `gen.dt(u)` differentiates against the deformation gradient *and* its rate,
+    # both built from the same field.  `energy_variable_factors` reads how each
+    # depends on the field and the flux becomes their weighted sum, so what
+    # reaches the plans is shaped exactly as a single group's would be.
 
 
 def _symbols_from_variables(variables):
