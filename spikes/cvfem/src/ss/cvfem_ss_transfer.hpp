@@ -163,13 +163,18 @@ namespace cvfem_ss {
             // about how the derefined mesh numbers its nodes, and going via
             // hex8_elements_as_sshex8_level1 on the coarse array instead gives a wrong
             // matrix (measured: relative error 1.14 against the matrix-free transfer).
+            // The columns must be COARSE ids, and the coarse block's own element table is where
+            // they live. Serially the fine macro-corner slots carry the same ids, because SSHEX8
+            // numbers macro corners first; under a partition the local order is
+            // [owned-not-shared | shared | ghosts | aura] and those corner ids run past the coarse
+            // extent -- measured at 2 ranks the columns reached 348 and 429 against n_coarse of 75
+            // and 100, while CRS::transpose sizes its row counter from n_coarse and increments it
+            // once per column with no bound of its own.
+            //
+            // smesh owns the HEX8 -> lattice reindexing (2<->3 and 6<->7 against lexicographic
+            // order); smesh_restrict.cpp reaches for the same helper in the same role.
             smesh::idx_t *from_corners[8];
-            for (int k = 0; k < 2; ++k)
-                for (int j = 0; j < 2; ++j)
-                    for (int i = 0; i < 2; ++i)
-                        from_corners[smesh::sshex8_lidx(1, i, j, k)] =
-                                to_b->elements()->data()[smesh::sshex8_lidx(
-                                        to_level, i * to_level, j * to_level, k * to_level)];
+            smesh::hex8_elements_as_sshex8_level1(from_b->elements()->data(), from_corners);
 
             build_prolongation_pattern(to_b->n_elements(),
                                        1,
