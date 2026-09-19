@@ -24,10 +24,14 @@
 // alone was ~280 s of a 713 s solve on one core while the other 71 waited. The BLAS dot is the
 // deterministic fixed-chunk sum, so the solve stays reproducible across thread counts.
 
+#include "cvfem_parallel.hpp"
+
 #include "sfem_Operator.hpp"
+#include "sfem_ParallelOperator.hpp"
 #include "sfem_openmp_blas.hpp"
 #include "smesh_env.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -39,7 +43,23 @@ namespace sfem {
     template <typename T>
     class FGMRES final {
     public:
-        explicit FGMRES(const std::shared_ptr<Operator<T>> &op) : op_(op), blas_(make_openmp_blas<T>()) {}
+        // The communicator comes from the operator rather than from the caller.
+        //
+        // Multigrid already asks its operators the same question the same way
+        // (sfem_Multigrid.hpp: reduce_norm2, level_owned, verbose_rank0), so this reuses that
+        // convention instead of adding a second way for a solver to learn it is distributed.
+        // An operator with no parallel face leaves the domain empty, every reduction below
+        // short-circuits, and the serial path is untouched.
+        //
+        // rows() is the OWNED dof count and col_allocation_size() the local one, which is the
+        // distinction the workspace sizing below depends on.
+        explicit FGMRES(const std::shared_ptr<Operator<T>> &op) : op_(op), blas_(make_openmp_blas<T>()) {
+            if (auto pop = std::dynamic_pointer_cast<ParallelOperator<T>>(op_)) {
+                domain_.comm    = pop->comm();
+                domain_.n_owned = pop->rows();
+                domain_.n_local = pop->col_allocation_size();
+            }
+        }
         ~FGMRES() { release(); }
         FGMRES(const FGMRES &)            = delete;
         FGMRES &operator=(const FGMRES &) = delete;
@@ -60,6 +80,26 @@ namespace sfem {
 
         bool verbose{true};
 
+        // The two reductions the Krylov method needs, collective when there is anything to
+        // reduce with.
+        //
+        // norm2 is NOT reduced directly: it returns the square root of a sum of squares, so
+        // summing norms across ranks would be wrong. The square is reduced and the root taken
+        // afterwards.
+        //
+        // Both fall through to the original BLAS call when not distributed -- the same call,
+        // not an equivalent one -- so a serial solve produces the identical bits it did
+        // before, which the byte-compared verification matrix requires.
+        T pnorm2(const ptrdiff_t n, const T *const v) {
+            if (!domain_.distributed()) return blas_->norm2(n, v);
+            return std::sqrt(cvfem::sum(domain_, blas_->dot(n, v, v)));
+        }
+
+        T pdot(const ptrdiff_t n, const T *const a, const T *const c) {
+            const T d = blas_->dot(n, a, c);
+            return domain_.distributed() ? cvfem::sum(domain_, d) : d;
+        }
+
         int apply(const T *const b, T *const x) {
             const ptrdiff_t n = op_->rows();
             const int       m = restart_;
@@ -67,6 +107,11 @@ namespace sfem {
                 release();
                 n_ = n;
             }
+            // Arithmetic runs to n = rows(), the OWNED range, but the vectors have to be
+            // ALLOCATED larger: a distributed matrix-free apply writes the ghost and aura
+            // slots of its input, past the owned range it reads. Sizing the basis by rows()
+            // alone hands the operator a buffer it runs off the end of.
+            alloc_ = domain_.distributed() ? std::max(domain_.n_owned, domain_.n_local) : n;
 
             T *const                    r = vec(work_, 0);
             T *const                    w = vec(work_, 1);
@@ -83,7 +128,7 @@ namespace sfem {
             T *x_best    = nullptr;
             T  beta_best = std::numeric_limits<T>::max();
 
-            T bnorm = blas_->norm2(n, b);
+            T bnorm = pnorm2(n, b);
             if (bnorm == T(0)) bnorm = T(1);
 
             // Divergence is growth relative to where THIS solve started, not relative to the
@@ -103,7 +148,12 @@ namespace sfem {
                 op_->apply(x, r);
                 blas_->axpby(n, T(1), b, T(-1), r);
 
-                const T beta = blas_->norm2(n, r);
+                // Collective, and not only so the number printed is right: beta drives the
+                // convergence test, the divergence test and the best-iterate copy below. A
+                // per-rank beta means the ranks take DIFFERENT branches, and ranks that
+                // continue enter a collective the ranks that stopped never reach -- a hang
+                // rather than a wrong answer.
+                const T beta = pnorm2(n, r);
 
                 // Divergence is tested here, on the true residual, and not on the Arnoldi
                 // estimate below: within a restart cycle GMRES minimises over the Krylov
@@ -152,11 +202,14 @@ namespace sfem {
                     std::vector<T> h((size_t)j + 2, T(0));
                     for (int i = 0; i <= j; ++i) {
                         const T *const vi = V_[(size_t)i];
-                        const T        d  = blas_->dot(n, w, vi);
+                        // Without the reduction the basis is not orthogonal, and FGMRES then
+                        // STAGNATES rather than failing: it keeps iterating against a basis
+                        // that does not span what it thinks it spans.
+                        const T        d  = pdot(n, w, vi);
                         h[(size_t)i]      = d;
                         blas_->axpy(n, -d, vi, w);
                     }
-                    const T hn       = blas_->norm2(n, w);
+                    const T hn       = pnorm2(n, w);
                     h[(size_t)j + 1] = hn;
 
                     T *const vnext = vec(V_, (size_t)j + 1);
@@ -227,7 +280,8 @@ namespace sfem {
         // the pages of the ones it does are first written by the parallel BLAS loops.
         T *vec(std::vector<T *> &pool, const size_t k) {
             if (pool.size() <= k) pool.resize(k + 1, nullptr);
-            if (!pool[k]) pool[k] = blas_->allocate((size_t)n_);
+            // alloc_ rather than n_: see the note in apply(). Equal at one rank.
+            if (!pool[k]) pool[k] = blas_->allocate((size_t)(alloc_ > n_ ? alloc_ : n_));
             return pool[k];
         }
 
@@ -243,7 +297,9 @@ namespace sfem {
         std::shared_ptr<BLAS<T>>     blas_;
         std::vector<T *>             V_, Z_;
         std::vector<T *>             work_;  // r, w, x_best
+        cvfem::Domain                domain_;
         ptrdiff_t                    n_{0};
+        ptrdiff_t                    alloc_{0};
         int                          max_it_{1000};
         int                          restart_{30};
         int                          iterations_{0};
