@@ -26,6 +26,7 @@
 #include "sfem_GeometricMultigrid.hpp"
 #include "sfem_ElementScope.hpp"
 #include "sfem_Multigrid.hpp"
+#include "sfem_ParallelGradientOperator.hpp"
 #include "sfem_ParallelOperator.hpp"
 #include "sfem_context.hpp"
 #include "sfem_mask.hpp"
@@ -242,9 +243,20 @@ namespace {
 // same quantity the "sum of continuity residual" conservation check already reports.
 class PressureGauge {
 public:
-    PressureGauge(const ptrdiff_t ndof, const mask_t *const cmask) {
+    // ndof_owned as well as ndof, because the two halves of the projection need different
+    // ranges: the mean is reduced over owned entries, the subtraction touches every local one.
+    // idx_ is filled with k increasing, so the owned entries are exactly its first
+    // n_owned_idx_ elements and no second index list is needed.
+    PressureGauge(const ptrdiff_t       ndof,
+                  const ptrdiff_t       ndof_owned,
+                  const mask_t *const   cmask,
+                  const cvfem::Domain  &domain)
+        : domain_(domain) {
         for (ptrdiff_t k = 3; k < ndof; k += N_FIELDS)
-            if (!mask_get(k, cmask)) idx_.push_back(k);
+            if (!mask_get(k, cmask)) {
+                if (k < ndof_owned) ++n_owned_idx_;
+                idx_.push_back(k);
+            }
     }
 
     // Off when something already constrains the pressure -- a pin, or a Dirichlet value.
@@ -255,14 +267,36 @@ public:
 
     void project(real_t *const v) const {
         if (!active()) return;
+        // Reduce over OWNED entries, subtract over ALL local ones. The asymmetry is the whole
+        // content of making this distributed, and inverting either half is silent.
+        //
+        // The mean must be global, so BOTH its numerator and its denominator are reduced over
+        // the owned prefix. Using idx_.size() would count every shared, ghost and aura
+        // pressure dof once per rank holding it and shrink the mean.
+        //
+        // The subtraction, by contrast, has to touch every local entry: the operator reads
+        // ghost values, and leaving them unprojected hands it a vector still carrying the
+        // constant this exists to remove.
         long double s = 0;
-        for (const ptrdiff_t k : idx_) s += (long double)v[(size_t)k];
-        const real_t m = (real_t)(s / (long double)idx_.size());
+        for (ptrdiff_t i = 0; i < n_owned_idx_; ++i) s += (long double)v[(size_t)idx_[(size_t)i]];
+        ptrdiff_t n = n_owned_idx_;
+        // Only when there is something to reduce with. At one rank the accumulator, the count
+        // and the long double division below are exactly what they were, so the serial gauge
+        // is unchanged bit for bit -- narrowing to double to reduce and dividing in double
+        // would move the last bit of every projected vector.
+        if (domain_.distributed()) {
+            s = (long double)cvfem::sum_kahan(domain_, s);
+            n = cvfem::sum(domain_, n);
+        }
+        if (n == 0) return;
+        const real_t m = (real_t)(s / (long double)n);
         for (const ptrdiff_t k : idx_) v[(size_t)k] -= m;
     }
 
 private:
     std::vector<ptrdiff_t> idx_;
+    ptrdiff_t              n_owned_idx_{0};
+    cvfem::Domain          domain_;
     bool                   active_{true};
 };
 
@@ -3915,8 +3949,15 @@ int main(int argc, char **argv) {
     // At one rank n_owned_nodes == nnodes and every loop below is unchanged.
     cvfem::Domain domain;
     domain.comm                     = ctx->communicator();
+    // The node count comes from the mesh and the dof count from the function space, because
+    // they are different quantities and each has an owner. FunctionSpace already derives the
+    // owned dof count from the same Distributed metadata -- initialize_dof_counts() computes
+    // nowned = n_nodes_owned * block_size, and collapses all three counts to n_nodes() * bs on
+    // a serial mesh -- so multiplying the node count by N_FIELDS here would be a second way to
+    // reach a number the space already publishes. The space is created with block_size
+    // N_FIELDS, so the two agree by construction.
     const ptrdiff_t n_owned_nodes   = mesh->is_distributed() ? mesh->distributed()->n_nodes_owned() : nnodes;
-    const ptrdiff_t ndof_owned      = n_owned_nodes * N_FIELDS;
+    const ptrdiff_t ndof_owned      = f->space()->n_owned_dofs();
     domain.n_owned                  = ndof_owned;
     domain.n_local                  = ndof;
     std::vector<real_t> p_exact;
@@ -4582,13 +4623,19 @@ int main(int argc, char **argv) {
     // So an open outlet is a pressure condition even though it constrains no dof, and adding
     // a zero-mean condition on top over-determines the system. Measured, doing so took the
     // backward-facing step's continuity residual from 6.8e-09 to 5.4e-03.
-    PressureGauge gauge(ndof, cmask.data());
+    PressureGauge gauge(ndof, ndof_owned, cmask.data(), domain);
     {
+        // Counted over the owned range and reduced, because what follows is a DECISION rather
+        // than a report: whether the gauge is active at all. Counted locally, one rank can
+        // find every pressure dof free while another does not, and the gauge would then be on
+        // for some ranks and off for others -- two different problems being solved at once.
         ptrdiff_t n_p_free = 0, n_p = 0;
-        for (ptrdiff_t k = 3; k < ndof; k += N_FIELDS) {
+        for (ptrdiff_t k = 3; k < ndof_owned; k += N_FIELDS) {
             ++n_p;
             if (!mask_get(k, cmask.data())) ++n_p_free;
         }
+        n_p      = cvfem::sum(domain, n_p);
+        n_p_free = cvfem::sum(domain, n_p_free);
         // Ask the operator rather than testing one of the three conditions that can do it.
         // A traction surface and a pressure port fix the level exactly as the do-nothing
         // outflow does, and this test used to see only the outflow -- so naming a port
@@ -4896,6 +4943,23 @@ int main(int argc, char **argv) {
         mf_op = sfem::create_linear_operator(sfem::op_type::MATRIX_FREE, f, xbuf, sfem::EXECUTION_SPACE_HOST);
         t_op += smesh::time_seconds() - t0;
     }
+
+    // The residual's counterpart to mf_op.
+    //
+    // Function::gradient communicates nothing: it reads x wherever its elements point, and on
+    // a distributed mesh that includes ghost and aura nodes whose slots nothing fills. Every
+    // owned row touched by a partition-crossing element then comes out wrong -- and wrong the
+    // same way on every rank, so the ranks agree with each other and disagree with serial.
+    // That is the one failure a rank-to-rank comparison cannot see, which is why it survived
+    // until a 1-vs-N check existed: measured on the cavity at N=4 over two ranks, Newton's
+    // first residual read 6.131693e-03 against a serial 8.100926e-03.
+    //
+    // The evaluator gathers ghosts AND aura, then evaluates over every local element. The aura
+    // is one element deep, so every element touching an owned node is present locally and the
+    // owned rows come out complete -- one gather, and no scatter back to the owners.
+    //
+    // At one rank it calls Function::gradient directly, so the serial path is unchanged.
+    auto grad_op = sfem::create_parallel_gradient_operator(f, sfem::EXECUTION_SPACE_HOST);
 
     // Built once: the hierarchy and its transfer operators depend on the mesh, not the
     // state. The level states are refreshed per Newton step below, since they do.
@@ -5557,7 +5621,7 @@ int main(int argc, char **argv) {
     for (newton_it = 0; newton_it <= max_newton; ++newton_it) {
         std::fill(r.begin(), r.end(), real_t(0));
         { const double t0 = smesh::time_seconds();
-          f->gradient(x, r.data());
+          grad_op->gradient(x, r.data());
           phase_add("newton_residual", smesh::time_seconds() - t0); }
         // Measure the residual on the free dofs only. Function::gradient leaves the
         // boundary-condition residual (x - value) in the constrained rows, which is a
@@ -5633,9 +5697,17 @@ int main(int argc, char **argv) {
                         n_pos, outlet_nodes.size(), n_flip);
         }
 
+        // Over the owned range, with the SQUARE reduced and the root taken after: a sum of
+        // per-rank norms is not the norm of the whole. Summing to ndof would count every
+        // shared, ghost and aura entry once per rank holding it, so the residual would grow
+        // with the rank count while the problem did not.
+        //
+        // This is an acceptance quantity and not a diagnostic. rnorm sets r0 and rel, which
+        // gate convergence and the line-search floor below, so per-rank values make the ranks
+        // take different branches -- which is a hang, not a wrong answer.
         real_t rnorm = 0;
-        for (ptrdiff_t i = 0; i < ndof; ++i) rnorm += r[(size_t)i] * r[(size_t)i];
-        rnorm = std::sqrt(rnorm);
+        for (ptrdiff_t i = 0; i < ndof_owned; ++i) rnorm += r[(size_t)i] * r[(size_t)i];
+        rnorm = std::sqrt(cvfem::sum(domain, rnorm));
         if (r0 == real_t(0) && rnorm > 0) r0 = rnorm;
         step_last_rnorm = rnorm;  // outlives the stage loop, for the step-failure report
 
@@ -6254,12 +6326,17 @@ int main(int argc, char **argv) {
             break;
         }
 
+        // Max over the owned range, then reduced. Unlike a summed norm this is EXACTLY
+        // partition-independent: max associates and commutes, so it agrees bit for bit
+        // between one rank and many, with no tolerance to argue about.
         real_t dxinf = 0;
-        for (ptrdiff_t i = 0; i < ndof; ++i) dxinf = std::max(dxinf, std::fabs(dx[(size_t)i]));
+        for (ptrdiff_t i = 0; i < ndof_owned; ++i) dxinf = std::max(dxinf, std::fabs(dx[(size_t)i]));
+        dxinf = cvfem::max(domain, dxinf);
 
         {
             real_t xinf = 0;
-            for (ptrdiff_t i = 0; i < ndof; ++i) xinf = std::max(xinf, std::fabs(x[(size_t)i]));
+            for (ptrdiff_t i = 0; i < ndof_owned; ++i) xinf = std::max(xinf, std::fabs(x[(size_t)i]));
+            xinf = cvfem::max(domain, xinf);
             // nl_stol > 0 guards the disabled case: with nl_stol == 0 the comparison reduces
             // to dxinf <= 0, which is *true* for an exactly-zero correction -- so a linear
             // solve that returned nothing would be reported as a converged Newton step.
@@ -6284,12 +6361,20 @@ int main(int argc, char **argv) {
                 for (ptrdiff_t i = 0; i < ndof; ++i)
                     x_try[(size_t)i] = x[(size_t)i] + alpha * dx[(size_t)i];
                 std::fill(r_try.begin(), r_try.end(), real_t(0));
-                f->gradient(x_try.data(), r_try.data());
+                // The same evaluator as the Newton residual, and for the same reason: rt is
+                // compared against rnorm a few lines below, so the two have to be the same
+                // measure. x_try's ghost slots are stale by construction -- dx is written only
+                // over the owned range -- and the evaluator re-gathers them.
+                grad_op->gradient(x_try.data(), r_try.data());
                 f->apply_zero_constraints(r_try.data());
                 gauge.project(r_try.data());   // same measure as the residual it is compared to
+                // The same measure as the rnorm it is compared against on the next line, which
+                // is the reason this has to be reduced too: an Armijo test between a global
+                // rnorm and a per-rank rt would accept on some ranks and reject on others, and
+                // the ranks would then walk different Newton paths.
                 real_t rt = 0;
-                for (ptrdiff_t i = 0; i < ndof; ++i) rt += r_try[(size_t)i] * r_try[(size_t)i];
-                rt = std::sqrt(rt);
+                for (ptrdiff_t i = 0; i < ndof_owned; ++i) rt += r_try[(size_t)i] * r_try[(size_t)i];
+                rt = std::sqrt(cvfem::sum(domain, rt));
                 if (std::isfinite((double)rt) && rt < (real_t(1) - ls_armijo * alpha) * rnorm) {
                     ok = true;
                     break;
@@ -7127,11 +7212,27 @@ int main(int argc, char **argv) {
         // the sum of magnitudes, the scale it is judged against.
         auto continuity_sums = [&](long double &net, long double &absnet) {
             std::vector<real_t> rr((size_t)ndof, 0);
-            f->gradient(x, rr.data());
+            // Gathered, like every other residual evaluation here. An ungathered gradient
+            // leaves the continuity rows of partition-crossing elements wrong, and those rows
+            // are exactly what this sums.
+            grad_op->gradient(x, rr.data());
             net = absnet = 0;
-            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            // Over OWNED nodes. Summing to nnodes counts every shared, ghost and aura node
+            // once per rank holding it, and this is a conservation identity -- the strongest
+            // row in the verification table, precisely because it does not care how the domain
+            // was cut. A figure that grew with the rank count would discredit the one quantity
+            // meant to be partition-independent.
+            for (ptrdiff_t i = 0; i < n_owned_nodes; ++i) {
                 net += (long double)rr[(size_t)i * 4 + 3];
                 absnet += std::fabs((long double)rr[(size_t)i * 4 + 3]);
+            }
+            // Reduced only when there is something to reduce with, and the accumulators stay
+            // long double throughout: the consumer prints these at %.6Le, so narrowing to
+            // double in order to reduce would move a printed conservation figure that the
+            // tracked verification reports compare against.
+            if (domain.distributed()) {
+                net    = (long double)cvfem::sum_kahan(domain, net);
+                absnet = (long double)cvfem::sum_kahan(domain, absnet);
             }
         };
         if (flow == cvfem_case::FlowCase::Nozzle) {
