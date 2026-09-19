@@ -20,6 +20,10 @@ from which the emitter derives the individual streams.
 
 from dataclasses import dataclass
 
+from codegen.framework.plans.dependencies import (
+    contracted_test_quantities,
+    substituted_trial_quantities,
+)
 from codegen.framework.plans.generation import (
     DataStreamLayout,
     DataStreamPlan,
@@ -243,7 +247,8 @@ def local_kernel_stream_plans(
     stream_layout="pointer",
     grad_ref_name=None,
     needs_reference_basis=True,
-    reads_shape_values=True,
+    needs_reference_gradients=True,
+    reads_shape_values=None,
     output=None,
 ):
     """Which streams cross a local kernel's boundary, and in what order.
@@ -272,10 +277,29 @@ def local_kernel_stream_plans(
     for a kernel that does take reference data: the shape *values* are read only
     where a form contracts a test function's value or substitutes a trial
     function's, and a kernel that does neither would otherwise name a table it
-    never touches.  ``output`` replaces the per-degree-of-freedom output streams
+    never touches.  ``needs_reference_gradients`` is the same question for the
+    gradient tables, and it is deliberately not part of ``needs_reference_basis``
+    because the two describe different kernels.  A constant-P1 simplex folds the
+    basis *gradients* into its arithmetic as constants -- they are the same
+    number at every quadrature point -- while still integrating with quadrature
+    weights, so it wants ``q_weight`` and no ``grad_ref``.  Bundling the two
+    would either leave the gradient tables dead or take away a weight the kernel
+    reads.  ``output`` replaces the per-degree-of-freedom output streams
     with a single stream, which is what a kernel that fills an element matrix
     writes to.
     """
+    # Derived here unless a caller insists, because it is a question about the
+    # form and this layer can answer it.  It used to be the emitter's to pass,
+    # and five call sites had to pass the same answer: the one building the
+    # signature did, and the ones building the calls left it at its default, so
+    # a kernel was declared without the shape table and called with it.  A
+    # question the plan can answer should not be an argument that can disagree.
+    if reads_shape_values is None:
+        reads_shape_values = (
+            "value" in contracted_test_quantities(dependencies)
+            or "value" in substituted_trial_quantities(dependencies)
+        )
+
     streams = []
 
     if uses_gradient_metric:
@@ -313,7 +337,7 @@ def local_kernel_stream_plans(
                 layout=DataStreamLayout.TENSOR_PRODUCT_1D,
             )
         )
-        if dependencies.uses_reference_gradients:
+        if dependencies.uses_reference_gradients and needs_reference_gradients:
             streams.append(
                 DataStreamPlan(
                     name="grad_1d",
@@ -340,7 +364,7 @@ def local_kernel_stream_plans(
                         layout=DataStreamLayout.SCALAR,
                     )
                 )
-            if dependencies.uses_reference_gradients:
+            if dependencies.uses_reference_gradients and needs_reference_gradients:
                 streams.extend(
                     DataStreamPlan(
                         name=grad_ref_name(d),

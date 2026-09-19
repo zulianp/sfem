@@ -736,11 +736,26 @@ def total_residual_collection(system, orders=(FormOrder.ONE,)):
         TOTAL_RESIDUAL_UNIT_NAME,
         residual_system,
         tuple(orders),
-        equation_fields=tuple(
-            field for equation in system.equations for field in equation.fields
-        ),
+        equation_fields=_distinct_equation_fields(system),
         measure="dx",
     )
+
+
+def _distinct_equation_fields(system):
+    """The system's fields, once each.
+
+    Units of one material share their fields -- an elastic energy and a viscous
+    residual are both written on the same displacement -- so concatenating each
+    unit's list repeats them.  The repeat is not harmless: the blocks a
+    collection publishes are named after the field pair, so `u` appearing twice
+    produces two blocks called `..._jacobian_u_u` and generation stops on the
+    duplicate.
+    """
+    seen = {}
+    for equation in system.equations:
+        for field in equation.fields:
+            seen.setdefault(field.name, field)
+    return tuple(seen.values())
 
 
 #: The unit name the combined residual is emitted under.  Named after the

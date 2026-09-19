@@ -3236,6 +3236,19 @@ def _local_function(
     )
     # Which streams cross this kernel's boundary is a planning decision; this
     # function only spells the declarations.  The order is the kernel's ABI.
+    # What the body will read decides what crosses the boundary.  Both
+    # questions are the plan's, and both were left at their defaults here: the
+    # shape table went to every kernel whether or not the form contracts a test
+    # value, and the reference gradients went to the constant-P1 expansion that
+    # emits them as literals.
+    folds_gradients = not tensor_product and _folds_reference_gradients(
+        system,
+        rule,
+        coefficients,
+        dependencies,
+        gradient_metric,
+        constant_p1_gradient_expansion,
+    )
     params = ["const int ne", "const ptrdiff_t geometry_stride"]
     params.extend(
         _declare_stream(stream)
@@ -3248,6 +3261,7 @@ def _local_function(
             metric_components=symmetric_metric_component_count(dim),
             stream_layout=stream_layout,
             grad_ref_name=lambda d: sfem_simplex_grad_ref_name("grad_ref", d),
+            needs_reference_gradients=not folds_gradients,
         )
     )
     template_params = [
@@ -4120,6 +4134,29 @@ def _simplex_state_transform_nodes(system, dependencies, usage):
         tuple(_geometry_value_nodes(dependencies, dim)) + tuple(transform_values)
         if transform_values
         else ()
+    )
+
+
+def _folds_reference_gradients(system, rule, coefficients, dependencies,
+                               gradient_metric, constant_p1_gradient_expansion):
+    """Whether the body about to be built reads no reference gradient tables.
+
+    Two bodies do not: a gradient-metric kernel, which has the basis contracted
+    into the metric before it is called, and the constant-P1 expansion, whose
+    reference gradients are the same number at every quadrature point and are
+    emitted as literals.
+
+    Asked here rather than inferred twice.  `_simplex_local_body` selects the
+    body and `_local_function` builds the signature, and if they disagree the
+    kernel names a table it never reads -- which is what
+    `test_kernels_are_lean` counts, and what it caught.
+    """
+    if gradient_metric is not None:
+        return True
+    if not constant_p1_gradient_expansion:
+        return False
+    return _uses_constant_p1_gradient_expansion(
+        system, dependencies, constant_p1_simplex_reference_gradients(rule)
     )
 
 

@@ -140,7 +140,19 @@ UNUSED_CONSTANT_BUDGET = 0
 #: eighteen were the tool's mistake rather than the tree's, and the 64 recorded
 #: above was already sixteen too high.  What is left is the simplex local
 #: kernels described at the top, which are real.
-UNUSED_PARAMETER_BUDGET = 48
+#: 48 -> 12.  The simplex local kernels described above are fixed rather than
+#: tolerated, and the fix is the one recorded there: the plan stopped putting
+#: the streams on the boundary.  `_local_function` had been leaving two of
+#: `local_kernel_stream_plans`' questions at their defaults, so the shape table
+#: went to every kernel whether or not the form contracts a test value, and the
+#: reference gradients went to the constant-P1 expansion, which emits them as
+#: literals because they are the same number at every quadrature point.  Asking
+#: both questions clears all 32 `shape` and all 40 `grad_ref_*` entries.
+#: Signature and body now read one predicate, `_folds_reference_gradients`, so
+#: they cannot disagree about which tables the kernel wants.
+#: What remains is `geometry_stride` and `q_weight`, 6 each, which are a
+#: different shape and still a ratchet to drive down.
+UNUSED_PARAMETER_BUDGET = 12
 
 #: Node-ordering permutations built inside a kernel.
 #:
