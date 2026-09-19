@@ -781,6 +781,28 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
     }
 }
 
+// Whether the packing spans the whole mesh. On a distributed mesh it does not.
+//
+// smesh restricts packing to the owned-not-shared prefix there, and has to: a node's
+// position inside its owner's owned block is a number the neighbouring ranks have already
+// recorded in their ghost indices, so permuting anything else silently redirects their
+// gathers. The consequence for this file is that the packs cover only a prefix of the macro
+// elements.
+//
+// That is not merely a missing contribution. sscvfem_nodal_grad_packed bounds its element
+// loop with MIN(d.nmacro, (pack + 1) * n_elements_per_pack) -- by d.nmacro, not by the
+// packed element count -- while p.elems is sized to the packed range. Once the two differ,
+// the last pack reads that array past its end.
+//
+// The condition is the one the format already answers: sscvfem_nodal_grad_packed computes
+// the same owned_nodes_ptr tiling test as `owns_all` to decide whether it may skip
+// pre-zeroing. Asking it here rather than inventing a second notion of coverage keeps one
+// definition of what a complete packing is.
+inline bool sscvfem_pack_covers_all_elements(const SSMeshData &d, const PackedData &p) {
+    return p.n_packs > 0 && p.owned_nodes_ptr[0] == 0 &&
+           p.owned_nodes_ptr[p.n_packs] == d.nnodes;
+}
+
 inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
                                        const int stride, std::vector<scalar_t> &ogx,
                                        std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz) {
@@ -788,7 +810,15 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
     // Over packed macro-elements where there is a packing, which leaves an eighth of the
     // nodes staged instead of half. Same operator either way; the summation order differs, so
     // the two agree to round-off rather than bit for bit.
-    if (d.packed) {
+    //
+    // Guarded on the packing actually covering the mesh. A serial mesh always satisfies
+    // that, so this path is entered exactly as before and the fast case is unchanged bit for
+    // bit; a distributed mesh does not, and falls through to the sweep below, which bounds
+    // itself by d.nmacro and so reconstructs from every local macro element. That is slower
+    // than a completed packed sweep would be and is the honest starting point rather than
+    // the destination: the packed path wants a remainder sweep over the unpacked elements,
+    // and that wants measuring against this once a distributed solve exists to measure it on.
+    if (d.packed && sscvfem_pack_covers_all_elements(d, *d.packed)) {
         sscvfem_nodal_grad_packed(d, *d.packed, src, stride, ogx, ogy, ogz);
         return;
     }
