@@ -918,6 +918,69 @@ int test_holding_the_scheme_equals_adding_its_operator() {
         SFEM_TEST_ASSERT(std::abs(held_apply->data()[i] - pushed_apply->data()[i]) <= real_t(1e-10) * (1 + std::abs(pushed_apply->data()[i])));
     }
 
+    // The assembled tangent too.  The material forwards every matrix format to
+    // the term, and a format that skipped it would build a tangent that does
+    // not match the residual beside it.
+    {
+        auto graph   = space->node_to_node_graph();
+        const int bs = space->block_size();
+        const ptrdiff_t nnz = graph->nnz();
+
+        auto held_bsr   = sfem::create_host_buffer<real_t>(nnz * bs * bs);
+        auto pushed_bsr = sfem::create_host_buffer<real_t>(nnz * bs * bs);
+        SFEM_TEST_ASSERT(held->hessian_bsr(x->data(),
+                                           graph->rowptr()->data(),
+                                           graph->colidx()->data(),
+                                           held_bsr->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(pushed->hessian_bsr(x->data(),
+                                             graph->rowptr()->data(),
+                                             graph->colidx()->data(),
+                                             pushed_bsr->data()) == SFEM_SUCCESS);
+
+        real_t bsr_scale = 0;
+        for (ptrdiff_t k = 0; k < nnz * bs * bs; ++k) {
+            bsr_scale = std::max(bsr_scale, std::abs(pushed_bsr->data()[k]));
+        }
+        SFEM_TEST_ASSERT(bsr_scale > 0);
+        for (ptrdiff_t k = 0; k < nnz * bs * bs; ++k) {
+            SFEM_TEST_ASSERT(std::abs(held_bsr->data()[k] - pushed_bsr->data()[k]) <= real_t(1e-12) * bsr_scale);
+        }
+
+        // The block-diagonal format goes through `linear_elasticity`, the energy
+        // material that emits it -- `neohookean_ogden` declares only BSR, so
+        // asking it for this format aborts whether or not a scheme is held.
+        const int       packed  = bs * (bs + 1) / 2;
+        const ptrdiff_t n_nodes = ndofs / bs;
+
+        auto sym_scheme = make_scheme();
+        SFEM_TEST_ASSERT(sym_scheme != nullptr);
+        auto sym_held_op = sfem::Factory::create_op(space, "GeneratedLinearElasticity");
+        SFEM_TEST_ASSERT(sym_held_op != nullptr);
+        std::dynamic_pointer_cast<sfem::TimeSteppable>(sym_held_op)->set_time_scheme(sym_scheme);
+        auto sym_held = sfem::Function::create(space);
+        sym_held->add_operator(sym_held_op);
+
+        auto sym_pushed_scheme = make_scheme();
+        SFEM_TEST_ASSERT(sym_pushed_scheme != nullptr);
+        auto sym_pushed = sfem::Function::create(space);
+        sym_pushed->add_operator(sfem::Factory::create_op(space, "GeneratedLinearElasticity"));
+        sym_pushed->add_operator(sym_pushed_scheme->inertia_op());
+
+        auto held_sym   = sfem::create_host_buffer<real_t>(n_nodes * packed);
+        auto pushed_sym = sfem::create_host_buffer<real_t>(n_nodes * packed);
+        SFEM_TEST_ASSERT(sym_held->hessian_block_diag_sym(x->data(), held_sym->data()) == SFEM_SUCCESS);
+        SFEM_TEST_ASSERT(sym_pushed->hessian_block_diag_sym(x->data(), pushed_sym->data()) == SFEM_SUCCESS);
+
+        real_t sym_scale = 0;
+        for (ptrdiff_t k = 0; k < n_nodes * packed; ++k) {
+            sym_scale = std::max(sym_scale, std::abs(pushed_sym->data()[k]));
+        }
+        SFEM_TEST_ASSERT(sym_scale > 0);
+        for (ptrdiff_t k = 0; k < n_nodes * packed; ++k) {
+            SFEM_TEST_ASSERT(std::abs(held_sym->data()[k] - pushed_sym->data()[k]) <= real_t(1e-12) * sym_scale);
+        }
+    }
+
     // And at a trial step, which is where a line search reads the energy.
     const real_t step = real_t(1e-3);
     real_t       held_step = 0, pushed_step = 0;
