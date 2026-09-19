@@ -17,6 +17,7 @@ from codegen.framework.forms.forms import (
 from codegen.framework.symbolic.boundary_forms import BoundaryIntegral, integral_integrand, integral_measure
 from codegen.framework.forms.residual import (
     CoupledResidualSystem,
+    WeakResidualCoefficients,
     coupled_residual_weak_coefficients,
     weak_residual_coefficients,
 )
@@ -579,6 +580,100 @@ def _symbols_from_fields(fields):
         else:
             symbols.append(sp.sympify(field))
     return tuple(symbols)
+
+
+def total_residual_weak_coefficients(system):
+    """Every unit's 1-form, summed on one basis: the system's whole residual.
+
+    A material may be written as several units -- Mooney-Rivlin Kelvin-Voigt is
+    an energy for the elastic response and a residual for the viscous one -- and
+    each publishes its own kernels today, accumulating into the same global
+    vector through two traversals.  That is fine for an assembly and wrong for
+    the residual merit, which must square a node's *complete* value: two
+    traversals mean the node is finished only after the second, so neither can
+    contract.  One form yields one kernel, and the kernel can contract.
+
+    Summing is exact rather than a modelling choice, and that is the point of
+    the 1-form being one object regardless of front end.  A residual unit has
+    already contracted against the test function and publishes its weak
+    coefficients directly.  An energy unit publishes the flux against its
+    staged variable, and the staged variable carries the expression that
+    *defines* it -- `F = I + grad(u)` for a deformation gradient -- so changing
+    basis is the framework restating its own definition, never an identity
+    offset assumed here.  Checked numerically on the material above: the
+    combined form and the two units evaluated apart agree exactly, with both
+    parts nonzero.
+
+    Returns one `WeakResidualCoefficients` per lowered field component, in
+    field-component order -- the same shape `coupled_residual_weak_coefficients`
+    returns, so everything downstream reads it without knowing a material had
+    more than one unit.
+    """
+    dim = system.dim
+    rows = []
+    value = {}
+    gradient = {}
+    for equation in system.equations:
+        for field in equation.fields:
+            for name in _residual_component_names(field):
+                if name not in value:
+                    rows.append(name)
+                    value[name] = sp.S.Zero
+                    gradient[name] = [sp.S.Zero] * dim
+
+    for equation in system.equations:
+        collection = system.form_collection(equation, orders=(FormOrder.ONE,))
+        if equation.is_residual:
+            for per_field in collection.coefficients:
+                for entry in per_field:
+                    value[entry.row_field] += sp.sympify(entry.value)
+                    for direction in range(dim):
+                        gradient[entry.row_field][direction] += sp.sympify(
+                            entry.gradient[direction]
+                        )
+            continue
+
+        flux = collection.forms[0].expression
+        group = equation.variable_groups[0]
+        staged = tuple(equation.variables)
+        to_definition = dict(
+            zip(staged, (group.definition[index] for index in range(len(staged))))
+        )
+        names = tuple(
+            name
+            for field in equation.fields
+            for name in _residual_component_names(field)
+        )
+        # The energy writes one flat gradient per field, `u_grad[i * dim + j]`;
+        # a lowered residual names the component and the direction apart.  Both
+        # spellings are ABI in their own layer, so the rename belongs here,
+        # where the two meet.
+        rename = {
+            sp.Symbol("%s_grad[%d]" % (field.name, component * dim + direction)):
+                sp.Symbol(
+                    "%s_grad_%d"
+                    % (_residual_component_names(field)[component], direction)
+                )
+            for field in equation.fields
+            for component in range(len(_residual_component_names(field)))
+            for direction in range(dim)
+        }
+        for component, name in enumerate(names):
+            for direction in range(dim):
+                gradient[name][direction] += (
+                    sp.sympify(flux[component * dim + direction])
+                    .xreplace(to_definition)
+                    .xreplace(rename)
+                )
+
+    return tuple(
+        WeakResidualCoefficients(
+            row_field=name,
+            value=value[name],
+            gradient=tuple(gradient[name]),
+        )
+        for name in rows
+    )
 
 
 def _build_form_collection(system, equation, orders):
