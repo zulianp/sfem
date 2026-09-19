@@ -1,0 +1,145 @@
+"""The material's whole residual is one 1-form, whatever its units are written in.
+
+A residual merit has to square a node's *complete* value, so the residual it
+squares cannot arrive in two traversals.  `total_residual_weak_coefficients`
+sums every unit's 1-form into one, and these tests hold it to the property that
+makes that legitimate: the combined form is the sum of the units evaluated
+apart, exactly, with each part contributing something.
+"""
+import random
+
+import sympy as sp
+
+from codegen.framework.forms.equations import (
+    FormOrder,
+    total_residual_weak_coefficients,
+)
+from codegen.framework.materials.mooney_rivlin_kelvin_voigt import (
+    _build_system,
+    _mooney_rivlin_energy,
+)
+
+DIM = 3
+PARAMETERS = {
+    sp.Symbol("mu"): sp.Rational(3),
+    sp.Symbol("lmbda"): sp.Rational(7, 2),
+    sp.Symbol("eta_s"): sp.Rational(1, 20),
+    sp.Symbol("eta_b"): sp.Rational(1, 100),
+    sp.Symbol("u_dt_shift"): sp.Rational(2),
+}
+
+
+def _grad(i, j):
+    return sp.Symbol("u%d_grad_%d" % (i, j))
+
+
+def _test_grad(i, j):
+    return sp.Symbol("u%d_test_grad_%d" % (i, j))
+
+
+def _test_value(i):
+    return sp.Symbol("u%d_test" % i)
+
+
+def _random_point(seed):
+    random.seed(seed)
+    point = {}
+    for i in range(DIM):
+        point[_test_value(i)] = sp.Rational(random.randint(-30, 30), 100)
+        for j in range(DIM):
+            point[_grad(i, j)] = sp.Rational(random.randint(-40, 40), 1000)
+            point[_test_grad(i, j)] = sp.Rational(random.randint(-30, 30), 100)
+            point[sp.Symbol("u%d_old_grad_%d" % (i, j))] = sp.Rational(
+                random.randint(-40, 40), 1000
+            )
+    return point
+
+
+def _evaluate(expression, point):
+    return sp.nsimplify(sp.sympify(expression).xreplace(point).xreplace(PARAMETERS))
+
+
+def _combined_weak_form(system):
+    coefficients = total_residual_weak_coefficients(system)
+    return sum(
+        (
+            sp.sympify(entry.value) * _test_value(row)
+            + sum(
+                sp.sympify(entry.gradient[j]) * _test_grad(row, j) for j in range(DIM)
+            )
+            for row, entry in enumerate(coefficients)
+        ),
+        sp.S.Zero,
+    )
+
+
+def _viscous_weak_form(system):
+    equation = next(e for e in system.equations if e.name == "viscous")
+    collection = system.form_collection(equation, orders=(FormOrder.ONE,))
+    return sum(
+        (sp.sympify(row) for row in collection.residual_expressions), sp.S.Zero
+    )
+
+
+def _elastic_weak_form():
+    """The elastic unit from its energy, by differentiation -- an independent
+    route to the same 1-form, so the test does not check the combiner against
+    the machinery it is built from."""
+    deformation = sp.Matrix(
+        DIM, DIM, lambda i, j: (1 if i == j else 0) + _grad(i, j)
+    )
+
+    class _Variable:
+        pass
+
+    variable = _Variable()
+    variable.value = deformation
+    energy = _mooney_rivlin_energy(variable, DIM)
+    return sum(
+        (
+            sp.diff(energy, _grad(i, j)) * _test_grad(i, j)
+            for i in range(DIM)
+            for j in range(DIM)
+        ),
+        sp.S.Zero,
+    )
+
+
+def test_the_combined_form_is_the_sum_of_the_units():
+    system = _build_system(DIM)
+    point = _random_point(11)
+
+    combined = _evaluate(_combined_weak_form(system), point)
+    elastic = _evaluate(_elastic_weak_form(), point)
+    viscous = _evaluate(_viscous_weak_form(system), point)
+
+    assert sp.simplify(combined - (elastic + viscous)) == 0
+    # Otherwise the agreement above is agreement about zero.
+    assert elastic != 0
+    assert viscous != 0
+
+
+def test_every_unit_reaches_the_combined_form():
+    """Dropping either unit must change the answer.
+
+    The negative control for the test above: a combiner that silently skipped
+    the energy, or the residual, would still satisfy an equality written
+    against whichever half it kept.
+    """
+    system = _build_system(DIM)
+    point = _random_point(23)
+
+    combined = _evaluate(_combined_weak_form(system), point)
+    elastic = _evaluate(_elastic_weak_form(), point)
+    viscous = _evaluate(_viscous_weak_form(system), point)
+
+    assert sp.simplify(combined - elastic) != 0
+    assert sp.simplify(combined - viscous) != 0
+
+
+def test_one_row_per_lowered_field_component():
+    system = _build_system(DIM)
+    coefficients = total_residual_weak_coefficients(system)
+    assert tuple(entry.row_field for entry in coefficients) == ("u0", "u1", "u2")
+    for entry in coefficients:
+        assert len(entry.gradient) == DIM
