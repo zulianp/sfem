@@ -28,6 +28,7 @@
 #include "sfem_Multigrid.hpp"
 #include "sfem_ParallelGradientOperator.hpp"
 #include "sfem_ParallelOperator.hpp"
+#include "sfem_ParallelPreconditioner.hpp"
 #include "sfem_context.hpp"
 #include "sfem_mask.hpp"
 
@@ -2785,6 +2786,24 @@ private:
                         phase_add("vanka_setup", smesh::time_seconds() - t_v);
                     }
                     prec_op = g_vanka_cached;
+                }
+
+                // A Vanka patch reads its neighbours' residual entries, and on a distributed
+                // mesh some of those are ghost or aura nodes that nothing fills: Multigrid
+                // hands the smoother mem->rhs, whose residual was reduced over the owned range
+                // alone. Block-Jacobi never sees this, because it reads only its own row --
+                // which is why block-Jacobi is unaffected by the cut while Vanka was not.
+                // Cavity, N 4, level 2, full continuation: Vanka took 61 linear iterations at
+                // one rank and then exhausted the 4000- and 7000-iteration caps at two and four
+                // ranks WITHOUT converging. Gathered, the same runs converge in 3088 and 9082,
+                // against 9125 and 8189 for block-Jacobi over the same two cuts.
+                //
+                // Only the Vanka branches are wrapped. The point-block default needs no
+                // exchange, and giving it a ParallelOperator face would change which branch
+                // Multigrid::level_owned takes for that level.
+                if (prec_op != prec) {
+                    prec_op = sfem::create_parallel_preconditioner(prec_op, fi->space(),
+                                                                   sfem::EXECUTION_SPACE_HOST);
                 }
 
                 std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> sm;
