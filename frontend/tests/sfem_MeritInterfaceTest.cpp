@@ -322,6 +322,53 @@ namespace {
         return SFEM_TEST_SUCCESS;
     }
 
+    /// The hand-written traction's stepped 0-form, which had no test at all.
+    ///
+    /// It swept the whole vector once per step for a quantity that is affine in
+    /// the step -- `g . (x + s h)` is `g.x + s * g.h`, the identity the
+    /// generated traction already used.  Two dots now serve every step, and the
+    /// property that makes that legitimate is held here: the stepped form is
+    /// the 0-form at the stepped point, at steps that include zero, a negative
+    /// and a magnitude past one.
+    int test_a_traction_steps_match_the_stepped_value() {
+        auto fixture = make_fixture();
+
+        auto left = sfem::Sideset::create_from_selector(
+                fixture.mesh, [](const geom_t x, const geom_t, const geom_t) { return x < 1e-8; });
+        SFEM_TEST_ASSERT(!left.empty());
+
+        sfem::NeumannConditions::Condition traction{.sidesets = left, .value = real_t(0.5), .component = 0};
+        auto conditions = sfem::create_neumann_conditions(fixture.space, {traction},
+                                                          sfem::EXECUTION_SPACE_HOST);
+        SFEM_TEST_ASSERT(conditions != nullptr);
+
+        auto x     = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        auto h     = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        auto point = sfem::create_host_buffer<real_t>(fixture.ndofs);
+        seed(fixture.ndofs, 6, x->data());
+        seed(fixture.ndofs, 7, h->data());
+
+        const real_t        steps[] = {real_t(0), real_t(-0.5), real_t(0.25), real_t(-2), real_t(3)};
+        const int           nsteps  = 5;
+        std::vector<real_t> stepped(nsteps, 0);
+        SFEM_TEST_ASSERT(conditions->value_steps(x->data(), h->data(), nsteps, steps, stepped.data()) ==
+                         SFEM_SUCCESS);
+
+        bool any_nonzero = false;
+        for (int step = 0; step < nsteps; ++step) {
+            for (ptrdiff_t i = 0; i < fixture.ndofs; ++i) {
+                point->data()[i] = x->data()[i] + steps[step] * h->data()[i];
+            }
+            real_t direct = 0;
+            SFEM_TEST_ASSERT(conditions->value(point->data(), &direct) == SFEM_SUCCESS);
+            SFEM_TEST_ASSERT(std::abs(stepped[step] - direct) <= real_t(1e-12) * (1 + std::abs(direct)));
+            any_nonzero = any_nonzero || std::abs(direct) > real_t(1e-14);
+        }
+        // Otherwise the agreement above is agreement about zero.
+        SFEM_TEST_ASSERT(any_nonzero);
+        return SFEM_TEST_SUCCESS;
+    }
+
 }  // namespace
 
 int main(int argc, char *argv[]) {
@@ -333,6 +380,7 @@ int main(int argc, char *argv[]) {
     SFEM_RUN_TEST(test_a_system_without_a_potential_refuses_the_energy);
     SFEM_RUN_TEST(test_an_energy_system_offers_both_merits);
     SFEM_RUN_TEST(test_a_body_force_can_be_line_searched);
+    SFEM_RUN_TEST(test_a_traction_steps_match_the_stepped_value);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }
