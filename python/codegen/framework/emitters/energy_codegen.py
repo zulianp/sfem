@@ -8181,7 +8181,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 )
             )
         else:
-            lines.extend(["", "      for (int q = 0; q < NQ; ++q) {"])
+            lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "      ")])
             geometry_lines = _sfem_soa_isoparametric_geometry_lines(
                 dim,
                 n_nodes,
@@ -8498,7 +8498,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
             )
         )
     else:
-        lines.extend(["", "    for (int q = 0; q < NQ; ++q) {"])
+        lines.extend(["", *quadrature_scope_lines(quadrature_rule.element_type, "    ")])
         lines.extend(
             _sfem_soa_isoparametric_geometry_lines(
                 dim,

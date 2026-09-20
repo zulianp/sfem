@@ -54,7 +54,7 @@ def _loop_two():
         rc._coefficient_evaluation_nodes(system, coefficients, dependencies), ""
     )
     return "\n".join(
-        patch_loop_two_lines(system, coefficients, dependencies, material)
+        patch_loop_two_lines(system, coefficients, dependencies, material, "TET4")
     )
 
 
@@ -208,7 +208,7 @@ def test_a_gradient_only_form_stages_no_value():
         rc._coefficient_evaluation_nodes(system, coefficients, dependencies), ""
     )
     text = "\n".join(
-        patch_loop_two_lines(system, coefficients, dependencies, material)
+        patch_loop_two_lines(system, coefficients, dependencies, material, "TET4")
     )
     names = [name for name, _ in patch_loop_one_buffers(DIM, 1, dependencies)]
     assert "pm_state_value" not in names

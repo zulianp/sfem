@@ -33,6 +33,7 @@ number of elements incident on a node is a property of the mesh and cannot be
 chosen.
 """
 
+from codegen.framework.plans.evaluation_strategy import quadrature_scope_lines
 from codegen.framework.targets import current_target
 from codegen.framework.plans.residual_structure import (
     patch_merit_staged_quantities,
@@ -270,7 +271,7 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
     n_fields = len(system.fields)
     lines = [
         "%s// loop 1 -- lanes are the elements incident on this node." % indent,
-        "%sfor (int q = 0; q < NQ; ++q) {" % indent,
+        *quadrature_scope_lines(rule.element_type, indent),
         "%s  %s" % (indent, _vectorize_pragma()),
         "%s  for (int lane = 0; lane < ne; ++lane) {" % indent,
         "%s    const idx_t element = pm_incident[lane];" % indent,
@@ -382,7 +383,7 @@ _STAGED_COMBINATION = {
 
 
 def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
-                         indent="  "):
+                         element_type, indent="  "):
     """What the step length changes, and nothing else.
 
     Lanes are the sampled step lengths.  The elements are walked serially here
@@ -403,7 +404,7 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
     lines = [
         "%s// loop 2 -- lanes are the sampled step lengths." % indent,
         "%sfor (int lane_e = 0; lane_e < ne; ++lane_e) {" % indent,
-        "%s  for (int q = 0; q < NQ; ++q) {" % indent,
+        *quadrature_scope_lines(element_type, "%s  " % indent),
         "%s    %s" % (indent, _vectorize_pragma()),
         "%s    for (int lane = 0; lane < nsteps; ++lane) {" % indent,
         "%s      const s_t alpha = steps[lane];" % indent,
@@ -599,7 +600,12 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
     lines.extend(patch_loop_one_lines(system, rule, dependencies, indent="        "))
     lines.extend(
         patch_loop_two_lines(
-            system, coefficients, dependencies, material_lines, indent="        "
+            system,
+            coefficients,
+            dependencies,
+            material_lines,
+            rule.element_type,
+            indent="        ",
         )
     )
     lines.extend(["      }", ""])
