@@ -58,7 +58,7 @@ function the same in every lane and at every step, which is what allows those
 terms to leave both loops.  The second loop's lanes are the trial
 steps, because $m$ is a quantity the line search chooses and is therefore set to
 the hardware's vector length --- unlike the number of elements incident on a
-node, which the mesh fixes.  The alternatives are built and timed against it.  What this is worth is bounded by the constitutive evaluation, which
+node, which the mesh fixes.  It is the only arrangement built.  What this is worth is bounded by the constitutive evaluation, which
 repeats per trial step by construction.  The same reorganization is already in
 place for the energy merit, and measured on the same node it costs $5.7\times$
 one step at $m=12$ for a Mooney--Rivlin-class material and $3.7\times$ for
@@ -355,9 +355,12 @@ $\phi$ along the direction at no cost, which is a pleasant inversion of the
 usual trade.
 
 The alternatives --- lanes over the incident elements with the steps serial, and
-lanes over the flattened element-by-step product --- are still built and timed
-against it rather than argued away, which is how a competing loop arrangement is
-settled in this framework.
+lanes over the flattened element-by-step product --- are not built.  Competing
+loop arrangements are normally settled here by measurement rather than by
+argument, and this one is the exception because the comparison has no contested
+regime: the step count is chosen and the incident count is not, so the
+mesh-determined axis is never the better-behaved one and building it would
+confirm that at the price of a second kernel to keep correct.
 
 What the shape costs is that an element is visited once per node it carries, so
 the constitutive evaluation $P(\nabla u)$ is performed about $N_s$ times where an
