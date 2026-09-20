@@ -434,15 +434,14 @@ namespace codegen {
 
 static constexpr int pm_orientation[4][4] = {{0, 1, 2, 3}, {1, 0, 3, 2}, {2, 3, 0, 1}, {3, 2, 1, 0}};
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, typename g_t, int NQ, int NS, int VS>
 static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
     const ptrdiff_t n_owned_nodes,
     const count_t *const RSTR n2e_ptr,
     const element_idx_t *const RSTR n2e_idx,
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
-    const s_t *const RSTR determinant,
-    const s_t *const RSTR adjugate[9],
+    const g_t *const *const RSTR points,
     const s_t *const RSTR shape,
     const s_t *const RSTR grad_ref[3],
     const s_t *const RSTR q_weight,
@@ -512,13 +511,29 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
                 previous[j * NC + c] = p[node * NC + c];
               }
             }
-            // The geometry is indexed by the element, not by a block
-            // offset: a node's incident elements are scattered through
-            // the mesh rather than contiguous.  It carries no quadrature
-            // index either, because the orientation gate has already
-            // restricted this kernel to affine simplices, whose Jacobian
-            // is constant over the cell.
-            const s_t det = determinant[element];
+            // The Jacobian of the *permuted* element: its columns are the
+            // edges from the visited node, which the permutation put at
+            // slot 0.  Constant over the cell, because the orientation
+            // gate admits only affine simplices.
+            s_t jac[ND * ND];
+            for (int d = 0; d < ND; ++d) {
+              const s_t origin = (s_t)points[d][elements[perm[0]][element]];
+              for (int k = 0; k < ND; ++k) {
+                jac[d * ND + k] =
+                    (s_t)points[d][elements[perm[k + 1]][element]] - origin;
+              }
+            }
+            s_t adj[9];
+            adj[0] = jac[4] * jac[8] - jac[5] * jac[7];
+            adj[1] = jac[2] * jac[7] - jac[1] * jac[8];
+            adj[2] = jac[1] * jac[5] - jac[2] * jac[4];
+            adj[3] = jac[5] * jac[6] - jac[3] * jac[8];
+            adj[4] = jac[0] * jac[8] - jac[2] * jac[6];
+            adj[5] = jac[2] * jac[3] - jac[0] * jac[5];
+            adj[6] = jac[3] * jac[7] - jac[4] * jac[6];
+            adj[7] = jac[1] * jac[6] - jac[0] * jac[7];
+            adj[8] = jac[0] * jac[4] - jac[1] * jac[3];
+            const s_t det = jac[0] * adj[0] + jac[1] * adj[3] + jac[2] * adj[6];
             // physical gradient of the state: summed over shape functions,
             // then mapped.  Mapped here and not in loop 2 because the map
             // is linear and does not depend on the step length.
@@ -530,7 +545,7 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
                   for (int j = 0; j < NS; ++j) {
                     acc += state[j * NC + c] * grad_ref[k][q * NS + j];
                   }
-                  mapped += acc * adjugate[k * ND + d][element];
+                  mapped += acc * adj[k * ND + d];
                 }
                 pm_state_grad[(q * 9 + c * ND + d) * VS + lane] = mapped / det;
               }
@@ -546,7 +561,7 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
                   for (int j = 0; j < NS; ++j) {
                     acc += direction[j * NC + c] * grad_ref[k][q * NS + j];
                   }
-                  mapped += acc * adjugate[k * ND + d][element];
+                  mapped += acc * adj[k * ND + d];
                 }
                 pm_direction_grad[(q * 9 + c * ND + d) * VS + lane] = mapped / det;
               }
@@ -562,7 +577,7 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
                   for (int j = 0; j < NS; ++j) {
                     acc += previous[j * NC + c] * grad_ref[k][q * NS + j];
                   }
-                  mapped += acc * adjugate[k * ND + d][element];
+                  mapped += acc * adj[k * ND + d];
                 }
                 pm_previous_grad[(q * 9 + c * ND + d) * VS + lane] = mapped / det;
               }
@@ -574,7 +589,7 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
             for (int d = 0; d < ND; ++d) {
               s_t mapped = s_t(0);
               for (int k = 0; k < ND; ++k) {
-                mapped += grad_ref[k][q * NS + 0] * adjugate[k * ND + d][element];
+                mapped += grad_ref[k][q * NS + 0] * adj[k * ND + d];
               }
               pm_test_grad[(q * 3 + d) * VS + lane] = mapped / det;
             }
@@ -700,7 +715,7 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
         squared += rho[0 * VS + lane] * rho[0 * VS + lane];
         squared += rho[1 * VS + lane] * rho[1 * VS + lane];
         squared += rho[2 * VS + lane] * rho[2 * VS + lane];
-        merit[lane] += s_t(0.5) * squared;
+        merit_local[lane] += s_t(0.5) * squared;
       }
     }
 
@@ -724,8 +739,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch_a_msoa(
     const element_idx_t *const RSTR n2e_idx,
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
-    const void *const RSTR determinant,
-    const void *const RSTR adjugate[9],
+    const geom_t *const *const RSTR points,
     const void *const RSTR shape,
     const void *const RSTR grad_ref[3],
     const void *const RSTR q_weight,
@@ -744,10 +758,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_merit_patch<double, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, (const double *)determinant, (const double *const *)adjugate, (const double *)shape, (const double *const *)grad_ref, (const double *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)p, (const double *)accumulator, (double *)merit);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_merit_patch<double, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *)shape, (const double *const *)grad_ref, (const double *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)p, (const double *)accumulator, (double *)merit);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_merit_patch<float, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, (const float *)determinant, (const float *const *)adjugate, (const float *)shape, (const float *const *)grad_ref, (const float *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)p, (const float *)accumulator, (float *)merit);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_merit_patch<float, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *)shape, (const float *const *)grad_ref, (const float *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)p, (const float *)accumulator, (float *)merit);
     }
     default:
       break;

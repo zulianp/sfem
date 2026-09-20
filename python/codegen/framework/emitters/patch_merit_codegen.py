@@ -133,6 +133,43 @@ def patch_orientation_table_lines(element_type, name="pm_orientation"):
     ]
 
 
+def _jacobian_adjugate_2(indent):
+    return [
+        "%s    const s_t det = jac[0] * jac[3] - jac[1] * jac[2];" % indent,
+        "%s    s_t adj[4];" % indent,
+        "%s    adj[0] =  jac[3];" % indent,
+        "%s    adj[1] = -jac[1];" % indent,
+        "%s    adj[2] = -jac[2];" % indent,
+        "%s    adj[3] =  jac[0];" % indent,
+    ]
+
+
+def _jacobian_adjugate_3(indent):
+    return [
+        "%s    s_t adj[9];" % indent,
+        "%s    adj[0] = jac[4] * jac[8] - jac[5] * jac[7];" % indent,
+        "%s    adj[1] = jac[2] * jac[7] - jac[1] * jac[8];" % indent,
+        "%s    adj[2] = jac[1] * jac[5] - jac[2] * jac[4];" % indent,
+        "%s    adj[3] = jac[5] * jac[6] - jac[3] * jac[8];" % indent,
+        "%s    adj[4] = jac[0] * jac[8] - jac[2] * jac[6];" % indent,
+        "%s    adj[5] = jac[2] * jac[3] - jac[0] * jac[5];" % indent,
+        "%s    adj[6] = jac[3] * jac[7] - jac[4] * jac[6];" % indent,
+        "%s    adj[7] = jac[1] * jac[6] - jac[0] * jac[7];" % indent,
+        "%s    adj[8] = jac[0] * jac[4] - jac[1] * jac[3];" % indent,
+        "%s    const s_t det = jac[0] * adj[0] + jac[1] * adj[3] + jac[2] * adj[6];" % indent,
+    ]
+
+
+#: The adjugate and determinant of a small dense Jacobian, per dimension.
+#:
+#: Spelled here rather than through `geometry_kernels.hpp`'s helper because
+#: that one writes through an array of pointers at an offset -- the shape a
+#: structure-of-arrays traversal wants -- and this kernel needs the values as
+#: scalars inside its lane loop, where an array of pointers per lane would stop
+#: it vectorising.  Same arithmetic, and the entries are in the same order.
+_JACOBIAN_ADJUGATE = {2: _jacobian_adjugate_2, 3: _jacobian_adjugate_3}
+
+
 def _buffer_index(offset, count, lane="lane"):
     """`(q * count + offset) * VS + <element lane>`.
 
@@ -173,7 +210,7 @@ def _stage_gradient_lines(indent, name, dim, n_fields):
         "%s          for (int j = 0; j < NS; ++j) {" % indent,
         "%s            acc += %s[j * NC + c] * grad_ref[k][q * NS + j];" % (indent, name),
         "%s          }" % indent,
-        "%s          mapped += acc * adjugate[k * ND + d][element];" % indent,
+        "%s          mapped += acc * adj[k * ND + d];" % indent,
         "%s        }" % indent,
         "%s        %s[%s] = mapped / det;"
         % (indent, target, _buffer_index("c * ND + d", n_fields * dim)),
@@ -232,15 +269,21 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
     lines.extend(["%s      }" % indent, "%s    }" % indent])
     lines.extend(
         [
-            "%s    // The geometry is indexed by the element, not by a block" % indent,
-            "%s    // offset: a node's incident elements are scattered through" % indent,
-            "%s    // the mesh rather than contiguous.  It carries no quadrature" % indent,
-            "%s    // index either, because the orientation gate has already" % indent,
-            "%s    // restricted this kernel to affine simplices, whose Jacobian" % indent,
-            "%s    // is constant over the cell." % indent,
-            "%s    const s_t det = determinant[element];" % indent,
+            "%s    // The Jacobian of the *permuted* element: its columns are the" % indent,
+            "%s    // edges from the visited node, which the permutation put at" % indent,
+            "%s    // slot 0.  Constant over the cell, because the orientation" % indent,
+            "%s    // gate admits only affine simplices." % indent,
+            "%s    s_t jac[ND * ND];" % indent,
+            "%s    for (int d = 0; d < ND; ++d) {" % indent,
+            "%s      const s_t origin = (s_t)points[d][elements[perm[0]][element]];" % indent,
+            "%s      for (int k = 0; k < ND; ++k) {" % indent,
+            "%s        jac[d * ND + k] =" % indent,
+            "%s            (s_t)points[d][elements[perm[k + 1]][element]] - origin;" % indent,
+            "%s      }" % indent,
+            "%s    }" % indent,
         ]
     )
+    lines.extend(_JACOBIAN_ADJUGATE[dim](indent))
     for quantity in patch_merit_staged_quantities(dependencies):
         for name, _ in gathers:
             lines.extend(
@@ -255,7 +298,7 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
             "%s    for (int d = 0; d < ND; ++d) {" % indent,
             "%s      s_t mapped = s_t(0);" % indent,
             "%s      for (int k = 0; k < ND; ++k) {" % indent,
-            "%s        mapped += grad_ref[k][q * NS + 0] * adjugate[k * ND + d][element];"
+            "%s        mapped += grad_ref[k][q * NS + 0] * adj[k * ND + d];"
             % indent,
             "%s      }" % indent,
             "%s      pm_test_grad[%s] = mapped / det;" % (indent, _buffer_index("d", dim)),
@@ -388,7 +431,10 @@ def patch_reduction_lines(system, indent="  "):
         "%s  squared += rho[%d * VS + lane] * rho[%d * VS + lane];" % (indent, c, c)
         for c in range(n_fields)
     ] + [
-        "%s  merit[lane] += s_t(0.5) * squared;" % indent,
+        # Into the thread's own buffer, never the shared output.  Writing
+        # `merit` here is a data race between every thread that owns a node,
+        # and it shows up as two lanes sampling the same alpha disagreeing.
+        "%s  merit_local[lane] += s_t(0.5) * squared;" % indent,
         "%s}" % indent,
     ]
 
@@ -407,8 +453,19 @@ def patch_merit_kernel_parameters(system, rule, dependencies, parameters=()):
         "const element_idx_t *const RSTR n2e_idx",
         "const uint8_t *const RSTR n2e_local",
         "idx_t **const RSTR elements",
-        "const s_t *const RSTR determinant",
-        "const s_t *const RSTR adjugate[%d]" % (dim * dim),
+        # Coordinates, not cached geometry.  The element is read through a
+        # permutation that brings the visited node to slot 0, and permuting the
+        # vertices is only a relabelling of the same element if the Jacobian is
+        # permuted with them -- the cached adjugate belongs to the original
+        # ordering, and pairing it with permuted degrees of freedom describes no
+        # element at all.  So the Jacobian is formed here from the permuted
+        # vertices.  For an affine simplex that is `dim` edge vectors, computed
+        # once per element in loop 1 and never per step.
+        #
+        # `g_t` because coordinates are `geom_t`, which the tree builds as
+        # `float` while `real_t` is `double`; reading them through the scalar's
+        # pointer type is garbage, and the merit comes out NaN.
+        "const g_t *const *const RSTR points",
         "const s_t *const RSTR shape",
         "const s_t *const RSTR grad_ref[%d]" % dim,
         "const s_t *const RSTR q_weight",
@@ -428,6 +485,8 @@ def patch_merit_argument_names(system, rule, dependencies, parameters=()):
     """The same sequence as names, for the entry point to forward."""
     names = []
     for param in patch_merit_kernel_parameters(system, rule, dependencies, parameters):
+        if param.lstrip().startswith("#"):
+            continue
         name = param.split("[")[0].split()[-1].lstrip("*")
         names.append(name)
     return tuple(names)
@@ -455,7 +514,7 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
     buffers = patch_loop_one_buffers(dim, n_fields, dependencies)
     declared = patch_merit_kernel_parameters(system, rule, dependencies, parameters)
     lines = [
-        "template <typename s_t, int NQ, int NS, int VS>",
+        "template <typename s_t, typename g_t, int NQ, int NS, int VS>",
         "static int %s(" % function_name,
     ]
     lines.extend(

@@ -5817,7 +5817,7 @@ def _operator_source(
                 list(kernel_params),
                 list(kernel_arguments),
                 lambda scalar_type, arguments, _name="%s_%s" % (prefix, kernel): [
-                    "  return sfem::codegen::%s<%s, %d, %d, %d>(%s);"
+                    "  return sfem::codegen::%s<%s, geom_t, %d, %d, %d>(%s);"
                     % (_name, scalar_type, n_qp, n_shape, vector_size,
                        ", ".join(arguments)),
                 ],
