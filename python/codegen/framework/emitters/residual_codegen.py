@@ -8344,7 +8344,7 @@ def _scalar_crs_matrix_assembly_source(
                     "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
-                "    for (int q = 0; q < NQ; ++q) {",
+                *quadrature_scope_lines(rule.element_type, "    "),
                 *_target().work_item_prologue_lines("      "),
             ]
         )
@@ -8712,7 +8712,7 @@ def _scalar_crs_matrix_assembly_source(
                         "badjugate_data[%d]" % component
                         for component in range(dim * dim)
                     ),
-                    "      for (int q = 0; q < NQ; ++q) {",
+                    *quadrature_scope_lines(rule.element_type, "      "),
                     *_target().work_item_prologue_lines("        "),
                 ]
             )
@@ -9337,7 +9337,7 @@ def _scalar_packed_jacobian_action_source(
                     "badjugate_data[%d]" % component
                     for component in range(dim * dim)
                 ),
-                "        for (int q = 0; q < NQ; ++q) {",
+                *quadrature_scope_lines(rule.element_type, "        "),
                 *_work_item_loop_lines("          "),
             ]
         )

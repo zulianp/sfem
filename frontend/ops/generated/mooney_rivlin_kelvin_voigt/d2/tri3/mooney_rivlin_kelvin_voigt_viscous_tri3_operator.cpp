@@ -490,7 +490,8 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_viscous_tri3_hessian_crs_i_mso
     }
 
     s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
-    for (int q = 0; q < NQ; ++q) {
+    {
+        const int q = 0;  // TRI3 evaluates in closed form
       const int lane = 0;
       const s_t J00 = bcoordinates[0][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[2][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[4][lane] * isoparametric_grad_ref_x[q * NS + 2];
       const s_t J01 = bcoordinates[0][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[2][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[4][lane] * isoparametric_grad_ref_y[q * NS + 2];

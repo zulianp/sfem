@@ -2003,7 +2003,8 @@ static int mooney_rivlin_kelvin_voigt_elastic_tet4_hessian_i_msoa_assemble_impl(
     }
 
 
-    for (int q = 0; q < NQ; ++q) {
+    {
+        const int q = 0;  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
       s_t J00_values[VS];
       s_t J01_values[VS];

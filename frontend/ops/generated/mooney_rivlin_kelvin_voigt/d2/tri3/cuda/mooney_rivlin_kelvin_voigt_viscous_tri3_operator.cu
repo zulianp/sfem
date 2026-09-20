@@ -492,7 +492,8 @@ __global__ void mooney_rivlin_kelvin_voigt_viscous_tri3_hessian_crs_i_msoa_impl(
     }
 
     s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
-    for (int q = 0; q < NQ; ++q) {
+    {
+        const int q = 0;  // TRI3 evaluates in closed form
       const s_t J00 = bcoordinates[0][0] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[2][0] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[4][0] * isoparametric_grad_ref_x[q * NS + 2];
       const s_t J01 = bcoordinates[0][0] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[2][0] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[4][0] * isoparametric_grad_ref_y[q * NS + 2];
       const s_t J10 = bcoordinates[1][0] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[3][0] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[5][0] * isoparametric_grad_ref_x[q * NS + 2];

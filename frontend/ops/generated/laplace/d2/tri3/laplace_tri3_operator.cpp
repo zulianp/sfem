@@ -594,7 +594,8 @@ static int laplace_tri3_hessian_i_msoa_assemble_impl(
     }
 
 
-    for (int q = 0; q < NQ; ++q) {
+    {
+        const int q = 0;  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
       s_t J00_values[VS];
       s_t J01_values[VS];

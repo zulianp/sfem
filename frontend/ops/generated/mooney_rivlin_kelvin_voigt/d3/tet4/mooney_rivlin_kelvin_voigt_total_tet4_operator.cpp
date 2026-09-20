@@ -118,7 +118,8 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
           pm_local_node[lane] = n2e_local[block + lane];
         }
         // loop 1 -- lanes are the elements incident on this node.
-        for (int q = 0; q < NQ; ++q) {
+        {
+            const int q = 0;  // TET4 evaluates in closed form
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
             const idx_t element = pm_incident[lane];
@@ -221,7 +222,8 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
         }
         // loop 2 -- lanes are the sampled step lengths.
         for (int lane_e = 0; lane_e < ne; ++lane_e) {
-          for (int q = 0; q < NQ; ++q) {
+          {
+              const int q = 0;  // TET4 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nsteps; ++lane) {
               const s_t alpha = steps[lane];
