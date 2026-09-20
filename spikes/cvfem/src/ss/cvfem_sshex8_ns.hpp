@@ -31,6 +31,7 @@
 #include "cvfem_hex8_ns_core.hpp"
 
 #include "packed_elements.hpp"   // packed_elements_matmul_nonsym: BLAS gemm, loop fallback
+#include "smesh_exchange.hpp"    // the nodal reconstruction is completed across ranks
 #include "smesh_mesh.hpp"
 
 #include <cmath>
@@ -124,6 +125,14 @@ struct SSMeshData {
     // by 24 bytes, and the block diagonal -- which reads those fields per micro cell and
     // whose own source was unchanged -- compiled differently and ran 7-9% slower.
     std::vector<uint8_t> macro_curved;
+
+    // Completes the nodal gradient reconstruction across ranks; null on a serial mesh.
+    //
+    // Built once and cached rather than per apply, because the Jacobian action reconstructs
+    // on every Krylov iteration and Exchange::create_nodal is collective. Keyed the same way
+    // grad_w_inv is, on the node count it was built for.
+    std::shared_ptr<smesh::Exchange> grad_exchange;
+    ptrdiff_t                        grad_exchange_nnodes{-1};
 };
 // Defined below, next to the macro-element geometry it configures; the element sweeps that
 // need it sit above.
@@ -835,6 +844,88 @@ inline void sscvfem_nodal_grad_normalize(SSMeshData &d, std::vector<scalar_t> &o
         ogx[(size_t)i] *= s;
         ogy[(size_t)i] *= s;
         ogz[(size_t)i] *= s;
+    }
+
+    // Complete the reconstruction on the nodes this rank does not own.
+    //
+    // The sweep that consumes this field reads it at EVERY local node, including ghosts and
+    // aura, because an element touching an owned node also touches nodes owned elsewhere.
+    // The accumulation above runs over local elements only, so those entries hold a partial
+    // numerator over a partial denominator -- the errors do not cancel, and the sweep then
+    // carries them into owned rows. That makes A*x depend on how the domain was cut, which
+    // is why the Krylov iteration count stopped being decomposition invariant: measured on
+    // the cavity with no multigrid and block-Jacobi, 812 linear iterations at one rank
+    // became 4765 at four and 52186 at eight, while the same case with the reconstruction
+    // disabled (SFEM_RC_EXACT_JAC=0) stayed flat at 6056 / 6067 / 6067 / 6051.
+    //
+    // A gather is sufficient and a scatter_add is NOT needed, which is a statement about
+    // the aura rather than about this loop: every element touching an owned node is local,
+    // so the OWNER's entry is already complete and only the copies need filling. That was
+    // measured rather than assumed -- summed over the owned range and keyed by global id,
+    // the first reconstruction agrees to 3.1e-16 between one, two and four ranks, which is
+    // the reassociation the packed and two-pass paths differ by anyway.
+    //
+    // GhostsAndAura, not GhostsOnly: the sweep reaches aura nodes, so a ghosts-only gather
+    // would leave exactly the slots this exists to fill. Serial returns above without
+    // touching this, so the byte-compared verification matrix is unaffected.
+    if (d.mesh && d.mesh->is_distributed() && d.mesh->comm() && d.mesh->comm()->size() > 1) {
+        if (!d.grad_exchange || d.grad_exchange_nnodes != d.nnodes) {
+            d.grad_exchange = smesh::Exchange::create_nodal(
+                    d.mesh, smesh::Exchange::ExchangeScope::GhostsAndAura);
+            d.grad_exchange_nnodes = d.nnodes;
+        }
+        if (d.grad_exchange) {
+            d.grad_exchange->gather(ogx.data(), 1);
+            d.grad_exchange->gather(ogy.data(), 1);
+            d.grad_exchange->gather(ogz.data(), 1);
+        }
+    }
+
+    // SFEM_GRAD_OWNED_SUM=1: is this reconstruction complete on the nodes this rank OWNS?
+    //
+    // The reconstruction accumulates over local elements and divides by a weight built the
+    // same way, and nothing exchanges the result, so ghost and aura nodes hold a partial
+    // numerator over a partial denominator. That much is certain from the code. What is NOT
+    // written down anywhere is whether the OWNER's entry is complete -- it is complete only
+    // if every element touching an owned node is local, which is what the aura is supposed
+    // to guarantee but which no comment in smesh or ARCHITECTURE.md actually states.
+    //
+    // The answer decides the fix and the two possibilities are not interchangeable:
+    //
+    //   owned sums match serial  -> the owner is authoritative, and a plain gather of the
+    //                               finished field into ghost and aura slots is correct
+    //   owned sums differ        -> the owner's own accumulation is short, and the fix must
+    //                               scatter_add the raw sums back to their owners BEFORE
+    //                               normalising, then gather
+    //
+    // Keyed by global id and summed over the owned range only, because local indices are
+    // incomparable across partitions and the ghost entries each rank also stores belong to
+    // somebody else. Gated, so an unset variable leaves the fast path exactly as it was.
+    if (smesh::Env::read<int>("SFEM_GRAD_OWNED_SUM", 0) && d.mesh) {
+        const bool dist = d.mesh->is_distributed() && d.mesh->comm() && d.mesh->comm()->size() > 1;
+        const ptrdiff_t n_owned =
+                dist ? d.mesh->distributed()->n_nodes_owned() : d.nnodes;
+
+        long double plain = 0, gidw = 0;
+        for (ptrdiff_t i = 0; i < n_owned; ++i) {
+            const long double g =
+                    dist ? (long double)d.mesh->distributed()->node_mapping()->data()[i] : (long double)i;
+            const long double v = (long double)ogx[(size_t)i] + (long double)ogy[(size_t)i] +
+                                  (long double)ogz[(size_t)i];
+            plain += v;
+            gidw += v * g;
+        }
+
+        double gp = (double)plain, gw = (double)gidw, gn = (double)n_owned;
+        int    rank = 0;
+        if (dist) {
+            gp   = d.mesh->comm()->sum(gp);
+            gw   = d.mesh->comm()->sum(gw);
+            gn   = d.mesh->comm()->sum(gn);
+            rank = d.mesh->comm()->rank();
+        }
+        if (rank == 0)
+            std::printf("gradsum: owned_nodes %.0f  sum %.17g  gidsum %.17g\n", gn, gp, gw);
     }
 }
 
