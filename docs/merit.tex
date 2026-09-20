@@ -46,11 +46,14 @@ be hoisted out of the trial-step loop exactly rather than approximately, because
 the state enters the element kernel through a quantity that is affine in
 $\alpha$.
 
-The resulting kernel is a single pass over the mesh producing all $m$ merit
-values, and it materializes no per-step residual vector: the contraction closes
-inside a patch of elements, where the node sums are complete, so each trial step
-leaves the patch as one number and a thread's entire output is a buffer of $m$
-scalars.  What this is worth is bounded by the constitutive evaluation, which
+The resulting kernel produces all $m$ merit values in one pass and materializes
+no per-step residual vector --- indeed no accumulator array at all.  It works one
+node at a time, so that node's value is complete once its incident elements have
+been summed and can be squared in registers; the SIMD lanes are filled from
+within that one node's patch, by its incident elements and by the trial steps
+together.  Normalizing each element's orientation so the node is always the same
+local node makes its basis function the same in every lane and at every step,
+which is what allows those terms to be hoisted out of both vectorization loops.  What this is worth is bounded by the constitutive evaluation, which
 repeats per trial step by construction.  The same reorganization is already in
 place for the energy merit, and measured on the same node it costs $5.7\times$
 one step at $m=12$ for a Mooney--Rivlin-class material and $3.7\times$ for
@@ -246,117 +249,92 @@ the first Piola--Kirchhoff stress $P(\nabla u)$ of a Mooney--Rivlin solid is not
 arithmetic, not a truncation: $\phi(\alpha_k)$ is the same number the per-step
 assembly computes, up to the reassociation of a sum.
 
-\section{The kernel: a patch contracts, and emits $m$ numbers}
+\section{The kernel: one node at a time, vectorized twice}
 \label{sec:kernel}
 
-The work unit is a \emph{patch} $p$ --- a pack of elements together with the nodes
-they touch.  Its nodes divide into three classes, and the library's packed layout
-already names them: the owned nodes not shared with any other pack, which we write
-$\mathcal{N}_p^{\circ}$; the owned nodes that are shared; and the ghosts.  Only the
-first class has all of its incident elements inside the patch, so only there is the
-sum in \eqref{eq:assembly} complete without leaving it:
+The work unit is a single owned node $n$, not an element block.  Write
+$\mathcal{E}(n)$ for the elements incident on $n$, which the node-to-element
+graph supplies directly.  Then \eqref{eq:assembly} restricted to that node is a
+sum over $\mathcal{E}(n)$ and nothing else,
 \begin{equation}
-  \bigl[R_M(y)\bigr]_n \;=\; \sum_{\substack{e\in p \\ e\ni n}}
-  \bigl[r^e_M(P_e y)\bigr]_n ,
-  \qquad n\in\mathcal{N}_p^{\circ} .
-  \label{eq:patchcomplete}
+  \bigl[R_M(y)\bigr]_n \;=\; \sum_{e\in\mathcal{E}(n)} \bigl[r^e_M(P_e y)\bigr]_n ,
+  \label{eq:nodecentric}
 \end{equation}
-This is not an assumption about the partition; it is the same distinction the
-existing packed kernels make when they write $\mathcal{N}_p^{\circ}$ with a plain
-accumulation and reach for an atomic, or for a deferred ghost buffer, on everything
-else.
+so the node's value is complete the moment that loop closes.  It can be squared
+on the spot, and \emph{no accumulator array exists at all}: the $m$ residuals of
+one node are $m N_c$ numbers living in registers, seeded from the accumulator
+$g$ of \eqref{eq:split} and discarded as soon as they are squared into the
+thread's $m$-slot buffer.  The patch-local node storage an element-centric
+traversal needs --- $m\,|\mathcal{N}_p|\,N_c$ words, the one structure that grew
+with $m$ --- is gone.
 
-Where \eqref{eq:patchcomplete} holds the square in \eqref{eq:contract} is taken
-inside the patch and the patch reports numbers rather than vectors.  The remaining
-nodes --- the interface $\Gamma$ --- carry partial sums that must meet before they
-may be squared, and they go through the deterministic ghost reduction the packed
-traversal already owns, with one copy per trial step.  That buffer is the one
-object in the scheme that grows with both $m$ and the mesh, and it is
-\emph{surface}-sized, $m\,N_c\,|\Gamma|$ against the $m\,n$ it replaces: for a pack
-of $P$ elements the interface fraction falls like $P^{-1/3}$, and the pack size is
-tunable.  The fast interior and the small remainder are two passes over different
-node sets, not a fast path with a fallback that redoes the work.
+\subsection*{Two vectorization axes, and the orientation that pays for them}
 
-This is what must be understood about the data layout, and it is the point of the
-whole design: \textbf{no per-step residual vector is ever materialized}.  The
-contraction of trial step $k$ produces one scalar.  A thread holds
-\begin{itemize}[nosep]
-  \item patch-local node accumulators $\rho^{(k)}\in\R^{|\mathcal{N}_p| N_c}$,
-    $k=1,\dots,m$, thread-private and sized to stay in cache --- which is what the
-    pack size tunes; and
-  \item one buffer of $m$ slots, $s\in\R^m$, accumulated over the patches the
-    thread owns and reduced across threads at the end.
-\end{itemize}
-The only global per-degree-of-freedom array in the scheme is the accumulator $g$ of
-\eqref{eq:split}, and it is \emph{read}, gathered per node for the pointwise
-reduction and shared by all $m$ trial steps.  Nothing of size $m\,n$ is allocated,
-written or streamed.
+The lanes are filled from within one node's patch: the elements of
+$\mathcal{E}(n)$, and the trial steps $\alpha_1,\dots,\alpha_m$.  Both are
+vectorized.  What is deliberately \emph{not} done is to fill lanes by processing
+several patches at once; the lanes belong to one node.
 
-Algorithm~\ref{alg:kernel} is the emitted loop nest; phases marked $\star$ do not
-depend on $\alpha$ and are executed once.
+That choice is what makes the orientation matter.  A node sits at a different
+local index in each of its incident elements, so the basis function paired with
+it --- the test function of \eqref{eq:formsum} --- would differ from lane to
+lane, and nothing about it could be hoisted.  Each element is therefore
+presented with its local numbering permuted so that $n$ is always local node
+$0$.  Then $\varphi_0$ is the same basis function in every lane and at every
+trial step, and everything belonging to it hoists out of \emph{both} loops: for
+a low-order simplex $\widehat\nabla\varphi_0$ is a constant the generator emits
+as a literal rather than a table read, and the test-gradient map
+$J_e^{-\top}\widehat\nabla\varphi_0$ is formed once per element rather than once
+per element per step.
+
+The permutation is not free to be any relabelling.  It must preserve the sign of
+$\det J_e$, or the element's volume changes sign and its contribution is
+subtracted; on a simplex that restricts it to the even permutations carrying the
+chosen vertex to position $0$, which exist for every vertex.
 
 \begin{algorithm}
-\caption{Residual merit at $m$ trial step lengths: one pass, $m$ scalars out}
+\caption{Residual merit at $m$ trial steps: one node at a time}
 \label{alg:kernel}
 \begin{algorithmic}[1]
-\State $s \gets 0 \in \R^{m}$ \Comment{thread-private, $m$ slots --- the only output}
-\For{each patch $p$ owned by this thread}
-  \State $\rho^{(k)} \gets 0$ for $k=1,\dots,m$
-         \Comment{patch-local nodes, cache resident}
-  \For{each element block $e\in p$ (vectorized over lanes)}
-    \State $\star$ gather coordinates; form $J_e$, $\det J_e$, $\mathrm{adj}\,J_e$
-    \State $\star$ gather $x^e$ and $h^e$ \Comment{$2 N_s N_c$ loads, once}
+\State $s \gets 0 \in \R^{m}$ \Comment{thread-private, the only output}
+\For{each owned node $n$ (threads)}
+  \State $\rho_k \gets g_n \in \R^{N_c}$, $k=1,\dots,m$ \Comment{registers, not memory}
+  \State $\star$ $\widehat\nabla\varphi_0$ \Comment{same for every lane and step: a literal}
+  \For{$e \in \mathcal{E}(n)$ \textbf{(SIMD lanes)}}
+    \State $\star$ present $e$ with $n$ at local $0$, by an even permutation
+    \State $\star$ gather $x^e,h^e$; form $J_e$, $\det J_e$, $\mathrm{adj}\,J_e$
     \For{$q = 1,\dots,N_q$}
-      \State $\star$ $\gradhat u_q \gets \sum_j x^e_j \gradhat\varphi_j(\xhat_q)$
-             \Comment{$O(N_s d)$}
-      \State $\star$ $\gradhat w_q \gets \sum_j h^e_j \gradhat\varphi_j(\xhat_q)$
-             \Comment{$O(N_s d)$}
-      \For{$k = 1,\dots,m$}
-        \State $\gradhat u_q^{(k)} \gets \gradhat u_q + \alpha_k\,\gradhat w_q$
-               \Comment{$d$ FMA}
-        \State $\nabla u_q^{(k)} \gets J_e^{-\top}\gradhat u_q^{(k)}$
-               \Comment{$O(d^2)$}
-        \State evaluate the constitutive flux at $\nabla u_q^{(k)}$
-        \State $\rho^{(k)} \mathrel{+}= w_q \det J_e \cdot (\text{flux}) \cdot
-               \nabla\varphi_{\text{test}}$ \Comment{into $e$'s patch-local nodes}
+      \State $\star$ $\widehat\nabla u_q \gets \sum_j x^e_j \widehat\nabla\varphi_j$,
+             \; $\widehat\nabla w_q \gets \sum_j h^e_j \widehat\nabla\varphi_j$
+      \State $\star$ $\nabla\varphi_0 \gets J_e^{-\top}\widehat\nabla\varphi_0$
+             \Comment{step-independent}
+      \For{$k = 1,\dots,m$ \textbf{(SIMD lanes)}}
+        \State $\nabla u_q^{(k)} \gets J_e^{-\top}(\widehat\nabla u_q + \alpha_k \widehat\nabla w_q)$
+        \State $\rho_k \mathrel{+}= w_q \det J_e \cdot P\bigl(\nabla u_q^{(k)}\bigr)\,\nabla\varphi_0$
       \EndFor
     \EndFor
   \EndFor
-  \For{$n \in \mathcal{N}_p^{\circ}$} \Comment{complete: squared here}
-    \State gather $g_n$ \Comment{$N_c$ loads, shared by all $m$ steps}
-    \For{$k = 1,\dots,m$}
-      \State $s_k \mathrel{+}= \tfrac12 \bigl\| g_n + \rho^{(k)}_n \bigr\|^2$
-    \EndFor
-  \EndFor
-  \For{$n \in \Gamma \cap p$} \Comment{partial: deferred}
-    \State append $\rho^{(k)}_n$ to the ghost buffer of step $k$
-  \EndFor
-\EndFor
-\For{each interface node $n\in\Gamma$} \Comment{second pass, surface-sized}
+  \State reduce $\rho_k$ across the element lanes
   \For{$k = 1,\dots,m$}
-    \State $s_k \mathrel{+}= \tfrac12 \bigl\| g_n + \textstyle\sum_{p\ni n}
-           \rho^{(k)}_{n,p} \bigr\|^2$
+    \State $s_k \mathrel{+}= \tfrac12 \|\rho_k\|^2$ \Comment{complete by \eqref{eq:nodecentric}}
   \EndFor
 \EndFor
 \State $\phi(\alpha_k) \gets \sum_{\text{threads}} s_k$
 \end{algorithmic}
 \end{algorithm}
 
-The trial-step loop is placed \emph{outside} the lane loop and not inside it.  On a
-CPU target the work item is a SIMD lane, and a lane loop containing another loop is
-no longer innermost and does not vectorize; the same decision, for the same
-measured reason, is already recorded for the stepped objective.  The
-$\alpha$-independent quantities therefore go to lane-indexed buffers, the first
-lane loop closes, and the trial-step loop opens a second one.
+Phases marked $\star$ depend on neither the trial step nor, in the case of
+$\widehat\nabla\varphi_0$, on the element either.  The gain over an
+element-centric pass is that the second kind exists at all: with the orientation
+fixed there is work that is constant across the whole of both vectorization
+loops, which is the strongest form of hoisting available.
 
-Two consequences of \eqref{eq:patchcomplete} are worth stating together, because
-they are the same fact seen from two sides.  Only one operator may contract the
-merit: a single contractor owns the node sums and can close them inside the patch,
-whereas two contractors would each hold a partial node value and the design would
-be forced back to assembling vectors.  And the gather of $g$ is per node, not per
-node per step, so the state-independent part of the residual is read once for all
-$m$ trial steps --- against $m$ full assemblies of it in the implementation this
-replaces.
+What it costs is that an element is visited once per node it carries, so the
+constitutive evaluation $P(\nabla u)$ is performed about $N_s$ times where an
+element-centric pass performs it once and contracts it against every test
+function.  Whether the hoisting, the vanished accumulator and the absent scatter
+outweigh that is a question for measurement: the two arrangements are built and
+timed against each other rather than chosen by counting operations.
 
 \section{Cost model}
 
@@ -389,10 +367,9 @@ contraction earns its keep.  Writing $n$ for the number of degrees of freedom, t
 per-trial-step implementation forms a combined iterate, assembles a residual into an
 $n$-vector and reduces it, once per step: $\Theta(m\,n)$ words written and
 $\Theta(m\,n)$ read, none of it reused.  The sampling kernel reads $x$, $h$ and $g$
---- $3n$ words, independent of $m$ --- and writes $m$ scalars per thread.  The $m$
-patch-local accumulators $\rho^{(k)}$ are the only structure that grows with $m$,
-they are thread-private, and their footprint $m\,|\mathcal{N}_p|\,N_c$ is bounded by
-the pack size, which is tunable for exactly this reason.  The arithmetic above is
+--- $3n$ words, independent of $m$ --- and writes $m$ scalars per thread.  Nothing in the sampling kernel grows with $m$ except the
+$m\,N_c$ registers holding one node's residuals, which are live for the length of
+one node's element loop.  The arithmetic above is
 therefore the honest limit: nothing in the sampling kernel becomes bandwidth-bound
 as $m$ grows.
 
