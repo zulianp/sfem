@@ -75,7 +75,7 @@ namespace {
         const ptrdiff_t nelements = mesh->n_elements();
         const ptrdiff_t nnodes    = mesh->n_nodes();
 
-        SFEM_TEST_ASSERT(mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_msoa(
+        SFEM_TEST_ASSERT(mooney_rivlin_kelvin_voigt_total_residual_3d_i_msoa(
                                  smesh::HEX8,
                                  smesh::TypeToEnum<real_t>::value(),
                                  nelements,
@@ -141,7 +141,7 @@ namespace {
             const real_t eta_s = arm == 0 ? kEtaShear : real_t(0);
             const real_t eta_b = arm == 0 ? kEtaBulk : real_t(0);
             real_t *const out  = arm == 0 ? with.data() : without.data();
-            SFEM_TEST_ASSERT(mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_msoa(
+            SFEM_TEST_ASSERT(mooney_rivlin_kelvin_voigt_total_residual_3d_i_msoa(
                                      smesh::HEX8,
                                      smesh::TypeToEnum<real_t>::value(),
                                      mesh->n_elements(),

@@ -1,5 +1,5 @@
-#ifndef MOONEY_RIVLIN_KELVIN_VOIGT_RESIDUAL_MERIT_D3_SIMPLEX_LOCAL_HPP
-#define MOONEY_RIVLIN_KELVIN_VOIGT_RESIDUAL_MERIT_D3_SIMPLEX_LOCAL_HPP
+#ifndef MOONEY_RIVLIN_KELVIN_VOIGT_TOTAL_D3_SIMPLEX_LOCAL_HPP
+#define MOONEY_RIVLIN_KELVIN_VOIGT_TOTAL_D3_SIMPLEX_LOCAL_HPP
 
 #include <math.h>
 #include <stddef.h>
@@ -9,12 +9,9 @@
 #define SFEM_GENERATED_SCALAR_T
 #endif
 #endif
-#include "../../kernel_math.hpp"
-#include "../../tensor_product_kernels.hpp"
+#include "../../../cuda/kernel_math.cuh"
+#include "../../../cuda/tensor_product_kernels.cuh"
 
-#ifndef SFEM_INLINE
-#define SFEM_INLINE inline
-#endif
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
@@ -34,7 +31,7 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_residual_block(
+__host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block(
     const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
@@ -81,99 +78,86 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_res
     s_t grad_coeff2_0_values[VS];
     s_t grad_coeff2_1_values[VS];
     s_t grad_coeff2_2_values[VS];
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_grad_0_ref_values[lane] = s_t(0);
-      u0_grad_1_ref_values[lane] = s_t(0);
-      u0_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_grad_0_ref_values[0] = s_t(0);
+      u0_grad_1_ref_values[0] = s_t(0);
+      u0_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC][lane];
-        u0_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC][0];
+        u0_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_old_grad_0_ref_values[lane] = s_t(0);
-      u0_old_grad_1_ref_values[lane] = s_t(0);
-      u0_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_old_grad_0_ref_values[0] = s_t(0);
+      u0_old_grad_1_ref_values[0] = s_t(0);
+      u0_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC][lane];
-        u0_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC][0];
+        u0_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_grad_0_ref_values[lane] = s_t(0);
-      u1_grad_1_ref_values[lane] = s_t(0);
-      u1_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_grad_0_ref_values[0] = s_t(0);
+      u1_grad_1_ref_values[0] = s_t(0);
+      u1_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 1][lane];
-        u1_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC + 1][0];
+        u1_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_old_grad_0_ref_values[lane] = s_t(0);
-      u1_old_grad_1_ref_values[lane] = s_t(0);
-      u1_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_old_grad_0_ref_values[0] = s_t(0);
+      u1_old_grad_1_ref_values[0] = s_t(0);
+      u1_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 1][lane];
-        u1_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC + 1][0];
+        u1_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_grad_0_ref_values[lane] = s_t(0);
-      u2_grad_1_ref_values[lane] = s_t(0);
-      u2_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_grad_0_ref_values[0] = s_t(0);
+      u2_grad_1_ref_values[0] = s_t(0);
+      u2_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 2][lane];
-        u2_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC + 2][0];
+        u2_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_old_grad_0_ref_values[lane] = s_t(0);
-      u2_old_grad_1_ref_values[lane] = s_t(0);
-      u2_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_old_grad_0_ref_values[0] = s_t(0);
+      u2_old_grad_1_ref_values[0] = s_t(0);
+      u2_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 2][lane];
-        u2_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC + 2][0];
+        u2_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
@@ -184,39 +168,39 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_res
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_grad_0_ref = u0_grad_0_ref_values[lane];
-      const s_t u0_grad_1_ref = u0_grad_1_ref_values[lane];
-      const s_t u0_grad_2_ref = u0_grad_2_ref_values[lane];
+      const s_t u0_grad_0_ref = u0_grad_0_ref_values[0];
+      const s_t u0_grad_1_ref = u0_grad_1_ref_values[0];
+      const s_t u0_grad_2_ref = u0_grad_2_ref_values[0];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
       const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[lane];
-      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[lane];
-      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[lane];
+      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[0];
+      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[0];
+      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[0];
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
       const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-      const s_t u1_grad_0_ref = u1_grad_0_ref_values[lane];
-      const s_t u1_grad_1_ref = u1_grad_1_ref_values[lane];
-      const s_t u1_grad_2_ref = u1_grad_2_ref_values[lane];
+      const s_t u1_grad_0_ref = u1_grad_0_ref_values[0];
+      const s_t u1_grad_1_ref = u1_grad_1_ref_values[0];
+      const s_t u1_grad_2_ref = u1_grad_2_ref_values[0];
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
       const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[lane];
-      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[lane];
-      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[lane];
+      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[0];
+      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[0];
+      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[0];
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
       const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-      const s_t u2_grad_0_ref = u2_grad_0_ref_values[lane];
-      const s_t u2_grad_1_ref = u2_grad_1_ref_values[lane];
-      const s_t u2_grad_2_ref = u2_grad_2_ref_values[lane];
+      const s_t u2_grad_0_ref = u2_grad_0_ref_values[0];
+      const s_t u2_grad_1_ref = u2_grad_1_ref_values[0];
+      const s_t u2_grad_2_ref = u2_grad_2_ref_values[0];
       const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
       const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[lane];
-      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[lane];
-      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[lane];
+      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[0];
+      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[0];
+      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[0];
       const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
       const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
       const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
@@ -299,20 +283,19 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_res
       const s_t grad_coeff2_0 = mu*(s_t(6)*residual_tmp1*u0_grad_2 - residual_tmp11*residual_tmp62 + s_t(2)*residual_tmp15*u2_grad_0 - s_t(6)*residual_tmp23 - residual_tmp67*residual_tmp7 - residual_tmp68*residual_tmp9 + s_t(2)*u2_grad_0) + residual_tmp22*(-eta_s*(residual_tmp20*residual_tmp38 - residual_tmp39*residual_tmp65) + ((s_t(1) / s_t(3)))*residual_tmp24*residual_tmp69) + residual_tmp6*(-residual_tmp1*residual_tmp10 + s_t(2)*residual_tmp23);
       const s_t grad_coeff2_1 = mu*(-residual_tmp13*residual_tmp67 + s_t(2)*residual_tmp15*u2_grad_1 - s_t(6)*residual_tmp27 + s_t(6)*residual_tmp5*u1_grad_2 - residual_tmp61*residual_tmp68 - residual_tmp62*residual_tmp7 + s_t(2)*u2_grad_1) + residual_tmp22*(-eta_s*(-residual_tmp31*residual_tmp38 + residual_tmp43*residual_tmp65) + ((s_t(1) / s_t(3)))*residual_tmp28*residual_tmp69) + residual_tmp6*(s_t(2)*residual_tmp27 - residual_tmp5*residual_tmp63);
       const s_t grad_coeff2_2 = mu*(-s_t(6)*residual_tmp1*residual_tmp5 - residual_tmp14*residual_tmp68 + residual_tmp15*residual_tmp68 + s_t(6)*residual_tmp3 - residual_tmp61*residual_tmp67 - residual_tmp62*residual_tmp9 + s_t(2)*u2_grad_2 + s_t(2)) + residual_tmp22*(eta_s*(residual_tmp34*residual_tmp38 + residual_tmp40*residual_tmp65) - (s_t(1) / s_t(3))*residual_tmp36*residual_tmp69) + residual_tmp6*(s_t(2)*residual_tmp1*residual_tmp5 - s_t(2)*residual_tmp3);
-      grad_coeff0_0_values[lane] = grad_coeff0_0;
-      grad_coeff0_1_values[lane] = grad_coeff0_1;
-      grad_coeff0_2_values[lane] = grad_coeff0_2;
-      grad_coeff1_0_values[lane] = grad_coeff1_0;
-      grad_coeff1_1_values[lane] = grad_coeff1_1;
-      grad_coeff1_2_values[lane] = grad_coeff1_2;
-      grad_coeff2_0_values[lane] = grad_coeff2_0;
-      grad_coeff2_1_values[lane] = grad_coeff2_1;
-      grad_coeff2_2_values[lane] = grad_coeff2_2;
+      grad_coeff0_0_values[0] = grad_coeff0_0;
+      grad_coeff0_1_values[0] = grad_coeff0_1;
+      grad_coeff0_2_values[0] = grad_coeff0_2;
+      grad_coeff1_0_values[0] = grad_coeff1_0;
+      grad_coeff1_1_values[0] = grad_coeff1_1;
+      grad_coeff1_2_values[0] = grad_coeff1_2;
+      grad_coeff2_0_values[0] = grad_coeff2_0;
+      grad_coeff2_1_values[0] = grad_coeff2_1;
+      grad_coeff2_2_values[0] = grad_coeff2_2;
     }
     for (int test = 0; test < NS; ++test) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
+      {
+        const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
@@ -326,16 +309,16 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_res
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][lane] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
-        output[test * NC + 1][lane] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
-        output[test * NC + 2][lane] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+        output[test * NC][0] += q_weight[q] * det * (grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
+        output[test * NC + 1][0] += q_weight[q] * det * (grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC + 2][0] += q_weight[q] * det * (grad_coeff2_0_values[0] * test_grad0 + grad_coeff2_1_values[0] * test_grad1 + grad_coeff2_2_values[0] * test_grad2);
       }
     }
   }
 }
 
 template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_residual_block_contiguous(
+__host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
@@ -382,99 +365,86 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_res
     s_t grad_coeff2_0_values[VS];
     s_t grad_coeff2_1_values[VS];
     s_t grad_coeff2_2_values[VS];
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_grad_0_ref_values[lane] = s_t(0);
-      u0_grad_1_ref_values[lane] = s_t(0);
-      u0_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_grad_0_ref_values[0] = s_t(0);
+      u0_grad_1_ref_values[0] = s_t(0);
+      u0_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC][lane];
-        u0_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC][0];
+        u0_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_old_grad_0_ref_values[lane] = s_t(0);
-      u0_old_grad_1_ref_values[lane] = s_t(0);
-      u0_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_old_grad_0_ref_values[0] = s_t(0);
+      u0_old_grad_1_ref_values[0] = s_t(0);
+      u0_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC][lane];
-        u0_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC][0];
+        u0_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_grad_0_ref_values[lane] = s_t(0);
-      u1_grad_1_ref_values[lane] = s_t(0);
-      u1_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_grad_0_ref_values[0] = s_t(0);
+      u1_grad_1_ref_values[0] = s_t(0);
+      u1_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 1][lane];
-        u1_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC + 1][0];
+        u1_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_old_grad_0_ref_values[lane] = s_t(0);
-      u1_old_grad_1_ref_values[lane] = s_t(0);
-      u1_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_old_grad_0_ref_values[0] = s_t(0);
+      u1_old_grad_1_ref_values[0] = s_t(0);
+      u1_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 1][lane];
-        u1_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC + 1][0];
+        u1_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_grad_0_ref_values[lane] = s_t(0);
-      u2_grad_1_ref_values[lane] = s_t(0);
-      u2_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_grad_0_ref_values[0] = s_t(0);
+      u2_grad_1_ref_values[0] = s_t(0);
+      u2_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 2][lane];
-        u2_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC + 2][0];
+        u2_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_old_grad_0_ref_values[lane] = s_t(0);
-      u2_old_grad_1_ref_values[lane] = s_t(0);
-      u2_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_old_grad_0_ref_values[0] = s_t(0);
+      u2_old_grad_1_ref_values[0] = s_t(0);
+      u2_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 2][lane];
-        u2_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC + 2][0];
+        u2_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
@@ -485,39 +455,39 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_res
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_grad_0_ref = u0_grad_0_ref_values[lane];
-      const s_t u0_grad_1_ref = u0_grad_1_ref_values[lane];
-      const s_t u0_grad_2_ref = u0_grad_2_ref_values[lane];
+      const s_t u0_grad_0_ref = u0_grad_0_ref_values[0];
+      const s_t u0_grad_1_ref = u0_grad_1_ref_values[0];
+      const s_t u0_grad_2_ref = u0_grad_2_ref_values[0];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
       const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[lane];
-      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[lane];
-      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[lane];
+      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[0];
+      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[0];
+      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[0];
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
       const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-      const s_t u1_grad_0_ref = u1_grad_0_ref_values[lane];
-      const s_t u1_grad_1_ref = u1_grad_1_ref_values[lane];
-      const s_t u1_grad_2_ref = u1_grad_2_ref_values[lane];
+      const s_t u1_grad_0_ref = u1_grad_0_ref_values[0];
+      const s_t u1_grad_1_ref = u1_grad_1_ref_values[0];
+      const s_t u1_grad_2_ref = u1_grad_2_ref_values[0];
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
       const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[lane];
-      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[lane];
-      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[lane];
+      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[0];
+      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[0];
+      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[0];
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
       const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-      const s_t u2_grad_0_ref = u2_grad_0_ref_values[lane];
-      const s_t u2_grad_1_ref = u2_grad_1_ref_values[lane];
-      const s_t u2_grad_2_ref = u2_grad_2_ref_values[lane];
+      const s_t u2_grad_0_ref = u2_grad_0_ref_values[0];
+      const s_t u2_grad_1_ref = u2_grad_1_ref_values[0];
+      const s_t u2_grad_2_ref = u2_grad_2_ref_values[0];
       const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
       const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[lane];
-      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[lane];
-      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[lane];
+      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[0];
+      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[0];
+      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[0];
       const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
       const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
       const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
@@ -600,20 +570,19 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_res
       const s_t grad_coeff2_0 = mu*(s_t(6)*residual_tmp1*u0_grad_2 - residual_tmp11*residual_tmp62 + s_t(2)*residual_tmp15*u2_grad_0 - s_t(6)*residual_tmp23 - residual_tmp67*residual_tmp7 - residual_tmp68*residual_tmp9 + s_t(2)*u2_grad_0) + residual_tmp22*(-eta_s*(residual_tmp20*residual_tmp38 - residual_tmp39*residual_tmp65) + ((s_t(1) / s_t(3)))*residual_tmp24*residual_tmp69) + residual_tmp6*(-residual_tmp1*residual_tmp10 + s_t(2)*residual_tmp23);
       const s_t grad_coeff2_1 = mu*(-residual_tmp13*residual_tmp67 + s_t(2)*residual_tmp15*u2_grad_1 - s_t(6)*residual_tmp27 + s_t(6)*residual_tmp5*u1_grad_2 - residual_tmp61*residual_tmp68 - residual_tmp62*residual_tmp7 + s_t(2)*u2_grad_1) + residual_tmp22*(-eta_s*(-residual_tmp31*residual_tmp38 + residual_tmp43*residual_tmp65) + ((s_t(1) / s_t(3)))*residual_tmp28*residual_tmp69) + residual_tmp6*(s_t(2)*residual_tmp27 - residual_tmp5*residual_tmp63);
       const s_t grad_coeff2_2 = mu*(-s_t(6)*residual_tmp1*residual_tmp5 - residual_tmp14*residual_tmp68 + residual_tmp15*residual_tmp68 + s_t(6)*residual_tmp3 - residual_tmp61*residual_tmp67 - residual_tmp62*residual_tmp9 + s_t(2)*u2_grad_2 + s_t(2)) + residual_tmp22*(eta_s*(residual_tmp34*residual_tmp38 + residual_tmp40*residual_tmp65) - (s_t(1) / s_t(3))*residual_tmp36*residual_tmp69) + residual_tmp6*(s_t(2)*residual_tmp1*residual_tmp5 - s_t(2)*residual_tmp3);
-      grad_coeff0_0_values[lane] = grad_coeff0_0;
-      grad_coeff0_1_values[lane] = grad_coeff0_1;
-      grad_coeff0_2_values[lane] = grad_coeff0_2;
-      grad_coeff1_0_values[lane] = grad_coeff1_0;
-      grad_coeff1_1_values[lane] = grad_coeff1_1;
-      grad_coeff1_2_values[lane] = grad_coeff1_2;
-      grad_coeff2_0_values[lane] = grad_coeff2_0;
-      grad_coeff2_1_values[lane] = grad_coeff2_1;
-      grad_coeff2_2_values[lane] = grad_coeff2_2;
+      grad_coeff0_0_values[0] = grad_coeff0_0;
+      grad_coeff0_1_values[0] = grad_coeff0_1;
+      grad_coeff0_2_values[0] = grad_coeff0_2;
+      grad_coeff1_0_values[0] = grad_coeff1_0;
+      grad_coeff1_1_values[0] = grad_coeff1_1;
+      grad_coeff1_2_values[0] = grad_coeff1_2;
+      grad_coeff2_0_values[0] = grad_coeff2_0;
+      grad_coeff2_1_values[0] = grad_coeff2_1;
+      grad_coeff2_2_values[0] = grad_coeff2_2;
     }
     for (int test = 0; test < NS; ++test) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
+      {
+        const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
@@ -627,16 +596,16 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_res
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][lane] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
-        output[test * NC + 1][lane] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
-        output[test * NC + 2][lane] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+        output[test * NC][0] += q_weight[q] * det * (grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
+        output[test * NC + 1][0] += q_weight[q] * det * (grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC + 2][0] += q_weight[q] * det * (grad_coeff2_0_values[0] * test_grad0 + grad_coeff2_1_values[0] * test_grad1 + grad_coeff2_2_values[0] * test_grad2);
       }
     }
   }
 }
 
 template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet4_residual_block(
+__host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_residual_block(
     const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
@@ -652,9 +621,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
     s_t *const RSTR output[3 * NS]
 ) {
   for (int q = 0; q < NQ; ++q) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
@@ -665,39 +633,39 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_grad_0_ref = -(current[0][lane]) + current[3][lane];
-      const s_t u0_grad_1_ref = -(current[0][lane]) + current[6][lane];
-      const s_t u0_grad_2_ref = -(current[0][lane]) + current[9][lane];
+      const s_t u0_grad_0_ref = -(current[0][0]) + current[3][0];
+      const s_t u0_grad_1_ref = -(current[0][0]) + current[6][0];
+      const s_t u0_grad_2_ref = -(current[0][0]) + current[9][0];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
       const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-      const s_t u0_old_grad_0_ref = -(previous[0][lane]) + previous[3][lane];
-      const s_t u0_old_grad_1_ref = -(previous[0][lane]) + previous[6][lane];
-      const s_t u0_old_grad_2_ref = -(previous[0][lane]) + previous[9][lane];
+      const s_t u0_old_grad_0_ref = -(previous[0][0]) + previous[3][0];
+      const s_t u0_old_grad_1_ref = -(previous[0][0]) + previous[6][0];
+      const s_t u0_old_grad_2_ref = -(previous[0][0]) + previous[9][0];
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
       const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-      const s_t u1_grad_0_ref = -(current[1][lane]) + current[4][lane];
-      const s_t u1_grad_1_ref = -(current[1][lane]) + current[7][lane];
-      const s_t u1_grad_2_ref = -(current[1][lane]) + current[10][lane];
+      const s_t u1_grad_0_ref = -(current[1][0]) + current[4][0];
+      const s_t u1_grad_1_ref = -(current[1][0]) + current[7][0];
+      const s_t u1_grad_2_ref = -(current[1][0]) + current[10][0];
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
       const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-      const s_t u1_old_grad_0_ref = -(previous[1][lane]) + previous[4][lane];
-      const s_t u1_old_grad_1_ref = -(previous[1][lane]) + previous[7][lane];
-      const s_t u1_old_grad_2_ref = -(previous[1][lane]) + previous[10][lane];
+      const s_t u1_old_grad_0_ref = -(previous[1][0]) + previous[4][0];
+      const s_t u1_old_grad_1_ref = -(previous[1][0]) + previous[7][0];
+      const s_t u1_old_grad_2_ref = -(previous[1][0]) + previous[10][0];
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
       const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-      const s_t u2_grad_0_ref = -(current[2][lane]) + current[5][lane];
-      const s_t u2_grad_1_ref = -(current[2][lane]) + current[8][lane];
-      const s_t u2_grad_2_ref = -(current[2][lane]) + current[11][lane];
+      const s_t u2_grad_0_ref = -(current[2][0]) + current[5][0];
+      const s_t u2_grad_1_ref = -(current[2][0]) + current[8][0];
+      const s_t u2_grad_2_ref = -(current[2][0]) + current[11][0];
       const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
       const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-      const s_t u2_old_grad_0_ref = -(previous[2][lane]) + previous[5][lane];
-      const s_t u2_old_grad_1_ref = -(previous[2][lane]) + previous[8][lane];
-      const s_t u2_old_grad_2_ref = -(previous[2][lane]) + previous[11][lane];
+      const s_t u2_old_grad_0_ref = -(previous[2][0]) + previous[5][0];
+      const s_t u2_old_grad_1_ref = -(previous[2][0]) + previous[8][0];
+      const s_t u2_old_grad_2_ref = -(previous[2][0]) + previous[11][0];
       const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
       const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
       const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
@@ -801,24 +769,24 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
       const s_t test3_grad0 = (adj6) / det;
       const s_t test3_grad1 = (adj7) / det;
       const s_t test3_grad2 = (adj8) / det;
-      output[0][lane] += q_weight[q] * det * (grad_coeff0_0_value * test0_grad0 + grad_coeff0_1_value * test0_grad1 + grad_coeff0_2_value * test0_grad2);
-      output[1][lane] += q_weight[q] * det * (grad_coeff1_0_value * test0_grad0 + grad_coeff1_1_value * test0_grad1 + grad_coeff1_2_value * test0_grad2);
-      output[2][lane] += q_weight[q] * det * (grad_coeff2_0_value * test0_grad0 + grad_coeff2_1_value * test0_grad1 + grad_coeff2_2_value * test0_grad2);
-      output[3][lane] += q_weight[q] * det * (grad_coeff0_0_value * test1_grad0 + grad_coeff0_1_value * test1_grad1 + grad_coeff0_2_value * test1_grad2);
-      output[4][lane] += q_weight[q] * det * (grad_coeff1_0_value * test1_grad0 + grad_coeff1_1_value * test1_grad1 + grad_coeff1_2_value * test1_grad2);
-      output[5][lane] += q_weight[q] * det * (grad_coeff2_0_value * test1_grad0 + grad_coeff2_1_value * test1_grad1 + grad_coeff2_2_value * test1_grad2);
-      output[6][lane] += q_weight[q] * det * (grad_coeff0_0_value * test2_grad0 + grad_coeff0_1_value * test2_grad1 + grad_coeff0_2_value * test2_grad2);
-      output[7][lane] += q_weight[q] * det * (grad_coeff1_0_value * test2_grad0 + grad_coeff1_1_value * test2_grad1 + grad_coeff1_2_value * test2_grad2);
-      output[8][lane] += q_weight[q] * det * (grad_coeff2_0_value * test2_grad0 + grad_coeff2_1_value * test2_grad1 + grad_coeff2_2_value * test2_grad2);
-      output[9][lane] += q_weight[q] * det * (grad_coeff0_0_value * test3_grad0 + grad_coeff0_1_value * test3_grad1 + grad_coeff0_2_value * test3_grad2);
-      output[10][lane] += q_weight[q] * det * (grad_coeff1_0_value * test3_grad0 + grad_coeff1_1_value * test3_grad1 + grad_coeff1_2_value * test3_grad2);
-      output[11][lane] += q_weight[q] * det * (grad_coeff2_0_value * test3_grad0 + grad_coeff2_1_value * test3_grad1 + grad_coeff2_2_value * test3_grad2);
+      output[0][0] += q_weight[q] * det * (grad_coeff0_0_value * test0_grad0 + grad_coeff0_1_value * test0_grad1 + grad_coeff0_2_value * test0_grad2);
+      output[1][0] += q_weight[q] * det * (grad_coeff1_0_value * test0_grad0 + grad_coeff1_1_value * test0_grad1 + grad_coeff1_2_value * test0_grad2);
+      output[2][0] += q_weight[q] * det * (grad_coeff2_0_value * test0_grad0 + grad_coeff2_1_value * test0_grad1 + grad_coeff2_2_value * test0_grad2);
+      output[3][0] += q_weight[q] * det * (grad_coeff0_0_value * test1_grad0 + grad_coeff0_1_value * test1_grad1 + grad_coeff0_2_value * test1_grad2);
+      output[4][0] += q_weight[q] * det * (grad_coeff1_0_value * test1_grad0 + grad_coeff1_1_value * test1_grad1 + grad_coeff1_2_value * test1_grad2);
+      output[5][0] += q_weight[q] * det * (grad_coeff2_0_value * test1_grad0 + grad_coeff2_1_value * test1_grad1 + grad_coeff2_2_value * test1_grad2);
+      output[6][0] += q_weight[q] * det * (grad_coeff0_0_value * test2_grad0 + grad_coeff0_1_value * test2_grad1 + grad_coeff0_2_value * test2_grad2);
+      output[7][0] += q_weight[q] * det * (grad_coeff1_0_value * test2_grad0 + grad_coeff1_1_value * test2_grad1 + grad_coeff1_2_value * test2_grad2);
+      output[8][0] += q_weight[q] * det * (grad_coeff2_0_value * test2_grad0 + grad_coeff2_1_value * test2_grad1 + grad_coeff2_2_value * test2_grad2);
+      output[9][0] += q_weight[q] * det * (grad_coeff0_0_value * test3_grad0 + grad_coeff0_1_value * test3_grad1 + grad_coeff0_2_value * test3_grad2);
+      output[10][0] += q_weight[q] * det * (grad_coeff1_0_value * test3_grad0 + grad_coeff1_1_value * test3_grad1 + grad_coeff1_2_value * test3_grad2);
+      output[11][0] += q_weight[q] * det * (grad_coeff2_0_value * test3_grad0 + grad_coeff2_1_value * test3_grad1 + grad_coeff2_2_value * test3_grad2);
     }
   }
 }
 
 template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet4_residual_block_contiguous(
+__host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_residual_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
@@ -834,9 +802,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
     s_t output[3 * NS][VS]
 ) {
   for (int q = 0; q < NQ; ++q) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
@@ -847,39 +814,39 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_grad_0_ref = -(current[0][lane]) + current[3][lane];
-      const s_t u0_grad_1_ref = -(current[0][lane]) + current[6][lane];
-      const s_t u0_grad_2_ref = -(current[0][lane]) + current[9][lane];
+      const s_t u0_grad_0_ref = -(current[0][0]) + current[3][0];
+      const s_t u0_grad_1_ref = -(current[0][0]) + current[6][0];
+      const s_t u0_grad_2_ref = -(current[0][0]) + current[9][0];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
       const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-      const s_t u0_old_grad_0_ref = -(previous[0][lane]) + previous[3][lane];
-      const s_t u0_old_grad_1_ref = -(previous[0][lane]) + previous[6][lane];
-      const s_t u0_old_grad_2_ref = -(previous[0][lane]) + previous[9][lane];
+      const s_t u0_old_grad_0_ref = -(previous[0][0]) + previous[3][0];
+      const s_t u0_old_grad_1_ref = -(previous[0][0]) + previous[6][0];
+      const s_t u0_old_grad_2_ref = -(previous[0][0]) + previous[9][0];
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
       const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-      const s_t u1_grad_0_ref = -(current[1][lane]) + current[4][lane];
-      const s_t u1_grad_1_ref = -(current[1][lane]) + current[7][lane];
-      const s_t u1_grad_2_ref = -(current[1][lane]) + current[10][lane];
+      const s_t u1_grad_0_ref = -(current[1][0]) + current[4][0];
+      const s_t u1_grad_1_ref = -(current[1][0]) + current[7][0];
+      const s_t u1_grad_2_ref = -(current[1][0]) + current[10][0];
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
       const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-      const s_t u1_old_grad_0_ref = -(previous[1][lane]) + previous[4][lane];
-      const s_t u1_old_grad_1_ref = -(previous[1][lane]) + previous[7][lane];
-      const s_t u1_old_grad_2_ref = -(previous[1][lane]) + previous[10][lane];
+      const s_t u1_old_grad_0_ref = -(previous[1][0]) + previous[4][0];
+      const s_t u1_old_grad_1_ref = -(previous[1][0]) + previous[7][0];
+      const s_t u1_old_grad_2_ref = -(previous[1][0]) + previous[10][0];
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
       const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-      const s_t u2_grad_0_ref = -(current[2][lane]) + current[5][lane];
-      const s_t u2_grad_1_ref = -(current[2][lane]) + current[8][lane];
-      const s_t u2_grad_2_ref = -(current[2][lane]) + current[11][lane];
+      const s_t u2_grad_0_ref = -(current[2][0]) + current[5][0];
+      const s_t u2_grad_1_ref = -(current[2][0]) + current[8][0];
+      const s_t u2_grad_2_ref = -(current[2][0]) + current[11][0];
       const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
       const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-      const s_t u2_old_grad_0_ref = -(previous[2][lane]) + previous[5][lane];
-      const s_t u2_old_grad_1_ref = -(previous[2][lane]) + previous[8][lane];
-      const s_t u2_old_grad_2_ref = -(previous[2][lane]) + previous[11][lane];
+      const s_t u2_old_grad_0_ref = -(previous[2][0]) + previous[5][0];
+      const s_t u2_old_grad_1_ref = -(previous[2][0]) + previous[8][0];
+      const s_t u2_old_grad_2_ref = -(previous[2][0]) + previous[11][0];
       const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
       const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
       const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
@@ -983,24 +950,24 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
       const s_t test3_grad0 = (adj6) / det;
       const s_t test3_grad1 = (adj7) / det;
       const s_t test3_grad2 = (adj8) / det;
-      output[0][lane] += q_weight[q] * det * (grad_coeff0_0_value * test0_grad0 + grad_coeff0_1_value * test0_grad1 + grad_coeff0_2_value * test0_grad2);
-      output[1][lane] += q_weight[q] * det * (grad_coeff1_0_value * test0_grad0 + grad_coeff1_1_value * test0_grad1 + grad_coeff1_2_value * test0_grad2);
-      output[2][lane] += q_weight[q] * det * (grad_coeff2_0_value * test0_grad0 + grad_coeff2_1_value * test0_grad1 + grad_coeff2_2_value * test0_grad2);
-      output[3][lane] += q_weight[q] * det * (grad_coeff0_0_value * test1_grad0 + grad_coeff0_1_value * test1_grad1 + grad_coeff0_2_value * test1_grad2);
-      output[4][lane] += q_weight[q] * det * (grad_coeff1_0_value * test1_grad0 + grad_coeff1_1_value * test1_grad1 + grad_coeff1_2_value * test1_grad2);
-      output[5][lane] += q_weight[q] * det * (grad_coeff2_0_value * test1_grad0 + grad_coeff2_1_value * test1_grad1 + grad_coeff2_2_value * test1_grad2);
-      output[6][lane] += q_weight[q] * det * (grad_coeff0_0_value * test2_grad0 + grad_coeff0_1_value * test2_grad1 + grad_coeff0_2_value * test2_grad2);
-      output[7][lane] += q_weight[q] * det * (grad_coeff1_0_value * test2_grad0 + grad_coeff1_1_value * test2_grad1 + grad_coeff1_2_value * test2_grad2);
-      output[8][lane] += q_weight[q] * det * (grad_coeff2_0_value * test2_grad0 + grad_coeff2_1_value * test2_grad1 + grad_coeff2_2_value * test2_grad2);
-      output[9][lane] += q_weight[q] * det * (grad_coeff0_0_value * test3_grad0 + grad_coeff0_1_value * test3_grad1 + grad_coeff0_2_value * test3_grad2);
-      output[10][lane] += q_weight[q] * det * (grad_coeff1_0_value * test3_grad0 + grad_coeff1_1_value * test3_grad1 + grad_coeff1_2_value * test3_grad2);
-      output[11][lane] += q_weight[q] * det * (grad_coeff2_0_value * test3_grad0 + grad_coeff2_1_value * test3_grad1 + grad_coeff2_2_value * test3_grad2);
+      output[0][0] += q_weight[q] * det * (grad_coeff0_0_value * test0_grad0 + grad_coeff0_1_value * test0_grad1 + grad_coeff0_2_value * test0_grad2);
+      output[1][0] += q_weight[q] * det * (grad_coeff1_0_value * test0_grad0 + grad_coeff1_1_value * test0_grad1 + grad_coeff1_2_value * test0_grad2);
+      output[2][0] += q_weight[q] * det * (grad_coeff2_0_value * test0_grad0 + grad_coeff2_1_value * test0_grad1 + grad_coeff2_2_value * test0_grad2);
+      output[3][0] += q_weight[q] * det * (grad_coeff0_0_value * test1_grad0 + grad_coeff0_1_value * test1_grad1 + grad_coeff0_2_value * test1_grad2);
+      output[4][0] += q_weight[q] * det * (grad_coeff1_0_value * test1_grad0 + grad_coeff1_1_value * test1_grad1 + grad_coeff1_2_value * test1_grad2);
+      output[5][0] += q_weight[q] * det * (grad_coeff2_0_value * test1_grad0 + grad_coeff2_1_value * test1_grad1 + grad_coeff2_2_value * test1_grad2);
+      output[6][0] += q_weight[q] * det * (grad_coeff0_0_value * test2_grad0 + grad_coeff0_1_value * test2_grad1 + grad_coeff0_2_value * test2_grad2);
+      output[7][0] += q_weight[q] * det * (grad_coeff1_0_value * test2_grad0 + grad_coeff1_1_value * test2_grad1 + grad_coeff1_2_value * test2_grad2);
+      output[8][0] += q_weight[q] * det * (grad_coeff2_0_value * test2_grad0 + grad_coeff2_1_value * test2_grad1 + grad_coeff2_2_value * test2_grad2);
+      output[9][0] += q_weight[q] * det * (grad_coeff0_0_value * test3_grad0 + grad_coeff0_1_value * test3_grad1 + grad_coeff0_2_value * test3_grad2);
+      output[10][0] += q_weight[q] * det * (grad_coeff1_0_value * test3_grad0 + grad_coeff1_1_value * test3_grad1 + grad_coeff1_2_value * test3_grad2);
+      output[11][0] += q_weight[q] * det * (grad_coeff2_0_value * test3_grad0 + grad_coeff2_1_value * test3_grad1 + grad_coeff2_2_value * test3_grad2);
     }
   }
 }
 
 template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jacobian_action_block(
+__host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
@@ -1057,144 +1024,125 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jac
     s_t grad_coeff2_0_values[VS];
     s_t grad_coeff2_1_values[VS];
     s_t grad_coeff2_2_values[VS];
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_grad_0_ref_values[lane] = s_t(0);
-      u0_grad_1_ref_values[lane] = s_t(0);
-      u0_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_grad_0_ref_values[0] = s_t(0);
+      u0_grad_1_ref_values[0] = s_t(0);
+      u0_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC][lane];
-        u0_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC][0];
+        u0_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_old_grad_0_ref_values[lane] = s_t(0);
-      u0_old_grad_1_ref_values[lane] = s_t(0);
-      u0_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_old_grad_0_ref_values[0] = s_t(0);
+      u0_old_grad_1_ref_values[0] = s_t(0);
+      u0_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC][lane];
-        u0_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC][0];
+        u0_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_direction_grad_0_ref_values[lane] = s_t(0);
-      u0_direction_grad_1_ref_values[lane] = s_t(0);
-      u0_direction_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_direction_grad_0_ref_values[0] = s_t(0);
+      u0_direction_grad_1_ref_values[0] = s_t(0);
+      u0_direction_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = direction[trial * NC][lane];
-        u0_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_direction_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_direction_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = direction[trial * NC][0];
+        u0_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_grad_0_ref_values[lane] = s_t(0);
-      u1_grad_1_ref_values[lane] = s_t(0);
-      u1_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_grad_0_ref_values[0] = s_t(0);
+      u1_grad_1_ref_values[0] = s_t(0);
+      u1_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 1][lane];
-        u1_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC + 1][0];
+        u1_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_old_grad_0_ref_values[lane] = s_t(0);
-      u1_old_grad_1_ref_values[lane] = s_t(0);
-      u1_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_old_grad_0_ref_values[0] = s_t(0);
+      u1_old_grad_1_ref_values[0] = s_t(0);
+      u1_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 1][lane];
-        u1_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC + 1][0];
+        u1_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_direction_grad_0_ref_values[lane] = s_t(0);
-      u1_direction_grad_1_ref_values[lane] = s_t(0);
-      u1_direction_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_direction_grad_0_ref_values[0] = s_t(0);
+      u1_direction_grad_1_ref_values[0] = s_t(0);
+      u1_direction_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = direction[trial * NC + 1][lane];
-        u1_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_direction_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_direction_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = direction[trial * NC + 1][0];
+        u1_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_grad_0_ref_values[lane] = s_t(0);
-      u2_grad_1_ref_values[lane] = s_t(0);
-      u2_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_grad_0_ref_values[0] = s_t(0);
+      u2_grad_1_ref_values[0] = s_t(0);
+      u2_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 2][lane];
-        u2_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC + 2][0];
+        u2_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_old_grad_0_ref_values[lane] = s_t(0);
-      u2_old_grad_1_ref_values[lane] = s_t(0);
-      u2_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_old_grad_0_ref_values[0] = s_t(0);
+      u2_old_grad_1_ref_values[0] = s_t(0);
+      u2_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 2][lane];
-        u2_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC + 2][0];
+        u2_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_direction_grad_0_ref_values[lane] = s_t(0);
-      u2_direction_grad_1_ref_values[lane] = s_t(0);
-      u2_direction_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_direction_grad_0_ref_values[0] = s_t(0);
+      u2_direction_grad_1_ref_values[0] = s_t(0);
+      u2_direction_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = direction[trial * NC + 2][lane];
-        u2_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_direction_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_direction_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = direction[trial * NC + 2][0];
+        u2_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
@@ -1205,57 +1153,57 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jac
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_grad_0_ref = u0_grad_0_ref_values[lane];
-      const s_t u0_grad_1_ref = u0_grad_1_ref_values[lane];
-      const s_t u0_grad_2_ref = u0_grad_2_ref_values[lane];
+      const s_t u0_grad_0_ref = u0_grad_0_ref_values[0];
+      const s_t u0_grad_1_ref = u0_grad_1_ref_values[0];
+      const s_t u0_grad_2_ref = u0_grad_2_ref_values[0];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
       const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[lane];
-      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[lane];
-      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[lane];
+      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[0];
+      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[0];
+      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[0];
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
       const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-      const s_t u0_direction_grad_0_ref = u0_direction_grad_0_ref_values[lane];
-      const s_t u0_direction_grad_1_ref = u0_direction_grad_1_ref_values[lane];
-      const s_t u0_direction_grad_2_ref = u0_direction_grad_2_ref_values[lane];
+      const s_t u0_direction_grad_0_ref = u0_direction_grad_0_ref_values[0];
+      const s_t u0_direction_grad_1_ref = u0_direction_grad_1_ref_values[0];
+      const s_t u0_direction_grad_2_ref = u0_direction_grad_2_ref_values[0];
       const s_t u0_direction_grad_0 = (u0_direction_grad_0_ref * adj0 + u0_direction_grad_1_ref * adj3 + u0_direction_grad_2_ref * adj6) / det;
       const s_t u0_direction_grad_1 = (u0_direction_grad_0_ref * adj1 + u0_direction_grad_1_ref * adj4 + u0_direction_grad_2_ref * adj7) / det;
       const s_t u0_direction_grad_2 = (u0_direction_grad_0_ref * adj2 + u0_direction_grad_1_ref * adj5 + u0_direction_grad_2_ref * adj8) / det;
-      const s_t u1_grad_0_ref = u1_grad_0_ref_values[lane];
-      const s_t u1_grad_1_ref = u1_grad_1_ref_values[lane];
-      const s_t u1_grad_2_ref = u1_grad_2_ref_values[lane];
+      const s_t u1_grad_0_ref = u1_grad_0_ref_values[0];
+      const s_t u1_grad_1_ref = u1_grad_1_ref_values[0];
+      const s_t u1_grad_2_ref = u1_grad_2_ref_values[0];
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
       const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[lane];
-      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[lane];
-      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[lane];
+      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[0];
+      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[0];
+      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[0];
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
       const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-      const s_t u1_direction_grad_0_ref = u1_direction_grad_0_ref_values[lane];
-      const s_t u1_direction_grad_1_ref = u1_direction_grad_1_ref_values[lane];
-      const s_t u1_direction_grad_2_ref = u1_direction_grad_2_ref_values[lane];
+      const s_t u1_direction_grad_0_ref = u1_direction_grad_0_ref_values[0];
+      const s_t u1_direction_grad_1_ref = u1_direction_grad_1_ref_values[0];
+      const s_t u1_direction_grad_2_ref = u1_direction_grad_2_ref_values[0];
       const s_t u1_direction_grad_0 = (u1_direction_grad_0_ref * adj0 + u1_direction_grad_1_ref * adj3 + u1_direction_grad_2_ref * adj6) / det;
       const s_t u1_direction_grad_1 = (u1_direction_grad_0_ref * adj1 + u1_direction_grad_1_ref * adj4 + u1_direction_grad_2_ref * adj7) / det;
       const s_t u1_direction_grad_2 = (u1_direction_grad_0_ref * adj2 + u1_direction_grad_1_ref * adj5 + u1_direction_grad_2_ref * adj8) / det;
-      const s_t u2_grad_0_ref = u2_grad_0_ref_values[lane];
-      const s_t u2_grad_1_ref = u2_grad_1_ref_values[lane];
-      const s_t u2_grad_2_ref = u2_grad_2_ref_values[lane];
+      const s_t u2_grad_0_ref = u2_grad_0_ref_values[0];
+      const s_t u2_grad_1_ref = u2_grad_1_ref_values[0];
+      const s_t u2_grad_2_ref = u2_grad_2_ref_values[0];
       const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
       const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[lane];
-      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[lane];
-      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[lane];
+      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[0];
+      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[0];
+      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[0];
       const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
       const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
       const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
-      const s_t u2_direction_grad_0_ref = u2_direction_grad_0_ref_values[lane];
-      const s_t u2_direction_grad_1_ref = u2_direction_grad_1_ref_values[lane];
-      const s_t u2_direction_grad_2_ref = u2_direction_grad_2_ref_values[lane];
+      const s_t u2_direction_grad_0_ref = u2_direction_grad_0_ref_values[0];
+      const s_t u2_direction_grad_1_ref = u2_direction_grad_1_ref_values[0];
+      const s_t u2_direction_grad_2_ref = u2_direction_grad_2_ref_values[0];
       const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
       const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
@@ -1705,20 +1653,19 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jac
       const s_t grad_coeff2_0 = u0_direction_grad_0*(residual_tmp112*residual_tmp400 + residual_tmp121*residual_tmp403 + residual_tmp24*(-eta_s*(residual_tmp114*residual_tmp20 - residual_tmp25*residual_tmp334) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp407) + residual_tmp88) + u0_direction_grad_1*(residual_tmp128*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp144*residual_tmp20 - residual_tmp25*residual_tmp365 - residual_tmp415) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp414 - residual_tmp417) + residual_tmp289 + residual_tmp403*residual_tmp60) + u0_direction_grad_2*(residual_tmp157*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp178*residual_tmp20 - residual_tmp25*residual_tmp353 + residual_tmp422) + residual_tmp2*residual_tmp416 + residual_tmp420*residual_tmp421) + residual_tmp313 + residual_tmp403*residual_tmp62) + u1_direction_grad_0*(residual_tmp10*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp41 - residual_tmp25*residual_tmp332) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp401) + residual_tmp25*residual_tmp403 + residual_tmp319) + u1_direction_grad_1*(mu*(residual_tmp122*residual_tmp222 + residual_tmp387) + residual_tmp226*residual_tmp400 + residual_tmp230*residual_tmp403 + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp240 - residual_tmp25*residual_tmp350 + residual_tmp424) + residual_tmp421*residual_tmp423 + residual_tmp425) + residual_tmp388) + u1_direction_grad_2*(residual_tmp188*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp202 - residual_tmp25*residual_tmp341 - residual_tmp419) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp418 - residual_tmp416*u0_grad_1) + residual_tmp397 + residual_tmp403*residual_tmp67) + u2_direction_grad_0*(mu*(residual_tmp404 + residual_tmp405) + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp94 - residual_tmp25*residual_tmp322) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp406) + residual_tmp33*residual_tmp403 + residual_tmp400*residual_tmp90) + u2_direction_grad_1*(residual_tmp208*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp217 - residual_tmp25*residual_tmp358 + residual_tmp410) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp409) + residual_tmp403*residual_tmp57 + residual_tmp408) + u2_direction_grad_2*(mu*(s_t(2)*residual_tmp227*u2_grad_0 - residual_tmp411*u2_grad_0 - residual_tmp412) + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp254 - residual_tmp25*residual_tmp372 - residual_tmp306 - residual_tmp342) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp413) + residual_tmp245*residual_tmp400 + residual_tmp247*residual_tmp403);
       const s_t grad_coeff2_1 = u0_direction_grad_0*(mu*(residual_tmp207 + residual_tmp271*residual_tmp278) + residual_tmp112*residual_tmp426 + residual_tmp121*residual_tmp427 + residual_tmp210 + residual_tmp24*(-eta_s*(-residual_tmp114*residual_tmp60 + residual_tmp334*residual_tmp68 + residual_tmp415) + residual_tmp407*residual_tmp431 + residual_tmp417)) + u0_direction_grad_1*(residual_tmp128*residual_tmp426 + residual_tmp24*(-eta_s*(-residual_tmp144*residual_tmp60 + residual_tmp365*residual_tmp68) + ((s_t(1) / s_t(3)))*residual_tmp414*residual_tmp57) + residual_tmp259 + residual_tmp427*residual_tmp60) + u0_direction_grad_2*(residual_tmp157*residual_tmp426 + residual_tmp24*(-eta_s*(-residual_tmp178*residual_tmp60 + residual_tmp353*residual_tmp68 - residual_tmp430) - residual_tmp416*u1_grad_0 + ((s_t(1) / s_t(3)))*residual_tmp420*residual_tmp57) + residual_tmp308 + residual_tmp427*residual_tmp62) + u1_direction_grad_0*(residual_tmp10*residual_tmp426 + residual_tmp24*(-eta_s*(residual_tmp332*residual_tmp68 - residual_tmp41*residual_tmp60 - residual_tmp424) + ((s_t(1) / s_t(3)))*residual_tmp401*residual_tmp57 - residual_tmp425) + residual_tmp25*residual_tmp427 + residual_tmp362) + u1_direction_grad_1*(residual_tmp226*residual_tmp426 + residual_tmp230*residual_tmp427 + residual_tmp24*(-eta_s*(-residual_tmp240*residual_tmp60 + residual_tmp350*residual_tmp68) + ((s_t(1) / s_t(3)))*residual_tmp423*residual_tmp57) + residual_tmp380) + u1_direction_grad_2*(residual_tmp188*residual_tmp426 + residual_tmp24*(-eta_s*(-residual_tmp202*residual_tmp60 + residual_tmp341*residual_tmp68 + residual_tmp432) + residual_tmp182*residual_tmp416 + residual_tmp418*residual_tmp431) + residual_tmp399 + residual_tmp427*residual_tmp67) + u2_direction_grad_0*(residual_tmp24*(-eta_s*(residual_tmp322*residual_tmp68 - residual_tmp410 - residual_tmp60*residual_tmp94) + ((s_t(1) / s_t(3)))*residual_tmp406*residual_tmp57) + residual_tmp33*residual_tmp427 + residual_tmp408 + residual_tmp426*residual_tmp90) + u2_direction_grad_1*(mu*(residual_tmp404 + residual_tmp428) + residual_tmp208*residual_tmp426 + residual_tmp24*(-eta_s*(-residual_tmp217*residual_tmp60 + residual_tmp358*residual_tmp68) + ((s_t(1) / s_t(3)))*residual_tmp409*residual_tmp57) + residual_tmp427*residual_tmp57) + u2_direction_grad_2*(mu*(s_t(2)*residual_tmp227*u2_grad_1 - residual_tmp411*u2_grad_1 - residual_tmp429) + residual_tmp24*(-eta_s*(-residual_tmp254*residual_tmp60 - residual_tmp274 + residual_tmp372*residual_tmp68 - residual_tmp396) + ((s_t(1) / s_t(3)))*residual_tmp413*residual_tmp57) + residual_tmp245*residual_tmp426 + residual_tmp247*residual_tmp427);
       const s_t grad_coeff2_2 = u0_direction_grad_0*(mu*(-residual_tmp244 + s_t(2)*residual_tmp278*residual_tmp8) + residual_tmp112*residual_tmp433 + residual_tmp121*residual_tmp436 + residual_tmp24*(eta_s*(residual_tmp114*residual_tmp62 + residual_tmp334*residual_tmp67 + residual_tmp422) + residual_tmp2*residual_tmp435 - residual_tmp407*residual_tmp434) + residual_tmp246) + u0_direction_grad_1*(mu*(residual_tmp295 + s_t(4)*residual_tmp9) + residual_tmp128*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp144*residual_tmp62 + residual_tmp365*residual_tmp67 - residual_tmp430) - residual_tmp414*residual_tmp434 - residual_tmp435*u1_grad_0) + residual_tmp297 + residual_tmp436*residual_tmp60) + u0_direction_grad_2*(residual_tmp157*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp178*residual_tmp62 + residual_tmp353*residual_tmp67) - residual_tmp420*residual_tmp434) + residual_tmp305 + residual_tmp436*residual_tmp62) + u1_direction_grad_0*(mu*(s_t(4)*residual_tmp127 + residual_tmp368) + residual_tmp10*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp332*residual_tmp67 + residual_tmp41*residual_tmp62 - residual_tmp419) - residual_tmp401*residual_tmp434 - residual_tmp435*u0_grad_1) + residual_tmp25*residual_tmp436 + residual_tmp370) + u1_direction_grad_1*(mu*(s_t(2)*residual_tmp222*residual_tmp8 - residual_tmp390) + residual_tmp226*residual_tmp433 + residual_tmp230*residual_tmp436 + residual_tmp24*(eta_s*(residual_tmp240*residual_tmp62 + residual_tmp350*residual_tmp67 + residual_tmp432) + residual_tmp182*residual_tmp435 - residual_tmp423*residual_tmp434) + residual_tmp391) + u1_direction_grad_2*(residual_tmp188*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp202*residual_tmp62 + residual_tmp341*residual_tmp67) - residual_tmp418*residual_tmp434) + residual_tmp395 + residual_tmp436*residual_tmp67) + u2_direction_grad_0*(-mu*residual_tmp412 + residual_tmp24*(eta_s*(residual_tmp181 + residual_tmp322*residual_tmp67 - residual_tmp342 + residual_tmp62*residual_tmp94) - residual_tmp406*residual_tmp434) + residual_tmp33*residual_tmp436 + residual_tmp433*residual_tmp90) + u2_direction_grad_1*(-mu*residual_tmp429 + residual_tmp208*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp217*residual_tmp62 - residual_tmp274 + residual_tmp358*residual_tmp67 + residual_tmp385) - residual_tmp409*residual_tmp434) + residual_tmp436*residual_tmp57) + u2_direction_grad_2*(mu*(residual_tmp405 + residual_tmp428 + s_t(2)) + residual_tmp24*(eta_s*(residual_tmp254*residual_tmp62 + residual_tmp372*residual_tmp67) - residual_tmp413*residual_tmp434) + residual_tmp245*residual_tmp433 + residual_tmp247*residual_tmp436);
-      grad_coeff0_0_values[lane] = grad_coeff0_0;
-      grad_coeff0_1_values[lane] = grad_coeff0_1;
-      grad_coeff0_2_values[lane] = grad_coeff0_2;
-      grad_coeff1_0_values[lane] = grad_coeff1_0;
-      grad_coeff1_1_values[lane] = grad_coeff1_1;
-      grad_coeff1_2_values[lane] = grad_coeff1_2;
-      grad_coeff2_0_values[lane] = grad_coeff2_0;
-      grad_coeff2_1_values[lane] = grad_coeff2_1;
-      grad_coeff2_2_values[lane] = grad_coeff2_2;
+      grad_coeff0_0_values[0] = grad_coeff0_0;
+      grad_coeff0_1_values[0] = grad_coeff0_1;
+      grad_coeff0_2_values[0] = grad_coeff0_2;
+      grad_coeff1_0_values[0] = grad_coeff1_0;
+      grad_coeff1_1_values[0] = grad_coeff1_1;
+      grad_coeff1_2_values[0] = grad_coeff1_2;
+      grad_coeff2_0_values[0] = grad_coeff2_0;
+      grad_coeff2_1_values[0] = grad_coeff2_1;
+      grad_coeff2_2_values[0] = grad_coeff2_2;
     }
     for (int test = 0; test < NS; ++test) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
+      {
+        const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
@@ -1732,16 +1679,16 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jac
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][lane] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
-        output[test * NC + 1][lane] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
-        output[test * NC + 2][lane] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+        output[test * NC][0] += q_weight[q] * det * (grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
+        output[test * NC + 1][0] += q_weight[q] * det * (grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC + 2][0] += q_weight[q] * det * (grad_coeff2_0_values[0] * test_grad0 + grad_coeff2_1_values[0] * test_grad1 + grad_coeff2_2_values[0] * test_grad2);
       }
     }
   }
 }
 
 template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jacobian_action_block_contiguous(
+__host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
@@ -1798,144 +1745,125 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jac
     s_t grad_coeff2_0_values[VS];
     s_t grad_coeff2_1_values[VS];
     s_t grad_coeff2_2_values[VS];
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_grad_0_ref_values[lane] = s_t(0);
-      u0_grad_1_ref_values[lane] = s_t(0);
-      u0_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_grad_0_ref_values[0] = s_t(0);
+      u0_grad_1_ref_values[0] = s_t(0);
+      u0_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC][lane];
-        u0_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC][0];
+        u0_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_old_grad_0_ref_values[lane] = s_t(0);
-      u0_old_grad_1_ref_values[lane] = s_t(0);
-      u0_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_old_grad_0_ref_values[0] = s_t(0);
+      u0_old_grad_1_ref_values[0] = s_t(0);
+      u0_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC][lane];
-        u0_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC][0];
+        u0_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_direction_grad_0_ref_values[lane] = s_t(0);
-      u0_direction_grad_1_ref_values[lane] = s_t(0);
-      u0_direction_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_direction_grad_0_ref_values[0] = s_t(0);
+      u0_direction_grad_1_ref_values[0] = s_t(0);
+      u0_direction_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = direction[trial * NC][lane];
-        u0_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u0_direction_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u0_direction_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = direction[trial * NC][0];
+        u0_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u0_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u0_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_grad_0_ref_values[lane] = s_t(0);
-      u1_grad_1_ref_values[lane] = s_t(0);
-      u1_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_grad_0_ref_values[0] = s_t(0);
+      u1_grad_1_ref_values[0] = s_t(0);
+      u1_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 1][lane];
-        u1_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC + 1][0];
+        u1_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_old_grad_0_ref_values[lane] = s_t(0);
-      u1_old_grad_1_ref_values[lane] = s_t(0);
-      u1_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_old_grad_0_ref_values[0] = s_t(0);
+      u1_old_grad_1_ref_values[0] = s_t(0);
+      u1_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 1][lane];
-        u1_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC + 1][0];
+        u1_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_direction_grad_0_ref_values[lane] = s_t(0);
-      u1_direction_grad_1_ref_values[lane] = s_t(0);
-      u1_direction_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_direction_grad_0_ref_values[0] = s_t(0);
+      u1_direction_grad_1_ref_values[0] = s_t(0);
+      u1_direction_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = direction[trial * NC + 1][lane];
-        u1_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u1_direction_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u1_direction_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = direction[trial * NC + 1][0];
+        u1_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u1_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u1_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_grad_0_ref_values[lane] = s_t(0);
-      u2_grad_1_ref_values[lane] = s_t(0);
-      u2_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_grad_0_ref_values[0] = s_t(0);
+      u2_grad_1_ref_values[0] = s_t(0);
+      u2_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = current[trial * NC + 2][lane];
-        u2_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = current[trial * NC + 2][0];
+        u2_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_old_grad_0_ref_values[lane] = s_t(0);
-      u2_old_grad_1_ref_values[lane] = s_t(0);
-      u2_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_old_grad_0_ref_values[0] = s_t(0);
+      u2_old_grad_1_ref_values[0] = s_t(0);
+      u2_old_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = previous[trial * NC + 2][lane];
-        u2_old_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_old_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_old_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = previous[trial * NC + 2][0];
+        u2_old_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_old_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_old_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_direction_grad_0_ref_values[lane] = s_t(0);
-      u2_direction_grad_1_ref_values[lane] = s_t(0);
-      u2_direction_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_direction_grad_0_ref_values[0] = s_t(0);
+      u2_direction_grad_1_ref_values[0] = s_t(0);
+      u2_direction_grad_2_ref_values[0] = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t coeff = direction[trial * NC + 2][lane];
-        u2_direction_grad_0_ref_values[lane] += coeff * grad_ref_x[q * NS + trial];
-        u2_direction_grad_1_ref_values[lane] += coeff * grad_ref_y[q * NS + trial];
-        u2_direction_grad_2_ref_values[lane] += coeff * grad_ref_z[q * NS + trial];
+      {
+        const s_t coeff = direction[trial * NC + 2][0];
+        u2_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
+        u2_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        u2_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
@@ -1946,57 +1874,57 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jac
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_grad_0_ref = u0_grad_0_ref_values[lane];
-      const s_t u0_grad_1_ref = u0_grad_1_ref_values[lane];
-      const s_t u0_grad_2_ref = u0_grad_2_ref_values[lane];
+      const s_t u0_grad_0_ref = u0_grad_0_ref_values[0];
+      const s_t u0_grad_1_ref = u0_grad_1_ref_values[0];
+      const s_t u0_grad_2_ref = u0_grad_2_ref_values[0];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
       const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[lane];
-      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[lane];
-      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[lane];
+      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[0];
+      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[0];
+      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[0];
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
       const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-      const s_t u0_direction_grad_0_ref = u0_direction_grad_0_ref_values[lane];
-      const s_t u0_direction_grad_1_ref = u0_direction_grad_1_ref_values[lane];
-      const s_t u0_direction_grad_2_ref = u0_direction_grad_2_ref_values[lane];
+      const s_t u0_direction_grad_0_ref = u0_direction_grad_0_ref_values[0];
+      const s_t u0_direction_grad_1_ref = u0_direction_grad_1_ref_values[0];
+      const s_t u0_direction_grad_2_ref = u0_direction_grad_2_ref_values[0];
       const s_t u0_direction_grad_0 = (u0_direction_grad_0_ref * adj0 + u0_direction_grad_1_ref * adj3 + u0_direction_grad_2_ref * adj6) / det;
       const s_t u0_direction_grad_1 = (u0_direction_grad_0_ref * adj1 + u0_direction_grad_1_ref * adj4 + u0_direction_grad_2_ref * adj7) / det;
       const s_t u0_direction_grad_2 = (u0_direction_grad_0_ref * adj2 + u0_direction_grad_1_ref * adj5 + u0_direction_grad_2_ref * adj8) / det;
-      const s_t u1_grad_0_ref = u1_grad_0_ref_values[lane];
-      const s_t u1_grad_1_ref = u1_grad_1_ref_values[lane];
-      const s_t u1_grad_2_ref = u1_grad_2_ref_values[lane];
+      const s_t u1_grad_0_ref = u1_grad_0_ref_values[0];
+      const s_t u1_grad_1_ref = u1_grad_1_ref_values[0];
+      const s_t u1_grad_2_ref = u1_grad_2_ref_values[0];
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
       const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[lane];
-      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[lane];
-      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[lane];
+      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[0];
+      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[0];
+      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[0];
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
       const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-      const s_t u1_direction_grad_0_ref = u1_direction_grad_0_ref_values[lane];
-      const s_t u1_direction_grad_1_ref = u1_direction_grad_1_ref_values[lane];
-      const s_t u1_direction_grad_2_ref = u1_direction_grad_2_ref_values[lane];
+      const s_t u1_direction_grad_0_ref = u1_direction_grad_0_ref_values[0];
+      const s_t u1_direction_grad_1_ref = u1_direction_grad_1_ref_values[0];
+      const s_t u1_direction_grad_2_ref = u1_direction_grad_2_ref_values[0];
       const s_t u1_direction_grad_0 = (u1_direction_grad_0_ref * adj0 + u1_direction_grad_1_ref * adj3 + u1_direction_grad_2_ref * adj6) / det;
       const s_t u1_direction_grad_1 = (u1_direction_grad_0_ref * adj1 + u1_direction_grad_1_ref * adj4 + u1_direction_grad_2_ref * adj7) / det;
       const s_t u1_direction_grad_2 = (u1_direction_grad_0_ref * adj2 + u1_direction_grad_1_ref * adj5 + u1_direction_grad_2_ref * adj8) / det;
-      const s_t u2_grad_0_ref = u2_grad_0_ref_values[lane];
-      const s_t u2_grad_1_ref = u2_grad_1_ref_values[lane];
-      const s_t u2_grad_2_ref = u2_grad_2_ref_values[lane];
+      const s_t u2_grad_0_ref = u2_grad_0_ref_values[0];
+      const s_t u2_grad_1_ref = u2_grad_1_ref_values[0];
+      const s_t u2_grad_2_ref = u2_grad_2_ref_values[0];
       const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
       const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[lane];
-      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[lane];
-      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[lane];
+      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[0];
+      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[0];
+      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[0];
       const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
       const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
       const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
-      const s_t u2_direction_grad_0_ref = u2_direction_grad_0_ref_values[lane];
-      const s_t u2_direction_grad_1_ref = u2_direction_grad_1_ref_values[lane];
-      const s_t u2_direction_grad_2_ref = u2_direction_grad_2_ref_values[lane];
+      const s_t u2_direction_grad_0_ref = u2_direction_grad_0_ref_values[0];
+      const s_t u2_direction_grad_1_ref = u2_direction_grad_1_ref_values[0];
+      const s_t u2_direction_grad_2_ref = u2_direction_grad_2_ref_values[0];
       const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
       const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
@@ -2446,20 +2374,19 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jac
       const s_t grad_coeff2_0 = u0_direction_grad_0*(residual_tmp112*residual_tmp400 + residual_tmp121*residual_tmp403 + residual_tmp24*(-eta_s*(residual_tmp114*residual_tmp20 - residual_tmp25*residual_tmp334) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp407) + residual_tmp88) + u0_direction_grad_1*(residual_tmp128*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp144*residual_tmp20 - residual_tmp25*residual_tmp365 - residual_tmp415) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp414 - residual_tmp417) + residual_tmp289 + residual_tmp403*residual_tmp60) + u0_direction_grad_2*(residual_tmp157*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp178*residual_tmp20 - residual_tmp25*residual_tmp353 + residual_tmp422) + residual_tmp2*residual_tmp416 + residual_tmp420*residual_tmp421) + residual_tmp313 + residual_tmp403*residual_tmp62) + u1_direction_grad_0*(residual_tmp10*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp41 - residual_tmp25*residual_tmp332) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp401) + residual_tmp25*residual_tmp403 + residual_tmp319) + u1_direction_grad_1*(mu*(residual_tmp122*residual_tmp222 + residual_tmp387) + residual_tmp226*residual_tmp400 + residual_tmp230*residual_tmp403 + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp240 - residual_tmp25*residual_tmp350 + residual_tmp424) + residual_tmp421*residual_tmp423 + residual_tmp425) + residual_tmp388) + u1_direction_grad_2*(residual_tmp188*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp202 - residual_tmp25*residual_tmp341 - residual_tmp419) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp418 - residual_tmp416*u0_grad_1) + residual_tmp397 + residual_tmp403*residual_tmp67) + u2_direction_grad_0*(mu*(residual_tmp404 + residual_tmp405) + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp94 - residual_tmp25*residual_tmp322) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp406) + residual_tmp33*residual_tmp403 + residual_tmp400*residual_tmp90) + u2_direction_grad_1*(residual_tmp208*residual_tmp400 + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp217 - residual_tmp25*residual_tmp358 + residual_tmp410) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp409) + residual_tmp403*residual_tmp57 + residual_tmp408) + u2_direction_grad_2*(mu*(s_t(2)*residual_tmp227*u2_grad_0 - residual_tmp411*u2_grad_0 - residual_tmp412) + residual_tmp24*(-eta_s*(residual_tmp20*residual_tmp254 - residual_tmp25*residual_tmp372 - residual_tmp306 - residual_tmp342) + ((s_t(1) / s_t(3)))*residual_tmp33*residual_tmp413) + residual_tmp245*residual_tmp400 + residual_tmp247*residual_tmp403);
       const s_t grad_coeff2_1 = u0_direction_grad_0*(mu*(residual_tmp207 + residual_tmp271*residual_tmp278) + residual_tmp112*residual_tmp426 + residual_tmp121*residual_tmp427 + residual_tmp210 + residual_tmp24*(-eta_s*(-residual_tmp114*residual_tmp60 + residual_tmp334*residual_tmp68 + residual_tmp415) + residual_tmp407*residual_tmp431 + residual_tmp417)) + u0_direction_grad_1*(residual_tmp128*residual_tmp426 + residual_tmp24*(-eta_s*(-residual_tmp144*residual_tmp60 + residual_tmp365*residual_tmp68) + ((s_t(1) / s_t(3)))*residual_tmp414*residual_tmp57) + residual_tmp259 + residual_tmp427*residual_tmp60) + u0_direction_grad_2*(residual_tmp157*residual_tmp426 + residual_tmp24*(-eta_s*(-residual_tmp178*residual_tmp60 + residual_tmp353*residual_tmp68 - residual_tmp430) - residual_tmp416*u1_grad_0 + ((s_t(1) / s_t(3)))*residual_tmp420*residual_tmp57) + residual_tmp308 + residual_tmp427*residual_tmp62) + u1_direction_grad_0*(residual_tmp10*residual_tmp426 + residual_tmp24*(-eta_s*(residual_tmp332*residual_tmp68 - residual_tmp41*residual_tmp60 - residual_tmp424) + ((s_t(1) / s_t(3)))*residual_tmp401*residual_tmp57 - residual_tmp425) + residual_tmp25*residual_tmp427 + residual_tmp362) + u1_direction_grad_1*(residual_tmp226*residual_tmp426 + residual_tmp230*residual_tmp427 + residual_tmp24*(-eta_s*(-residual_tmp240*residual_tmp60 + residual_tmp350*residual_tmp68) + ((s_t(1) / s_t(3)))*residual_tmp423*residual_tmp57) + residual_tmp380) + u1_direction_grad_2*(residual_tmp188*residual_tmp426 + residual_tmp24*(-eta_s*(-residual_tmp202*residual_tmp60 + residual_tmp341*residual_tmp68 + residual_tmp432) + residual_tmp182*residual_tmp416 + residual_tmp418*residual_tmp431) + residual_tmp399 + residual_tmp427*residual_tmp67) + u2_direction_grad_0*(residual_tmp24*(-eta_s*(residual_tmp322*residual_tmp68 - residual_tmp410 - residual_tmp60*residual_tmp94) + ((s_t(1) / s_t(3)))*residual_tmp406*residual_tmp57) + residual_tmp33*residual_tmp427 + residual_tmp408 + residual_tmp426*residual_tmp90) + u2_direction_grad_1*(mu*(residual_tmp404 + residual_tmp428) + residual_tmp208*residual_tmp426 + residual_tmp24*(-eta_s*(-residual_tmp217*residual_tmp60 + residual_tmp358*residual_tmp68) + ((s_t(1) / s_t(3)))*residual_tmp409*residual_tmp57) + residual_tmp427*residual_tmp57) + u2_direction_grad_2*(mu*(s_t(2)*residual_tmp227*u2_grad_1 - residual_tmp411*u2_grad_1 - residual_tmp429) + residual_tmp24*(-eta_s*(-residual_tmp254*residual_tmp60 - residual_tmp274 + residual_tmp372*residual_tmp68 - residual_tmp396) + ((s_t(1) / s_t(3)))*residual_tmp413*residual_tmp57) + residual_tmp245*residual_tmp426 + residual_tmp247*residual_tmp427);
       const s_t grad_coeff2_2 = u0_direction_grad_0*(mu*(-residual_tmp244 + s_t(2)*residual_tmp278*residual_tmp8) + residual_tmp112*residual_tmp433 + residual_tmp121*residual_tmp436 + residual_tmp24*(eta_s*(residual_tmp114*residual_tmp62 + residual_tmp334*residual_tmp67 + residual_tmp422) + residual_tmp2*residual_tmp435 - residual_tmp407*residual_tmp434) + residual_tmp246) + u0_direction_grad_1*(mu*(residual_tmp295 + s_t(4)*residual_tmp9) + residual_tmp128*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp144*residual_tmp62 + residual_tmp365*residual_tmp67 - residual_tmp430) - residual_tmp414*residual_tmp434 - residual_tmp435*u1_grad_0) + residual_tmp297 + residual_tmp436*residual_tmp60) + u0_direction_grad_2*(residual_tmp157*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp178*residual_tmp62 + residual_tmp353*residual_tmp67) - residual_tmp420*residual_tmp434) + residual_tmp305 + residual_tmp436*residual_tmp62) + u1_direction_grad_0*(mu*(s_t(4)*residual_tmp127 + residual_tmp368) + residual_tmp10*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp332*residual_tmp67 + residual_tmp41*residual_tmp62 - residual_tmp419) - residual_tmp401*residual_tmp434 - residual_tmp435*u0_grad_1) + residual_tmp25*residual_tmp436 + residual_tmp370) + u1_direction_grad_1*(mu*(s_t(2)*residual_tmp222*residual_tmp8 - residual_tmp390) + residual_tmp226*residual_tmp433 + residual_tmp230*residual_tmp436 + residual_tmp24*(eta_s*(residual_tmp240*residual_tmp62 + residual_tmp350*residual_tmp67 + residual_tmp432) + residual_tmp182*residual_tmp435 - residual_tmp423*residual_tmp434) + residual_tmp391) + u1_direction_grad_2*(residual_tmp188*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp202*residual_tmp62 + residual_tmp341*residual_tmp67) - residual_tmp418*residual_tmp434) + residual_tmp395 + residual_tmp436*residual_tmp67) + u2_direction_grad_0*(-mu*residual_tmp412 + residual_tmp24*(eta_s*(residual_tmp181 + residual_tmp322*residual_tmp67 - residual_tmp342 + residual_tmp62*residual_tmp94) - residual_tmp406*residual_tmp434) + residual_tmp33*residual_tmp436 + residual_tmp433*residual_tmp90) + u2_direction_grad_1*(-mu*residual_tmp429 + residual_tmp208*residual_tmp433 + residual_tmp24*(eta_s*(residual_tmp217*residual_tmp62 - residual_tmp274 + residual_tmp358*residual_tmp67 + residual_tmp385) - residual_tmp409*residual_tmp434) + residual_tmp436*residual_tmp57) + u2_direction_grad_2*(mu*(residual_tmp405 + residual_tmp428 + s_t(2)) + residual_tmp24*(eta_s*(residual_tmp254*residual_tmp62 + residual_tmp372*residual_tmp67) - residual_tmp413*residual_tmp434) + residual_tmp245*residual_tmp433 + residual_tmp247*residual_tmp436);
-      grad_coeff0_0_values[lane] = grad_coeff0_0;
-      grad_coeff0_1_values[lane] = grad_coeff0_1;
-      grad_coeff0_2_values[lane] = grad_coeff0_2;
-      grad_coeff1_0_values[lane] = grad_coeff1_0;
-      grad_coeff1_1_values[lane] = grad_coeff1_1;
-      grad_coeff1_2_values[lane] = grad_coeff1_2;
-      grad_coeff2_0_values[lane] = grad_coeff2_0;
-      grad_coeff2_1_values[lane] = grad_coeff2_1;
-      grad_coeff2_2_values[lane] = grad_coeff2_2;
+      grad_coeff0_0_values[0] = grad_coeff0_0;
+      grad_coeff0_1_values[0] = grad_coeff0_1;
+      grad_coeff0_2_values[0] = grad_coeff0_2;
+      grad_coeff1_0_values[0] = grad_coeff1_0;
+      grad_coeff1_1_values[0] = grad_coeff1_1;
+      grad_coeff1_2_values[0] = grad_coeff1_2;
+      grad_coeff2_0_values[0] = grad_coeff2_0;
+      grad_coeff2_1_values[0] = grad_coeff2_1;
+      grad_coeff2_2_values[0] = grad_coeff2_2;
     }
     for (int test = 0; test < NS; ++test) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
+      {
+        const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
@@ -2473,16 +2400,16 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_jac
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][lane] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
-        output[test * NC + 1][lane] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
-        output[test * NC + 2][lane] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+        output[test * NC][0] += q_weight[q] * det * (grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
+        output[test * NC + 1][0] += q_weight[q] * det * (grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC + 2][0] += q_weight[q] * det * (grad_coeff2_0_values[0] * test_grad0 + grad_coeff2_1_values[0] * test_grad1 + grad_coeff2_2_values[0] * test_grad2);
       }
     }
   }
 }
 
 template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet4_jacobian_action_block(
+__host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
@@ -2499,9 +2426,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
     s_t *const RSTR output[3 * NS]
 ) {
   for (int q = 0; q < NQ; ++q) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
@@ -2512,57 +2438,57 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_grad_0_ref = -(current[0][lane]) + current[3][lane];
-      const s_t u0_grad_1_ref = -(current[0][lane]) + current[6][lane];
-      const s_t u0_grad_2_ref = -(current[0][lane]) + current[9][lane];
+      const s_t u0_grad_0_ref = -(current[0][0]) + current[3][0];
+      const s_t u0_grad_1_ref = -(current[0][0]) + current[6][0];
+      const s_t u0_grad_2_ref = -(current[0][0]) + current[9][0];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
       const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-      const s_t u0_old_grad_0_ref = -(previous[0][lane]) + previous[3][lane];
-      const s_t u0_old_grad_1_ref = -(previous[0][lane]) + previous[6][lane];
-      const s_t u0_old_grad_2_ref = -(previous[0][lane]) + previous[9][lane];
+      const s_t u0_old_grad_0_ref = -(previous[0][0]) + previous[3][0];
+      const s_t u0_old_grad_1_ref = -(previous[0][0]) + previous[6][0];
+      const s_t u0_old_grad_2_ref = -(previous[0][0]) + previous[9][0];
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
       const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-      const s_t u0_direction_grad_0_ref = -(direction[0][lane]) + direction[3][lane];
-      const s_t u0_direction_grad_1_ref = -(direction[0][lane]) + direction[6][lane];
-      const s_t u0_direction_grad_2_ref = -(direction[0][lane]) + direction[9][lane];
+      const s_t u0_direction_grad_0_ref = -(direction[0][0]) + direction[3][0];
+      const s_t u0_direction_grad_1_ref = -(direction[0][0]) + direction[6][0];
+      const s_t u0_direction_grad_2_ref = -(direction[0][0]) + direction[9][0];
       const s_t u0_direction_grad_0 = (u0_direction_grad_0_ref * adj0 + u0_direction_grad_1_ref * adj3 + u0_direction_grad_2_ref * adj6) / det;
       const s_t u0_direction_grad_1 = (u0_direction_grad_0_ref * adj1 + u0_direction_grad_1_ref * adj4 + u0_direction_grad_2_ref * adj7) / det;
       const s_t u0_direction_grad_2 = (u0_direction_grad_0_ref * adj2 + u0_direction_grad_1_ref * adj5 + u0_direction_grad_2_ref * adj8) / det;
-      const s_t u1_grad_0_ref = -(current[1][lane]) + current[4][lane];
-      const s_t u1_grad_1_ref = -(current[1][lane]) + current[7][lane];
-      const s_t u1_grad_2_ref = -(current[1][lane]) + current[10][lane];
+      const s_t u1_grad_0_ref = -(current[1][0]) + current[4][0];
+      const s_t u1_grad_1_ref = -(current[1][0]) + current[7][0];
+      const s_t u1_grad_2_ref = -(current[1][0]) + current[10][0];
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
       const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-      const s_t u1_old_grad_0_ref = -(previous[1][lane]) + previous[4][lane];
-      const s_t u1_old_grad_1_ref = -(previous[1][lane]) + previous[7][lane];
-      const s_t u1_old_grad_2_ref = -(previous[1][lane]) + previous[10][lane];
+      const s_t u1_old_grad_0_ref = -(previous[1][0]) + previous[4][0];
+      const s_t u1_old_grad_1_ref = -(previous[1][0]) + previous[7][0];
+      const s_t u1_old_grad_2_ref = -(previous[1][0]) + previous[10][0];
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
       const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-      const s_t u1_direction_grad_0_ref = -(direction[1][lane]) + direction[4][lane];
-      const s_t u1_direction_grad_1_ref = -(direction[1][lane]) + direction[7][lane];
-      const s_t u1_direction_grad_2_ref = -(direction[1][lane]) + direction[10][lane];
+      const s_t u1_direction_grad_0_ref = -(direction[1][0]) + direction[4][0];
+      const s_t u1_direction_grad_1_ref = -(direction[1][0]) + direction[7][0];
+      const s_t u1_direction_grad_2_ref = -(direction[1][0]) + direction[10][0];
       const s_t u1_direction_grad_0 = (u1_direction_grad_0_ref * adj0 + u1_direction_grad_1_ref * adj3 + u1_direction_grad_2_ref * adj6) / det;
       const s_t u1_direction_grad_1 = (u1_direction_grad_0_ref * adj1 + u1_direction_grad_1_ref * adj4 + u1_direction_grad_2_ref * adj7) / det;
       const s_t u1_direction_grad_2 = (u1_direction_grad_0_ref * adj2 + u1_direction_grad_1_ref * adj5 + u1_direction_grad_2_ref * adj8) / det;
-      const s_t u2_grad_0_ref = -(current[2][lane]) + current[5][lane];
-      const s_t u2_grad_1_ref = -(current[2][lane]) + current[8][lane];
-      const s_t u2_grad_2_ref = -(current[2][lane]) + current[11][lane];
+      const s_t u2_grad_0_ref = -(current[2][0]) + current[5][0];
+      const s_t u2_grad_1_ref = -(current[2][0]) + current[8][0];
+      const s_t u2_grad_2_ref = -(current[2][0]) + current[11][0];
       const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
       const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-      const s_t u2_old_grad_0_ref = -(previous[2][lane]) + previous[5][lane];
-      const s_t u2_old_grad_1_ref = -(previous[2][lane]) + previous[8][lane];
-      const s_t u2_old_grad_2_ref = -(previous[2][lane]) + previous[11][lane];
+      const s_t u2_old_grad_0_ref = -(previous[2][0]) + previous[5][0];
+      const s_t u2_old_grad_1_ref = -(previous[2][0]) + previous[8][0];
+      const s_t u2_old_grad_2_ref = -(previous[2][0]) + previous[11][0];
       const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
       const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
       const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
-      const s_t u2_direction_grad_0_ref = -(direction[2][lane]) + direction[5][lane];
-      const s_t u2_direction_grad_1_ref = -(direction[2][lane]) + direction[8][lane];
-      const s_t u2_direction_grad_2_ref = -(direction[2][lane]) + direction[11][lane];
+      const s_t u2_direction_grad_0_ref = -(direction[2][0]) + direction[5][0];
+      const s_t u2_direction_grad_1_ref = -(direction[2][0]) + direction[8][0];
+      const s_t u2_direction_grad_2_ref = -(direction[2][0]) + direction[11][0];
       const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
       const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
@@ -3033,24 +2959,24 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
       const s_t test3_grad0 = (adj6) / det;
       const s_t test3_grad1 = (adj7) / det;
       const s_t test3_grad2 = (adj8) / det;
-      output[0][lane] += q_weight[q] * det * (grad_coeff0_0_value * test0_grad0 + grad_coeff0_1_value * test0_grad1 + grad_coeff0_2_value * test0_grad2);
-      output[1][lane] += q_weight[q] * det * (grad_coeff1_0_value * test0_grad0 + grad_coeff1_1_value * test0_grad1 + grad_coeff1_2_value * test0_grad2);
-      output[2][lane] += q_weight[q] * det * (grad_coeff2_0_value * test0_grad0 + grad_coeff2_1_value * test0_grad1 + grad_coeff2_2_value * test0_grad2);
-      output[3][lane] += q_weight[q] * det * (grad_coeff0_0_value * test1_grad0 + grad_coeff0_1_value * test1_grad1 + grad_coeff0_2_value * test1_grad2);
-      output[4][lane] += q_weight[q] * det * (grad_coeff1_0_value * test1_grad0 + grad_coeff1_1_value * test1_grad1 + grad_coeff1_2_value * test1_grad2);
-      output[5][lane] += q_weight[q] * det * (grad_coeff2_0_value * test1_grad0 + grad_coeff2_1_value * test1_grad1 + grad_coeff2_2_value * test1_grad2);
-      output[6][lane] += q_weight[q] * det * (grad_coeff0_0_value * test2_grad0 + grad_coeff0_1_value * test2_grad1 + grad_coeff0_2_value * test2_grad2);
-      output[7][lane] += q_weight[q] * det * (grad_coeff1_0_value * test2_grad0 + grad_coeff1_1_value * test2_grad1 + grad_coeff1_2_value * test2_grad2);
-      output[8][lane] += q_weight[q] * det * (grad_coeff2_0_value * test2_grad0 + grad_coeff2_1_value * test2_grad1 + grad_coeff2_2_value * test2_grad2);
-      output[9][lane] += q_weight[q] * det * (grad_coeff0_0_value * test3_grad0 + grad_coeff0_1_value * test3_grad1 + grad_coeff0_2_value * test3_grad2);
-      output[10][lane] += q_weight[q] * det * (grad_coeff1_0_value * test3_grad0 + grad_coeff1_1_value * test3_grad1 + grad_coeff1_2_value * test3_grad2);
-      output[11][lane] += q_weight[q] * det * (grad_coeff2_0_value * test3_grad0 + grad_coeff2_1_value * test3_grad1 + grad_coeff2_2_value * test3_grad2);
+      output[0][0] += q_weight[q] * det * (grad_coeff0_0_value * test0_grad0 + grad_coeff0_1_value * test0_grad1 + grad_coeff0_2_value * test0_grad2);
+      output[1][0] += q_weight[q] * det * (grad_coeff1_0_value * test0_grad0 + grad_coeff1_1_value * test0_grad1 + grad_coeff1_2_value * test0_grad2);
+      output[2][0] += q_weight[q] * det * (grad_coeff2_0_value * test0_grad0 + grad_coeff2_1_value * test0_grad1 + grad_coeff2_2_value * test0_grad2);
+      output[3][0] += q_weight[q] * det * (grad_coeff0_0_value * test1_grad0 + grad_coeff0_1_value * test1_grad1 + grad_coeff0_2_value * test1_grad2);
+      output[4][0] += q_weight[q] * det * (grad_coeff1_0_value * test1_grad0 + grad_coeff1_1_value * test1_grad1 + grad_coeff1_2_value * test1_grad2);
+      output[5][0] += q_weight[q] * det * (grad_coeff2_0_value * test1_grad0 + grad_coeff2_1_value * test1_grad1 + grad_coeff2_2_value * test1_grad2);
+      output[6][0] += q_weight[q] * det * (grad_coeff0_0_value * test2_grad0 + grad_coeff0_1_value * test2_grad1 + grad_coeff0_2_value * test2_grad2);
+      output[7][0] += q_weight[q] * det * (grad_coeff1_0_value * test2_grad0 + grad_coeff1_1_value * test2_grad1 + grad_coeff1_2_value * test2_grad2);
+      output[8][0] += q_weight[q] * det * (grad_coeff2_0_value * test2_grad0 + grad_coeff2_1_value * test2_grad1 + grad_coeff2_2_value * test2_grad2);
+      output[9][0] += q_weight[q] * det * (grad_coeff0_0_value * test3_grad0 + grad_coeff0_1_value * test3_grad1 + grad_coeff0_2_value * test3_grad2);
+      output[10][0] += q_weight[q] * det * (grad_coeff1_0_value * test3_grad0 + grad_coeff1_1_value * test3_grad1 + grad_coeff1_2_value * test3_grad2);
+      output[11][0] += q_weight[q] * det * (grad_coeff2_0_value * test3_grad0 + grad_coeff2_1_value * test3_grad1 + grad_coeff2_2_value * test3_grad2);
     }
   }
 }
 
 template <typename s_t, int NQ, int NS, int VS>
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet4_jacobian_action_block_contiguous(
+__host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobian_action_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
@@ -3067,9 +2993,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
     s_t output[3 * NS][VS]
 ) {
   for (int q = 0; q < NQ; ++q) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
@@ -3080,57 +3005,57 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_grad_0_ref = -(current[0][lane]) + current[3][lane];
-      const s_t u0_grad_1_ref = -(current[0][lane]) + current[6][lane];
-      const s_t u0_grad_2_ref = -(current[0][lane]) + current[9][lane];
+      const s_t u0_grad_0_ref = -(current[0][0]) + current[3][0];
+      const s_t u0_grad_1_ref = -(current[0][0]) + current[6][0];
+      const s_t u0_grad_2_ref = -(current[0][0]) + current[9][0];
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
       const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-      const s_t u0_old_grad_0_ref = -(previous[0][lane]) + previous[3][lane];
-      const s_t u0_old_grad_1_ref = -(previous[0][lane]) + previous[6][lane];
-      const s_t u0_old_grad_2_ref = -(previous[0][lane]) + previous[9][lane];
+      const s_t u0_old_grad_0_ref = -(previous[0][0]) + previous[3][0];
+      const s_t u0_old_grad_1_ref = -(previous[0][0]) + previous[6][0];
+      const s_t u0_old_grad_2_ref = -(previous[0][0]) + previous[9][0];
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
       const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-      const s_t u0_direction_grad_0_ref = -(direction[0][lane]) + direction[3][lane];
-      const s_t u0_direction_grad_1_ref = -(direction[0][lane]) + direction[6][lane];
-      const s_t u0_direction_grad_2_ref = -(direction[0][lane]) + direction[9][lane];
+      const s_t u0_direction_grad_0_ref = -(direction[0][0]) + direction[3][0];
+      const s_t u0_direction_grad_1_ref = -(direction[0][0]) + direction[6][0];
+      const s_t u0_direction_grad_2_ref = -(direction[0][0]) + direction[9][0];
       const s_t u0_direction_grad_0 = (u0_direction_grad_0_ref * adj0 + u0_direction_grad_1_ref * adj3 + u0_direction_grad_2_ref * adj6) / det;
       const s_t u0_direction_grad_1 = (u0_direction_grad_0_ref * adj1 + u0_direction_grad_1_ref * adj4 + u0_direction_grad_2_ref * adj7) / det;
       const s_t u0_direction_grad_2 = (u0_direction_grad_0_ref * adj2 + u0_direction_grad_1_ref * adj5 + u0_direction_grad_2_ref * adj8) / det;
-      const s_t u1_grad_0_ref = -(current[1][lane]) + current[4][lane];
-      const s_t u1_grad_1_ref = -(current[1][lane]) + current[7][lane];
-      const s_t u1_grad_2_ref = -(current[1][lane]) + current[10][lane];
+      const s_t u1_grad_0_ref = -(current[1][0]) + current[4][0];
+      const s_t u1_grad_1_ref = -(current[1][0]) + current[7][0];
+      const s_t u1_grad_2_ref = -(current[1][0]) + current[10][0];
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
       const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-      const s_t u1_old_grad_0_ref = -(previous[1][lane]) + previous[4][lane];
-      const s_t u1_old_grad_1_ref = -(previous[1][lane]) + previous[7][lane];
-      const s_t u1_old_grad_2_ref = -(previous[1][lane]) + previous[10][lane];
+      const s_t u1_old_grad_0_ref = -(previous[1][0]) + previous[4][0];
+      const s_t u1_old_grad_1_ref = -(previous[1][0]) + previous[7][0];
+      const s_t u1_old_grad_2_ref = -(previous[1][0]) + previous[10][0];
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
       const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-      const s_t u1_direction_grad_0_ref = -(direction[1][lane]) + direction[4][lane];
-      const s_t u1_direction_grad_1_ref = -(direction[1][lane]) + direction[7][lane];
-      const s_t u1_direction_grad_2_ref = -(direction[1][lane]) + direction[10][lane];
+      const s_t u1_direction_grad_0_ref = -(direction[1][0]) + direction[4][0];
+      const s_t u1_direction_grad_1_ref = -(direction[1][0]) + direction[7][0];
+      const s_t u1_direction_grad_2_ref = -(direction[1][0]) + direction[10][0];
       const s_t u1_direction_grad_0 = (u1_direction_grad_0_ref * adj0 + u1_direction_grad_1_ref * adj3 + u1_direction_grad_2_ref * adj6) / det;
       const s_t u1_direction_grad_1 = (u1_direction_grad_0_ref * adj1 + u1_direction_grad_1_ref * adj4 + u1_direction_grad_2_ref * adj7) / det;
       const s_t u1_direction_grad_2 = (u1_direction_grad_0_ref * adj2 + u1_direction_grad_1_ref * adj5 + u1_direction_grad_2_ref * adj8) / det;
-      const s_t u2_grad_0_ref = -(current[2][lane]) + current[5][lane];
-      const s_t u2_grad_1_ref = -(current[2][lane]) + current[8][lane];
-      const s_t u2_grad_2_ref = -(current[2][lane]) + current[11][lane];
+      const s_t u2_grad_0_ref = -(current[2][0]) + current[5][0];
+      const s_t u2_grad_1_ref = -(current[2][0]) + current[8][0];
+      const s_t u2_grad_2_ref = -(current[2][0]) + current[11][0];
       const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
       const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-      const s_t u2_old_grad_0_ref = -(previous[2][lane]) + previous[5][lane];
-      const s_t u2_old_grad_1_ref = -(previous[2][lane]) + previous[8][lane];
-      const s_t u2_old_grad_2_ref = -(previous[2][lane]) + previous[11][lane];
+      const s_t u2_old_grad_0_ref = -(previous[2][0]) + previous[5][0];
+      const s_t u2_old_grad_1_ref = -(previous[2][0]) + previous[8][0];
+      const s_t u2_old_grad_2_ref = -(previous[2][0]) + previous[11][0];
       const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
       const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
       const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
-      const s_t u2_direction_grad_0_ref = -(direction[2][lane]) + direction[5][lane];
-      const s_t u2_direction_grad_1_ref = -(direction[2][lane]) + direction[8][lane];
-      const s_t u2_direction_grad_2_ref = -(direction[2][lane]) + direction[11][lane];
+      const s_t u2_direction_grad_0_ref = -(direction[2][0]) + direction[5][0];
+      const s_t u2_direction_grad_1_ref = -(direction[2][0]) + direction[8][0];
+      const s_t u2_direction_grad_2_ref = -(direction[2][0]) + direction[11][0];
       const s_t u2_direction_grad_0 = (u2_direction_grad_0_ref * adj0 + u2_direction_grad_1_ref * adj3 + u2_direction_grad_2_ref * adj6) / det;
       const s_t u2_direction_grad_1 = (u2_direction_grad_0_ref * adj1 + u2_direction_grad_1_ref * adj4 + u2_direction_grad_2_ref * adj7) / det;
       const s_t u2_direction_grad_2 = (u2_direction_grad_0_ref * adj2 + u2_direction_grad_1_ref * adj5 + u2_direction_grad_2_ref * adj8) / det;
@@ -3601,18 +3526,18 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_residual_merit_d3_simplex_tet
       const s_t test3_grad0 = (adj6) / det;
       const s_t test3_grad1 = (adj7) / det;
       const s_t test3_grad2 = (adj8) / det;
-      output[0][lane] += q_weight[q] * det * (grad_coeff0_0_value * test0_grad0 + grad_coeff0_1_value * test0_grad1 + grad_coeff0_2_value * test0_grad2);
-      output[1][lane] += q_weight[q] * det * (grad_coeff1_0_value * test0_grad0 + grad_coeff1_1_value * test0_grad1 + grad_coeff1_2_value * test0_grad2);
-      output[2][lane] += q_weight[q] * det * (grad_coeff2_0_value * test0_grad0 + grad_coeff2_1_value * test0_grad1 + grad_coeff2_2_value * test0_grad2);
-      output[3][lane] += q_weight[q] * det * (grad_coeff0_0_value * test1_grad0 + grad_coeff0_1_value * test1_grad1 + grad_coeff0_2_value * test1_grad2);
-      output[4][lane] += q_weight[q] * det * (grad_coeff1_0_value * test1_grad0 + grad_coeff1_1_value * test1_grad1 + grad_coeff1_2_value * test1_grad2);
-      output[5][lane] += q_weight[q] * det * (grad_coeff2_0_value * test1_grad0 + grad_coeff2_1_value * test1_grad1 + grad_coeff2_2_value * test1_grad2);
-      output[6][lane] += q_weight[q] * det * (grad_coeff0_0_value * test2_grad0 + grad_coeff0_1_value * test2_grad1 + grad_coeff0_2_value * test2_grad2);
-      output[7][lane] += q_weight[q] * det * (grad_coeff1_0_value * test2_grad0 + grad_coeff1_1_value * test2_grad1 + grad_coeff1_2_value * test2_grad2);
-      output[8][lane] += q_weight[q] * det * (grad_coeff2_0_value * test2_grad0 + grad_coeff2_1_value * test2_grad1 + grad_coeff2_2_value * test2_grad2);
-      output[9][lane] += q_weight[q] * det * (grad_coeff0_0_value * test3_grad0 + grad_coeff0_1_value * test3_grad1 + grad_coeff0_2_value * test3_grad2);
-      output[10][lane] += q_weight[q] * det * (grad_coeff1_0_value * test3_grad0 + grad_coeff1_1_value * test3_grad1 + grad_coeff1_2_value * test3_grad2);
-      output[11][lane] += q_weight[q] * det * (grad_coeff2_0_value * test3_grad0 + grad_coeff2_1_value * test3_grad1 + grad_coeff2_2_value * test3_grad2);
+      output[0][0] += q_weight[q] * det * (grad_coeff0_0_value * test0_grad0 + grad_coeff0_1_value * test0_grad1 + grad_coeff0_2_value * test0_grad2);
+      output[1][0] += q_weight[q] * det * (grad_coeff1_0_value * test0_grad0 + grad_coeff1_1_value * test0_grad1 + grad_coeff1_2_value * test0_grad2);
+      output[2][0] += q_weight[q] * det * (grad_coeff2_0_value * test0_grad0 + grad_coeff2_1_value * test0_grad1 + grad_coeff2_2_value * test0_grad2);
+      output[3][0] += q_weight[q] * det * (grad_coeff0_0_value * test1_grad0 + grad_coeff0_1_value * test1_grad1 + grad_coeff0_2_value * test1_grad2);
+      output[4][0] += q_weight[q] * det * (grad_coeff1_0_value * test1_grad0 + grad_coeff1_1_value * test1_grad1 + grad_coeff1_2_value * test1_grad2);
+      output[5][0] += q_weight[q] * det * (grad_coeff2_0_value * test1_grad0 + grad_coeff2_1_value * test1_grad1 + grad_coeff2_2_value * test1_grad2);
+      output[6][0] += q_weight[q] * det * (grad_coeff0_0_value * test2_grad0 + grad_coeff0_1_value * test2_grad1 + grad_coeff0_2_value * test2_grad2);
+      output[7][0] += q_weight[q] * det * (grad_coeff1_0_value * test2_grad0 + grad_coeff1_1_value * test2_grad1 + grad_coeff1_2_value * test2_grad2);
+      output[8][0] += q_weight[q] * det * (grad_coeff2_0_value * test2_grad0 + grad_coeff2_1_value * test2_grad1 + grad_coeff2_2_value * test2_grad2);
+      output[9][0] += q_weight[q] * det * (grad_coeff0_0_value * test3_grad0 + grad_coeff0_1_value * test3_grad1 + grad_coeff0_2_value * test3_grad2);
+      output[10][0] += q_weight[q] * det * (grad_coeff1_0_value * test3_grad0 + grad_coeff1_1_value * test3_grad1 + grad_coeff1_2_value * test3_grad2);
+      output[11][0] += q_weight[q] * det * (grad_coeff2_0_value * test3_grad0 + grad_coeff2_1_value * test3_grad1 + grad_coeff2_2_value * test3_grad2);
     }
   }
 }

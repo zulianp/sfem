@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string.h>
-#include "../mooney_rivlin_kelvin_voigt_residual_merit_d2_simplex_local.hpp"
+#include "../mooney_rivlin_kelvin_voigt_total_d2_simplex_local.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
@@ -46,7 +46,7 @@ SFEM_INLINE const s_t *ageom_stream(
 
 } // namespace codegen
 } // namespace sfem
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_esoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_residual_esoa(
     const int scalar_bytes,
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -63,24 +63,24 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_residual_merit_d2_simplex_residual_block<double, 1, 3, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tri3_q1<double>::grad_ref_x(), sfem::codegen::ref_tri3_q1<double>::grad_ref_y(), sfem::codegen::quad_tri_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_residual_block<double, 1, 3, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tri3_q1<double>::grad_ref_x(), sfem::codegen::ref_tri3_q1<double>::grad_ref_y(), sfem::codegen::quad_tri_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_residual_merit_d2_simplex_residual_block<float, 1, 3, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tri3_q1<float>::grad_ref_x(), sfem::codegen::ref_tri3_q1<float>::grad_ref_y(), sfem::codegen::quad_tri_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_residual_block<float, 1, 3, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tri3_q1<float>::grad_ref_x(), sfem::codegen::ref_tri3_q1<float>::grad_ref_y(), sfem::codegen::quad_tri_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_esoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tri3_residual_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_a_msoa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tri3_residual_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -154,7 +154,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_a
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_residual_merit_d2_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[4], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d2_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[4], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -176,7 +176,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_a
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_a_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_residual_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -203,18 +203,18 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_residual_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, out_stride, (double *)u0_out, (double *)u1_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_residual_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, out_stride, (float *)u0_out, (float *)u1_out);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_residual_merit_tri3_residual_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tri3_residual_a_msoa", -1, (int)scalar_bytes);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_action_esoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_esoa(
     const int scalar_bytes,
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -232,24 +232,24 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_action_es
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_residual_merit_d2_simplex_jacobian_action_block<double, 1, 3, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tri3_q1<double>::grad_ref_x(), sfem::codegen::ref_tri3_q1<double>::grad_ref_y(), sfem::codegen::quad_tri_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_jacobian_action_block<double, 1, 3, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tri3_q1<double>::grad_ref_x(), sfem::codegen::ref_tri3_q1<double>::grad_ref_y(), sfem::codegen::quad_tri_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_residual_merit_d2_simplex_jacobian_action_block<float, 1, 3, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tri3_q1<float>::grad_ref_x(), sfem::codegen::ref_tri3_q1<float>::grad_ref_y(), sfem::codegen::quad_tri_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_jacobian_action_block<float, 1, 3, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tri3_q1<float>::grad_ref_x(), sfem::codegen::ref_tri3_q1<float>::grad_ref_y(), sfem::codegen::quad_tri_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_action_esoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_esoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
 namespace codegen {
 
 template <typename s_t, typename g_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_action_a_msoa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
@@ -329,7 +329,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_a
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_residual_merit_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[4], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d2_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[4], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -351,7 +351,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_a
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_action_a_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -381,22 +381,25 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_action_a_
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl<double, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, previous_stride, (const double *)u0_old, (const double *)u1_old, direction_stride, (const double *)u0_direction, (const double *)u1_direction, out_stride, (double *)u0_out, (double *)u1_out);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_a_msoa_impl<float, geom_t>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, previous_stride, (const float *)u0_old, (const float *)u1_old, direction_stride, (const float *)u0_direction, (const float *)u1_direction, out_stride, (float *)u0_out, (float *)u1_out);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_residual_merit_tri3_jacobian_action_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_a_msoa", -1, (int)scalar_bytes);
 }
 
+
+namespace sfem {
+namespace codegen {
 
 static constexpr int pm_orientation[3][3] = {{0, 1, 2}, {1, 2, 0}, {2, 0, 1}};
 
 template <typename s_t, int NQ, int NS, int VS>
-static int mooney_rivlin_kelvin_voigt_residual_merit_tri3_merit_patch(
+static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
     const ptrdiff_t n_owned_nodes,
     const count_t *const RSTR n2e_ptr,
     const element_idx_t *const RSTR n2e_idx,
@@ -610,4 +613,46 @@ static int mooney_rivlin_kelvin_voigt_residual_merit_tri3_merit_patch(
     }
   }
   return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+
+extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_owned_nodes,
+    const count_t *const RSTR n2e_ptr,
+    const element_idx_t *const RSTR n2e_idx,
+    const uint8_t *const RSTR n2e_local,
+    idx_t **const RSTR elements,
+    const void *const RSTR determinant,
+    const void *const RSTR adjugate[4],
+    const void *const RSTR shape,
+    const void *const RSTR grad_ref[2],
+    const void *const RSTR q_weight,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const int nsteps,
+    const void *const RSTR steps,
+    const void *const RSTR x,
+    const void *const RSTR h,
+    const void *const RSTR p,
+    const void *const RSTR accumulator,
+    void *const RSTR merit
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_merit_patch<double, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, (const double *)determinant, (const double *const *)adjugate, (const double *)shape, (const double *const *)grad_ref, (const double *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)p, (const double *)accumulator, (double *)merit);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_merit_patch<float, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, (const float *)determinant, (const float *const *)adjugate, (const float *)shape, (const float *const *)grad_ref, (const float *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)p, (const float *)accumulator, (float *)merit);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa", -1, (int)scalar_bytes);
 }

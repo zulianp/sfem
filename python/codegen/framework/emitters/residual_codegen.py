@@ -208,7 +208,9 @@ from codegen.framework.emitters.cprinter import (
     _sfem_math_header_source,
 )
 from codegen.framework.emitters.patch_merit_codegen import (
+    patch_merit_argument_names,
     patch_merit_kernel_lines,
+    patch_merit_kernel_parameters,
     patch_orientation_table_lines,
 )
 from codegen.framework.emitters.energy_codegen import (
@@ -5765,12 +5767,18 @@ def _operator_source(
     # is.  The family header is shared by every element of a family and by the
     # block units, so a kernel gated on either would generate one file two ways.
     stepped = stepped_residual_dependencies(form_dependencies["residual"])
+    material_parameters = tuple(
+        str(parameter) for parameter in form_dependencies["residual"].parameters
+    )
     for kernel in published_patch_merit_kernels(
         rule.element_type,
         unit_name,
         has_parallel_region=_target().parallel_region_pragma() is not None,
     ):
-        lines.append("")
+        # Inside the namespace the entry point below names it in.  The
+        # surrounding source has closed it by this point, so the kernel opens
+        # its own rather than being declared at file scope and called qualified.
+        lines.extend(["", "namespace sfem {", "namespace codegen {", ""])
         lines.extend(patch_orientation_table_lines(rule.element_type))
         lines.append("")
         lines.extend(
@@ -5784,10 +5792,35 @@ def _operator_source(
                 _print_statement_nodes(
                     _coefficient_evaluation_nodes(system, residual_coeffs, stepped), ""
                 ),
-                parameters=tuple(
-                    str(parameter)
-                    for parameter in form_dependencies["residual"].parameters
-                ),
+                parameters=material_parameters,
+            )
+        )
+        lines.extend(["", "} // namespace codegen", "} // namespace sfem", ""])
+        # The entry point over it, built from the same parameter sequence the
+        # kernel declared.  Two lists would be one call that compiles and
+        # passes the wrong pointer.
+        kernel_params = patch_merit_kernel_parameters(
+            system, rule, stepped, material_parameters
+        )
+        kernel_arguments = patch_merit_argument_names(
+            system, rule, stepped, material_parameters
+        )
+        # The entry point carries the geometry and layout markers every mesh
+        # kernel's name carries, so the wrapper layer parses it and builds the
+        # dimension-generic dispatch for it like any other.  `a` is not a
+        # choice: the orientation gate already restricted this kernel to affine
+        # simplices.
+        lines.append("")
+        lines.extend(
+            _runtime_typed_entry_point(
+                "%s_merit_patch_a_msoa" % prefix,
+                list(kernel_params),
+                list(kernel_arguments),
+                lambda scalar_type, arguments, _name="%s_%s" % (prefix, kernel): [
+                    "  return sfem::codegen::%s<%s, %d, %d, %d>(%s);"
+                    % (_name, scalar_type, n_qp, n_shape, vector_size,
+                       ", ".join(arguments)),
+                ],
             )
         )
     return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))

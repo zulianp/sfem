@@ -393,6 +393,46 @@ def patch_reduction_lines(system, indent="  "):
     ]
 
 
+def patch_merit_kernel_parameters(system, rule, dependencies, parameters=()):
+    """The kernel's parameter list, in ABI order.
+
+    Returned separately from the body so the entry point over it can be built
+    from the same sequence rather than a second copy of the list -- the two
+    disagreeing is a call that compiles and passes the wrong pointer.
+    """
+    dim = system.dim
+    params = [
+        "const ptrdiff_t n_owned_nodes",
+        "const count_t *const RSTR n2e_ptr",
+        "const element_idx_t *const RSTR n2e_idx",
+        "const uint8_t *const RSTR n2e_local",
+        "idx_t **const RSTR elements",
+        "const s_t *const RSTR determinant",
+        "const s_t *const RSTR adjugate[%d]" % (dim * dim),
+        "const s_t *const RSTR shape",
+        "const s_t *const RSTR grad_ref[%d]" % dim,
+        "const s_t *const RSTR q_weight",
+    ]
+    params.extend("const s_t %s" % parameter for parameter in parameters)
+    params.extend(["const int nsteps", "const s_t *const RSTR steps"])
+    params.extend(
+        "const s_t *const RSTR %s" % source
+        for role in patch_merit_staged_roles(dependencies)
+        for _, source in _ROLE_SPELLING[role]["gathers"]
+    )
+    params.extend(["const s_t *const RSTR accumulator", "s_t *const RSTR merit"])
+    return tuple(params)
+
+
+def patch_merit_argument_names(system, rule, dependencies, parameters=()):
+    """The same sequence as names, for the entry point to forward."""
+    names = []
+    for param in patch_merit_kernel_parameters(system, rule, dependencies, parameters):
+        name = param.split("[")[0].split()[-1].lstrip("*")
+        names.append(name)
+    return tuple(names)
+
+
 def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
                              element_type, function_name, material_lines,
                              parameters=()):
@@ -413,36 +453,17 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
     n_fields = len(system.fields)
     n_shape = rule.n_shape
     buffers = patch_loop_one_buffers(dim, n_fields, dependencies)
+    declared = patch_merit_kernel_parameters(system, rule, dependencies, parameters)
     lines = [
         "template <typename s_t, int NQ, int NS, int VS>",
         "static int %s(" % function_name,
-        "    const ptrdiff_t n_owned_nodes,",
-        "    const count_t *const RSTR n2e_ptr,",
-        "    const element_idx_t *const RSTR n2e_idx,",
-        "    const uint8_t *const RSTR n2e_local,",
-        "    idx_t **const RSTR elements,",
-        "    const s_t *const RSTR determinant,",
-        "    const s_t *const RSTR adjugate[%d]," % (dim * dim),
-        "    const s_t *const RSTR shape,",
-        "    const s_t *const RSTR grad_ref[%d]," % dim,
-        "    const s_t *const RSTR q_weight,",
     ]
-    lines.extend("    const s_t %s," % parameter for parameter in parameters)
     lines.extend(
-        [
-            "    const int nsteps,",
-            "    const s_t *const RSTR steps,",
-        ]
-    )
-    lines.extend(
-        "    const s_t *const RSTR %s," % source
-        for role in patch_merit_staged_roles(dependencies)
-        for _, source in _ROLE_SPELLING[role]["gathers"]
+        "    %s%s" % (param, "," if index + 1 < len(declared) else "")
+        for index, param in enumerate(declared)
     )
     lines.extend(
         [
-            "    const s_t *const RSTR accumulator,",
-            "    s_t *const RSTR merit",
             ") {",
             "  static constexpr int ND = %d;" % dim,
             "  static constexpr int NC = %d;" % n_fields,

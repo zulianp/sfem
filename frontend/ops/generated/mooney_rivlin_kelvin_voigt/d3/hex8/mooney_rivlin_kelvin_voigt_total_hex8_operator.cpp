@@ -1,6 +1,6 @@
 #include "../../op/sfem_GeneratedMooneyRivlinKelvinVoigt_c_abi.hpp"
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_i_maos(
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -12,7 +12,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_a
         const void *const RSTR direction,
         void *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_i_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -40,7 +40,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_a
         void *const RSTR u1_out,
         void *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i_maos(
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -51,7 +51,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i
         const void *const RSTR previous,
         void *const RSTR output
 );
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -75,7 +75,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i
         void *const RSTR u1_out,
         void *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_a_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -112,7 +112,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_a
         void *const RSTR u1_out,
         void *const RSTR u2_out
 );
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_a_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -146,7 +146,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_a
         void *const RSTR u2_out
 );
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_i_maos(
+extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -168,10 +168,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_i_
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
+    return mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, current, previous, direction, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_i_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -209,10 +209,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_i_
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_i_maos(
+extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_residual_i_maos(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -233,10 +233,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_i_maos(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
+    return mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_maos(scalar_bytes, nelements, nnodes, proteus_elements, points, parameters, current, previous, output);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_i_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_residual_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -270,10 +270,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_i_msoa(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_a_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -320,10 +320,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_a_
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out);
 }
 
-extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_a_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_residual_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -366,5 +366,5 @@ extern "C" int mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_a_msoa(
         elements[7],
         elements[6]
     };
-    return mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
+    return mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out);
 }

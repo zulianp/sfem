@@ -300,7 +300,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_tet10_objective_steps_i_mso
         void *const RSTR value,
         void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_jacobian_action_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -313,7 +313,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_jacobi
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_jacobian_action_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -326,7 +326,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_jacobian_actio
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_jacobian_action_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -351,7 +351,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_jacobi
     void *const RSTR u1_out,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_jacobian_action_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -376,7 +376,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_jacobian_actio
     void *const RSTR u1_out,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -389,7 +389,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -402,7 +402,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobia
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_jacobian_action_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -415,7 +415,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_jacobian_actio
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -444,7 +444,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action
     void *const RSTR u2_out,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -473,7 +473,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobia
     void *const RSTR u2_out,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_jacobian_action_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -502,7 +502,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_jacobian_actio
     void *const RSTR u2_out,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_residual_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_quad4_residual_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -514,7 +514,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_residu
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_residual_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_quad4_residual_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -526,7 +526,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_residual_i_mao
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_residual_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_quad4_residual_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -548,7 +548,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_residu
     void *const RSTR u1_out,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_residual_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_quad4_residual_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -570,7 +570,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_residual_i_mso
     void *const RSTR u1_out,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hex8_residual_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -582,7 +582,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_i_maos
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -594,7 +594,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residua
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_residual_i_maos(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet10_residual_i_maos(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -606,32 +606,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_residual_i_mao
     void *const RSTR output,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_i_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
-    const ptrdiff_t current_stride,
-    const void *const RSTR u0,
-    const void *const RSTR u1,
-    const void *const RSTR u2,
-    const ptrdiff_t previous_stride,
-    const void *const RSTR u0_old,
-    const void *const RSTR u1_old,
-    const void *const RSTR u2_old,
-    const ptrdiff_t out_stride,
-    void *const RSTR u0_out,
-    void *const RSTR u1_out,
-    void *const RSTR u2_out,
-    void *const stream
-);
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hex8_residual_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -656,7 +631,32 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residua
     void *const RSTR u2_out,
     void *const stream
 );
-extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_residual_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const *const RSTR points,
+    const real_t eta_b,
+    const real_t eta_s,
+    const real_t lmbda,
+    const real_t mu,
+    const real_t u_dt_shift,
+    const ptrdiff_t current_stride,
+    const void *const RSTR u0,
+    const void *const RSTR u1,
+    const void *const RSTR u2,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR u0_old,
+    const void *const RSTR u1_old,
+    const void *const RSTR u2_old,
+    const ptrdiff_t out_stride,
+    void *const RSTR u0_out,
+    void *const RSTR u1_out,
+    void *const RSTR u2_out,
+    void *const stream
+);
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet10_residual_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -1414,7 +1414,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_o
       "mooney_rivlin_kelvin_voigt_elastic_objective_steps_3d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_i_maos(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1434,17 +1434,17 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
     case smesh::QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_i_maos", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_maos", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1476,17 +1476,17 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
     case smesh::QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_quad4_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, direction_stride, u0_direction, u1_direction, out_stride, u0_out, u1_out, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_2d_i_msoa", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_i_maos(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1506,19 +1506,19 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
     case smesh::TET10:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, direction, output, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_i_maos", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_maos", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1554,19 +1554,19 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_hex8_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::TET10:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_tet10_jacobian_action_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, direction_stride, u0_direction, u1_direction, u2_direction, out_stride, u0_out, u1_out, u2_out, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_residual_merit_jacobian_action_3d_i_msoa", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_i_maos(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_2d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1585,17 +1585,17 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_proteus_quad4_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
     case smesh::QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_quad4_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_i_maos", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_total_residual_2d_i_maos", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1624,17 +1624,17 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_
           : real_type;
   switch (element_type) {
     case smesh::PROTEUS_QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_quad4_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_proteus_quad4_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
     case smesh::QUAD4:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_quad4_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_quad4_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, out_stride, u0_out, u1_out, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_residual_merit_residual_2d_i_msoa", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_total_residual_2d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_maos(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_3d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1653,19 +1653,19 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_hex8_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
     case smesh::TET10:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_tet10_residual_i_maos((int)resolved_real_type, nelements, nnodes, elements, points, parameters, current, previous, output, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_maos", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_total_residual_3d_i_maos", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_msoa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -1697,16 +1697,16 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_residual_
           : real_type;
   switch (element_type) {
     case smesh::HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_hex8_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_hex8_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::PROTEUS_HEX8:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_proteus_hex8_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
     case smesh::TET10:
-      return cu_mooney_rivlin_kelvin_voigt_residual_merit_tet10_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
+      return cu_mooney_rivlin_kelvin_voigt_total_tet10_residual_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, out_stride, u0_out, u1_out, u2_out, stream);
     default:
       break;
   }
   return sfem::codegen::unsupported_dispatch(
-      "mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_msoa", (int)element_type, (int)real_type);
+      "mooney_rivlin_kelvin_voigt_total_residual_3d_i_msoa", (int)element_type, (int)real_type);
 }
 
 SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_2d_i_msoa(
