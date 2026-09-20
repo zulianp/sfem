@@ -29,23 +29,35 @@ lengths per iteration.  When the merit is the squared residual norm
 $\tfrac12\|R(x+\alpha h)\|^2$ --- the only merit available to a formulation that
 is not the gradient of a potential --- the obvious implementation assembles the
 whole residual once per trial step, so a search over $m$ step lengths costs $m$
-assemblies.  Measured on a Mooney--Rivlin Kelvin--Voigt solid, $m=12$ costs
-$11.8\times$ one assembly at $m=12$, measured at $512{,}000$ elements on a
-Grace node at $72$ threads.  We show that the $m$ evaluations share a
-substantial part of their work, and that what they share can be hoisted out of
-the trial-step loop exactly, not approximately, because the state enters the
-element kernel through a quantity that is affine in $\alpha$.  The result is a single pass over the mesh
-that produces all $m$ merit values, whose cost model is one gather, one
-trial-function accumulation per field role, and $m$ repetitions of the
-constitutive evaluation alone.  No per-step residual vector is materialized at any
-point: the contraction is closed inside a patch of elements, where the node sums
-are complete, so each trial step leaves the patch as a single number and a thread's
-entire output is a buffer of $m$ scalars.  How much that is worth is bounded by the
-constitutive evaluation, which repeats per trial step and cannot be hoisted.
-The same reorganization is already in place for the energy merit, and measured
-on the same node it costs $5.7\times$ one step at $m=12$ for a Mooney-Rivlin
-class material and $3.7\times$ for linear elasticity --- a real saving against
-$11.8$, and not the near-flat cost a reading of "sampled" might suggest.
+assemblies.  Measured on a Mooney--Rivlin Kelvin--Voigt solid at $512{,}000$
+elements on one Grace node at $72$ threads, $m=12$ costs $11.8\times$ one
+assembly, and only $6\%$ of a merit evaluation is independent of the step
+length.
+
+We reorganize that evaluation in two steps.  First, a material written as
+several units --- here a stored energy for the elastic response and a weak
+residual for the viscous one --- has no single form to contract, because a
+squared nodal residual may not be taken until every unit has contributed.  Both
+units are $1$-forms on the same fields, so they sum, and the material's whole
+residual becomes one kernel: one traversal in place of two, worth $1.57\times$
+the element rate and $36\%$ of the time on the same node.  Second, the $m$ trial
+steps share everything upstream of the constitutive law, and what they share can
+be hoisted out of the trial-step loop exactly rather than approximately, because
+the state enters the element kernel through a quantity that is affine in
+$\alpha$.
+
+The resulting kernel is a single pass over the mesh producing all $m$ merit
+values, and it materializes no per-step residual vector: the contraction closes
+inside a patch of elements, where the node sums are complete, so each trial step
+leaves the patch as one number and a thread's entire output is a buffer of $m$
+scalars.  What this is worth is bounded by the constitutive evaluation, which
+repeats per trial step by construction.  The same reorganization is already in
+place for the energy merit, and measured on the same node it costs $5.7\times$
+one step at $m=12$ for a Mooney--Rivlin-class material and $3.7\times$ for
+linear elasticity: the step-independent fraction rises from $6\%$ to $57\%$.
+That is the quantity this work moves, and we report it in preference to the
+ratio, because a material whose stress evaluation dominates pays for every step
+it samples and no arrangement of the loops can make the cost flat.
 \end{abstract}
 
 \section{Notation}
@@ -125,7 +137,77 @@ numbers.  With \eqref{eq:split} the merit becomes
 \end{equation}
 and the single operator $M$ owns its evaluation for all $k$ at once.
 
+\section{One material, several units, one form}
+\label{sec:combined}
+
+Equation~\eqref{eq:contract} assumes a single operator $M$ whose kernel produces
+$R_M$.  A material need not be written that way.  Mooney--Rivlin Kelvin--Voigt is
+two \emph{units} --- a stored-energy density for the elastic response and a weak
+residual for the viscous one --- and each publishes its own kernels, which the
+operator runs one after the other into the same vector.  Neither can contract the
+merit, for the reason of \eqref{eq:nonadditive} applied one level up: after the
+first traversal no node is finished, so nothing may be squared.
+
+The resolution is not to fuse two kernels in one traversal, which would mean
+carrying two element-kernel calling conventions through a single loop nest.  It
+is that both units are $1$-forms on the same fields, and $1$-forms add.  Writing
+$c^{(u)}_{i}$ and $\mathbf{c}^{(u)}_{i}$ for the coefficients unit $u$ contracts
+against the test value and the test gradient of component $i$,
+\begin{equation}
+  R_i(v) \;=\; \sum_{u} \Bigl( c^{(u)}_i\,v_i
+  \;+\; \mathbf{c}^{(u)}_i\!\cdot\!\nabla v_i \Bigr),
+  \label{eq:formsum}
+\end{equation}
+so the material's whole residual is one form whose coefficients are the
+componentwise sums.  A residual unit publishes its coefficients directly.  An
+energy unit publishes the flux against its staged variable, and the change of
+basis is the framework's own statement rather than an assumption: the staged
+variable carries the expression defining it, $F = I + \nabla u$ for a deformation
+gradient, so
+\begin{equation}
+  \mathbf{c}_i \;=\; \frac{\partial W}{\partial F_{i\cdot}}
+  \Bigl|_{F = I + \nabla u}
+  \;=\; \frac{\partial W}{\partial (\nabla u)_{i\cdot}} ,
+\end{equation}
+which was checked entry by entry against differentiating $W$ directly and agrees
+exactly in rational arithmetic.
+
+This is what makes the sampled merit possible at all, and it is worth something
+on its own.  The combined form is emitted as one ordinary residual unit, so one
+traversal computes what the two computed between them.  Measured on HEX8 at
+$72$ threads on a Grace node, against the two units run the way the operator runs
+them:
+
+\begin{center}
+\begin{tabular}{rrrrr}
+\toprule
+elements & dofs & two units & combined & ratio \\
+         &      & [MElem/s] & [MElem/s] & \\
+\midrule
+ 32{,}768 &   107{,}811 & 54.2 & 88.8 & 0.610 \\
+110{,}592 &   352{,}947 & 60.6 & 95.8 & 0.632 \\
+262{,}144 &   823{,}875 & 61.4 & 96.1 & 0.639 \\
+512{,}000 & 1{,}594{,}323 & 62.5 & 97.9 & 0.639 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Throughput flattens by $262{,}144$ elements, so the last two rows are saturated:
+$1.57\times$ the element rate, $36\%$ of the time removed, with the two residuals
+agreeing to $8\times10^{-16}$ relative.  The saving is the second traversal's
+gather, geometry and trial-function accumulation --- the same quantities
+Section~\ref{sec:affine} hoists out of the trial-step loop, here hoisted out of
+the unit loop.
+
+The combination is refused where it would be a second path to an existing
+answer: a material already written as one unit \emph{is} its own total residual.
+It is also refused for mixed-order systems, whose fields do not share a shape
+count, because the lowered components carry no record of which element each came
+from --- a Taylor--Hood material keeps its kernels and falls back to assembling
+per trial step.
+
 \section{The affine structure that makes one pass exact}
+\label{sec:affine}
 
 Fix an element $e$ and a quadrature point $\xhat_q$.  The element kernel reads the
 state only through the value and the reference gradient of the interpolated field,
@@ -165,6 +247,7 @@ arithmetic, not a truncation: $\phi(\alpha_k)$ is the same number the per-step
 assembly computes, up to the reassociation of a sum.
 
 \section{The kernel: a patch contracts, and emits $m$ numbers}
+\label{sec:kernel}
 
 The work unit is a \emph{patch} $p$ --- a pack of elements together with the nodes
 they touch.  Its nodes divide into three classes, and the library's packed layout
@@ -336,6 +419,32 @@ The last row is the target and the middle row is what a sampled kernel of
 comparable constitutive cost achieves: today $6\%$ of a residual merit
 evaluation is step-independent, against $57\%$ once the sharing is in place.
 The number to move is that fraction, not the ratio directly.
+
+\section{What is built, and what is not}
+
+The form-layer combination of Section~\ref{sec:combined} is in place: the
+material's whole residual is emitted as one kernel, and it agrees with the two
+units the operator runs to $8\times10^{-16}$ relative on $512{,}000$ elements.
+That kernel is the one the sampled merit contracts, and the measurement above is
+its floor.
+
+The sampling kernel itself is not built.  What remains is the trial-step loop
+inside the element traversal, the patch-local accumulators of
+Section~\ref{sec:kernel}, and the contraction to $m$ scalars.  The traversal
+those need is the packed one, and it does not yet exist for this kernel: the
+residual emitter's packed path is restricted to single-field systems and is
+inactive for every material in the tree, so the combined kernel currently has no
+packed variant.  Extending it to vector fields is the next step and is a
+prerequisite rather than an optimization, because the patch is what makes the
+node sums complete and therefore what makes the contraction legal at all.
+
+One case is refused rather than approximated.  A patch is built within one mesh
+block, so a node on a block boundary has incident elements the patch never sees
+and would be squared while its sum is still partial --- a merit that comes out
+too small with nothing to show for it.  Inter-block patches are the general
+answer; until they exist the sampled path refuses a multi-block space, and the
+per-step implementation, which assembles through the ordinary operator and spans
+blocks like any other assembly, continues to serve it.
 
 \section{The interface}
 
