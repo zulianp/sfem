@@ -241,6 +241,8 @@ from codegen.framework.plans.residual_structure import (
     residual_local_phases as _residual_local_phases,
     residual_mesh_phase_plans as _residual_mesh_phase_plans,
     residual_mesh_phases as _residual_mesh_phases,
+    published_block_kernels as _published_block_kernels,
+    publishes_inexact_apply as _publishes_inexact_apply,
 )
 
 
@@ -753,7 +755,7 @@ class CodeGenerationStage:
                         backend.target.source_subdirectory(),
                     ),
                 )
-                if wants_inexact:
+                if _publishes_inexact_apply(unit.unit_name, wants_inexact):
                     _merge_files(
                         outputs,
                         _layout_codegen_files(
@@ -1174,7 +1176,12 @@ def _residual_codegen_unit(material_name, dim, evaluated):
             unit_name=evaluated.name,
         )
     block_kernels = (
-        _block_codegen_units(material_name, dim, evaluated, blocks)
+        _block_codegen_units(
+            material_name,
+            dim,
+            evaluated,
+            _published_block_kernels(evaluated.name, blocks),
+        )
         if coupling is not KernelCoupling.SINGLE_FIELD
         else ()
     )
@@ -2261,24 +2268,38 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
 
 
 def _total_residual_unit(material_system, mixed_order=False):
-    """One more unit carrying the material's whole residual, where it needs one.
+    """One more unit carrying the material's whole residual.
 
     A residual merit squares a node's complete value, so it has to be
     contracted by a single kernel over a single form.  A material written as
     several units has no such form until they are summed, which is what
     `total_residual_collection` does.
 
-    Absent for a material that already is its own total residual.  A single
-    unit's residual *is* the material's, so emitting a second unit computing
-    the same thing would be a redundant path -- two kernels that must agree,
-    with nothing making them.  So this is exactly the multi-unit case, and
-    materials like navier_stokes, written as one coupled residual, are
-    untouched.
+    Every material has a residual and therefore a residual merit, so every
+    material gets this unit and a line search can sample any of them.  A
+    material written as one energy has no residual form of its own at all --
+    its merit comes from reading that energy's 1-form as one, which is the
+    same call -- and a material already written as one residual gets the same
+    treatment rather than a second rule.
+
+    It was once restricted to the multi-unit case, on the grounds that a single
+    unit's residual already *is* the material's and a second unit computing the
+    same thing would be a redundant path: two kernels that must agree, with
+    nothing making them.  That was true while this unit published a full
+    residual and jacobian action beside its merit.  It no longer does --
+    `published_residual_forms` refuses them and the unit publishes its merit
+    kernel and nothing else -- so there is still one kernel per thing, and the
+    restriction was keeping the merit away from nine materials for a reason
+    that had already been removed.
     """
     equations = material_system.equations
-    if len(equations) < 2:
-        return None
-    if not any(equation.is_residual for equation in equations):
+    if any(equation.measure != "dx" for equation in equations):
+        # A surface form.  `total_residual_collection` builds its sum on `dx`,
+        # so a traction unit would come back claiming a volume measure it was
+        # never written with.  Nor would it be wanted: `neumann` is a facet
+        # load emitted by `boundary_codegen`, which the merit path does not
+        # reach, and its residual already arrives in the assembled vector the
+        # contracting operator squares.
         return None
     if mixed_order:
         # Not yet.  A mixed-order system's fields do not share a shape count,

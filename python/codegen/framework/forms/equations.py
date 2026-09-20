@@ -634,6 +634,19 @@ def total_residual_weak_coefficients(system):
             continue
 
         flux = collection.forms[0].expression
+        # One group, because the line below pairs every staged variable with a
+        # definition taken from `variable_groups[0]`.  An energy staging a rate
+        # beside its gradient -- `gen.dt(u)` -- has two groups, and the pairing
+        # would run off the end of the first one's definition and substitute
+        # the wrong expression rather than fail.  No shipped material has one;
+        # saying so here is what keeps that true.
+        if len(equation.variable_groups) != 1:
+            raise NotImplementedError(
+                "the combined residual reads one variable group per energy "
+                "unit, and '%s' stages %d; pair each staged variable with its "
+                "own group's definition before lowering a merit for it"
+                % (equation.name or "<unnamed>", len(equation.variable_groups))
+            )
         group = equation.variable_groups[0]
         staged = tuple(equation.variables)
         to_definition = dict(
@@ -644,6 +657,21 @@ def total_residual_weak_coefficients(system):
             for field in equation.fields
             for name in _residual_component_names(field)
         )
+        # An energy's 1-form arrives as a flux contracted against the test
+        # *gradient*, one entry per component and direction, and that is all
+        # the accumulation below reads.  An energy differentiating to a term
+        # against the test value -- a reaction, a linear work -- would carry
+        # more, and dropping it would understate the residual silently, which
+        # a merit has no way to notice.  Every shipped energy is a gradient
+        # energy; this fails rather than drops if one stops being.
+        if len(flux) != len(names) * dim:
+            raise NotImplementedError(
+                "the combined residual reads an energy's 1-form as a flux "
+                "against the test gradient, expecting %d entries for '%s' and "
+                "finding %d; an energy with a test-value term needs that term "
+                "carried into `value[...]` as well"
+                % (len(names) * dim, equation.name or "<unnamed>", len(flux))
+            )
         # The energy writes one flat gradient per field, `u_grad[i * dim + j]`;
         # a lowered residual names the component and the direction apart.  Both
         # spellings are ABI in their own layer, so the rename belongs here,

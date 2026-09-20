@@ -33,6 +33,10 @@ number of elements incident on a node is a property of the mesh and cannot be
 chosen.
 """
 
+from codegen.framework.plans.dependencies import (
+    contracted_test_quantities,
+    live_test_coefficients,
+)
 from codegen.framework.plans.evaluation_strategy import quadrature_scope_lines
 from codegen.framework.targets import current_target
 from codegen.framework.plans.residual_structure import (
@@ -93,11 +97,73 @@ _QUANTITY_WIDTH = {
 _QUANTITY_BUFFER_SUFFIX = {"value": "_value", "gradient": "_grad"}
 
 
+#: What loop 1 calls the buffer holding one of the *test* function's
+#: quantities, and how wide it is.  One slot for the value, one per direction
+#: for the gradient: the node's own basis function, and only that one, because
+#: the orientation permutation put it at local slot 0.
+_TEST_QUANTITY_BUFFER = {
+    "value": ("pm_test", lambda dim: 1),
+    "gradient": ("pm_test_grad", lambda dim: dim),
+}
+
+
+#: How loop 1 fills each of them.  Both are the same function in every lane and
+#: at every trial step, which is what the orientation buys: they are computed
+#: once here and leave the step loop entirely.
+#:
+#: Which of the two a form needs is `contracted_test_quantities`, never a test
+#: written here.  Every hyperelastic material in the tree contracts only test
+#: gradients and fills no value buffer; a body force is the opposite, and its
+#: whole residual is the value term.
+_TEST_QUANTITY_FILL = {
+    "value": lambda indent, dim: [
+        "%s    pm_test[q * VS + %s] = shape[q * NS + 0];" % (indent, _lane()),
+    ],
+    "gradient": lambda indent, dim: [
+        "%s    for (int d = 0; d < ND; ++d) {" % indent,
+        "%s      s_t mapped = s_t(0);" % indent,
+        "%s      for (int k = 0; k < ND; ++k) {" % indent,
+        "%s        mapped += grad_ref[k][q * NS + 0] * adj[k * ND + d];" % indent,
+        "%s      }" % indent,
+        "%s      pm_test_grad[%s] = mapped / det;" % (indent, _buffer_index("d", dim)),
+        "%s    }" % indent,
+    ],
+}
+
+
+#: The reference table each contracted test quantity is read from.  Named in
+#: the signature only where it is read: a kernel that names a table it never
+#: touches makes its caller produce data for a computation that does not
+#: happen, and every hyperelastic material in the tree was asking for `shape`
+#: to contract nothing against it.
+_TEST_QUANTITY_PARAMETER = {
+    "value": lambda dim: "const s_t *const RSTR shape",
+    "gradient": lambda dim: "const s_t *const RSTR grad_ref[%d]" % dim,
+}
+
+
+#: The factor loop 2 multiplies a coefficient by, per kind.
+#: `live_test_coefficients` names the coefficient and says which kind it is;
+#: this is the other half of the product.
+_TEST_FACTOR = {
+    "value": lambda dim, axis: "pm_test[q * VS + lane_e]",
+    "gradient": lambda dim, axis: "pm_test_grad[%s]"
+    % _buffer_index("%d" % axis, dim, lane="lane_e"),
+}
+
+
 def patch_loop_one_buffers(dim, n_field_components, dependencies):
-    buffers = [("pm_test_grad", dim), ("pm_weight", 1)]
+    buffers = [
+        (name, width(dim))
+        for name, width in (
+            _TEST_QUANTITY_BUFFER[quantity]
+            for quantity in contracted_test_quantities(dependencies)
+        )
+    ]
+    buffers.append(("pm_weight", 1))
     for role in patch_merit_staged_roles(dependencies):
         for prefix in _ROLE_SPELLING[role]["buffers"]:
-            for quantity in patch_merit_staged_quantities(dependencies):
+            for quantity in patch_merit_staged_quantities(dependencies, role):
                 buffers.append(
                     (
                         prefix + _QUANTITY_BUFFER_SUFFIX[quantity],
@@ -203,7 +269,20 @@ def _atomic_update_pragma():
     return current_target().atomic_update_pragma()
 
 
-def _buffer_index(offset, count, lane="lane"):
+def _lane():
+    """The bound target's name for the work item, not the word `lane`.
+
+    Every lane loop in this kernel is a work-item loop, and what the index is
+    called belongs to the target: a target that spells it differently gets a
+    kernel that spells it differently, and one that emits no lane loop at all
+    gets none.  `test_target_binding` probes exactly this by renaming the
+    index and looking for survivors, and the tree had been driven to zero of
+    them before this kernel was written.
+    """
+    return current_target().loop_lowering_policy().lane_index
+
+
+def _buffer_index(offset, count, lane=None):
     """`(q * count + offset) * VS + <element lane>`.
 
     The lane axis of every loop-1 buffer is the *element*, in both loops.  That
@@ -212,7 +291,7 @@ def _buffer_index(offset, count, lane="lane"):
     element's value for another's, which is why the lane is a parameter here
     rather than the word `lane` written into the format string.
     """
-    return "(q * %d + %s) * VS + %s" % (count, offset, lane)
+    return "(q * %d + %s) * VS + %s" % (count, offset, lane or _lane())
 
 
 def _stage_value_lines(indent, name, dim, n_fields):
@@ -273,9 +352,10 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
         "%s// loop 1 -- lanes are the elements incident on this node." % indent,
         *quadrature_scope_lines(rule.element_type, indent),
         "%s  %s" % (indent, _vectorize_pragma()),
-        "%s  for (int lane = 0; lane < ne; ++lane) {" % indent,
-        "%s    const idx_t element = pm_incident[lane];" % indent,
-        "%s    const int *const RSTR perm = pm_orientation[pm_local_node[lane]];" % indent,
+        "%s  for (int %s = 0; %s < ne; ++%s) {" % ((indent,) + (_lane(),) * 3),
+        "%s    const idx_t element = pm_incident[%s];" % (indent, _lane()),
+        "%s    const int *const RSTR perm = pm_orientation[pm_local_node[%s]];"
+        % (indent, _lane()),
     ]
     # The gather reads geometry and state through the same permutation, so the
     # two cannot disagree about which vertex is which.
@@ -317,26 +397,25 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
         ]
     )
     lines.extend(_JACOBIAN_ADJUGATE[dim](indent))
-    for quantity in patch_merit_staged_quantities(dependencies):
-        for name, _ in gathers:
-            lines.extend(
-                _STAGE_QUANTITY[quantity](indent, name, dim, n_fields)
-            )
+    for role in patch_merit_staged_roles(dependencies):
+        for name, _ in _ROLE_SPELLING[role]["gathers"]:
+            for quantity in patch_merit_staged_quantities(dependencies, role):
+                lines.extend(
+                    _STAGE_QUANTITY[quantity](indent, name, dim, n_fields)
+                )
     lines.extend(
         [
-            "%s    // the fixed basis function's physical gradient, and the" % indent,
+            "%s    // the fixed basis function's quantities, and the" % indent,
             "%s    // integration weight.  Both are what the orientation buys:" % indent,
-            "%s    // `phi_0` is the same function in every lane and at every" % indent,
-            "%s    // step, so this leaves the step loop entirely." % indent,
-            "%s    for (int d = 0; d < ND; ++d) {" % indent,
-            "%s      s_t mapped = s_t(0);" % indent,
-            "%s      for (int k = 0; k < ND; ++k) {" % indent,
-            "%s        mapped += grad_ref[k][q * NS + 0] * adj[k * ND + d];"
-            % indent,
-            "%s      }" % indent,
-            "%s      pm_test_grad[%s] = mapped / det;" % (indent, _buffer_index("d", dim)),
-            "%s    }" % indent,
-            "%s    pm_weight[q * VS + lane] = q_weight[q] * det;" % indent,
+            "%s    // `phi_0` is the same function in every element and at" % indent,
+            "%s    // every step, so this leaves the step loop entirely." % indent,
+        ]
+    )
+    for quantity in contracted_test_quantities(dependencies):
+        lines.extend(_TEST_QUANTITY_FILL[quantity](indent, dim))
+    lines.extend(
+        [
+            "%s    pm_weight[q * VS + %s] = q_weight[q] * det;" % (indent, _lane()),
             "%s  }" % indent,
             "%s}" % indent,
         ]
@@ -406,8 +485,17 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
         "%sfor (int lane_e = 0; lane_e < ne; ++lane_e) {" % indent,
         *quadrature_scope_lines(element_type, "%s  " % indent),
         "%s    %s" % (indent, _vectorize_pragma()),
-        "%s    for (int lane = 0; lane < nsteps; ++lane) {" % indent,
-        "%s      const s_t alpha = steps[lane];" % indent,
+        "%s    for (int %s = 0; %s < nsteps; ++%s) {" % ((indent,) + (_lane(),) * 3),
+        # The step length is read by the combination below and by nothing
+        # else, so a residual that does not depend on the state names none.  A
+        # body force is the whole of its load and none of its state: its rows
+        # are the same at every trial step, and the kernel still produces one
+        # scalar per step because that is its contract.  Sliced rather than
+        # tested, so emission walks what the plan returned.
+        *[
+            "%s      const s_t alpha = steps[%s];" % (indent, _lane())
+            for _ in patch_merit_staged_quantities(dependencies, "current")[:1]
+        ],
     ]
     # `grad(x + alpha h) = grad x + alpha grad h`, one fused multiply-add per
     # component.  This is the whole of the affine identity at the point the
@@ -416,7 +504,7 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
     # join, so the same table produces a plain read for it.  The join is the
     # role's buffer list, not a test on which role this is.
     for role in patch_merit_staged_roles(dependencies):
-        for quantity in patch_merit_staged_quantities(dependencies):
+        for quantity in patch_merit_staged_quantities(dependencies, role):
             for field_index, field in enumerate(system.fields):
                 lines.extend(
                     _STAGED_COMBINATION[quantity](
@@ -427,14 +515,26 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
     lines.append(
         "%s      const s_t weight = pm_weight[q * VS + lane_e];" % indent
     )
+    # Every coefficient the row has live, against the test quantity it
+    # multiplies -- the value as well as the gradient.  This used to spell the
+    # gradient terms itself and drop the value ones, which was invisible while
+    # the merit existed for one hyperelastic material whose residual has no
+    # value term: a body force, whose residual is *nothing but* a value term,
+    # produced a merit that ignored the load entirely.  `live_test_coefficients`
+    # has always answered this, for every other contraction in the tree.
     for row in range(n_fields):
-        terms = " + ".join(
-            "grad_coeff%d_%d * pm_test_grad[%s]"
-            % (row, d, _buffer_index("%d" % d, dim, lane="lane_e"))
-            for d in range(dim)
-        )
-        lines.append(
-            "%s      rho[%d * VS + lane] += weight * (%s);" % (indent, row, terms)
+        terms = [
+            "%s * %s" % (name, _TEST_FACTOR[kind](dim, axis))
+            for kind, axis, name in live_test_coefficients(dependencies, row, dim)
+        ]
+        # A row whose coefficients are all structurally zero contracts nothing
+        # and gets no accumulation -- `rho` keeps the value the accumulator
+        # gathered into it.  Sliced rather than tested, so emission still only
+        # walks what the plan returned.
+        lines.extend(
+            "%s      rho[%d * VS + %s] += weight * (%s);"
+            % (indent, row, _lane(), " + ".join(terms))
+            for _ in terms[:1]
         )
     lines.extend(
         [
@@ -458,16 +558,17 @@ def patch_reduction_lines(system, indent="  "):
     return [
         "%s// The node is finished, so it may be squared." % indent,
         "%s%s" % (indent, _vectorize_pragma()),
-        "%sfor (int lane = 0; lane < nsteps; ++lane) {" % indent,
+        "%sfor (int %s = 0; %s < nsteps; ++%s) {" % ((indent,) + (_lane(),) * 3),
         "%s  s_t squared = s_t(0);" % indent,
     ] + [
-        "%s  squared += rho[%d * VS + lane] * rho[%d * VS + lane];" % (indent, c, c)
+        "%s  squared += rho[%d * VS + %s] * rho[%d * VS + %s];"
+        % (indent, c, _lane(), c, _lane())
         for c in range(n_fields)
     ] + [
         # Into the thread's own buffer, never the shared output.  Writing
         # `merit` here is a data race between every thread that owns a node,
         # and it shows up as two lanes sampling the same alpha disagreeing.
-        "%s  merit_local[lane] += s_t(0.5) * squared;" % indent,
+        "%s  merit_local[%s] += s_t(0.5) * squared;" % (indent, _lane()),
         "%s}" % indent,
     ]
 
@@ -499,10 +600,12 @@ def patch_merit_kernel_parameters(system, rule, dependencies, parameters=()):
         # `float` while `real_t` is `double`; reading them through the scalar's
         # pointer type is garbage, and the merit comes out NaN.
         "const g_t *const *const RSTR points",
-        "const s_t *const RSTR shape",
-        "const s_t *const RSTR grad_ref[%d]" % dim,
-        "const s_t *const RSTR q_weight",
     ]
+    params.extend(
+        _TEST_QUANTITY_PARAMETER[quantity](dim)
+        for quantity in contracted_test_quantities(dependencies)
+    )
+    params.append("const s_t *const RSTR q_weight")
     params.extend("const s_t %s" % parameter for parameter in parameters)
     params.extend(["const int nsteps", "const s_t *const RSTR steps"])
     params.extend(
@@ -566,7 +669,8 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
             "    // caller rounds the step count to it, which is the whole",
             "    // reason the steps carry the lanes.",
             "    s_t merit_local[VS];",
-            "    for (int lane = 0; lane < VS; ++lane) merit_local[lane] = s_t(0);",
+            "    for (int %s = 0; %s < VS; ++%s) merit_local[%s] = s_t(0);"
+            % ((_lane(),) * 4),
             "    s_t rho[NC * VS];",
         ]
     )
@@ -583,17 +687,22 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
             "      // Seed with everything that does not move with the state, so",
             "      // the square below is over the whole residual.",
             "      for (int c = 0; c < NC; ++c) {",
-            "        for (int lane = 0; lane < VS; ++lane) {",
-            "          rho[c * VS + lane] = accumulator[node * NC + c];",
+            "        for (int %s = 0; %s < VS; ++%s) {" % ((_lane(),) * 3),
+            "          rho[c * VS + %s] = accumulator[node * NC + c];" % _lane(),
             "        }",
             "      }",
             "      const count_t begin = n2e_ptr[node];",
             "      const count_t end = n2e_ptr[node + 1];",
             "      for (count_t block = begin; block < end; block += VS) {",
             "        const int ne = (int)MIN((count_t)VS, end - block);",
-            "        for (int lane = 0; lane < ne; ++lane) {",
-            "          pm_incident[lane] = n2e_idx[block + lane];",
-            "          pm_local_node[lane] = n2e_local[block + lane];",
+            # A contiguous copy out of the incidence graph, one entry per
+            # lane and no indirection on the left, so it is ordinary vector
+            # work and asks the target for its pragma like every other lane
+            # loop here.
+            "        %s" % _vectorize_pragma(),
+            "        for (int %s = 0; %s < ne; ++%s) {" % ((_lane(),) * 3),
+            "          pm_incident[%s] = n2e_idx[block + %s];" % ((_lane(),) * 2),
+            "          pm_local_node[%s] = n2e_local[block + %s];" % ((_lane(),) * 2),
             "        }",
         ]
     )
@@ -617,9 +726,9 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
             "    }",
             "",
             "    // One reduction per thread, not one per node.",
-            "    for (int lane = 0; lane < nsteps; ++lane) {",
+            "    for (int %s = 0; %s < nsteps; ++%s) {" % ((_lane(),) * 3),
             _atomic_update_pragma(),
-            "      merit[lane] += merit_local[lane];",
+            "      merit[%s] += merit_local[%s];" % ((_lane(),) * 2),
             "    }",
             "  }",
             "  return SFEM_SUCCESS;",
