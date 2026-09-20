@@ -17,9 +17,17 @@ TensorProductWeakOps (`tensor_test`), the residual path evaluates and integrates
 with TensorProductResidualOps (`tensor_evaluate` / `tensor_integrate`).  So rule
 one is largely met already, by two separate implementations of it.
 
-Rule two is not.  Lowest-order simplices still generate quadrature loops and
-per-point data across every material, and the compact expanded form exists only
-as hand-written C transcribed into the emitter for the Laplacian.
+Rule two is met in the volume kernels, where it is stated: every lowest-order
+simplex opens `{ const int q = 0; }` instead of a one-trip loop, and the count
+below is zero.  `tests/test_evaluation_strategy_conformance.py` holds it there.
+
+Rule two says nothing about a facet.  What makes a lowest-order simplex
+loop-free is that its volume integrand is built from basis gradients that are
+constant over the cell, so one point is exact and the rule carries exactly one;
+a facet load vector integrates the shape function itself, so its rule carries
+two points on an edge and three on a triangle and its loop is not a one-trip
+loop at all.  Surface integrals are therefore counted out of both rules rather
+than reported as departures -- see `survey`.
 
 This reports the gap against the three rules, so closing it is measurable
 rather than asserted.  It reads a generated tree:
@@ -79,17 +87,30 @@ def survey(generated):
                 continue
             element = os.path.basename(os.path.dirname(path))
             source = open(path, errors="ignore").read()
-            by_element.setdefault(element, 0)
-            by_element[element] += len(re.findall(r"for \(int q = 0", source))
             # The rules govern volume kernels.  A material whose only kernels
             # are surface integrals -- the Neumann conditions emit nothing but
             # `*_boundary_operator.cpp` -- is not a tensor-product volume
             # element missing sum factorization; it is a different kind of
             # integral, and counting it as a departure was a category error
             # that put sixteen phantom entries in this report.
+            #
+            # The same category error applied to the quadrature-loop rule, and
+            # it put four more here.  What makes a lowest-order simplex
+            # loop-free is that its *volume* integrand is built from basis
+            # gradients that are constant over the cell, so one point is exact
+            # and `sfem_element_quadrature_rule("TET4")` carries exactly one.
+            # A facet load vector is a different integrand: it contains the
+            # shape function itself, and for `neumann_general` a spatially
+            # varying traction besides, so `boundary_codegen` asks for degree
+            # `2 * order` and a flat TRISHELL3 facet genuinely carries three
+            # points.  Its loop runs three times and is not a departure --
+            # collapsing it to `q = 0` would keep a third of the traction.
+            # So loops are counted where the rules apply: in volume kernels.
             volume.setdefault(element, False)
+            by_element.setdefault(element, 0)
             if "_boundary_operator" not in os.path.basename(path):
                 volume[element] = True
+                by_element[element] += len(re.findall(r"for \(int q = 0", source))
         for element, quadrature_loops in sorted(by_element.items()):
             rows.append(
                 {

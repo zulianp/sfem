@@ -111,6 +111,10 @@ system, a rule, a plan — is emission choosing *what* to emit rather than *how 
   was written: tensor-product → sum factorization, always; lowest-order simplex → closed form,
   no quadrature loop and no per-point data; higher-order simplex → quadrature. *Expanded* refers
   to the loop and quadrature structure, not to the algebra — expanding the algebra defeats the rule.
+  The rule is about the *cell's* integrand, which is built from basis gradients that are constant
+  over a lowest-order simplex, so one point is exact and its rule carries one. It does not reach a
+  facet: a surface load integrates the shape function itself, its rule carries two points on an
+  edge and three on a triangle, and that loop is not a one-trip loop to remove.
 - **Applicability is pattern-matched, not enumerated.** Ask the structural question of the
   lowered form (is the isolated map free of the gradient, and symmetric?), not a question whose
   only answer is the operator you already had in mind. Element-varying parameters ride *inside*
