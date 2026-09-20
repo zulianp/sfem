@@ -36,6 +36,27 @@ def residual_local_phase_plans():
     )
 
 
+def patch_merit_staged_quantities(dependencies):
+    """Which of a field's quantities a sampled patch kernel carries between its
+    two loops.
+
+    Loop 1 interpolates them and loop 2 combines each with `alpha`, so the two
+    have to agree about which exist -- a quantity staged and not combined is a
+    dead buffer, and one combined but not staged is a symbol nothing defines.
+    Answering it once here is what keeps them in step, and keeps the emitter
+    spelling a sequence rather than testing the form.
+
+    The order is the order the buffers are declared and the combinations are
+    emitted, so it is part of the kernel's layout rather than incidental.
+    """
+    quantities = []
+    if dependencies.current_value:
+        quantities.append("value")
+    if dependencies.current_gradient:
+        quantities.append("gradient")
+    return tuple(quantities)
+
+
 def residual_step_dependent_phases():
     """Which local phases a sampled merit repeats for every trial step.
 

@@ -33,6 +33,7 @@ number of elements incident on a node is a property of the mesh and cannot be
 chosen.
 """
 
+from codegen.framework.plans.residual_structure import patch_merit_staged_quantities
 from codegen.framework.fem.patch_orientation import (
     patch_orientation_permutations,
     supports_patch_orientation,
@@ -53,22 +54,22 @@ from codegen.framework.fem.patch_orientation import (
 #: `test_grad` is the physical gradient of the *fixed* basis function -- the one
 #: the orientation permutation put at local slot 0 -- which is why it belongs
 #: here at all rather than inside the step loop.
-def patch_loop_one_buffers(dim, n_field_components, reads_value=False):
-    buffers = [
-        ("pm_state_grad", n_field_components * dim),
-        ("pm_direction_grad", n_field_components * dim),
-        ("pm_test_grad", dim),
-        ("pm_weight", 1),
-    ]
-    if reads_value:
-        # A form that contracts a field *value* needs it interpolated as well,
-        # and it combines under alpha exactly as the gradient does.  Omitting it
-        # is not a missing optimisation but a missing symbol: the material would
-        # reference `u` and nothing would define it.
-        buffers.extend(
-            (("pm_state_value", n_field_components),
-             ("pm_direction_value", n_field_components))
-        )
+#: The two buffers a staged quantity needs, and how wide each is.  A quantity
+#: that a form does not read contributes no entry, which is the plan's answer
+#: rather than a test here: see `patch_merit_staged_quantities`.
+_STAGED_BUFFERS = {
+    "value": lambda dim, nc: (("pm_state_value", nc), ("pm_direction_value", nc)),
+    "gradient": lambda dim, nc: (
+        ("pm_state_grad", nc * dim),
+        ("pm_direction_grad", nc * dim),
+    ),
+}
+
+
+def patch_loop_one_buffers(dim, n_field_components, dependencies):
+    buffers = [("pm_test_grad", dim), ("pm_weight", 1)]
+    for quantity in patch_merit_staged_quantities(dependencies):
+        buffers.extend(_STAGED_BUFFERS[quantity](dim, n_field_components))
     return tuple(buffers)
 
 
@@ -110,6 +111,51 @@ def _buffer_index(offset, count, lane="lane"):
     rather than the word `lane` written into the format string.
     """
     return "(q * %d + %s) * VS + %s" % (count, offset, lane)
+
+
+def _stage_value_lines(indent, name, dim, n_fields):
+    target = "pm_state_value" if name == "state" else "pm_direction_value"
+    return [
+        "%s    // interpolated %s value" % (indent, name),
+        "%s    for (int c = 0; c < NC; ++c) {" % indent,
+        "%s      s_t acc = s_t(0);" % indent,
+        "%s      for (int j = 0; j < NS; ++j) {" % indent,
+        "%s        acc += %s[j * NC + c] * shape[q * NS + j];" % (indent, name),
+        "%s      }" % indent,
+        "%s      %s[%s] = acc;" % (indent, target, _buffer_index("c", n_fields)),
+        "%s    }" % indent,
+    ]
+
+
+def _stage_gradient_lines(indent, name, dim, n_fields):
+    target = "pm_state_grad" if name == "state" else "pm_direction_grad"
+    return [
+        "%s    // physical gradient of the %s: summed over shape functions," % (indent, name),
+        "%s    // then mapped.  Mapped here and not in loop 2 because the map" % indent,
+        "%s    // is linear and does not depend on the step length." % indent,
+        "%s    for (int c = 0; c < NC; ++c) {" % indent,
+        "%s      for (int d = 0; d < ND; ++d) {" % indent,
+        "%s        s_t mapped = s_t(0);" % indent,
+        "%s        for (int k = 0; k < ND; ++k) {" % indent,
+        "%s          s_t acc = s_t(0);" % indent,
+        "%s          for (int j = 0; j < NS; ++j) {" % indent,
+        "%s            acc += %s[j * NC + c] * grad_ref[k][q * NS + j];" % (indent, name),
+        "%s          }" % indent,
+        "%s          mapped += acc * adjugate[k * ND + d][element];" % indent,
+        "%s        }" % indent,
+        "%s        %s[%s] = mapped / det;"
+        % (indent, target, _buffer_index("c * ND + d", n_fields * dim)),
+        "%s      }" % indent,
+        "%s    }" % indent,
+    ]
+
+
+#: How loop 1 fills each staged quantity's pair of buffers.  Walked in the
+#: plan's order, so the buffers exist in the order they are declared.
+_STAGE_QUANTITY = {
+    "value": _stage_value_lines,
+    "gradient": _stage_gradient_lines,
+}
 
 
 def patch_loop_one_lines(system, rule, dependencies, indent="  "):
@@ -155,55 +201,11 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
             "%s    const s_t det = determinant[element];" % indent,
         ]
     )
-    if getattr(dependencies, "current_value", False):
+    for quantity in patch_merit_staged_quantities(dependencies):
         for name in ("state", "direction"):
-            target = "pm_state_value" if name == "state" else "pm_direction_value"
             lines.extend(
-                [
-                    "%s    // interpolated %s value" % (indent, name),
-                    "%s    for (int c = 0; c < NC; ++c) {" % indent,
-                    "%s      s_t acc = s_t(0);" % indent,
-                    "%s      for (int j = 0; j < NS; ++j) {" % indent,
-                    "%s        acc += %s[j * NC + c] * shape[q * NS + j];"
-                    % (indent, name),
-                    "%s      }" % indent,
-                    "%s      %s[%s] = acc;"
-                    % (indent, target, _buffer_index("c", n_fields)),
-                    "%s    }" % indent,
-                ]
+                _STAGE_QUANTITY[quantity](indent, name, dim, n_fields)
             )
-    for name in ("state", "direction"):
-        target = "pm_state_grad" if name == "state" else "pm_direction_grad"
-        lines.append(
-            "%s    // physical gradient of the %s: summed over shape functions,"
-            % (indent, name)
-        )
-        lines.append(
-            "%s    // then mapped.  Mapped here and not in loop 2 because the map"
-            % indent
-        )
-        lines.append(
-            "%s    // is linear and does not depend on the step length." % indent
-        )
-        lines.extend(
-            [
-                "%s    for (int c = 0; c < NC; ++c) {" % indent,
-                "%s      for (int d = 0; d < ND; ++d) {" % indent,
-                "%s        s_t mapped = s_t(0);" % indent,
-                "%s        for (int k = 0; k < ND; ++k) {" % indent,
-                "%s          s_t acc = s_t(0);" % indent,
-                "%s          for (int j = 0; j < NS; ++j) {" % indent,
-                "%s            acc += %s[j * NC + c] * grad_ref[k][q * NS + j];"
-                % (indent, name),
-                "%s          }" % indent,
-                "%s          mapped += acc * adjugate[k * ND + d][element];" % indent,
-                "%s        }" % indent,
-                "%s        %s[%s] = mapped / det;"
-                % (indent, target, _buffer_index("c * ND + d", n_fields * dim)),
-                "%s      }" % indent,
-                "%s    }" % indent,
-            ]
-        )
     lines.extend(
         [
             "%s    // the fixed basis function's physical gradient, and the" % indent,
@@ -224,6 +226,36 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
         ]
     )
     return lines
+
+
+def _combine_value_lines(indent, field, field_index, dim, n_fields, components):
+    source = _buffer_index("%d" % field_index, n_fields, lane="lane_e")
+    return [
+        "%s      const s_t %s = pm_state_value[%s] + alpha * pm_direction_value[%s];"
+        % (indent, field.name, source, source)
+    ]
+
+
+def _combine_gradient_lines(indent, field, field_index, dim, n_fields, components):
+    lines = []
+    for d in range(dim):
+        source = _buffer_index(
+            "%d" % (field_index * dim + d), components, lane="lane_e"
+        )
+        lines.append(
+            "%s      const s_t %s_grad_%d = pm_state_grad[%s] + alpha * pm_direction_grad[%s];"
+            % (indent, field.name, d, source, source)
+        )
+    return lines
+
+
+#: `grad(x + alpha h) = grad x + alpha grad h`, and the same for the value.
+#: One entry per staged quantity, walked in the plan's order so loop 2 combines
+#: exactly what loop 1 staged.
+_STAGED_COMBINATION = {
+    "value": _combine_value_lines,
+    "gradient": _combine_gradient_lines,
+}
 
 
 def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
@@ -256,27 +288,11 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
     # `grad(x + alpha h) = grad x + alpha grad h`, one fused multiply-add per
     # component.  This is the whole of the affine identity at the point the
     # state enters the arithmetic.
-    for field_index, field in enumerate(system.fields):
-        if dependencies.current_value:
-            lines.append(
-                "%s      const s_t %s = pm_state_value[%s] + alpha * pm_direction_value[%s];"
-                % (
-                    indent,
-                    field.name,
-                    _buffer_index("%d" % field_index, n_fields, lane="lane_e"),
-                    _buffer_index("%d" % field_index, n_fields, lane="lane_e"),
-                )
-            )
-        for d in range(dim):
-            offset = "%d" % (field_index * dim + d)
-            lines.append(
-                "%s      const s_t %s_grad_%d = pm_state_grad[%s] + alpha * pm_direction_grad[%s];"
-                % (
-                    indent,
-                    field.name,
-                    d,
-                    _buffer_index(offset, components, lane="lane_e"),
-                    _buffer_index(offset, components, lane="lane_e"),
+    for quantity in patch_merit_staged_quantities(dependencies):
+        for field_index, field in enumerate(system.fields):
+            lines.extend(
+                _STAGED_COMBINATION[quantity](
+                    indent, field, field_index, dim, n_fields, components
                 )
             )
     lines.extend("%s      %s" % (indent, line) for line in material_lines)
@@ -344,9 +360,7 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
     dim = system.dim
     n_fields = len(system.fields)
     n_shape = rule.n_shape
-    buffers = patch_loop_one_buffers(
-        dim, n_fields, getattr(dependencies, "current_value", False)
-    )
+    buffers = patch_loop_one_buffers(dim, n_fields, dependencies)
     lines = [
         "template <typename s_t, int NQ, int NS, int VS>",
         "static int %s(" % function_name,

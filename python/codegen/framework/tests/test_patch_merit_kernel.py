@@ -79,8 +79,9 @@ def test_loop_two_reads_loop_one_by_the_element_lane():
     """Loop 2's own lane is the trial step, so every buffer loop 1 filled must
     be indexed by the element lane instead.  Indexing them by `lane` would take
     one element's value for another's -- a wrong answer that still runs."""
+    _, _, dependencies = _fixture()
     for line in _loop_two().splitlines():
-        for buffer_name, _ in patch_loop_one_buffers(DIM, 1, reads_value=True):
+        for buffer_name, _ in patch_loop_one_buffers(DIM, 1, dependencies):
             if buffer_name in line:
                 assert "+ lane_e]" in line, line
 
@@ -179,3 +180,34 @@ def test_threads_reduce_once_each():
 
 def test_the_incident_buffer_holds_element_indices():
     assert "element_idx_t pm_incident[VS];" in _kernel()
+
+
+def test_a_gradient_only_form_stages_no_value():
+    """The staged sequence is the plan's answer, and both loops walk it.
+
+    A flux that never reads the field value must produce no value buffer and no
+    value combination -- otherwise loop 1 fills something loop 2 ignores, which
+    is dead traffic proportional to the incident count.
+    """
+    from codegen.framework.emitters.patch_merit_codegen import patch_loop_one_buffers
+
+    system = CoupledResidualSystem(DIM)
+    u = system.add_field("u", previous=False)
+    system.add_residual(
+        u, sum(u.gradient[d] * u.test_gradient[d] for d in range(DIM))
+    )
+    coefficients = coupled_residual_weak_coefficients(system, False)
+    dependencies = stepped_residual_dependencies(
+        residual_codegen_dependencies(
+            system, coefficients, system.residual_dependencies()
+        )
+    )
+    material = rc._print_statement_nodes(
+        rc._coefficient_evaluation_nodes(system, coefficients, dependencies), ""
+    )
+    text = "\n".join(
+        patch_loop_two_lines(system, coefficients, dependencies, material)
+    )
+    names = [name for name, _ in patch_loop_one_buffers(DIM, 1, dependencies)]
+    assert "pm_state_value" not in names
+    assert "pm_state_value" not in text
