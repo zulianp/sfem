@@ -109,6 +109,7 @@ from codegen.framework.plans.generation import (
 )
 from codegen.framework.plans.generation import LocalPhase, MeshPhase
 from codegen.framework.plans.residual_structure import (
+    residual_step_dependent_phases,
     publishes_scalar_jacobian_action,
     published_jacobian_blocks,
     jacobian_block_plan,
@@ -4099,7 +4100,26 @@ def _simplex_state_gather_nodes(system, dependencies, usage):
     return nodes
 
 
-def _simplex_state_transform_nodes(system, dependencies, usage):
+def _stepped_reference_source(stem, staged, direction_stem, stepped):
+    """Where a staged reference quantity is read from, per trial step.
+
+    The plain body reads what the trial-function loop accumulated.  A sampled
+    body reads the same thing plus `alpha` times the direction's, which is the
+    whole of the affine identity `grad(x + alpha h) = grad x + alpha grad h`
+    spelled at the one place the state enters the arithmetic.
+
+    Combining in *reference* space rather than after the geometric map is
+    deliberate.  Both are correct, because the map is linear; doing it here
+    means the direction needs no physical gradient of its own, so a sampled
+    kernel stages one extra reference quantity per component and not one extra
+    transform.
+    """
+    if not stepped:
+        return staged
+    return "%s + alpha * %s" % (staged, staged.replace(stem, direction_stem, 1))
+
+
+def _simplex_state_transform_nodes(system, dependencies, usage, stepped=False):
     """Read the staged values back and take them to the physical element."""
     dim = system.dim
     transform_values = []
@@ -4107,10 +4127,24 @@ def _simplex_state_transform_nodes(system, dependencies, usage):
         for group in _dependency_stream_groups(dependencies):
             stem = field.name + group.symbol_suffix
             read = usage[(field.name, group.name)]
+            # A sampled body folds the direction into the current state, so the
+            # direction has no physical gradient of its own and nothing reads
+            # one.  Transforming it anyway would be `dim` dead divisions per
+            # component per quadrature point.
+            if stepped and group.name == "direction":
+                continue
+            direction_stem = field.name + _STREAM_GROUP_SYNTAX["direction"][0]
+            combine = stepped and group.name == "current"
             if read.uses_value:
                 transform_values.append(
                     BufferDeclNode(
-                        "const s_t", stem, (), expr_ref(('%s_values' + _wi()) % stem)
+                        "const s_t", stem, (),
+                        expr_ref(_stepped_reference_source(
+                            stem,
+                            ('%s_values' + _wi()) % stem,
+                            direction_stem,
+                            combine,
+                        )),
                     )
                 )
             if read.uses_gradient:
@@ -4119,7 +4153,12 @@ def _simplex_state_transform_nodes(system, dependencies, usage):
                         "const s_t",
                         "%s_grad_%d_ref" % (stem, d),
                         (),
-                        expr_ref(('%s_grad_%d_ref_values' + _wi()) % (stem, d)),
+                        expr_ref(_stepped_reference_source(
+                            stem,
+                            ('%s_grad_%d_ref_values' + _wi()) % (stem, d),
+                            direction_stem,
+                            combine,
+                        )),
                     )
                     for d in range(dim)
                 )
@@ -4168,6 +4207,7 @@ def _simplex_local_body(
     gradient_metric=None,
     allow_gradient_metric=True,
     constant_p1_gradient_expansion=True,
+    stepped=False,
 ):
     if gradient_metric is None and allow_gradient_metric:
         gradient_metric = simplex_gradient_metric_transformation(system.fields, rule, coefficients, dependencies)
@@ -4194,7 +4234,7 @@ def _simplex_local_body(
         for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
     )
     gather = _simplex_state_gather_nodes(system, dependencies, usage)
-    transform = _simplex_state_transform_nodes(system, dependencies, usage)
+    transform = _simplex_state_transform_nodes(system, dependencies, usage, stepped)
 
     # EVALUATE_MATERIAL: the constitutive evaluation, staged for the contraction.
     material = []
@@ -4233,11 +4273,16 @@ def _simplex_local_body(
             for kind, axis, name in live_test_coefficients(dependencies, row, dim)
         ]
         if terms:
+            # A sampled body owns `nsteps` element residuals rather than
+            # one, so the stream index carries the step.  The streams stay in
+            # the same order within a step, so a caller that wants step `k`
+            # reads the same slice it always did, offset by `k * NC * NS`.
+            stream = c_sum(c_product("test", "NC"), row)
+            if stepped:
+                stream = c_sum(c_product("step", "NC * NS"), stream)
             test_body.append(
                 ScatterNode(
-                    expr_ref(
-                        ('output[%s]' + _wi()) % c_sum(c_product("test", "NC"), row)
-                    ),
+                    expr_ref(('output[%s]' + _wi()) % stream),
                     expr_ref("q_weight[q] * det * (%s)" % " + ".join(terms)),
                     "+=",
                 )
@@ -4262,7 +4307,7 @@ def _simplex_local_body(
             quadrature,
             iteration_range(0, expr_ref("NQ", "quadrature_count")),
             pre_increment(quadrature),
-            body=_assemble_local_phases(sections),
+            body=_assemble_local_phases(sections, stepped),
         ),
     )
 
@@ -4650,7 +4695,7 @@ def _geometry_value_nodes(dependencies, dim):
     return nodes
 
 
-def _assemble_local_phases(sections):
+def _assemble_local_phases(sections, stepped=False):
     """Order a local kernel's phases the way the plan says, and fuse them.
 
     ``residual_local_phase_plans`` states the sequence: evaluate the trial
@@ -4666,24 +4711,57 @@ def _assemble_local_phases(sections):
     the same staged values, and splitting them would reload every one.
     """
     body = []
+    stepped_body = []
     pending = []
+    step_dependent = (
+        frozenset(residual_step_dependent_phases()) if stepped else frozenset()
+    )
 
     def flush():
-        if pending:
-            body.append(_work_item_loop_node(tuple(pending)))
-            del pending[:]
+        if not pending:
+            return
+        target = stepped_body if stepped and in_step[0] else body
+        target.append(_work_item_loop_node(tuple(pending)))
+        del pending[:]
 
+    # Which side of the trial-step boundary the phases land on.  The boundary
+    # is not a new decision about where statements go: the plan already says
+    # which phases read the state, and the lane loop already closes between the
+    # trial-function accumulation and the transform, because the two are at
+    # different scopes.  The step loop opens in that existing seam.
+    in_step = [False]
     for phase_plan in residual_local_phase_plans():
         scope, nodes = sections[phase_plan.phase]
         if not nodes:
             continue
+        step_phase = phase_plan.phase in step_dependent
+        if step_phase != in_step[0]:
+            flush()
+            in_step[0] = step_phase
         if scope == _LANE_SCOPE:
             pending.extend(nodes)
             continue
         flush()
-        body.extend(nodes)
+        (stepped_body if stepped and in_step[0] else body).extend(nodes)
     flush()
-    return tuple(body)
+    if not stepped_body:
+        return tuple(body)
+    # The lane loop is inside this, never outside it.  A work item is a SIMD
+    # lane, and a lane loop with another loop in it is no longer innermost and
+    # does not vectorise -- the same measured reason the stepped objective
+    # records for putting its alphas here rather than one level in.
+    return tuple(body) + (
+        _counted_loop_node(
+            "step",
+            "nsteps",
+            (
+                BufferDeclNode(
+                    "const s_t", "alpha", (), expr_ref("steps[step]")
+                ),
+            )
+            + tuple(stepped_body),
+        ),
+    )
 
 
 def _work_item_loop_node(body):
