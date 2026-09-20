@@ -114,7 +114,9 @@ def test_loop_one_reads_the_element_through_its_orientation():
 def test_the_square_is_taken_per_step_after_the_elements_close():
     text = "\n".join(patch_reduction_lines(_fixture()[0]))
     assert "for (int lane = 0; lane < nsteps; ++lane)" in text
-    assert "merit[lane] += s_t(0.5) * squared;" in text
+    assert "merit_local[lane] += s_t(0.5) * squared;" in text
+    # The shared output is written once per thread, not per node.
+    assert "merit[lane] += s_t(0.5)" not in text
 
 
 def test_the_kernel_is_gated_on_having_an_orientation():
