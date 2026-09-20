@@ -31,6 +31,7 @@ from codegen.framework.emitters.runtime_typed_abi import (
 from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
+    stepped_residual_dependencies,
     substituted_trial_quantities,
     contracted_gradient_components,
     live_gradient_directions,
