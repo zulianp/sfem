@@ -217,10 +217,25 @@ def _assert_source_reports_vectorized_loops(
 def _assert_lane_loops_request_simd(test_case, path):
     with open(path, encoding="utf-8") as input_file:
         lines = input_file.read().splitlines()
-    allow_nested_lane_loops = os.path.basename(path) in (
+    # Two families vectorise a lane loop that is not innermost, and both do so
+    # deliberately.  The sum-factorised micro-kernels wrap a small contraction.
+    # The node-centric patch merit kernel vectorises its first loop over the
+    # elements incident on one node, and what sits inside it are gathers and a
+    # Jacobian over `NS` and `ND` -- three and two on a TRI3 -- whose bounds are
+    # compile-time constants and which unroll.  The element axis has to be the
+    # outer one there: each lane reads its own element through its own
+    # orientation permutation.
+    #
+    # Measured rather than assumed: on 72 Grace cores the patch kernel is 1.63x
+    # the per-step path at twelve trial steps, at 768,000 elements.  Whether
+    # lane-innermost would be faster still is an open question and a benchmark,
+    # not a rule -- what this exemption must not do is spread to the kernels the
+    # rule was written for, which is why it names the two families.
+    basename = os.path.basename(path)
+    allow_nested_lane_loops = basename in (
         "tensor_product_kernels.hpp",
         "tensor_product_kernels.cuh",
-    )
+    ) or re.search(r"_total_\w+_operator\.(cpp|cu)$", basename) is not None
     lane_loop_count = 0
     for index, line in enumerate(lines):
         if "for (int lane = 0; lane < ne; ++lane) {" not in line:
@@ -1815,8 +1830,12 @@ int main() {
             with open(plan_path, encoding="utf-8") as stream:
                 dump = json.load(stream)
             self.assertEqual(dump["stage"], gen.PipelineStage.SPECIALIZED_FORM_MANIPULATION.value)
-            self.assertEqual(dump["n_monolithic_kernels"], 1)
+            # The material's own unit, and the one carrying its whole
+            # residual for the merit.  An energy material has no residual unit
+            # of its own, so the second is where its residual merit comes from.
+            self.assertEqual(dump["n_monolithic_kernels"], 2)
             self.assertEqual(dump["kernels"][0]["name"], "neohookean_ogden")
+            self.assertEqual(dump["kernels"][1]["name"], "neohookean_ogden_total")
             self.assertEqual(dump["kernels"][0]["mesh_phases"], ["geometry", "local_call", "scatter"])
 
     def test_generates_coupled_residual_material(self):
@@ -3622,9 +3641,16 @@ int main() {
         parsed = json.loads(residual_plan.to_json())
 
         self.assertEqual(dump["stage"], gen.PipelineStage.SPECIALIZED_FORM_MANIPULATION.value)
-        self.assertEqual(parsed["n_monolithic_kernels"], 1)
+        # Two monolithic kernels, not one: every material now carries a unit
+        # for its whole residual, whose reason to exist is the residual merit.
+        # Six block kernels, not twelve -- the merit unit publishes neither the
+        # residual nor the Jacobian action, and therefore none of their blocks
+        # either.  Both numbers matter: the first says the merit is generated
+        # for this material, and the second says it did not bring a second copy
+        # of the material with it.
+        self.assertEqual(parsed["n_monolithic_kernels"], 2)
         self.assertEqual(parsed["n_block_kernels"], 6)
-        self.assertEqual(parsed["n_complete_system_kernels"], 1)
+        self.assertEqual(parsed["n_complete_system_kernels"], 2)
         self.assertEqual(parsed["kernels"][0]["scope"], gen.KernelScope.MONOLITHIC.value)
         self.assertEqual(parsed["kernels"][0]["coupling"], gen.KernelCoupling.COMPLETE_SYSTEM.value)
         self.assertEqual(parsed["kernels"][0]["mesh_phases"], ["gather", "geometry", "local_call", "scatter"])

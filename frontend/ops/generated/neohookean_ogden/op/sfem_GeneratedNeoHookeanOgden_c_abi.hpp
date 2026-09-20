@@ -914,6 +914,48 @@ extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_tet4_matrix_as
 
 extern "C" int neohookean_ogden_tet4_matrix_assembly_variant_count();
 
+extern "C" int neohookean_ogden_total_merit_patch_2d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t n_owned_nodes,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx,
+        const uint8_t *const RSTR n2e_local,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR grad_ref[2],
+        const void *const RSTR q_weight,
+        const real_t lmbda,
+        const real_t mu,
+        const int nsteps,
+        const void *const RSTR steps,
+        const void *const RSTR x,
+        const void *const RSTR h,
+        const void *const RSTR accumulator,
+        void *const RSTR merit
+);
+
+extern "C" int neohookean_ogden_total_merit_patch_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t n_owned_nodes,
+        const count_t *const RSTR n2e_ptr,
+        const element_idx_t *const RSTR n2e_idx,
+        const uint8_t *const RSTR n2e_local,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const void *const RSTR grad_ref[3],
+        const void *const RSTR q_weight,
+        const real_t lmbda,
+        const real_t mu,
+        const int nsteps,
+        const void *const RSTR steps,
+        const void *const RSTR x,
+        const void *const RSTR h,
+        const void *const RSTR accumulator,
+        void *const RSTR merit
+);
+
 extern "C" void neohookean_ogden_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
 extern "C" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_tri3_matrix_assembly_variant(const int variant);

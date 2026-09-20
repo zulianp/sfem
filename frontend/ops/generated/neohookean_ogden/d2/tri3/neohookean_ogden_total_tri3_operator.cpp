@@ -58,7 +58,7 @@ namespace codegen {
 static constexpr int pm_orientation[3][3] = {{0, 1, 2}, {1, 2, 0}, {2, 0, 1}};
 
 template <typename s_t, typename g_t, int NQ, int NS, int VS>
-static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
+static int neohookean_ogden_total_tri3_merit_patch(
     const ptrdiff_t n_owned_nodes,
     const count_t *const RSTR n2e_ptr,
     const element_idx_t *const RSTR n2e_idx,
@@ -67,16 +67,12 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
     const g_t *const *const RSTR points,
     const s_t *const RSTR grad_ref[2],
     const s_t *const RSTR q_weight,
-    const s_t eta_b,
-    const s_t eta_s,
     const s_t lmbda,
     const s_t mu,
-    const s_t u_dt_shift,
     const int nsteps,
     const s_t *const RSTR steps,
     const s_t *const RSTR x,
     const s_t *const RSTR h,
-    const s_t *const RSTR p,
     const s_t *const RSTR accumulator,
     s_t *const RSTR merit
 ) {
@@ -95,7 +91,6 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
     s_t pm_weight[NQ * 1 * VS];
     s_t pm_state_grad[NQ * 4 * VS];
     s_t pm_direction_grad[NQ * 4 * VS];
-    s_t pm_previous_grad[NQ * 4 * VS];
     element_idx_t pm_incident[VS];
     uint8_t pm_local_node[VS];
 
@@ -126,13 +121,11 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
             const int *const RSTR perm = pm_orientation[pm_local_node[lane]];
             s_t state[6];
             s_t direction[6];
-            s_t previous[6];
             for (int j = 0; j < NS; ++j) {
               const idx_t node = elements[perm[j]][element];
               for (int c = 0; c < NC; ++c) {
                 state[j * NC + c] = x[node * NC + c];
                 direction[j * NC + c] = h[node * NC + c];
-                previous[j * NC + c] = p[node * NC + c];
               }
             }
             // The Jacobian of the *permuted* element: its columns are the
@@ -185,22 +178,6 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
                 pm_direction_grad[(q * 4 + c * ND + d) * VS + lane] = mapped / det;
               }
             }
-            // physical gradient of the previous: summed over shape functions,
-            // then mapped.  Mapped here and not in loop 2 because the map
-            // is linear and does not depend on the step length.
-            for (int c = 0; c < NC; ++c) {
-              for (int d = 0; d < ND; ++d) {
-                s_t mapped = s_t(0);
-                for (int k = 0; k < ND; ++k) {
-                  s_t acc = s_t(0);
-                  for (int j = 0; j < NS; ++j) {
-                    acc += previous[j * NC + c] * grad_ref[k][q * NS + j];
-                  }
-                  mapped += acc * adj[k * ND + d];
-                }
-                pm_previous_grad[(q * 4 + c * ND + d) * VS + lane] = mapped / det;
-              }
-            }
             // the fixed basis function's quantities, and the
             // integration weight.  Both are what the orientation buys:
             // `phi_0` is the same function in every element and at
@@ -226,39 +203,19 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
               const s_t u0_grad_1 = pm_state_grad[(q * 4 + 1) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 1) * VS + lane_e];
               const s_t u1_grad_0 = pm_state_grad[(q * 4 + 2) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 2) * VS + lane_e];
               const s_t u1_grad_1 = pm_state_grad[(q * 4 + 3) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 3) * VS + lane_e];
-              const s_t u0_old_grad_0 = pm_previous_grad[(q * 4 + 0) * VS + lane_e];
-              const s_t u0_old_grad_1 = pm_previous_grad[(q * 4 + 1) * VS + lane_e];
-              const s_t u1_old_grad_0 = pm_previous_grad[(q * 4 + 2) * VS + lane_e];
-              const s_t u1_old_grad_1 = pm_previous_grad[(q * 4 + 3) * VS + lane_e];
-              const s_t residual_tmp0 = u1_grad_1 + s_t(1);
-              const s_t residual_tmp1 = u0_grad_1*u1_grad_0;
-              const s_t residual_tmp2 = u0_grad_0 + s_t(1);
-              const s_t residual_tmp3 = lmbda*(residual_tmp0*residual_tmp2 - residual_tmp1 + s_t(-1));
-              const s_t residual_tmp4 = residual_tmp0*u1_grad_0 + residual_tmp2*u0_grad_1;
-              const s_t residual_tmp5 = s_t(2)*u0_grad_1;
-              const s_t residual_tmp6 = pow_2(residual_tmp2) + pow_2(u1_grad_0);
-              const s_t residual_tmp7 = s_t(2)*residual_tmp2;
-              const s_t residual_tmp8 = pow_2(residual_tmp0) + pow_2(u0_grad_1);
-              const s_t residual_tmp9 = residual_tmp6 + residual_tmp8;
-              const s_t residual_tmp10 = pow_m1(-residual_tmp1 + residual_tmp2 + u0_grad_0*u1_grad_1 + u1_grad_1);
-              const s_t residual_tmp11 = u0_grad_0*u_dt_shift + u0_old_grad_0;
-              const s_t residual_tmp12 = u1_grad_1*u_dt_shift + u1_old_grad_1;
-              const s_t residual_tmp13 = u0_grad_1*u_dt_shift + u0_old_grad_1;
-              const s_t residual_tmp14 = u1_grad_0*u_dt_shift + u1_old_grad_0;
-              const s_t residual_tmp15 = eta_s*(-residual_tmp0*residual_tmp14 + residual_tmp11*u0_grad_1 + residual_tmp12*u1_grad_0 - residual_tmp13*residual_tmp2);
-              const s_t residual_tmp16 = residual_tmp13*u1_grad_0;
-              const s_t residual_tmp17 = residual_tmp0*residual_tmp11;
-              const s_t residual_tmp18 = -residual_tmp12*residual_tmp2 + residual_tmp14*u0_grad_1;
-              const s_t residual_tmp19 = eta_b*(residual_tmp16 - residual_tmp17 + residual_tmp18);
-              const s_t residual_tmp20 = -residual_tmp16 + residual_tmp17 + residual_tmp18;
-              const s_t residual_tmp21 = -eta_s*residual_tmp20 + residual_tmp19;
-              const s_t residual_tmp22 = s_t(2)*u1_grad_0;
-              const s_t residual_tmp23 = s_t(2)*residual_tmp0;
-              const s_t residual_tmp24 = eta_s*residual_tmp20 + residual_tmp19;
-              const s_t grad_coeff0_0 = mu*(s_t(2)*residual_tmp2*residual_tmp9 - residual_tmp4*residual_tmp5 - residual_tmp6*residual_tmp7 + s_t(4)*u0_grad_0 - s_t(6)*u1_grad_1 + s_t(-2)) + residual_tmp0*residual_tmp3 + residual_tmp10*(-residual_tmp0*residual_tmp21 + residual_tmp15*u0_grad_1);
-              const s_t grad_coeff0_1 = mu*(-residual_tmp4*residual_tmp7 - residual_tmp5*residual_tmp8 + residual_tmp5*residual_tmp9 + s_t(4)*u0_grad_1 + s_t(6)*u1_grad_0) + residual_tmp10*(-residual_tmp15*residual_tmp2 + residual_tmp21*u1_grad_0) - residual_tmp3*u1_grad_0;
-              const s_t grad_coeff1_0 = mu*(-residual_tmp22*residual_tmp6 + residual_tmp22*residual_tmp9 - residual_tmp23*residual_tmp4 + s_t(6)*u0_grad_1 + s_t(4)*u1_grad_0) + residual_tmp10*(-residual_tmp0*residual_tmp15 + residual_tmp24*u0_grad_1) - residual_tmp3*u0_grad_1;
-              const s_t grad_coeff1_1 = mu*(s_t(2)*residual_tmp0*residual_tmp9 - residual_tmp22*residual_tmp4 - residual_tmp23*residual_tmp8 - s_t(6)*u0_grad_0 + s_t(4)*u1_grad_1 + s_t(-2)) + residual_tmp10*(residual_tmp15*u1_grad_0 - residual_tmp2*residual_tmp24) + residual_tmp2*residual_tmp3;
+              const s_t residual_tmp0 = u0_grad_0 + s_t(1);
+              const s_t residual_tmp1 = mu*residual_tmp0;
+              const s_t residual_tmp2 = u1_grad_1 + s_t(1);
+              const s_t residual_tmp3 = residual_tmp0*residual_tmp2 - u0_grad_1*u1_grad_0;
+              const s_t residual_tmp4 = pow_m1(residual_tmp3);
+              const s_t residual_tmp5 = mu*residual_tmp2;
+              const s_t residual_tmp6 = lmbda*residual_tmp4*log(residual_tmp3);
+              const s_t residual_tmp7 = mu*u0_grad_1;
+              const s_t residual_tmp8 = mu*u1_grad_0;
+              const s_t grad_coeff0_0 = residual_tmp1 + residual_tmp2*residual_tmp6 - residual_tmp4*residual_tmp5;
+              const s_t grad_coeff0_1 = residual_tmp4*residual_tmp8 - residual_tmp6*u1_grad_0 + residual_tmp7;
+              const s_t grad_coeff1_0 = residual_tmp4*residual_tmp7 - residual_tmp6*u0_grad_1 + residual_tmp8;
+              const s_t grad_coeff1_1 = residual_tmp0*residual_tmp6 - residual_tmp1*residual_tmp4 + residual_tmp5;
               const s_t weight = pm_weight[q * VS + lane_e];
               rho[0 * VS + lane] += weight * (grad_coeff0_0 * pm_test_grad[(q * 2 + 0) * VS + lane_e] + grad_coeff0_1 * pm_test_grad[(q * 2 + 1) * VS + lane_e]);
               rho[1 * VS + lane] += weight * (grad_coeff1_0 * pm_test_grad[(q * 2 + 0) * VS + lane_e] + grad_coeff1_1 * pm_test_grad[(q * 2 + 1) * VS + lane_e]);
@@ -290,7 +247,7 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
 } // namespace sfem
 
 
-extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa(
+extern "C" int neohookean_ogden_total_tri3_merit_patch_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t n_owned_nodes,
     const count_t *const RSTR n2e_ptr,
@@ -300,28 +257,24 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa(
     const geom_t *const *const RSTR points,
     const void *const RSTR grad_ref[2],
     const void *const RSTR q_weight,
-    const real_t eta_b,
-    const real_t eta_s,
     const real_t lmbda,
     const real_t mu,
-    const real_t u_dt_shift,
     const int nsteps,
     const void *const RSTR steps,
     const void *const RSTR x,
     const void *const RSTR h,
-    const void *const RSTR p,
     const void *const RSTR accumulator,
     void *const RSTR merit
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_merit_patch<double, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *const *)grad_ref, (const double *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)p, (const double *)accumulator, (double *)merit);
+        return sfem::codegen::neohookean_ogden_total_tri3_merit_patch<double, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *const *)grad_ref, (const double *)q_weight, lmbda, mu, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)accumulator, (double *)merit);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_merit_patch<float, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *const *)grad_ref, (const float *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)p, (const float *)accumulator, (float *)merit);
+        return sfem::codegen::neohookean_ogden_total_tri3_merit_patch<float, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *const *)grad_ref, (const float *)q_weight, lmbda, mu, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)accumulator, (float *)merit);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("neohookean_ogden_total_tri3_merit_patch_a_msoa", -1, (int)scalar_bytes);
 }

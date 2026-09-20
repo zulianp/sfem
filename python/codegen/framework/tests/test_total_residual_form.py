@@ -188,3 +188,88 @@ def test_the_combined_collection_reads_the_previous_state():
     dependencies = collection.dependencies
     assert dependencies.previous
     assert dependencies.current
+
+
+# Every material has a residual and therefore a residual merit, so the combined
+# form is built for materials with one unit as well as for materials with
+# several.  The two shapes that unlocks are the ones below: a material written
+# as one energy, whose residual exists only as that energy's 1-form, and a
+# material written as one residual, which already is its own total and must
+# combine to itself rather than to something near it.
+
+
+def _weak_form(coefficients):
+    """The 1-form the coefficients stand for, named as the lowering names it.
+
+    `_combined_weak_form` spells its test symbols `u0_test`, which is right for
+    a vector field and wrong for a scalar one -- laplace's row is `u`, not
+    `u0`.  This reads the row name the coefficients carry instead.
+    """
+    return sum(
+        (
+            sp.sympify(entry.value) * sp.Symbol("%s_test" % entry.row_field)
+            + sum(
+                sp.sympify(entry.gradient[j])
+                * sp.Symbol("%s_test_grad_%d" % (entry.row_field, j))
+                for j in range(DIM)
+            )
+            for entry in coefficients
+        ),
+        sp.S.Zero,
+    )
+
+
+def test_an_energy_only_material_combines_to_its_energy_gradient():
+    """Laplace has no residual unit at all; its residual is the 1-form.
+
+    Checked against the energy differentiated by hand rather than against the
+    form collection the combiner reads, so this is not the machinery agreeing
+    with itself.
+    """
+    from codegen.framework.materials.laplace import _build_system
+
+    coefficients = total_residual_weak_coefficients(_build_system(DIM))
+    assert tuple(entry.row_field for entry in coefficients) == ("u",)
+
+    kappa = sp.Symbol("kappa")
+    expected = sum(
+        (
+            kappa
+            * sp.Symbol("u_grad_%d" % j)
+            * sp.Symbol("u_test_grad_%d" % j)
+            for j in range(DIM)
+        ),
+        sp.S.Zero,
+    )
+    assert sp.simplify(_weak_form(coefficients) - expected) == 0
+    # A gradient energy contributes nothing against the test value, and the
+    # combiner leaving that row zero is the correct answer rather than a
+    # dropped term -- the guard in `total_residual_weak_coefficients` is what
+    # makes an energy that *would* contribute one fail instead of land here.
+    assert all(sp.sympify(entry.value) == 0 for entry in coefficients)
+
+
+def test_a_single_residual_unit_combines_to_itself():
+    """A material already written as one residual is its own total.
+
+    Exactly, not approximately: the combined form is the route the merit
+    kernel lowers through, so any drift between it and the unit's own 1-form
+    is a merit that disagrees with the gradient it is supposed to measure.
+    """
+    from codegen.framework.materials.body_force import _build_system
+
+    system = _build_system(DIM)
+    equation = system.equations[0]
+    own = sum(
+        (
+            sp.sympify(row)
+            for row in system.form_collection(
+                equation, orders=(FormOrder.ONE,)
+            ).residual_expressions
+        ),
+        sp.S.Zero,
+    )
+
+    assert sp.simplify(_weak_form(total_residual_weak_coefficients(system)) - own) == 0
+    # Otherwise the agreement above is agreement about zero.
+    assert own != 0

@@ -39,6 +39,14 @@
     {
       "declaration": "extern \"C\" int body_force_residual_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t density,\n        const real_t g0,\n        const real_t g1,\n        const real_t g2,\n        const ptrdiff_t out_stride,\n        void *const RSTR u0_out,\n        void *const RSTR u1_out,\n        void *const RSTR u2_out\n);",
       "name": "body_force_residual_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int body_force_total_merit_patch_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_owned_nodes,\n        const count_t *const RSTR n2e_ptr,\n        const element_idx_t *const RSTR n2e_idx,\n        const uint8_t *const RSTR n2e_local,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR shape,\n        const void *const RSTR q_weight,\n        const real_t density,\n        const real_t g0,\n        const real_t g1,\n        const int nsteps,\n        const void *const RSTR steps,\n        const void *const RSTR x,\n        const void *const RSTR h,\n        const void *const RSTR accumulator,\n        void *const RSTR merit\n);",
+      "name": "body_force_total_merit_patch_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int body_force_total_merit_patch_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_owned_nodes,\n        const count_t *const RSTR n2e_ptr,\n        const element_idx_t *const RSTR n2e_idx,\n        const uint8_t *const RSTR n2e_local,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR shape,\n        const void *const RSTR q_weight,\n        const real_t density,\n        const real_t g0,\n        const real_t g1,\n        const real_t g2,\n        const int nsteps,\n        const void *const RSTR steps,\n        const void *const RSTR x,\n        const void *const RSTR h,\n        const void *const RSTR accumulator,\n        void *const RSTR merit\n);",
+      "name": "body_force_total_merit_patch_3d_a_msoa"
     }
   ],
   "factory": {

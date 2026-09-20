@@ -41,6 +41,25 @@ def residual_local_phase_plans():
 RESIDUAL_FORMS = ("residual", "jacobian_action")
 
 
+def unit_exists_for_the_merit(unit_name):
+    """Whether this unit is the one carrying the material's whole residual.
+
+    Its reason to exist is the residual merit: one kernel contracting one form
+    over a node's complete value.  Everything else a residual unit would
+    normally publish is something the material's own units already publish, so
+    this predicate is the left-hand side of three refusals below -- the forms,
+    the block kernels and the projected apply.
+
+    One predicate rather than the same comparison written at each of them.  The
+    comparison was written once, at the forms, and the other two paths reached
+    emission by different names and emitted a full second copy of the material
+    unnoticed.
+    """
+    from codegen.framework.forms.equations import TOTAL_RESIDUAL_UNIT_NAME
+
+    return str(unit_name) == TOTAL_RESIDUAL_UNIT_NAME
+
+
 def published_residual_forms(form_dependencies, unit_name=""):
     """Which of `RESIDUAL_FORMS` a unit publishes.
 
@@ -58,15 +77,50 @@ def published_residual_forms(form_dependencies, unit_name=""):
     single-unit material they would be the same arithmetic twice; for a
     multi-unit one they are a second spelling of the sum.
     """
-    from codegen.framework.forms.equations import TOTAL_RESIDUAL_UNIT_NAME
-
-    if str(unit_name) == TOTAL_RESIDUAL_UNIT_NAME:
+    if unit_exists_for_the_merit(unit_name):
         return ()
     return tuple(
         form
         for form in RESIDUAL_FORMS
         if form in form_dependencies and publishes_kernel(form_dependencies[form])
     )
+
+
+def published_block_kernels(unit_name, blocks):
+    """Which of a coupled unit's blocks are published as kernels of their own.
+
+    A coupled system emits a kernel per block so an assembly can fill one block
+    at a time.  A unit carrying the material's whole residual for the merit
+    publishes neither the residual nor the Jacobian action -- see
+    `published_residual_forms` -- so it has no blocks to publish either: a
+    block kernel *is* one of those forms, restricted to a block.
+
+    Stated here rather than left to the refusal above, because the two are not
+    reached by the same name.  A unit's blocks become units of their own, named
+    after the block -- `total_form_1_p_c`, `total_form_2_p_c_p_w` -- and those
+    names are not `TOTAL_RESIDUAL_UNIT_NAME`, so they walked past the check and
+    emitted a full second set of kernels for every coupled material.  For
+    two_phase_flow that was 123 files standing behind one merit kernel.
+    """
+    if unit_exists_for_the_merit(unit_name):
+        return ()
+    return tuple(blocks)
+
+
+def publishes_inexact_apply(unit_name, material_publishes_inexact_apply):
+    """Whether this unit publishes the projected (inexact) Jacobian action.
+
+    The projected apply is a *variant* of the Jacobian action, so a unit that
+    publishes no Jacobian action publishes no variant of one.  The material's
+    flag says the material has a lowering for it; it does not say that each of
+    the material's units has a form for the variant to be a variant of, and
+    applying it per material rather than per unit is what emitted a projected
+    tangent for a Jacobian nobody publishes -- twelve files per vector
+    material, standing behind a merit kernel that does not use them.
+    """
+    if unit_exists_for_the_merit(unit_name):
+        return False
+    return bool(material_publishes_inexact_apply)
 
 
 def published_local_kernel_files(published_forms, unit_name=""):
@@ -163,9 +217,18 @@ def patch_merit_staged_roles(dependencies):
     return tuple(roles)
 
 
-def patch_merit_staged_quantities(dependencies):
+#: Which pair of the dependency record's flags decides a role's quantities.
+#: `current` speaks for the direction too: loop 2 forms `current + alpha *
+#: direction`, so whatever one of the pair is interpolated, the other must be.
+_STAGED_QUANTITY_FLAGS = {
+    "current": ("current_value", "current_gradient"),
+    "previous": ("previous_value", "previous_gradient"),
+}
+
+
+def patch_merit_staged_quantities(dependencies, role="current"):
     """Which of a field's quantities a sampled patch kernel carries between its
-    two loops.
+    two loops, for one role.
 
     Loop 1 interpolates them and loop 2 combines each with `alpha`, so the two
     have to agree about which exist -- a quantity staged and not combined is a
@@ -173,13 +236,20 @@ def patch_merit_staged_quantities(dependencies):
     Answering it once here is what keeps them in step, and keeps the emitter
     spelling a sequence rather than testing the form.
 
+    Per role, because the roles do not read the same quantities.  Asking the
+    current state's flags on the history's behalf staged a previous gradient
+    for every form that reads a current one, and two_phase_flow -- which reads
+    the previous *value* and no previous gradient -- interpolated six dead
+    buffers per quadrature point to prove it.
+
     The order is the order the buffers are declared and the combinations are
     emitted, so it is part of the kernel's layout rather than incidental.
     """
+    value_flag, gradient_flag = _STAGED_QUANTITY_FLAGS[role]
     quantities = []
-    if dependencies.current_value:
+    if getattr(dependencies, value_flag):
         quantities.append("value")
-    if dependencies.current_gradient:
+    if getattr(dependencies, gradient_flag):
         quantities.append("gradient")
     return tuple(quantities)
 

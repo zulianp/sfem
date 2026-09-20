@@ -11,8 +11,8 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
-#include "../../../reference/quad_tri_q1.hpp"
-#include "../../../reference/tri3_q1.hpp"
+#include "../../../reference/quad_tri_q6.hpp"
+#include "../../../reference/tri3_q6.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -58,20 +58,37 @@ namespace codegen {
 static constexpr int pm_orientation[3][3] = {{0, 1, 2}, {1, 2, 0}, {2, 0, 1}};
 
 template <typename s_t, typename g_t, int NQ, int NS, int VS>
-static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
+static int two_phase_flow_total_tri3_merit_patch(
     const ptrdiff_t n_owned_nodes,
     const count_t *const RSTR n2e_ptr,
     const element_idx_t *const RSTR n2e_idx,
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const g_t *const *const RSTR points,
+    const s_t *const RSTR shape,
     const s_t *const RSTR grad_ref[2],
     const s_t *const RSTR q_weight,
-    const s_t eta_b,
-    const s_t eta_s,
-    const s_t lmbda,
-    const s_t mu,
-    const s_t u_dt_shift,
+    const s_t P_r,
+    const s_t S_res,
+    const s_t dt,
+    const s_t kappa_T,
+    const s_t m,
+    const s_t p_wr,
+    const s_t porosity,
+    const s_t rho_w0,
+    const s_t C_kw1,
+    const s_t K_0,
+    const s_t K_1,
+    const s_t mu_w,
+    const s_t K_2,
+    const s_t K_3,
+    const s_t M_c,
+    const s_t R,
+    const s_t T,
+    const s_t Z,
+    const s_t C_ka1,
+    const s_t C_ka2,
+    const s_t mu_c,
     const int nsteps,
     const s_t *const RSTR steps,
     const s_t *const RSTR x,
@@ -91,11 +108,14 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
     s_t merit_local[VS];
     for (int lane = 0; lane < VS; ++lane) merit_local[lane] = s_t(0);
     s_t rho[NC * VS];
+    s_t pm_test[NQ * 1 * VS];
     s_t pm_test_grad[NQ * 2 * VS];
     s_t pm_weight[NQ * 1 * VS];
+    s_t pm_state_value[NQ * 2 * VS];
     s_t pm_state_grad[NQ * 4 * VS];
+    s_t pm_direction_value[NQ * 2 * VS];
     s_t pm_direction_grad[NQ * 4 * VS];
-    s_t pm_previous_grad[NQ * 4 * VS];
+    s_t pm_previous_value[NQ * 2 * VS];
     element_idx_t pm_incident[VS];
     uint8_t pm_local_node[VS];
 
@@ -153,6 +173,14 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
             adj[1] = -jac[1];
             adj[2] = -jac[2];
             adj[3] =  jac[0];
+            // interpolated state value
+            for (int c = 0; c < NC; ++c) {
+              s_t acc = s_t(0);
+              for (int j = 0; j < NS; ++j) {
+                acc += state[j * NC + c] * shape[q * NS + j];
+              }
+              pm_state_value[(q * 2 + c) * VS + lane] = acc;
+            }
             // physical gradient of the state: summed over shape functions,
             // then mapped.  Mapped here and not in loop 2 because the map
             // is linear and does not depend on the step length.
@@ -168,6 +196,14 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
                 }
                 pm_state_grad[(q * 4 + c * ND + d) * VS + lane] = mapped / det;
               }
+            }
+            // interpolated direction value
+            for (int c = 0; c < NC; ++c) {
+              s_t acc = s_t(0);
+              for (int j = 0; j < NS; ++j) {
+                acc += direction[j * NC + c] * shape[q * NS + j];
+              }
+              pm_direction_value[(q * 2 + c) * VS + lane] = acc;
             }
             // physical gradient of the direction: summed over shape functions,
             // then mapped.  Mapped here and not in loop 2 because the map
@@ -185,26 +221,19 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
                 pm_direction_grad[(q * 4 + c * ND + d) * VS + lane] = mapped / det;
               }
             }
-            // physical gradient of the previous: summed over shape functions,
-            // then mapped.  Mapped here and not in loop 2 because the map
-            // is linear and does not depend on the step length.
+            // interpolated previous value
             for (int c = 0; c < NC; ++c) {
-              for (int d = 0; d < ND; ++d) {
-                s_t mapped = s_t(0);
-                for (int k = 0; k < ND; ++k) {
-                  s_t acc = s_t(0);
-                  for (int j = 0; j < NS; ++j) {
-                    acc += previous[j * NC + c] * grad_ref[k][q * NS + j];
-                  }
-                  mapped += acc * adj[k * ND + d];
-                }
-                pm_previous_grad[(q * 4 + c * ND + d) * VS + lane] = mapped / det;
+              s_t acc = s_t(0);
+              for (int j = 0; j < NS; ++j) {
+                acc += previous[j * NC + c] * shape[q * NS + j];
               }
+              pm_previous_value[(q * 2 + c) * VS + lane] = acc;
             }
             // the fixed basis function's quantities, and the
             // integration weight.  Both are what the orientation buys:
             // `phi_0` is the same function in every element and at
             // every step, so this leaves the step loop entirely.
+            pm_test[q * VS + lane] = shape[q * NS + 0];
             for (int d = 0; d < ND; ++d) {
               s_t mapped = s_t(0);
               for (int k = 0; k < ND; ++k) {
@@ -222,46 +251,38 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
             #pragma omp simd
             for (int lane = 0; lane < nsteps; ++lane) {
               const s_t alpha = steps[lane];
-              const s_t u0_grad_0 = pm_state_grad[(q * 4 + 0) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 0) * VS + lane_e];
-              const s_t u0_grad_1 = pm_state_grad[(q * 4 + 1) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 1) * VS + lane_e];
-              const s_t u1_grad_0 = pm_state_grad[(q * 4 + 2) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 2) * VS + lane_e];
-              const s_t u1_grad_1 = pm_state_grad[(q * 4 + 3) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 3) * VS + lane_e];
-              const s_t u0_old_grad_0 = pm_previous_grad[(q * 4 + 0) * VS + lane_e];
-              const s_t u0_old_grad_1 = pm_previous_grad[(q * 4 + 1) * VS + lane_e];
-              const s_t u1_old_grad_0 = pm_previous_grad[(q * 4 + 2) * VS + lane_e];
-              const s_t u1_old_grad_1 = pm_previous_grad[(q * 4 + 3) * VS + lane_e];
-              const s_t residual_tmp0 = u1_grad_1 + s_t(1);
-              const s_t residual_tmp1 = u0_grad_1*u1_grad_0;
-              const s_t residual_tmp2 = u0_grad_0 + s_t(1);
-              const s_t residual_tmp3 = lmbda*(residual_tmp0*residual_tmp2 - residual_tmp1 + s_t(-1));
-              const s_t residual_tmp4 = residual_tmp0*u1_grad_0 + residual_tmp2*u0_grad_1;
-              const s_t residual_tmp5 = s_t(2)*u0_grad_1;
-              const s_t residual_tmp6 = pow_2(residual_tmp2) + pow_2(u1_grad_0);
-              const s_t residual_tmp7 = s_t(2)*residual_tmp2;
-              const s_t residual_tmp8 = pow_2(residual_tmp0) + pow_2(u0_grad_1);
-              const s_t residual_tmp9 = residual_tmp6 + residual_tmp8;
-              const s_t residual_tmp10 = pow_m1(-residual_tmp1 + residual_tmp2 + u0_grad_0*u1_grad_1 + u1_grad_1);
-              const s_t residual_tmp11 = u0_grad_0*u_dt_shift + u0_old_grad_0;
-              const s_t residual_tmp12 = u1_grad_1*u_dt_shift + u1_old_grad_1;
-              const s_t residual_tmp13 = u0_grad_1*u_dt_shift + u0_old_grad_1;
-              const s_t residual_tmp14 = u1_grad_0*u_dt_shift + u1_old_grad_0;
-              const s_t residual_tmp15 = eta_s*(-residual_tmp0*residual_tmp14 + residual_tmp11*u0_grad_1 + residual_tmp12*u1_grad_0 - residual_tmp13*residual_tmp2);
-              const s_t residual_tmp16 = residual_tmp13*u1_grad_0;
-              const s_t residual_tmp17 = residual_tmp0*residual_tmp11;
-              const s_t residual_tmp18 = -residual_tmp12*residual_tmp2 + residual_tmp14*u0_grad_1;
-              const s_t residual_tmp19 = eta_b*(residual_tmp16 - residual_tmp17 + residual_tmp18);
-              const s_t residual_tmp20 = -residual_tmp16 + residual_tmp17 + residual_tmp18;
-              const s_t residual_tmp21 = -eta_s*residual_tmp20 + residual_tmp19;
-              const s_t residual_tmp22 = s_t(2)*u1_grad_0;
-              const s_t residual_tmp23 = s_t(2)*residual_tmp0;
-              const s_t residual_tmp24 = eta_s*residual_tmp20 + residual_tmp19;
-              const s_t grad_coeff0_0 = mu*(s_t(2)*residual_tmp2*residual_tmp9 - residual_tmp4*residual_tmp5 - residual_tmp6*residual_tmp7 + s_t(4)*u0_grad_0 - s_t(6)*u1_grad_1 + s_t(-2)) + residual_tmp0*residual_tmp3 + residual_tmp10*(-residual_tmp0*residual_tmp21 + residual_tmp15*u0_grad_1);
-              const s_t grad_coeff0_1 = mu*(-residual_tmp4*residual_tmp7 - residual_tmp5*residual_tmp8 + residual_tmp5*residual_tmp9 + s_t(4)*u0_grad_1 + s_t(6)*u1_grad_0) + residual_tmp10*(-residual_tmp15*residual_tmp2 + residual_tmp21*u1_grad_0) - residual_tmp3*u1_grad_0;
-              const s_t grad_coeff1_0 = mu*(-residual_tmp22*residual_tmp6 + residual_tmp22*residual_tmp9 - residual_tmp23*residual_tmp4 + s_t(6)*u0_grad_1 + s_t(4)*u1_grad_0) + residual_tmp10*(-residual_tmp0*residual_tmp15 + residual_tmp24*u0_grad_1) - residual_tmp3*u0_grad_1;
-              const s_t grad_coeff1_1 = mu*(s_t(2)*residual_tmp0*residual_tmp9 - residual_tmp22*residual_tmp4 - residual_tmp23*residual_tmp8 - s_t(6)*u0_grad_0 + s_t(4)*u1_grad_1 + s_t(-2)) + residual_tmp10*(residual_tmp15*u1_grad_0 - residual_tmp2*residual_tmp24) + residual_tmp2*residual_tmp3;
+              const s_t p_w = pm_state_value[(q * 2 + 0) * VS + lane_e] + alpha * pm_direction_value[(q * 2 + 0) * VS + lane_e];
+              const s_t p_c = pm_state_value[(q * 2 + 1) * VS + lane_e] + alpha * pm_direction_value[(q * 2 + 1) * VS + lane_e];
+              const s_t p_w_grad_0 = pm_state_grad[(q * 4 + 0) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 0) * VS + lane_e];
+              const s_t p_w_grad_1 = pm_state_grad[(q * 4 + 1) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 1) * VS + lane_e];
+              const s_t p_c_grad_0 = pm_state_grad[(q * 4 + 2) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 2) * VS + lane_e];
+              const s_t p_c_grad_1 = pm_state_grad[(q * 4 + 3) * VS + lane_e] + alpha * pm_direction_grad[(q * 4 + 3) * VS + lane_e];
+              const s_t p_w_old = pm_previous_value[(q * 2 + 0) * VS + lane_e];
+              const s_t p_c_old = pm_previous_value[(q * 2 + 1) * VS + lane_e];
+              const s_t residual_tmp0 = -p_wr;
+              const s_t residual_tmp1 = exp(kappa_T*(p_w + residual_tmp0));
+              const s_t residual_tmp2 = S_res + s_t(-1);
+              const s_t residual_tmp3 = -residual_tmp2;
+              const s_t residual_tmp4 = pow_m1(P_r);
+              const s_t residual_tmp5 = (s_t(1) - m)/m;
+              const s_t residual_tmp6 = pow(pow(residual_tmp4*(p_c - p_w), m) + s_t(1), residual_tmp5);
+              const s_t residual_tmp7 = pow(pow(residual_tmp4*(p_c_old - p_w_old), m) + s_t(1), residual_tmp5);
+              const s_t residual_tmp8 = porosity/dt;
+              const s_t residual_tmp9 = residual_tmp2*residual_tmp6;
+              const s_t residual_tmp10 = S_res - residual_tmp9;
+              const s_t residual_tmp11 = residual_tmp1*sqrt(residual_tmp10)*rho_w0*pow_2(pow(s_t(1) - pow(residual_tmp10, pow_m1(C_kw1)), C_kw1) + s_t(-1))/mu_w;
+              const s_t residual_tmp12 = s_t(1) - S_res;
+              const s_t residual_tmp13 = M_c/(R*T*Z);
+              const s_t residual_tmp14 = p_c*residual_tmp13*pow(s_t(1) - residual_tmp6, C_ka1)*(pow(residual_tmp6, C_ka2) + s_t(-1))/mu_c;
+              const s_t value_coeff0 = residual_tmp8*rho_w0*(residual_tmp1*(S_res + residual_tmp3*residual_tmp6) - (S_res + residual_tmp3*residual_tmp7)*exp(kappa_T*(p_w_old + residual_tmp0)));
+              const s_t grad_coeff0_0 = residual_tmp11*(K_0*p_w_grad_0 + K_1*p_w_grad_1);
+              const s_t grad_coeff0_1 = residual_tmp11*(K_2*p_w_grad_0 + K_3*p_w_grad_1);
+              const s_t value_coeff1 = -residual_tmp13*residual_tmp8*(-p_c*(residual_tmp12 + residual_tmp9) + p_c_old*(residual_tmp12 + residual_tmp2*residual_tmp7));
+              const s_t grad_coeff1_0 = residual_tmp14*(-K_0*p_c_grad_0 - K_1*p_c_grad_1);
+              const s_t grad_coeff1_1 = residual_tmp14*(-K_2*p_c_grad_0 - K_3*p_c_grad_1);
               const s_t weight = pm_weight[q * VS + lane_e];
-              rho[0 * VS + lane] += weight * (grad_coeff0_0 * pm_test_grad[(q * 2 + 0) * VS + lane_e] + grad_coeff0_1 * pm_test_grad[(q * 2 + 1) * VS + lane_e]);
-              rho[1 * VS + lane] += weight * (grad_coeff1_0 * pm_test_grad[(q * 2 + 0) * VS + lane_e] + grad_coeff1_1 * pm_test_grad[(q * 2 + 1) * VS + lane_e]);
+              rho[0 * VS + lane] += weight * (value_coeff0 * pm_test[q * VS + lane_e] + grad_coeff0_0 * pm_test_grad[(q * 2 + 0) * VS + lane_e] + grad_coeff0_1 * pm_test_grad[(q * 2 + 1) * VS + lane_e]);
+              rho[1 * VS + lane] += weight * (value_coeff1 * pm_test[q * VS + lane_e] + grad_coeff1_0 * pm_test_grad[(q * 2 + 0) * VS + lane_e] + grad_coeff1_1 * pm_test_grad[(q * 2 + 1) * VS + lane_e]);
             }
           }
         }
@@ -290,7 +311,7 @@ static int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch(
 } // namespace sfem
 
 
-extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa(
+extern "C" int two_phase_flow_total_tri3_merit_patch_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t n_owned_nodes,
     const count_t *const RSTR n2e_ptr,
@@ -298,13 +319,30 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
+    const void *const RSTR shape,
     const void *const RSTR grad_ref[2],
     const void *const RSTR q_weight,
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
+    const real_t P_r,
+    const real_t S_res,
+    const real_t dt,
+    const real_t kappa_T,
+    const real_t m,
+    const real_t p_wr,
+    const real_t porosity,
+    const real_t rho_w0,
+    const real_t C_kw1,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t mu_w,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t M_c,
+    const real_t R,
+    const real_t T,
+    const real_t Z,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t mu_c,
     const int nsteps,
     const void *const RSTR steps,
     const void *const RSTR x,
@@ -315,13 +353,13 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_merit_patch<double, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *const *)grad_ref, (const double *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)p, (const double *)accumulator, (double *)merit);
+        return sfem::codegen::two_phase_flow_total_tri3_merit_patch<double, geom_t, 6, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *)shape, (const double *const *)grad_ref, (const double *)q_weight, P_r, S_res, dt, kappa_T, m, p_wr, porosity, rho_w0, C_kw1, K_0, K_1, mu_w, K_2, K_3, M_c, R, T, Z, C_ka1, C_ka2, mu_c, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)p, (const double *)accumulator, (double *)merit);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tri3_merit_patch<float, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *const *)grad_ref, (const float *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)p, (const float *)accumulator, (float *)merit);
+        return sfem::codegen::two_phase_flow_total_tri3_merit_patch<float, geom_t, 6, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *)shape, (const float *const *)grad_ref, (const float *)q_weight, P_r, S_res, dt, kappa_T, m, p_wr, porosity, rho_w0, C_kw1, K_0, K_1, mu_w, K_2, K_3, M_c, R, T, Z, C_ka1, C_ka2, mu_c, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)p, (const float *)accumulator, (float *)merit);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tri3_merit_patch_a_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("two_phase_flow_total_tri3_merit_patch_a_msoa", -1, (int)scalar_bytes);
 }

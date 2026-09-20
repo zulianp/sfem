@@ -65,7 +65,6 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const g_t *const *const RSTR points,
-    const s_t *const RSTR shape,
     const s_t *const RSTR grad_ref[3],
     const s_t *const RSTR q_weight,
     const s_t eta_b,
@@ -113,6 +112,7 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
       const count_t end = n2e_ptr[node + 1];
       for (count_t block = begin; block < end; block += VS) {
         const int ne = (int)MIN((count_t)VS, end - block);
+        #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           pm_incident[lane] = n2e_idx[block + lane];
           pm_local_node[lane] = n2e_local[block + lane];
@@ -206,10 +206,10 @@ static int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch(
                 pm_previous_grad[(q * 9 + c * ND + d) * VS + lane] = mapped / det;
               }
             }
-            // the fixed basis function's physical gradient, and the
+            // the fixed basis function's quantities, and the
             // integration weight.  Both are what the orientation buys:
-            // `phi_0` is the same function in every lane and at every
-            // step, so this leaves the step loop entirely.
+            // `phi_0` is the same function in every element and at
+            // every step, so this leaves the step loop entirely.
             for (int d = 0; d < ND; ++d) {
               s_t mapped = s_t(0);
               for (int k = 0; k < ND; ++k) {
@@ -365,7 +365,6 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR shape,
     const void *const RSTR grad_ref[3],
     const void *const RSTR q_weight,
     const real_t eta_b,
@@ -383,10 +382,10 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_merit_patch_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_merit_patch<double, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *)shape, (const double *const *)grad_ref, (const double *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)p, (const double *)accumulator, (double *)merit);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_merit_patch<double, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *const *)grad_ref, (const double *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)p, (const double *)accumulator, (double *)merit);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_merit_patch<float, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *)shape, (const float *const *)grad_ref, (const float *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)p, (const float *)accumulator, (float *)merit);
+        return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_merit_patch<float, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *const *)grad_ref, (const float *)q_weight, eta_b, eta_s, lmbda, mu, u_dt_shift, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)p, (const float *)accumulator, (float *)merit);
     }
     default:
       break;

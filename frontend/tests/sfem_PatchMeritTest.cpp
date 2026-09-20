@@ -129,7 +129,9 @@ namespace {
                 fx.patch->element_local->data(),
                 fx.mesh->elements(0)->data(),
                 const_cast<const geom_t *const *>(fx.mesh->points()->data()),
-                sfem::codegen::ref_tet4_q1<real_t>::shape(),
+                // No `shape`: this material's residual contracts only test
+                // gradients, and the kernel names a reference table only where
+                // it reads one.
                 grad_ref,
                 sfem::codegen::quad_tet_q1<real_t>::q_weight(),
                 kEtaB, kEtaS, kLambda, kMu, kDtShift,
