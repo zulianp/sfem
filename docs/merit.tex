@@ -362,8 +362,34 @@ settled in this framework.
 What the shape costs is that an element is visited once per node it carries, so
 the constitutive evaluation $P(\nabla u)$ is performed about $N_s$ times where an
 element-centric pass performs it once and contracts it against every test
-function.  Whether the hoisting, the vanished accumulator and the absent scatter
-outweigh that is the same question, answered the same way.
+function.  That cost is measured rather than argued.  On TET4 Mooney--Rivlin
+Kelvin--Voigt at $768{,}000$ elements on one Grace node at $72$ threads, against
+the implementation that assembles the whole residual once per trial step and
+fitted to $T(m)=a+bm$:
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+arm & $a$ [s] & $b$ [s] & $a/(a{+}b)$ & $T(12)$ [s] \\
+\midrule
+assemble per step   & $2.33\times10^{-4}$ & $3.01\times10^{-3}$ & 7.2\%  & $3.63\times10^{-2}$ \\
+patch, node-centric & $5.60\times10^{-3}$ & $1.40\times10^{-3}$ & 80.0\% & $2.22\times10^{-2}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The step-independent fraction rises from $7\%$ to $80\%$, which is the quantity
+this work exists to move and is past the $57\%$ an already-sampled energy kernel
+of comparable constitutive cost reaches.  At twelve trial steps the patch kernel
+is $1.63\times$ faster.
+
+The redundancy is in the same numbers, and it is the honest half of the result:
+at a \emph{single} step the patch kernel is $2.16\times$ slower, which is what
+visiting each element once per node costs.  That it is $2.16$ rather than
+$N_s=4$ is the scatter and the accumulator traffic it no longer pays.  The two
+cross between three and four trial steps, so the arrangement is a loss for a
+search sampling one or two points and a gain for anything sampling more --- the
+regime the interface was built for.
 
 \section{Cost model}
 
