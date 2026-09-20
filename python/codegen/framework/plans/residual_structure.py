@@ -36,6 +36,47 @@ def residual_local_phase_plans():
     )
 
 
+def published_patch_merit_kernels(element_type, mixed=False):
+    """The node-centric merit kernels this unit publishes: one, or none.
+
+    A sequence rather than a predicate, for the reason `published_forms` is one:
+    the emitter walks what this returns instead of testing it, so a unit with no
+    such kernel simply contributes nothing rather than being skipped by a branch
+    in emission.
+
+    There is at most one, and whether it exists is a question about the element.
+    The arrangement rests on presenting a chosen node at local slot 0 by a
+    permutation that does not reverse the element, and only the affine simplices
+    have one.  A mixed-order unit has none either: its fields do not share a
+    shape count, so there is no single local slot to bring to the front.
+    """
+    from codegen.framework.fem.patch_orientation import supports_patch_orientation
+
+    if mixed or not supports_patch_orientation(element_type):
+        return ()
+    return ("merit_patch",)
+
+
+def patch_merit_staged_roles(dependencies):
+    """Which field roles a sampled patch kernel carries between its two loops.
+
+    `current` is always there, and it is staged together with the direction
+    because the two are what the trial step combines: loop 2 forms
+    `current + alpha * direction`.
+
+    `previous` is staged alone, and the asymmetry is the point.  A history is
+    fixed for the whole time step, so it does not combine with alpha and has no
+    direction partner; loop 2 reads it as it was interpolated.  A rate-dependent
+    material such as Kelvin-Voigt needs it, and a kernel that staged only the
+    state would reference `u_old` symbols nothing defines -- which is what the
+    compiler caught the first time this kernel was emitted for real.
+    """
+    roles = ["current"]
+    if dependencies.previous:
+        roles.append("previous")
+    return tuple(roles)
+
+
 def patch_merit_staged_quantities(dependencies):
     """Which of a field's quantities a sampled patch kernel carries between its
     two loops.

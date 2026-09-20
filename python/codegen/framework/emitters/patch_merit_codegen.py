@@ -33,7 +33,10 @@ number of elements incident on a node is a property of the mesh and cannot be
 chosen.
 """
 
-from codegen.framework.plans.residual_structure import patch_merit_staged_quantities
+from codegen.framework.plans.residual_structure import (
+    patch_merit_staged_quantities,
+    patch_merit_staged_roles,
+)
 from codegen.framework.fem.patch_orientation import (
     patch_orientation_permutations,
     supports_patch_orientation,
@@ -54,22 +57,51 @@ from codegen.framework.fem.patch_orientation import (
 #: `test_grad` is the physical gradient of the *fixed* basis function -- the one
 #: the orientation permutation put at local slot 0 -- which is why it belongs
 #: here at all rather than inside the step loop.
+#: How each staged role is spelled.  `gathers` are the kernel arguments loop 1
+#: reads for it, `buffers` the prefix its loop-1 buffers take, and `suffix` what
+#: loop 2 calls the symbol it defines -- the same suffix the element-centric
+#: bodies use, so a material's expressions need no translation.
+#:
+#: `current` carries two gathers because the trial step combines it with the
+#: direction.  `previous` carries one: a history is fixed within the step.
+_ROLE_SPELLING = {
+    "current": {
+        "gathers": (("state", "x"), ("direction", "h")),
+        "buffers": ("pm_state", "pm_direction"),
+        "suffix": "",
+    },
+    "previous": {
+        "gathers": (("previous", "p"),),
+        "buffers": ("pm_previous",),
+        "suffix": "_old",
+    },
+}
+
+
 #: The two buffers a staged quantity needs, and how wide each is.  A quantity
 #: that a form does not read contributes no entry, which is the plan's answer
 #: rather than a test here: see `patch_merit_staged_quantities`.
-_STAGED_BUFFERS = {
-    "value": lambda dim, nc: (("pm_state_value", nc), ("pm_direction_value", nc)),
-    "gradient": lambda dim, nc: (
-        ("pm_state_grad", nc * dim),
-        ("pm_direction_grad", nc * dim),
-    ),
+#: How wide one staged quantity is, per field component.
+_QUANTITY_WIDTH = {
+    "value": lambda dim, nc: nc,
+    "gradient": lambda dim, nc: nc * dim,
 }
+
+#: What loop 1 names the buffer holding a quantity.
+_QUANTITY_BUFFER_SUFFIX = {"value": "_value", "gradient": "_grad"}
 
 
 def patch_loop_one_buffers(dim, n_field_components, dependencies):
     buffers = [("pm_test_grad", dim), ("pm_weight", 1)]
-    for quantity in patch_merit_staged_quantities(dependencies):
-        buffers.extend(_STAGED_BUFFERS[quantity](dim, n_field_components))
+    for role in patch_merit_staged_roles(dependencies):
+        for prefix in _ROLE_SPELLING[role]["buffers"]:
+            for quantity in patch_merit_staged_quantities(dependencies):
+                buffers.append(
+                    (
+                        prefix + _QUANTITY_BUFFER_SUFFIX[quantity],
+                        _QUANTITY_WIDTH[quantity](dim, n_field_components),
+                    )
+                )
     return tuple(buffers)
 
 
@@ -114,7 +146,7 @@ def _buffer_index(offset, count, lane="lane"):
 
 
 def _stage_value_lines(indent, name, dim, n_fields):
-    target = "pm_state_value" if name == "state" else "pm_direction_value"
+    target = "pm_%s_value" % name
     return [
         "%s    // interpolated %s value" % (indent, name),
         "%s    for (int c = 0; c < NC; ++c) {" % indent,
@@ -128,7 +160,7 @@ def _stage_value_lines(indent, name, dim, n_fields):
 
 
 def _stage_gradient_lines(indent, name, dim, n_fields):
-    target = "pm_state_grad" if name == "state" else "pm_direction_grad"
+    target = "pm_%s_grad" % name
     return [
         "%s    // physical gradient of the %s: summed over shape functions," % (indent, name),
         "%s    // then mapped.  Mapped here and not in loop 2 because the map" % indent,
@@ -177,19 +209,27 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
     ]
     # The gather reads geometry and state through the same permutation, so the
     # two cannot disagree about which vertex is which.
+    gathers = [
+        pair
+        for role in patch_merit_staged_roles(dependencies)
+        for pair in _ROLE_SPELLING[role]["gathers"]
+    ]
+    lines.extend(
+        "%s    s_t %s[%d];" % (indent, name, n_fields * rule.n_shape)
+        for name, _ in gathers
+    )
     lines.extend(
         [
-            "%s    s_t state[%d];" % (indent, n_fields * rule.n_shape),
-            "%s    s_t direction[%d];" % (indent, n_fields * rule.n_shape),
             "%s    for (int j = 0; j < NS; ++j) {" % indent,
             "%s      const idx_t node = elements[perm[j]][element];" % indent,
             "%s      for (int c = 0; c < NC; ++c) {" % indent,
-            "%s        state[j * NC + c] = x[node * NC + c];" % indent,
-            "%s        direction[j * NC + c] = h[node * NC + c];" % indent,
-            "%s      }" % indent,
-            "%s    }" % indent,
         ]
     )
+    lines.extend(
+        "%s        %s[j * NC + c] = %s[node * NC + c];" % (indent, name, source)
+        for name, source in gathers
+    )
+    lines.extend(["%s      }" % indent, "%s    }" % indent])
     lines.extend(
         [
             "%s    // The geometry is indexed by the element, not by a block" % indent,
@@ -202,7 +242,7 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
         ]
     )
     for quantity in patch_merit_staged_quantities(dependencies):
-        for name in ("state", "direction"):
+        for name, _ in gathers:
             lines.extend(
                 _STAGE_QUANTITY[quantity](indent, name, dim, n_fields)
             )
@@ -228,23 +268,31 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
     return lines
 
 
-def _combine_value_lines(indent, field, field_index, dim, n_fields, components):
+def _combine_value_lines(indent, field, field_index, dim, n_fields, components, role):
+    spelling = _ROLE_SPELLING[role]
     source = _buffer_index("%d" % field_index, n_fields, lane="lane_e")
+    reads = " + alpha * ".join(
+        "%s_value[%s]" % (prefix, source) for prefix in spelling["buffers"]
+    )
     return [
-        "%s      const s_t %s = pm_state_value[%s] + alpha * pm_direction_value[%s];"
-        % (indent, field.name, source, source)
+        "%s      const s_t %s%s = %s;"
+        % (indent, field.name, spelling["suffix"], reads)
     ]
 
 
-def _combine_gradient_lines(indent, field, field_index, dim, n_fields, components):
+def _combine_gradient_lines(indent, field, field_index, dim, n_fields, components, role):
+    spelling = _ROLE_SPELLING[role]
     lines = []
     for d in range(dim):
         source = _buffer_index(
             "%d" % (field_index * dim + d), components, lane="lane_e"
         )
+        reads = " + alpha * ".join(
+            "%s_grad[%s]" % (prefix, source) for prefix in spelling["buffers"]
+        )
         lines.append(
-            "%s      const s_t %s_grad_%d = pm_state_grad[%s] + alpha * pm_direction_grad[%s];"
-            % (indent, field.name, d, source, source)
+            "%s      const s_t %s%s_grad_%d = %s;"
+            % (indent, field.name, spelling["suffix"], d, reads)
         )
     return lines
 
@@ -288,13 +336,17 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
     # `grad(x + alpha h) = grad x + alpha grad h`, one fused multiply-add per
     # component.  This is the whole of the affine identity at the point the
     # state enters the arithmetic.
-    for quantity in patch_merit_staged_quantities(dependencies):
-        for field_index, field in enumerate(system.fields):
-            lines.extend(
-                _STAGED_COMBINATION[quantity](
-                    indent, field, field_index, dim, n_fields, components
+    # `current` joins its direction under alpha; `previous` has no direction to
+    # join, so the same table produces a plain read for it.  The join is the
+    # role's buffer list, not a test on which role this is.
+    for role in patch_merit_staged_roles(dependencies):
+        for quantity in patch_merit_staged_quantities(dependencies):
+            for field_index, field in enumerate(system.fields):
+                lines.extend(
+                    _STAGED_COMBINATION[quantity](
+                        indent, field, field_index, dim, n_fields, components, role
+                    )
                 )
-            )
     lines.extend("%s      %s" % (indent, line) for line in material_lines)
     lines.append(
         "%s      const s_t weight = pm_weight[q * VS + lane_e];" % indent
@@ -380,8 +432,15 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
         [
             "    const int nsteps,",
             "    const s_t *const RSTR steps,",
-            "    const s_t *const RSTR x,",
-            "    const s_t *const RSTR h,",
+        ]
+    )
+    lines.extend(
+        "    const s_t *const RSTR %s," % source
+        for role in patch_merit_staged_roles(dependencies)
+        for _, source in _ROLE_SPELLING[role]["gathers"]
+    )
+    lines.extend(
+        [
             "    const s_t *const RSTR accumulator,",
             "    s_t *const RSTR merit",
             ") {",
