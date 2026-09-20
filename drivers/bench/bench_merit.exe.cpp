@@ -21,6 +21,9 @@
 #include "sfem_Function.hpp"
 #include "sfem_OpFactory.hpp"
 #include "sfem_GeneratedMooneyRivlinKelvinVoigt_c_abi.hpp"
+#include "sfem_PatchIncidence.hpp"
+#include "reference/tet4_q1.hpp"
+#include "reference/quad_tet_q1.hpp"
 
 #include <cmath>
 #include <limits>
@@ -376,6 +379,72 @@ int main(int argc, char *argv[]) {
                        per_call,
                        first > 0 ? per_call / first : 0.0,
                        values[0]);
+            }
+
+            // The node-centric patch kernel, on the same states and the same
+            // step counts.  This is the comparison the whole arrangement is
+            // for: it samples every step in one traversal, and it pays for
+            // that by visiting each element once per node it carries, so
+            // whether it wins is measured rather than argued.
+            //
+            // TET4 and Mooney-Rivlin Kelvin-Voigt because that is where the
+            // kernel exists: it needs an even permutation fronting a node,
+            // which only the affine simplices have, and it is published by the
+            // unit carrying the material's whole residual.
+            if (op_name == "GeneratedMooneyRivlinKelvinVoigt" &&
+                static_cast<smesh::ElemType>(element) == smesh::TET4 && block == 3) {
+                auto patch = sfem::build_patch_incidence(mesh);
+                std::vector<real_t> accumulator((size_t)ndofs, 0);
+                const void *grad_ref[3] = {
+                        sfem::codegen::ref_tet4_q1<real_t>::grad_ref_x(),
+                        sfem::codegen::ref_tet4_q1<real_t>::grad_ref_y(),
+                        sfem::codegen::ref_tet4_q1<real_t>::grad_ref_z(),
+                };
+                const real_t mu = real_t(1), lmbda = real_t(1);
+                const real_t eta_s = real_t(0.1), eta_b = real_t(0), dt_shift = real_t(1);
+                double patch_first = 0;
+                printf("# line search sweep: residual_merit, node-centric patch kernel\n");
+                // At most the kernel's vector width, which is the axis the
+                // caller controls -- the count is rounded to it rather than
+                // being whatever a search happened to ask for.
+                const int patch_counts[] = {1, 2, 4, 8, 12, 16};
+                for (const int nsteps : patch_counts) {
+                    std::vector<real_t> steps(nsteps);
+                    for (int k = 0; k < nsteps; ++k) {
+                        steps[k] = real_t(-1) / real_t(k + 1);
+                    }
+                    std::vector<real_t> values(nsteps, 0);
+                    auto call = [&]() {
+                        std::fill(values.begin(), values.end(), real_t(0));
+                        return mooney_rivlin_kelvin_voigt_total_merit_patch_3d_a_msoa(
+                                smesh::TET4,
+                                smesh::TypeToEnum<real_t>::value(),
+                                patch->n_nodes(),
+                                patch->node_ptr->data(),
+                                patch->element->data(),
+                                patch->element_local->data(),
+                                mesh->elements(0)->data(),
+                                const_cast<const geom_t *const *>(mesh->points()->data()),
+                                sfem::codegen::ref_tet4_q1<real_t>::shape(),
+                                grad_ref,
+                                sfem::codegen::quad_tet_q1<real_t>::q_weight(),
+                                eta_b, eta_s, lmbda, mu, dt_shift,
+                                nsteps, steps.data(),
+                                x_host->data(), h_host->data(), previous_host->data(),
+                                accumulator.data(), values.data());
+                    };
+                    for (int r = 0; r < warmup; ++r) call();
+                    const double p0 = MPI_Wtime();
+                    for (int r = 0; r < repeat; ++r) call();
+                    const double per_call = (MPI_Wtime() - p0) / repeat;
+                    if (patch_first == 0) patch_first = per_call;
+                    printf("%-34s %12d %14.6e %14.3f %26.17g\n",
+                           "host_line_search_patch",
+                           nsteps,
+                           per_call,
+                           patch_first > 0 ? per_call / patch_first : 0.0,
+                           values[0]);
+                }
             }
         }
     }
