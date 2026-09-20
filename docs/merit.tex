@@ -30,18 +30,22 @@ $\tfrac12\|R(x+\alpha h)\|^2$ --- the only merit available to a formulation that
 is not the gradient of a potential --- the obvious implementation assembles the
 whole residual once per trial step, so a search over $m$ step lengths costs $m$
 assemblies.  Measured on a Mooney--Rivlin Kelvin--Voigt solid, $m=12$ costs
-$9.25\times$ one assembly.  We show that the $m$ evaluations share almost all of
-their work, and that what they share can be hoisted out of the trial-step loop
-exactly, not approximately, because the state enters the element kernel through a
-quantity that is affine in $\alpha$.  The result is a single pass over the mesh
+$11.8\times$ one assembly at $m=12$, measured at $512{,}000$ elements on a
+Grace node at $72$ threads.  We show that the $m$ evaluations share a
+substantial part of their work, and that what they share can be hoisted out of
+the trial-step loop exactly, not approximately, because the state enters the
+element kernel through a quantity that is affine in $\alpha$.  The result is a single pass over the mesh
 that produces all $m$ merit values, whose cost model is one gather, one
 trial-function accumulation per field role, and $m$ repetitions of the
 constitutive evaluation alone.  No per-step residual vector is materialized at any
 point: the contraction is closed inside a patch of elements, where the node sums
 are complete, so each trial step leaves the patch as a single number and a thread's
-entire output is a buffer of $m$ scalars.  For comparison, the same reorganization applied
-to the energy merit --- where it is already in place --- costs $1.17\times$ one
-step at $m=12$.
+entire output is a buffer of $m$ scalars.  How much that is worth is bounded by the
+constitutive evaluation, which repeats per trial step and cannot be hoisted.
+The same reorganization is already in place for the energy merit, and measured
+on the same node it costs $5.7\times$ one step at $m=12$ for a Mooney-Rivlin
+class material and $3.7\times$ for linear elasticity --- a real saving against
+$11.8$, and not the near-flat cost a reading of "sampled" might suggest.
 \end{abstract}
 
 \section{Notation}
@@ -311,9 +315,27 @@ as $m$ grows.
 
 and at $m=1$ the two agree up to the one extra accumulation $C_{\text{acc}}$.  The
 measurement that settles the design is the line-search sweep over
-$m\in\{1,2,4,8,12,20\}$ reported as $T(m)/T(1)$: the residual arm reads $9.25$ at
-$m=12$ with the per-step implementation, against $1.17$ for the energy arm, which
-is the same reorganization already applied one layer up.
+$m\in\{1,2,4,8,12,20\}$ reported as $T(m)/T(1)$.  Measured at $512{,}000$
+elements on one Grace node at $72$ threads with \texttt{OMP\_PROC\_BIND=true},
+and fitted to $T(m)=a+bm$ to separate the step-independent work $a$ from the
+per-step work $b$:
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+arm & $a$ [s] & $b$ [s] & $a/(a{+}b)$ & $T(12)/T(1)$ \\
+\midrule
+linear elasticity, energy   & $1.67\times10^{-3}$ & $5.36\times10^{-4}$ & 75.7\% & 3.70 \\
+Mooney-Rivlin, energy       & $1.72\times10^{-3}$ & $1.29\times10^{-3}$ & 57.1\% & 5.75 \\
+Mooney-Rivlin KV, residual  & $5.90\times10^{-4}$ & $9.09\times10^{-3}$ & 6.1\%  & 11.78 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The last row is the target and the middle row is what a sampled kernel of
+comparable constitutive cost achieves: today $6\%$ of a residual merit
+evaluation is step-independent, against $57\%$ once the sharing is in place.
+The number to move is that fraction, not the ratio directly.
 
 \section{The interface}
 
