@@ -20,6 +20,7 @@
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_OpFactory.hpp"
+#include "sfem_GeneratedMooneyRivlinKelvinVoigt_c_abi.hpp"
 
 #include <cmath>
 #include <limits>
@@ -222,6 +223,95 @@ int main(int argc, char *argv[]) {
                    elapsed, nelements, ndofs, repeat, host_value);
         host_gradient = gradient_norm(f, x_host->data(), sfem::EXECUTION_SPACE_HOST);
         printf("%-34s %12s %14s %14s %26.17g\n", "host_gradient_norm", "", "", "", host_gradient);
+
+        // One traversal against two, for the material that has a combined unit.
+        //
+        // A residual merit squares a node's complete value, so it has to be
+        // contracted by a single kernel over a single form.  This material used
+        // to publish its elastic and viscous units separately, and
+        // `Function::gradient` runs them one after the other into the same
+        // vector; `residual_merit` is the form-layer sum of the two, emitted as
+        // one kernel.  What that costs is the floor for the sampling kernel
+        // built on top of it, which is why it is measured here rather than
+        // assumed.
+        //
+        // Reported as a cost-model input and not as a shipped speed-up: nothing
+        // routes `gradient` through the combined kernel, so this is not a
+        // configuration the library runs today.  Mooney-Rivlin Kelvin-Voigt is
+        // named because it is the only material with a combined unit; the arm
+        // is skipped for anything else rather than pretending to be generic.
+        if (op_name == "GeneratedMooneyRivlinKelvinVoigt" &&
+            static_cast<smesh::ElemType>(element) == smesh::HEX8 && block == 3) {
+            const real_t mu = real_t(1), lmbda = real_t(1);
+            const real_t eta_s = real_t(0.1), eta_b = real_t(0), dt_shift = real_t(1);
+            for (const auto &blk : mesh->blocks()) {
+                op->set_value_in_block(blk->name(), "mu", mu);
+                op->set_value_in_block(blk->name(), "lmbda", lmbda);
+                op->set_value_in_block(blk->name(), "eta_s", eta_s);
+                op->set_value_in_block(blk->name(), "eta_b", eta_b);
+                op->set_value_in_block(blk->name(), "u_dt_shift", dt_shift);
+            }
+            op->set_field("previous", previous_host, 0);
+
+            auto two_unit = sfem::create_host_buffer<real_t>(ndofs);
+            auto combined = sfem::create_host_buffer<real_t>(ndofs);
+
+            auto run_combined = [&](real_t *const out) {
+                return mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_msoa(
+                        smesh::HEX8,
+                        smesh::TypeToEnum<real_t>::value(),
+                        nelements,
+                        mesh->n_nodes(),
+                        mesh->elements(0)->data(),
+                        const_cast<const geom_t *const *>(mesh->points()->data()),
+                        eta_b, eta_s, lmbda, mu, dt_shift,
+                        block, x_host->data() + 0, x_host->data() + 1, x_host->data() + 2,
+                        block, previous_host->data() + 0, previous_host->data() + 1,
+                        previous_host->data() + 2,
+                        block, out + 0, out + 1, out + 2);
+            };
+
+            for (int i = 0; i < warmup; ++i) {
+                sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST)->zeros(ndofs, two_unit->data());
+                f->gradient(x_host->data(), two_unit->data());
+                sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST)->zeros(ndofs, combined->data());
+                run_combined(combined->data());
+            }
+
+            auto blas = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
+            double t0 = MPI_Wtime();
+            for (int i = 0; i < repeat; ++i) {
+                blas->zeros(ndofs, two_unit->data());
+                f->gradient(x_host->data(), two_unit->data());
+            }
+            const double two_unit_elapsed = MPI_Wtime() - t0;
+
+            t0 = MPI_Wtime();
+            for (int i = 0; i < repeat; ++i) {
+                blas->zeros(ndofs, combined->data());
+                run_combined(combined->data());
+            }
+            const double combined_elapsed = MPI_Wtime() - t0;
+
+            // The two must be the same residual, or the timings compare
+            // different computations.  Reported, not asserted: a benchmark that
+            // aborts tells you less than one that prints the disagreement.
+            real_t worst = 0, scale = 0;
+            for (ptrdiff_t i = 0; i < ndofs; ++i) {
+                worst = std::max(worst, std::abs(combined->data()[i] - two_unit->data()[i]));
+                scale = std::max(scale, std::abs(two_unit->data()[i]));
+            }
+            print_rate("host_gradient_two_units", two_unit_elapsed, nelements, ndofs, repeat,
+                       blas->norm2(ndofs, two_unit->data()));
+            print_rate("host_residual_combined", combined_elapsed, nelements, ndofs, repeat,
+                       blas->norm2(ndofs, combined->data()));
+            printf("%-34s %12.4f %14s %14s %26.17g\n",
+                   "combined/two_units ratio",
+                   combined_elapsed / two_unit_elapsed,
+                   "", "",
+                   static_cast<double>(scale > 0 ? worst / scale : worst));
+            fflush(stdout);
+        }
 
         // A line search evaluates several trial steps, and the claim the merit
         // interface makes is that it should not cost several line searches.
