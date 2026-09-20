@@ -111,6 +111,7 @@ from codegen.framework.plans.generation import (
 from codegen.framework.plans.generation import LocalPhase, MeshPhase
 from codegen.framework.plans.residual_structure import (
     residual_step_dependent_phases,
+    published_patch_merit_kernels,
     publishes_scalar_jacobian_action,
     published_jacobian_blocks,
     jacobian_block_plan,
@@ -205,6 +206,10 @@ from codegen.framework.emitters.cprinter import (
     c_sum,
     _sfem_ccode,
     _sfem_math_header_source,
+)
+from codegen.framework.emitters.patch_merit_codegen import (
+    patch_merit_kernel_lines,
+    patch_orientation_table_lines,
 )
 from codegen.framework.emitters.energy_codegen import (
     _sfem_soa_diagnostics_header,
@@ -1876,6 +1881,7 @@ def generate_coupled_residual_sfem_files(
     reference_data_plan=None,
     diagnostics_plan=None,
     matrix_format_plan=None,
+    unit_name="",
 ):
     if not isinstance(system, ResidualEmissionModel):
         raise TypeError(
@@ -1956,6 +1962,7 @@ def generate_coupled_residual_sfem_files(
         geometry_family=geometry_family,
         matrix_format_plan=matrix_format_plan,
         emit_diagnostics=diagnostics_plan is not None,
+        unit_name=unit_name,
     )
     diagnostics_name = _header("kernel_diagnostics")
     return (
@@ -5520,6 +5527,7 @@ def _operator_source(
     geometry_family=None,
     matrix_format_plan=None,
     emit_diagnostics=True,
+    unit_name="",
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -5750,6 +5758,38 @@ def _operator_source(
             matrix_format_plan,
         )
     )
+    # The node-centric merit kernel, where the unit and the element admit one.
+    # It goes in the per-element source rather than the family header because
+    # it is both: it needs an orientation, which only the affine simplices
+    # have, and it contracts the whole residual, which only the combined unit
+    # is.  The family header is shared by every element of a family and by the
+    # block units, so a kernel gated on either would generate one file two ways.
+    stepped = stepped_residual_dependencies(form_dependencies["residual"])
+    for kernel in published_patch_merit_kernels(
+        rule.element_type,
+        unit_name,
+        has_parallel_region=_target().parallel_region_pragma() is not None,
+    ):
+        lines.append("")
+        lines.extend(patch_orientation_table_lines(rule.element_type))
+        lines.append("")
+        lines.extend(
+            patch_merit_kernel_lines(
+                system,
+                rule,
+                residual_coeffs,
+                stepped,
+                rule.element_type,
+                "%s_%s" % (prefix, kernel),
+                _print_statement_nodes(
+                    _coefficient_evaluation_nodes(system, residual_coeffs, stepped), ""
+                ),
+                parameters=tuple(
+                    str(parameter)
+                    for parameter in form_dependencies["residual"].parameters
+                ),
+            )
+        )
     return "\n".join(resolve_dead_parameters(resolve_kernel_constants(lines)))
 
 

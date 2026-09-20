@@ -36,7 +36,8 @@ def residual_local_phase_plans():
     )
 
 
-def published_patch_merit_kernels(element_type, mixed=False):
+def published_patch_merit_kernels(element_type, unit_name="", mixed=False,
+                                  has_parallel_region=True):
     """The node-centric merit kernels this unit publishes: one, or none.
 
     A sequence rather than a predicate, for the reason `published_forms` is one:
@@ -51,8 +52,24 @@ def published_patch_merit_kernels(element_type, mixed=False):
     shape count, so there is no single local slot to bring to the front.
     """
     from codegen.framework.fem.patch_orientation import supports_patch_orientation
+    from codegen.framework.forms.equations import TOTAL_RESIDUAL_UNIT_NAME
 
     if mixed or not supports_patch_orientation(element_type):
+        return ()
+    # Only the unit carrying the material's whole residual.  A block unit
+    # numbers its coefficients by the block's row rather than from zero, so a
+    # kernel contracting `grad_coeff0_*` does not even compile against one --
+    # and a unit that is only part of the residual has no merit to contract in
+    # the first place.
+    if str(unit_name) != TOTAL_RESIDUAL_UNIT_NAME:
+        return ()
+    # And only where the target has a host parallel region to put it in.  The
+    # kernel is host-shaped throughout -- one thread per patch, thread-private
+    # staging buffers between its two loops, an atomic to combine the per-thread
+    # step totals -- so it is not a kernel a device target can spell
+    # differently, it is a kernel a device target does not have.  Emitting it
+    # anyway puts OpenMP pragmas in a `.cu`, which the generator refuses.
+    if not has_parallel_region:
         return ()
     return ("merit_patch",)
 
