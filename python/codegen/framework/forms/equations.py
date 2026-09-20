@@ -758,9 +758,15 @@ def _distinct_equation_fields(system):
     return tuple(seen.values())
 
 
-#: The unit name the combined residual is emitted under.  Named after the
-#: kernel family rather than the mathematics, like every other unit here.
-TOTAL_RESIDUAL_UNIT_NAME = "residual_merit"
+#: The unit name the combined residual is emitted under.
+#:
+#: Deliberately not "residual_merit", which is what it says but collides with
+#: the ABI naming vocabulary: a kernel name is parsed by finding its verb, and
+#: a unit whose own name contains one makes `..._residual_merit_jacobian_action`
+#: parse as the verb `merit` followed by the qualifier `jacobian_action`.  The
+#: unit name sits before the verb in every published symbol, so it has to stay
+#: out of that vocabulary.
+TOTAL_RESIDUAL_UNIT_NAME = "total"
 
 
 def _build_form_collection(system, equation, orders):

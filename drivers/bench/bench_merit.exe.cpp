@@ -271,7 +271,7 @@ int main(int argc, char *argv[]) {
             auto combined = sfem::create_host_buffer<real_t>(ndofs);
 
             auto run_combined = [&](real_t *const out) {
-                return mooney_rivlin_kelvin_voigt_residual_merit_residual_3d_i_msoa(
+                return mooney_rivlin_kelvin_voigt_total_residual_3d_i_msoa(
                         smesh::HEX8,
                         smesh::TypeToEnum<real_t>::value(),
                         nelements,

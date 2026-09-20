@@ -485,6 +485,11 @@ ABI_TRAVERSAL_SPELLING = (
     ("packed_one_pass", "packed_one_pass"),
     ("packed_two_pass", "packed_two_pass"),
     ("packed", "packed"),
+    # A patch traversal walks one node at a time and sums the elements incident
+    # on it, rather than walking elements and scattering.  It is a traversal
+    # and not a store, so it occupies this slot for the same reason the packed
+    # ones do: it says how the kernel walks the mesh.
+    ("patch", "patch"),
 )
 
 #: Which dispatch translation unit each traversal belongs in.
@@ -494,6 +499,7 @@ ABI_TRAVERSAL_SPELLING = (
 #: routed to a unit of its own, and because the file name keeps the long word --
 #: file names are outside the abbreviation.
 ABI_TRAVERSAL_UNIT = {
+    "patch": "patch",
     "packed_one_pass": "packed",
     "packed_two_pass": "packed",
     "packed": "packed",
@@ -509,6 +515,7 @@ ABI_TRAVERSAL_UNIT = {
 ABI_VERBS = (
     "hessian_block_diag_sym",
     "objective_steps",
+    "merit",
     "jacobian_action",
     "matrix_assembly",
     "inexact_apply",
