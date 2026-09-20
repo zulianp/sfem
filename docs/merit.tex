@@ -55,8 +55,10 @@ trial steps --- two sequential vector loops, never nested, the first
 precomputing everything the second would otherwise recompute.  Normalizing each
 element's orientation so the node is always the same local node makes its basis
 function the same in every lane and at every step, which is what allows those
-terms to leave both loops.  Which axis should carry the second loop's lanes is
-left to measurement: the arrangements are built as variants and timed.  What this is worth is bounded by the constitutive evaluation, which
+terms to leave both loops.  The second loop's lanes are the trial
+steps, because $m$ is a quantity the line search chooses and is therefore set to
+the hardware's vector length --- unlike the number of elements incident on a
+node, which the mesh fixes.  The alternatives are built and timed against it.  What this is worth is bounded by the constitutive evaluation, which
 repeats per trial step by construction.  The same reorganization is already in
 place for the energy merit, and measured on the same node it costs $5.7\times$
 one step at $m=12$ for a Mooney--Rivlin-class material and $3.7\times$ for
@@ -337,13 +339,25 @@ chosen vertex to position $0$, which exist for every vertex.
 \end{algorithmic}
 \end{algorithm}
 
-Which axis should carry the second loop's lanes is not settled here.  Three
-arrangements are available --- lanes over the trial steps, lanes over the
-incident elements with the steps serial, and lanes over the flattened
-element-by-step product --- and they trade differently: the step count is a
-runtime value and may be shorter than the vector width, while the incident count
-varies from node to node.  They are built as variants and timed against each
-other, which is how a competing loop arrangement is settled in this framework.
+The second loop's lanes are the trial steps, and the reason is that $m$ is ours
+to choose.  The objection that would otherwise count against that axis --- a
+runtime count shorter than the vector width, leaving lanes idle --- does not
+apply to a quantity the line search sets: $m$ is rounded to the hardware's
+vector length, or a multiple of it.  The lanes are then uniform, always full and
+identical for every node, whereas the number of elements incident on a node is a
+property of the mesh, varies from node to node, and leaves a ragged tail no
+choice of ours can remove.
+
+Sampling more step lengths than a classical search would ask for is close to
+free in this arrangement, because the extra samples occupy lanes that would
+otherwise idle.  Rounding $m$ up to the vector width buys a finer picture of
+$\phi$ along the direction at no cost, which is a pleasant inversion of the
+usual trade.
+
+The alternatives --- lanes over the incident elements with the steps serial, and
+lanes over the flattened element-by-step product --- are still built and timed
+against it rather than argued away, which is how a competing loop arrangement is
+settled in this framework.
 
 What the shape costs is that an element is visited once per node it carries, so
 the constitutive evaluation $P(\nabla u)$ is performed about $N_s$ times where an
