@@ -113,6 +113,26 @@ namespace sfem {
             // alone hands the operator a buffer it runs off the end of.
             alloc_ = domain_.distributed() ? std::max(domain_.n_owned, domain_.n_local) : n;
 
+            // SFEM_FGMRES_DIAG=1: what this solver believes about its own parallelism, and
+            // whether the Krylov basis it builds is actually orthogonal.
+            //
+            // Every reduction here routes through domain_, and domain_ is populated only if
+            // the constructor's dynamic_pointer_cast to ParallelOperator succeeded. If an
+            // operator reaches the solver with that face erased, the cast fails silently,
+            // distributed() is false, and every dot and norm below is rank-local while the
+            // source still reads as collective. The symptom is not a wrong answer but a
+            // degraded iteration count, which is indistinguishable by eye from a weaker
+            // preconditioner -- so it has to be reported rather than inferred.
+            if (smesh::Env::read<int>("SFEM_FGMRES_DIAG", 0) && !diag_announced_) {
+                diag_announced_ = true;
+                const int rank  = domain_.rank();
+                if (domain_.is_root())
+                    std::printf("fgmres: distributed %d  size %d  n(owned) %td  n_local %td  alloc %td\n",
+                                domain_.distributed() ? 1 : 0, domain_.size(), (ptrdiff_t)n,
+                                domain_.n_local, alloc_);
+                (void)rank;
+            }
+
             T *const                    r = vec(work_, 0);
             T *const                    w = vec(work_, 1);
             std::vector<std::vector<T>> H;
@@ -120,6 +140,7 @@ namespace sfem {
 
             iterations_ = 0;
             diverged_   = false;
+            orth_worst_ = T(0);
 
             // Best iterate seen, so a solve abandoned as divergent hands back the best point
             // it reached rather than the diverging one. GMRES only writes x at the end of a
@@ -218,6 +239,25 @@ namespace sfem {
                     else
                         blas_->zeros((size_t)n, vnext);
 
+                    // SFEM_FGMRES_DIAG=1: the orthogonality defect of the basis just
+                    // extended, max_i |<v_i, v_{j+1}>| over the vectors already built.
+                    //
+                    // This is the measurement that separates a reduction which is absent
+                    // from one which is merely wrong. The diagnostic above reports what the
+                    // solver believes about its own parallelism; this reports whether that
+                    // belief produced an orthogonal basis. Modified Gram-Schmidt has just
+                    // projected v_{j+1} against every earlier vector, so on a correct
+                    // reduction these inner products are at rounding level; a rank-local
+                    // dot leaves them O(1) while the solve still converges, slowly, which
+                    // is exactly the signature that reads as a weaker preconditioner.
+                    if (smesh::Env::read<int>("SFEM_FGMRES_DIAG", 0)) {
+                        for (int i = 0; i <= j; ++i) {
+                            const T od = pdot(n, vnext, V_[(size_t)i]);
+                            const T a  = od < T(0) ? -od : od;
+                            if (a > orth_worst_) orth_worst_ = a;
+                        }
+                    }
+
                     for (int i = 0; i < j; ++i) {
                         const T t        = cs[(size_t)i] * h[(size_t)i] + sn[(size_t)i] * h[(size_t)i + 1];
                         h[(size_t)i + 1] = -sn[(size_t)i] * h[(size_t)i] + cs[(size_t)i] * h[(size_t)i + 1];
@@ -271,6 +311,12 @@ namespace sfem {
 
                 if (j < m) break;  // inner loop converged rather than exhausting the restart
             }
+
+            // Reported once per solve rather than per iteration: the worst it ever got is
+            // the number that matters, and a per-iteration trace would bury it.
+            if (smesh::Env::read<int>("SFEM_FGMRES_DIAG", 0) && domain_.is_root())
+                std::printf("fgmres: orth_worst %.3e  its %d\n", (double)orth_worst_, iterations_);
+
             return diverged_ ? 1 : 0;
         }
 
@@ -298,6 +344,8 @@ namespace sfem {
         std::vector<T *>             V_, Z_;
         std::vector<T *>             work_;  // r, w, x_best
         cvfem::Domain                domain_;
+        bool                         diag_announced_{false};
+        T                            orth_worst_{0};
         ptrdiff_t                    n_{0};
         ptrdiff_t                    alloc_{0};
         int                          max_it_{1000};

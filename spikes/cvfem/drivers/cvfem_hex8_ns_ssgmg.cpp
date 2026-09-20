@@ -2421,6 +2421,62 @@ private:
             g.data->functions[i]->apply_constraints(g.states[i]->data());
         }
 
+        // SFEM_GMG_STATE_SUM=1: the linearisation state of every level, as it stands at the
+        // moment the cycle is rebuilt.
+        //
+        // This is the quantity SFEM_GMG_CONST_STATE replaces, and replacing it makes the
+        // iteration counts identical at 1, 2 and 4 ranks, so it is where the decomposition
+        // dependence is carried. refresh_gmg runs once before the Newton loop and again on
+        // every step; only the later calls are informative, because before the first step
+        // the state is boundary data alone -- every non-zero entry sits on a constrained
+        // dof, both transfers zero constrained dofs on their output, and the hierarchy is
+        // derefined with homogeneous Dirichlet data, so a zero coarse state there is
+        // correct rather than evidence of anything.
+        //
+        // Summed over the owned range only and keyed by global id: local indices are
+        // incomparable across partitions, and the ghost and aura entries a rank also stores
+        // belong to their owners. The gid-weighted sum accompanies the plain one because a
+        // permutation moves the weighted sum while leaving the plain one untouched.
+        if (smesh::Env::read<int>("SFEM_GMG_STATE_SUM", 0)) {
+            for (int i = 0; i < nlevels; ++i) {
+                auto      sp = g.data->functions[i]->space();
+                auto      me = sp->mesh_ptr();
+                const int bs = sp->block_size();
+                const bool dd = me->is_distributed() && me->comm() && me->comm()->size() > 1;
+                const ptrdiff_t nown = dd ? me->distributed()->n_nodes_owned() : sp->n_dofs() / bs;
+                const real_t *const xs = g.states[i]->data();
+
+                std::vector<mask_t> cm(mask_count(sp->n_dofs()), 0);
+                g.data->functions[i]->constraints_mask(cm.data());
+
+                long double plain = 0, wsum = 0, free_abs = 0;
+                for (ptrdiff_t n = 0; n < nown; ++n) {
+                    const long double gid =
+                            dd ? (long double)me->distributed()->node_mapping()->data()[n] : (long double)n;
+                    for (int c = 0; c < bs; ++c) {
+                        const ptrdiff_t   k = n * bs + c;
+                        const long double v = (long double)xs[(size_t)k];
+                        plain += v;
+                        wsum += v * (gid * (long double)bs + (long double)c);
+                        if (!mask_get(k, cm.data())) free_abs += v < 0 ? -v : v;
+                    }
+                }
+
+                cvfem::Domain dom;
+                dom.comm    = me->comm();
+                dom.n_owned = nown * bs;
+                dom.n_local = sp->n_dofs();
+
+                const double gp = cvfem::sum_kahan(dom, plain);
+                const double gw = cvfem::sum_kahan(dom, wsum);
+                const double gn = cvfem::sum_kahan(dom, (long double)nown);
+                const double gf = cvfem::sum_kahan(dom, free_abs);
+                if (dom.is_root())
+                    std::printf("gmgstate level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g  free_abs %.17g\n",
+                                i, gn, gp, gw, gf);
+            }
+        }
+
         g.mg          = sfem::h_mg<real_t>();
         g.mg->verbose = false;
 
@@ -2591,6 +2647,66 @@ private:
                     auto a_c      = egal_hier.op[(size_t)i];
                     galerkin_diag = egal_hier.diag[(size_t)i];
 
+                    // SFEM_GMG_DIAG_OWNED_SUM=1: is the coarse block diagonal complete on the
+                    // nodes this rank OWNS?
+                    //
+                    // galerkin_block_diag accumulates each coarse node's 4x4 centre block
+                    // over the local reduce table alone, and nothing exchanges the result, so
+                    // a coarse node shared between ranks holds only its local contributions.
+                    // That diagonal is what the coarse block-Jacobi smoother inverts
+                    // (make_block_jacobi_from_diag below), which is a direct mechanism for the
+                    // cycle degrading as the decomposition gets finer -- and unlike the
+                    // operator comparison further down, this quantity never touches a probe
+                    // vector, so it was never affected by that probe being index-keyed.
+                    //
+                    // What is NOT settled is which exchange repairs it, and the two are not
+                    // interchangeable:
+                    //
+                    //   owned sums match serial -> the owner is authoritative and a gather of
+                    //                              the finished diagonal is enough
+                    //   owned sums differ       -> the partial sums are genuinely split and
+                    //                              the fix must scatter_add them back first
+                    //
+                    // The argument cuts both ways on inspection. The coarse level reuses the
+                    // FINE macro elements (galerkin_init copies d.nmacro), and d.nmacro is
+                    // Mesh::n_elements, the whole local array including aura -- which is the
+                    // same shape the fine nodal reconstruction had, where the owner did turn
+                    // out to be authoritative. But a coarse node is a macro-element corner
+                    // rather than an interior lattice node, so that is a resemblance, not a
+                    // proof. Hence this, rather than a guess.
+                    //
+                    // Summed over the owned range only and keyed by global id: local indices
+                    // are incomparable across partitions, and the ghost entries this rank
+                    // also stores belong to somebody else.
+                    if (smesh::Env::read<int>("SFEM_GMG_DIAG_OWNED_SUM", 0) && !galerkin_diag.empty()) {
+                        auto       cm   = fi->space()->mesh_ptr();
+                        const bool dist = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
+                        const ptrdiff_t nown = dist ? cm->distributed()->n_nodes_owned() : nn;
+
+                        long double plain = 0, gidw = 0;
+                        for (ptrdiff_t n = 0; n < nown && n < nn; ++n) {
+                            const long double gid =
+                                    dist ? (long double)cm->distributed()->node_mapping()->data()[n]
+                                         : (long double)n;
+                            long double blk = 0;
+                            for (int c = 0; c < 16; ++c) blk += (long double)galerkin_diag[(size_t)(n * 16 + c)];
+                            plain += blk;
+                            gidw += blk * gid;
+                        }
+
+                        double gp = (double)plain, gw = (double)gidw, gn = (double)nown;
+                        int    rank = 0;
+                        if (dist) {
+                            gp   = cm->comm()->sum(gp);
+                            gw   = cm->comm()->sum(gw);
+                            gn   = cm->comm()->sum(gn);
+                            rank = cm->comm()->rank();
+                        }
+                        if (rank == 0)
+                            std::printf("diagsum level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g\n",
+                                        i, gn, gp, gw);
+                    }
+
                     // Cross-check against the construction it replaces (SFEM_GMG_CHECK).
                     //
                     // The gates in build_gmg compare the two constructions unconstrained.
@@ -2633,8 +2749,30 @@ private:
 
                         const ptrdiff_t ndc = fi->space()->n_dofs();
                         std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), yb((size_t)ndc, 0);
-                        for (ptrdiff_t k = 0; k < ndc; ++k)
-                            v[(size_t)k] = std::sin(real_t(0.37) * (real_t)k + real_t(1.1));
+
+                        // The probe direction is a function of POSITION, not of the local
+                        // index. It used to be sin(0.37 k + 1.1) over the local dof index,
+                        // which is not a distributed vector at all: a node carries one local
+                        // index on its owner and a different one in every rank that holds it
+                        // as a ghost, so the same physical node entered the two operators
+                        // with different values, and the vector itself changed shape with the
+                        // decomposition. The comparison below stayed apples-to-apples within
+                        // a single run -- both operators saw the same v -- but its value
+                        // could not be compared BETWEEN rank counts, which is precisely what
+                        // it was being read for. Keyed on the coordinates the node actually
+                        // has, a ghost copy agrees with its owner by construction and the
+                        // same run at one, two and four ranks probes the same direction.
+                        {
+                            const auto *const cx = fi->space()->points()->data()[0];
+                            const auto *const cy = fi->space()->points()->data()[1];
+                            const auto *const cz = fi->space()->points()->data()[2];
+                            for (ptrdiff_t n = 0; n < nn; ++n) {
+                                const double X = (double)cx[n], Y = (double)cy[n], Z = (double)cz[n];
+                                for (int c = 0; c < N_FIELDS; ++c)
+                                    v[(size_t)(n * N_FIELDS + c)] =
+                                            (real_t)std::sin(2.3 * X + 1.7 * Y + 1.1 * Z + 0.4 * c + 1.1);
+                            }
+                        }
                         fi->apply_zero_constraints(v.data());
                         a_c->apply(v.data(), ya.data());
                         probed->apply(v.data(), yb.data());
