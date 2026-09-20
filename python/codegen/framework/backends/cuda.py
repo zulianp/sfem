@@ -55,6 +55,11 @@ class CUDASoABackend(SoABackend):
         _require_gpu_target(unit)
 
     def _validate_emitted(self, files, traversal):
+        # A unit that emitted nothing published nothing for this element.  The
+        # merit-only unit is the case and it is structural on a device target:
+        # its one kernel is host-shaped, so there is nothing for CUDA to emit.
+        if not files:
+            return
         _validate_cuda_source_contract(files)
 
     def emit_inexact(self, material, unit, context):
