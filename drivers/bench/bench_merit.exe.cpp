@@ -206,6 +206,20 @@ int main(int argc, char *argv[]) {
         if (!op) {
             SFEM_ERROR("no host operator %s\n", op_name.c_str());
         }
+        // A P1 simplex is affine by construction, so this is exact rather than
+        // an assumption -- and it is not optional.  A material whose simplex
+        // kernels exist only in the affine variant reads the cached adjugate
+        // unconditionally, and that cache is built only when the option is set
+        // before or during `initialize`.  Left off, the operator dereferences a
+        // null adjugate: Mooney-Rivlin Kelvin-Voigt on TET4 segfaults inside
+        // `gradient`.  Defaulting it on for the two elements that are affine by
+        // definition is what makes the benchmark runnable there.
+        const bool affine_by_construction =
+                static_cast<smesh::ElemType>(element) == smesh::TET4 ||
+                static_cast<smesh::ElemType>(element) == smesh::TRI3;
+        if (smesh::Env::read("SFEM_ASSUME_AFFINE", affine_by_construction)) {
+            op->set_option("ASSUME_AFFINE", true);
+        }
         if (op->initialize() != SFEM_SUCCESS) {
             SFEM_ERROR("could not initialize host %s\n", op_name.c_str());
         }
