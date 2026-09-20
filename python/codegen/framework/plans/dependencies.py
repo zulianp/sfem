@@ -289,6 +289,29 @@ def residual_codegen_dependencies(system, coefficients, dependencies):
     )
 
 
+def stepped_residual_dependencies(dependencies):
+    """The dependency view a sampled residual kernel sees.
+
+    The form is the same form; what changes is that the kernel is handed a
+    direction as well as a state, and reads it wherever it reads the state.  So
+    the direction's access flags mirror the current state's exactly -- a form
+    that contracts a value gets a direction value, one that contracts a gradient
+    gets a direction gradient -- and its symbols are the current ones renamed.
+
+    Derived rather than re-detected.  The direction never appears in the weak
+    form's free symbols, because the combination `x + alpha h` is formed by the
+    kernel and not by the material, so a scan of the expressions would report no
+    direction at all and the gather would not be emitted.
+    """
+    return replace(
+        dependencies,
+        direction=dependencies.current,
+        direction_value=dependencies.current_value,
+        direction_gradient=dependencies.current_gradient,
+        direction_symbols=dependencies.current_symbols,
+    )
+
+
 def assembled_matrix_dependencies(dependencies):
     """The dependency view an assembled matrix kernel sees.
 

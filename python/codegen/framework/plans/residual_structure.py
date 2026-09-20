@@ -36,6 +36,28 @@ def residual_local_phase_plans():
     )
 
 
+def residual_step_dependent_phases():
+    """Which local phases a sampled merit repeats for every trial step.
+
+    The state enters the arithmetic at the transform -- that is where
+    `grad(x + alpha h)` is formed -- so the transform and everything after it
+    depends on the step length, while the trial-function accumulation before it
+    does not.  Naming the boundary here is what lets the emitter open its step
+    loop without deciding what belongs inside it.
+
+    This is also the statement of what the sampling buys and what it cannot.
+    `EVALUATE_TRIAL` is the sum over shape functions, hoisted once whatever the
+    line search asks for; `EVALUATE_MATERIAL` is the constitutive law and is
+    inside, because it is not affine in the state and repeats per step by
+    construction.
+    """
+    return (
+        LocalPhase.TRANSFORM_REFERENCE,
+        LocalPhase.EVALUATE_MATERIAL,
+        LocalPhase.CONTRACT_TEST,
+    )
+
+
 def residual_local_phases():
     return tuple(plan.phase for plan in residual_local_phase_plans())
 
