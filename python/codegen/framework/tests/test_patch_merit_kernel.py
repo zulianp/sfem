@@ -119,3 +119,63 @@ def test_the_square_is_taken_per_step_after_the_elements_close():
 def test_the_kernel_is_gated_on_having_an_orientation():
     assert patch_merit_kernel_is_available("TET4")
     assert not patch_merit_kernel_is_available("HEX8")
+
+
+def _kernel():
+    system, coefficients, dependencies = _fixture()
+    material = rc._print_statement_nodes(
+        rc._coefficient_evaluation_nodes(system, coefficients, dependencies), ""
+    )
+    from codegen.framework.emitters.patch_merit_codegen import patch_merit_kernel_lines
+
+    return "\n".join(
+        patch_merit_kernel_lines(
+            system,
+            sfem_element_quadrature_rule("TET4"),
+            coefficients,
+            dependencies,
+            "TET4",
+            "demo_merit_patch",
+            material,
+        )
+    )
+
+
+def test_the_kernel_outputs_only_the_step_scalars():
+    """No residual vector, no node accumulator, no scatter.  The only writable
+    output is `merit`, which is `nsteps` long."""
+    text = _kernel()
+    assert "s_t *const RSTR merit" in text
+    writable = [
+        line
+        for line in text.splitlines()
+        if line.strip().startswith("s_t *const RSTR")
+        or line.strip().startswith("void *const RSTR")
+    ]
+    assert writable == ["    s_t *const RSTR merit"], writable
+
+
+def test_the_node_residual_is_seeded_from_the_accumulator():
+    """Otherwise the square is over this operator's share rather than the whole
+    residual, and the merit is not zero at the solution of the system."""
+    text = _kernel()
+    assert "rho[c * VS + lane] = accumulator[node * NC + c];" in text
+
+
+def test_the_element_loop_closes_before_the_square():
+    """The square is only legal once every incident element has contributed."""
+    text = _kernel()
+    square = text.index("The node is finished")
+    block_loop = text.index("for (count_t block = begin;")
+    close = text.index("      }\n\n", block_loop)
+    assert block_loop < close < square
+
+
+def test_threads_reduce_once_each():
+    text = _kernel()
+    assert "merit_local[VS]" in text
+    assert text.count("#pragma omp atomic update") == 1
+
+
+def test_the_incident_buffer_holds_element_indices():
+    assert "element_idx_t pm_incident[VS];" in _kernel()

@@ -146,8 +146,13 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
     )
     lines.extend(
         [
-            "%s    const ptrdiff_t goff = q * geometry_stride + pm_offset + lane;" % indent,
-            "%s    const s_t det = determinant[goff];" % indent,
+            "%s    // The geometry is indexed by the element, not by a block" % indent,
+            "%s    // offset: a node's incident elements are scattered through" % indent,
+            "%s    // the mesh rather than contiguous.  It carries no quadrature" % indent,
+            "%s    // index either, because the orientation gate has already" % indent,
+            "%s    // restricted this kernel to affine simplices, whose Jacobian" % indent,
+            "%s    // is constant over the cell." % indent,
+            "%s    const s_t det = determinant[element];" % indent,
         ]
     )
     if getattr(dependencies, "current_value", False):
@@ -191,7 +196,7 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
                 "%s            acc += %s[j * NC + c] * grad_ref[k][q * NS + j];"
                 % (indent, name),
                 "%s          }" % indent,
-                "%s          mapped += acc * adjugate[k * ND + d][goff];" % indent,
+                "%s          mapped += acc * adjugate[k * ND + d][element];" % indent,
                 "%s        }" % indent,
                 "%s        %s[%s] = mapped / det;"
                 % (indent, target, _buffer_index("c * ND + d", n_fields * dim)),
@@ -208,7 +213,7 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
             "%s    for (int d = 0; d < ND; ++d) {" % indent,
             "%s      s_t mapped = s_t(0);" % indent,
             "%s      for (int k = 0; k < ND; ++k) {" % indent,
-            "%s        mapped += grad_ref[k][q * NS + 0] * adjugate[k * ND + d][goff];"
+            "%s        mapped += grad_ref[k][q * NS + 0] * adjugate[k * ND + d][element];"
             % indent,
             "%s      }" % indent,
             "%s      pm_test_grad[%s] = mapped / det;" % (indent, _buffer_index("d", dim)),
@@ -318,3 +323,116 @@ def patch_reduction_lines(system, indent="  "):
         "%s  merit[lane] += s_t(0.5) * squared;" % indent,
         "%s}" % indent,
     ]
+
+
+def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
+                             element_type, function_name, material_lines,
+                             parameters=()):
+    """The whole kernel: threads over nodes, two vector loops inside each.
+
+    The output is `nsteps` scalars and nothing else.  There is no residual
+    vector, no node accumulator and no scatter: a node's residual lives in
+    `rho` for the length of its element loop and is squared when that loop
+    closes, which is legal exactly because the loop ran over every element
+    incident on the node.
+
+    `accumulator` carries what the operators that do not move with the state
+    contribute -- tractions, body force, constraints -- gathered per node rather
+    than assembled per step.  It seeds `rho`, so the square is taken over the
+    whole residual and not just this operator's share.
+    """
+    dim = system.dim
+    n_fields = len(system.fields)
+    n_shape = rule.n_shape
+    buffers = patch_loop_one_buffers(
+        dim, n_fields, getattr(dependencies, "current_value", False)
+    )
+    lines = [
+        "template <typename s_t, int NQ, int NS, int VS>",
+        "static int %s(" % function_name,
+        "    const ptrdiff_t n_owned_nodes,",
+        "    const count_t *const RSTR n2e_ptr,",
+        "    const element_idx_t *const RSTR n2e_idx,",
+        "    const uint8_t *const RSTR n2e_local,",
+        "    idx_t **const RSTR elements,",
+        "    const s_t *const RSTR determinant,",
+        "    const s_t *const RSTR adjugate[%d]," % (dim * dim),
+        "    const s_t *const RSTR shape,",
+        "    const s_t *const RSTR grad_ref[%d]," % dim,
+        "    const s_t *const RSTR q_weight,",
+    ]
+    lines.extend("    const s_t %s," % parameter for parameter in parameters)
+    lines.extend(
+        [
+            "    const int nsteps,",
+            "    const s_t *const RSTR steps,",
+            "    const s_t *const RSTR x,",
+            "    const s_t *const RSTR h,",
+            "    const s_t *const RSTR accumulator,",
+            "    s_t *const RSTR merit",
+            ") {",
+            "  static constexpr int ND = %d;" % dim,
+            "  static constexpr int NC = %d;" % n_fields,
+            "",
+            "#pragma omp parallel",
+            "  {",
+            "    // Per thread, and never larger than the vector width: the",
+            "    // caller rounds the step count to it, which is the whole",
+            "    // reason the steps carry the lanes.",
+            "    s_t merit_local[VS];",
+            "    for (int lane = 0; lane < VS; ++lane) merit_local[lane] = s_t(0);",
+            "    s_t rho[NC * VS];",
+        ]
+    )
+    lines.extend(
+        "    s_t %s[NQ * %d * VS];" % (name, count) for name, count in buffers
+    )
+    lines.extend(
+        [
+            "    element_idx_t pm_incident[VS];",
+            "    uint8_t pm_local_node[VS];",
+            "",
+            "#pragma omp for schedule(static)",
+            "    for (ptrdiff_t node = 0; node < n_owned_nodes; ++node) {",
+            "      // Seed with everything that does not move with the state, so",
+            "      // the square below is over the whole residual.",
+            "      for (int c = 0; c < NC; ++c) {",
+            "        for (int lane = 0; lane < VS; ++lane) {",
+            "          rho[c * VS + lane] = accumulator[node * NC + c];",
+            "        }",
+            "      }",
+            "      const count_t begin = n2e_ptr[node];",
+            "      const count_t end = n2e_ptr[node + 1];",
+            "      for (count_t block = begin; block < end; block += VS) {",
+            "        const int ne = (int)MIN((count_t)VS, end - block);",
+            "        for (int lane = 0; lane < ne; ++lane) {",
+            "          pm_incident[lane] = n2e_idx[block + lane];",
+            "          pm_local_node[lane] = n2e_local[block + lane];",
+            "        }",
+        ]
+    )
+    lines.extend(patch_loop_one_lines(system, rule, dependencies, indent="        "))
+    lines.extend(
+        patch_loop_two_lines(
+            system, coefficients, dependencies, material_lines, indent="        "
+        )
+    )
+    lines.extend(["      }", ""])
+    lines.extend(
+        "      %s" % line for line in patch_reduction_lines(system, indent="")
+    )
+    lines.extend(
+        [
+            "    }",
+            "",
+            "    // One reduction per thread, not one per node.",
+            "    for (int lane = 0; lane < nsteps; ++lane) {",
+            "#pragma omp atomic update",
+            "      merit[lane] += merit_local[lane];",
+            "    }",
+            "  }",
+            "  return SFEM_SUCCESS;",
+            "}",
+        ]
+    )
+    return lines
