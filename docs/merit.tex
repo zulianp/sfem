@@ -50,10 +50,13 @@ The resulting kernel produces all $m$ merit values in one pass and materializes
 no per-step residual vector --- indeed no accumulator array at all.  It works one
 node at a time, so that node's value is complete once its incident elements have
 been summed and can be squared in registers; the SIMD lanes are filled from
-within that one node's patch, by its incident elements and by the trial steps
-together.  Normalizing each element's orientation so the node is always the same
-local node makes its basis function the same in every lane and at every step,
-which is what allows those terms to be hoisted out of both vectorization loops.  What this is worth is bounded by the constitutive evaluation, which
+within that one node's patch, first by its incident elements and then by the
+trial steps --- two sequential vector loops, never nested, the first
+precomputing everything the second would otherwise recompute.  Normalizing each
+element's orientation so the node is always the same local node makes its basis
+function the same in every lane and at every step, which is what allows those
+terms to leave both loops.  Which axis should carry the second loop's lanes is
+left to measurement: the arrangements are built as variants and timed.  What this is worth is bounded by the constitutive evaluation, which
 repeats per trial step by construction.  The same reorganization is already in
 place for the energy merit, and measured on the same node it costs $5.7\times$
 one step at $m=12$ for a Mooney--Rivlin-class material and $3.7\times$ for
@@ -268,24 +271,35 @@ thread's $m$-slot buffer.  The patch-local node storage an element-centric
 traversal needs --- $m\,|\mathcal{N}_p|\,N_c$ words, the one structure that grew
 with $m$ --- is gone.
 
-\subsection*{Two vectorization axes, and the orientation that pays for them}
+\subsection*{Two vectorization axes, one after the other}
 
 The lanes are filled from within one node's patch: the elements of
-$\mathcal{E}(n)$, and the trial steps $\alpha_1,\dots,\alpha_m$.  Both are
-vectorized.  What is deliberately \emph{not} done is to fill lanes by processing
-several patches at once; the lanes belong to one node.
+$\mathcal{E}(n)$, and the trial steps $\alpha_1,\dots,\alpha_m$.  What is
+deliberately \emph{not} done is to fill lanes by processing several patches at
+once; the lanes belong to one node.
 
-That choice is what makes the orientation matter.  A node sits at a different
-local index in each of its incident elements, so the basis function paired with
-it --- the test function of \eqref{eq:formsum} --- would differ from lane to
-lane, and nothing about it could be hoisted.  Each element is therefore
-presented with its local numbering permuted so that $n$ is always local node
-$0$.  Then $\varphi_0$ is the same basis function in every lane and at every
-trial step, and everything belonging to it hoists out of \emph{both} loops: for
-a low-order simplex $\widehat\nabla\varphi_0$ is a constant the generator emits
-as a literal rather than a table read, and the test-gradient map
-$J_e^{-\top}\widehat\nabla\varphi_0$ is formed once per element rather than once
-per element per step.
+The two axes are two \emph{sequential} vector loops, never one inside the other.
+Nesting them is not an arrangement the hardware has: a lane loop containing
+another loop is no longer innermost and does not vectorize at all, which is the
+same measured fact the stepped objective already records from the other
+direction.  So the first loop is vectorized over the incident elements and
+computes everything independent of the trial step --- the gathers, the geometry,
+the reference gradients of the state and of the direction, the physical gradient
+of the fixed basis function, and $w_q\det J_e$ --- writing them to per-element
+buffers.  The second loop reads those buffers and does only what the trial step
+changes: the combination, the constitutive law, and the contraction.
+
+\subsection*{The orientation that pays for it}
+
+A node sits at a different local index in each of its incident elements, so the
+basis function paired with it --- the test function of \eqref{eq:formsum} ---
+would differ from lane to lane, and nothing about it could be hoisted.  Each
+element is therefore presented with its local numbering permuted so that $n$ is
+always local node $0$.  Then $\varphi_0$ is the same basis function in every lane
+and at every trial step, and everything belonging to it leaves both loops: for a
+low-order simplex $\widehat\nabla\varphi_0$ is a constant the generator emits as
+a literal rather than a table read, and $J_e^{-\top}\widehat\nabla\varphi_0$ is
+computed in the first loop and merely read in the second.
 
 The permutation is not free to be any relabelling.  It must preserve the sign of
 $\det J_e$, or the element's volume changes sign and its contribution is
@@ -293,29 +307,29 @@ subtracted; on a simplex that restricts it to the even permutations carrying the
 chosen vertex to position $0$, which exist for every vertex.
 
 \begin{algorithm}
-\caption{Residual merit at $m$ trial steps: one node at a time}
+\caption{Residual merit at $m$ trial steps: one node, two vector loops}
 \label{alg:kernel}
 \begin{algorithmic}[1]
 \State $s \gets 0 \in \R^{m}$ \Comment{thread-private, the only output}
+\State $\widehat\nabla\varphi_0$ \Comment{a literal: same for every node, lane and step}
 \For{each owned node $n$ (threads)}
   \State $\rho_k \gets g_n \in \R^{N_c}$, $k=1,\dots,m$ \Comment{registers, not memory}
-  \State $\star$ $\widehat\nabla\varphi_0$ \Comment{same for every lane and step: a literal}
-  \For{$e \in \mathcal{E}(n)$ \textbf{(SIMD lanes)}}
-    \State $\star$ present $e$ with $n$ at local $0$, by an even permutation
-    \State $\star$ gather $x^e,h^e$; form $J_e$, $\det J_e$, $\mathrm{adj}\,J_e$
+  \Statex \textbf{loop 1 --- lanes are the elements of $\mathcal{E}(n)$}
+  \For{$e \in \mathcal{E}(n)$}
+    \State present $e$ with $n$ at local $0$, by an even permutation
+    \State gather $x^e,h^e$; form $\det J_e$, $\mathrm{adj}\,J_e$
     \For{$q = 1,\dots,N_q$}
-      \State $\star$ $\widehat\nabla u_q \gets \sum_j x^e_j \widehat\nabla\varphi_j$,
-             \; $\widehat\nabla w_q \gets \sum_j h^e_j \widehat\nabla\varphi_j$
-      \State $\star$ $\nabla\varphi_0 \gets J_e^{-\top}\widehat\nabla\varphi_0$
-             \Comment{step-independent}
-      \For{$k = 1,\dots,m$ \textbf{(SIMD lanes)}}
-        \State $\nabla u_q^{(k)} \gets J_e^{-\top}(\widehat\nabla u_q + \alpha_k \widehat\nabla w_q)$
-        \State $\rho_k \mathrel{+}= w_q \det J_e \cdot P\bigl(\nabla u_q^{(k)}\bigr)\,\nabla\varphi_0$
-      \EndFor
+      \State $G^e_q \gets \widehat\nabla u_q$, \; $H^e_q \gets \widehat\nabla w_q$
+      \State $T^e_q \gets J_e^{-\top}\widehat\nabla\varphi_0$, \;
+             $\omega^e_q \gets w_q \det J_e$
     \EndFor
   \EndFor
-  \State reduce $\rho_k$ across the element lanes
+  \Statex \textbf{loop 2 --- lanes are the trial steps $\alpha_k$}
   \For{$k = 1,\dots,m$}
+    \For{$e \in \mathcal{E}(n)$, $q = 1,\dots,N_q$}
+      \State $\rho_k \mathrel{+}= \omega^e_q \,
+             P\bigl(J_e^{-\top}(G^e_q + \alpha_k H^e_q)\bigr)\, T^e_q$
+    \EndFor
     \State $s_k \mathrel{+}= \tfrac12 \|\rho_k\|^2$ \Comment{complete by \eqref{eq:nodecentric}}
   \EndFor
 \EndFor
@@ -323,18 +337,19 @@ chosen vertex to position $0$, which exist for every vertex.
 \end{algorithmic}
 \end{algorithm}
 
-Phases marked $\star$ depend on neither the trial step nor, in the case of
-$\widehat\nabla\varphi_0$, on the element either.  The gain over an
-element-centric pass is that the second kind exists at all: with the orientation
-fixed there is work that is constant across the whole of both vectorization
-loops, which is the strongest form of hoisting available.
+Which axis should carry the second loop's lanes is not settled here.  Three
+arrangements are available --- lanes over the trial steps, lanes over the
+incident elements with the steps serial, and lanes over the flattened
+element-by-step product --- and they trade differently: the step count is a
+runtime value and may be shorter than the vector width, while the incident count
+varies from node to node.  They are built as variants and timed against each
+other, which is how a competing loop arrangement is settled in this framework.
 
-What it costs is that an element is visited once per node it carries, so the
-constitutive evaluation $P(\nabla u)$ is performed about $N_s$ times where an
+What the shape costs is that an element is visited once per node it carries, so
+the constitutive evaluation $P(\nabla u)$ is performed about $N_s$ times where an
 element-centric pass performs it once and contracts it against every test
 function.  Whether the hoisting, the vanished accumulator and the absent scatter
-outweigh that is a question for measurement: the two arrangements are built and
-timed against each other rather than chosen by counting operations.
+outweigh that is the same question, answered the same way.
 
 \section{Cost model}
 
