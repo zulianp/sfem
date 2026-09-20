@@ -250,36 +250,6 @@
       "l2": 0.01782125890308,
       "material": "mooney_rivlin_kelvin_voigt"
     },
-    "mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_a_msoa": {
-      "l1": 7.950973009349,
-      "l2": 0.2911214954929,
-      "material": "mooney_rivlin_kelvin_voigt"
-    },
-    "mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_maos": {
-      "l1": 2.001504796026,
-      "l2": 0.08046585847361,
-      "material": "mooney_rivlin_kelvin_voigt"
-    },
-    "mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa": {
-      "l1": 7.950972626242,
-      "l2": 0.2911214800012,
-      "material": "mooney_rivlin_kelvin_voigt"
-    },
-    "mooney_rivlin_kelvin_voigt_total_residual_3d_a_msoa": {
-      "l1": 14.40618043433,
-      "l2": 0.5530959809603,
-      "material": "mooney_rivlin_kelvin_voigt"
-    },
-    "mooney_rivlin_kelvin_voigt_total_residual_3d_i_maos": {
-      "l1": 1.815967199048,
-      "l2": 0.0729406727328,
-      "material": "mooney_rivlin_kelvin_voigt"
-    },
-    "mooney_rivlin_kelvin_voigt_total_residual_3d_i_msoa": {
-      "l1": 14.40617982962,
-      "l2": 0.5530959479853,
-      "material": "mooney_rivlin_kelvin_voigt"
-    },
     "mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_3d_i_msoa": {
       "l1": 1457.664820146,
       "l2": 15.57657464668,

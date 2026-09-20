@@ -2293,14 +2293,16 @@ def _total_residual_unit(material_system, mixed_order=False):
         return None
     return LoweredEquationEvaluation(
         TOTAL_RESIDUAL_UNIT_NAME,
-        # Both orders, because a residual unit in this pipeline always carries
-        # its Jacobian: `_validate_residual_plan` requires metadata for ONE and
-        # TWO.  Only the residual is published as a kernel -- `kernels` decides
-        # that -- so the tangent is lowered but not emitted twice.
+        # Both orders.  The unit publishes neither a residual nor a Jacobian
+        # action -- `published_residual_forms` refuses them -- but lowering the
+        # 2-form is measured at about two seconds against the 1-form's cost,
+        # and requiring only what is published would make the 2-form optional
+        # through the backend, the emitter and every signature that names it.
+        # Not worth that for two seconds.
         total_residual_collection(
             material_system, orders=(FormOrder.ONE, FormOrder.TWO)
         ),
-        kernels=("gradient",),
+        kernels=(),
         diagnostics=False,
     )
 

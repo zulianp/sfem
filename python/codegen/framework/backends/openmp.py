@@ -48,6 +48,12 @@ class OpenMPSoABackend(SoABackend):
         _require_openmp(unit)
 
     def _validate_emitted(self, files, traversal):
+        # A unit that emitted nothing published nothing for this element -- a
+        # merit-only unit on an element with no patch kernel is the case.  There
+        # is no translation unit to hold to a contract, and an empty set is
+        # unambiguous: a unit that should have emitted still emits its headers.
+        if not files:
+            return
         if traversal.local_name:
             self._validate_common_source_contract(files, traversal.local_prefix)
         else:
@@ -65,10 +71,19 @@ class OpenMPSoABackend(SoABackend):
     def _validate_common_source_contract(files, local_prefix):
         source_by_path = {file.path: file.source for file in files}
         local_name = "%s_local.hpp" % local_prefix
-        local_source = source_by_path.get(local_name)
-        if local_source is None:
-            raise RuntimeError("OpenMP SoA backend did not emit '%s'" % local_name)
         OpenMPSoABackend._validate_mesh_source_contract(files)
+        # A unit need not have an element-local kernel header.  One that
+        # publishes no form has no element-local kernel to put in a header, and
+        # emitting an empty one rather than none is what this contract exists to
+        # catch -- so its absence is the correct state, not a missing file.  The
+        # checks below are about the header a unit *does* emit.
+        for local_source in filter(None, (source_by_path.get(local_name),)):
+            OpenMPSoABackend._validate_local_kernel_contract(
+                files, local_prefix, local_name, local_source
+            )
+
+    @staticmethod
+    def _validate_local_kernel_contract(files, local_prefix, local_name, local_source):
         if "template <typename s_t, int NQ" not in local_source:
             raise RuntimeError(
                 "OpenMP SoA local kernel '%s' is not templated on NQ" % local_name

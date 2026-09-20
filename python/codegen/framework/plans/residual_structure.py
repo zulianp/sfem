@@ -36,6 +36,75 @@ def residual_local_phase_plans():
     )
 
 
+#: The forms a residual unit can publish, in the order it has always published
+#: them.
+RESIDUAL_FORMS = ("residual", "jacobian_action")
+
+
+def published_residual_forms(form_dependencies, unit_name=""):
+    """Which of `RESIDUAL_FORMS` a unit publishes.
+
+    Two conditions, and neither is emission's to decide.
+
+    A form whose coefficients are all structurally zero contributes nothing and
+    is absent from the sequence, so nothing below emits, declares or dispatches
+    to it -- see `plans.dependencies.publishes_kernel`.
+
+    And a unit carrying the material's *whole* residual publishes neither form.
+    It exists so that one kernel can contract the merit over one form; the
+    residual and the Jacobian action it would otherwise emit are what the
+    material's own units already emit, and a second set computing the same
+    numbers is a redundant path with nothing to keep the two in step.  For a
+    single-unit material they would be the same arithmetic twice; for a
+    multi-unit one they are a second spelling of the sum.
+    """
+    from codegen.framework.forms.equations import TOTAL_RESIDUAL_UNIT_NAME
+
+    if str(unit_name) == TOTAL_RESIDUAL_UNIT_NAME:
+        return ()
+    return tuple(
+        form
+        for form in RESIDUAL_FORMS
+        if form in form_dependencies and publishes_kernel(form_dependencies[form])
+    )
+
+
+def published_local_kernel_files(published_forms, unit_name=""):
+    """Whether this unit emits an element-local kernel header: one, or none.
+
+    A sequence rather than a predicate, so emission walks it instead of testing
+    it.  A unit that publishes no form has no element-local kernel to put in a
+    header, and an empty header is not the answer -- a form that contributes
+    nothing publishes no kernel rather than an empty one, and the backend
+    contract checks that the header it is handed is a real templated kernel.
+
+    Keyed on the unit rather than on whether a matrix format was requested.
+    The material's format plan reaches every one of its units, so a unit that
+    assembles nothing would otherwise be handed one and emit a header for an
+    assembly it does not do.  The unit carrying the whole residual for the
+    merit is exactly that case: its kernel is the patch merit kernel, which
+    lives in the per-element source.
+    """
+    if not published_forms:
+        return ()
+    return ("local",)
+
+
+def published_mesh_operator_files(published_forms, patch_merit_kernels=()):
+    """Whether this unit emits a per-element mesh operator source: one, or none.
+
+    A unit that publishes no form and no patch merit kernel has nothing to put
+    in one.  That is not hypothetical: the unit carrying the material's whole
+    residual publishes no form by design, and on a device target it publishes no
+    patch kernel either, because that kernel is host-shaped.  Emitting a source
+    whose only content is its own includes leaves the CUDA backend rejecting a
+    translation unit with no kernels in it -- correctly.
+    """
+    if published_forms or patch_merit_kernels:
+        return ("operator",)
+    return ()
+
+
 def published_patch_merit_kernels(element_type, unit_name="", mixed=False,
                                   has_parallel_region=True):
     """The node-centric merit kernels this unit publishes: one, or none.

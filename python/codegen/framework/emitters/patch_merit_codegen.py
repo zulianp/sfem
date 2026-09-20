@@ -33,6 +33,7 @@ number of elements incident on a node is a property of the mesh and cannot be
 chosen.
 """
 
+from codegen.framework.targets import current_target
 from codegen.framework.plans.residual_structure import (
     patch_merit_staged_quantities,
     patch_merit_staged_roles,
@@ -170,6 +171,37 @@ def _jacobian_adjugate_3(indent):
 _JACOBIAN_ADJUGATE = {2: _jacobian_adjugate_2, 3: _jacobian_adjugate_3}
 
 
+def _vectorize_pragma():
+    """The lane-loop pragma, from the bound target rather than from a literal.
+
+    A literal lane pragma written here would be this emitter deciding how the
+    machine is addressed, which is the target's business -- and on a target that
+    spells it differently, or not at all, a literal is simply wrong.
+    `test_target_binding` forbids it.
+    """
+    return current_target().vectorize_pragma()
+
+
+def _parallel_region_pragma():
+    return current_target().parallel_region_pragma()
+
+
+def _worksharing_for_pragma(schedule=None):
+    """The work-sharing `for`, not the combined parallel-for.
+
+    The kernel has already opened its parallel region, because the staging
+    buffers between its two loops are thread-private.  `parallel_for_pragma`
+    would open a second region inside it, the work-sharing would be lost, and
+    every thread would walk every node -- which is exactly what happened, and
+    the merit came out multiplied by the thread count.
+    """
+    return current_target().worksharing_for_pragma(schedule)
+
+
+def _atomic_update_pragma():
+    return current_target().atomic_update_pragma()
+
+
 def _buffer_index(offset, count, lane="lane"):
     """`(q * count + offset) * VS + <element lane>`.
 
@@ -239,7 +271,7 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
     lines = [
         "%s// loop 1 -- lanes are the elements incident on this node." % indent,
         "%sfor (int q = 0; q < NQ; ++q) {" % indent,
-        "%s  #pragma omp simd" % indent,
+        "%s  %s" % (indent, _vectorize_pragma()),
         "%s  for (int lane = 0; lane < ne; ++lane) {" % indent,
         "%s    const idx_t element = pm_incident[lane];" % indent,
         "%s    const int *const RSTR perm = pm_orientation[pm_local_node[lane]];" % indent,
@@ -372,7 +404,7 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
         "%s// loop 2 -- lanes are the sampled step lengths." % indent,
         "%sfor (int lane_e = 0; lane_e < ne; ++lane_e) {" % indent,
         "%s  for (int q = 0; q < NQ; ++q) {" % indent,
-        "%s    #pragma omp simd" % indent,
+        "%s    %s" % (indent, _vectorize_pragma()),
         "%s    for (int lane = 0; lane < nsteps; ++lane) {" % indent,
         "%s      const s_t alpha = steps[lane];" % indent,
     ]
@@ -424,7 +456,7 @@ def patch_reduction_lines(system, indent="  "):
     n_fields = len(system.fields)
     return [
         "%s// The node is finished, so it may be squared." % indent,
-        "%s#pragma omp simd" % indent,
+        "%s%s" % (indent, _vectorize_pragma()),
         "%sfor (int lane = 0; lane < nsteps; ++lane) {" % indent,
         "%s  s_t squared = s_t(0);" % indent,
     ] + [
@@ -527,7 +559,7 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
             "  static constexpr int ND = %d;" % dim,
             "  static constexpr int NC = %d;" % n_fields,
             "",
-            "#pragma omp parallel",
+            _parallel_region_pragma(),
             "  {",
             "    // Per thread, and never larger than the vector width: the",
             "    // caller rounds the step count to it, which is the whole",
@@ -545,7 +577,7 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
             "    element_idx_t pm_incident[VS];",
             "    uint8_t pm_local_node[VS];",
             "",
-            "#pragma omp for schedule(static)",
+            _worksharing_for_pragma("static"),
             "    for (ptrdiff_t node = 0; node < n_owned_nodes; ++node) {",
             "      // Seed with everything that does not move with the state, so",
             "      // the square below is over the whole residual.",
@@ -580,7 +612,7 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
             "",
             "    // One reduction per thread, not one per node.",
             "    for (int lane = 0; lane < nsteps; ++lane) {",
-            "#pragma omp atomic update",
+            _atomic_update_pragma(),
             "      merit[lane] += merit_local[lane];",
             "    }",
             "  }",

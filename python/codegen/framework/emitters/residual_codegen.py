@@ -110,6 +110,9 @@ from codegen.framework.plans.generation import (
 )
 from codegen.framework.plans.generation import LocalPhase, MeshPhase
 from codegen.framework.plans.residual_structure import (
+    published_local_kernel_files,
+    published_mesh_operator_files,
+    published_residual_forms,
     residual_step_dependent_phases,
     published_patch_merit_kernels,
     publishes_scalar_jacobian_action,
@@ -1939,6 +1942,30 @@ def generate_coupled_residual_sfem_files(
     validate_diagnostics_plan_names(diagnostics_plan, expected_diagnostics)
     local_name = local_kernel.header if local_name is None else str(local_name)
     operator_name = mesh_kernel.source if operator_name is None else str(operator_name)
+    # Whether there is an element-local kernel to put in a header at all.  A
+    # unit that publishes no form and assembles no matrix has none, and an
+    # empty header is not the answer: the backend contract checks the header it
+    # is handed is a real templated kernel.
+    published_here = _published_forms(
+        {
+            "residual": residual_codegen_dependencies(
+                system, residual_coeffs, system.residual_dependencies()
+            ),
+            "jacobian_action": residual_codegen_dependencies(
+                system, action_coeffs, system.jacobian_action_dependencies()
+            ),
+        },
+        unit_name,
+    )
+    local_files = published_local_kernel_files(published_here, unit_name)
+    operator_files = published_mesh_operator_files(
+        published_here,
+        published_patch_merit_kernels(
+            element_type,
+            unit_name,
+            has_parallel_region=_target().parallel_region_pragma() is not None,
+        ),
+    )
     local_source = _local_header(
         system,
         local_prefix,
@@ -1950,6 +1977,7 @@ def generate_coupled_residual_sfem_files(
         matrix_block=_ElementMatrixBlock(
             *_compatible_matrix_field_indices_from_prefix(prefix, system, element_type)
         ),
+        unit_name=unit_name,
     )
     operator_source = _operator_source(
         system,
@@ -1965,8 +1993,15 @@ def generate_coupled_residual_sfem_files(
         matrix_format_plan=matrix_format_plan,
         emit_diagnostics=diagnostics_plan is not None,
         unit_name=unit_name,
+        local_files=local_files,
     )
     diagnostics_name = _header("kernel_diagnostics")
+    # A unit with neither a local kernel nor a mesh operator publishes nothing
+    # for this element, so it contributes no files at all -- not even the shared
+    # headers, which every other unit brings anyway.  Returning them alone would
+    # leave the backend inspecting a translation unit that does not exist.
+    if not local_files and not operator_files:
+        return ()
     return (
         GeneratedKernelFile(_header("kernel_math"), _math_header_source()),
         GeneratedKernelFile(
@@ -1982,8 +2017,14 @@ def generate_coupled_residual_sfem_files(
             _diagnostics_header_source(),
         ),
         *_packed_thread_scratch_files(),
-        GeneratedKernelFile(local_name, local_source),
-        GeneratedKernelFile(operator_name, operator_source),
+        *(
+            GeneratedKernelFile(local_name, local_source)
+            for _local in local_files
+        ),
+        *(
+            GeneratedKernelFile(operator_name, operator_source)
+            for _operator in operator_files
+        ),
     ) + _reference_header_files(
         (affine_specialization.quadrature_rule, specialization.quadrature_rule),
         sfem_mesh_reference_data,
@@ -2313,6 +2354,7 @@ def _local_header(
     field_element_types=None,
     matrix_format_plan=None,
     matrix_block=None,
+    unit_name="",
 ):
     """The element-local header for one kernel.
 
@@ -2392,7 +2434,8 @@ def _local_header(
     # `plans.dependencies.publishes_kernel`.  `_published_forms` is what the
     # operator source walks, and the header agrees with it by construction.
     published = _published_forms(
-        {"residual": residual_dependencies, "jacobian_action": action_dependencies}
+        {"residual": residual_dependencies, "jacobian_action": action_dependencies},
+        unit_name,
     )
     for _residual in [form for form in published if form == "residual"]:
         lines.extend(
@@ -4647,21 +4690,15 @@ def _test_value_nodes(dependencies):
 
 #: The forms a coupled residual unit emits, in the order it has always emitted
 #: them.
-RESIDUAL_FORMS = ("residual", "jacobian_action")
+def _published_forms(form_dependencies, unit_name=""):
+    """Those of `RESIDUAL_FORMS` this unit publishes, from the plan.
 
-
-def _published_forms(form_dependencies):
-    """Those of `RESIDUAL_FORMS` that contribute anything.
-
-    See `plans.dependencies.publishes_kernel`: a block whose coefficients are
-    all structurally zero has no kernel, so it is absent from this sequence and
-    nothing below emits, declares or dispatches to one.
+    The sequence is `plans.residual_structure.published_residual_forms`; this is
+    the emitter walking it.  A form absent from it is neither emitted, declared
+    nor dispatched to, and an empty sequence emits nothing at all -- which is
+    what a unit carrying only the material's whole residual for the merit gets.
     """
-    return tuple(
-        form
-        for form in RESIDUAL_FORMS
-        if form in form_dependencies and publishes_kernel(form_dependencies[form])
-    )
+    return published_residual_forms(form_dependencies, unit_name)
 
 
 def _geometry_value_nodes(dependencies, dim):
@@ -5516,6 +5553,25 @@ def _reference_includes(rules, references_for):
     return tuple(seen)
 
 
+def _local_header_prologue_lines():
+    """What a local kernel header would have brought into a source.
+
+    Two things: the index types -- `idx_t`, `count_t`, `element_idx_t` -- and
+    the scalar helpers the emitted arithmetic calls, `pow_2` among them.  A
+    source that includes a local header inherits both.  A unit whose only kernel
+    is the node-centric merit kernel has no local header, so it takes the same
+    prologue directly, and spelling it once keeps the two from drifting.
+    """
+    return [
+        "#if defined(__has_include)",
+        '#if __has_include("sfem_base.hpp")',
+        '#include "sfem_base.hpp"',
+        "#endif",
+        "#endif",
+        '#include "%s"' % _header("kernel_math"),
+    ]
+
+
 def _operator_source(
     system,
     prefix,
@@ -5530,6 +5586,7 @@ def _operator_source(
     matrix_format_plan=None,
     emit_diagnostics=True,
     unit_name="",
+    local_files=("local",),
 ):
     rule = specialization.quadrature_rule
     dim = system.dim
@@ -5544,7 +5601,16 @@ def _operator_source(
         "#include <cstdint>",
         "#include <cstdlib>",
         "#include <string.h>",
-        '#include "%s"' % local_name,
+        # Only when a local kernel header was written for this unit.  It is
+        # also where the index types reach this source -- `count_t`,
+        # `element_idx_t`, `idx_t` -- so a unit without one takes the same
+        # prologue directly rather than inheriting it.
+        *('#include "%s"' % local_name for _local in local_files),
+        *(
+            line
+            for _absent in ((),) if not local_files
+            for line in _local_header_prologue_lines()
+        ),
         '#include "%s"' % _header("geometry_kernels"),
         '#include "%s"' % _header("kernel_diagnostics"),
         *_packed_thread_scratch_includes(),
@@ -5589,7 +5655,7 @@ def _operator_source(
     # Which forms publish a kernel is the plan's answer, and the loop walks
     # what it returns: a form that contracts nothing has no element entry
     # point, rather than one wrapping an empty loop nest.
-    for form in _published_forms(form_dependencies):
+    for form in _published_forms(form_dependencies, unit_name):
         dependencies = form_dependencies[form]
         coefficients = residual_coeffs if form == "residual" else action_coeffs
         gradient_metric = None
