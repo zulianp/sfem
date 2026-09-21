@@ -1,18 +1,24 @@
+"""Compatibility facade over the framework's layers.
+
+This module re-exports a flat namespace of 262 names drawn from every layer.
+That is convenient for callers outside the framework and actively harmful
+inside it: an import through this module names no layer, so the layering rule
+cannot be stated, let alone enforced, at such an import.
+
+Framework modules therefore import from the layer module that defines the name
+-- ``codegen.framework.plans.generation``, ``codegen.framework.symbolic.fields``
+and so on.  ``tests/test_layering.py`` enforces that; this facade exists for
+external callers only.
+"""
+
 from .symbolic import (
     DeformationGradient,
     DisplacementGradient,
-    ExpressionCost,
-    ExpressionGraph,
     ExpressionPattern,
     ExpressionRole,
-    EvaluationMetrics,
-    EvaluationPlan,
-    EvaluationStatement,
     FirstPiolaStress,
     GeometricAdjugate,
     GeometricJacobian,
-    GeneratedKernelCode,
-    GeneratedKernelFile,
     KernelExpression,
     KernelExpressions,
     KernelTemplateParameter,
@@ -20,18 +26,14 @@ from .symbolic import (
     DimensionSpecialization,
     LayoutKind,
     LinearizedTransformedFirstPiola,
-    LivenessState,
     PatternKind,
     ReferenceShapeGradient,
     ReferenceShapeGradients,
     ReferenceShapeValues,
     ExecutionScope,
     ScopeKind,
-    SfemSoAKernelForm,
-    SfemSoAWeakForm,
     SymbolicObject,
     TransformedFirstPiola,
-    build_expression_graph,
     data_layout,
     dimension_specialization,
     displacement_gradient_from_reference,
@@ -49,16 +51,29 @@ from .symbolic import (
     matrix_inner,
     matrix_symbols,
     residual_from_energy,
-    sfem_soa_adjugate_geometry_inputs,
-    sfem_soa_kernel_form,
-    sfem_soa_weak_form,
     small_strain,
     transformed_first_piola,
     vector_symbols,
     weak_gradient_from_transformed_first_piola,
     weak_hessian_action_from_linearized_transformed_first_piola,
 )
+from .plans.scheduling import (
+    EvaluationMetrics,
+    EvaluationPlan,
+    EvaluationStatement,
+    ExpressionCost,
+    ExpressionGraph,
+    LivenessState,
+    build_expression_graph,
+)
+from .emitters.artifacts import GeneratedKernelCode
+from .emitters.artifacts import GeneratedKernelFile
+from .forms.weak_forms import SfemSoAKernelForm
+from .forms.weak_forms import SfemSoAWeakForm
+from .forms.weak_forms import sfem_soa_kernel_form
+from .forms.weak_forms import sfem_soa_weak_form
 from .fem import (
+    sfem_soa_adjugate_geometry_inputs,
     SfemCompatibleElement,
     SfemElementQuadratureRule,
     SfemElementBasisPolicy,
@@ -89,6 +104,7 @@ from .fem import (
     sfem_soa_element_specialization,
     sfem_soa_element_specializations,
     sfem_soa_reference_input,
+    sfem_default_element_types,
     sfem_supported_element_types,
     sfem_taylor_hood_element_types,
     sfem_tensor_product_field_reference_data,
@@ -118,7 +134,7 @@ from .fem.tensor_product import (
     tensor_product_sum_factorization_plan,
     tensor_product_test_contraction_plan,
 )
-from .symbolic.forms import (
+from .forms.forms import (
     FormBlock,
     FormDependencies,
     FormEvaluation,
@@ -181,15 +197,12 @@ from .plans.diagnostics import (
 from .plans.matrix_formats import (
     BlockDiagSymAssemblyPlan,
     BSRAssemblyPlan,
-    COOAssemblyPlan,
     CRSAssemblyPlan,
-    DIAAssemblyPlan,
     MatrixAssemblyVariantPlan,
     MatrixFormat,
     MatrixFormatPlan,
     MatrixMeshLayout,
     PackedAssemblyPass,
-    PatchAssemblyPlan,
     matrix_format_plan_from_request,
     specialize_matrix_format_plan,
 )
@@ -208,7 +221,7 @@ from .fem.geometry import (
     geometry_plans_for_fem_policy,
     isoparametric_geometry_plan,
 )
-from .symbolic.equations import (
+from .forms.equations import (
     Equation,
     EquationField,
     EquationForm,
@@ -279,7 +292,7 @@ from .symbolic.qualifiers import (
     qualify,
     variable,
 )
-from .backends.targets import (
+from .targets import (
     AVX512Target,
     ARMSMETarget,
     ARMSVETarget,
@@ -366,9 +379,7 @@ __all__ = [
     "MeshKernelSignature",
     "BlockDiagSymAssemblyPlan",
     "BSRAssemblyPlan",
-    "COOAssemblyPlan",
     "CRSAssemblyPlan",
-    "DIAAssemblyPlan",
     "MatrixAssemblyVariantPlan",
     "MatrixFormat",
     "MatrixFormatPlan",
@@ -377,7 +388,6 @@ __all__ = [
     "MeshPhase",
     "MeshPhasePlan",
     "PackedAssemblyPass",
-    "PatchAssemblyPlan",
     "ReferenceBasisDataPlan",
     "ReferenceDataPlan",
     "ReferenceDataSetPlan",
@@ -511,6 +521,7 @@ __all__ = [
     "sfem_detect_compatible_element_types",
     "sfem_detect_taylor_hood_element_types",
     "sfem_default_quadrature_order",
+    "sfem_default_element_types",
     "sfem_supported_element_types",
     "sfem_taylor_hood_element_types",
     "sfem_soa_adjugate_geometry_inputs",

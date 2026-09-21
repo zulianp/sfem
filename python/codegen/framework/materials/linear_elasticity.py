@@ -40,10 +40,15 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "linear_elasticity",
     systems,
-    elements=gen.sfem_supported_element_types() + ("PROTEUS_HEX125", "PROTEUS_HEX729"),
+    elements=gen.sfem_default_element_types(),
     op_name="GeneratedLinearElasticity",
     parameter_defaults=(("mu", 1.0), ("lmbda", 1.0)),
     matrix_formats=("bsr", "block_diag_sym"),
+    # The split apply is part of what this material ships, so it is declared
+    # here rather than flipped at the call site.  Without it a regeneration
+    # silently drops the stored-tangent kernels and the Op methods that reach
+    # them.
+    inexact_apply=True,
 )
 
 

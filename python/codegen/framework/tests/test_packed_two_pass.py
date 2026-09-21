@@ -28,7 +28,7 @@ class PackedTwoPassEmissionTests(unittest.TestCase):
         )
         text = path.read_text()
         self.assertIn("two_pass=False", text)
-        self.assertIn("jacobian_action_packed_two_pass_isoparametric_mesh_soa", text)
+        self.assertIn("jacobian_action_packed_two_pass_i_msoa", text)
 
 
 if __name__ == "__main__":

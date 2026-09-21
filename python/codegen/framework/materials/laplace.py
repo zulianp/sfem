@@ -13,9 +13,13 @@ def _build_system(dim):
     system = gen.EquationSystemBuilder(dim)
     with gen.geometric_dimension_context(dim):
         u = gen.Function(V, "u")
-        v = gen.TestFunction(V, name="u_test")
-        system.add_residual(
-            "", kappa * gen.inner(gen.grad(u), gen.grad(v)), fields=(u,)
+        # The Dirichlet energy, whose gradient is the residual this used to
+        # declare.  Written as the potential so that `value` and `value_steps`
+        # answer with an energy rather than a merit, and so the 0-form, the
+        # gradient and the Hessian action all come from one statement.
+        G = gen.variable(gen.grad(u).T, name="G")
+        system.add_energy(
+            "", kappa / 2 * gen.inner(G, G), fields=(u,), variables=(G,)
         )
     return system.build()
 
@@ -28,9 +32,13 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "laplace",
     systems,
-    elements=gen.sfem_supported_element_types() + ("PROTEUS_HEX125", "PROTEUS_HEX729"),
+    elements=gen.sfem_default_element_types(),
     op_name="GeneratedLaplace",
     parameter_defaults=(("kappa", 1.0),),
+    # The formats the shipped tree carries.  They used to be requested from the
+    # command line, which no generator script passes, so a regeneration deleted
+    # them.
+    matrix_formats=("crs", "bsr"),
 )
 
 

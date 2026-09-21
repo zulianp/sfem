@@ -4,6 +4,7 @@
 #include "kelvin_voigt_newmark.hpp"
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"
+#include "sfem_NewmarkScheme.hpp"
 #include "sfem_KelvinVoigtNewmark.hpp"
 #include "sfem_ssgmg.hpp"
 #include "sfem_test.hpp"
@@ -142,9 +143,14 @@ int test_newmark_kv() {
         auto blas = sfem::blas<real_t>(es);
 
         const ptrdiff_t ndofs        = fs->n_dofs();
-        auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
-        auto            velocity     = sfem::create_buffer<real_t>(ndofs, es);
-        auto            acceleration = sfem::create_buffer<real_t>(ndofs, es);
+        // Newmark lives in the scheme; this test drives the operator, not the
+        // method.  beta = 1/4 and gamma = 1/2 are `NewmarkScheme`'s defaults,
+        // which is what the literal 4/(dt*dt) and 2/dt here used to mean.
+        auto scheme = std::make_shared<sfem::NewmarkScheme>(fs, es);
+        SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
+        auto            displacement = scheme->state();
+        auto            velocity     = scheme->velocity();
+        auto            acceleration = scheme->acceleration();
 
         auto increment = sfem::create_buffer<real_t>(ndofs, es);
         auto temp_vel  = sfem::create_buffer<real_t>(ndofs, es);
@@ -213,18 +219,12 @@ int test_newmark_kv() {
         }
 
         while (t < T) {
-            for (int k = 0; k < nliter; k++) {
-                // Use increment as temp buffer
-                blas->zeros(ndofs, increment->data());
-                blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
-                blas->axpy(ndofs, -dt, velocity->data(), increment->data());
-                blas->scal(ndofs, 4 / (dt * dt), increment->data());
-                blas->axpy(ndofs, -1, acceleration->data(), increment->data());
+            scheme->begin_step(t, dt);
 
-                blas->zeros(ndofs, temp_vel->data());
-                blas->copy(ndofs, increment->data(), temp_vel->data());
-                blas->zaxpby(ndofs, dt / 2, temp_vel->data(), dt / 2, acceleration->data(), temp_vel->data());
-                blas->axpy(ndofs, 1, velocity->data(), temp_vel->data());
+            for (int k = 0; k < nliter; k++) {
+                // The velocity and acceleration Newmark implies at this
+                // iterate; the operator takes them as fields.
+                scheme->reconstruct(solution->data(), temp_vel->data(), increment->data());
 
                 blas->zeros(ndofs, g->data());
                 // Adds material gradient computation to g
@@ -235,21 +235,7 @@ int test_newmark_kv() {
                 blas->axpy(ndofs, -1, increment->data(), solution->data());
             }
 
-            ////////////////////////////////
-            // Update all quantities
-            ////////////////////////////////
-
-            // acceleration
-            blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
-            blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
-            blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
-
-            // velocity
-            blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
-            blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
-
-            // displacement
-            blas->copy(ndofs, solution->data(), displacement->data());
+            scheme->advance(solution->data());
 
             t += dt;
             if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {
@@ -289,9 +275,14 @@ int test_newmark_kv() {
 
         const ptrdiff_t ndofs        = fs->n_dofs();
         const int       block_size   = 3;
-        auto            displacement = sfem::create_buffer<real_t>(ndofs, es);
-        auto            velocity     = sfem::create_buffer<real_t>(ndofs, es);
-        auto            acceleration = sfem::create_buffer<real_t>(ndofs, es);
+        // Newmark lives in the scheme; this test drives the operator, not the
+        // method.  beta = 1/4 and gamma = 1/2 are `NewmarkScheme`'s defaults,
+        // which is what the literal 4/(dt*dt) and 2/dt here used to mean.
+        auto scheme = std::make_shared<sfem::NewmarkScheme>(fs, es);
+        SFEM_TEST_ASSERT(scheme->initialize() == SFEM_SUCCESS);
+        auto            displacement = scheme->state();
+        auto            velocity     = scheme->velocity();
+        auto            acceleration = scheme->acceleration();
 
         auto increment = sfem::create_buffer<real_t>(ndofs, es);
         auto temp_vel  = sfem::create_buffer<real_t>(ndofs, es);
@@ -414,6 +405,8 @@ int test_newmark_kv() {
         }
 
         while (t < T) {
+            scheme->begin_step(t, dt);
+
             // Compute lower_bound based on current displacement (before solve)
             // This is the function requested: compute current lower bound based on
             // current displacement, change from left to right
@@ -437,17 +430,9 @@ int test_newmark_kv() {
             }
 
             for (int k = 0; k < nliter; k++) {
-                // Use increment as temp buffer
-                blas->zeros(ndofs, increment->data());
-                blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
-                blas->axpy(ndofs, -dt, velocity->data(), increment->data());
-                blas->scal(ndofs, 4 / (dt * dt), increment->data());
-                blas->axpy(ndofs, -1, acceleration->data(), increment->data());
-
-                blas->zeros(ndofs, temp_vel->data());
-                blas->copy(ndofs, increment->data(), temp_vel->data());
-                blas->zaxpby(ndofs, dt / 2, temp_vel->data(), dt / 2, acceleration->data(), temp_vel->data());
-                blas->axpy(ndofs, 1, velocity->data(), temp_vel->data());
+                // The velocity and acceleration Newmark implies at this
+                // iterate; the operator takes them as fields.
+                scheme->reconstruct(solution->data(), temp_vel->data(), increment->data());
 
                 blas->zeros(ndofs, g->data());
                 // Adds material gradient computation to g
@@ -466,21 +451,7 @@ int test_newmark_kv() {
                 }
             }
 
-            ////////////////////////////////
-            // Update all quantities
-            ////////////////////////////////
-
-            // acceleration
-            blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
-            blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
-            blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
-
-            // velocity
-            blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
-            blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
-
-            // displacement
-            blas->copy(ndofs, solution->data(), displacement->data());
+            scheme->advance(solution->data());
 
             t += dt;
             if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {

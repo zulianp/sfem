@@ -2,7 +2,6 @@
 
 #include <map>
 #include "sfem_BoundaryMass.hpp"
-#include "sfem_BDF2InertiaPotential.hpp"
 #include "sfem_CVFEMMass.hpp"
 #include "sfem_CVFEMUpwindConvection.hpp"
 #include "generated/sfem_generated_ops_registration.hpp"
@@ -17,7 +16,7 @@
 #include "sfem_Mass.hpp"
 #include "sfem_MooneyRivlinActiveStrainPacked.hpp"
 #include "sfem_MooneyRivlinVisco.hpp"
-#include "sfem_NewmarkInertiaPotential.hpp"
+#include "sfem_InertiaPotential.hpp"
 #include "sfem_NeoHookeanOgden.hpp"
 #include "sfem_NeoHookeanOgdenActiveStrainPacked.hpp"
 #include "sfem_NeoHookeanOgdenPacked.hpp"
@@ -55,8 +54,14 @@ namespace sfem {
 
         if (instance_.impl_->name_to_create.empty()) {
             instance_.private_register_op("KelvinVoigtNewmark", KelvinVoigtNewmark::create);
-            instance_.private_register_op("BDF2InertiaPotential", BDF2InertiaPotential::create);
-            instance_.private_register_op("NewmarkInertiaPotential", NewmarkInertiaPotential::create);
+            instance_.private_register_op("InertiaPotential", InertiaPotential::create);
+            // The two names this operator used to have.  It never implemented
+            // either method -- it is a lumped mass about a predictor, and the
+            // caller picks `alpha` and fills `u_hat` -- so one class answers
+            // both, and the keys stay because drivers and env vars resolve
+            // operators by string.
+            instance_.private_register_op("BDF2InertiaPotential", InertiaPotential::create);
+            instance_.private_register_op("NewmarkInertiaPotential", InertiaPotential::create);
             instance_.private_register_op("LinearElasticity", LinearElasticity::create);
             instance_.private_register_op("Laplacian", Laplacian::create);
             instance_.private_register_op("VectorLaplacian", VectorLaplacian::create);

@@ -1631,6 +1631,26 @@ namespace sfem {
             return sfem::create_parallel_matrix_free_operator(f, u, es);
         }
 
+        if (format == op_type::INEXACT) {
+            if (!f->inexact_supported()) {
+                fprintf(stderr,
+                        "[Warning] no operator in this function stores a tangent; "
+                        "falling back to matrix-free\n");
+                return sfem::create_parallel_matrix_free_operator(f, u, es);
+            }
+            // The tangent is assembled by whoever owns the linearization -- a
+            // Newton step calls `Function::inexact_update` once and then applies
+            // this for every Krylov iteration.  It is not assembled here,
+            // because this object outlives the state it would have been
+            // assembled at.
+            const ptrdiff_t ndofs = f->space()->n_dofs();
+            return sfem::make_op<real_t>(
+                    ndofs,
+                    ndofs,
+                    [f](const real_t *const h, real_t *const out) { f->inexact_apply(h, out); },
+                    es);
+        }
+
         if (f->space()->block_size() == 1) {
             if (format == op_type::CRS_SYM)
                 return sfem::hessian_crs_sym(f, u, es);

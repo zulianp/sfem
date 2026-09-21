@@ -147,7 +147,7 @@ namespace {
                                       const int                                  batch_nelems,
                                       ElementThreadContext<BATCH_SIZE>          &thread_ctx) {
         if (ctx.dim == 2) {
-            return sfem::codegen::neohookean_ogden_hessian_2d_element_soa<real_t, BATCH_SIZE>(ctx.element_type,
+            return sfem::codegen::neohookean_ogden_hessian_2d_esoa<real_t, BATCH_SIZE>(ctx.element_type,
                                                                                               batch_nelems,
                                                                                               thread_ctx.coord_streams.data(),
                                                                                               ctx.lmbda,
@@ -156,7 +156,7 @@ namespace {
                                                                                               thread_ctx.matrix_streams.data());
         }
         if (ctx.dim == 3) {
-            return sfem::codegen::neohookean_ogden_hessian_3d_element_soa<real_t, BATCH_SIZE>(ctx.element_type,
+            return sfem::codegen::neohookean_ogden_hessian_3d_esoa<real_t, BATCH_SIZE>(ctx.element_type,
                                                                                               batch_nelems,
                                                                                               thread_ctx.coord_streams.data(),
                                                                                               ctx.lmbda,

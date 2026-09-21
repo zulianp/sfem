@@ -8,6 +8,8 @@ namespace sfem {
         std::shared_ptr<Op>        lor_op(const std::shared_ptr<FunctionSpace> &space) override;
         std::shared_ptr<Op>        derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
         const char                *name() const override { return "Hyperelasticity"; }
+        //! a stored energy density
+        bool energy_or_potential_based() const override { return true; }
         inline bool                is_linear() const override { return false; }
         ptrdiff_t                  n_dofs_domain() const override;
         ptrdiff_t                  n_dofs_image() const override;

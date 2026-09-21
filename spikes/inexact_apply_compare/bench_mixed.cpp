@@ -1,0 +1,411 @@
+// The split on a material with more than one unit.
+//
+// Mooney-Rivlin elasticity plus Kelvin-Voigt viscosity: an energy unit and a
+// residual unit.  The operator's action is the sum of the two, so the split has
+// to carry both -- two tangents assembled, two applies summed -- and the
+// comparison is against the sum of the two exact kernels.
+//
+// The two units differ in a way that matters for the store.  The elastic
+// tangent came from an energy, so it is a Hessian and its major symmetry folds
+// 81 numbers into 45.  The viscous tangent came from a residual, is a Jacobian,
+// and is genuinely unsymmetric, so all 81 are independent.  126 numbers per
+// element in total, against 45 for a single hyperelastic material.
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#include <chrono>
+#include <vector>
+#include <algorithm>
+#include <type_traits>
+#include "sfem_base.hpp"
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include "kernel_math.hpp"
+// Element and unit names arrive as -D from `run_mixed.sh`, the way
+// `bench_split.cpp` already takes them.  The two units are separate materials
+// with separate generated headers, so there are two of everything.
+#include ELASTIC_INEXACT_HEADER
+#include VISCOUS_INEXACT_HEADER
+#include "element_mesh.inc"
+#include "packed_mesh.inc"
+#ifdef ELASTIC_HESSIAN_BSR
+#include "bsr_matrix.inc"
+// The assembled Jacobian, through the same C entry points the Op calls.  Both
+// units accumulate into one matrix, which is what makes it the operator rather
+// than half of it.
+// The two units do not publish the same ABI, and the difference is invisible to
+// the linker.  The energy unit's entry point is runtime-typed, the convention
+// the rest of the generated surface follows: a leading `scalar_bytes` and `void
+// *` buffers.  The residual unit's is typed per precision -- `double` buffers
+// and a separate `..._float` symbol -- with no leading width.  Declaring the
+// energy shape for both links cleanly, because C linkage does not mangle
+// parameters, and then passes every argument one register across; it segfaults
+// inside the kernel reading `points`, which is how this was found.
+extern "C" int ELASTIC_HESSIAN_BSR(const int, const ptrdiff_t, const ptrdiff_t,
+    idx_t **const, const geom_t *const *const, const double, const double,
+    const ptrdiff_t, const void *const, const void *const, const void *const,
+    const count_t *const, const idx_t *const, void *const);
+extern "C" int VISCOUS_HESSIAN_BSR(const ptrdiff_t, const ptrdiff_t,
+    idx_t **const, const geom_t *const *const, const double, const double, const double,
+    const ptrdiff_t, const double *const, const double *const, const double *const,
+    const ptrdiff_t, const double *const, const double *const, const double *const,
+    const count_t *const, const idx_t *const, double *const);
+#endif
+
+#define TC_ELASTIC 45
+#define TC_VISCOUS 81
+// `half_t` comes from sfem_config.h: __fp16 on some targets, _Float16 on
+// others.  Declaring it here would conflict on whichever one it is not.
+
+
+// Deformation severity.  The projection approximates a tangent that varies over
+// the cell, so how far the state is from a constant gradient is the condition
+// it approximates -- and at zero it is exact on any element, which makes that
+// row a control that isolates the store's own error.  `bench_split.cpp` has
+// carried this knob for the single-unit case; the previous state scales with it
+// so that the viscous unit's velocity gradient vanishes at zero too.
+#ifndef STATE_AMPLITUDE
+#define STATE_AMPLITUDE 0.02
+#endif
+#define PREVIOUS_AMPLITUDE ((STATE_AMPLITUDE) * 0.65)
+
+#include "generated_abi.inc"
+
+extern "C" int EXACT_ELASTIC_APPLY(
+    const int,
+    const ptrdiff_t, const ptrdiff_t, idx_t **const,
+    const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
+    const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
+    const geom_t *const, const geom_t *const, const double, const double,
+    const ptrdiff_t, const double *const, const double *const, const double *const,
+    const ptrdiff_t, const double *const, const double *const, const double *const,
+    const ptrdiff_t, double *const, double *const, double *const);
+
+extern "C" int EXACT_VISCOUS_ACTION(
+    const int,
+    const ptrdiff_t, const ptrdiff_t, idx_t **const,
+    const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
+    const geom_t *const, const geom_t *const, const geom_t *const, const geom_t *const,
+    const geom_t *const, const geom_t *const,
+    const double, const double, const double,
+    const ptrdiff_t, const double *const, const double *const, const double *const,
+    const ptrdiff_t, const double *const, const double *const, const double *const,
+    const ptrdiff_t, const double *const, const double *const, const double *const,
+    const ptrdiff_t, double *const, double *const, double *const);
+
+template <typename F> static double best_mdof(int repeats, ptrdiff_t ndof, F &&fn) {
+    // The timed region is the kernel and nothing else.
+    //
+    // Two things used to sit inside it and both distorted the result, badly at
+    // high thread counts.  Zeroing the output arrays is a serial `std::fill` of
+    // several megabytes that is not part of the operator and does not
+    // parallelise, so it charged Amdahl's tax to the kernel.  And timing a
+    // single call charged that call for the OpenMP team startup and a cold
+    // cache, which is a large fraction of a kernel that runs for a few
+    // milliseconds on ten cores.  Together they understated throughput by three
+    // to five times and compressed the measured scaling.
+    //
+    // So: the outputs are not cleared between repetitions.  The apply
+    // accumulates, so the values grow -- which does not affect what is being
+    // measured, and correctness is checked separately, with clearing, outside
+    // any timed region.
+    fn();
+    double top = 0;
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        auto t0 = std::chrono::steady_clock::now();
+        for (int r = 0; r < repeats; ++r) fn();
+        auto t1 = std::chrono::steady_clock::now();
+        const double seconds = std::chrono::duration<double>(t1 - t0).count();
+        top = std::max(top, (double)ndof * repeats / seconds * 1e-6);
+    }
+    return top;
+}
+
+int main(int argc, char **argv) {
+    const int repeats = argc > 1 ? std::atoi(argv[1]) : 7;
+    // An optional single mesh size, for when the question is throughput at one
+    // resolution rather than the refinement study: a saturated thread sweep
+    // wants one large mesh measured many times, not five of which four are too
+    // small to fill the machine.
+    const int only = argc > 2 ? std::atoi(argv[2]) : 0;
+    int threads = 1;
+#ifdef _OPENMP
+    threads = omp_get_max_threads();
+#endif
+    const double mu = 1.3, lmbda = 2.2, eta_s = 0.31, eta_b = 0.17, alpha = 0.9;
+    std::printf("mooney_rivlin_kelvin_voigt (elastic + viscous), %s, threads %d, best of %d\n\n",
+                ELEMENT_NAME,
+                threads, repeats);
+    std::printf("%10s %10s %12s | %8s %8s %8s %8s | %8s | %9s %9s %9s",
+                "elements", "nodes", "ndof", "exact", "st.f64", "st.f32", "st.f16",
+                "assembly", "f64 diff", "f32 diff", "f16 diff");
+#ifdef PACKED_STORED_APPLY
+    std::printf(" | %8s %8s %9s", "pk.f64", "pk.f32", "pk diff");
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+    std::printf(" | %8s %8s %9s %7s", "bsr", "bsr asm", "bsr diff", "MB");
+#endif
+    std::printf("\n");
+    std::printf("%10s %10s %12s | %s | %8s | %9s %9s %9s", "", "", "",
+                "          MDOF/s (apply)           ", "MDOF/s", "rel", "rel", "rel");
+#ifdef PACKED_STORED_APPLY
+    std::printf(" | %8s %8s %9s", "MDOF/s", "MDOF/s", "rel");
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+    std::printf(" | %8s %8s %9s %7s", "MDOF/s", "MDOF/s", "rel", "values");
+#endif
+    std::printf("\n");
+
+    for (int n : {8, 16, 24, 32, 40}) {
+        if (only && n != only) continue;
+        Mesh m = build(n);
+        const ptrdiff_t N = m.nnodes, EC = m.nelements, CS = EC + 64, ndof = 3 * N;
+        std::vector<double> ux(N),uy(N),uz(N), zx(N),zy(N),zz(N), hx(N),hy(N),hz(N);
+        for (ptrdiff_t v = 0; v < N; ++v) {
+            const double x=m.px[v], y=m.py[v], z=m.pz[v];
+            ux[v]=(STATE_AMPLITUDE)*std::sin(3*x+y+0.5*z); uy[v]=(STATE_AMPLITUDE)*std::sin(x+3*y+1.5*z); uz[v]=(STATE_AMPLITUDE)*std::sin(0.5*x+1.5*y+3*z);
+            zx[v]=(PREVIOUS_AMPLITUDE)*std::sin(2*x+0.4*y+z); zy[v]=(PREVIOUS_AMPLITUDE)*std::sin(0.4*x+2*y+z); zz[v]=(PREVIOUS_AMPLITUDE)*std::sin(x+0.6*y+2*z);
+#ifdef RANDOM_INCREMENT
+            // A smooth increment makes the deviation ratio flat under
+            // refinement even where the projection converges perfectly well:
+            // the assembled action of a smooth field is a discrete second
+            // derivative, so neighbouring elements' contributions cancel in the
+            // denominator while the per-element projection errors carry
+            // independent signs and do not cancel at all.  White noise removes
+            // the cancellation and lets the rate be read.  See "The TET10
+            // non-convergence was the metric" in RESULTS.md, which established
+            // this for a single unit.
+            (void)x; (void)y; (void)z;
+            const unsigned seed = (unsigned)(v * 2654435761u);
+            auto noise = [](unsigned t) {
+                t ^= t >> 15; t *= 2246822519u; t ^= t >> 13;
+                return (double)(t & 0xffffff) / 16777216.0 - 0.5;
+            };
+            hx[v]=0.05*noise(seed+1); hy[v]=0.05*noise(seed+2); hz[v]=0.05*noise(seed+3);
+#else
+            hx[v]=0.05*std::sin(2*x+0.7*y+1.1*z); hy[v]=0.05*std::sin(0.7*x+2*y+1.3*z); hz[v]=0.05*std::sin(1.1*x+1.3*y+2*z);
+#endif
+        }
+        std::vector<double> E64((size_t)CS*TC_ELASTIC), V64((size_t)CS*TC_VISCOUS);
+        std::vector<float>  E32((size_t)CS*TC_ELASTIC), V32((size_t)CS*TC_VISCOUS);
+        std::vector<half_t> E16((size_t)CS*TC_ELASTIC), V16((size_t)CS*TC_VISCOUS);
+        std::vector<float>  ES(EC, 1.0f), VS(EC, 1.0f);
+        std::vector<double> ax(N,0),ay(N,0),az(N,0), bx(N,0),by(N,0),bz(N,0);
+        const geom_t *A[9]; for (int i=0;i<9;++i) A[i]=m.adj[i].data();
+        auto z3=[&](std::vector<double>&a,std::vector<double>&b,std::vector<double>&c){
+            std::fill(a.begin(),a.end(),0.0);std::fill(b.begin(),b.end(),0.0);std::fill(c.begin(),c.end(),0.0);};
+
+        // Both units, assembled.  This is the once-per-tangent cost.
+        auto assemble = [&] {
+            ELASTIC_TANGENT<double,geom_t,double,16>(EC, m.kevp.data(),
+                A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
+                lmbda, mu, 1, ux.data(),uy.data(),uz.data(), CS, E64.data());
+            VISCOUS_TANGENT<double,geom_t,double,16>(EC, m.kevp.data(),
+                A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
+                eta_b, eta_s, alpha, 1, ux.data(),uy.data(),uz.data(),
+                1, zx.data(),zy.data(),zz.data(), CS, V64.data());
+        };
+        assemble();
+        auto narrow = [&](std::vector<double>&S64, std::vector<float>&S32,
+                          std::vector<half_t>&S16, std::vector<float>&SC, int TC) {
+            for (ptrdiff_t e = 0; e < EC; ++e) {
+                double top = 0;
+                for (int c = 0; c < TC; ++c) top = std::max(top, std::fabs(S64[(size_t)c*CS+e]));
+                const double s = top > 65504.0 ? (top + 1e-8)/65504.0 : 1.0;
+                SC[e] = (float)s;
+                for (int c = 0; c < TC; ++c) {
+                    const size_t at = (size_t)c*CS+e;
+                    S32[at] = (float)S64[at]; S16[at] = (half_t)(S64[at]/s);
+                }
+            }
+        };
+        narrow(E64,E32,E16,ES,TC_ELASTIC); narrow(V64,V32,V16,VS,TC_VISCOUS);
+
+        // The exact action is the sum of the two units' exact kernels.
+        auto run_exact = [&] {
+            EXACT_ELASTIC_APPLY(SFEM_CODEGEN_F64,
+                EC, N, m.evp.data(), A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
+                lmbda, mu, 1, ux.data(),uy.data(),uz.data(), 1, hx.data(),hy.data(),hz.data(),
+                1, ax.data(),ay.data(),az.data());
+            EXACT_VISCOUS_ACTION(SFEM_CODEGEN_F64,
+                EC, N, m.evp.data(), A[0],A[1],A[2],A[3],A[4],A[5],A[6],A[7],A[8], m.det.data(),
+                eta_b, eta_s, alpha, 1, ux.data(),uy.data(),uz.data(),
+                1, zx.data(),zy.data(),zz.data(), 1, hx.data(),hy.data(),hz.data(),
+                1, ax.data(),ay.data(),az.data());
+        };
+        auto run_stored = [&](auto *ep, auto *vp) {
+            ELASTIC_STORED<double, typename std::remove_const<typename std::remove_pointer<decltype(ep)>::type>::type, 16>(
+                EC, m.kevp.data(), CS, ep, 1, hx.data(),hy.data(),hz.data(),
+                1, bx.data(),by.data(),bz.data());
+            VISCOUS_STORED<double, typename std::remove_const<typename std::remove_pointer<decltype(vp)>::type>::type, 16>(
+                EC, m.kevp.data(), CS, vp, 1, hx.data(),hy.data(),hz.data(),
+                1, bx.data(),by.data(),bz.data());
+        };
+#ifdef PACKED_STORED_APPLY
+        // The same mesh partitioned into packs, with the increment placed through
+        // its permutation so this is the same problem relabelled.  The stores are
+        // assembled on the standard mesh and read unchanged: packing renumbers
+        // nodes, never elements, so element e is element e in both layouts and its
+        // tangent components are the same numbers.
+        // Compile-time default, overridable at run time: the pack size is the
+        // layout's one tuning knob and this translation unit takes forty minutes
+        // to build, so a sweep must not need a rebuild per point.
+        const char *const pack_env = std::getenv("PACK_SIZE");
+        const int pack_size = pack_env ? std::atoi(pack_env) : (int)PACK_SIZE;
+        PackedMeshView pk = build_packed_mesh(m, pack_size);
+        std::vector<double> phx, phy, phz;
+        place_packed(hx, pk.layout, phx);
+        place_packed(hy, pk.layout, phy);
+        place_packed(hz, pk.layout, phz);
+        std::vector<double> pkx(N), pky(N), pkz(N);
+        std::vector<double> ghost_buf((size_t)pk.layout.n_ghost_entries * 3, 0.0);
+        auto run_packed_stored = [&](auto *ep, auto *vp) {
+            ELASTIC_PACKED_STORED<double, typename std::remove_const<
+                typename std::remove_pointer<decltype(ep)>::type>::type, 16>(
+                pk.layout.n_packs, pk.layout.n_elements_per_pack, EC,
+                pk.layout.max_nodes_per_pack, pk.kernel_element_ptrs.data(),
+                pk.layout.owned_nodes_ptr.data(),
+                pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
+                pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
+                pk.layout.ghost_reduce_ptr.data(), pk.layout.ghost_reduce_idx.data(),
+                pk.layout.ghost_reduce_dest.data(), ghost_buf.data(),
+                CS, ep, 1, phx.data(), phy.data(), phz.data(),
+                1, pkx.data(), pky.data(), pkz.data());
+            VISCOUS_PACKED_STORED<double, typename std::remove_const<
+                typename std::remove_pointer<decltype(vp)>::type>::type, 16>(
+                pk.layout.n_packs, pk.layout.n_elements_per_pack, EC,
+                pk.layout.max_nodes_per_pack, pk.kernel_element_ptrs.data(),
+                pk.layout.owned_nodes_ptr.data(),
+                pk.layout.n_ghost_entries, pk.layout.n_ghost_reduce_rows,
+                pk.layout.ghost_ptr.data(), pk.layout.ghost_idx.data(),
+                pk.layout.ghost_reduce_ptr.data(), pk.layout.ghost_reduce_idx.data(),
+                pk.layout.ghost_reduce_dest.data(), ghost_buf.data(),
+                CS, vp, 1, phx.data(), phy.data(), phz.data(),
+                1, pkx.data(), pky.data(), pkz.data());
+        };
+        // The packed answer is in packed node order, so it is compared against the
+        // exact one through the same permutation rather than element-wise.
+        auto rel_packed = [&] {
+            double num = 0, den = 0;
+            for (ptrdiff_t v = 0; v < N; ++v) {
+                const ptrdiff_t pv = pk.layout.to_new[v];
+                num += std::fabs(ax[v] - pkx[pv]) + std::fabs(ay[v] - pky[pv])
+                     + std::fabs(az[v] - pkz[pv]);
+                den += std::fabs(ax[v]) + std::fabs(ay[v]) + std::fabs(az[v]);
+            }
+            return num / den;
+        };
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+        // The assembled Jacobian.  Its graph is the node-to-node graph, its
+        // vectors are component-interleaved, and its values are whatever the two
+        // units accumulate -- so the comparison against the matrix-free action
+        // goes through an interleave and back.
+        const BsrGraph graph = build_bsr_graph(m);
+        std::vector<geom_t> gx(N), gy(N), gz(N);
+        for (ptrdiff_t v = 0; v < N; ++v) {
+            gx[v] = (geom_t)m.px[v]; gy[v] = (geom_t)m.py[v]; gz[v] = (geom_t)m.pz[v];
+        }
+        const geom_t *const points[3] = {gx.data(), gy.data(), gz.data()};
+        std::vector<double> bsr_values((size_t)graph.nnz() * 9, 0.0);
+        std::vector<double> bsr_x((size_t)N * 3), bsr_y((size_t)N * 3, 0.0);
+        for (ptrdiff_t v = 0; v < N; ++v) {
+            bsr_x[(size_t)v * 3 + 0] = hx[v];
+            bsr_x[(size_t)v * 3 + 1] = hy[v];
+            bsr_x[(size_t)v * 3 + 2] = hz[v];
+        }
+        auto run_bsr_assemble = [&] {
+            std::fill(bsr_values.begin(), bsr_values.end(), 0.0);
+            ELASTIC_HESSIAN_BSR(SFEM_CODEGEN_F64, EC, N, m.evp.data(), points,
+                lmbda, mu, 1, ux.data(), uy.data(), uz.data(),
+                graph.rowptr.data(), graph.colidx.data(), bsr_values.data());
+            VISCOUS_HESSIAN_BSR(EC, N, m.evp.data(), points,
+                eta_b, eta_s, alpha, 1, ux.data(), uy.data(), uz.data(),
+                1, zx.data(), zy.data(), zz.data(),
+                graph.rowptr.data(), graph.colidx.data(), bsr_values.data());
+        };
+        auto run_bsr_apply = [&] {
+            bsr_apply<3>(graph, bsr_values.data(), bsr_x.data(), bsr_y.data());
+        };
+        auto rel_bsr = [&] {
+            double num = 0, den = 0;
+            for (ptrdiff_t v = 0; v < N; ++v) {
+                num += std::fabs(ax[v] - bsr_y[(size_t)v * 3 + 0])
+                     + std::fabs(ay[v] - bsr_y[(size_t)v * 3 + 1])
+                     + std::fabs(az[v] - bsr_y[(size_t)v * 3 + 2]);
+                den += std::fabs(ax[v]) + std::fabs(ay[v]) + std::fabs(az[v]);
+            }
+            return num / den;
+        };
+#endif
+        auto run_compressed = [&] {
+            ELASTIC_COMPRESS<double, half_t, float>(EC, m.kevp.data(), CS, E16.data(), ES.data(),
+                1, hx.data(),hy.data(),hz.data(), 1, bx.data(),by.data(),bz.data());
+            VISCOUS_COMPRESS<double, half_t, float>(EC, m.kevp.data(), CS, V16.data(), VS.data(),
+                1, hx.data(),hy.data(),hz.data(), 1, bx.data(),by.data(),bz.data());
+        };
+        auto rel=[&]{ double num=0,den=0; for(ptrdiff_t i=0;i<N;++i){
+                num+=std::fabs(ax[i]-bx[i])+std::fabs(ay[i]-by[i])+std::fabs(az[i]-bz[i]);
+                den+=std::fabs(ax[i])+std::fabs(ay[i])+std::fabs(az[i]); } return num/den; };
+
+        // Correctness first, each from a cleared output.  Outside any timing.
+        z3(ax,ay,az); run_exact();
+        z3(bx,by,bz); run_stored(E64.data(), V64.data()); const double d64 = rel();
+        z3(bx,by,bz); run_stored(E32.data(), V32.data()); const double d32 = rel();
+        z3(bx,by,bz); run_compressed();                   const double d16 = rel();
+#ifdef PACKED_STORED_APPLY
+        z3(pkx,pky,pkz); run_packed_stored(E64.data(), V64.data());
+        const double dpk = rel_packed();
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+        run_bsr_assemble(); run_bsr_apply();
+        const double dbsr = rel_bsr();
+#endif
+
+        const double e   = best_mdof(repeats, ndof, run_exact);
+        const double s64 = best_mdof(repeats, ndof, [&]{ run_stored(E64.data(), V64.data()); });
+        const double s32 = best_mdof(repeats, ndof, [&]{ run_stored(E32.data(), V32.data()); });
+        const double s16 = best_mdof(repeats, ndof, run_compressed);
+        const double a   = best_mdof(repeats, ndof, assemble);
+#ifdef PACKED_STORED_APPLY
+        const double p64 = best_mdof(repeats, ndof, [&]{ run_packed_stored(E64.data(), V64.data()); });
+        const double p32 = best_mdof(repeats, ndof, [&]{ run_packed_stored(E32.data(), V32.data()); });
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+        const double bsr_mdof = best_mdof(repeats, ndof, run_bsr_apply);
+        const double bsr_asm  = best_mdof(repeats, ndof, run_bsr_assemble);
+        const double bsr_mb   = (double)bsr_values.size() * sizeof(double) / (1024.0 * 1024.0);
+#endif
+        // All three error columns per row: f64 is the projection error alone,
+        // and what f32 and f16 add over it is the store's own contribution.
+        std::printf("%10ld %10ld %12ld | %8.2f %8.2f %8.2f %8.2f | %8.2f | %9.1e %9.1e %9.1e",
+                    (long)EC, (long)N, (long)ndof, e, s64, s32, s16, a, d64, d32, d16);
+#ifdef PACKED_STORED_APPLY
+        std::printf(" | %8.2f %8.2f %9.1e", p64, p32, dpk);
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+        std::printf(" | %8.2f %8.2f %9.1e %7.1f", bsr_mdof, bsr_asm, dbsr, bsr_mb);
+#endif
+        std::printf("\n");
+        if (n == 40 || (only && n == only)) {
+            std::printf("\n  stored-f64 vs exact rel diff %.2e\n", d64);
+            auto be = [&](double s){ return s <= e ? -1.0 : (1.0/a)/(1.0/e - 1.0/s); };
+#ifdef PACKED_STORED_APPLY
+            std::printf("  packed pack size %d, %ld packs, %d threads\n",
+                        pack_size, (long)pk.layout.n_packs, threads);
+            std::printf("  packed vs standard stored f64: %.2fx\n", p64 / s64);
+#endif
+#ifdef ELASTIC_HESSIAN_BSR
+            std::printf("  BSR: %.1f MB of values, assembly costs %.1f applies of its own\n",
+                        bsr_mb, (1.0 / bsr_asm) / (1.0 / bsr_mdof));
+#endif
+            std::printf("  break-even applies per tangent: f64 %.1f  f32 %.1f  f16 %.1f\n",
+                        be(s64), be(s32), be(s16));
+            std::printf("  store bytes/element: f64 %d  f32 %d  f16+scale %d   (45 elastic + 81 viscous)\n",
+                        (TC_ELASTIC+TC_VISCOUS)*8, (TC_ELASTIC+TC_VISCOUS)*4,
+                        (TC_ELASTIC+TC_VISCOUS)*2 + 8);
+        }
+    }
+    return 0;
+}
