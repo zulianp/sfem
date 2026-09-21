@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "generated/linear_elasticity/op/sfem_GeneratedLinearElasticity.hpp"
 #include "sfem_API.hpp"
@@ -158,6 +159,71 @@ namespace {
         }
         sfem::device_synchronize();
         return MPI_Wtime() - t0;
+    }
+
+    /// The merit -- `Function::value` -- in whichever reduction the Function
+    /// carries.  Element-wise it sums the objective kernels; node-wise it
+    /// assembles the residual and squares per node, so this number includes a
+    /// `gradient` and is expected to cost more than one.  Measured per layout
+    /// because the assembly underneath it is what the layout changes.
+    double time_value(const std::shared_ptr<sfem::Function> &f,
+                      const real_t *const                    x,
+                      const int                              repeat) {
+        real_t value = 0;
+        sfem::device_synchronize();
+        const double t0 = MPI_Wtime();
+        for (int i = 0; i < repeat; ++i) {
+            value = 0;
+            f->energy_merit(x, &value);
+        }
+        sfem::device_synchronize();
+        const double elapsed = MPI_Wtime() - t0;
+        // Keep the result observable so the loop cannot be optimised away, and
+        // so a layout that quietly answers something else is visible.
+        printf("%-40s %24.17g\n", "  value", (double)value);
+        return elapsed;
+    }
+
+    /// The step lengths a Newton line search asks the merit for, taken from
+    /// `drivers/mech/hyperelasticy.exe.cpp` rather than invented here: nine
+    /// trial alphas, evaluated together.  The count is the point of the
+    /// measurement -- everything a stepped objective can hoist, it hoists once
+    /// for all nine -- so a single alpha would say nothing about it.
+    std::vector<real_t> line_search_alphas() {
+        const real_t alpha = 1;
+        return {-2 * alpha,
+                -alpha,
+                -(real_t)0.9 * alpha,
+                -2 * alpha / 3,
+                -alpha / 2,
+                -alpha / 4,
+                -alpha / 8,
+                -alpha / 32,
+                -alpha / 128};
+    }
+
+    /// The merit at every trial step of a line search -- `Function::value_steps`
+    /// -- which is how the merit is actually asked for inside Newton.  Reported
+    /// beside `value` because the two are different questions: `value` is the
+    /// merit at the current state and pays for one evaluation, this one pays
+    /// for nine and is the kernel a line search waits on.
+    double time_value_steps(const std::shared_ptr<sfem::Function> &f,
+                            const real_t *const                    x,
+                            const real_t *const                    h,
+                            const int                              repeat) {
+        const std::vector<real_t> alphas = line_search_alphas();
+        std::vector<real_t>       energies(alphas.size(), 0);
+        sfem::device_synchronize();
+        const double t0 = MPI_Wtime();
+        for (int i = 0; i < repeat; ++i) {
+            std::fill(energies.begin(), energies.end(), (real_t)0);
+            f->energy_merit(x, h, (int)alphas.size(), alphas.data(), energies.data());
+        }
+        sfem::device_synchronize();
+        const double elapsed = MPI_Wtime() - t0;
+        // Observable for the same reason `time_value` prints its result.
+        printf("%-40s %24.17g\n", "  value_steps[0]", (double)energies.front());
+        return elapsed;
     }
 
     double time_apply(const std::shared_ptr<sfem::Operator<real_t>> &op,
@@ -363,6 +429,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    const double generated_value_elapsed = time_value(generated_f, x->data(), repeat);
+    const double generated_value_steps_elapsed =
+            time_value_steps(generated_f, x->data(), h->data(), repeat);
     const double generated_gradient_elapsed =
             time_gradient(generated_f, x->data(), generated_gradient->data(), ndofs, repeat, blas);
     const double generated_apply_elapsed =
@@ -374,15 +443,24 @@ int main(int argc, char *argv[]) {
         baseline_gradient_elapsed = time_gradient(baseline_f, x->data(), baseline_gradient->data(), ndofs, repeat, blas);
         baseline_apply_elapsed    = time_apply(baseline_linear_op, h->data(), baseline_apply->data(), ndofs, repeat, blas);
     }
+    double packed_value_elapsed    = 0;
     double packed_gradient_elapsed = 0;
     double packed_apply_elapsed    = 0;
+    double packed_value_steps_elapsed = 0;
     if (packed_f) {
+        packed_value_elapsed    = time_value(packed_f, x->data(), repeat);
+        packed_value_steps_elapsed = time_value_steps(packed_f, x->data(), h->data(), repeat);
         packed_gradient_elapsed = time_gradient(packed_f, x->data(), packed_gradient->data(), ndofs, repeat, blas);
         packed_apply_elapsed    = time_apply(packed_linear_op, h->data(), packed_apply->data(), ndofs, repeat, blas);
     }
+    double packed_two_pass_value_elapsed    = 0;
     double packed_two_pass_gradient_elapsed = 0;
     double packed_two_pass_apply_elapsed    = 0;
+    double packed_two_pass_value_steps_elapsed = 0;
     if (packed_two_pass_f) {
+        packed_two_pass_value_elapsed = time_value(packed_two_pass_f, x->data(), repeat);
+        packed_two_pass_value_steps_elapsed =
+                time_value_steps(packed_two_pass_f, x->data(), h->data(), repeat);
         packed_two_pass_gradient_elapsed =
                 time_gradient(packed_two_pass_f, x->data(), packed_two_pass_gradient->data(), ndofs, repeat, blas);
         packed_two_pass_apply_elapsed =
@@ -465,6 +543,20 @@ int main(int argc, char *argv[]) {
            "[GB/s]");
     printf("------------------------------------------------------------------------------------------------------------------------------------------"
            "------\n");
+    print_rate("generated_value",
+               generated_value_elapsed,
+               nelements,
+               ndofs,
+               repeat,
+               0,
+               0);
+    print_rate("generated_value_steps",
+               generated_value_steps_elapsed,
+               nelements,
+               ndofs,
+               repeat,
+               0,
+               0);
     print_rate("generated_gradient",
                generated_gradient_elapsed,
                nelements,
@@ -498,6 +590,20 @@ int main(int argc, char *argv[]) {
         printf("baseline_skipped unsupported_element %s\n", type_to_string(mesh->element_type(0)));
     }
     if (packed_f) {
+        print_rate("packed_value",
+                   packed_value_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   0,
+                   0);
+        print_rate("packed_value_steps",
+                   packed_value_steps_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   0,
+                   0);
         print_rate("packed_gradient",
                    packed_gradient_elapsed,
                    nelements,
@@ -516,6 +622,20 @@ int main(int argc, char *argv[]) {
         printf("packed_skipped unsupported_element %s\n", type_to_string(mesh->element_type(0)));
     }
     if (packed_two_pass_f) {
+        print_rate("packed_two_pass_value",
+                   packed_two_pass_value_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   0,
+                   0);
+        print_rate("packed_two_pass_value_steps",
+                   packed_two_pass_value_steps_elapsed,
+                   nelements,
+                   ndofs,
+                   repeat,
+                   0,
+                   0);
         print_rate("packed_two_pass_gradient",
                    packed_two_pass_gradient_elapsed,
                    nelements,

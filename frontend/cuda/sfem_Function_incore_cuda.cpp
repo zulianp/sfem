@@ -1,4 +1,10 @@
 #include "sfem_Function_incore_cuda.hpp"
+
+// The generated device Ops.  Each material emits its own
+// `op/cuda/sfem_<Op>_cuda_registration.cpp`; this aggregate is the one unit
+// that calls them all, and it is generated from the device manifests rather
+// than hand-edited.
+#include "sfem_generated_device_ops_registration.hpp"
 #include <algorithm>
 #include <cstring>
 #include <memory>
@@ -2191,6 +2197,7 @@ namespace sfem {
         Factory::register_op("gpu:EMMultiVectorWarpOp", &GPUEMMultiVectorWarpOp::create);
         Factory::register_op("gpu:EMVectorWarpOp", &GPUEMVectorWarpOp::create);
         Factory::register_op("gpu:KelvinVoigtNewmark", &GPUKelvinVoigtNewmark::create);
+        register_generated_device_ops();
     }
 
 }  // namespace sfem

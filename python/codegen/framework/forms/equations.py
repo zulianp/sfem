@@ -1,0 +1,1308 @@
+from dataclasses import dataclass
+from enum import Enum
+import math
+
+import sympy as sp
+
+from codegen.framework.forms.forms import (
+    FormBlock,
+    FormCollection,
+    FormDependencies,
+    FormMetadata,
+    FormOrder,
+    FormQualifier,
+    energy_form_pipeline,
+    residual_form_pipeline,
+)
+from codegen.framework.symbolic.boundary_forms import BoundaryIntegral, integral_integrand, integral_measure
+from codegen.framework.forms.residual import (
+    CoupledResidualSystem,
+    WeakResidualCoefficients,
+    coupled_residual_weak_coefficients,
+    weak_residual_coefficients,
+)
+from codegen.framework.symbolic.fields import (
+    ScalarField,
+    SymbolicField,
+    TensorField,
+    VectorField,
+    Function,
+    VectorFunction,
+    TensorFunction,
+    _family_from_qualifier,
+    is_previous_symbol,
+    scalar_field,
+    geometric_dimension_context,
+    tensor_field,
+    test_function,
+    trial_function,
+    vector_field,
+)
+
+
+class EquationForm(Enum):
+    ENERGY = "energy"
+    RESIDUAL = "residual"
+
+
+@dataclass(frozen=True)
+class EquationField:
+    name: str
+    components: int = 1
+    family: str = ""
+    metadata: object = None
+
+    def __post_init__(self):
+        name = str(self.name)
+        family = str(self.family)
+        components = int(self.components)
+        metadata = dict(self.metadata or ())
+        if not name or not name.isidentifier():
+            raise ValueError("equation field name must be a valid identifier")
+        if components <= 0:
+            raise ValueError("equation field components must be positive")
+        if family and not family.isidentifier():
+            raise ValueError("equation field family must be a valid identifier")
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "components", components)
+        object.__setattr__(self, "family", family)
+        object.__setattr__(self, "metadata", metadata)
+
+    @property
+    def is_scalar(self):
+        return self.components == 1
+
+    @property
+    def is_vector(self):
+        return self.components > 1
+
+
+@dataclass(frozen=True)
+class Equation:
+    name: str
+    form: EquationForm
+    define: object
+    fields: tuple = ()
+    variables: tuple = ()
+    #: The differentiating groups as the material declared them, before they
+    #: were flattened into `variables`.  An energy carrying a rate has more than
+    #: one, and the flux is then a weighted sum over them; the weights are read
+    #: from each group's recorded definition, which only survives here.
+    variable_groups: tuple = ()
+    directions: tuple = ()
+    kernels: tuple = ()
+    diagnostics: bool = True
+    measure: str = "dx"
+
+    def __post_init__(self):
+        name = str(self.name)
+        if name and not name.isidentifier():
+            raise ValueError("equation name must be empty or a valid identifier")
+        form = EquationForm(self.form)
+        fields = tuple(self.fields)
+        if not all(isinstance(field, EquationField) for field in fields):
+            raise TypeError("equation fields must be EquationField instances")
+        variables = tuple(self.variables)
+        define = self.define
+        if form is EquationForm.ENERGY:
+            if callable(define):
+                raise TypeError("energy equations require an expression, not a callable")
+            if not variables:
+                raise ValueError("energy equations require explicit variables")
+            define = _expression_value(define)
+        elif not callable(define):
+            raise TypeError("residual equations require a callable definition")
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "form", form)
+        object.__setattr__(self, "define", define)
+        object.__setattr__(self, "fields", fields)
+        object.__setattr__(self, "variables", variables)
+        object.__setattr__(self, "directions", tuple(self.directions))
+        object.__setattr__(self, "kernels", tuple(self.kernels))
+        object.__setattr__(self, "diagnostics", bool(self.diagnostics))
+        object.__setattr__(self, "measure", str(self.measure))
+
+    @property
+    def is_energy(self):
+        return self.form is EquationForm.ENERGY
+
+    @property
+    def is_residual(self):
+        return self.form is EquationForm.RESIDUAL
+
+
+class EquationSystem:
+    def __init__(self, dim):
+        self.dim = int(dim)
+        if self.dim <= 0:
+            raise ValueError("equation system dimension must be positive")
+        self._fields = []
+        self._equations = []
+        self._form_collections = {}
+
+    @property
+    def fields(self):
+        return tuple(self._fields)
+
+    @property
+    def equations(self):
+        return tuple(self._equations)
+
+    def form_collection(self, equation_or_name, orders=None):
+        equation = self._resolve_equation(equation_or_name)
+        normalized_orders = (
+            (FormOrder.ZERO, FormOrder.ONE, FormOrder.TWO)
+            if orders is None
+            else tuple(FormOrder(order) for order in orders)
+        )
+        key = (id(equation), normalized_orders)
+        collection = self._form_collections.get(key)
+        if collection is None:
+            collection = _build_form_collection(self, equation, normalized_orders)
+            self._form_collections[key] = collection
+        return collection
+
+    def form_collections(self, orders=None):
+        return tuple(
+            self.form_collection(equation, orders=orders)
+            for equation in self._equations
+        )
+
+    def field(self, name, components=1, family="", metadata=None):
+        field = EquationField(name, components, family, metadata)
+        if any(existing.name == field.name for existing in self._fields):
+            raise ValueError("equation field '%s' is already registered" % field.name)
+        self._fields.append(field)
+        return field
+
+    def scalar_field(self, name, family="", metadata=None):
+        return self.field(name, 1, family, metadata)
+
+    def vector_field(self, name, components=None, family="", metadata=None):
+        return self.field(name, self.dim if components is None else components, family, metadata)
+
+    def equation(
+        self,
+        name,
+        form,
+        define,
+        *,
+        fields=(),
+        variables=(),
+        directions=(),
+        kernels=(),
+        diagnostics=True,
+        measure="dx",
+    ):
+        detected_measure = integral_measure(define)
+        define = integral_integrand(define)
+        measure = detected_measure if measure == "dx" else measure
+        equation = Equation(
+            name,
+            form,
+            define,
+            fields=tuple(fields),
+            variables=_symbols_from_variables(variables),
+            variable_groups=tuple(variables) if isinstance(variables, (tuple, list)) else (),
+            directions=_symbols_from_variables(directions),
+            kernels=tuple(kernels),
+            diagnostics=diagnostics,
+            measure=measure,
+        )
+        if equation.name and any(existing.name == equation.name for existing in self._equations):
+            raise ValueError("equation '%s' is already registered" % equation.name)
+        self._equations.append(equation)
+        return equation
+
+    def add_energy(
+        self,
+        name,
+        define,
+        *,
+        fields=(),
+        variables=None,
+        directions=(),
+        kernels=("objective", "gradient", "apply"),
+        diagnostics=True,
+    ):
+        _validate_energy_variable_groups(fields, variables)
+        return self.equation(
+            name,
+            EquationForm.ENERGY,
+            define,
+            fields=fields,
+            variables=variables,
+            directions=directions,
+            kernels=kernels,
+            diagnostics=diagnostics,
+        )
+
+    def add_residual(
+        self,
+        name,
+        define,
+        *,
+        fields=(),
+        kernels=("gradient", "apply"),
+        diagnostics=True,
+        measure="dx",
+    ):
+        detected_measure = integral_measure(define)
+        define = integral_integrand(define)
+        measure = detected_measure if measure == "dx" else measure
+        return self.equation(
+            name,
+            EquationForm.RESIDUAL,
+            define,
+            fields=fields,
+            kernels=kernels,
+            diagnostics=diagnostics,
+            measure=measure,
+        )
+
+    def _resolve_equation(self, equation_or_name):
+        if isinstance(equation_or_name, Equation):
+            if any(equation is equation_or_name for equation in self._equations):
+                return equation_or_name
+            raise ValueError("equation is not registered in this system")
+        name = str(equation_or_name)
+        matches = tuple(equation for equation in self._equations if equation.name == name)
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            raise ValueError("unknown equation '%s'" % name)
+        raise ValueError("equation name '%s' is ambiguous" % name)
+
+
+class EquationSystems:
+    def __init__(self, *systems):
+        if len(systems) == 1 and isinstance(systems[0], (tuple, list)):
+            systems = tuple(systems[0])
+        self._by_dim = {}
+        for system in systems:
+            self.add(system)
+
+    @property
+    def systems(self):
+        return tuple(self._by_dim[dim] for dim in sorted(self._by_dim))
+
+    @property
+    def dims(self):
+        return tuple(sorted(self._by_dim))
+
+    def add(self, system):
+        if not isinstance(system, EquationSystem):
+            raise TypeError("EquationSystems entries must be EquationSystem instances")
+        if system.dim in self._by_dim:
+            raise ValueError("equation system for dim %d is already registered" % system.dim)
+        self._by_dim[system.dim] = system
+        return system
+
+    def for_dim(self, dim):
+        dim = int(dim)
+        try:
+            return self._by_dim[dim]
+        except KeyError:
+            raise ValueError("material does not define an equation system for dim %d" % dim)
+
+    def __len__(self):
+        return len(self._by_dim)
+
+    def __iter__(self):
+        return iter(self.systems)
+
+
+class EquationSystemBuilder:
+    def __init__(self, dim):
+        self._system = EquationSystem(dim)
+        self._symbolic_fields = []
+        self._equation_fields_by_name = {}
+
+    @property
+    def dim(self):
+        return self._system.dim
+
+    @property
+    def system(self):
+        return self._system
+
+    @property
+    def fields(self):
+        return tuple(self._symbolic_fields)
+
+    @property
+    def equations(self):
+        return self._system.equations
+
+    def build(self):
+        return self._system
+
+    def field(self, name, components=1, family=""):
+        components = int(components)
+        if components <= 0:
+            raise ValueError("equation field components must be positive")
+        if components == 1:
+            return self.scalar_field(name, family)
+        return self.vector_field(name, components, family)
+
+    def scalar_field(self, name, family=""):
+        return self._register_symbolic_field(
+            scalar_field(name, family, {"dim": self.dim}),
+            1,
+        )
+
+    def Function(self, space_or_name, name=None, family="", qualifier=None):
+        if name is None:
+            return self.scalar_field(space_or_name, _family_from_qualifier(qualifier) or family)
+        with geometric_dimension_context(self.dim):
+            return self._register_external_field(Function(space_or_name, name, qualifier=qualifier))
+
+    def vector_field(self, name, components=None, family=""):
+        components = self.dim if components is None else int(components)
+        return self._register_symbolic_field(
+            vector_field(name, components, family, {"dim": self.dim}),
+            components,
+        )
+
+    def VectorFunction(self, space_or_name, name=None, components=None, family="", qualifier=None):
+        if name is None:
+            return self.vector_field(
+                space_or_name,
+                components,
+                _family_from_qualifier(qualifier) or family,
+            )
+        with geometric_dimension_context(self.dim):
+            return self._register_external_field(VectorFunction(space_or_name, name, qualifier=qualifier))
+
+    def tensor_field(self, name, shape, family=""):
+        field = tensor_field(name, shape, family, {"dim": self.dim})
+        return self._register_symbolic_field(field, math.prod(field.shape))
+
+    def TensorFunction(self, space_or_name, name=None, shape=None, family="", qualifier=None):
+        if name is None:
+            return self.tensor_field(
+                space_or_name,
+                shape,
+                _family_from_qualifier(qualifier) or family,
+            )
+        return self._register_external_field(TensorFunction(space_or_name, name, qualifier=qualifier))
+
+    def equation(
+        self,
+        name,
+        form,
+        define,
+        *,
+        fields=(),
+        variables=(),
+        directions=(),
+        kernels=(),
+        diagnostics=True,
+        measure="dx",
+    ):
+        return self._system.equation(
+            name,
+            form,
+            define,
+            fields=self._resolve_fields(fields),
+            variables=_symbols_from_variables(variables),
+            directions=_symbols_from_variables(directions),
+            kernels=kernels,
+            diagnostics=diagnostics,
+            measure=measure,
+        )
+
+    def add_energy(
+        self,
+        name,
+        define,
+        *,
+        fields=(),
+        variables=None,
+        directions=None,
+        kernels=("objective", "gradient", "apply"),
+        diagnostics=True,
+    ):
+        if variables is None:
+            raise ValueError("energy requires explicit variables")
+        _validate_energy_variable_groups(fields, variables)
+        variable_symbols = _symbols_from_variables(variables)
+        if not variable_symbols:
+            raise ValueError("energy requires explicit variables")
+        direction_symbols = () if directions is None else _symbols_from_variables(directions)
+        return self._system.add_energy(
+            name,
+            _expression_value(define),
+            fields=self._resolve_fields(fields),
+            variables=variables,
+            directions=direction_symbols,
+            kernels=kernels,
+            diagnostics=diagnostics,
+        )
+
+    def add_residual(
+        self,
+        name,
+        define,
+        *,
+        fields=(),
+        kernels=("gradient", "apply"),
+        diagnostics=True,
+    ):
+        measure = integral_measure(define)
+        define = integral_integrand(define)
+        symbolic_fields = tuple(fields)
+        return self._system.add_residual(
+            name,
+            _residual_define(define, symbolic_fields, self.dim),
+            fields=self._resolve_fields(fields),
+            kernels=kernels,
+            diagnostics=diagnostics,
+            measure=measure,
+        )
+
+    def add_boundary_residual(self, name, define, *, fields=()):
+        return self.add_residual(name, BoundaryIntegral(define), fields=fields)
+
+    def derive_energy_forms(
+        self,
+        expression,
+        *,
+        variables=None,
+        fields=None,
+        directions=None,
+        orders=None,
+    ):
+        if variables is None:
+            if fields is None:
+                raise ValueError("derive_energy_forms requires variables")
+            variables = fields
+        variables = _symbols_from_variables(variables)
+        if directions is None:
+            directions = _default_direction_symbols(variables)
+        else:
+            directions = _symbols_from_variables(directions)
+        pipeline = energy_form_pipeline(
+            _expression_value(expression),
+            variables,
+            directions,
+        )
+        if orders is None:
+            return pipeline.evaluate()
+        return pipeline.evaluate(orders)
+
+    def derive_merit_forms(
+        self,
+        expression,
+        *,
+        variables=None,
+        fields=None,
+        directions=None,
+        orders=None,
+    ):
+        return self.derive_energy_forms(
+            expression,
+            variables=variables,
+            fields=fields,
+            directions=directions,
+            orders=orders,
+        )
+
+    def derive_residual_forms(self, residual, *, fields, directions=None, orders=None):
+        variables = _symbols_from_fields(fields)
+        if directions is None:
+            directions = tuple(
+                symbol
+                for field in fields
+                for symbol in trial_function(field).symbols
+            )
+        else:
+            directions = _symbols_from_fields(directions)
+        pipeline = residual_form_pipeline(
+            _residual_value(residual),
+            variables,
+            directions,
+        )
+        if orders is None:
+            return pipeline.evaluate()
+        return pipeline.evaluate(orders)
+
+    def derive_gradient_forms(self, residual, *, fields, directions=None, orders=None):
+        return self.derive_residual_forms(
+            residual,
+            fields=fields,
+            directions=directions,
+            orders=orders,
+        )
+
+    def equation_field(self, field):
+        if isinstance(field, EquationField):
+            return field
+        name = field.name if isinstance(field, SymbolicField) else str(field)
+        try:
+            return self._equation_fields_by_name[name]
+        except KeyError:
+            if isinstance(field, SymbolicField):
+                self._register_external_field(field)
+                return self._equation_fields_by_name[name]
+            raise ValueError("unknown equation field '%s'" % name)
+
+    def _register_symbolic_field(self, symbolic, components):
+        if symbolic.name in self._equation_fields_by_name:
+            raise ValueError("equation field '%s' is already registered" % symbolic.name)
+        equation_field = self._system.field(
+            symbolic.name,
+            components,
+            symbolic.family,
+            symbolic.metadata,
+        )
+        self._symbolic_fields.append(symbolic)
+        self._equation_fields_by_name[symbolic.name] = equation_field
+        return symbolic
+
+    def _register_external_field(self, symbolic):
+        if not isinstance(symbolic, SymbolicField):
+            raise TypeError("external equation fields must be symbolic fields")
+        components = math.prod(symbolic.shape) if symbolic.shape else 1
+        return self._register_symbolic_field(symbolic, components)
+
+    def _resolve_fields(self, fields):
+        return tuple(self.equation_field(field) for field in fields)
+
+
+def _symbols_from_fields(fields):
+    symbols = []
+    for field in fields:
+        if isinstance(field, (SymbolicField, ScalarField, VectorField, TensorField)):
+            symbols.extend(field.symbols)
+        elif hasattr(field, "symbols"):
+            symbols.extend(field.symbols)
+        else:
+            symbols.append(sp.sympify(field))
+    return tuple(symbols)
+
+
+def total_residual_weak_coefficients(system):
+    """Every unit's 1-form, summed on one basis: the system's whole residual.
+
+    A material may be written as several units -- Mooney-Rivlin Kelvin-Voigt is
+    an energy for the elastic response and a residual for the viscous one -- and
+    each publishes its own kernels today, accumulating into the same global
+    vector through two traversals.  That is fine for an assembly and wrong for
+    the residual merit, which must square a node's *complete* value: two
+    traversals mean the node is finished only after the second, so neither can
+    contract.  One form yields one kernel, and the kernel can contract.
+
+    Summing is exact rather than a modelling choice, and that is the point of
+    the 1-form being one object regardless of front end.  A residual unit has
+    already contracted against the test function and publishes its weak
+    coefficients directly.  An energy unit publishes the flux against its
+    staged variable, and the staged variable carries the expression that
+    *defines* it -- `F = I + grad(u)` for a deformation gradient -- so changing
+    basis is the framework restating its own definition, never an identity
+    offset assumed here.  Checked numerically on the material above: the
+    combined form and the two units evaluated apart agree exactly, with both
+    parts nonzero.
+
+    Returns one `WeakResidualCoefficients` per lowered field component, in
+    field-component order -- the same shape `coupled_residual_weak_coefficients`
+    returns, so everything downstream reads it without knowing a material had
+    more than one unit.
+    """
+    dim = system.dim
+    rows = []
+    value = {}
+    gradient = {}
+    for equation in system.equations:
+        for field in equation.fields:
+            for name in _residual_component_names(field):
+                if name not in value:
+                    rows.append(name)
+                    value[name] = sp.S.Zero
+                    gradient[name] = [sp.S.Zero] * dim
+
+    for equation in system.equations:
+        collection = system.form_collection(equation, orders=(FormOrder.ONE,))
+        if equation.is_residual:
+            for per_field in collection.coefficients:
+                for entry in per_field:
+                    value[entry.row_field] += sp.sympify(entry.value)
+                    for direction in range(dim):
+                        gradient[entry.row_field][direction] += sp.sympify(
+                            entry.gradient[direction]
+                        )
+            continue
+
+        flux = collection.forms[0].expression
+        # One group, because the line below pairs every staged variable with a
+        # definition taken from `variable_groups[0]`.  An energy staging a rate
+        # beside its gradient -- `gen.dt(u)` -- has two groups, and the pairing
+        # would run off the end of the first one's definition and substitute
+        # the wrong expression rather than fail.  No shipped material has one;
+        # saying so here is what keeps that true.
+        if len(equation.variable_groups) != 1:
+            raise NotImplementedError(
+                "the combined residual reads one variable group per energy "
+                "unit, and '%s' stages %d; pair each staged variable with its "
+                "own group's definition before lowering a merit for it"
+                % (equation.name or "<unnamed>", len(equation.variable_groups))
+            )
+        group = equation.variable_groups[0]
+        staged = tuple(equation.variables)
+        to_definition = dict(
+            zip(staged, (group.definition[index] for index in range(len(staged))))
+        )
+        names = tuple(
+            name
+            for field in equation.fields
+            for name in _residual_component_names(field)
+        )
+        # An energy's 1-form arrives as a flux contracted against the test
+        # *gradient*, one entry per component and direction, and that is all
+        # the accumulation below reads.  An energy differentiating to a term
+        # against the test value -- a reaction, a linear work -- would carry
+        # more, and dropping it would understate the residual silently, which
+        # a merit has no way to notice.  Every shipped energy is a gradient
+        # energy; this fails rather than drops if one stops being.
+        if len(flux) != len(names) * dim:
+            raise NotImplementedError(
+                "the combined residual reads an energy's 1-form as a flux "
+                "against the test gradient, expecting %d entries for '%s' and "
+                "finding %d; an energy with a test-value term needs that term "
+                "carried into `value[...]` as well"
+                % (len(names) * dim, equation.name or "<unnamed>", len(flux))
+            )
+        # The energy writes one flat gradient per field, `u_grad[i * dim + j]`;
+        # a lowered residual names the component and the direction apart.  Both
+        # spellings are ABI in their own layer, so the rename belongs here,
+        # where the two meet.
+        rename = {
+            sp.Symbol("%s_grad[%d]" % (field.name, component * dim + direction)):
+                sp.Symbol(
+                    "%s_grad_%d"
+                    % (_residual_component_names(field)[component], direction)
+                )
+            for field in equation.fields
+            for component in range(len(_residual_component_names(field)))
+            for direction in range(dim)
+        }
+        for component, name in enumerate(names):
+            for direction in range(dim):
+                gradient[name][direction] += (
+                    sp.sympify(flux[component * dim + direction])
+                    .xreplace(to_definition)
+                    .xreplace(rename)
+                )
+
+    return tuple(
+        WeakResidualCoefficients(
+            row_field=name,
+            value=value[name],
+            gradient=tuple(gradient[name]),
+        )
+        for name in rows
+    )
+
+
+def total_residual_collection(system, orders=(FormOrder.ONE,)):
+    """The system's whole residual as an ordinary residual `FormCollection`.
+
+    `total_residual_weak_coefficients` states that every unit's 1-form sums;
+    this puts the sum back into the shape a residual material arrives in, by
+    building a `CoupledResidualSystem` that holds it and running the identical
+    pipeline `_build_form_collection` runs for a hand-written residual.  The
+    result is not a special case downstream: dependencies, blocks, jacobian
+    blocks and the emitters all see a residual unit and cannot tell that the
+    material was written as an energy plus a residual.
+
+    That is the property the residual merit needs.  A merit squares a node's
+    complete value, so it has to be contracted by one kernel over one form; a
+    material whose units each publish their own kernels has no such kernel, and
+    inventing one at the emitter would mean carrying two local-block ABIs
+    through a single traversal.
+    """
+    dim = system.dim
+    coefficients = total_residual_weak_coefficients(system)
+    residual_system = CoupledResidualSystem(dim)
+    fields = tuple(
+        residual_system.add_field(entry.row_field) for entry in coefficients
+    )
+
+    # Register the material constants before the expressions are read, so the
+    # dependency scan classifies them as parameters.  Anything left over would
+    # be taken for field data, which is a runtime failure rather than a wrong
+    # number: the kernel would ask for a stream that does not exist.
+    reserved = set()
+    for field in fields:
+        reserved.update(field.current_symbols)
+        reserved.update(field.previous_symbols)
+        reserved.update(field.test_symbols)
+        reserved.update(field.direction_symbols)
+    parameters = []
+    for entry in coefficients:
+        for expression in (entry.value,) + tuple(entry.gradient):
+            for symbol in sorted(sp.sympify(expression).free_symbols, key=str):
+                if symbol not in reserved and symbol not in parameters:
+                    parameters.append(symbol)
+    if parameters:
+        residual_system.add_parameters(*parameters)
+
+    for field, entry in zip(fields, coefficients):
+        residual_system.add_residual(
+            field,
+            sp.sympify(entry.value) * field.test_value
+            + sum(
+                (
+                    sp.sympify(entry.gradient[direction]) * field.test_gradient[direction]
+                    for direction in range(dim)
+                ),
+                sp.S.Zero,
+            ),
+        )
+
+    return _residual_collection_from_system(
+        TOTAL_RESIDUAL_UNIT_NAME,
+        residual_system,
+        tuple(orders),
+        equation_fields=_distinct_equation_fields(system),
+        measure="dx",
+    )
+
+
+def _distinct_equation_fields(system):
+    """The system's fields, once each.
+
+    Units of one material share their fields -- an elastic energy and a viscous
+    residual are both written on the same displacement -- so concatenating each
+    unit's list repeats them.  The repeat is not harmless: the blocks a
+    collection publishes are named after the field pair, so `u` appearing twice
+    produces two blocks called `..._jacobian_u_u` and generation stops on the
+    duplicate.
+    """
+    seen = {}
+    for equation in system.equations:
+        for field in equation.fields:
+            seen.setdefault(field.name, field)
+    return tuple(seen.values())
+
+
+#: The unit name the combined residual is emitted under.
+#:
+#: Deliberately not "residual_merit", which is what it says but collides with
+#: the ABI naming vocabulary: a kernel name is parsed by finding its verb, and
+#: a unit whose own name contains one makes `..._residual_merit_jacobian_action`
+#: parse as the verb `merit` followed by the qualifier `jacobian_action`.  The
+#: unit name sits before the verb in every published symbol, so it has to stay
+#: out of that vocabulary.
+TOTAL_RESIDUAL_UNIT_NAME = "total"
+
+
+def _build_form_collection(system, equation, orders):
+    if equation.is_energy:
+        variables = tuple(equation.variables)
+        directions = tuple(equation.directions)
+        if FormOrder.TWO in orders and not directions:
+            directions = _default_direction_symbols(variables)
+        evaluation = energy_form_pipeline(
+            equation.define,
+            variables,
+            directions or None,
+            variable_groups=tuple(equation.variable_groups),
+        ).evaluate(orders)
+        metadata = _evaluation_metadata(
+            evaluation,
+            variables=variables,
+            directions=directions,
+        )
+        return FormCollection.from_evaluation(
+            equation.name,
+            evaluation,
+            measure=equation.measure,
+            fields=equation.fields,
+            variables=variables,
+            directions=directions,
+            qualifiers=_equation_qualifiers(equation),
+            dependencies=tuple(entry.dependencies for entry in metadata),
+            metadata=metadata,
+        )
+    if equation.is_residual:
+        residual_system = CoupledResidualSystem(system.dim)
+        equation.define(residual_system)
+        return _residual_collection_from_system(
+            equation.name,
+            residual_system,
+            orders,
+            equation_fields=equation.fields,
+            measure=equation.measure,
+            qualifiers=_equation_qualifiers(equation),
+        )
+    raise TypeError("unsupported equation form %s" % equation.form)
+
+
+def _residual_collection_from_system(
+    name,
+    residual_system,
+    orders,
+    *,
+    equation_fields,
+    measure="dx",
+    qualifiers=(),
+):
+    """A residual `CoupledResidualSystem`, lowered to its `FormCollection`.
+
+    Extracted from `_build_form_collection` so the combined residual of a
+    multi-unit material goes through the same lowering a hand-written residual
+    does, rather than a second one written beside it.  The only thing the
+    caller supplies beyond the system is what the collection is labelled with.
+    """
+    residual_vector = sp.Matrix(
+        [
+            residual_system.residual_expression(field)
+            for field in residual_system.fields
+        ]
+    )
+    variables = tuple(
+        symbol
+        for field in residual_system.fields
+        for symbol in field.variables
+    )
+    directions = tuple(
+        symbol
+        for field in residual_system.fields
+        for symbol in field.directions
+    )
+    evaluation = residual_form_pipeline(
+        residual_vector,
+        variables,
+        directions,
+    ).evaluate(orders)
+    residual_metadata = []
+    if FormOrder.ZERO in orders:
+        residual_metadata.append(FormMetadata(FormOrder.ZERO))
+    if FormOrder.ONE in orders:
+        blocks = _residual_row_blocks(residual_system, equation_fields)
+        residual_metadata.append(
+            FormMetadata(
+                FormOrder.ONE,
+                coefficients=coupled_residual_weak_coefficients(
+                    residual_system,
+                    False,
+                ),
+                dependencies=residual_system.residual_dependencies(),
+                blocks=blocks,
+            )
+        )
+    if FormOrder.TWO in orders:
+        blocks = _residual_jacobian_blocks(residual_system, equation_fields)
+        residual_metadata.append(
+            FormMetadata(
+                FormOrder.TWO,
+                coefficients=coupled_residual_weak_coefficients(
+                    residual_system,
+                    True,
+                ),
+                dependencies=residual_system.jacobian_action_dependencies(),
+                blocks=blocks,
+            )
+        )
+    blocks = tuple(
+        block
+        for metadata in residual_metadata
+        for block in metadata.blocks
+    )
+    return FormCollection.from_evaluation(
+        name,
+        evaluation,
+        measure=measure,
+        fields=equation_fields,
+        variables=variables,
+        directions=directions,
+        coefficients=tuple(
+            metadata.coefficients
+            for metadata in residual_metadata
+            if metadata.coefficients
+        ),
+        dependencies=residual_system.residual_dependencies()
+        if FormOrder.ONE in orders
+        else None,
+        blocks=blocks,
+        qualifiers=qualifiers,
+        residual_fields=tuple(residual_system.fields),
+        residual_expressions=tuple(
+            residual_system.residual_expression(field)
+            for field in residual_system.fields
+        ),
+        jacobian_action_blocks=tuple(residual_system.jacobian_blocks()),
+        parameters=tuple(residual_system.parameters or ()),
+        metadata=tuple(residual_metadata),
+    )
+
+def _residual_row_blocks(residual_system, equation_fields):
+    return tuple(
+        FormBlock(
+            FormOrder.ONE,
+            row_field=field.name,
+            expression=_residual_expression_for_equation_field(
+                residual_system,
+                field,
+            ),
+            coefficients=_residual_coefficients_for_equation_field(
+                residual_system,
+                field,
+            ),
+            dependencies=residual_system.dependencies_for_expressions(
+                _residual_component_expressions_for_equation_field(
+                    residual_system,
+                    field,
+                )
+            ),
+        )
+        for field in equation_fields
+        if _has_nonzero_expression(
+            _residual_component_expressions_for_equation_field(residual_system, field)
+        )
+    )
+
+
+def _residual_jacobian_blocks(residual_system, equation_fields):
+    component_blocks = {
+        (block.row_field, block.column_field): block.expression
+        for block in residual_system.jacobian_blocks()
+    }
+    return tuple(
+        FormBlock(
+            FormOrder.TWO,
+            row_field=row.name,
+            column_field=column.name,
+            expression=_jacobian_block_expression_for_equation_fields(
+                component_blocks,
+                row,
+                column,
+            ),
+            coefficients=_jacobian_block_coefficients_for_equation_fields(
+                residual_system,
+                component_blocks,
+                row,
+                column,
+            ),
+            dependencies=residual_system.dependencies_for_expressions(
+                _jacobian_component_expressions_for_equation_fields(
+                    component_blocks,
+                    row,
+                    column,
+                )
+            ),
+        )
+        for row in equation_fields
+        for column in equation_fields
+        if _has_nonzero_expression(
+            _jacobian_component_expressions_for_equation_fields(
+                component_blocks,
+                row,
+                column,
+            )
+        )
+    )
+
+
+def _residual_component_expressions_for_equation_field(residual_system, field):
+    return tuple(
+        residual_system.residual_expression(component_name)
+        for component_name in _residual_component_names(field)
+    )
+
+
+def _residual_expression_for_equation_field(residual_system, field):
+    return sum(
+        _residual_component_expressions_for_equation_field(residual_system, field),
+        sp.S.Zero,
+    )
+
+
+def _residual_coefficients_for_equation_field(residual_system, field):
+    return tuple(
+        weak_residual_coefficients(
+            residual_system,
+            residual_system.residual_expression(component_name),
+            component_name,
+        )
+        for component_name in _residual_component_names(field)
+    )
+
+
+def _jacobian_component_expressions_for_equation_fields(component_blocks, row, column):
+    return tuple(
+        component_blocks[(row_component, column_component)]
+        for row_component in _residual_component_names(row)
+        for column_component in _residual_component_names(column)
+    )
+
+
+def _jacobian_block_expression_for_equation_fields(component_blocks, row, column):
+    return sum(
+        _jacobian_component_expressions_for_equation_fields(component_blocks, row, column),
+        sp.S.Zero,
+    )
+
+
+def _jacobian_block_coefficients_for_equation_fields(residual_system, component_blocks, row, column):
+    column_components = _residual_component_names(column)
+    return tuple(
+        weak_residual_coefficients(
+            residual_system,
+            sum(
+                (
+                    component_blocks[(row_component, column_component)]
+                    for column_component in column_components
+                ),
+                sp.S.Zero,
+            ),
+            row_component,
+        )
+        for row_component in _residual_component_names(row)
+    )
+
+
+def _residual_component_names(field):
+    components = int(getattr(field, "components", 1))
+    if components == 1:
+        return (field.name,)
+    return tuple("%s%d" % (field.name, component) for component in range(components))
+
+
+def _is_zero_expression(expression):
+    expression = sp.sympify(expression)
+    return expression == 0 or expression.is_zero is True
+
+
+def _has_nonzero_expression(expressions):
+    return any(not _is_zero_expression(expression) for expression in expressions)
+
+
+def _equation_qualifiers(equation):
+    ret = []
+    for field in equation.fields:
+        if field.family:
+            ret.append(FormQualifier(field.name, "field_family", field.family))
+        ret.append(FormQualifier(field.name, "field_components", field.components))
+    return tuple(ret)
+
+
+def _evaluation_metadata(evaluation, *, variables=(), directions=()):
+    return tuple(
+        FormMetadata(
+            form.order,
+            dependencies=_expression_dependencies(
+                form.expression,
+                variables=variables,
+                directions=directions,
+            ),
+        )
+        for form in evaluation.forms
+    )
+
+
+def _expression_dependencies(expression, *, variables=(), directions=()):
+    free_symbols = _free_symbols(expression)
+    free_set = set(free_symbols)
+    current_symbols = tuple(symbol for symbol in _symbols_from_variables(variables) if symbol in free_set)
+    direction_symbols = tuple(symbol for symbol in _symbols_from_variables(directions) if symbol in free_set)
+    # The history stream, when the form carries a `gen.dt`.  Everything left
+    # over is a material constant, so without this the previous state's symbols
+    # would be classified as scalars a caller sets per block -- which is a
+    # runtime failure asking `require_real_value` for `u_old_grad[0]`.
+    previous_symbols = tuple(symbol for symbol in free_symbols if is_previous_symbol(symbol))
+    categorized = set(current_symbols)
+    categorized.update(direction_symbols)
+    categorized.update(previous_symbols)
+    parameters = tuple(symbol for symbol in free_symbols if symbol not in categorized)
+    return FormDependencies(
+        current=bool(current_symbols),
+        previous=bool(previous_symbols),
+        direction=bool(direction_symbols),
+        parameters=parameters,
+        current_symbols=current_symbols,
+        previous_symbols=previous_symbols,
+        direction_symbols=direction_symbols,
+        symbols=free_symbols,
+    )
+
+
+def _free_symbols(expression):
+    if isinstance(expression, sp.MatrixBase):
+        symbols = set()
+        for entry in expression:
+            symbols.update(sp.sympify(entry).free_symbols)
+        return tuple(sorted(symbols, key=str))
+    return tuple(sorted(sp.sympify(expression).free_symbols, key=str))
+
+
+def _validate_energy_variable_groups(fields, variables):
+    if variables is None:
+        raise ValueError("energy requires explicit variables")
+    field_groups = tuple(fields)
+    variable_groups = tuple(variables) if isinstance(variables, (tuple, list)) else None
+    if variable_groups is None:
+        raise TypeError("energy variables must be a tuple/list with one entry per field")
+    if len(variable_groups) < len(field_groups):
+        raise ValueError(
+            "energy variables must provide at least one differentiating variable "
+            "group per field"
+        )
+    # More groups than fields is how a rate is carried: an energy written with
+    # `gen.dt(u)` differentiates against the deformation gradient *and* its rate,
+    # both built from the same field.  `energy_variable_factors` reads how each
+    # depends on the field and the flux becomes their weighted sum, so what
+    # reaches the plans is shaped exactly as a single group's would be.
+
+
+def _symbols_from_variables(variables):
+    if variables is None:
+        return ()
+    if isinstance(variables, (SymbolicField, ScalarField, VectorField, TensorField)):
+        return tuple(variables.symbols)
+    if isinstance(variables, (tuple, list)):
+        symbols = []
+        for variable in variables:
+            symbols.extend(_symbols_from_variables(variable))
+        return tuple(symbols)
+    value = _expression_value(variables)
+    if isinstance(value, sp.MatrixBase):
+        return tuple(value)
+    if isinstance(value, sp.NDimArray):
+        return tuple(value)
+    if hasattr(variables, "symbols"):
+        return tuple(variables.symbols)
+    return (sp.sympify(variables),)
+
+
+def _default_direction_symbols(variables):
+    directions = []
+    for variable in variables:
+        name = str(variable)
+        if name.startswith("F["):
+            directions.append(sp.Symbol("d%s" % name))
+        elif "[" in name:
+            directions.append(sp.Symbol("d_%s" % name))
+        else:
+            directions.append(sp.Symbol("%s_trial" % name))
+    return tuple(directions)
+
+
+def _expression_value(expression):
+    if hasattr(expression, "value"):
+        return expression.value
+    return sp.sympify(expression)
+
+
+def _residual_value(residual):
+    if isinstance(residual, sp.MatrixBase):
+        return residual
+    if isinstance(residual, (tuple, list)):
+        return sp.Matrix([_expression_value(entry) for entry in residual])
+    return sp.Matrix([_expression_value(residual)])
+
+
+def _residual_define(define, fields, dim):
+    if callable(define):
+        return define
+    expression = _expression_value(define)
+
+    def evaluate(system):
+        if not isinstance(system, CoupledResidualSystem):
+            raise TypeError("residual expression lowering requires CoupledResidualSystem")
+        residual_fields, substitutions = _lower_residual_fields(system, fields, dim)
+        lowered = expression.xreplace(substitutions)
+        parameters = tuple(
+            symbol
+            for symbol in sorted(lowered.free_symbols.difference(system.registered_symbols()), key=str)
+            if isinstance(symbol, sp.Symbol)
+        )
+        if parameters:
+            system.add_parameters(*parameters)
+        for residual_field in residual_fields:
+            row_expression = _extract_row_weak_form(lowered, residual_field)
+            system.add_residual(residual_field, row_expression)
+
+    return evaluate
+
+
+def _lower_residual_fields(system, fields, dim):
+    residual_fields = []
+    substitutions = {}
+    for field in fields:
+        if isinstance(field, ScalarField):
+            lowered = system.add_field(
+                field.name,
+                field_name=field.name,
+                component=0,
+                components=1,
+            )
+            residual_fields.append(lowered)
+            _map_scalar_field_symbols(substitutions, field, lowered)
+        elif isinstance(field, VectorField):
+            tests = test_function(field)
+            trials = trial_function(field)
+            previous = trial_function(field, name="%s_old" % field.name)
+            for component in range(field.dim):
+                lowered = system.add_field(
+                    "%s%d" % (field.name, component),
+                    field_name=field.name,
+                    component=component,
+                    components=field.dim,
+                )
+                residual_fields.append(lowered)
+                _map_vector_component_symbols(
+                    substitutions,
+                    field,
+                    tests,
+                    trials,
+                    previous,
+                    component,
+                    lowered,
+                    dim,
+                )
+        else:
+            raise ValueError("residual expression fields must be scalar or vector fields")
+    return tuple(residual_fields), substitutions
+
+
+def _map_scalar_field_symbols(substitutions, field, lowered):
+    substitutions[field.value] = lowered.value
+    substitutions[trial_function(field).value] = lowered.direction_value
+    substitutions[test_function(field).value] = lowered.test_value
+    substitutions[trial_function(field, name="%s_old" % field.name).value] = lowered.previous_value
+    for d in range(lowered.dim):
+        substitutions[sp.Symbol("%s_grad[%d]" % (field.name, d))] = lowered.gradient[d]
+        substitutions[sp.Symbol("%s_trial_grad[%d]" % (field.name, d))] = lowered.direction_gradient[d]
+        substitutions[sp.Symbol("%s_test_grad[%d]" % (field.name, d))] = lowered.test_gradient[d]
+        substitutions[sp.Symbol("%s_old_grad[%d]" % (field.name, d))] = lowered.previous_gradient[d]
+
+
+def _map_vector_component_symbols(
+    substitutions,
+    field,
+    tests,
+    trials,
+    previous,
+    component,
+    lowered,
+    dim,
+):
+    substitutions[field[component]] = lowered.value
+    substitutions[tests[component]] = lowered.test_value
+    substitutions[trials[component]] = lowered.direction_value
+    substitutions[previous[component]] = lowered.previous_value
+    for d in range(dim):
+        flat = component * dim + d
+        substitutions[sp.Symbol("%s_grad[%d]" % (field.name, flat))] = lowered.gradient[d]
+        substitutions[sp.Symbol("%s_grad[%d]" % (tests.name, flat))] = lowered.test_gradient[d]
+        substitutions[sp.Symbol("%s_grad[%d]" % (trials.name, flat))] = lowered.direction_gradient[d]
+        substitutions[sp.Symbol("%s_grad[%d]" % (previous.name, flat))] = lowered.previous_gradient[d]
+
+
+def _extract_row_weak_form(expression, residual_field):
+    ret = sp.diff(expression, residual_field.test_value) * residual_field.test_value
+    for symbol in residual_field.test_gradient:
+        ret += sp.diff(expression, symbol) * symbol
+    return sp.simplify(ret)

@@ -1,0 +1,502 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\refcell}{\widehat{K}}
+\newcommand{\xhat}{\boldsymbol{\xi}}
+\newcommand{\flop}{\mathrm{flop}}
+\newcommand{\gradhat}{\widehat{\nabla}}
+
+\title{Sampling the residual-based merit in one pass:\\
+       a generated line-search kernel whose cost is independent\\
+       of the number of trial step lengths}
+\author{Patrick Zulian\thanks{Affiliation to be completed.}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+A globalized Newton solver evaluates a merit function at several trial step
+lengths per iteration.  When the merit is the squared residual norm
+$\tfrac12\|R(x+\alpha h)\|^2$ --- the only merit available to a formulation that
+is not the gradient of a potential --- the obvious implementation assembles the
+whole residual once per trial step, so a search over $m$ step lengths costs $m$
+assemblies.  Measured on a Mooney--Rivlin Kelvin--Voigt solid at $512{,}000$
+elements on one Grace node at $72$ threads, $m=12$ costs $11.8\times$ one
+assembly, and only $6\%$ of a merit evaluation is independent of the step
+length.
+
+We reorganize that evaluation in two steps.  First, a material written as
+several units --- here a stored energy for the elastic response and a weak
+residual for the viscous one --- has no single form to contract, because a
+squared nodal residual may not be taken until every unit has contributed.  Both
+units are $1$-forms on the same fields, so they sum, and the material's whole
+residual becomes one kernel: one traversal in place of two, worth $1.57\times$
+the element rate and $36\%$ of the time on the same node.  Second, the $m$ trial
+steps share everything upstream of the constitutive law, and what they share can
+be hoisted out of the trial-step loop exactly rather than approximately, because
+the state enters the element kernel through a quantity that is affine in
+$\alpha$.
+
+The resulting kernel produces all $m$ merit values in one pass and materializes
+no per-step residual vector --- indeed no accumulator array at all.  It works one
+node at a time, so that node's value is complete once its incident elements have
+been summed and can be squared in registers; the SIMD lanes are filled from
+within that one node's patch, first by its incident elements and then by the
+trial steps --- two sequential vector loops, never nested, the first
+precomputing everything the second would otherwise recompute.  Normalizing each
+element's orientation so the node is always the same local node makes its basis
+function the same in every lane and at every step, which is what allows those
+terms to leave both loops.  The second loop's lanes are the trial
+steps, because $m$ is a quantity the line search chooses and is therefore set to
+the hardware's vector length --- unlike the number of elements incident on a
+node, which the mesh fixes.  It is the only arrangement built.  What this is worth is bounded by the constitutive evaluation, which
+repeats per trial step by construction.  The same reorganization is already in
+place for the energy merit, and measured on the same node it costs $5.7\times$
+one step at $m=12$ for a Mooney--Rivlin-class material and $3.7\times$ for
+linear elasticity: the step-independent fraction rises from $6\%$ to $57\%$.
+That is the quantity this work moves, and we report it in preference to the
+ratio, because a material whose stress evaluation dominates pays for every step
+it samples and no arrangement of the loops can make the cost flat.
+\end{abstract}
+
+\section{Notation}
+
+Let $R:\R^n\to\R^n$ be the assembled nonlinear residual of the discrete problem,
+$x\in\R^n$ the current iterate and $h\in\R^n$ the search direction.  A line
+search asks for the merit
+\begin{equation}
+  \phi(\alpha) \;=\; \tfrac12\,\bigl\|R(x+\alpha h)\bigr\|_2^2
+  \;=\; \tfrac12 \sum_{i=1}^{n} R_i(x+\alpha h)^2
+  \label{eq:merit}
+\end{equation}
+at a prescribed set of trial step lengths $\{\alpha_k\}_{k=1}^{m}$, with $m=12$
+for \texttt{hyperelasticity\_bdf2}, $m=13$ for \texttt{MaMAL} and $m=20$ by
+default for \texttt{bench\_hyperelasticity}.
+
+The residual is a sum over the operators registered on the
+\texttt{Function},
+\begin{equation}
+  R(y) \;=\; \sum_{p\in\mathcal{P}} R_p(y),
+  \label{eq:opsum}
+\end{equation}
+and each operator assembles element-wise from a local kernel $r^e$,
+\begin{equation}
+  R_p(y) \;=\; \sum_{e\in\mathcal{E}_p} P_e^{\!\top}\, r_p^e\bigl(P_e\,y\bigr),
+  \label{eq:assembly}
+\end{equation}
+where $P_e\in\R^{N_s N_c\times n}$ is the gather of element $e$'s $N_s$ nodes and
+$N_c$ field components.
+
+\section{What is not additive, and what is}
+
+The energy merit and the residual merit differ in exactly one respect, and it
+governs the whole design.  An energy or potential is a sum of scalars, so it is
+additive over operators and over elements:
+\begin{equation}
+  E(y) = \sum_{p} E_p(y) = \sum_{p}\sum_{e} E_p^e\bigl(P_e y\bigr).
+\end{equation}
+Each element contributes a number and the numbers are summed.  The residual merit
+is not of that form.  Squaring happens \emph{after} the sum over operators and
+after the sum over elements, and squaring does not commute with either:
+\begin{equation}
+  \tfrac12\Bigl\|\sum_{p} R_p\Bigr\|^2 \;\neq\; \sum_{p}\tfrac12\bigl\|R_p\bigr\|^2,
+  \qquad
+  \tfrac12\Bigl\|\sum_{e} P_e^{\!\top} r^e\Bigr\|^2 \;\neq\; \sum_{e}\tfrac12\bigl\|r^e\bigr\|^2 .
+  \label{eq:nonadditive}
+\end{equation}
+Equation~\eqref{eq:nonadditive} is why \eqref{eq:merit} cannot be evaluated by an
+element-local reduction the way an energy can, and why no operator can compute its
+own share of it.  A node's residual is a sum over every element incident on that
+node, and the square may be taken only once that sum is complete.
+
+The consequence for the interface is that \emph{one} operator performs the
+contraction, and it must be handed everything the other operators contribute.
+We therefore split $\mathcal{P}$ into the operator $M$ whose residual moves with
+the state and the remainder $\mathcal{A}=\mathcal{P}\setminus\{M\}$ whose residuals
+do not:
+\begin{equation}
+  R(x+\alpha h) \;=\; \underbrace{\sum_{a\in\mathcal{A}} R_a}_{\textstyle g}
+  \;+\; R_M(x+\alpha h),
+  \qquad
+  \frac{\partial R_a}{\partial y} \equiv 0 \quad\forall a\in\mathcal{A}.
+  \label{eq:split}
+\end{equation}
+The vector $g\in\R^n$ --- the \emph{accumulator} --- collects the Neumann
+tractions, the body force and the constraint contributions, signs included,
+exactly as \texttt{Function::gradient} builds them.  It is assembled once per
+Newton step rather than $m$ times, which is already correct today only by
+accident: those operators are re-assembled per trial step and return the same
+numbers.  With \eqref{eq:split} the merit becomes
+\begin{equation}
+  \boxed{\;
+  \phi(\alpha_k) \;=\; \tfrac12 \sum_{i=1}^{n}
+  \Bigl( g_i + \bigl[R_M(x+\alpha_k h)\bigr]_i \Bigr)^{2}
+  \;}
+  \label{eq:contract}
+\end{equation}
+and the single operator $M$ owns its evaluation for all $k$ at once.
+
+\section{One material, several units, one form}
+\label{sec:combined}
+
+Equation~\eqref{eq:contract} assumes a single operator $M$ whose kernel produces
+$R_M$.  A material need not be written that way.  Mooney--Rivlin Kelvin--Voigt is
+two \emph{units} --- a stored-energy density for the elastic response and a weak
+residual for the viscous one --- and each publishes its own kernels, which the
+operator runs one after the other into the same vector.  Neither can contract the
+merit, for the reason of \eqref{eq:nonadditive} applied one level up: after the
+first traversal no node is finished, so nothing may be squared.
+
+The resolution is not to fuse two kernels in one traversal, which would mean
+carrying two element-kernel calling conventions through a single loop nest.  It
+is that both units are $1$-forms on the same fields, and $1$-forms add.  Writing
+$c^{(u)}_{i}$ and $\mathbf{c}^{(u)}_{i}$ for the coefficients unit $u$ contracts
+against the test value and the test gradient of component $i$,
+\begin{equation}
+  R_i(v) \;=\; \sum_{u} \Bigl( c^{(u)}_i\,v_i
+  \;+\; \mathbf{c}^{(u)}_i\!\cdot\!\nabla v_i \Bigr),
+  \label{eq:formsum}
+\end{equation}
+so the material's whole residual is one form whose coefficients are the
+componentwise sums.  A residual unit publishes its coefficients directly.  An
+energy unit publishes the flux against its staged variable, and the change of
+basis is the framework's own statement rather than an assumption: the staged
+variable carries the expression defining it, $F = I + \nabla u$ for a deformation
+gradient, so
+\begin{equation}
+  \mathbf{c}_i \;=\; \frac{\partial W}{\partial F_{i\cdot}}
+  \Bigl|_{F = I + \nabla u}
+  \;=\; \frac{\partial W}{\partial (\nabla u)_{i\cdot}} ,
+\end{equation}
+which was checked entry by entry against differentiating $W$ directly and agrees
+exactly in rational arithmetic.
+
+This is what makes the sampled merit possible at all, and it is worth something
+on its own.  The combined form is emitted as one ordinary residual unit, so one
+traversal computes what the two computed between them.  Measured on HEX8 at
+$72$ threads on a Grace node, against the two units run the way the operator runs
+them:
+
+\begin{center}
+\begin{tabular}{rrrrr}
+\toprule
+elements & dofs & two units & combined & ratio \\
+         &      & [MElem/s] & [MElem/s] & \\
+\midrule
+ 32{,}768 &   107{,}811 & 54.2 & 88.8 & 0.610 \\
+110{,}592 &   352{,}947 & 60.6 & 95.8 & 0.632 \\
+262{,}144 &   823{,}875 & 61.4 & 96.1 & 0.639 \\
+512{,}000 & 1{,}594{,}323 & 62.5 & 97.9 & 0.639 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Throughput flattens by $262{,}144$ elements, so the last two rows are saturated:
+$1.57\times$ the element rate, $36\%$ of the time removed, with the two residuals
+agreeing to $8\times10^{-16}$ relative.  The saving is the second traversal's
+gather, geometry and trial-function accumulation --- the same quantities
+Section~\ref{sec:affine} hoists out of the trial-step loop, here hoisted out of
+the unit loop.
+
+The combination is refused where it would be a second path to an existing
+answer: a material already written as one unit \emph{is} its own total residual.
+It is also refused for mixed-order systems, whose fields do not share a shape
+count, because the lowered components carry no record of which element each came
+from --- a Taylor--Hood material keeps its kernels and falls back to assembling
+per trial step.
+
+\section{The affine structure that makes one pass exact}
+\label{sec:affine}
+
+Fix an element $e$ and a quadrature point $\xhat_q$.  The element kernel reads the
+state only through the value and the reference gradient of the interpolated field,
+\begin{equation}
+  u^e_q(y) \;=\; \sum_{j=1}^{N_s} y^e_j\,\varphi_j(\xhat_q),
+  \qquad
+  \gradhat u^e_q(y) \;=\; \sum_{j=1}^{N_s} y^e_j\,\gradhat\varphi_j(\xhat_q),
+  \qquad y^e = P_e y .
+  \label{eq:interp}
+\end{equation}
+Both maps $y\mapsto u^e_q$ and $y\mapsto\gradhat u^e_q$ are \emph{linear}.  With
+$y = x + \alpha h$ this gives, exactly and for every $\alpha$,
+\begin{equation}
+  u^e_q(x+\alpha h) = u^e_q(x) + \alpha\, u^e_q(h),
+  \qquad
+  \gradhat u^e_q(x+\alpha h) = \gradhat u^e_q(x) + \alpha\, \gradhat u^e_q(h).
+  \label{eq:affine}
+\end{equation}
+The right-hand sides of \eqref{eq:affine} are two accumulations over the $N_s$
+shape functions, independent of $\alpha$.  The left-hand side is what the
+constitutive law consumes.  So the sum over shape functions in \eqref{eq:interp}
+--- the expensive part, $O(N_s\,d)$ per quadrature point per field --- is performed
+\emph{twice} in total, not $2m$ times, and each trial step recovers its own state
+with $d$ fused multiply--adds.
+
+The same argument carries through the geometric map, which is also linear:
+\begin{equation}
+  \nabla u^e_q \;=\; J_e^{-\top}\,\gradhat u^e_q
+  \quad\Longrightarrow\quad
+  \nabla u^e_q(x+\alpha h) = \nabla u^e_q(x) + \alpha\,\nabla u^e_q(h),
+\end{equation}
+so the combination may equivalently be formed in reference space before the map or
+in physical space after it.  Nothing downstream of $\nabla u^e_q$ is affine ---
+the first Piola--Kirchhoff stress $P(\nabla u)$ of a Mooney--Rivlin solid is not
+--- and nothing downstream is hoisted.  This is a redistribution of exact
+arithmetic, not a truncation: $\phi(\alpha_k)$ is the same number the per-step
+assembly computes, up to the reassociation of a sum.
+
+\section{The kernel: one node at a time, vectorized twice}
+\label{sec:kernel}
+
+The work unit is a single owned node $n$, not an element block.  Write
+$\mathcal{E}(n)$ for the elements incident on $n$, which the node-to-element
+graph supplies directly.  Then \eqref{eq:assembly} restricted to that node is a
+sum over $\mathcal{E}(n)$ and nothing else,
+\begin{equation}
+  \bigl[R_M(y)\bigr]_n \;=\; \sum_{e\in\mathcal{E}(n)} \bigl[r^e_M(P_e y)\bigr]_n ,
+  \label{eq:nodecentric}
+\end{equation}
+so the node's value is complete the moment that loop closes.  It can be squared
+on the spot, and \emph{no accumulator array exists at all}: the $m$ residuals of
+one node are $m N_c$ numbers living in registers, seeded from the accumulator
+$g$ of \eqref{eq:split} and discarded as soon as they are squared into the
+thread's $m$-slot buffer.  The patch-local node storage an element-centric
+traversal needs --- $m\,|\mathcal{N}_p|\,N_c$ words, the one structure that grew
+with $m$ --- is gone.
+
+\subsection*{Two vectorization axes, one after the other}
+
+The lanes are filled from within one node's patch: the elements of
+$\mathcal{E}(n)$, and the trial steps $\alpha_1,\dots,\alpha_m$.  What is
+deliberately \emph{not} done is to fill lanes by processing several patches at
+once; the lanes belong to one node.
+
+The two axes are two \emph{sequential} vector loops, never one inside the other.
+Nesting them is not an arrangement the hardware has: a lane loop containing
+another loop is no longer innermost and does not vectorize at all, which is the
+same measured fact the stepped objective already records from the other
+direction.  So the first loop is vectorized over the incident elements and
+computes everything independent of the trial step --- the gathers, the geometry,
+the reference gradients of the state and of the direction, the physical gradient
+of the fixed basis function, and $w_q\det J_e$ --- writing them to per-element
+buffers.  The second loop reads those buffers and does only what the trial step
+changes: the combination, the constitutive law, and the contraction.
+
+\subsection*{The orientation that pays for it}
+
+A node sits at a different local index in each of its incident elements, so the
+basis function paired with it --- the test function of \eqref{eq:formsum} ---
+would differ from lane to lane, and nothing about it could be hoisted.  Each
+element is therefore presented with its local numbering permuted so that $n$ is
+always local node $0$.  Then $\varphi_0$ is the same basis function in every lane
+and at every trial step, and everything belonging to it leaves both loops: for a
+low-order simplex $\widehat\nabla\varphi_0$ is a constant the generator emits as
+a literal rather than a table read, and $J_e^{-\top}\widehat\nabla\varphi_0$ is
+computed in the first loop and merely read in the second.
+
+The permutation is not free to be any relabelling.  It must preserve the sign of
+$\det J_e$, or the element's volume changes sign and its contribution is
+subtracted; on a simplex that restricts it to the even permutations carrying the
+chosen vertex to position $0$, which exist for every vertex.
+
+\begin{algorithm}
+\caption{Residual merit at $m$ trial steps: one node, two vector loops}
+\label{alg:kernel}
+\begin{algorithmic}[1]
+\State $s \gets 0 \in \R^{m}$ \Comment{thread-private, the only output}
+\State $\widehat\nabla\varphi_0$ \Comment{a literal: same for every node, lane and step}
+\For{each owned node $n$ (threads)}
+  \State $\rho_k \gets g_n \in \R^{N_c}$, $k=1,\dots,m$ \Comment{registers, not memory}
+  \Statex \textbf{loop 1 --- lanes are the elements of $\mathcal{E}(n)$}
+  \For{$e \in \mathcal{E}(n)$}
+    \State present $e$ with $n$ at local $0$, by an even permutation
+    \State gather $x^e,h^e$; form $\det J_e$, $\mathrm{adj}\,J_e$
+    \For{$q = 1,\dots,N_q$}
+      \State $G^e_q \gets \widehat\nabla u_q$, \; $H^e_q \gets \widehat\nabla w_q$
+      \State $T^e_q \gets J_e^{-\top}\widehat\nabla\varphi_0$, \;
+             $\omega^e_q \gets w_q \det J_e$
+    \EndFor
+  \EndFor
+  \Statex \textbf{loop 2 --- lanes are the trial steps $\alpha_k$}
+  \For{$k = 1,\dots,m$}
+    \For{$e \in \mathcal{E}(n)$, $q = 1,\dots,N_q$}
+      \State $\rho_k \mathrel{+}= \omega^e_q \,
+             P\bigl(J_e^{-\top}(G^e_q + \alpha_k H^e_q)\bigr)\, T^e_q$
+    \EndFor
+    \State $s_k \mathrel{+}= \tfrac12 \|\rho_k\|^2$ \Comment{complete by \eqref{eq:nodecentric}}
+  \EndFor
+\EndFor
+\State $\phi(\alpha_k) \gets \sum_{\text{threads}} s_k$
+\end{algorithmic}
+\end{algorithm}
+
+The second loop's lanes are the trial steps, and the reason is that $m$ is ours
+to choose.  The objection that would otherwise count against that axis --- a
+runtime count shorter than the vector width, leaving lanes idle --- does not
+apply to a quantity the line search sets: $m$ is rounded to the hardware's
+vector length, or a multiple of it.  The lanes are then uniform, always full and
+identical for every node, whereas the number of elements incident on a node is a
+property of the mesh, varies from node to node, and leaves a ragged tail no
+choice of ours can remove.
+
+Sampling more step lengths than a classical search would ask for is close to
+free in this arrangement, because the extra samples occupy lanes that would
+otherwise idle.  Rounding $m$ up to the vector width buys a finer picture of
+$\phi$ along the direction at no cost, which is a pleasant inversion of the
+usual trade.
+
+The alternatives --- lanes over the incident elements with the steps serial, and
+lanes over the flattened element-by-step product --- are not built.  Competing
+loop arrangements are normally settled here by measurement rather than by
+argument, and this one is the exception because the comparison has no contested
+regime: the step count is chosen and the incident count is not, so the
+mesh-determined axis is never the better-behaved one and building it would
+confirm that at the price of a second kernel to keep correct.
+
+What the shape costs is that an element is visited once per node it carries, so
+the constitutive evaluation $P(\nabla u)$ is performed about $N_s$ times where an
+element-centric pass performs it once and contracts it against every test
+function.  That cost is measured rather than argued.  On TET4 Mooney--Rivlin
+Kelvin--Voigt at $768{,}000$ elements on one Grace node at $72$ threads, against
+the implementation that assembles the whole residual once per trial step and
+fitted to $T(m)=a+bm$:
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+arm & $a$ [s] & $b$ [s] & $a/(a{+}b)$ & $T(12)$ [s] \\
+\midrule
+assemble per step   & $2.33\times10^{-4}$ & $3.01\times10^{-3}$ & 7.2\%  & $3.63\times10^{-2}$ \\
+patch, node-centric & $5.60\times10^{-3}$ & $1.40\times10^{-3}$ & 80.0\% & $2.22\times10^{-2}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The step-independent fraction rises from $7\%$ to $80\%$, which is the quantity
+this work exists to move and is past the $57\%$ an already-sampled energy kernel
+of comparable constitutive cost reaches.  At twelve trial steps the patch kernel
+is $1.63\times$ faster.
+
+The redundancy is in the same numbers, and it is the honest half of the result:
+at a \emph{single} step the patch kernel is $2.16\times$ slower, which is what
+visiting each element once per node costs.  That it is $2.16$ rather than
+$N_s=4$ is the scatter and the accumulator traffic it no longer pays.  The two
+cross between three and four trial steps, so the arrangement is a loss for a
+search sampling one or two points and a gain for anything sampling more --- the
+regime the interface was built for.
+
+\section{Cost model}
+
+Write $C_{\text{gath}}$ for the element gather and geometry, $C_{\text{acc}}$ for
+one trial-function accumulation \eqref{eq:interp}, $C_{\text{geo}}$ for the
+geometric map, $C_{\text{mat}}$ for the constitutive evaluation and
+$C_{\text{con}}$ for the test-function contraction, all per element.  The
+per-trial-step implementation costs
+\begin{equation}
+  T_{\text{naive}}(m) \;=\; m\,\bigl(C_{\text{gath}} + C_{\text{acc}}
+  + C_{\text{geo}} + C_{\text{mat}} + C_{\text{con}}\bigr)
+  \;+\; m\,T_{\mathcal{A}},
+\end{equation}
+where $T_{\mathcal{A}}$ is the assembly of the state-independent operators.  The
+sampling kernel costs
+\begin{equation}
+  T_{\text{samp}}(m) \;=\; C_{\text{gath}} + 2\,C_{\text{acc}}
+  \;+\; m\,\bigl(C_{\text{geo}} + C_{\text{mat}} + C_{\text{con}}\bigr)
+  \;+\; T_{\mathcal{A}},
+\end{equation}
+with $T_{\mathcal{A}}$ appearing once by \eqref{eq:split}.  The asymptotic ratio is
+\begin{equation}
+  \lim_{m\to\infty}\frac{T_{\text{samp}}(m)}{T_{\text{naive}}(m)}
+  \;=\;
+  \frac{C_{\text{geo}} + C_{\text{mat}} + C_{\text{con}}}
+       {C_{\text{gath}} + C_{\text{acc}} + C_{\text{geo}} + C_{\text{mat}} + C_{\text{con}} + T_{\mathcal{A}}/|\mathcal{E}|},
+\end{equation}
+The memory side is the sharper of the two, and it is where the patch-local
+contraction earns its keep.  Writing $n$ for the number of degrees of freedom, the
+per-trial-step implementation forms a combined iterate, assembles a residual into an
+$n$-vector and reduces it, once per step: $\Theta(m\,n)$ words written and
+$\Theta(m\,n)$ read, none of it reused.  The sampling kernel reads $x$, $h$ and $g$
+--- $3n$ words, independent of $m$ --- and writes $m$ scalars per thread.  Nothing in the sampling kernel grows with $m$ except the
+$m\,N_c$ registers holding one node's residuals, which are live for the length of
+one node's element loop.  The arithmetic above is
+therefore the honest limit: nothing in the sampling kernel becomes bandwidth-bound
+as $m$ grows.
+
+and at $m=1$ the two agree up to the one extra accumulation $C_{\text{acc}}$.  The
+measurement that settles the design is the line-search sweep over
+$m\in\{1,2,4,8,12,20\}$ reported as $T(m)/T(1)$.  Measured at $512{,}000$
+elements on one Grace node at $72$ threads with \texttt{OMP\_PROC\_BIND=true},
+and fitted to $T(m)=a+bm$ to separate the step-independent work $a$ from the
+per-step work $b$:
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\toprule
+arm & $a$ [s] & $b$ [s] & $a/(a{+}b)$ & $T(12)/T(1)$ \\
+\midrule
+linear elasticity, energy   & $1.67\times10^{-3}$ & $5.36\times10^{-4}$ & 75.7\% & 3.70 \\
+Mooney-Rivlin, energy       & $1.72\times10^{-3}$ & $1.29\times10^{-3}$ & 57.1\% & 5.75 \\
+Mooney-Rivlin KV, residual  & $5.90\times10^{-4}$ & $9.09\times10^{-3}$ & 6.1\%  & 11.78 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The last row is the target and the middle row is what a sampled kernel of
+comparable constitutive cost achieves: today $6\%$ of a residual merit
+evaluation is step-independent, against $57\%$ once the sharing is in place.
+The number to move is that fraction, not the ratio directly.
+
+\section{What is built, and what is not}
+
+The form-layer combination of Section~\ref{sec:combined} is in place: the
+material's whole residual is emitted as one kernel, and it agrees with the two
+units the operator runs to $8\times10^{-16}$ relative on $512{,}000$ elements.
+That kernel is the one the sampled merit contracts, and the measurement above is
+its floor.
+
+The sampling kernel itself is not built.  What remains is the trial-step loop
+inside the element traversal, the patch-local accumulators of
+Section~\ref{sec:kernel}, and the contraction to $m$ scalars.  The traversal
+those need is the packed one, and it does not yet exist for this kernel: the
+residual emitter's packed path is restricted to single-field systems and is
+inactive for every material in the tree, so the combined kernel currently has no
+packed variant.  Extending it to vector fields is the next step and is a
+prerequisite rather than an optimization, because the patch is what makes the
+node sums complete and therefore what makes the contraction legal at all.
+
+One case is refused rather than approximated.  A patch is built within one mesh
+block, so a node on a block boundary has incident elements the patch never sees
+and would be squared while its sum is still partial --- a merit that comes out
+too small with nothing to show for it.  Inter-block patches are the general
+answer; until they exist the sampled path refuses a multi-block space, and the
+per-step implementation, which assembles through the ordinary operator and spans
+blocks like any other assembly, continues to serve it.
+
+\section{The interface}
+
+Two predicates and one entry point express the split \eqref{eq:split} at the
+\texttt{Op} boundary:
+\begin{itemize}[nosep]
+  \item \texttt{energy\_or\_potential\_based()} --- whether this operator's
+    $0$-form is a potential, hence summable with others.  False for a residual
+    that is the gradient of nothing.
+  \item \texttt{contracts\_residual\_merit()} --- whether this operator is $M$.
+    A false answer is the promise $\partial R_a/\partial y\equiv 0$ that puts the
+    operator in $\mathcal{A}$.
+  \item \texttt{residual\_merit\_steps(x, h, nsteps, steps, accumulator, out)} ---
+    evaluates \eqref{eq:contract} for every $k$ in one pass, with
+    \texttt{accumulator} carrying $g$.
+\end{itemize}
+Because \eqref{eq:nonadditive} admits only one contractor, \texttt{add\_operator}
+keeps the contracting operator last and refuses a second one.
+
+\end{document}

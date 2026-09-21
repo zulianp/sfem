@@ -47,10 +47,10 @@ class PystencilsOpenCLFloat32Smoke:
         return "\n".join(
             (
                 "__kernel void %s(" % self.kernel_name,
-                "    __global const float *a,",
-                "    __global const float *b,",
-                "    __global float *out) {",
-                "    const int gid = get_global_id(0);",
+                "  __global const float *a,",
+                "  __global const float *b,",
+                "  __global float *out) {",
+                "  const int gid = get_global_id(0);",
                 body,
                 "}",
             )
@@ -114,7 +114,7 @@ class PystencilsOpenCLFloat32Smoke:
         result = PystencilsKernelASTAdapter(default_float_type="float32").generate_c(ast)
         if not result.success:
             raise RuntimeError("; ".join(result.diagnostics))
-        return _strip_c_block(result.lowered, indent="    ")
+        return _strip_c_block(result.lowered, indent="  ")
 
     def _find_apple_gpu_device(self, cl):
         for platform in cl.get_platforms():

@@ -593,7 +593,7 @@ int main(int argc, char *argv[]) {
         real_t step = -damping;
         if (line_search_steps > 0) {
             std::fill(line_search_values.begin(), line_search_values.begin() + line_search_steps, real_t(0));
-            if (generated_f->value_steps(
+            if (generated_f->energy_merit(
                         x->data(), increment->data(), line_search_steps, line_search_alphas.data(), line_search_values.data()) !=
                 SFEM_SUCCESS) {
                 SFEM_ERROR("Generated value_steps failed during Newton line search\n");

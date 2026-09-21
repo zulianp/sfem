@@ -9,6 +9,8 @@ namespace sfem {
     class Gradient final : public Op {
     public:
         const char *name() const override { return "Gradient"; }
+        //! rectangular: it maps a scalar field to a vector one
+        bool energy_or_potential_based() const override { return false; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t  n_dofs_domain() const override;
         ptrdiff_t  n_dofs_image() const override;

@@ -25,9 +25,6 @@ TENSOR_PRODUCT_DIA_ELEMENTS = frozenset(
 class MatrixFormat(Enum):
     CRS = "crs"
     BSR = "bsr"
-    DIA = "dia"
-    COO = "coo"
-    PATCH = "patch"
     BLOCK_DIAG_SYM = "block_diag_sym"
 
 
@@ -131,127 +128,6 @@ class BSRAssemblyPlan:
             "block_columns_per_element": self.block_columns_per_element,
             "block_entries_per_element": self.block_entries_per_element,
             "compatible_block_size": self.compatible_block_size,
-        }
-
-
-@dataclass(frozen=True)
-class DIAAssemblyPlan:
-    diagonal_offsets: str = "diagonal_offsets"
-    value_stream: str = "values"
-    element_connectivity: str = "elements"
-    mesh_access: str = "standard_block_elements"
-    pack_index_type: str = "idx_t"
-    pack_partition: str = "none"
-    packed_node_partition: str = "none"
-    value_mapping: str = "identity"
-    stride: str = "nnodes"
-    value_layout: str = "diagonal_node_block_row_major"
-    stencil_compatibility: str = "requires_stable_diagonal_structure"
-    accumulation_policy: str = "fill_diagonal_values"
-    structural_compatibility: str = "runtime_validated_diagonal_offsets"
-    reduction_policy: str = "atomic_add"
-    row_dofs_per_element: int = 0
-    values_per_element: int = 0
-
-    def to_dict(self):
-        return {
-            "kind": "dia",
-            "diagonal_offsets": self.diagonal_offsets,
-            "value_stream": self.value_stream,
-            "element_connectivity": self.element_connectivity,
-            "mesh_access": self.mesh_access,
-            "pack_index_type": self.pack_index_type,
-            "pack_partition": self.pack_partition,
-            "packed_node_partition": self.packed_node_partition,
-            "value_mapping": self.value_mapping,
-            "stride": self.stride,
-            "value_layout": self.value_layout,
-            "stencil_compatibility": self.stencil_compatibility,
-            "accumulation_policy": self.accumulation_policy,
-            "structural_compatibility": self.structural_compatibility,
-            "reduction_policy": self.reduction_policy,
-            "row_dofs_per_element": self.row_dofs_per_element,
-            "values_per_element": self.values_per_element,
-        }
-
-
-@dataclass(frozen=True)
-class COOAssemblyPlan:
-    row_index_stream: str = "rowidx"
-    column_index_stream: str = "colidx"
-    value_stream: str = "values"
-    element_connectivity: str = "elements"
-    mesh_access: str = "standard_block_elements"
-    pack_index_type: str = "idx_t"
-    pack_partition: str = "none"
-    packed_node_partition: str = "none"
-    value_mapping: str = "identity"
-    duplicate_policy: str = "deterministic_element_order_external_reduction"
-    sort_policy: str = "external_stable_sort_or_existing_sfem_coo_reduce"
-    reduction_phase: str = "non_hot_setup_phase"
-    accumulation_policy: str = "emit_triplets"
-    structural_compatibility: str = "allows_duplicates"
-    entries_per_element: int = 0
-
-    def to_dict(self):
-        return {
-            "kind": "coo",
-            "row_index_stream": self.row_index_stream,
-            "column_index_stream": self.column_index_stream,
-            "value_stream": self.value_stream,
-            "element_connectivity": self.element_connectivity,
-            "mesh_access": self.mesh_access,
-            "pack_index_type": self.pack_index_type,
-            "pack_partition": self.pack_partition,
-            "packed_node_partition": self.packed_node_partition,
-            "value_mapping": self.value_mapping,
-            "duplicate_policy": self.duplicate_policy,
-            "sort_policy": self.sort_policy,
-            "reduction_phase": self.reduction_phase,
-            "accumulation_policy": self.accumulation_policy,
-            "structural_compatibility": self.structural_compatibility,
-            "entries_per_element": self.entries_per_element,
-        }
-
-
-@dataclass(frozen=True)
-class PatchAssemblyPlan:
-    patch_graph: str = "rowptr_colidx"
-    value_stream: str = "values"
-    element_connectivity: str = "elements"
-    mesh_access: str = "standard_block_elements"
-    pack_index_type: str = "idx_t"
-    pack_partition: str = "none"
-    packed_node_partition: str = "none"
-    value_mapping: str = "identity"
-    patch_value_layout: str = "node_block_crs_block_row_major"
-    node_index_filter: bool = False
-    accumulation_policy: str = "add_scatter"
-    structural_compatibility: str = "requires_full_graph"
-    reduction_policy: str = "atomic_add"
-    row_dofs_per_patch: int = 0
-    column_dofs_per_patch: int = 0
-    entries_per_patch: int = 0
-
-    def to_dict(self):
-        return {
-            "kind": "patch",
-            "patch_graph": self.patch_graph,
-            "value_stream": self.value_stream,
-            "element_connectivity": self.element_connectivity,
-            "mesh_access": self.mesh_access,
-            "pack_index_type": self.pack_index_type,
-            "pack_partition": self.pack_partition,
-            "packed_node_partition": self.packed_node_partition,
-            "value_mapping": self.value_mapping,
-            "patch_value_layout": self.patch_value_layout,
-            "node_index_filter": self.node_index_filter,
-            "accumulation_policy": self.accumulation_policy,
-            "structural_compatibility": self.structural_compatibility,
-            "reduction_policy": self.reduction_policy,
-            "row_dofs_per_patch": self.row_dofs_per_patch,
-            "column_dofs_per_patch": self.column_dofs_per_patch,
-            "entries_per_patch": self.entries_per_patch,
         }
 
 
@@ -394,6 +270,69 @@ class MatrixFormatPlan:
             "schema_version": MATRIX_FORMAT_PLAN_SCHEMA_VERSION,
             "variants": [variant.to_dict() for variant in self.variants],
         }
+
+
+#: The formats whose scatter walks a sparsity pattern, and so must locate its
+#: columns in a row before it can write.  `block_diag_sym` is not one: its block
+#: is dense and indexed directly, so it needs no lookup.
+#:
+#: `emitters/energy_codegen.py` asked this as `"bsr" in formats or "crs" in
+#: formats or "patch" in formats`.  That third disjunct was dead -- the patch
+#: assembly format left with the scope cut and `MatrixFormat` has published only
+#: crs, bsr and block_diag_sym since -- which is the failure mode of spelling a
+#: set membership as a chain: the chain keeps naming a member that no longer
+#: exists and nothing says so.
+PATTERN_SCATTERED_FORMATS = frozenset(("crs", "bsr"))
+
+
+def pattern_scattered_formats(formats):
+    """Those of `formats` whose scatter has to find its columns first."""
+    return tuple(f for f in formats if f in PATTERN_SCATTERED_FORMATS)
+
+
+def published_matrix_formats(plan):
+    """The matrix formats this plan publishes, as the ABI spells them.
+
+    `MatrixFormatPlan.formats` answers this in the plan's own enum; what the
+    emitted names, the dispatch tables and the manifest carry is the word.  Both
+    big emitters lowered the one to the other themselves, in functions that were
+    the same code under two names -- `_matrix_formats_from_plan` in
+    `emitters/energy_codegen.py` and `_matrix_format_values` in
+    `emitters/residual_codegen.py`, differing only in what they called the local
+    list.  Two paths to one answer is one more than there should be.
+
+    The lowering they each wrote was `getattr(f, "value", str(f)).lower()`, a
+    fallback for not being sure what emission had been handed.  Here that
+    uncertainty does not exist: `MatrixAssemblyVariantPlan.__post_init__`
+    coerces every field through its enum, so a format is a `MatrixFormat` and
+    its value is already the lowercase word.
+    """
+    if plan is None or plan.is_empty:
+        return ()
+    return tuple(matrix_format.value for matrix_format in plan.formats)
+
+
+def packed_crs_passes(plan):
+    """Which passes the packed CRS assembly this plan asks for is emitted in.
+
+    The other function both emitters had written out twice, this one under the
+    same name in both files and with byte-identical bodies.
+
+    Their version also skipped a variant whose pass was ``none``.  A packed
+    variant cannot have one: `MatrixAssemblyVariantPlan.__post_init__` rejects
+    `PACKED` with `NONE` outright, which is the stronger statement and the one
+    worth keeping.
+    """
+    if plan is None or plan.is_empty:
+        return ()
+    return tuple(
+        dict.fromkeys(
+            variant.packed_pass.value
+            for variant in plan.variants
+            if variant.matrix_format is MatrixFormat.CRS
+            and variant.mesh_layout is MatrixMeshLayout.PACKED
+        )
+    )
 
 
 def matrix_format_plan_from_request(
@@ -587,8 +526,6 @@ def _matrix_fields(unit):
 
 
 def _value_writes_per_element(variant, row_layouts, column_layouts, row_dofs, entries):
-    if variant.matrix_format is MatrixFormat.DIA:
-        return max(1, row_dofs)
     if variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
         block_size = _component_block_size(row_layouts)
         if (
@@ -610,9 +547,7 @@ def _expected_bytes_per_element(variant, row_layouts, column_layouts, row_dofs, 
     scalar_bytes = 8
     index_bytes = 4
     pass_multiplier = 2 if variant.packed_pass is PackedAssemblyPass.TWO_PASS else 1
-    if variant.matrix_format is MatrixFormat.DIA:
-        output_entries = max(1, row_dofs)
-    elif variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
+    if variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
         output_entries = _value_writes_per_element(
             variant,
             row_layouts,
@@ -662,24 +597,6 @@ def _assembly_plan_for_variant(
                 * _block_count(column_dofs, column_block_size)
             ),
             compatible_block_size=compatible,
-        )
-    if variant.matrix_format is MatrixFormat.DIA:
-        dia_contract = _dia_structure_contract(row_layouts, column_layouts)
-        return DIAAssemblyPlan(
-            **mesh_contract,
-            **dia_contract,
-            row_dofs_per_element=row_dofs,
-            values_per_element=max(1, row_dofs),
-        )
-    if variant.matrix_format is MatrixFormat.COO:
-        return COOAssemblyPlan(**mesh_contract, entries_per_element=entries)
-    if variant.matrix_format is MatrixFormat.PATCH:
-        return PatchAssemblyPlan(
-            **mesh_contract,
-            node_index_filter=variant.node_index_filter,
-            row_dofs_per_patch=row_dofs,
-            column_dofs_per_patch=column_dofs,
-            entries_per_patch=entries,
         )
     if variant.matrix_format is MatrixFormat.BLOCK_DIAG_SYM:
         block_size = _component_block_size(row_layouts)
@@ -742,31 +659,6 @@ def _block_count(dofs, block_size):
     if dofs % block_size != 0:
         return dofs
     return dofs // block_size
-
-
-def _dia_structure_contract(row_layouts, column_layouts):
-    if not _single_matching_field_layout(row_layouts, column_layouts):
-        return {
-            "stencil_compatibility": "unsupported_mixed_or_asymmetric_diagonal_structure",
-            "structural_compatibility": "unsupported_mixed_or_asymmetric_diagonal_structure",
-            "reduction_policy": "not_emitted",
-        }
-
-    element_type = row_layouts[0]["element_type"].upper()
-    if element_type in SIMPLEX_AFFINE_DIA_ELEMENTS:
-        return {
-            "stencil_compatibility": "stable_simplex_affine_diagonal_offsets",
-            "structural_compatibility": "stable_simplex_affine_diagonal_offsets",
-        }
-    if element_type in TENSOR_PRODUCT_DIA_ELEMENTS:
-        return {
-            "stencil_compatibility": "stable_tensor_product_diagonal_offsets",
-            "structural_compatibility": "stable_tensor_product_diagonal_offsets",
-        }
-    return {
-        "stencil_compatibility": "runtime_validated_diagonal_offsets",
-        "structural_compatibility": "runtime_validated_diagonal_offsets",
-    }
 
 
 def _single_matching_field_layout(row_layouts, column_layouts):

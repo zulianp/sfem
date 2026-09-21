@@ -100,14 +100,97 @@ namespace sfem {
         int hessian_block_diag_sym(const real_t *const x, real_t *const values);
 
         int update(const real_t *const x);
+
+        /**
+         * @brief Whether any operator here can have its tangent stored and reapplied
+         *
+         * Any, not all. A function is a sum of operators and the split is worth
+         * taking wherever it is offered: an operator that does not support it
+         * keeps its exact apply, which is the same operator either way.
+         */
+        bool inexact_supported() const;
+
+        /**
+         * @brief Assemble the stored tangent of every operator that has one
+         *
+         * Explicit, like the per-operator call it forwards to: the tangent stays
+         * valid until the next call, so a Newton step assembles once here and
+         * then applies for every Krylov iteration. Nothing invalidates it
+         * implicitly.
+         */
+        int inexact_update(const real_t *const x);
+
+        /**
+         * @brief Apply the stored tangent, exactly where an operator has none
+         *
+         * Takes no state. An operator without a stored tangent is applied
+         * exactly, at the state its own `update` last saw -- which is why this
+         * is only correct when `inexact_update` and `update` are driven from
+         * the same `x`, as a Newton step does.
+         */
+        int inexact_apply(const real_t *const h, real_t *const out);
         int gradient(const real_t *const x, real_t *const out, const ElementScope scope = ElementScope::ALL);
         int apply(const real_t *const x,
                   const real_t *const h,
                   real_t *const       out,
                   const ElementScope  scope = ElementScope::ALL);
-        int value(const real_t *x, real_t *const out, const ElementScope scope = ElementScope::ALL);
+        /**
+         * @brief The sum of the operators' potentials at each trial step.
+         *
+         * Exists only when every operator is `energy_or_potential_based()`;
+         * otherwise it refuses, naming the operator that has no potential,
+         * because a squared residual norm and an energy are not terms of one
+         * sum.  Appending a potential -- an inertia beside a static energy --
+         * is how a material without transient terms becomes transient, and
+         * this is the merit that stays available when you do.
+         */
+        int energy_merit(const real_t       *x,
+                         const real_t       *h,
+                         const int           nsteps,
+                         const real_t *const steps,
+                         real_t *const       out);
 
-        int value_steps(const real_t *x, const real_t *h, const int nsteps, const real_t *const steps, real_t *const out);
+        /**
+         * @brief `1/2 * ||R||^2` over the residual this Function assembles, at
+         *        each trial step.
+         *
+         * Always available: every system has a residual.  The operators whose
+         * `gradient` ignores the state are assembled **once** into an
+         * accumulator, and the one operator that moves with the state is handed
+         * that accumulator and asked to finish the sum at every step -- so a
+         * twelve-point sampling line search costs close to one classical step
+         * rather than twelve assemblies of everything.
+         *
+         * The overload taking `accumulator` lets a caller own the buffer; the
+         * other allocates one lazily and keeps it.  It must hold `n_dofs()` and
+         * live in this Function's execution space.
+         */
+        int residual_merit(const real_t       *x,
+                           const real_t       *h,
+                           const int           nsteps,
+                           const real_t *const steps,
+                           real_t *const       out);
+
+        int residual_merit(const real_t       *x,
+                           const real_t       *h,
+                           const int           nsteps,
+                           const real_t *const steps,
+                           real_t *const       accumulator,
+                           real_t *const       out);
+
+        //! The merit at `x` itself: one trial step of length zero.  Both
+        //! accumulate into `out` rather than assigning, as every 0-form here
+        //! does, so a caller may sum several.
+        /**
+         * @brief Whether every operator has a potential, so `energy_merit` exists.
+         *
+         * A question, not a default: the caller still names the merit it wants.
+         * `residual_merit` needs no such guard -- every system has a residual.
+         */
+        bool has_energy_merit() const;
+
+        int energy_merit(const real_t *x, real_t *const out);
+        int residual_merit(const real_t *x, real_t *const out);
 
         int apply_constraints(real_t *const x);
         int constraints_gradient(const real_t *const x, real_t *const g);

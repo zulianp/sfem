@@ -3,6 +3,12 @@ from types import SimpleNamespace
 
 import sympy as sp
 
+from codegen.framework.plans.loperand import (
+    gradient_metric_scale,
+    loperand_matrix,
+)
+from codegen.framework.forms.weak_forms import flux_form_from_energy
+
 
 @dataclass(frozen=True)
 class GradientMetricTransformation:
@@ -49,11 +55,18 @@ class GradientMetricTransformation:
         }
 
 
-def simplex_gradient_metric_transformation(system, rule, coefficients, dependencies):
+def simplex_gradient_metric_transformation(fields, rule, coefficients, dependencies):
+    """Detect the constant-P1 simplex gradient-metric specialization.
+
+    Takes the lowered residual field records directly.  It used to take the
+    whole pre-lowering system, which is what forced the planning layer to hold
+    a back-pointer to it.
+    """
     if not _is_constant_p1_simplex_rule(rule):
         return None
-    dependencies = _gradient_metric_dependencies(system, coefficients, dependencies)
-    if len(system.fields) != 1 or len(coefficients) != 1:
+    fields = tuple(fields)
+    dependencies = _gradient_metric_dependencies(fields, coefficients, dependencies)
+    if len(fields) != 1 or len(coefficients) != 1:
         return None
     if any(dependencies.value_coefficients):
         return None
@@ -63,7 +76,7 @@ def simplex_gradient_metric_transformation(system, rule, coefficients, dependenc
         return None
 
     stream_group_name = "current" if dependencies.current_gradient else "direction"
-    field = system.fields[0]
+    field = fields[0]
     gradient_symbols = (
         field.gradient
         if stream_group_name == "current"
@@ -89,7 +102,7 @@ def simplex_gradient_metric_transformation(system, rule, coefficients, dependenc
     )
 
 
-def _gradient_metric_dependencies(system, coefficients, dependencies):
+def _gradient_metric_dependencies(fields, coefficients, dependencies):
     if hasattr(dependencies, "value_coefficients"):
         return dependencies
     free_symbols = set()
@@ -97,22 +110,22 @@ def _gradient_metric_dependencies(system, coefficients, dependencies):
         free_symbols.update(sp.sympify(coefficient.value).free_symbols)
         for expression in coefficient.gradient:
             free_symbols.update(sp.sympify(expression).free_symbols)
-    current_value = any(field.value in free_symbols for field in system.fields)
+    current_value = any(field.value in free_symbols for field in fields)
     current_gradient = any(
-        free_symbols.intersection(field.gradient) for field in system.fields
+        free_symbols.intersection(field.gradient) for field in fields
     )
     previous_value = any(
         field.previous_value is not None and field.previous_value in free_symbols
-        for field in system.fields
+        for field in fields
     )
     previous_gradient = any(
-        free_symbols.intersection(field.previous_gradient) for field in system.fields
+        free_symbols.intersection(field.previous_gradient) for field in fields
     )
     direction_value = any(
-        field.direction_value in free_symbols for field in system.fields
+        field.direction_value in free_symbols for field in fields
     )
     direction_gradient = any(
-        free_symbols.intersection(field.direction_gradient) for field in system.fields
+        free_symbols.intersection(field.direction_gradient) for field in fields
     )
     return SimpleNamespace(
         current=current_value or current_gradient,
@@ -131,6 +144,14 @@ def _gradient_metric_dependencies(system, coefficients, dependencies):
 
 
 def constant_p1_simplex_reference_gradients(rule):
+    """The constant reference gradients of a lowest-order simplex rule, or None.
+
+    `None` in, `None` out: a caller that has no rule -- because the element has
+    no constant-P1 specialisation -- asks anyway and reads the answer, rather
+    than guarding the call and making the same decision a second time.
+    """
+    if rule is None:
+        return None
     return _constant_reference_gradients(rule) if _is_constant_p1_simplex_rule(rule) else None
 
 
@@ -205,3 +226,227 @@ def _constant_reference_gradients(rule):
             row.append(sp.nsimplify(first))
         gradients.append(tuple(row))
     return tuple(gradients)
+
+
+def flux_gradient_metric_scale(flux_form):
+    """The scale `kappa` when the isolated loperand is `kappa * FFF`, else None.
+
+    Asked of a `SfemSoAFluxForm` -- the object both front ends reach.  An energy
+    formulation gets there by differentiating its density; a residual
+    formulation by differentiating out its test function.  Asking it here, of
+    the flux, is what makes the answer a property of the operator rather than of
+    how the material was written.
+
+    It used to be asked as "is the flux a uniform scalar multiple of the field
+    gradient", which is true of the Laplacian and of nothing else, so the metric
+    path reached exactly one operator by construction.  It is asked of the
+    loperand now -- `plans.loperand` isolates the matrix the element's operator
+    contracts the reference gradient with, and this recognises the shape the
+    six-stream ABI carries.  Same answer for the same operators, and a shape
+    that can find others: the isolated matrix carries whatever the flux does,
+    material parameters included, so an element-varying coefficient rides in it
+    rather than disqualifying it.
+
+    A deformation gradient is rejected outright: its variable is `I + grad(u)`,
+    so the map is not the gradient metric even when it is linear.
+    """
+    if flux_form is None or flux_form.is_deformation_gradient:
+        return None
+    if not tuple(flux_form.gradient):
+        return None
+    if flux_form.has_source:
+        # Something contracts against the test value, so the element integral
+        # is not `grad(v) . flux` alone and does not factor through the metric.
+        return None
+    return gradient_metric_scale(loperand_matrix(flux_form))
+
+
+def energy_gradient_metric_scale(weak_form):
+    """The same question asked of an energy density.
+
+    Kept as its own entry point because that is what the energy emitter holds,
+    and because the two guards below are about the weak form rather than the
+    flux: a form with no gradient variables has no flux to ask about.
+
+    The compact metric kernel contracts a P1 simplex element through
+    `FFF * grad`, six symmetric components instead of nine adjugate ones and a
+    determinant.  It is available exactly when the flux is a uniform scalar
+    multiple of the field gradient, because only then does the contraction
+    factor through the metric: a hyperelastic first Piola depends on the
+    gradient nonlinearly and cannot.
+
+    The residual path detects the same specialization from its lowered field
+    records, in `simplex_gradient_metric_transformation`.  An energy has no such
+    records -- it has a weak form -- so the question is asked of the flux
+    directly, which is the one thing both formulations agree on.
+
+    Returns the scale as a SymPy expression, so the emitter can carry it, or
+    None when the specialization does not apply.  A deformation gradient is
+    rejected outright: its variable is `I + grad(u)`, so the flux is not a
+    multiple of the gradient even when it is linear in it.
+    """
+    if weak_form is None or getattr(weak_form, "is_deformation_gradient", True):
+        return None
+    if not tuple(getattr(weak_form, "deformation_gradient", ()) or ()):
+        return None
+    return flux_gradient_metric_scale(flux_form_from_energy(weak_form))
+
+
+@dataclass(frozen=True)
+class CachedMetricGeometry:
+    """The geometry a form takes when its contraction factors through `FFF`.
+
+    `scale` multiplies the metric: for `kappa/2 * ||grad u||^2` it is `kappa`.
+    `metric_components` is how many symmetric entries the ABI carries, which is
+    what makes this six streams where the adjugate is nine and a determinant.
+    """
+
+    dim: int
+    scale: object
+
+    @property
+    def metric_components(self):
+        return symmetric_metric_component_count(self.dim)
+
+
+def cached_metric_geometry(weak_form, rule):
+    """Whether this form reads a cached metric rather than the adjugate.
+
+    The geometry a kernel takes follows what its contraction needs, not which
+    `add_*` call the material used.  Two conditions, and both are properties of
+    the lowered form: the element must be a constant-P1 simplex, so the metric
+    can be cached per element; and the flux must be a uniform scalar multiple of
+    the field gradient, so that `grad(v) . flux` factors as `B^T (kappa*FFF) B`.
+
+    The residual path asks the same question through
+    `simplex_gradient_metric_transformation`, from its lowered field records.
+    This asks it of the flux, which is what an energy has.  Both must answer the
+    same way for the same operator, which is what makes the choice a property of
+    the form rather than of the formulation.
+
+    Only the affine variant can use the answer.  An isoparametric kernel builds
+    its geometry from coordinates and holds an adjugate, not a cached metric, so
+    the two modes need different kernels rather than different arguments.
+    """
+    if rule is None or not _is_constant_p1_simplex_rule(rule):
+        return None
+    scale = energy_gradient_metric_scale(weak_form)
+    if scale is None:
+        return None
+    return CachedMetricGeometry(dim=int(rule.dim), scale=scale)
+
+
+def metric_value_scale(weak_form):
+    """The scale when the energy is exactly `scale/2 * ||grad u||^2`, else None.
+
+    The metric-based 0-form evaluates the element energy as
+    `scale/2 * g^T FFF g`, and that identity holds only for the quadratic
+    invariant: `FFF` is `J^-1 J^-T det J`, which contracts two gradients and
+    can express nothing else.
+
+    This cannot be inferred from `flux_gradient_metric_scale`.  Adding a
+    constant to an energy density leaves its flux untouched, so a form whose
+    metric-based gradient is valid can have a value that is not, and the
+    difference would show up as a 0-form that is wrong by a constant times the
+    element measure -- which the gradient tests would never catch.  So the
+    question is asked of the density itself.
+    """
+    if weak_form is None or getattr(weak_form, "is_deformation_gradient", True):
+        return None
+    scale = energy_gradient_metric_scale(weak_form)
+    if scale is None:
+        return None
+    variables = tuple(getattr(weak_form, "deformation_gradient", ()) or ())
+    quadratic = scale / 2 * sum((variable ** 2 for variable in variables), sp.Integer(0))
+    if sp.simplify(sp.expand(weak_form.energy_density - quadratic)) != 0:
+        return None
+    return scale
+
+
+#: How large an argument this will expand before giving up.  Expanding a
+#: determinant of a 3x3 costs nothing; expanding an arbitrary logarithm's
+#: argument could cost a great deal, and a rewrite that is not worth its
+#: compile time is not worth doing.
+_LOG1P_EXPANSION_BUDGET = 512
+
+
+def _cancel_constants(expression):
+    """Expand the sums whose constant term is about to cancel against the rest.
+
+    `I1 - dim` is the case in every hyperelastic density: `I1` is
+    `trace(F^T F)`, which for a deformation gradient is `dim` plus something
+    small, so forming it and subtracting `dim` keeps only the bits above eps
+    relative to `dim`.  Expanded in the displacement gradient the constant is
+    gone -- `2 tr(G) + ||G||^2` -- and nothing is lost.
+
+    Expanding only the sums that carry a constant, rather than the whole
+    density, keeps this targeted: an expansion that cancels no constant buys no
+    accuracy and costs expression size.
+    """
+    additions = expression.atoms(sp.Add) if hasattr(expression, "atoms") else ()
+    replacements = {}
+    for node in additions:
+        constant = node.as_coeff_Add()[0]
+        if constant == 0 or sp.count_ops(node) > _LOG1P_EXPANSION_BUDGET:
+            continue
+        expanded = sp.expand(node)
+        if abs(expanded.as_coeff_Add()[0]) < abs(constant):
+            replacements[node] = expanded
+    if not replacements:
+        return expression
+    return expression.xreplace(replacements)
+
+
+def stabilise_constant_cancellation(expression):
+    """Both halves of the fix, which only work together.
+
+    Measured against exact arithmetic on the neo-Hookean density at a strain of
+    1e-3, the relative error is 1.07e-11 as emitted, 1.07e-11 with the
+    logarithm alone and 3.68e-12 with the expansion alone -- each masked by the
+    other, because the two cancellations are in series and their errors are
+    comparable.  Together they give 1.53e-14, and the gain grows as the strain
+    falls: 6e3 times at 1e-4 and 6e4 at 1e-5.  Fixing one alone is worth
+    nothing, which is why this is one function rather than two.
+    """
+    return stabilise_logs_near_one(_cancel_constants(expression))
+
+
+def stabilise_logs_near_one(expression):
+    """Rewrite `log(X)` as `log1p(X - 1)` wherever `X` expands to `1 + small`.
+
+    A hyperelastic density asks for `log(det F)`, and a deformation gradient is
+    the identity plus a displacement gradient, so `det F` lands near 1.  Forming
+    it and then taking the logarithm throws away everything below eps relative
+    to 1, which is most of the answer when the strain is small: measured against
+    exact arithmetic the density's relative error is 1.2e-11 at a strain of
+    1e-3, rising as the square of the cancellation ratio, and that is the floor
+    an energy-based line search reads round-off against.
+
+    The rewrite is algebraically an identity and `log1p` is never less accurate
+    than `log(1 + x)`, so it is applied whenever the constant term is exactly 1
+    rather than gated on a guess about magnitudes.
+
+    Two things decide where this runs.  It has to see the *displacement*
+    gradient: recovering it from an already-formed `F` is worth almost nothing,
+    because `1 + G_ii` has rounded away the bits the rewrite exists to keep --
+    measured, 5.5e-14 against 6.8e-17 for the same strain.  And it has to run
+    before common subexpression elimination, or the `+ 1` is already behind a
+    temporary and the constant term is no longer visible.
+
+    Nothing about deformation gradients is named here.  A logarithm of something
+    that expands to `1 + small` has this problem whatever produced it, and
+    `det(I + G)` is recognised by the arithmetic rather than by a qualifier.
+    """
+    logs = expression.atoms(sp.log) if hasattr(expression, "atoms") else ()
+    replacements = {}
+    for node in logs:
+        argument = node.args[0]
+        if sp.count_ops(argument) > _LOG1P_EXPANSION_BUDGET:
+            continue
+        expanded = sp.expand(argument)
+        constant, rest = expanded.as_coeff_Add()
+        if constant == 1 and rest != 0:
+            replacements[node] = sp.Function('sfem_log1p')(rest)
+    if not replacements:
+        return expression
+    return expression.xreplace(replacements)

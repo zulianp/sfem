@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 
 
 @dataclass(frozen=True)
@@ -166,6 +166,61 @@ def kernel_diagnostics_plan_from_plan(
     return KernelDiagnosticsPlan(operator_prefix, kind, tuple(entries))
 
 
+def reference_data_traffic(entries):
+    """Split a kernel's reference arrays into basis scalars and weights.
+
+    Two of the numbers every `KernelDiagnostics` record carries, and the split
+    between them is on the `q_weight` name prefix -- which is ABI, set by
+    `fem.reference.sfem_reference_data`, and so belongs beside the plan that
+    reads it rather than being re-spelled wherever a record is built.
+    """
+    return (
+        sum(len(entry.values) for entry in entries
+            if not entry.name.startswith("q_weight")),
+        sum(len(entry.values) for entry in entries
+            if entry.name.startswith("q_weight")),
+    )
+
+
+def energy_reference_data_traffic(rule, reference_inputs, n_qp):
+    """The same two numbers for an energy kernel, which counts differently.
+
+    An energy kernel reads only the reference arrays its own signature takes,
+    so the non-tensor-product count is over `reference_inputs` -- a kernel that
+    never reads `shape` is not charged for it -- while a tensor-product one
+    reads the 1D tables whole and counts them from the rule.
+
+    Those are two different measures and both are wanted; what was wrong is
+    that `emitters/energy_codegen.py` chose between them by asking the *basis
+    family*, which is a question the rule answers about itself.
+    `sfem_reference_data` branches on `rule.is_tensor_product` internally and
+    returns the 1D tables for exactly these elements.
+
+    That the two agree where they overlap was measured, not assumed: for HEX8,
+    QUAD4, PROTEUS_HEX8 and HEX27 the rule's own split gives the same pair this
+    branch computes -- (8, 2) for the first three and (18, 3) for HEX27.  The
+    non-tensor-product branch is deliberately left counting the kernel's inputs,
+    because it is the more accurate of the two and nothing here should quietly
+    start charging a kernel for a table it does not read.
+
+    `reproducibility --all` would not catch a mistake here -- it compares kernel
+    *answers*, and a diagnostics number is not one -- but byte-identity of the
+    regenerated tree does, because the record is emitted as literal integers
+    into the operator source.  That is a narrower gate than it sounds: it holds
+    a number steady, it does not say the number is right.
+    """
+    if rule.is_tensor_product:
+        return (
+            len(rule.tensor_product_shape_values_1d)
+            + len(rule.tensor_product_shape_gradients_1d),
+            len(rule.tensor_product_weights_1d),
+        )
+    return (
+        sum(array_input.size for array_input in reference_inputs),
+        n_qp,
+    )
+
+
 def validate_diagnostics_plan_names(plan, expected_names):
     if plan is None:
         return None
@@ -230,7 +285,7 @@ def _residual_diagnostics_entries(
     if residual_plan is not None:
         entries.append(
             _entry_from_expression_plan(
-                "%s_residual_element_soa" % operator_prefix,
+                "%s_residual_esoa" % operator_prefix,
                 residual_plan,
                 mesh_signature,
                 local_by_order,
@@ -254,7 +309,7 @@ def _residual_diagnostics_entries(
     if action_plan is not None:
         entries.append(
             _entry_from_expression_plan(
-                "%s_jacobian_action_element_soa" % operator_prefix,
+                "%s_jacobian_action_esoa" % operator_prefix,
                 action_plan,
                 mesh_signature,
                 local_by_order,
@@ -281,9 +336,21 @@ def _boundary_diagnostics_entries(unit, operator_prefix, mesh_signature, local_b
 
 
 def _diagnostic_block_names(unit, action_plan):
-    system = getattr(unit.form_collection, "source", None)
-    if system is not None and hasattr(system, "jacobian_blocks"):
-        return tuple(block.name for block in system.jacobian_blocks())
+    """Names of the Jacobian-action blocks, in field order.
+
+    Read from the form collection's own 2-form block metadata.  This used to
+    call `jacobian_blocks()` on the pre-lowering system through
+    `FormCollection.source`; the blocks carry the same names and are already
+    part of the lowered collection.
+    """
+    collection = unit.form_collection
+    try:
+        blocks = collection.blocks_for(FormOrder.TWO)
+    except (AttributeError, ValueError):
+        blocks = ()
+    names = tuple(block.name for block in blocks if getattr(block, "name", ""))
+    if names:
+        return names
     names = tuple(getattr(block, "name", str(block)) for block in action_plan.blocks)
     if names:
         return names
@@ -320,3 +387,51 @@ def _entry_from_expression_plan(
         reference_dataset=reference_dataset,
         block_name=block_name,
     )
+
+
+# ---------------------------------------------------------------------------
+# Cost of a residual kernel's diagnostic entries.
+#
+# Every generated kernel carries FLOP and arithmetic-intensity reporting, which
+# the PRD asks for so performance analyses can be produced automatically.  The
+# numbers come from the scheduling layer's cost model, and choosing which
+# kernels are measured and under which temporary naming is a planning decision.
+#
+# Both residual emitters computed these inline, with the same three call shapes
+# written out twice -- once in the coupled path and once in the mixed one.  The
+# temporary prefixes matter: they name the intermediates in the scheduled graph
+# and so feed into the cost, which is why they are fixed here rather than left
+# to each caller.
+# ---------------------------------------------------------------------------
+
+
+def residual_diagnostic_cost(system):
+    """Cost of evaluating the residual for one element."""
+    from codegen.framework.plans.scheduling import build_residual_graph
+
+    return build_residual_graph(system, "residual_diagnostics_tmp").cost
+
+
+def jacobian_action_diagnostic_cost(system):
+    """Cost of applying the Jacobian to one element's worth of data.
+
+    This is the matrix-free apply, the kernel the framework exists to make
+    fast, so its cost is the number most worth reporting accurately.
+    """
+    from codegen.framework.plans.scheduling import build_jacobian_action_graph
+
+    return build_jacobian_action_graph(
+        system, temporary_prefix="jacobian_action_diagnostics_tmp"
+    ).cost
+
+
+def jacobian_block_diagnostic_cost(system, block):
+    """Cost of one row/column block of the Jacobian action."""
+    from codegen.framework.symbolic.core import KernelExpressions
+    from codegen.framework.plans.scheduling import build_expression_graph
+
+    return build_expression_graph(
+        KernelExpressions().jacobian_action(block.expression, block.name),
+        data_symbols=system.jacobian_action_data_symbols(),
+        temporary_prefix="%s_diagnostics_tmp" % block.name,
+    ).cost

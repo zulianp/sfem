@@ -130,6 +130,8 @@ list(APPEND SFEM_MODULES
     frontend/constraints
     frontend/ops
     frontend/ops/generated
+    frontend/ops/generated/body_force
+    frontend/ops/generated/body_force/op
     frontend/ops/generated/laplace
     frontend/ops/generated/laplace/op
     frontend/ops/generated/linear_elasticity
@@ -138,8 +140,8 @@ list(APPEND SFEM_MODULES
     frontend/ops/generated/saint_venant_kirchhoff/op
     frontend/ops/generated/neohookean_ogden
     frontend/ops/generated/neohookean_ogden/op
-    frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark
-    frontend/ops/generated/mooney_rivlin_kelvin_voigt_newmark/op
+    frontend/ops/generated/mooney_rivlin_kelvin_voigt
+    frontend/ops/generated/mooney_rivlin_kelvin_voigt/op
     frontend/ops/generated/two_phase_flow
     frontend/ops/generated/two_phase_flow/op
     frontend/mesh
@@ -176,6 +178,20 @@ if(SFEM_ENABLE_CUDA)
         operators/tet4/cuda
         resampling/surface/cuda
         resampling/quadshell4/cuda
+        ssmg/cuda
+        frontend/ops/cuda
+        # The generated device tree, laid out the way the hand-written one is:
+        # a local `cuda/` folder beside the host sources it mirrors.  These are
+        # the folders whose files are included by bare name and so need to be
+        # on the include path; the kernels below them include by relative path
+        # and are swept up by the recursive glob further down.
+        frontend/ops/generated/cuda
+        frontend/ops/generated/body_force/op/cuda
+        frontend/ops/generated/laplace/op/cuda
+        frontend/ops/generated/linear_elasticity/op/cuda
+        frontend/ops/generated/neohookean_ogden/op/cuda
+        frontend/ops/generated/mooney_rivlin_kelvin_voigt/op/cuda
+        frontend/ops/generated/two_phase_flow/op/cuda
     )
 
     if(SFEM_ENABLE_AMG)
@@ -206,8 +222,32 @@ file(GLOB_RECURSE SFEM_GENERATED_SOURCES CONFIGURE_DEPENDS
      "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cpp")
 file(GLOB_RECURSE SFEM_GENERATED_HEADERS CONFIGURE_DEPENDS
      "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.hpp")
+
+# The device tree's wrappers are `.cpp` -- host C++ that launches device kernels
+# -- so this glob sweeps them up whether or not CUDA is enabled.  They cannot do
+# anything in a build without it: they allocate device buffers, stage to the
+# device and dispatch to `cu_` entry points that live in the `.cu` files the
+# glob below only collects when CUDA is on.  Compiling them anyway meant a
+# host-only build depended on the device runtime being on the include path.
+if(NOT SFEM_ENABLE_CUDA)
+    list(FILTER SFEM_GENERATED_SOURCES EXCLUDE REGEX "/generated/.*/cuda/")
+    list(FILTER SFEM_GENERATED_HEADERS EXCLUDE REGEX "/generated/.*/cuda/")
+endif()
 list(APPEND SFEM_SOURCES ${SFEM_GENERATED_SOURCES})
 list(APPEND SFEM_HEADERS ${SFEM_GENERATED_HEADERS})
+
+# The generated device tree.  The per-module glob above walks SFEM_MODULES and
+# the generated tree is not one of them, so without this no generated `.cu`
+# reaches the build however correct it is.  Recursive, because the generated
+# tree nests by dimension and element rather than by module.
+if(SFEM_ENABLE_CUDA)
+    file(GLOB_RECURSE SFEM_GENERATED_KERNEL_SOURCES CONFIGURE_DEPENDS
+         "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cu")
+    file(GLOB_RECURSE SFEM_GENERATED_KERNEL_HEADERS CONFIGURE_DEPENDS
+         "${CMAKE_CURRENT_SOURCE_DIR}/frontend/ops/generated/*.cuh")
+    list(APPEND SFEM_KERNEL_SOURCES ${SFEM_GENERATED_KERNEL_SOURCES})
+    list(APPEND SFEM_KERNEL_HEADERS ${SFEM_GENERATED_KERNEL_HEADERS})
+endif()
 
 list(REMOVE_DUPLICATES SFEM_SOURCES)
 list(REMOVE_DUPLICATES SFEM_HEADERS)

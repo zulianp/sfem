@@ -11,6 +11,12 @@ class KernelASTNodeKind(str, Enum):
     SCATTER = "scatter"
     GEOMETRY = "geometry"
     LOCAL_COMPUTATION = "local_computation"
+    FUNCTION_DEF = "function_def"
+    RAW_LINES = "raw_lines"
+    BLOCK = "block"
+    LOOP_HEADER = "loop_header"
+    RETURN = "return"
+    IF = "if"
 
 
 class GeometryNodeKind(str, Enum):
@@ -166,7 +172,7 @@ class BufferAccess:
 @dataclass(frozen=True)
 class VectorizationStrategy:
     name: str = "simd_lane"
-    vector_width_symbol: str = "VECTOR_SIZE"
+    vector_width_symbol: str = "VS"
     lane_index: str = "lane"
 
     def to_dict(self):
@@ -319,9 +325,21 @@ class BufferDeclNode:
 
 @dataclass(frozen=True)
 class CallNode:
+    """A call, optionally with its arguments on a continuation line.
+
+    ``wrap_arguments`` is a formatting concession and worth naming as one.
+    Layout belongs to the printer, not to the IR; this flag is here because
+    the tensor-product body emits every one of its helper calls wrapped -- the
+    callee at the statement indent, the arguments eight columns further in --
+    and reproducing that exactly is what lets the migration be proven by
+    byte-identity rather than by reading the diff.  When the printer grows a
+    real line-breaking policy this flag should go with it.
+    """
+
     callee: SymbolRef
     arguments: tuple = ()
     template_arguments: tuple = ()
+    wrap_arguments: bool = False
     kind: KernelASTNodeKind = field(default=KernelASTNodeKind.CALL, init=False)
 
     def __post_init__(self):
@@ -423,6 +441,181 @@ class LocalComputationNode:
             "output_name": self.output_name,
             "statement_count": len(tuple(getattr(self.evaluation_plan, "statements", ()))),
             "cost": None if self.cost is None else _cost_to_dict(self.cost),
+        }
+
+
+@dataclass(frozen=True)
+class IfNode:
+    """A conditional, with an optional else branch.
+
+    Control flow a kernel IR needs on its own merits -- a scatter that has to
+    locate its entry, a boundary term that applies on some faces, a variant
+    that guards a fast path.  ``inline_body`` prints the then-branch on the
+    same line as the condition, which is how the emitters spell a single-
+    statement guard such as ``if (!ok) return SFEM_FAILURE;``.
+    """
+
+    condition: object
+    body: tuple = ()
+    orelse: tuple = ()
+    inline_body: bool = False
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.IF, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "condition", _as_expr(self.condition))
+        object.__setattr__(self, "body", tuple(self.body))
+        object.__setattr__(self, "orelse", tuple(self.orelse))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "condition": _entity_to_dict(self.condition),
+            "body": [_entity_to_dict(node) for node in self.body],
+            "orelse": [_entity_to_dict(node) for node in self.orelse],
+        }
+
+
+@dataclass(frozen=True)
+class ReturnNode:
+    """A return, with or without a value.
+
+    The scatter helpers report whether they found every entry they needed, so
+    they return a status rather than being void.  Nothing in the IR could say
+    that, which is why those kernels stayed text.
+    """
+
+    value: object = None
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.RETURN, init=False)
+
+    def __post_init__(self):
+        if self.value is not None:
+            object.__setattr__(self, "value", _as_expr(self.value))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "value": None if self.value is None else _entity_to_dict(self.value),
+        }
+
+
+@dataclass(frozen=True)
+class BlockNode:
+    """A braced scope with no loop of its own.
+
+    A target whose lowering policy sets ``emits_lane_loop = False`` -- CUDA,
+    where the lane is a thread rather than an iteration -- opens a bare
+    ``{`` where a CPU target opens a lane loop.  Without this node that shape
+    had no representation, so the whole loop nest fell back to pre-rendered
+    text on exactly the targets the IR exists to serve.
+    """
+
+    body: tuple = ()
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.BLOCK, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "body", tuple(self.body))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "body": [_entity_to_dict(node) for node in self.body],
+        }
+
+
+@dataclass(frozen=True)
+class LoopHeaderNode:
+    """Just the opening lines of a loop, with the closing brace left to the caller.
+
+    This exists to make an old implicit behaviour explicit.  ``LoopNode``
+    used to omit its closing brace whenever its body was empty, and five call
+    sites relied on that to use it as a header generator while they built the
+    body as lines and wrote the matching ``}`` by hand.  The cost was that a
+    genuinely empty loop silently emitted unbalanced braces, and nothing in
+    the IR distinguished "I want only the header" from "this loop has no
+    statements".
+
+    Wrapping the loop says which one is meant, so ``LoopNode`` can always
+    close what it opens.  Every use of this node is a body that has not
+    migrated; when one does, the wrapper goes away with it.
+    """
+
+    loop: object
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.LOOP_HEADER, init=False)
+
+    def to_dict(self):
+        return {"kind": self.kind.value, "loop": _entity_to_dict(self.loop)}
+
+
+@dataclass(frozen=True)
+class FunctionDefNode:
+    """A whole kernel: its signature and its body as one tree.
+
+    Until this node existed a kernel was half a tree -- the body could be IR
+    while the template line, qualifier and parameter list stayed string
+    concatenation in the emitter, which meant no pass could see or rewrite a
+    kernel as a unit.  The qualifier comes from the target at print time, so a
+    function printed for CUDA carries ``__host__ __device__`` without the
+    emitter deciding anything.
+
+    ``params`` are rendered strings rather than typed entities.  A parameter
+    IR is a separate subsystem, and carrying pre-rendered declarations is what
+    keeps this node small enough to introduce under a byte-identity gate.
+    """
+
+    name: str
+    params: tuple = ()
+    body: tuple = ()
+    return_type: str = "void"
+    qualifier: str = ""
+    template_params: tuple = ()
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.FUNCTION_DEF, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "params", tuple(self.params))
+        object.__setattr__(self, "body", tuple(self.body))
+        object.__setattr__(self, "template_params", tuple(self.template_params))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "name": self.name,
+            "return_type": self.return_type,
+            "qualifier": self.qualifier,
+            "template_params": list(self.template_params),
+            "params": list(self.params),
+            "body": [_entity_to_dict(node) for node in self.body],
+        }
+
+
+@dataclass(frozen=True)
+class RawLinesNode:
+    """Pre-rendered text that has not been migrated to the IR yet.
+
+    An explicit escape hatch, and deliberately an ugly one.  It lets a kernel
+    be a ``FunctionDefNode`` before its body is nodes, so the IR becomes the
+    spine of every kernel immediately rather than only of the few bodies that
+    have been converted -- and it marks exactly what is left, which a ratchet
+    counts and drives down.
+
+    Unlike every other node, it prints its lines **verbatim and ignores the
+    indent it is given**: the text it carries was written with its own
+    absolute indentation baked in, which is precisely the property that makes
+    it un-migrated.  ``reason`` says what it is waiting on, so the remaining
+    ones stay legible instead of becoming anonymous debt.
+    """
+
+    lines: tuple = ()
+    reason: str = ""
+    kind: KernelASTNodeKind = field(default=KernelASTNodeKind.RAW_LINES, init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "lines", tuple(self.lines))
+
+    def to_dict(self):
+        return {
+            "kind": self.kind.value,
+            "line_count": len(self.lines),
+            "reason": self.reason,
         }
 
 
