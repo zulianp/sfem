@@ -74,30 +74,36 @@ namespace sfem {
         const ptrdiff_t ndofs = impl_->space->n_dofs();
 
         if (!impl_->mass) {
-            // The lumped mass is assembled on the host, because `LumpedMass` is
-            // a host operator, and then moved to wherever this one runs.  It is
-            // built once, so the transfer is once too.
-            auto host_mass = create_host_buffer<real_t>(ndofs);
-            LumpedMass lumped_mass(impl_->space);
-            if (lumped_mass.initialize(block_names) != SFEM_SUCCESS) {
-                return SFEM_FAILURE;
-            }
+            // Zero density contributes nothing; skip assembly so quasi-static
+            // runs (e.g. SFEM_RHO=0) do not require an element mass kernel.
+            if (impl_->density == real_t(0)) {
+                impl_->mass = create_buffer<real_t>(ndofs, impl_->es);
+            } else {
+                // The lumped mass is assembled on the host, because `LumpedMass` is
+                // a host operator, and then moved to wherever this one runs.  It is
+                // built once, so the transfer is once too.
+                auto host_mass = create_host_buffer<real_t>(ndofs);
+                LumpedMass lumped_mass(impl_->space);
+                if (lumped_mass.initialize(block_names) != SFEM_SUCCESS) {
+                    return SFEM_FAILURE;
+                }
 
-            if (lumped_mass.hessian_diag(nullptr, host_mass->data()) != SFEM_SUCCESS) {
-                return SFEM_FAILURE;
-            }
+                if (lumped_mass.hessian_diag(nullptr, host_mass->data()) != SFEM_SUCCESS) {
+                    return SFEM_FAILURE;
+                }
 
-            if (impl_->density != real_t(1)) {
-                sfem::blas<real_t>(EXECUTION_SPACE_HOST)
-                        ->scal(ndofs, impl_->density, host_mass->data());
-            }
+                if (impl_->density != real_t(1)) {
+                    sfem::blas<real_t>(EXECUTION_SPACE_HOST)
+                            ->scal(ndofs, impl_->density, host_mass->data());
+                }
 
-            impl_->mass = host_mass;
+                impl_->mass = host_mass;
 #ifdef SFEM_ENABLE_CUDA
-            if (impl_->es == EXECUTION_SPACE_DEVICE) {
-                impl_->mass = smesh::to_device(host_mass);
-            }
+                if (impl_->es == EXECUTION_SPACE_DEVICE) {
+                    impl_->mass = smesh::to_device(host_mass);
+                }
 #endif
+            }
         }
 
         if (!impl_->u_hat) {
