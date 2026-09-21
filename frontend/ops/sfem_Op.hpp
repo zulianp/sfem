@@ -72,6 +72,56 @@ namespace sfem {
         }
 
         /**
+         * @brief Whether this operator can apply from a stored linearization
+         * @return false unless the operator implements the inexact path
+         *
+         * An operator that supports it can have its tangent assembled once, at
+         * a state, and then applied many times without touching the state or
+         * the geometry again -- partial assembly.  The apply that follows is
+         * inexact wherever the tangent varies within an element, and exact
+         * where it does not, which for a linear simplex is everywhere.
+         */
+        virtual bool inexact_supported() const { return false; }
+
+        /**
+         * @brief Assemble the stored tangent at x, for the applies that follow
+         * @param x State to linearize about
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * Explicit, and deliberately so.  The stored tangent stays valid until
+         * the next call, so the caller says when it is rebuilt rather than
+         * having the operator guess: a Newton step assembles once and then
+         * applies for every Krylov iteration, which is the whole reason the
+         * split pays.  Nothing invalidates it implicitly, so an operator whose
+         * state has moved without a call returns a tangent for the old state --
+         * which is why this is the caller's decision to make and not a cache
+         * that silently refreshes itself.
+         *
+         * `apply` continues to mean the exact operator.  The inexact apply is
+         * reached only through this path, so no existing caller changes
+         * behaviour by an operator gaining support for it.
+         *
+         * An implementation may treat a missing or stale precondition as fatal
+         * rather than returning: the generated Ops use SFEM_ERROR, which aborts,
+         * as they already do for a missing geometry cache.  Calling the inexact
+         * apply without having assembled a tangent is a programming error, not a
+         * condition to probe for.
+         */
+        virtual int inexact_update(const real_t *const /*x*/) { return SFEM_FAILURE; }
+
+        /**
+         * @brief Apply the stored tangent assembled by inexact_update
+         * @param h Input vector
+         * @param out Output vector (accumulated into)
+         * @return SFEM_SUCCESS on success, SFEM_FAILURE on error
+         *
+         * Takes no state: the state was consumed by `inexact_update` and lives
+         * in the store.  That is the property the split exists for, and the
+         * signature says so.
+         */
+        virtual int inexact_apply(const real_t *const /*h*/, real_t *const /*out*/) { return SFEM_FAILURE; }
+
+        /**
          * @brief Assemble the Hessian matrix in CRS format
          * @param x Current solution vector
          * @param rowptr Row pointer array for CRS format
@@ -259,6 +309,79 @@ namespace sfem {
         }
 
         /**
+         * @brief Whether this operator's 0-form is a potential that may be summed.
+         *
+         * An energy or a recovered potential is an element integral: each
+         * element contributes a number, the numbers sum, and the total adds
+         * across operators -- which is what lets `value` be a term in a sum.
+         * Appending such a term is how a material without transient terms
+         * becomes transient: an inertia potential beside a static energy is
+         * one more term, not a different problem.
+         *
+         * A residual that is the gradient of nothing has no such integral, and
+         * answers false.  It is not a statement that the operator has no
+         * merit -- the residual merit always exists -- only that its 0-form is
+         * not additive: `1/2*||sum_op R_op||^2` is not `sum_op 1/2*||R_op||^2`.
+         *
+         * Pure, with no default, because both answers are common and a wrong
+         * one is silent: an operator that wrongly claims a potential has its
+         * number added to a sum it does not belong in.
+         */
+        virtual bool energy_or_potential_based() const = 0;
+
+        /**
+         * @brief Whether `gradient` reads the state at all.
+         *
+         * False is a promise that it does not -- a traction, a body force --
+         * so the operator is assembled once into the accumulator instead of
+         * once per trial step.  That promise is what takes the external terms
+         * out of the line search, and it is the cheap half of the saving.
+         *
+         * True is the safe answer and the default: an operator that reads `x`
+         * must be re-assembled wherever `x` moves.
+         */
+        virtual bool residual_depends_on_state() const { return true; }
+
+        /**
+         * @brief Whether this operator samples the merit itself.
+         *
+         * True means it implements `residual_merit_steps` as one pass over the
+         * mesh with the steps as an inner loop, and so should be handed the
+         * accumulator and asked to finish the sum.  Default false: an operator
+         * that has not been given such a kernel is served by the base
+         * implementation, correctly and slowly.
+         *
+         * At most one operator in a `Function` may answer true, since two
+         * norms cannot be composed.  It is not what `add_operator` refuses,
+         * though -- that rule is about operators with no potential, which
+         * mandate this merit rather than merely accelerate it.
+         */
+        virtual bool contracts_residual_merit() const { return false; }
+
+        /**
+         * @brief `out[step] += 1/2 * ||accumulator + gradient(x + steps[step]*h)||^2`.
+         *
+         * Every step in one pass over the mesh.  `accumulator` already holds
+         * every other operator's contribution, signs included, exactly as
+         * `Function::gradient` builds it, so this finishes a sum rather than
+         * starting one.
+         *
+         * The shape exists so the alpha-independent work -- geometry, the
+         * gathers, the reference tables -- is done once and the steps are an
+         * inner loop over values already in cache, which is what makes a
+         * twelve-point sampling line search cost about what one step costs.
+         * The square is node-wise and cannot be taken element-locally, so an
+         * implementation accumulates the steps' residuals into node storage
+         * before squaring; the packed layout makes that local to a pack.
+         */
+        virtual int residual_merit_steps(const real_t *const       x,
+                                         const real_t *const       h,
+                                         const int                 nsteps,
+                                         const real_t *const       steps,
+                                         const real_t *const       accumulator,
+                                         real_t *const             out);
+
+        /**
          * @brief Compute the value/energy of the operator
          * @param x Current solution vector
          * @param h Input vector
@@ -370,6 +493,12 @@ namespace sfem {
     public:
         const char *name() const override { return "NoOp"; }
         bool        is_linear() const override { return true; }
+        //! It contributes nothing, so nothing of it belongs in either merit.
+        //! `true` keeps it summable: adding zero to a potential is still a
+        //! potential, while claiming it moves with the state would make it a
+        //! contractor and refuse a real one beside it.
+        bool energy_or_potential_based() const override { return true; }
+        bool contracts_residual_merit() const override { return false; }
         int         hessian_crs(const real_t *const /*x*/,
                                 const count_t *const /*rowptr*/,
                                 const idx_t *const /*colidx*/,
@@ -413,5 +542,12 @@ namespace sfem {
      * @return Shared pointer to a NoOp instance
      */
     std::shared_ptr<Op> no_op();
+
+    /// `sum_i r_i^2` over an assembled residual, summed in a fixed order.
+    ///
+    /// Shared by `Op::residual_merit_steps` and `Function`, so the two cannot
+    /// reduce the same vector differently.  Deterministic because a line search
+    /// compares these numbers across runs.
+    real_t squared_residual_norm(const ptrdiff_t ndofs, const int block_size, const real_t *const values);
 
 }  // namespace sfem

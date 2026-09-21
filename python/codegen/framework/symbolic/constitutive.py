@@ -218,25 +218,6 @@ class TwoPhaseFlowConstitutiveModel:
                 )
         return expressions
 
-    def build_expression_graph(
-        self,
-        water_pressure,
-        co2_pressure,
-        include_derivatives=False,
-        temporary_prefix="two_phase_tmp",
-    ):
-        return self.kernel_expressions(
-            water_pressure,
-            co2_pressure,
-            include_derivatives,
-        ).build_graph(
-            data_symbols=(
-                water_pressure,
-                co2_pressure,
-            )
-            + self.parameters.as_tuple(),
-            temporary_prefix=temporary_prefix,
-        )
 
     def validate_state(self, water_pressure, co2_pressure):
         if co2_pressure <= 0.0:

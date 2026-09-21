@@ -11,7 +11,7 @@ from codegen.framework.plans.matrix_formats import (
     MatrixFormatPlan,
     specialize_matrix_format_plan,
 )
-from codegen.framework.symbolic.forms import FormCollection, FormOrder, PipelineStage
+from codegen.framework.forms.forms import FormCollection, FormOrder, PipelineStage
 from codegen.framework.fem.geometry import GeometryPlanNode
 
 
@@ -32,6 +32,12 @@ class DataStreamLayout(Enum):
     AOS = "aos"
     QP_SOA = "qp_soa"
     TENSOR_PRODUCT_1D = "tensor_product_1d"
+
+    #: One flat array the kernel indexes itself, rather than a stream per
+    #: degree of freedom.  An element matrix is the case: its entries are
+    #: addressed `[row * n_columns + column]`, so there is nothing per-lane or
+    #: per-item for the boundary to describe.
+    DENSE = "dense"
 
 
 class MeshPhase(Enum):
@@ -79,6 +85,7 @@ class LocalKernelPlan:
     dim: int
     family: str
     suffix: str = ""
+    header_extension: str = "hpp"
 
     def __post_init__(self):
         prefix = str(self.prefix)
@@ -104,7 +111,7 @@ class LocalKernelPlan:
 
     @property
     def header(self):
-        return "%s_local.hpp" % self.name
+        return "%s_local.%s" % (self.name, self.header_extension)
 
     def to_dict(self):
         return {
@@ -121,6 +128,7 @@ class LocalKernelPlan:
 class MeshKernelPlan:
     prefix: str
     element_label: str
+    source_extension: str = "cpp"
 
     def __post_init__(self):
         prefix = str(self.prefix)
@@ -138,7 +146,7 @@ class MeshKernelPlan:
 
     @property
     def source(self):
-        return "%s_operator.cpp" % self.name
+        return "%s_operator.%s" % (self.name, self.source_extension)
 
     def to_dict(self):
         return {
@@ -149,9 +157,55 @@ class MeshKernelPlan:
         }
 
 
-def mesh_kernel_plan_from_context(unit, context, prefix, *, element_label=None):
+def local_kernel_plan_for(prefix, dim, family, suffix="", header_extension="hpp"):
+    """The element-local header a kernel of this dimension and family gets.
+
+    Naming is a structural decision -- it fixes which files exist and what each
+    includes -- so it belongs to the plan rather than to whichever emitter runs
+    first.  ``LocalKernelPlan.name`` and ``.header`` are the single definition.
+    """
+    return LocalKernelPlan(
+        prefix=prefix,
+        dim=dim,
+        family=family,
+        suffix=suffix,
+        header_extension=header_extension,
+    )
+
+
+def mesh_kernel_plan_for_element(prefix, element_type):
+    """The mesh-level operator source for one element type.
+
+    Applies the idempotence rule the emitters carried privately: a prefix that
+    already ends in the element label is not given a second one, so
+    ``laplace_tet4`` stays ``laplace_tet4`` rather than becoming
+    ``laplace_tet4_tet4``.
+    """
+    element_label = str(element_type).lower()
+    prefix = str(prefix)
+    if prefix.lower().endswith("_%s" % element_label):
+        # The prefix already names the element; split it back apart so the plan
+        # still holds both parts rather than a pre-joined string.
+        return MeshKernelPlan(
+            prefix=prefix[: -(len(element_label) + 1)],
+            element_label=element_label,
+        )
+    return MeshKernelPlan(prefix=prefix, element_label=element_label)
+
+
+def mesh_kernel_plan_from_context(
+    unit, context, prefix, *, element_label=None, source_extension="cpp"
+):
+    """The mesh kernel's name and translation unit.
+
+    `source_extension` comes from the backend rather than from `unit.target`,
+    which is not the generation's target: a CUDA run still reports
+    `KernelTarget.OPENMP` on the unit it emits.  The backend is the thing that
+    knows which target it is emitting for, and `plans` is index 2 while
+    `targets` is index 4, so it is handed down rather than asked for.
+    """
     label = _mesh_kernel_element_label(unit, context, element_label)
-    return MeshKernelPlan(prefix, label)
+    return MeshKernelPlan(prefix, label, source_extension)
 
 
 def _mesh_kernel_element_label(unit, context, element_label=None):
@@ -171,7 +225,7 @@ class DataStreamPlan:
     name: str
     role: DataStreamRole
     layout: DataStreamLayout
-    scalar_type: str = "scalar_t"
+    scalar_type: str = "s_t"
     components: int = 1
     n_items: int = 1
     source: str = ""
@@ -666,12 +720,13 @@ class KernelPlan:
             matrix_format_plan=matrix_format_plan,
         )
 
-    def local_kernel_plan(self, context, prefix, suffix=""):
+    def local_kernel_plan(self, context, prefix, suffix="", header_extension="hpp"):
         return LocalKernelPlan(
             prefix,
             context.specialization.dim,
             context.family,
             suffix,
+            header_extension,
         )
 
     def mesh_kernel_plan(self, context, prefix):
@@ -914,14 +969,14 @@ def _specialize_local_phase_for_context(phase, block, collection, context, basis
 def _local_phase_transformations(phase, block, collection, context):
     if phase.phase is not LocalPhase.TRANSFORM_REFERENCE:
         return ()
-    system = getattr(collection, "source", None)
-    if system is None:
+    residual_fields = getattr(collection, "residual_fields", ())
+    if not residual_fields:
         return ()
     form_block = _form_block_for_plan(collection, block)
     if form_block is None:
         return ()
     transform = simplex_gradient_metric_transformation(
-        system,
+        residual_fields,
         context.affine_specialization.quadrature_rule,
         form_block.coefficients,
         form_block.dependencies,

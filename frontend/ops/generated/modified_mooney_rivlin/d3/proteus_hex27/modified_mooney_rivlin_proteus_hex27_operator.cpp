@@ -1,6 +1,11 @@
 #include <cstdio>
 #include <type_traits>
 #include "../modified_mooney_rivlin_d3_tensor_product_local.hpp"
+#include "../modified_mooney_rivlin_d3_tensor_product_hessian.hpp"
+#include "../../../reference/line_p2_q3.hpp"
+#include "../../../reference/quad_line_q3.hpp"
+#include "../../../reference/line_p2_q4.hpp"
+#include "../../../reference/quad_line_q4.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
@@ -9,79 +14,31 @@
 #include <cstdint>
 #include <cstdlib>
 #include "../../../packed_thread_scratch.hpp"
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
-        const int,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT,
-        std::true_type) {
-    return source;
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int,
+    const g_t *const RSTR source,
+    s_t *const RSTR,
+    std::true_type) {
+  return source;
 }
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
-        const int nelems,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT converted,
-        std::false_type) {
-    #pragma omp simd
-    for (int lane = 0; lane < nelems; ++lane) {
-        converted[lane] = scalar_t(source[lane]);
-    }
-    return converted;
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR converted,
+    std::false_type) {
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    converted[lane] = s_t(source[lane]);
+  }
+  return converted;
 }
-
-} // namespace codegen
-} // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-
-template <typename scalar_t>
-struct modified_mooney_rivlin_proteus_hex27_affine_reference_data {
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[9] = {scalar_t(0.68729833462074175), scalar_t(0.39999999999999997), scalar_t(-0.087298334620741685), scalar_t(0), scalar_t(1), scalar_t(0), scalar_t(-0.087298334620741658), scalar_t(0.39999999999999991), scalar_t(0.68729833462074175)};
-        return data;
-    }
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[9] = {scalar_t(-2.5491933384829668), scalar_t(3.0983866769659336), scalar_t(-0.54919333848296681), scalar_t(-1), scalar_t(0), scalar_t(1), scalar_t(0.54919333848296681), scalar_t(-3.0983866769659336), scalar_t(2.5491933384829668)};
-        return data;
-    }
-    static const scalar_t *q_weight_1d() {
-        static const scalar_t data[3] = {scalar_t(0.27777777777777779), scalar_t(0.44444444444444442), scalar_t(0.27777777777777779)};
-        return data;
-    }
-};
-
-template <typename scalar_t>
-struct modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data {
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[12] = {scalar_t(0.80134602936993082), scalar_t(0.25844425285419081), scalar_t(-0.059790282224121687), scalar_t(0.22778407679095203), scalar_t(0.88441289000295209), scalar_t(-0.11219696679390417), scalar_t(-0.11219696679390401), scalar_t(0.88441289000295198), scalar_t(0.22778407679095214), scalar_t(-0.05979028222412186), scalar_t(0.25844425285419081), scalar_t(0.80134602936993082)};
-        return data;
-    }
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[12] = {scalar_t(-2.7222726231881049), scalar_t(3.4445452463762103), scalar_t(-0.72227262318810515), scalar_t(-1.6799620871697125), scalar_t(1.359924174339425), scalar_t(0.32003791283028749), scalar_t(-0.32003791283028749), scalar_t(-1.359924174339425), scalar_t(1.6799620871697125), scalar_t(0.72227262318810492), scalar_t(-3.4445452463762098), scalar_t(2.7222726231881049)};
-        return data;
-    }
-    static const scalar_t *q_weight_1d() {
-        static const scalar_t data[4] = {scalar_t(0.17392742256872692), scalar_t(0.3260725774312731), scalar_t(0.3260725774312731), scalar_t(0.17392742256872692)};
-        return data;
-    }
-};
 
 } // namespace codegen
 } // namespace sfem
@@ -90,827 +47,418 @@ namespace sfem {
 namespace codegen {
 
 static const KernelDiagnostics modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data = {
-    "modified_mooney_rivlin_proteus_hex27_objective_soa",
-    "PROTEUS_HEX27",
-    3,
-    64,
-    27,
-    16,
-    4,
-    32,
-    40,
-    0,
-    0,
-    19,
-    0,
-    1,
-    0,
-    6,
-    9,
-    111,
-    11056,
-    21024,
-    8,
-    17,
-    10,
-    24,
-    4,
-    2,
-    81,
-    0,
-    1,
-    1,
-    1,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+  "modified_mooney_rivlin_proteus_hex27_objective_soa",
+  "PROTEUS_HEX27",
+  3,
+  64,
+  27,
+  16,
+  4,
+  32,
+  31,
+  0,
+  0,
+  19,
+  0,
+  1,
+  0,
+  6,
+  9,
+  102,
+  11056,
+  21024,
+  8,
+  17,
+  10,
+  24,
+  4,
+  2,
+  81,
+  0,
+  1,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics(void) {
-    return &sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data;
-}
-
-extern "C" double modified_mooney_rivlin_proteus_hex27_objective_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_objective_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_proteus_hex27_objective_soa",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_objective_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_proteus_hex27_objective_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_objective_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_proteus_hex27_objective_affine_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_objective_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_proteus_hex27_objective_affine_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+  return &sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_soa_diagnostics_data;
 }
 
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_objective_affine_mesh_soa_impl(
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t c1,
-        const scalar_t c2,
-        const scalar_t kappa,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_adj4,
+        const g_t *const RSTR g_adj5,
+        const g_t *const RSTR g_adj6,
+        const g_t *const RSTR g_adj7,
+        const g_t *const RSTR g_adj8,
+        const g_t *const RSTR g_det0,
+        const s_t c1,
+        const s_t c2,
+        const s_t kappa,
         const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
-        scalar_t *const SFEM_RESTRICT value
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
+        const int nsteps,
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
+  static constexpr int NC = 3;
+  static constexpr int NQ = 27;
+  static constexpr int NS = 27;
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p2_q3<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p2_q3<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_value[VECTOR_SIZE];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
-            }
-        }
-        const scalar_t *const u_components[DIM] = {ux, uy, uz};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
-                }
-            }
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_value[lane] = scalar_t(0);
-        }
-
-        const scalar_t *block_u_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
-        }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-
-        modified_mooney_rivlin_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_value);
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            value[evbegin + lane] += block_value[lane];
-        }
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *const u_components[NC] = {ux, uy, uz};
+    const s_t *const h_components[NC] = {hx, hy, hz};
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+        }
+      }
+    }
+    s_t badj0_data[VS];
+    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data[VS];
+    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data[VS];
+    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data[VS];
+    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data[VS];
+    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data[VS];
+    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data[VS];
+    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data[VS];
+    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data[VS];
+    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data[VS];
+    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+
+    for (int step = 0; step < nsteps; ++step) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
+      }
+    }
+
+    modified_mooney_rivlin_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, value);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_steps_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_steps_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_objective_steps_a_msoa", -1, (int)scalar_bytes);
 }
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, value);
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_objective_steps_affine_mesh_soa_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t c1,
-        const scalar_t c2,
-        const scalar_t kappa,
-        const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const scalar_t *const SFEM_RESTRICT hx,
-        const scalar_t *const SFEM_RESTRICT hy,
-        const scalar_t *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const scalar_t *const SFEM_RESTRICT steps,
-        scalar_t *const SFEM_RESTRICT value
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_objective_steps_packed_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const int nsteps,
+    const s_t *const RSTR steps,
+    s_t *const RSTR value
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
+  static constexpr int NC = 3;
+  static constexpr int NQ = 27;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_value[VECTOR_SIZE];
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p2_q3<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p2_q3<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      const s_t *const h_components[NC] = {hx, hy, hz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_base_component[k] = u_component[node * u_stride];
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_base_component[n_contiguous + k] = u_component[node * u_stride];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bh_data[NS * NC][VS];
+
+        const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[18], bu_data[19], bu_data[20], bu_data[21], bu_data[22], bu_data[23], bu_data[24], bu_data[25], bu_data[26], bu_data[27], bu_data[28], bu_data[29], bu_data[30], bu_data[31], bu_data[32], bu_data[33], bu_data[34], bu_data[35], bu_data[36], bu_data[37], bu_data[38], bu_data[39], bu_data[40], bu_data[41], bu_data[42], bu_data[43], bu_data[44], bu_data[45], bu_data[46], bu_data[47], bu_data[48], bu_data[49], bu_data[50], bu_data[51], bu_data[52], bu_data[53], bu_data[54], bu_data[55], bu_data[56], bu_data[57], bu_data[58], bu_data[59], bu_data[60], bu_data[61], bu_data[62], bu_data[63], bu_data[64], bu_data[65], bu_data[66], bu_data[67], bu_data[68], bu_data[69], bu_data[70], bu_data[71], bu_data[72], bu_data[73], bu_data[74], bu_data[75], bu_data[76], bu_data[77], bu_data[78], bu_data[79], bu_data[80]};
+        const s_t *bh_streams[NS * NC] = {bh_data[0], bh_data[1], bh_data[2], bh_data[3], bh_data[4], bh_data[5], bh_data[6], bh_data[7], bh_data[8], bh_data[9], bh_data[10], bh_data[11], bh_data[12], bh_data[13], bh_data[14], bh_data[15], bh_data[16], bh_data[17], bh_data[18], bh_data[19], bh_data[20], bh_data[21], bh_data[22], bh_data[23], bh_data[24], bh_data[25], bh_data[26], bh_data[27], bh_data[28], bh_data[29], bh_data[30], bh_data[31], bh_data[32], bh_data[33], bh_data[34], bh_data[35], bh_data[36], bh_data[37], bh_data[38], bh_data[39], bh_data[40], bh_data[41], bh_data[42], bh_data[43], bh_data[44], bh_data[45], bh_data[46], bh_data[47], bh_data[48], bh_data[49], bh_data[50], bh_data[51], bh_data[52], bh_data[53], bh_data[54], bh_data[55], bh_data[56], bh_data[57], bh_data[58], bh_data[59], bh_data[60], bh_data[61], bh_data[62], bh_data[63], bh_data[64], bh_data[65], bh_data[66], bh_data[67], bh_data[68], bh_data[69], bh_data[70], bh_data[71], bh_data[72], bh_data[73], bh_data[74], bh_data[75], bh_data[76], bh_data[77], bh_data[78], bh_data[79], bh_data[80]};
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
+              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
             }
+          }
         }
 
-        const scalar_t *const u_components[DIM] = {ux, uy, uz};
-        const scalar_t *const h_components[DIM] = {hx, hy, hz};
-        const scalar_t *block_u_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
-        }
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
-                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
-                }
-            }
-        }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
         for (int step = 0; step < nsteps; ++step) {
-            const scalar_t alpha = steps[step];
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                for (int d = 0; d < DIM; ++d) {
-                    #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
-                    }
-                }
-            }
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_value[lane] = scalar_t(0);
-            }
-
-            modified_mooney_rivlin_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_value);
-
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
-            }
+          #pragma omp simd
+          for (int lane = 0; lane < ne; ++lane) {
+            value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
+          }
         }
+
+        modified_mooney_rivlin_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+      }
     }
-
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const int nsteps,
+    const void *const RSTR steps,
+    void *const RSTR value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_steps_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_steps_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-namespace sfem {
-namespace codegen {
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_packed_affine_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    (void)n_shared_nodes;
-
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u_base = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_base_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_value[VECTOR_SIZE];
-
-                const scalar_t *block_u_streams[N_SHAPE * DIM] = {block_u_data[0], block_u_data[1], block_u_data[2], block_u_data[3], block_u_data[4], block_u_data[5], block_u_data[6], block_u_data[7], block_u_data[8], block_u_data[9], block_u_data[10], block_u_data[11], block_u_data[12], block_u_data[13], block_u_data[14], block_u_data[15], block_u_data[16], block_u_data[17], block_u_data[18], block_u_data[19], block_u_data[20], block_u_data[21], block_u_data[22], block_u_data[23], block_u_data[24], block_u_data[25], block_u_data[26], block_u_data[27], block_u_data[28], block_u_data[29], block_u_data[30], block_u_data[31], block_u_data[32], block_u_data[33], block_u_data[34], block_u_data[35], block_u_data[36], block_u_data[37], block_u_data[38], block_u_data[39], block_u_data[40], block_u_data[41], block_u_data[42], block_u_data[43], block_u_data[44], block_u_data[45], block_u_data[46], block_u_data[47], block_u_data[48], block_u_data[49], block_u_data[50], block_u_data[51], block_u_data[52], block_u_data[53], block_u_data[54], block_u_data[55], block_u_data[56], block_u_data[57], block_u_data[58], block_u_data[59], block_u_data[60], block_u_data[61], block_u_data[62], block_u_data[63], block_u_data[64], block_u_data[65], block_u_data[66], block_u_data[67], block_u_data[68], block_u_data[69], block_u_data[70], block_u_data[71], block_u_data[72], block_u_data[73], block_u_data[74], block_u_data[75], block_u_data[76], block_u_data[77], block_u_data[78], block_u_data[79], block_u_data[80]};
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_base_data[shape * DIM + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                for (int step = 0; step < nsteps; ++step) {
-                    const scalar_t alpha = steps[step];
-                    for (int shape = 0; shape < N_SHAPE; ++shape) {
-                        for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                            for (int lane = 0; lane < nelems; ++lane) {
-                                block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
-                            }
-                        }
-                    }
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_value[lane] = scalar_t(0);
-                    }
-
-                    modified_mooney_rivlin_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_value);
-
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
-                    }
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_objective_steps_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
     }
-    return SFEM_SUCCESS;
-}
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_packed_affine_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    (void)n_shared_nodes;
-
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u_base = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_base_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_value[VECTOR_SIZE];
-
-                const scalar_t *block_u_streams[N_SHAPE * DIM] = {block_u_data[0], block_u_data[1], block_u_data[2], block_u_data[3], block_u_data[4], block_u_data[5], block_u_data[6], block_u_data[7], block_u_data[8], block_u_data[9], block_u_data[10], block_u_data[11], block_u_data[12], block_u_data[13], block_u_data[14], block_u_data[15], block_u_data[16], block_u_data[17], block_u_data[18], block_u_data[19], block_u_data[20], block_u_data[21], block_u_data[22], block_u_data[23], block_u_data[24], block_u_data[25], block_u_data[26], block_u_data[27], block_u_data[28], block_u_data[29], block_u_data[30], block_u_data[31], block_u_data[32], block_u_data[33], block_u_data[34], block_u_data[35], block_u_data[36], block_u_data[37], block_u_data[38], block_u_data[39], block_u_data[40], block_u_data[41], block_u_data[42], block_u_data[43], block_u_data[44], block_u_data[45], block_u_data[46], block_u_data[47], block_u_data[48], block_u_data[49], block_u_data[50], block_u_data[51], block_u_data[52], block_u_data[53], block_u_data[54], block_u_data[55], block_u_data[56], block_u_data[57], block_u_data[58], block_u_data[59], block_u_data[60], block_u_data[61], block_u_data[62], block_u_data[63], block_u_data[64], block_u_data[65], block_u_data[66], block_u_data[67], block_u_data[68], block_u_data[69], block_u_data[70], block_u_data[71], block_u_data[72], block_u_data[73], block_u_data[74], block_u_data[75], block_u_data[76], block_u_data[77], block_u_data[78], block_u_data[79], block_u_data[80]};
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_base_data[shape * DIM + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                for (int step = 0; step < nsteps; ++step) {
-                    const scalar_t alpha = steps[step];
-                    for (int shape = 0; shape < N_SHAPE; ++shape) {
-                        for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                            for (int lane = 0; lane < nelems; ++lane) {
-                                block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
-                            }
-                        }
-                    }
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_value[lane] = scalar_t(0);
-                    }
-
-                    modified_mooney_rivlin_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_value);
-
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
-                    }
-                }
-            }
-        }
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_objective_steps_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
     }
-    return SFEM_SUCCESS;
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_objective_steps_packed_a_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -920,657 +468,360 @@ extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_packed_affin
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa_impl(
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geometry_t *const *const SFEM_RESTRICT points,
-        const scalar_t c1,
-        const scalar_t c2,
-        const scalar_t kappa,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
+        const s_t c1,
+        const s_t c2,
+        const s_t kappa,
         const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
-        scalar_t *const SFEM_RESTRICT value
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
+        const int nsteps,
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const geometry_t *const SFEM_RESTRICT x = points[0];
-    const geometry_t *const SFEM_RESTRICT y = points[1];
-    const geometry_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 64;
+  static constexpr int NS = 27;
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const g_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_value[VECTOR_SIZE];
-        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
+    s_t bcoordinate_data[NS * ND][VS];
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t badj4[NQ * VS];
+    s_t badj5[NQ * VS];
+    s_t badj6[NQ * VS];
+    s_t badj7[NQ * VS];
+    s_t badj8[NQ * VS];
+    s_t bdet0[NQ * VS];
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
-            }
-        }
-        const geometry_t *const coordinate_components[DIM] = {x, y, z};
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const g_t *const coordinate_components[ND] = {x, y, z};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
-                }
-            }
-        }
-        const scalar_t *const u_components[DIM] = {ux, uy, uz};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
-                }
-            }
-        }
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < ND; ++d) {
         #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            block_value[lane] = scalar_t(0);
+        for (int lane = 0; lane < ne; ++lane) {
+          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
         }
-
-        const scalar_t *block_u_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-        modified_mooney_rivlin_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_value);
-
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            value[evbegin + lane] += block_value[lane];
-        }
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *const u_components[NC] = {ux, uy, uz};
+    const s_t *const h_components[NC] = {hx, hy, hz};
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+        }
+      }
+    }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    for (int step = 0; step < nsteps; ++step) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
+      }
+    }
+
+    modified_mooney_rivlin_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_steps_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_steps_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_objective_steps_i_msoa", -1, (int)scalar_bytes);
 }
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-}
-
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_objective_steps_isoparametric_mesh_soa_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geometry_t *const *const SFEM_RESTRICT points,
-        const scalar_t c1,
-        const scalar_t c2,
-        const scalar_t kappa,
-        const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const scalar_t *const SFEM_RESTRICT hx,
-        const scalar_t *const SFEM_RESTRICT hy,
-        const scalar_t *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const scalar_t *const SFEM_RESTRICT steps,
-        scalar_t *const SFEM_RESTRICT value
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_objective_steps_packed_i_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const *const RSTR points,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const int nsteps,
+    const s_t *const RSTR steps,
+    s_t *const RSTR value
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const geometry_t *const SFEM_RESTRICT x = points[0];
-    const geometry_t *const SFEM_RESTRICT y = points[1];
-    const geometry_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 64;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_value[VECTOR_SIZE];
-        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+  const geom_t *const RSTR x = points[0];
+  const geom_t *const RSTR y = points[1];
+  const geom_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
+#pragma omp parallel
+  {
+    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_u_base = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+
+#pragma omp for schedule(static)
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const geom_t *const coordinate_components[ND] = {x, y, z};
+      for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+        const geom_t *const RSTR coordinate_component = coordinate_components[d];
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_coordinate[k] = s_t(coordinate_component[node]);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);
+        }
+      }
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      const s_t *const h_components[NC] = {hx, hy, hz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_u_base_component = pk_u_base + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_base_component[k] = u_component[node * u_stride];
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_base_component[n_contiguous + k] = u_component[node * u_stride];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bh_data[NS * NC][VS];
+        s_t bcoordinate_data[NS * ND][VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+
+        const s_t *bu_streams[NS * NC] = {bu_data[0], bu_data[1], bu_data[2], bu_data[3], bu_data[4], bu_data[5], bu_data[6], bu_data[7], bu_data[8], bu_data[9], bu_data[10], bu_data[11], bu_data[12], bu_data[13], bu_data[14], bu_data[15], bu_data[16], bu_data[17], bu_data[18], bu_data[19], bu_data[20], bu_data[21], bu_data[22], bu_data[23], bu_data[24], bu_data[25], bu_data[26], bu_data[27], bu_data[28], bu_data[29], bu_data[30], bu_data[31], bu_data[32], bu_data[33], bu_data[34], bu_data[35], bu_data[36], bu_data[37], bu_data[38], bu_data[39], bu_data[40], bu_data[41], bu_data[42], bu_data[43], bu_data[44], bu_data[45], bu_data[46], bu_data[47], bu_data[48], bu_data[49], bu_data[50], bu_data[51], bu_data[52], bu_data[53], bu_data[54], bu_data[55], bu_data[56], bu_data[57], bu_data[58], bu_data[59], bu_data[60], bu_data[61], bu_data[62], bu_data[63], bu_data[64], bu_data[65], bu_data[66], bu_data[67], bu_data[68], bu_data[69], bu_data[70], bu_data[71], bu_data[72], bu_data[73], bu_data[74], bu_data[75], bu_data[76], bu_data[77], bu_data[78], bu_data[79], bu_data[80]};
+        const s_t *bh_streams[NS * NC] = {bh_data[0], bh_data[1], bh_data[2], bh_data[3], bh_data[4], bh_data[5], bh_data[6], bh_data[7], bh_data[8], bh_data[9], bh_data[10], bh_data[11], bh_data[12], bh_data[13], bh_data[14], bh_data[15], bh_data[16], bh_data[17], bh_data[18], bh_data[19], bh_data[20], bh_data[21], bh_data[22], bh_data[23], bh_data[24], bh_data[25], bh_data[26], bh_data[27], bh_data[28], bh_data[29], bh_data[30], bh_data[31], bh_data[32], bh_data[33], bh_data[34], bh_data[35], bh_data[36], bh_data[37], bh_data[38], bh_data[39], bh_data[40], bh_data[41], bh_data[42], bh_data[43], bh_data[44], bh_data[45], bh_data[46], bh_data[47], bh_data[48], bh_data[49], bh_data[50], bh_data[51], bh_data[52], bh_data[53], bh_data[54], bh_data[55], bh_data[56], bh_data[57], bh_data[58], bh_data[59], bh_data[60], bh_data[61], bh_data[62], bh_data[63], bh_data[64], bh_data[65], bh_data[66], bh_data[67], bh_data[68], bh_data[69], bh_data[70], bh_data[71], bh_data[72], bh_data[73], bh_data[74], bh_data[75], bh_data[76], bh_data[77], bh_data[78], bh_data[79], bh_data[80]};
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < ND; ++d) {
             #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
-        }
-        const geometry_t *const coordinate_components[DIM] = {x, y, z};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
-                }
+          }
+          for (int d = 0; d < NC; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
+              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
             }
+          }
         }
 
-        const scalar_t *const u_components[DIM] = {ux, uy, uz};
-        const scalar_t *const h_components[DIM] = {hx, hy, hz};
-        const scalar_t *block_u_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
-        }
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_base_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
-                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
-                }
-            }
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
         for (int step = 0; step < nsteps; ++step) {
-            const scalar_t alpha = steps[step];
-            for (int shape = 0; shape < N_SHAPE; ++shape) {
-                for (int d = 0; d < DIM; ++d) {
-                    #pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
-                    }
-                }
-            }
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_value[lane] = scalar_t(0);
-            }
-
-            modified_mooney_rivlin_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_value);
-
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
-            }
+          #pragma omp simd
+          for (int lane = 0; lane < ne; ++lane) {
+            value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
+          }
         }
+
+        modified_mooney_rivlin_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+      }
     }
-
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_packed_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const *const RSTR points,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const int nsteps,
+    const void *const RSTR steps,
+    void *const RSTR value
 ) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_steps_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_objective_steps_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-}
-
-namespace sfem {
-namespace codegen {
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    (void)n_shared_nodes;
-
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u_base = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_base_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_value[VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-
-                const scalar_t *block_u_streams[N_SHAPE * DIM] = {block_u_data[0], block_u_data[1], block_u_data[2], block_u_data[3], block_u_data[4], block_u_data[5], block_u_data[6], block_u_data[7], block_u_data[8], block_u_data[9], block_u_data[10], block_u_data[11], block_u_data[12], block_u_data[13], block_u_data[14], block_u_data[15], block_u_data[16], block_u_data[17], block_u_data[18], block_u_data[19], block_u_data[20], block_u_data[21], block_u_data[22], block_u_data[23], block_u_data[24], block_u_data[25], block_u_data[26], block_u_data[27], block_u_data[28], block_u_data[29], block_u_data[30], block_u_data[31], block_u_data[32], block_u_data[33], block_u_data[34], block_u_data[35], block_u_data[36], block_u_data[37], block_u_data[38], block_u_data[39], block_u_data[40], block_u_data[41], block_u_data[42], block_u_data[43], block_u_data[44], block_u_data[45], block_u_data[46], block_u_data[47], block_u_data[48], block_u_data[49], block_u_data[50], block_u_data[51], block_u_data[52], block_u_data[53], block_u_data[54], block_u_data[55], block_u_data[56], block_u_data[57], block_u_data[58], block_u_data[59], block_u_data[60], block_u_data[61], block_u_data[62], block_u_data[63], block_u_data[64], block_u_data[65], block_u_data[66], block_u_data[67], block_u_data[68], block_u_data[69], block_u_data[70], block_u_data[71], block_u_data[72], block_u_data[73], block_u_data[74], block_u_data[75], block_u_data[76], block_u_data[77], block_u_data[78], block_u_data[79], block_u_data[80]};
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_base_data[shape * DIM + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                for (int step = 0; step < nsteps; ++step) {
-                    const scalar_t alpha = steps[step];
-                    for (int shape = 0; shape < N_SHAPE; ++shape) {
-                        for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                            for (int lane = 0; lane < nelems; ++lane) {
-                                block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
-                            }
-                        }
-                    }
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_value[lane] = scalar_t(0);
-                    }
-
-                    modified_mooney_rivlin_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_value);
-
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
-                    }
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_objective_steps_packed_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
     }
-    return SFEM_SUCCESS;
-}
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_packed_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    (void)n_shared_nodes;
-
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u_base = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_base_component = pack_u_base + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_base_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_base_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_u_base_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_value[VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-
-                const scalar_t *block_u_streams[N_SHAPE * DIM] = {block_u_data[0], block_u_data[1], block_u_data[2], block_u_data[3], block_u_data[4], block_u_data[5], block_u_data[6], block_u_data[7], block_u_data[8], block_u_data[9], block_u_data[10], block_u_data[11], block_u_data[12], block_u_data[13], block_u_data[14], block_u_data[15], block_u_data[16], block_u_data[17], block_u_data[18], block_u_data[19], block_u_data[20], block_u_data[21], block_u_data[22], block_u_data[23], block_u_data[24], block_u_data[25], block_u_data[26], block_u_data[27], block_u_data[28], block_u_data[29], block_u_data[30], block_u_data[31], block_u_data[32], block_u_data[33], block_u_data[34], block_u_data[35], block_u_data[36], block_u_data[37], block_u_data[38], block_u_data[39], block_u_data[40], block_u_data[41], block_u_data[42], block_u_data[43], block_u_data[44], block_u_data[45], block_u_data[46], block_u_data[47], block_u_data[48], block_u_data[49], block_u_data[50], block_u_data[51], block_u_data[52], block_u_data[53], block_u_data[54], block_u_data[55], block_u_data[56], block_u_data[57], block_u_data[58], block_u_data[59], block_u_data[60], block_u_data[61], block_u_data[62], block_u_data[63], block_u_data[64], block_u_data[65], block_u_data[66], block_u_data[67], block_u_data[68], block_u_data[69], block_u_data[70], block_u_data[71], block_u_data[72], block_u_data[73], block_u_data[74], block_u_data[75], block_u_data[76], block_u_data[77], block_u_data[78], block_u_data[79], block_u_data[80]};
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_base_data[shape * DIM + d][lane] = pack_u_base[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                for (int step = 0; step < nsteps; ++step) {
-                    const scalar_t alpha = steps[step];
-                    for (int shape = 0; shape < N_SHAPE; ++shape) {
-                        for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                            for (int lane = 0; lane < nelems; ++lane) {
-                                block_u_data[shape * DIM + d][lane] = block_u_base_data[shape * DIM + d][lane] + alpha * block_h_data[shape * DIM + d][lane];
-                            }
-                        }
-                    }
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_value[lane] = scalar_t(0);
-                    }
-
-                    modified_mooney_rivlin_d3_tensor_product_objective_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_value);
-
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        value[(ptrdiff_t)step * nelements + evbegin + lane] = block_value[lane];
-                    }
-                }
-            }
-        }
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_objective_steps_packed_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
     }
-    return SFEM_SUCCESS;
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_objective_steps_packed_i_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -1581,1046 +832,685 @@ namespace sfem {
 namespace codegen {
 
 static const KernelDiagnostics modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data = {
-    "modified_mooney_rivlin_proteus_hex27_gradient_soa",
-    "PROTEUS_HEX27",
-    3,
-    64,
-    27,
-    16,
-    4,
-    103,
-    199,
-    2,
-    0,
-    18,
-    0,
-    1,
-    0,
-    6,
-    52,
-    356,
-    21988,
-    31956,
-    43,
-    38,
-    10,
-    24,
-    4,
-    2,
-    81,
-    0,
-    81,
-    81,
-    81,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+  "modified_mooney_rivlin_proteus_hex27_gradient_soa",
+  "PROTEUS_HEX27",
+  3,
+  64,
+  27,
+  16,
+  4,
+  103,
+  154,
+  2,
+  0,
+  18,
+  0,
+  1,
+  0,
+  6,
+  52,
+  311,
+  21988,
+  31956,
+  43,
+  38,
+  10,
+  24,
+  4,
+  2,
+  81,
+  0,
+  81,
+  81,
+  81,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics(void) {
-    return &sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data;
-}
-
-extern "C" double modified_mooney_rivlin_proteus_hex27_gradient_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_gradient_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_proteus_hex27_gradient_soa",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_gradient_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_proteus_hex27_gradient_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_gradient_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_proteus_hex27_gradient_affine_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_gradient_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_proteus_hex27_gradient_affine_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+  return &sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_soa_diagnostics_data;
 }
 
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_gradient_affine_mesh_soa_impl(
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t c1,
-        const scalar_t c2,
-        const scalar_t kappa,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_adj4,
+        const g_t *const RSTR g_adj5,
+        const g_t *const RSTR g_adj6,
+        const g_t *const RSTR g_adj7,
+        const g_t *const RSTR g_adj8,
+        const g_t *const RSTR g_det0,
+        const s_t c1,
+        const s_t c2,
+        const s_t kappa,
         const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT outx,
-        scalar_t *const SFEM_RESTRICT outy,
-        scalar_t *const SFEM_RESTRICT outz
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
+  static constexpr int NC = 3;
+  static constexpr int NQ = 27;
+  static constexpr int NS = 27;
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p2_q3<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p2_q3<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
-            }
-        }
-        const scalar_t *const u_components[DIM] = {ux, uy, uz};
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy, uz};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
-                }
-            }
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
         }
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_out_data[stream][lane] = scalar_t(0);
-            }
-        }
-
-        const scalar_t *block_u_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
-        }
-        scalar_t *block_out_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_out_streams[stream] = block_out_data[stream];
-        }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-
-        modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-        scalar_t *const out_components[DIM] = {outx, outy, outz};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
-                        #pragma omp atomic update
-                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
-                    }
-                }
-            }
-        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+    s_t badj0_data[VS];
+    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data[VS];
+    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data[VS];
+    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data[VS];
+    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data[VS];
+    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data[VS];
+    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data[VS];
+    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data[VS];
+    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data[VS];
+    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data[VS];
+    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+
+    modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy, outz};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_gradient_a_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_affine_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_gradient_packed_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
 ) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
+  static constexpr int NC = 3;
+  static constexpr int NQ = 27;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p2_q3<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p2_q3<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
 #pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+  {
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_component[k] = u_component[node * u_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_shared = n_shared_nodes[pack];
+      const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
         }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_component[k] = u_component[node * u_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_data[shape * NC + d][lane] = s_t(0);
+            }
+          }
+        }
+
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+
+        modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+          global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
     }
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_affine_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
 ) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_component[k] = u_component[node * u_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_gradient_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
-    return SFEM_SUCCESS;
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_gradient_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_gradient_packed_a_msoa", -1, (int)scalar_bytes);
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    s_t *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
 ) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
+  static constexpr int NC = 3;
+  static constexpr int NQ = 27;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p2_q3<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p2_q3<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
 #pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+  {
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            (void)n_shared_nodes;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_component[k] = u_component[node * u_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const ptrdiff_t ghost_off = ghost_ptr[pack];
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
         }
-    }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_component[k] = u_component[node * u_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+        }
+      }
 
-    scalar_t *const out_components[DIM] = {outx, outy, outz};
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_data[shape * NC + d][lane] = s_t(0);
+            }
+          }
+        }
+
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+
+        modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+
+  s_t *const out_components[NC] = {outx, outy, outz};
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
-        const idx_t dest = ghost_reduce_dest[row];
-        const ptrdiff_t begin = ghost_reduce_ptr[row];
-        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
-        for (int d = 0; d < DIM; ++d) {
-            const scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-            scalar_t sum = scalar_t(0);
-            for (ptrdiff_t j = begin; j < end; ++j) {
-                sum += ghost_component[ghost_reduce_idx[j]];
-            }
-            out_components[d][dest * out_stride] += sum;
-        }
+  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+    const idx_t dest = ghost_reduce_dest[row];
+    const ptrdiff_t begin = ghost_reduce_ptr[row];
+    const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+    for (int d = 0; d < NC; ++d) {
+      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+      s_t sum = s_t(0);
+      for (ptrdiff_t j = begin; j < end; ++j) {
+        sum += ghost_component[ghost_reduce_idx[j]];
+      }
+      out_components[d][dest * out_stride] += sum;
     }
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_affine_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
 ) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            (void)n_shared_nodes;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_component[k] = u_component[node * u_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
-
-    scalar_t *const out_components[DIM] = {outx, outy, outz};
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
-        const idx_t dest = ghost_reduce_dest[row];
-        const ptrdiff_t begin = ghost_reduce_ptr[row];
-        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
-        for (int d = 0; d < DIM; ++d) {
-            const scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-            scalar_t sum = scalar_t(0);
-            for (ptrdiff_t j = begin; j < end; ++j) {
-                sum += ghost_component[ghost_reduce_idx[j]];
-            }
-            out_components[d][dest * out_stride] += sum;
-        }
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
     }
-    return SFEM_SUCCESS;
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -2630,888 +1520,614 @@ extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_aff
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa_impl(
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geometry_t *const *const SFEM_RESTRICT points,
-        const scalar_t c1,
-        const scalar_t c2,
-        const scalar_t kappa,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
+        const s_t c1,
+        const s_t c2,
+        const s_t kappa,
         const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT outx,
-        scalar_t *const SFEM_RESTRICT outy,
-        scalar_t *const SFEM_RESTRICT outz
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const geometry_t *const SFEM_RESTRICT x = points[0];
-    const geometry_t *const SFEM_RESTRICT y = points[1];
-    const geometry_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 64;
+  static constexpr int NS = 27;
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const g_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
+    s_t bcoordinate_data[NS * ND][VS];
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t badj4[NQ * VS];
+    s_t badj5[NQ * VS];
+    s_t badj6[NQ * VS];
+    s_t badj7[NQ * VS];
+    s_t badj8[NQ * VS];
+    s_t bdet0[NQ * VS];
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
-            }
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const g_t *const coordinate_components[ND] = {x, y, z};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < ND; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
         }
-        const geometry_t *const coordinate_components[DIM] = {x, y, z};
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy, uz};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
-                }
-            }
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
         }
-        const scalar_t *const u_components[DIM] = {ux, uy, uz};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
-                }
-            }
-        }
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_out_data[stream][lane] = scalar_t(0);
-            }
-        }
-
-        const scalar_t *block_u_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
-        }
-        scalar_t *block_out_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_out_streams[stream] = block_out_data[stream];
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-        modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-        scalar_t *const out_components[DIM] = {outx, outy, outz};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
-                        #pragma omp atomic update
-                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
-                    }
-                }
-            }
-        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy, outz};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-}
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_gradient_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_gradient_i_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_gradient_packed_i_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const *const RSTR points,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
 ) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 64;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
+  const geom_t *const RSTR x = points[0];
+  const geom_t *const RSTR y = points[1];
+  const geom_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
 #pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+  {
+    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[k] = u_component[node * u_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_shared = n_shared_nodes[pack];
+      const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const geom_t *const coordinate_components[ND] = {x, y, z};
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        const geom_t *const RSTR coordinate_component = coordinate_components[d];
+        const s_t *const RSTR u_component = u_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
         }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_coordinate[k] = s_t(coordinate_component[node]);
+          pk_u_component[k] = u_component[node * u_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        s_t bcoordinate_data[NS * ND][VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < ND; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
+            }
+          }
+          for (int d = 0; d < NC; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_data[shape * NC + d][lane] = s_t(0);
+            }
+          }
+        }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+        modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+          global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
     }
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const *const RSTR points,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
 ) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[k] = u_component[node * u_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_gradient_packed_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
-    return SFEM_SUCCESS;
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_gradient_packed_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_gradient_packed_i_msoa", -1, (int)scalar_bytes);
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_i_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    s_t *const RSTR ghost_buf,
+    const geom_t *const *const RSTR points,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
 ) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 64;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
+  const geom_t *const RSTR x = points[0];
+  const geom_t *const RSTR y = points[1];
+  const geom_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
 #pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+  {
+    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            (void)n_shared_nodes;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[k] = u_component[node * u_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const ptrdiff_t ghost_off = ghost_ptr[pack];
+      const geom_t *const coordinate_components[ND] = {x, y, z};
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        const geom_t *const RSTR coordinate_component = coordinate_components[d];
+        const s_t *const RSTR u_component = u_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
         }
-    }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_coordinate[k] = s_t(coordinate_component[node]);
+          pk_u_component[k] = u_component[node * u_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+        }
+      }
 
-    scalar_t *const out_components[DIM] = {outx, outy, outz};
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        s_t bcoordinate_data[NS * ND][VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < ND; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
+            }
+          }
+          for (int d = 0; d < NC; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_data[shape * NC + d][lane] = s_t(0);
+            }
+          }
+        }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+        modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+
+  s_t *const out_components[NC] = {outx, outy, outz};
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
-        const idx_t dest = ghost_reduce_dest[row];
-        const ptrdiff_t begin = ghost_reduce_ptr[row];
-        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
-        for (int d = 0; d < DIM; ++d) {
-            const scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-            scalar_t sum = scalar_t(0);
-            for (ptrdiff_t j = begin; j < end; ++j) {
-                sum += ghost_component[ghost_reduce_idx[j]];
-            }
-            out_components[d][dest * out_stride] += sum;
-        }
+  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+    const idx_t dest = ghost_reduce_dest[row];
+    const ptrdiff_t begin = ghost_reduce_ptr[row];
+    const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+    for (int d = 0; d < NC; ++d) {
+      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+      s_t sum = s_t(0);
+      for (ptrdiff_t j = begin; j < end; ++j) {
+        sum += ghost_component[ghost_reduce_idx[j]];
+      }
+      out_components[d][dest * out_stride] += sum;
     }
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const *const RSTR points,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
 ) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            (void)n_shared_nodes;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[k] = u_component[node * u_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                modified_mooney_rivlin_d3_tensor_product_gradient_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
-
-    scalar_t *const out_components[DIM] = {outx, outy, outz};
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
-        const idx_t dest = ghost_reduce_dest[row];
-        const ptrdiff_t begin = ghost_reduce_ptr[row];
-        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
-        for (int d = 0; d < DIM; ++d) {
-            const scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-            scalar_t sum = scalar_t(0);
-            for (ptrdiff_t j = begin; j < end; ++j) {
-                sum += ghost_component[ghost_reduce_idx[j]];
-            }
-            out_components[d][dest * out_stride] += sum;
-        }
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
     }
-    return SFEM_SUCCESS;
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_gradient_packed_two_pass_i_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -3522,1129 +2138,740 @@ namespace sfem {
 namespace codegen {
 
 static const KernelDiagnostics modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data = {
-    "modified_mooney_rivlin_proteus_hex27_apply_soa",
-    "PROTEUS_HEX27",
-    3,
-    64,
-    27,
-    16,
-    4,
-    600,
-    1302,
-    2,
-    0,
-    30,
-    0,
-    1,
-    0,
-    6,
-    331,
-    1968,
-    21988,
-    31956,
-    322,
-    134,
-    10,
-    24,
-    4,
-    2,
-    81,
-    81,
-    81,
-    81,
-    81,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+  "modified_mooney_rivlin_proteus_hex27_apply_soa",
+  "PROTEUS_HEX27",
+  3,
+  64,
+  27,
+  16,
+  4,
+  600,
+  1076,
+  2,
+  0,
+  30,
+  0,
+  1,
+  0,
+  6,
+  331,
+  1742,
+  21988,
+  31956,
+  322,
+  134,
+  10,
+  24,
+  4,
+  2,
+  81,
+  81,
+  81,
+  81,
+  81,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
 extern "C" const sfem::codegen::KernelDiagnostics *modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics(void) {
-    return &sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data;
-}
-
-extern "C" double modified_mooney_rivlin_proteus_hex27_apply_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(&sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data, nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_apply_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_proteus_hex27_apply_soa",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_apply_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "modified_mooney_rivlin_proteus_hex27_apply_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_apply_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_proteus_hex27_apply_affine_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_apply_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "modified_mooney_rivlin_proteus_hex27_apply_affine_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa_float",
-            &sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
+  return &sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_soa_diagnostics_data;
 }
 
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_apply_affine_mesh_soa_impl(
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_apply_a_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t c1,
-        const scalar_t c2,
-        const scalar_t kappa,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const RSTR g_adj0,
+        const g_t *const RSTR g_adj1,
+        const g_t *const RSTR g_adj2,
+        const g_t *const RSTR g_adj3,
+        const g_t *const RSTR g_adj4,
+        const g_t *const RSTR g_adj5,
+        const g_t *const RSTR g_adj6,
+        const g_t *const RSTR g_adj7,
+        const g_t *const RSTR g_adj8,
+        const g_t *const RSTR g_det0,
+        const s_t c1,
+        const s_t c2,
+        const s_t kappa,
         const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t h_stride,
-        const scalar_t *const SFEM_RESTRICT hx,
-        const scalar_t *const SFEM_RESTRICT hy,
-        const scalar_t *const SFEM_RESTRICT hz,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT outx,
-        scalar_t *const SFEM_RESTRICT outy,
-        scalar_t *const SFEM_RESTRICT outz
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
+  static constexpr int NC = 3;
+  static constexpr int NQ = 27;
+  static constexpr int NS = 27;
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p2_q3<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p2_q3<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
-            }
-        }
-        const scalar_t *const u_components[DIM] = {ux, uy, uz};
-        const scalar_t *const h_components[DIM] = {hx, hy, hz};
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy, uz};
+    const s_t *const h_components[NC] = {hx, hy, hz};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
-                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
-                }
-            }
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
         }
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_out_data[stream][lane] = scalar_t(0);
-            }
-        }
-
-        const scalar_t *block_u_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
-        }
-        const scalar_t *block_h_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_h_streams[stream] = block_h_data[stream];
-        }
-        scalar_t *block_out_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_out_streams[stream] = block_out_data[stream];
-        }
-        scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<jacobian_t, scalar_t>());
-        scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-        const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<jacobian_t, scalar_t>());
-
-        modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-        scalar_t *const out_components[DIM] = {outx, outy, outz};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
-                        #pragma omp atomic update
-                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
-                    }
-                }
-            }
-        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+    s_t badj0_data[VS];
+    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data[VS];
+    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data[VS];
+    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data[VS];
+    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data[VS];
+    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data[VS];
+    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data[VS];
+    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data[VS];
+    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data[VS];
+    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
+        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data[VS];
+    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
+        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+
+    modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy, outz};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_affine_mesh_soa(
+extern "C" int modified_mooney_rivlin_proteus_hex27_apply_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_a_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_a_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_apply_a_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_affine_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_apply_packed_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
 ) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
+  static constexpr int NC = 3;
+  static constexpr int NQ = 27;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p2_q3<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p2_q3<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
 #pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+  {
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                const scalar_t *block_h_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_h_streams[stream] = block_h_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_shared = n_shared_nodes[pack];
+      const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      const s_t *const h_components[NC] = {hx, hy, hz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
         }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_component[k] = u_component[node * u_stride];
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bh_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        const s_t *bh_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bh_streams[stream] = bh_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_data[shape * NC + d][lane] = s_t(0);
+            }
+          }
+        }
+
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+
+        modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+          global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
     }
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_affine_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
 ) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                const scalar_t *block_h_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_h_streams[stream] = block_h_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_apply_packed_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
-    return SFEM_SUCCESS;
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_apply_packed_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_apply_packed_a_msoa", -1, (int)scalar_bytes);
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_affine_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_a_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    s_t *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
 ) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
+  static constexpr int NC = 3;
+  static constexpr int NQ = 27;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
+  const s_t *const affine_shape_1d = sfem::codegen::ref_line_p2_q3<s_t>::shape_1d();
+  const s_t *const affine_grad_1d = sfem::codegen::ref_line_p2_q3<s_t>::grad_1d();
+  const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
 #pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+  {
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            (void)n_shared_nodes;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                const scalar_t *block_h_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_h_streams[stream] = block_h_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const ptrdiff_t ghost_off = ghost_ptr[pack];
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      const s_t *const h_components[NC] = {hx, hy, hz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const s_t *const RSTR u_component = u_components[d];
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
         }
-    }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_u_component[k] = u_component[node * u_stride];
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
 
-    scalar_t *const out_components[DIM] = {outx, outy, outz};
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bh_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        const s_t *bh_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bh_streams[stream] = bh_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_data[shape * NC + d][lane] = s_t(0);
+            }
+          }
+        }
+
+        s_t badj0_data[VS];
+        const s_t *const badj0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj0 + evb, badj0_data, std::is_same<geom_t, s_t>());
+        s_t badj1_data[VS];
+        const s_t *const badj1 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj1 + evb, badj1_data, std::is_same<geom_t, s_t>());
+        s_t badj2_data[VS];
+        const s_t *const badj2 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj2 + evb, badj2_data, std::is_same<geom_t, s_t>());
+        s_t badj3_data[VS];
+        const s_t *const badj3 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj3 + evb, badj3_data, std::is_same<geom_t, s_t>());
+        s_t badj4_data[VS];
+        const s_t *const badj4 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj4 + evb, badj4_data, std::is_same<geom_t, s_t>());
+        s_t badj5_data[VS];
+        const s_t *const badj5 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj5 + evb, badj5_data, std::is_same<geom_t, s_t>());
+        s_t badj6_data[VS];
+        const s_t *const badj6 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj6 + evb, badj6_data, std::is_same<geom_t, s_t>());
+        s_t badj7_data[VS];
+        const s_t *const badj7 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj7 + evb, badj7_data, std::is_same<geom_t, s_t>());
+        s_t badj8_data[VS];
+        const s_t *const badj8 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_adj8 + evb, badj8_data, std::is_same<geom_t, s_t>());
+        s_t bdet0_data[VS];
+        const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
+            ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
+
+        modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+
+  s_t *const out_components[NC] = {outx, outy, outz};
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
-        const idx_t dest = ghost_reduce_dest[row];
-        const ptrdiff_t begin = ghost_reduce_ptr[row];
-        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
-        for (int d = 0; d < DIM; ++d) {
-            const scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-            scalar_t sum = scalar_t(0);
-            for (ptrdiff_t j = begin; j < end; ++j) {
-                sum += ghost_component[ghost_reduce_idx[j]];
-            }
-            out_components[d][dest * out_stride] += sum;
-        }
+  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+    const idx_t dest = ghost_reduce_dest[row];
+    const ptrdiff_t begin = ghost_reduce_ptr[row];
+    const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+    for (int d = 0; d < NC; ++d) {
+      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+      s_t sum = s_t(0);
+      for (ptrdiff_t j = begin; j < end; ++j) {
+        sum += ghost_component[ghost_reduce_idx[j]];
+      }
+      out_components[d][dest * out_stride] += sum;
     }
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_affine_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
 ) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 27;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-
-    const scalar_t *const affine_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_affine_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 3;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            (void)n_shared_nodes;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_u_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                const scalar_t *block_h_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_h_streams[stream] = block_h_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-                scalar_t block_jacobian_adjugate0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate0 + evbegin, block_jacobian_adjugate0_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate1_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate1 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate1 + evbegin, block_jacobian_adjugate1_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate2_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate2 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate2 + evbegin, block_jacobian_adjugate2_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate3_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate3 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate3 + evbegin, block_jacobian_adjugate3_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate4_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate4 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate4 + evbegin, block_jacobian_adjugate4_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate5_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate5 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate5 + evbegin, block_jacobian_adjugate5_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate6_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate6 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate6 + evbegin, block_jacobian_adjugate6_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate7_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate7 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate7 + evbegin, block_jacobian_adjugate7_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_adjugate8_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_adjugate8 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_adjugate8 + evbegin, block_jacobian_adjugate8_data, std::is_same<geom_t, scalar_t>());
-                scalar_t block_jacobian_determinant0_data[VECTOR_SIZE];
-                const scalar_t *const block_jacobian_determinant0 = affine_geometry_stream<scalar_t, geom_t, VECTOR_SIZE>(
-                        nelems, g_jacobian_determinant0 + evbegin, block_jacobian_determinant0_data, std::is_same<geom_t, scalar_t>());
-
-                modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_a_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
-
-    scalar_t *const out_components[DIM] = {outx, outy, outz};
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
-        const idx_t dest = ghost_reduce_dest[row];
-        const ptrdiff_t begin = ghost_reduce_ptr[row];
-        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
-        for (int d = 0; d < DIM; ++d) {
-            const scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-            scalar_t sum = scalar_t(0);
-            for (ptrdiff_t j = begin; j < end; ++j) {
-                sum += ghost_component[ghost_reduce_idx[j]];
-            }
-            out_components[d][dest * out_stride] += sum;
-        }
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_a_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
     }
-    return SFEM_SUCCESS;
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_a_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -4654,971 +2881,669 @@ extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_affine
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename geometry_t>
-static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa_impl(
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_apply_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geometry_t *const *const SFEM_RESTRICT points,
-        const scalar_t c1,
-        const scalar_t c2,
-        const scalar_t kappa,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
+        const s_t c1,
+        const s_t c2,
+        const s_t kappa,
         const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
+        const s_t *const RSTR ux,
+        const s_t *const RSTR uy,
+        const s_t *const RSTR uz,
         const ptrdiff_t h_stride,
-        const scalar_t *const SFEM_RESTRICT hx,
-        const scalar_t *const SFEM_RESTRICT hy,
-        const scalar_t *const SFEM_RESTRICT hz,
+        const s_t *const RSTR hx,
+        const s_t *const RSTR hy,
+        const s_t *const RSTR hz,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT outx,
-        scalar_t *const SFEM_RESTRICT outy,
-        scalar_t *const SFEM_RESTRICT outz
+        s_t *const RSTR outx,
+        s_t *const RSTR outy,
+        s_t *const RSTR outz
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const geometry_t *const SFEM_RESTRICT x = points[0];
-    const geometry_t *const SFEM_RESTRICT y = points[1];
-    const geometry_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 64;
+  static constexpr int NS = 27;
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const g_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        idx_t ev[VECTOR_SIZE * N_SHAPE];
-        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
+    s_t bcoordinate_data[NS * ND][VS];
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t badj4[NQ * VS];
+    s_t badj5[NQ * VS];
+    s_t badj6[NQ * VS];
+    s_t badj7[NQ * VS];
+    s_t badj8[NQ * VS];
+    s_t bdet0[NQ * VS];
 
-        for (int element_node = 0; element_node < N_SHAPE; ++element_node) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[element_node];
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                ev[element_node * VECTOR_SIZE + lane] = element_shape[evbegin + lane];
-            }
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const g_t *const coordinate_components[ND] = {x, y, z};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < ND; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
         }
-        const geometry_t *const coordinate_components[DIM] = {x, y, z};
+      }
+    }
+    const s_t *const u_components[NC] = {ux, uy, uz};
+    const s_t *const h_components[NC] = {hx, hy, hz};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    block_coordinate_data[shape * DIM + d][lane] = coordinate_components[d][ev[shape * VECTOR_SIZE + lane]];
-                }
-            }
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
         }
-        const scalar_t *const u_components[DIM] = {ux, uy, uz};
-        const scalar_t *const h_components[DIM] = {hx, hy, hz};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = ev[shape * VECTOR_SIZE + lane];
-                    block_u_data[shape * DIM + d][lane] = u_components[d][node * u_stride];
-                    block_h_data[shape * DIM + d][lane] = h_components[d][node * h_stride];
-                }
-            }
-        }
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_out_data[stream][lane] = scalar_t(0);
-            }
-        }
-
-        const scalar_t *block_u_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
-        }
-        const scalar_t *block_h_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_h_streams[stream] = block_h_data[stream];
-        }
-        scalar_t *block_out_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_out_streams[stream] = block_out_data[stream];
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-        modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-        scalar_t *const out_components[DIM] = {outx, outy, outz};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            for (int d = 0; d < DIM; ++d) {
-                {
-                    for (int scatter = 0; scatter < nelems; ++scatter) {
-                        #pragma omp atomic update
-                        out_components[d][ev[shape * VECTOR_SIZE + scatter] * out_stride] += block_out_data[shape * DIM + d][scatter];
-                    }
-                }
-            }
-        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx, outy, outz};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_proteus_hex27_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-}
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_apply_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_apply_i_msoa", -1, (int)scalar_bytes);
 }
 
 namespace sfem {
 namespace codegen {
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_apply_packed_i_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const *const RSTR points,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
 ) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 64;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
+  const geom_t *const RSTR x = points[0];
+  const geom_t *const RSTR y = points[1];
+  const geom_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
 #pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+  {
+    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                const scalar_t *block_h_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_h_streams[stream] = block_h_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_shared = n_shared_nodes[pack];
+      const ptrdiff_t n_not_shared = n_contiguous - n_shared;
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const geom_t *const coordinate_components[ND] = {x, y, z};
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      const s_t *const h_components[NC] = {hx, hy, hz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const geom_t *const RSTR coordinate_component = coordinate_components[d];
+        const s_t *const RSTR u_component = u_components[d];
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
         }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_coordinate[k] = s_t(coordinate_component[node]);
+          pk_u_component[k] = u_component[node * u_stride];
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
+
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bh_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        s_t bcoordinate_data[NS * ND][VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        const s_t *bh_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bh_streams[stream] = bh_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < ND; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
+            }
+          }
+          for (int d = 0; d < NC; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_data[shape * NC + d][lane] = s_t(0);
+            }
+          }
+        }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+        modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
+#pragma omp atomic update
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+#pragma omp atomic update
+          global_out[ghosts[k] * out_stride] += pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
     }
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const geom_t *const *const RSTR points,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
 ) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                const scalar_t *block_h_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_h_streams[stream] = block_h_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                    global_out[ghosts[k] * out_stride] += pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_apply_packed_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
-    return SFEM_SUCCESS;
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_apply_packed_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_apply_packed_i_msoa", -1, (int)scalar_bytes);
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+template <typename s_t>
+static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_i_msoa_impl(
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    s_t *const RSTR ghost_buf,
+    const geom_t *const *const RSTR points,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const s_t *const RSTR hx,
+    const s_t *const RSTR hy,
+    const s_t *const RSTR hz,
+    const ptrdiff_t out_stride,
+    s_t *const RSTR outx,
+    s_t *const RSTR outy,
+    s_t *const RSTR outz
 ) {
-    using scalar_t = double;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 64;
+  static constexpr int NS = 27;
+  static constexpr int VS = 16;
 
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
+  const geom_t *const RSTR x = points[0];
+  const geom_t *const RSTR y = points[1];
+  const geom_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
 #pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
+  {
+    s_t *const RSTR pk_coordinates = sfem::codegen::thread_scratch<s_t>(0, (size_t)ND * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_u = sfem::codegen::thread_scratch<s_t>(1, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_h = sfem::codegen::thread_scratch<s_t>(2, (size_t)NC * (size_t)max_nodes_per_pack);
+    s_t *const RSTR pk_out = sfem::codegen::thread_scratch<s_t>(3, (size_t)NC * (size_t)max_nodes_per_pack);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            (void)n_shared_nodes;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                const scalar_t *block_h_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_h_streams[stream] = block_h_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
+    for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+      const ptrdiff_t e_start = pack * n_elements_per_pack;
+      const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
+      const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
+      const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
+      const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
+      const idx_t *const RSTR ghosts = &ghost_idx[ghost_ptr[pack]];
+      const ptrdiff_t ghost_off = ghost_ptr[pack];
+      const geom_t *const coordinate_components[ND] = {x, y, z};
+      const s_t *const u_components[NC] = {ux, uy, uz};
+      const s_t *const h_components[NC] = {hx, hy, hz};
+      s_t *const out_components[NC] = {outx, outy, outz};
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR pk_coordinate = pk_coordinates + d * max_nodes_per_pack;
+        s_t *const RSTR pk_u_component = pk_u + d * max_nodes_per_pack;
+        s_t *const RSTR pk_h_component = pk_h + d * max_nodes_per_pack;
+        const geom_t *const RSTR coordinate_component = coordinate_components[d];
+        const s_t *const RSTR u_component = u_components[d];
+        const s_t *const RSTR h_component = h_components[d];
+        for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
+          pk_component_out[k] = s_t(0);
         }
-    }
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          const idx_t node = owned_nodes_ptr[pack] + k;
+          pk_coordinate[k] = s_t(coordinate_component[node]);
+          pk_u_component[k] = u_component[node * u_stride];
+          pk_h_component[k] = h_component[node * h_stride];
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          const idx_t node = ghosts[k];
+          pk_coordinate[n_contiguous + k] = s_t(coordinate_component[node]);
+          pk_u_component[n_contiguous + k] = u_component[node * u_stride];
+          pk_h_component[n_contiguous + k] = h_component[node * h_stride];
+        }
+      }
 
-    scalar_t *const out_components[DIM] = {outx, outy, outz};
+      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {
+        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);
+        s_t bu_data[NS * NC][VS];
+        s_t bh_data[NS * NC][VS];
+        s_t bout_data[NS * NC][VS];
+        s_t bcoordinate_data[NS * ND][VS];
+        s_t badj0[NQ * VS];
+        s_t badj1[NQ * VS];
+        s_t badj2[NQ * VS];
+        s_t badj3[NQ * VS];
+        s_t badj4[NQ * VS];
+        s_t badj5[NQ * VS];
+        s_t badj6[NQ * VS];
+        s_t badj7[NQ * VS];
+        s_t badj8[NQ * VS];
+        s_t bdet0[NQ * VS];
+        s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+        const s_t *bu_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bu_streams[stream] = bu_data[stream];
+        }
+        const s_t *bh_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bh_streams[stream] = bh_data[stream];
+        }
+        s_t *bout_streams[NS * NC];
+        for (int stream = 0; stream < NS * NC; ++stream) {
+          bout_streams[stream] = bout_data[stream];
+        }
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < ND; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
+            }
+          }
+          for (int d = 0; d < NC; ++d) {
+            #pragma omp simd
+            for (int lane = 0; lane < ne; ++lane) {
+              const uint16_t packed_node = element_shape[evb + lane];
+              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_data[shape * NC + d][lane] = s_t(0);
+            }
+          }
+        }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+        modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+
+        for (int shape = 0; shape < NS; ++shape) {
+          const uint16_t *const RSTR element_shape = elements[shape];
+          for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            for (int lane = 0; lane < ne; ++lane) {
+              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+            }
+          }
+        }
+      }
+
+      for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+        s_t *const RSTR global_out = out_components[d];
+        s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+        for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+          global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pk_component_out[k];
+          pk_component_out[k] = s_t(0);
+        }
+        for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+          ghost_component[ghost_off + k] = pk_component_out[n_contiguous + k];
+          pk_component_out[n_contiguous + k] = s_t(0);
+        }
+      }
+    }
+  }
+
+  s_t *const out_components[NC] = {outx, outy, outz};
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
-        const idx_t dest = ghost_reduce_dest[row];
-        const ptrdiff_t begin = ghost_reduce_ptr[row];
-        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
-        for (int d = 0; d < DIM; ++d) {
-            const scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-            scalar_t sum = scalar_t(0);
-            for (ptrdiff_t j = begin; j < end; ++j) {
-                sum += ghost_component[ghost_reduce_idx[j]];
-            }
-            out_components[d][dest * out_stride] += sum;
-        }
+  for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
+    const idx_t dest = ghost_reduce_dest[row];
+    const ptrdiff_t begin = ghost_reduce_ptr[row];
+    const ptrdiff_t end = ghost_reduce_ptr[row + 1];
+    for (int d = 0; d < NC; ++d) {
+      const s_t *const RSTR ghost_component = ghost_buf + d * n_ghost_entries;
+      s_t sum = s_t(0);
+      for (ptrdiff_t j = begin; j < end; ++j) {
+        sum += ghost_component[ghost_reduce_idx[j]];
+      }
+      out_components[d][dest * out_stride] += sum;
     }
-    return SFEM_SUCCESS;
+  }
+  return SFEM_SUCCESS;
 }
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
+extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t n_packs,
+    const ptrdiff_t n_elements_per_pack,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    const ptrdiff_t max_nodes_per_pack,
+    uint16_t **const RSTR elements,
+    const ptrdiff_t *const RSTR owned_nodes_ptr,
+    const ptrdiff_t *const RSTR n_shared_nodes,
+    const ptrdiff_t *const RSTR ghost_ptr,
+    const idx_t *const RSTR ghost_idx,
+    const ptrdiff_t n_ghost_entries,
+    const ptrdiff_t n_ghost_reduce_rows,
+    const ptrdiff_t *const RSTR ghost_reduce_ptr,
+    const ptrdiff_t *const RSTR ghost_reduce_idx,
+    const idx_t *const RSTR ghost_reduce_dest,
+    void *const RSTR ghost_buf,
+    const geom_t *const *const RSTR points,
+    const real_t c1,
+    const real_t c2,
+    const real_t kappa,
+    const ptrdiff_t u_stride,
+    const void *const RSTR ux,
+    const void *const RSTR uy,
+    const void *const RSTR uz,
+    const ptrdiff_t h_stride,
+    const void *const RSTR hx,
+    const void *const RSTR hy,
+    const void *const RSTR hz,
+    const ptrdiff_t out_stride,
+    void *const RSTR outx,
+    void *const RSTR outy,
+    void *const RSTR outz
 ) {
-    using scalar_t = float;
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-
-    const geom_t *const SFEM_RESTRICT x = points[0];
-    const geom_t *const SFEM_RESTRICT y = points[1];
-    const geom_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    static constexpr int N_QP_1D = 4;
-    static constexpr int N_SHAPE_1D = 3;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_u = sfem::codegen::thread_scratch<scalar_t>(1, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_h = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)DIM * (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            (void)n_shared_nodes;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            const geom_t *const coordinate_components[DIM] = {x, y, z};
-            const scalar_t *const u_components[DIM] = {ux, uy, uz};
-            const scalar_t *const h_components[DIM] = {hx, hy, hz};
-            scalar_t *const out_components[DIM] = {outx, outy, outz};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_u_component = pack_u + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT pack_h_component = pack_h + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                const scalar_t *const SFEM_RESTRICT u_component = u_components[d];
-                const scalar_t *const SFEM_RESTRICT h_component = h_components[d];
-                for (ptrdiff_t k = 0; k < n_pack_nodes; ++k) {
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    const idx_t node = owned_nodes_ptr[pack] + k;
-                    pack_coordinate[k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[k] = u_component[node * u_stride];
-                    pack_h_component[k] = h_component[node * h_stride];
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const idx_t node = ghosts[k];
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[node]);
-                    pack_u_component[n_contiguous + k] = u_component[node * u_stride];
-                    pack_h_component[n_contiguous + k] = h_component[node * h_stride];
-                }
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-                scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-                scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-                const scalar_t *block_u_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_u_streams[stream] = block_u_data[stream];
-                }
-                const scalar_t *block_h_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_h_streams[stream] = block_h_data[stream];
-                }
-                scalar_t *block_out_streams[N_SHAPE * DIM];
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_out_streams[stream] = block_out_data[stream];
-                }
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            const uint16_t packed_node = element_shape[evbegin + lane];
-                            block_coordinate_data[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + packed_node];
-                            block_u_data[shape * DIM + d][lane] = pack_u[d * max_nodes_per_pack + packed_node];
-                            block_h_data[shape * DIM + d][lane] = pack_h[d * max_nodes_per_pack + packed_node];
-                            block_out_data[shape * DIM + d][lane] = scalar_t(0);
-                        }
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-                modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT element_shape = elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-                        scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            pack_component_out[element_shape[evbegin + lane]] += block_out_data[shape * DIM + d][lane];
-                        }
-                    }
-                }
-            }
-
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_component_out = pack_out + d * max_nodes_per_pack;
-                scalar_t *const SFEM_RESTRICT global_out = out_components[d];
-                scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    global_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_component_out[k];
-                    pack_component_out[k] = scalar_t(0);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    ghost_component[ghost_off + k] = pack_component_out[n_contiguous + k];
-                    pack_component_out[n_contiguous + k] = scalar_t(0);
-                }
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_i_msoa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (double *)ghost_buf, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
     }
-
-    scalar_t *const out_components[DIM] = {outx, outy, outz};
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
-        const idx_t dest = ghost_reduce_dest[row];
-        const ptrdiff_t begin = ghost_reduce_ptr[row];
-        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
-        for (int d = 0; d < DIM; ++d) {
-            const scalar_t *const SFEM_RESTRICT ghost_component = ghost_buf + d * n_ghost_entries;
-            scalar_t sum = scalar_t(0);
-            for (ptrdiff_t j = begin; j < end; ++j) {
-                sum += ghost_component[ghost_reduce_idx[j]];
-            }
-            out_components[d][dest * out_stride] += sum;
-        }
+    case (int)sizeof(float): {
+        return modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_i_msoa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, (float *)ghost_buf, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
     }
-    return SFEM_SUCCESS;
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_i_msoa", -1, (int)scalar_bytes);
 }
 
 } // namespace codegen
@@ -5628,232 +3553,178 @@ extern "C" int modified_mooney_rivlin_proteus_hex27_apply_packed_two_pass_isopar
 namespace sfem {
 namespace codegen {
 
-static SFEM_INLINE void modified_mooney_rivlin_proteus_hex27_hessian_isoparametric_mesh_soa_find_cols(
-        const idx_t *const SFEM_RESTRICT targets,
-        const idx_t *const SFEM_RESTRICT row,
-        const int lenrow,
-        idx_t *const SFEM_RESTRICT ks) {
+static SFEM_INLINE void modified_mooney_rivlin_proteus_hex27_hessian_i_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+  for (int d = 0; d < 27; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
     for (int d = 0; d < 27; ++d) {
-        ks[d] = 0;
+      ks[d] += row[k] < targets[d];
     }
-    for (int k = 0; k < lenrow; ++k) {
-        for (int d = 0; d < 27; ++d) {
-            ks[d] += row[k] < targets[d];
-        }
-    }
+  }
 }
 
-template <typename scalar_t>
-static SFEM_INLINE int modified_mooney_rivlin_proteus_hex27_hessian_isoparametric_mesh_soa_scatter_bsr(
-        const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t *const SFEM_RESTRICT element_matrix,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        scalar_t *const SFEM_RESTRICT values) {
-    static constexpr int DIM = 3;
-    static constexpr int N_SHAPE = 27;
-    count_t entries[N_SHAPE * N_SHAPE];
-    idx_t ks[N_SHAPE];
-    bool valid_block_graph = true;
-    for (int i = 0; i < N_SHAPE; ++i) {
-        const idx_t dof_i = ev[i];
-        const count_t row_begin = rowptr[dof_i];
-        const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
-        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];
-        modified_mooney_rivlin_proteus_hex27_hessian_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
-        for (int j = 0; j < N_SHAPE; ++j) {
-            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {
-                if (valid_block_graph) {
-                    std::fprintf(stderr, "modified_mooney_rivlin_proteus_hex27_hessian_isoparametric_mesh_soa_scatter_bsr missing block graph entry (%ld, %ld)\n", (long)ev[i], (long)ev[j]);
-                }
-                entries[i * N_SHAPE + j] = row_begin;
-                valid_block_graph = false;
-            } else {
-                entries[i * N_SHAPE + j] = row_begin + ks[j];
-            }
-        }
+template <typename s_t>
+static SFEM_INLINE void modified_mooney_rivlin_proteus_hex27_hessian_i_msoa_scatter_bsr(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 3;
+  static constexpr int NS = 27;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const idx_t dof_i = ev[i];
+    const count_t row_begin = rowptr[dof_i];
+    const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    modified_mooney_rivlin_proteus_hex27_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
     }
-    if (!valid_block_graph) return SFEM_FAILURE;
-    for (int i = 0; i < N_SHAPE; ++i) {
-        for (int j = 0; j < N_SHAPE; ++j) {
-            scalar_t *const block = &values[entries[i * N_SHAPE + j] * DIM * DIM];
-            for (int bi = 0; bi < DIM; ++bi) {
-                const int row = bi * N_SHAPE + i;
-                for (int bj = 0; bj < DIM; ++bj) {
-                    const int col = bj * N_SHAPE + j;
+  }
+  for (int i = 0; i < NS; ++i) {
+    for (int j = 0; j < NS; ++j) {
+      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
 #pragma omp atomic update
-                    block[bi * DIM + bj] += element_matrix[row * (DIM * N_SHAPE) + col];
-                }
-            }
+          block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];
         }
+      }
     }
-    return SFEM_SUCCESS;
+  }
 }
 
-template <typename scalar_t, typename geometry_t, int FORMAT>
-static int modified_mooney_rivlin_proteus_hex27_hessian_isoparametric_mesh_soa_assemble_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geometry_t *const *const SFEM_RESTRICT points,
-        const scalar_t c1,
-        const scalar_t c2,
-        const scalar_t kappa,
-        const ptrdiff_t u_stride,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        scalar_t *const SFEM_RESTRICT values,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        const ptrdiff_t coo_nnz,
-        const idx_t *const SFEM_RESTRICT coo_rows,
-        const idx_t *const SFEM_RESTRICT coo_cols,
-        idx_t *const SFEM_RESTRICT coo_triplet_rows,
-        idx_t *const SFEM_RESTRICT coo_triplet_cols) {
-    static constexpr int DIM = 3;
-    static constexpr int N_QP = 64;
-    static constexpr int N_SHAPE = 27;
-    static constexpr int VECTOR_SIZE = 1;
-    static constexpr int NDOFS = DIM * N_SHAPE;
-    (void)nnodes;
-    const scalar_t *const u_components[DIM] = {ux, uy, uz};
-    const geometry_t *const SFEM_RESTRICT x = points[0];
-    const geometry_t *const SFEM_RESTRICT y = points[1];
-    const geometry_t *const SFEM_RESTRICT z = points[2];
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::modified_mooney_rivlin_proteus_hex27_isoparametric_reference_data<scalar_t>::q_weight_1d();
+template <typename s_t, typename g_t, int FORMAT>
+static int modified_mooney_rivlin_proteus_hex27_hessian_i_msoa_assemble_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const *const RSTR points,
+    const s_t c1,
+    const s_t c2,
+    const s_t kappa,
+    const ptrdiff_t u_stride,
+    const s_t *const RSTR ux,
+    const s_t *const RSTR uy,
+    const s_t *const RSTR uz,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values,
+    const int *const RSTR,
+    const ptrdiff_t,
+    const ptrdiff_t,
+    const idx_t *const RSTR,
+    const idx_t *const RSTR,
+    idx_t *const RSTR,
+    idx_t *const RSTR) {
+  static constexpr int NC = 3;
+  static constexpr int ND = 3;
+  static constexpr int NQ = 64;
+  static constexpr int NS = 27;
+  static constexpr int VS = 1;
+  static constexpr int NDOFS = NC * NS;
+  const s_t *const u_components[NC] = {ux, uy, uz};
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const g_t *const RSTR z = points[2];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
-    int invalid_matrix_graph = 0;
-#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)
-    for (ptrdiff_t element = 0; element < nelements; ++element) {
-        idx_t ev[N_SHAPE];
-        scalar_t element_matrix[NDOFS * NDOFS];
-        scalar_t block_h_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_out_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_coordinate_data[N_SHAPE * DIM][VECTOR_SIZE];
-        static constexpr int nelems = VECTOR_SIZE;
-        scalar_t block_u_data[N_SHAPE * DIM][VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate0[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate1[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate2[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate3[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate4[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate5[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate6[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate7[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_adjugate8[N_QP * VECTOR_SIZE];
-        scalar_t block_jacobian_determinant0[N_QP * VECTOR_SIZE];
-        scalar_t *block_jacobian_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        const scalar_t *block_u_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_u_streams[stream] = block_u_data[stream];
-        }
-        const scalar_t *block_h_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_h_streams[stream] = block_h_data[stream];
-        }
-        scalar_t *block_out_streams[N_SHAPE * DIM];
-        for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-            block_out_streams[stream] = block_out_data[stream];
-        }
+  static_assert(FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    idx_t ev[NS];
+    s_t element_matrix[NDOFS * NDOFS];
+    s_t bcoordinate_data[NS * ND][VS];
+    static constexpr int ne = VS;
+    s_t bu_data[NS * NC][VS];
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t badj4[NQ * VS];
+    s_t badj5[NQ * VS];
+    s_t badj6[NQ * VS];
+    s_t badj7[NQ * VS];
+    s_t badj8[NQ * VS];
+    s_t bdet0[NQ * VS];
+    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t node = elements[shape][element];
-            ev[shape] = node;
-            for (int d = 0; d < DIM; ++d) {
-                block_coordinate_data[shape * DIM + d][0] = scalar_t(points[d][node]);
-                block_u_data[shape * DIM + d][0] = u_components[d][node * u_stride];
-            }
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 3>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinate_data, 2,
-                coordinate_grad_ref + 2 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_jacobian_determinant0);
-
-        for (int entry = 0; entry < NDOFS * NDOFS; ++entry) {
-            element_matrix[entry] = scalar_t(0);
-        }
-
-        for (int trial_component = 0; trial_component < DIM; ++trial_component) {
-            for (int trial_shape = 0; trial_shape < N_SHAPE; ++trial_shape) {
-                for (int stream = 0; stream < N_SHAPE * DIM; ++stream) {
-                    block_h_data[stream][0] = scalar_t(0);
-                    block_out_data[stream][0] = scalar_t(0);
-                }
-                block_h_data[trial_shape * DIM + trial_component][0] = scalar_t(1);
-                modified_mooney_rivlin_d3_tensor_product_apply_block<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_jacobian_adjugate0, block_jacobian_adjugate1, block_jacobian_adjugate2, block_jacobian_adjugate3, block_jacobian_adjugate4, block_jacobian_adjugate5, block_jacobian_adjugate6, block_jacobian_adjugate7, block_jacobian_adjugate8, block_jacobian_determinant0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, block_u_streams, block_h_streams, block_out_streams);
-                const int col = trial_component * N_SHAPE + trial_shape;
-                for (int test_component = 0; test_component < DIM; ++test_component) {
-                    for (int test_shape = 0; test_shape < N_SHAPE; ++test_shape) {
-                        const int row = test_component * N_SHAPE + test_shape;
-                        element_matrix[row * NDOFS + col] = block_out_data[test_shape * DIM + test_component][0];
-                    }
-                }
-            }
-        }
-
-        if constexpr (FORMAT == 1) {
-            invalid_matrix_graph |= (modified_mooney_rivlin_proteus_hex27_hessian_isoparametric_mesh_soa_scatter_bsr(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
-        } else {
-            invalid_matrix_graph |= 1;
-        }
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+      for (int d = 0; d < ND; ++d) {
+        bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
+        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+      }
     }
 
-    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    modified_mooney_rivlin_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_data, element_matrix);
+
+    if constexpr (FORMAT == 1) {
+      modified_mooney_rivlin_proteus_hex27_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_proteus_hex27_hessian_bsr_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
 ) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_hessian_isoparametric_mesh_soa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
-}
-
-extern "C" int modified_mooney_rivlin_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::modified_mooney_rivlin_proteus_hex27_hessian_isoparametric_mesh_soa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::modified_mooney_rivlin_proteus_hex27_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_proteus_hex27_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
 }

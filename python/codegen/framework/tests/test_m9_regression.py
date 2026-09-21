@@ -80,8 +80,17 @@ def _stokes_reference_coefficients(dim, direction=False):
 
 
 def _poro_reference_coefficients(dim, direction=False):
+    """The lowered poro coefficients, written out by hand.
+
+    The rates are `gen.dt` now, so they read `shift * current + previous`
+    instead of `(current - previous)/dt`, and the reference says so.  The two
+    are the same backward Euler: a scheme supplies `shift = 1/dt` and puts
+    `z = -state/dt` in the `previous` stream, and substituting those turns one
+    into the other exactly.  What changed is which of the two spellings the
+    material owns -- the discretisation moved out of the form and into the
+    scheme, so `dt` no longer appears here at all.
+    """
     alpha = _symbol("alpha")
-    dt = _symbol("dt")
     hydraulic_conductivity = _symbol("hydraulic_conductivity")
     storage = _symbol("storage")
     p = _symbol("p_direction" if direction else "p")
@@ -93,25 +102,23 @@ def _poro_reference_coefficients(dim, direction=False):
             gradient.append(-alpha * p if row == col else sp.S.Zero)
         values["u%d" % row] = (sp.S.Zero, tuple(gradient))
     if direction:
-        pressure_value = (
-            alpha
-            * sum(_symbol("u%d_direction_grad_%d" % (d, d)) for d in range(dim))
-            + storage * _symbol("p_direction")
-        ) / dt
+        # A direction has no history: differentiating `shift * u + u_old` with
+        # respect to the state leaves the shift on the direction alone.
+        pressure_value = alpha * _symbol("u_dt_shift") * sum(
+            _symbol("u%d_direction_grad_%d" % (d, d)) for d in range(dim)
+        ) + storage * _symbol("p_dt_shift") * _symbol("p_direction")
         pressure_gradient = tuple(
             hydraulic_conductivity * _symbol("p_direction_grad_%d" % d)
             for d in range(dim)
         )
     else:
-        pressure_value = (
-            alpha
-            * sum(
-                _symbol("u%d_grad_%d" % (d, d))
-                - _symbol("u%d_old_grad_%d" % (d, d))
-                for d in range(dim)
-            )
-            + storage * (_symbol("p") - _symbol("p_old"))
-        ) / dt
+        pressure_value = alpha * sum(
+            _symbol("u_dt_shift") * _symbol("u%d_grad_%d" % (d, d))
+            + _symbol("u%d_old_grad_%d" % (d, d))
+            for d in range(dim)
+        ) + storage * (
+            _symbol("p_dt_shift") * _symbol("p") + _symbol("p_old")
+        )
         pressure_gradient = tuple(
             hydraulic_conductivity * _symbol("p_grad_%d" % d) for d in range(dim)
         )
@@ -276,8 +283,11 @@ class M9ReferenceRegressionTest(unittest.TestCase):
 
 class M9GeneratedArtifactRegressionTest(unittest.TestCase):
     MAINTAINED = (
-        ("neohookean_ogden", neohookean_ogden, ("TRI3",), ("objective", "gradient", "apply")),
-        ("mooney_rivlin", mooney_rivlin, ("TRI3",), ("objective", "gradient", "apply")),
+        # `objective_steps` rather than `objective`: the 0-form now has one
+        # mesh kernel, the stepped one, and the plain objective is that kernel
+        # called with a single step of length zero.
+        ("neohookean_ogden", neohookean_ogden, ("TRI3",), ("objective_steps", "gradient", "apply")),
+        ("mooney_rivlin", mooney_rivlin, ("TRI3",), ("objective_steps", "gradient", "apply")),
         ("two_phase_flow", two_phase_flow, ("TRI3",), ("residual", "jacobian_action")),
         ("stokes", stokes, ("TRI6_TRI3",), ("residual", "jacobian_action")),
         ("poro_hyperelasticity", poro_hyperelasticity, ("TRI6_TRI3",), ("gradient", "residual", "jacobian_action")),

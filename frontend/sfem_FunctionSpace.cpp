@@ -26,6 +26,11 @@ namespace sfem {
         std::shared_ptr<CRSGraph>              dof_to_dof_graph;
         std::shared_ptr<sfem::Buffer<idx_t *>> device_elements;
         std::shared_ptr<FunctionSpace::PackedMesh> packed_mesh;
+        //: old node id -> new node id, for the renumbering `packed_mesh` applied
+        //: to `mesh` in place.  Kept because nothing else records it: anything
+        //: still speaking the numbering the mesh had -- a nodeset read from a
+        //: file, most of all -- is unreconstructable without it.
+        SharedBuffer<idx_t> packed_node_map;
 
         ~Impl() {}
 
@@ -280,6 +285,18 @@ namespace sfem {
     std::vector<smesh::ElemType> FunctionSpace::element_types() const { return impl_->element_types; }
 
     int FunctionSpace::initialize_packed_mesh() {
+        // Built twice, on purpose.  `create(..., modify_mesh=true)` renumbers the
+        // mesh in place and then drops the permutation it used, so a caller
+        // holding node ids in the old numbering has no way back.  A
+        // non-modifying build keeps that map, is a pure function of the same
+        // mesh and pack size, and therefore produces the map the modifying one
+        // is about to apply.  The cost is one extra partition pass at setup,
+        // against a class of bug whose symptom is a solve that converges to the
+        // wrong problem in silence.
+        auto probe = FunctionSpace::PackedMesh::create(impl_->mesh, {}, false);
+        if (!probe) return SFEM_FAILURE;
+        impl_->packed_node_map = probe->node_map();
+
         impl_->packed_mesh = FunctionSpace::PackedMesh::create(impl_->mesh, {}, true);
         return SFEM_SUCCESS;
     }
@@ -287,5 +304,7 @@ namespace sfem {
     bool FunctionSpace::has_packed_mesh() const { return static_cast<bool>(impl_->packed_mesh); }
 
     std::shared_ptr<FunctionSpace::PackedMesh> FunctionSpace::packed_mesh() { return impl_->packed_mesh; }
+
+    SharedBuffer<idx_t> FunctionSpace::packed_node_map() const { return impl_->packed_node_map; }
 }  // namespace sfem
 

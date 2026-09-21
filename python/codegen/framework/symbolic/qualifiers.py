@@ -32,6 +32,15 @@ class FieldQualifier(CodegenQualifier):
 class QualifiedExpression:
     expression: object
     qualifiers: tuple
+    #: What the caller wrote, before it was replaced by symbols.
+    #:
+    #: `variable` mints fresh symbols and hands those to the material, which is
+    #: what makes the staged quantity a staged quantity.  The expression behind
+    #: them was dropped, and with it the only record of how the variable depends
+    #: on the field -- which is exactly what a second variable group needs: an
+    #: energy differentiated against both `F` and a rate `Fdot` has to weight
+    #: the two fluxes by dF/du and dFdot/du, and those differ.
+    definition: object = None
 
     def __post_init__(self):
         expression = _sympy_value(self.expression)
@@ -137,8 +146,8 @@ def variable(expression, name="F", qualifier=DEFORMATION_GRADIENT):
             expression.cols,
             sp.symbols("%s[0:%d]" % (name, expression.rows * expression.cols)),
         )
-        return QualifiedExpression(symbols, (qualifier,))
-    return QualifiedExpression(sp.Symbol(str(name)), (qualifier,))
+        return QualifiedExpression(symbols, (qualifier,), definition=expression)
+    return QualifiedExpression(sp.Symbol(str(name)), (qualifier,), definition=expression)
 
 
 def qualifiers(expression):

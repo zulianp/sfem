@@ -18,251 +18,267 @@
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT
 #endif
+#ifndef RSTR
+#define RSTR SFEM_RESTRICT
+#endif
 #ifndef SFEM_GENERATED_SCALAR_T
 #define SFEM_GENERATED_SCALAR_T
 typedef double real_t;
 typedef ptrdiff_t idx_t;
+typedef ptrdiff_t element_idx_t;
+typedef ptrdiff_t count_t;
 typedef double geom_t;
 #endif
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
+template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_c_d3_tensor_product_residual_block(
-        const int nelems,
-        const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT determinant,
-        const scalar_t *const SFEM_RESTRICT adjugate[9],
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t *const SFEM_RESTRICT current[2 * N_SHAPE],
-        const scalar_t *const SFEM_RESTRICT previous[2 * N_SHAPE],
-        const scalar_t C_ka1,
-        const scalar_t C_ka2,
-        const scalar_t K_0,
-        const scalar_t K_1,
-        const scalar_t K_2,
-        const scalar_t K_3,
-        const scalar_t K_4,
-        const scalar_t K_5,
-        const scalar_t K_6,
-        const scalar_t K_7,
-        const scalar_t K_8,
-        const scalar_t M_c,
-        const scalar_t P_r,
-        const scalar_t R,
-        const scalar_t S_res,
-        const scalar_t T,
-        const scalar_t Z,
-        const scalar_t dt,
-        const scalar_t m,
-        const scalar_t mu_c,
-        const scalar_t porosity,
-        scalar_t *const SFEM_RESTRICT output[2 * N_SHAPE]
+    const int ne,
+    const ptrdiff_t geometry_stride,
+    const s_t *const RSTR determinant,
+    const s_t *const RSTR adjugate[9],
+    const s_t *const RSTR shape_1d,
+    const s_t *const RSTR grad_1d,
+    const s_t *const RSTR q_weight_1d,
+    const s_t *const RSTR current[2 * NS],
+    const s_t *const RSTR previous[2 * NS],
+    const s_t C_ka1,
+    const s_t C_ka2,
+    const s_t K_0,
+    const s_t K_1,
+    const s_t K_2,
+    const s_t K_3,
+    const s_t K_4,
+    const s_t K_5,
+    const s_t K_6,
+    const s_t K_7,
+    const s_t K_8,
+    const s_t M_c,
+    const s_t P_r,
+    const s_t R,
+    const s_t S_res,
+    const s_t T,
+    const s_t Z,
+    const s_t dt,
+    const s_t m,
+    const s_t mu_c,
+    const s_t porosity,
+    s_t *const RSTR output[2 * NS]
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_FIELDS = 2;
-    scalar_t current_value[N_FIELDS * N_QP * VECTOR_SIZE];
-    scalar_t current_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
-            nelems, shape_1d, grad_1d, current, current_value, current_grad_ref);
-    scalar_t previous_value[N_FIELDS * N_QP * VECTOR_SIZE];
-    tensor_evaluate_value<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
-            nelems, shape_1d, previous, previous_value);
-    scalar_t value_coeff[N_FIELDS * N_QP * VECTOR_SIZE];
-    scalar_t grad_coeff_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    static constexpr int Q = integer_root(N_QP, DIM);
-    for (int q = 0; q < N_QP; ++q) {
-        const int qx = q % Q;
-        const int qy = (q / Q) % Q;
-        const int qz = q / (Q * Q);
-        const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const scalar_t det = determinant[geometry_offset];
-            const scalar_t adj0 = adjugate[0][geometry_offset];
-            const scalar_t adj1 = adjugate[1][geometry_offset];
-            const scalar_t adj2 = adjugate[2][geometry_offset];
-            const scalar_t adj3 = adjugate[3][geometry_offset];
-            const scalar_t adj4 = adjugate[4][geometry_offset];
-            const scalar_t adj5 = adjugate[5][geometry_offset];
-            const scalar_t adj6 = adjugate[6][geometry_offset];
-            const scalar_t adj7 = adjugate[7][geometry_offset];
-            const scalar_t adj8 = adjugate[8][geometry_offset];
-            const scalar_t p_w = current_value[(0 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t p_w_grad_0_ref = current_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-            const scalar_t p_w_grad_1_ref = current_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-            const scalar_t p_w_grad_2_ref = current_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-            const scalar_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
-            const scalar_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
-            const scalar_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-            const scalar_t p_w_old = previous_value[(0 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t p_c = current_value[(1 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t p_c_grad_0_ref = current_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-            const scalar_t p_c_grad_1_ref = current_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-            const scalar_t p_c_grad_2_ref = current_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-            const scalar_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
-            const scalar_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
-            const scalar_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-            const scalar_t p_c_old = previous_value[(1 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t residual_tmp0 = S_res + scalar_t(-1);
-            const scalar_t residual_tmp1 = pow_m1(P_r);
-            const scalar_t residual_tmp2 = (scalar_t(1) - m)/m;
-            const scalar_t residual_tmp3 = pow(pow(residual_tmp1*(p_c - p_w), m) + scalar_t(1), residual_tmp2);
-            const scalar_t residual_tmp4 = scalar_t(1) - S_res;
-            const scalar_t residual_tmp5 = M_c/(R*T*Z);
-            const scalar_t residual_tmp6 = p_c*residual_tmp5*pow(scalar_t(1) - residual_tmp3, C_ka1)*(pow(residual_tmp3, C_ka2) + scalar_t(-1))/mu_c;
-            const scalar_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + scalar_t(1), residual_tmp2) + residual_tmp4))/dt;
-            const scalar_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
-            const scalar_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
-            const scalar_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-            value_coeff[(0 * N_QP + q) * VECTOR_SIZE + lane] = scalar_t(0);
-            grad_coeff_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane] = scalar_t(0);
-            grad_coeff_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane] = scalar_t(0);
-            grad_coeff_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane] = scalar_t(0);
-            value_coeff[(1 * N_QP + q) * VECTOR_SIZE + lane] = qw * det * value_coeff1;
-            grad_coeff_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
-            grad_coeff_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
-            grad_coeff_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
-        }
+  static constexpr int ND = 3;
+  static constexpr int NC = 2;
+  s_t current_value[NC * NQ * VS];
+  s_t current_grad_ref[NC * NQ * ND * VS];
+  tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
+      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t previous_value[NC * NQ * VS];
+  tensor_evaluate_value<s_t, NQ, NS, VS, ND, NC>(
+      ne, shape_1d, previous, previous_value);
+  s_t value_coeff[NC * NQ * VS];
+  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  static constexpr int NQ1 = integer_root(NQ, ND);
+  for (int q = 0; q < NQ; ++q) {
+    const int qx = q % NQ1;
+    const int qy = (q / NQ1) % NQ1;
+    const int qz = q / (NQ1 * NQ1);
+    const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
+    const s_t *const RSTR det_q = determinant + q * geometry_stride;
+    const s_t *const RSTR adj_q0 = adjugate[0] + q * geometry_stride;
+    const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
+    const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
+    const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
+    const s_t *const RSTR adj_q4 = adjugate[4] + q * geometry_stride;
+    const s_t *const RSTR adj_q5 = adjugate[5] + q * geometry_stride;
+    const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
+    const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
+    const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
+    const s_t *const RSTR current_value_q0 = &current_value[q * VS];
+    const s_t *const RSTR previous_value_q0 = &previous_value[q * VS];
+    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q) * VS];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
+    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2) * VS];
+    const s_t *const RSTR previous_value_q1 = &previous_value[(NQ + q) * VS];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
+    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2) * VS];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
+    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2) * VS];
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      const s_t det = det_q[lane];
+      const s_t adj0 = adj_q0[lane];
+      const s_t adj1 = adj_q1[lane];
+      const s_t adj2 = adj_q2[lane];
+      const s_t adj3 = adj_q3[lane];
+      const s_t adj4 = adj_q4[lane];
+      const s_t adj5 = adj_q5[lane];
+      const s_t adj6 = adj_q6[lane];
+      const s_t adj7 = adj_q7[lane];
+      const s_t adj8 = adj_q8[lane];
+      const s_t p_w = current_value_q0[lane];
+      const s_t p_w_old = previous_value_q0[lane];
+      const s_t p_c = current_value_q1[lane];
+      const s_t p_c_grad_0_ref = current_grad_ref_q1_0[lane];
+      const s_t p_c_grad_1_ref = current_grad_ref_q1_1[lane];
+      const s_t p_c_grad_2_ref = current_grad_ref_q1_2[lane];
+      const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
+      const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
+      const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
+      const s_t p_c_old = previous_value_q1[lane];
+      const s_t residual_tmp0 = S_res + s_t(-1);
+      const s_t residual_tmp1 = pow_m1(P_r);
+      const s_t residual_tmp2 = (s_t(1) - m)/m;
+      const s_t residual_tmp3 = pow(pow(residual_tmp1*(p_c - p_w), m) + s_t(1), residual_tmp2);
+      const s_t residual_tmp4 = s_t(1) - S_res;
+      const s_t residual_tmp5 = M_c/(R*T*Z);
+      const s_t residual_tmp6 = p_c*residual_tmp5*pow(s_t(1) - residual_tmp3, C_ka1)*(pow(residual_tmp3, C_ka2) + s_t(-1))/mu_c;
+      const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
+      const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
+      const s_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
+      const s_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
+      value_coeff_q0[lane] = s_t(0);
+      grad_coeff_ref_q0_0[lane] = s_t(0);
+      grad_coeff_ref_q0_1[lane] = s_t(0);
+      grad_coeff_ref_q0_2[lane] = s_t(0);
+      value_coeff_q1[lane] = qw * det * value_coeff1;
+      grad_coeff_ref_q1_0[lane] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
+      grad_coeff_ref_q1_1[lane] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
+      grad_coeff_ref_q1_2[lane] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
     }
-    tensor_integrate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
-            nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  }
+  tensor_integrate<s_t, NQ, NS, VS, ND, NC>(
+      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
+template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void two_phase_flow_form_1_p_c_d3_tensor_product_residual_block_contiguous(
-        const int nelems,
-        const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT determinant,
-        const scalar_t *const SFEM_RESTRICT adjugate[9],
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT grad_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        const scalar_t current[2 * N_SHAPE][VECTOR_SIZE],
-        const scalar_t previous[2 * N_SHAPE][VECTOR_SIZE],
-        const scalar_t C_ka1,
-        const scalar_t C_ka2,
-        const scalar_t K_0,
-        const scalar_t K_1,
-        const scalar_t K_2,
-        const scalar_t K_3,
-        const scalar_t K_4,
-        const scalar_t K_5,
-        const scalar_t K_6,
-        const scalar_t K_7,
-        const scalar_t K_8,
-        const scalar_t M_c,
-        const scalar_t P_r,
-        const scalar_t R,
-        const scalar_t S_res,
-        const scalar_t T,
-        const scalar_t Z,
-        const scalar_t dt,
-        const scalar_t m,
-        const scalar_t mu_c,
-        const scalar_t porosity,
-        scalar_t output[2 * N_SHAPE][VECTOR_SIZE]
+    const int ne,
+    const ptrdiff_t geometry_stride,
+    const s_t *const RSTR determinant,
+    const s_t *const RSTR adjugate[9],
+    const s_t *const RSTR shape_1d,
+    const s_t *const RSTR grad_1d,
+    const s_t *const RSTR q_weight_1d,
+    const s_t current[2 * NS][VS],
+    const s_t previous[2 * NS][VS],
+    const s_t C_ka1,
+    const s_t C_ka2,
+    const s_t K_0,
+    const s_t K_1,
+    const s_t K_2,
+    const s_t K_3,
+    const s_t K_4,
+    const s_t K_5,
+    const s_t K_6,
+    const s_t K_7,
+    const s_t K_8,
+    const s_t M_c,
+    const s_t P_r,
+    const s_t R,
+    const s_t S_res,
+    const s_t T,
+    const s_t Z,
+    const s_t dt,
+    const s_t m,
+    const s_t mu_c,
+    const s_t porosity,
+    s_t output[2 * NS][VS]
 ) {
-    static constexpr int DIM = 3;
-    static constexpr int N_FIELDS = 2;
-    scalar_t current_value[N_FIELDS * N_QP * VECTOR_SIZE];
-    scalar_t current_grad_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    tensor_evaluate_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
-            nelems, shape_1d, grad_1d, current, current_value, current_grad_ref);
-    scalar_t previous_value[N_FIELDS * N_QP * VECTOR_SIZE];
-    tensor_evaluate_value_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
-            nelems, shape_1d, previous, previous_value);
-    scalar_t value_coeff[N_FIELDS * N_QP * VECTOR_SIZE];
-    scalar_t grad_coeff_ref[N_FIELDS * N_QP * DIM * VECTOR_SIZE];
-    static constexpr int Q = integer_root(N_QP, DIM);
-    for (int q = 0; q < N_QP; ++q) {
-        const int qx = q % Q;
-        const int qy = (q / Q) % Q;
-        const int qz = q / (Q * Q);
-        const scalar_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-        #pragma omp simd
-        for (int lane = 0; lane < nelems; ++lane) {
-            const ptrdiff_t geometry_offset = q * geometry_stride + lane;
-            const scalar_t det = determinant[geometry_offset];
-            const scalar_t adj0 = adjugate[0][geometry_offset];
-            const scalar_t adj1 = adjugate[1][geometry_offset];
-            const scalar_t adj2 = adjugate[2][geometry_offset];
-            const scalar_t adj3 = adjugate[3][geometry_offset];
-            const scalar_t adj4 = adjugate[4][geometry_offset];
-            const scalar_t adj5 = adjugate[5][geometry_offset];
-            const scalar_t adj6 = adjugate[6][geometry_offset];
-            const scalar_t adj7 = adjugate[7][geometry_offset];
-            const scalar_t adj8 = adjugate[8][geometry_offset];
-            const scalar_t p_w = current_value[(0 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t p_w_grad_0_ref = current_grad_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-            const scalar_t p_w_grad_1_ref = current_grad_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-            const scalar_t p_w_grad_2_ref = current_grad_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-            const scalar_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
-            const scalar_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
-            const scalar_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-            const scalar_t p_w_old = previous_value[(0 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t p_c = current_value[(1 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t p_c_grad_0_ref = current_grad_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane];
-            const scalar_t p_c_grad_1_ref = current_grad_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane];
-            const scalar_t p_c_grad_2_ref = current_grad_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane];
-            const scalar_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
-            const scalar_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
-            const scalar_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-            const scalar_t p_c_old = previous_value[(1 * N_QP + q) * VECTOR_SIZE + lane];
-            const scalar_t residual_tmp0 = S_res + scalar_t(-1);
-            const scalar_t residual_tmp1 = pow_m1(P_r);
-            const scalar_t residual_tmp2 = (scalar_t(1) - m)/m;
-            const scalar_t residual_tmp3 = pow(pow(residual_tmp1*(p_c - p_w), m) + scalar_t(1), residual_tmp2);
-            const scalar_t residual_tmp4 = scalar_t(1) - S_res;
-            const scalar_t residual_tmp5 = M_c/(R*T*Z);
-            const scalar_t residual_tmp6 = p_c*residual_tmp5*pow(scalar_t(1) - residual_tmp3, C_ka1)*(pow(residual_tmp3, C_ka2) + scalar_t(-1))/mu_c;
-            const scalar_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + scalar_t(1), residual_tmp2) + residual_tmp4))/dt;
-            const scalar_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
-            const scalar_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
-            const scalar_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-            value_coeff[(0 * N_QP + q) * VECTOR_SIZE + lane] = scalar_t(0);
-            grad_coeff_ref[((0 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane] = scalar_t(0);
-            grad_coeff_ref[((0 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane] = scalar_t(0);
-            grad_coeff_ref[((0 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane] = scalar_t(0);
-            value_coeff[(1 * N_QP + q) * VECTOR_SIZE + lane] = qw * det * value_coeff1;
-            grad_coeff_ref[((1 * N_QP + q) * DIM + 0) * VECTOR_SIZE + lane] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
-            grad_coeff_ref[((1 * N_QP + q) * DIM + 1) * VECTOR_SIZE + lane] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
-            grad_coeff_ref[((1 * N_QP + q) * DIM + 2) * VECTOR_SIZE + lane] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
-        }
+  static constexpr int ND = 3;
+  static constexpr int NC = 2;
+  s_t current_value[NC * NQ * VS];
+  s_t current_grad_ref[NC * NQ * ND * VS];
+  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
+      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t previous_value[NC * NQ * VS];
+  tensor_evaluate_value_contiguous<s_t, NQ, NS, VS, ND, NC>(
+      ne, shape_1d, previous, previous_value);
+  s_t value_coeff[NC * NQ * VS];
+  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  static constexpr int NQ1 = integer_root(NQ, ND);
+  for (int q = 0; q < NQ; ++q) {
+    const int qx = q % NQ1;
+    const int qy = (q / NQ1) % NQ1;
+    const int qz = q / (NQ1 * NQ1);
+    const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
+    const s_t *const RSTR det_q = determinant + q * geometry_stride;
+    const s_t *const RSTR adj_q0 = adjugate[0] + q * geometry_stride;
+    const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
+    const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
+    const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
+    const s_t *const RSTR adj_q4 = adjugate[4] + q * geometry_stride;
+    const s_t *const RSTR adj_q5 = adjugate[5] + q * geometry_stride;
+    const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
+    const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
+    const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
+    const s_t *const RSTR current_value_q0 = &current_value[q * VS];
+    const s_t *const RSTR previous_value_q0 = &previous_value[q * VS];
+    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q) * VS];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
+    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2) * VS];
+    const s_t *const RSTR previous_value_q1 = &previous_value[(NQ + q) * VS];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
+    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2) * VS];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
+    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2) * VS];
+    #pragma omp simd
+    for (int lane = 0; lane < ne; ++lane) {
+      const s_t det = det_q[lane];
+      const s_t adj0 = adj_q0[lane];
+      const s_t adj1 = adj_q1[lane];
+      const s_t adj2 = adj_q2[lane];
+      const s_t adj3 = adj_q3[lane];
+      const s_t adj4 = adj_q4[lane];
+      const s_t adj5 = adj_q5[lane];
+      const s_t adj6 = adj_q6[lane];
+      const s_t adj7 = adj_q7[lane];
+      const s_t adj8 = adj_q8[lane];
+      const s_t p_w = current_value_q0[lane];
+      const s_t p_w_old = previous_value_q0[lane];
+      const s_t p_c = current_value_q1[lane];
+      const s_t p_c_grad_0_ref = current_grad_ref_q1_0[lane];
+      const s_t p_c_grad_1_ref = current_grad_ref_q1_1[lane];
+      const s_t p_c_grad_2_ref = current_grad_ref_q1_2[lane];
+      const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
+      const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
+      const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
+      const s_t p_c_old = previous_value_q1[lane];
+      const s_t residual_tmp0 = S_res + s_t(-1);
+      const s_t residual_tmp1 = pow_m1(P_r);
+      const s_t residual_tmp2 = (s_t(1) - m)/m;
+      const s_t residual_tmp3 = pow(pow(residual_tmp1*(p_c - p_w), m) + s_t(1), residual_tmp2);
+      const s_t residual_tmp4 = s_t(1) - S_res;
+      const s_t residual_tmp5 = M_c/(R*T*Z);
+      const s_t residual_tmp6 = p_c*residual_tmp5*pow(s_t(1) - residual_tmp3, C_ka1)*(pow(residual_tmp3, C_ka2) + s_t(-1))/mu_c;
+      const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
+      const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
+      const s_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
+      const s_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
+      value_coeff_q0[lane] = s_t(0);
+      grad_coeff_ref_q0_0[lane] = s_t(0);
+      grad_coeff_ref_q0_1[lane] = s_t(0);
+      grad_coeff_ref_q0_2[lane] = s_t(0);
+      value_coeff_q1[lane] = qw * det * value_coeff1;
+      grad_coeff_ref_q1_0[lane] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
+      grad_coeff_ref_q1_1[lane] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
+      grad_coeff_ref_q1_2[lane] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
     }
-    tensor_integrate_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, N_FIELDS>(
-            nelems, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  }
+  tensor_integrate_contiguous<s_t, NQ, NS, VS, ND, NC>(
+      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE void two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block(
-        const int nelems,
-        const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT determinant,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        scalar_t *const SFEM_RESTRICT output[2 * N_SHAPE]
-) {
-    static constexpr int DIM = 3;
-    static constexpr int N_FIELDS = 2;
-}
-
-template <typename scalar_t, int N_QP, int N_SHAPE, int VECTOR_SIZE>
-static SFEM_INLINE void two_phase_flow_form_1_p_c_d3_tensor_product_jacobian_action_block_contiguous(
-        const int nelems,
-        const ptrdiff_t geometry_stride,
-        const scalar_t *const SFEM_RESTRICT determinant,
-        const scalar_t *const SFEM_RESTRICT shape_1d,
-        const scalar_t *const SFEM_RESTRICT q_weight_1d,
-        scalar_t output[2 * N_SHAPE][VECTOR_SIZE]
-) {
-    static constexpr int DIM = 3;
-    static constexpr int N_FIELDS = 2;
-}
 
 } // namespace codegen
 } // namespace sfem

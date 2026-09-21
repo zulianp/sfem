@@ -21,6 +21,7 @@
 #include "sfem_cuda_solver.hpp"
 #endif
 
+#include "sfem_NewmarkScheme.hpp"
 #include "sfem_ssmgc.hpp"
 
 int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int argc, char *argv[]) {
@@ -93,10 +94,21 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            blas  = sfem::blas<real_t>(es);
 
-    // Create state vectors for time integration
-    auto displacement = sfem::create_buffer<real_t>(ndofs, es);
-    auto velocity     = sfem::create_buffer<real_t>(ndofs, es);
-    auto acceleration = sfem::create_buffer<real_t>(ndofs, es);
+    // Newmark with beta = 1/4 and gamma = 1/2, which is what the predictor and
+    // corrector written out below came to.  The scheme carries the state, so
+    // `displacement`, `velocity` and `acceleration` are its buffers.
+    //
+    // Its `InertiaPotential` is not added to the function here and stays
+    // unused: `KelvinVoigtNewmark` takes the acceleration as a field and
+    // carries the inertia itself.
+    auto scheme = std::make_shared<sfem::NewmarkScheme>(fs, es);
+    if (scheme->initialize() != SFEM_SUCCESS) {
+        return SFEM_FAILURE;
+    }
+
+    auto displacement = scheme->state();
+    auto velocity     = scheme->velocity();
+    auto acceleration = scheme->acceleration();
     auto increment    = sfem::create_buffer<real_t>(ndofs, es);
     auto temp_vel     = sfem::create_buffer<real_t>(ndofs, es);
     auto solution     = sfem::create_buffer<real_t>(ndofs, es);
@@ -107,12 +119,20 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
     blas->zeros(ndofs, displacement->data());
     blas->zeros(ndofs, velocity->data());
     {
-        auto nnodes = fs->mesh().n_nodes();
-        auto dims   = fs->mesh_ptr()->spatial_dimension();
-        auto v      = velocity->data();
+        // Built on the host and copied, because `velocity` is allocated in
+        // `es` and the workflow for this driver runs on the device.
+        auto      nnodes = fs->mesh().n_nodes();
+        auto      dims   = fs->mesh_ptr()->spatial_dimension();
+        auto      host_v = sfem::create_host_buffer<real_t>(ndofs);
         for (int i = 0; i < nnodes; i++) {
-            v[i * dims + 1] = 0.1;
+            host_v->data()[i * dims + 1] = 0.1;
         }
+#ifdef SFEM_ENABLE_CUDA
+        if (es == sfem::EXECUTION_SPACE_DEVICE) {
+            host_v = smesh::to_device(host_v);
+        }
+#endif
+        blas->copy(ndofs, host_v->data(), velocity->data());
     }
 
     blas->zeros(ndofs, acceleration->data());
@@ -203,19 +223,16 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
 
     // Time loop
     while (t < T) {
-        for (int k = 0; k < nliter; k++) {
-            // Use increment as temp buffer for acceleration prediction
-            blas->zeros(ndofs, increment->data());
-            blas->zaxpby(ndofs, 1, solution->data(), -1, displacement->data(), increment->data());
-            blas->axpy(ndofs, -dt, velocity->data(), increment->data());
-            blas->scal(ndofs, 4 / (dt * dt), increment->data());
-            blas->axpy(ndofs, -1, acceleration->data(), increment->data());
+        // Opens the step: the shift, the history and the predictor are all
+        // built from the state carried out of the last step, never from the
+        // iterate the nonlinear loop below is moving.
+        scheme->begin_step(t, dt);
 
-            // Compute velocity prediction
-            blas->zeros(ndofs, temp_vel->data());
-            blas->copy(ndofs, increment->data(), temp_vel->data());
-            blas->zaxpby(ndofs, dt / 2, temp_vel->data(), dt / 2, acceleration->data(), temp_vel->data());
-            blas->axpy(ndofs, 1, velocity->data(), temp_vel->data());
+        for (int k = 0; k < nliter; k++) {
+            // The velocity and acceleration the method implies at the current
+            // iterate.  These are the operator's fields, so they are refreshed
+            // every nonlinear iteration rather than once per step.
+            scheme->reconstruct(solution->data(), temp_vel->data(), increment->data());
 
             // Update contact conditions based on current solution
             // solver->update(solution->data());
@@ -233,18 +250,7 @@ int solve_obstacle_problem(const std::shared_ptr<sfem::Communicator> &comm, int 
             // blas->axpy(ndofs, -1, increment->data(), solution->data());
         }
 
-        // Update all quantities
-        // acceleration
-        blas->axpby(ndofs, -4 / (dt * dt), displacement->data(), -1, acceleration->data());
-        blas->axpy(ndofs, 4 / (dt * dt), solution->data(), acceleration->data());
-        blas->axpy(ndofs, -4 / dt, velocity->data(), acceleration->data());
-
-        // velocity
-        blas->axpby(ndofs, -2 / dt, displacement->data(), -1, velocity->data());
-        blas->axpy(ndofs, 2 / dt, solution->data(), velocity->data());
-
-        // displacement
-        blas->copy(ndofs, solution->data(), displacement->data());
+        scheme->advance(solution->data());
 
         t += dt;
         if (++steps % export_freq == 0 && SFEM_NEWMARK_ENABLE_OUTPUT) {

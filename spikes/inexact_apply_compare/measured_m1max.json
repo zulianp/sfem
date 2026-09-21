@@ -1,0 +1,84 @@
+{
+  "machine": "m1max",
+  "threads": 8,
+  "note": [
+    "The laptop's eight performance cores, same meshes and same shipped",
+    "instantiation as measured_grace.json. Kept because the two machines'",
+    "rooflines differ in kind and not only in scale: the M1's ridge is at 1.0",
+    "FLOP/byte against Grace's 7.1, so a kernel that is bandwidth-bound on one",
+    "is compute-bound on the other.",
+    "Eight threads, not ten: the two efficiency cores are not interchangeable",
+    "with the performance ones and a rate that mixes them is not comparable",
+    "with anything.",
+    "Mesh ordering: morton3, the default, which is what SFEM's own benchmark drivers reorder with. See the ordering section of RESULTS.md for what the other orderings cost on these meshes."
+  ],
+  "points": [
+    {
+      "label": "HEX8 stored f32",
+      "kernel": "neohookean_ogden_hex8_inexact_apply_stored_a_msoa",
+      "element": "HEX8",
+      "threads": 8,
+      "scalar_bytes": 8,
+      "nelements": 64000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 171.75
+    },
+    {
+      "label": "HEX8 compressed f16",
+      "kernel": "neohookean_ogden_hex8_inexact_apply_compressed_a_msoa",
+      "element": "HEX8",
+      "threads": 8,
+      "scalar_bytes": 8,
+      "nelements": 64000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 120.33
+    },
+    {
+      "label": "HEX8 tangent assembly",
+      "kernel": "neohookean_ogden_hex8_inexact_apply_tangent_a_msoa",
+      "element": "HEX8",
+      "threads": 8,
+      "scalar_bytes": 8,
+      "nelements": 64000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 35.28
+    },
+    {
+      "label": "TET4 stored f32",
+      "kernel": "neohookean_ogden_tet4_inexact_apply_stored_a_msoa",
+      "element": "TET4",
+      "threads": 8,
+      "scalar_bytes": 8,
+      "nelements": 384000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 66.67
+    },
+    {
+      "label": "TET4 compressed f16",
+      "kernel": "neohookean_ogden_tet4_inexact_apply_compressed_a_msoa",
+      "element": "TET4",
+      "threads": 8,
+      "scalar_bytes": 8,
+      "nelements": 384000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 83.85
+    },
+    {
+      "label": "TET4 tangent assembly",
+      "kernel": "neohookean_ogden_tet4_inexact_apply_tangent_a_msoa",
+      "element": "TET4",
+      "threads": 8,
+      "scalar_bytes": 8,
+      "nelements": 384000,
+      "nnodes": 68921,
+      "ndof": 206763,
+      "mdofs": 35.24
+    }
+  ],
+  "ordering": "morton3"
+}

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from codegen.framework.symbolic.forms import FormOrder
+from codegen.framework.forms.forms import FormOrder
 
 
 @dataclass(frozen=True)
@@ -104,14 +104,14 @@ class MeshKernelSignature:
 
 
 LOCAL_KERNEL_TEMPLATE_PARAMETERS = (
-    "typename scalar_t",
-    "int N_QP",
-    "int N_SHAPE",
-    "int VECTOR_SIZE",
+    "typename s_t",
+    "int NQ",
+    "int NS",
+    "int VS",
 )
 
 
-MESH_KERNEL_TEMPLATE_PARAMETERS = ("typename scalar_t",)
+MESH_KERNEL_TEMPLATE_PARAMETERS = ("typename s_t",)
 
 
 def local_kernel_signatures_from_plan(unit, emission_plan, local_prefix, kind):
@@ -200,23 +200,23 @@ def _mesh_arguments(unit, emission_plan, kind):
     arguments = [
         KernelArgument("nelements", "const ptrdiff_t nelements", "control"),
         KernelArgument("nnodes", "const ptrdiff_t nnodes", "control"),
-        KernelArgument("elements", "idx_t **const SFEM_RESTRICT elements", "connectivity"),
+        KernelArgument("elements", "idx_t **const RSTR elements", "connectivity"),
     ]
     arguments.extend(
         (
             KernelArgument(
                 "adjugate",
-                "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim),
+                "const s_t *const RSTR adjugate[%d]" % (dim * dim),
                 "geometry",
             ),
             KernelArgument(
                 "determinant",
-                "const scalar_t *const SFEM_RESTRICT determinant",
+                "const s_t *const RSTR determinant",
                 "geometry",
             ),
             KernelArgument(
                 "coordinates",
-                "const scalar_t *const SFEM_RESTRICT coordinates[%d]" % dim,
+                "const s_t *const RSTR coordinates[%d]" % dim,
                 "geometry",
             ),
         )
@@ -229,13 +229,13 @@ def _mesh_arguments(unit, emission_plan, kind):
 
 def _mesh_field_arguments(unit, kind):
     dependencies = _merged_dependencies(unit.expression_plans)
-    n_components = _field_component_count(unit)
+    n_field_components = _field_component_count(unit)
     arguments = []
     if _dependencies_use_current(dependencies, default=False):
         arguments.append(
             KernelArgument(
                 "current",
-                "const scalar_t *const SFEM_RESTRICT current[%d]" % n_components,
+                "const s_t *const RSTR current[%d]" % n_field_components,
                 "field",
             )
         )
@@ -243,7 +243,7 @@ def _mesh_field_arguments(unit, kind):
         arguments.append(
             KernelArgument(
                 "previous",
-                "const scalar_t *const SFEM_RESTRICT previous[%d]" % n_components,
+                "const s_t *const RSTR previous[%d]" % n_field_components,
                 "previous",
             )
         )
@@ -251,7 +251,7 @@ def _mesh_field_arguments(unit, kind):
         arguments.append(
             KernelArgument(
                 "direction",
-                "const scalar_t *const SFEM_RESTRICT direction[%d]" % n_components,
+                "const s_t *const RSTR direction[%d]" % n_field_components,
                 "direction",
             )
         )
@@ -260,11 +260,11 @@ def _mesh_field_arguments(unit, kind):
 
 def _mesh_output_arguments(unit, kind):
     if kind == "energy_soa":
-        return (KernelArgument("output", "scalar_t *const SFEM_RESTRICT output", "output"),)
+        return (KernelArgument("output", "s_t *const RSTR output", "output"),)
     return (
         KernelArgument(
             "output",
-            "scalar_t *const SFEM_RESTRICT output[%d]" % _field_component_count(unit),
+            "s_t *const RSTR output[%d]" % _field_component_count(unit),
             "output",
         ),
     )
@@ -273,7 +273,7 @@ def _mesh_output_arguments(unit, kind):
 def _local_arguments(unit, emission_plan, kind, expression_plan):
     dim = int(unit.dim)
     dependencies = expression_plan.dependencies
-    arguments = [KernelArgument("nelems", "const ptrdiff_t nelems", "control")]
+    arguments = [KernelArgument("ne", "const ptrdiff_t ne", "control")]
     if kind != "boundary_residual_soa":
         arguments.extend(_geometry_arguments(dim))
         arguments.extend(_reference_arguments(emission_plan, dim, dependencies))
@@ -289,12 +289,12 @@ def _geometry_arguments(dim):
     return (
         KernelArgument(
             "adjugate",
-            "const scalar_t *const SFEM_RESTRICT adjugate[%d]" % (dim * dim),
+            "const s_t *const RSTR adjugate[%d]" % (dim * dim),
             "geometry",
         ),
         KernelArgument(
             "determinant",
-            "const scalar_t *const SFEM_RESTRICT determinant",
+            "const s_t *const RSTR determinant",
             "geometry",
         ),
     )
@@ -303,32 +303,32 @@ def _geometry_arguments(dim):
 def _reference_arguments(emission_plan, dim, dependencies):
     if emission_plan.basis_family == "tensor_product":
         return (
-            KernelArgument("shape_1d", "const scalar_t *const SFEM_RESTRICT shape_1d", "reference"),
-            KernelArgument("grad_1d", "const scalar_t *const SFEM_RESTRICT grad_1d", "reference"),
-            KernelArgument("q_weight_1d", "const scalar_t *const SFEM_RESTRICT q_weight_1d", "reference"),
+            KernelArgument("shape_1d", "const s_t *const RSTR shape_1d", "reference"),
+            KernelArgument("grad_1d", "const s_t *const RSTR grad_1d", "reference"),
+            KernelArgument("q_weight_1d", "const s_t *const RSTR q_weight_1d", "reference"),
         )
     arguments = [
-        KernelArgument("shape", "const scalar_t *const SFEM_RESTRICT shape", "reference")
+        KernelArgument("shape", "const s_t *const RSTR shape", "reference")
     ]
     if _uses_reference_gradients(dependencies):
         arguments.extend(
             KernelArgument(
                 "grad_ref_%d" % d,
-                "const scalar_t *const SFEM_RESTRICT grad_ref_%d" % d,
+                "const s_t *const RSTR grad_ref_%d" % d,
                 "reference",
             )
             for d in range(dim)
         )
     arguments.append(
-        KernelArgument("q_weight", "const scalar_t *const SFEM_RESTRICT q_weight", "reference")
+        KernelArgument("q_weight", "const s_t *const RSTR q_weight", "reference")
     )
     return tuple(arguments)
 
 
 def _boundary_reference_arguments():
     return (
-        KernelArgument("shape", "const scalar_t *const SFEM_RESTRICT shape", "reference"),
-        KernelArgument("q_weight", "const scalar_t *const SFEM_RESTRICT q_weight", "reference"),
+        KernelArgument("shape", "const s_t *const RSTR shape", "reference"),
+        KernelArgument("q_weight", "const s_t *const RSTR q_weight", "reference"),
     )
 
 
@@ -340,7 +340,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
             arguments.append(
                 KernelArgument(
                     "u_streams",
-                    "const scalar_t *const SFEM_RESTRICT u_streams[N_SHAPE * %d]" % dim,
+                    "const s_t *const RSTR u_streams[NS * %d]" % dim,
                     "field",
                 )
             )
@@ -348,7 +348,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
             arguments.append(
                 KernelArgument(
                     "h_streams",
-                    "const scalar_t *const SFEM_RESTRICT h_streams[N_SHAPE * %d]" % dim,
+                    "const s_t *const RSTR h_streams[NS * %d]" % dim,
                     "direction",
                 )
             )
@@ -361,7 +361,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
         arguments.append(
             KernelArgument(
                 "current",
-                "const scalar_t *const SFEM_RESTRICT current[%s]" % stream_extent,
+                "const s_t *const RSTR current[%s]" % stream_extent,
                 "field",
             )
         )
@@ -369,7 +369,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
         arguments.append(
             KernelArgument(
                 "previous",
-                "const scalar_t *const SFEM_RESTRICT previous[%s]" % stream_extent,
+                "const s_t *const RSTR previous[%s]" % stream_extent,
                 "previous",
             )
         )
@@ -377,7 +377,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
         arguments.append(
             KernelArgument(
                 "direction",
-                "const scalar_t *const SFEM_RESTRICT direction[%s]" % stream_extent,
+                "const s_t *const RSTR direction[%s]" % stream_extent,
                 "direction",
             )
         )
@@ -386,7 +386,7 @@ def _field_arguments(unit, kind, expression_plan, dependencies):
 
 def _parameter_arguments(dependencies):
     return tuple(
-        KernelArgument(str(parameter), "const scalar_t %s" % parameter, "parameter")
+        KernelArgument(str(parameter), "const s_t %s" % parameter, "parameter")
         for parameter in getattr(dependencies, "parameters", ())
     )
 
@@ -414,13 +414,13 @@ def _merged_dependencies(expression_plans):
 
 def _output_arguments(unit, kind, expression_plan):
     if kind == "energy_soa" and expression_plan.form_order is FormOrder.ZERO:
-        return (KernelArgument("value", "scalar_t *const SFEM_RESTRICT value", "output"),)
+        return (KernelArgument("value", "s_t *const RSTR value", "output"),)
     n_streams = _local_field_stream_count(unit, kind)
     if kind == "energy_soa":
         dim = int(unit.dim)
-        declaration = "scalar_t *const SFEM_RESTRICT out_streams[N_SHAPE * %d]" % dim
+        declaration = "s_t *const RSTR out_streams[NS * %d]" % dim
     else:
-        declaration = "scalar_t *const SFEM_RESTRICT output[%s]" % _field_stream_extent(unit, kind)
+        declaration = "s_t *const RSTR output[%s]" % _field_stream_extent(unit, kind)
     return (KernelArgument("output", declaration, "output"),)
 
 
@@ -439,8 +439,8 @@ def _field_stream_extent(unit, kind):
     if kind == "boundary_residual_soa":
         return str(count)
     if count == 1:
-        return "N_SHAPE"
-    return "%d * N_SHAPE" % count
+        return "NS"
+    return "%d * NS" % count
 
 
 def _local_shape_symbol_factor(unit):
@@ -475,3 +475,80 @@ def _dependencies_use_direction(dependencies, default):
     if dependencies is None:
         return bool(default)
     return bool(getattr(dependencies, "direction", False))
+
+
+#: The packed mesh traversal's arguments, in the order the C ABI takes them.
+#:
+#: Eleven sites across the three big emitters spelled this prologue out by hand,
+#: and the eleven do not all agree.  Nine of them -- every packed kernel in
+#: `emitters/energy_codegen.py` and `emitters/residual_codegen.py` -- take the
+#: sequence below.  The two in `emitters/inexact_apply_codegen.py` take
+#: `PACKED_MESH_REDUCE_ONLY_ARGUMENTS`, which is a different sequence, and the
+#: difference is not only which arguments are present: the ghost counts come
+#: before `ghost_ptr` there and after it here.
+#:
+#: An ABI spelled independently in eleven places is an ABI that can drift, and a
+#: caller built against one order calling a kernel compiled for the other is a
+#: silent memory error rather than a compile failure -- the dispatch layer
+#: builds its calls from these names, so both sides move together only because
+#: one emitter writes both.  Stating each sequence once is what makes the
+#: divergence a recorded fact instead of an accident nobody can see.
+PACKED_MESH_CORE_ARGUMENTS = (
+    KernelArgument("n_packs", "const ptrdiff_t n_packs", "pack"),
+    KernelArgument("n_elements_per_pack", "const ptrdiff_t n_elements_per_pack", "pack"),
+    KernelArgument("nelements", "const ptrdiff_t nelements", "pack"),
+    KernelArgument("nnodes", "const ptrdiff_t nnodes", "pack"),
+    KernelArgument("max_nodes_per_pack", "const ptrdiff_t max_nodes_per_pack", "pack"),
+    KernelArgument("elements", "uint16_t **const RSTR elements", "pack"),
+    KernelArgument("owned_nodes_ptr", "const ptrdiff_t *const RSTR owned_nodes_ptr", "pack"),
+    KernelArgument("n_shared_nodes", "const ptrdiff_t *const RSTR n_shared_nodes", "ghost"),
+    KernelArgument("ghost_ptr", "const ptrdiff_t *const RSTR ghost_ptr", "ghost"),
+    KernelArgument("ghost_idx", "const idx_t *const RSTR ghost_idx", "ghost"),
+)
+
+
+def packed_mesh_ghost_reduce_arguments(scalar="s_t"):
+    """The tail a two-pass packed kernel adds, for its deterministic reduction.
+
+    `scalar` is the buffer's element type, which is `s_t` inside a template and
+    the dispatched scalar at an `extern "C"` boundary -- the one part of this
+    sequence a caller spells for itself.
+    """
+    return (
+        KernelArgument("n_ghost_entries", "const ptrdiff_t n_ghost_entries", "ghost"),
+        KernelArgument("n_ghost_reduce_rows", "const ptrdiff_t n_ghost_reduce_rows", "ghost"),
+        KernelArgument("ghost_reduce_ptr", "const ptrdiff_t *const RSTR ghost_reduce_ptr", "ghost"),
+        KernelArgument("ghost_reduce_idx", "const ptrdiff_t *const RSTR ghost_reduce_idx", "ghost"),
+        KernelArgument("ghost_reduce_dest", "const idx_t *const RSTR ghost_reduce_dest", "ghost"),
+        KernelArgument("ghost_buf", "%s *const RSTR ghost_buf" % scalar, "ghost"),
+    )
+
+
+#: What the inexact family's packed kernels take instead.
+#:
+#: Two arguments the sequence above carries are absent, and only one of the two
+#: absences had ever been written down.  `n_shared_nodes` exists so a one-pass
+#: kernel can tell which owned nodes need an atomic, and these kernels are
+#: two-pass only, so it would never be read; that reason was in the emitter's
+#: docstring.  `nnodes` is absent too, and no comment anywhere says why -- it is
+#: recorded here as an observation, not as a justification.
+#:
+#: The ordering difference has no stated reason either.  It is preserved because
+#: changing it changes a published C ABI, which is a decision about the library's
+#: interface rather than about where a decision lives.
+PACKED_MESH_REDUCE_ONLY_ARGUMENTS = (
+    KernelArgument("n_packs", "const ptrdiff_t n_packs", "pack"),
+    KernelArgument("n_elements_per_pack", "const ptrdiff_t n_elements_per_pack", "pack"),
+    KernelArgument("nelements", "const ptrdiff_t nelements", "pack"),
+    KernelArgument("max_nodes_per_pack", "const ptrdiff_t max_nodes_per_pack", "pack"),
+    KernelArgument("elements", "uint16_t **const RSTR elements", "pack"),
+    KernelArgument("owned_nodes_ptr", "const ptrdiff_t *const RSTR owned_nodes_ptr", "pack"),
+    KernelArgument("n_ghost_entries", "const ptrdiff_t n_ghost_entries", "ghost"),
+    KernelArgument("n_ghost_reduce_rows", "const ptrdiff_t n_ghost_reduce_rows", "ghost"),
+    KernelArgument("ghost_ptr", "const ptrdiff_t *const RSTR ghost_ptr", "ghost"),
+    KernelArgument("ghost_idx", "const idx_t *const RSTR ghost_idx", "ghost"),
+    KernelArgument("ghost_reduce_ptr", "const ptrdiff_t *const RSTR ghost_reduce_ptr", "ghost"),
+    KernelArgument("ghost_reduce_idx", "const ptrdiff_t *const RSTR ghost_reduce_idx", "ghost"),
+    KernelArgument("ghost_reduce_dest", "const idx_t *const RSTR ghost_reduce_dest", "ghost"),
+    KernelArgument("ghost_buf", "s_t *const RSTR ghost_buf", "ghost"),
+)

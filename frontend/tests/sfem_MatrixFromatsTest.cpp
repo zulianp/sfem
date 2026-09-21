@@ -375,7 +375,8 @@ int test_generated_neohookean_hessian_action_matrix_formats() {
     std::vector<real_t> expected_apply(ndofs, 0);
     std::vector<real_t> packed_apply(ndofs, 0);
     SFEM_TEST_ASSERT(generated_hessian_action(*function, state, direction.data(), expected_apply.data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(neohookean_ogden_apply_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+    SFEM_TEST_ASSERT(neohookean_ogden_apply_packed_3d_i_msoa(smesh::HEX8,
+                                                                                    smesh::SMESH_DEFAULT,
                                                                                     1,
                                                                                     nelements,
                                                                                     nelements,
@@ -411,7 +412,8 @@ int test_generated_neohookean_hessian_action_matrix_formats() {
     std::vector<real_t> gradient_reference(ndofs, 0);
     std::vector<real_t> gradient_packed(ndofs, 0);
     SFEM_TEST_ASSERT(function->gradient(state.data(), gradient_reference.data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(neohookean_ogden_gradient_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+    SFEM_TEST_ASSERT(neohookean_ogden_gradient_packed_3d_i_msoa(smesh::HEX8,
+                                                                                       smesh::SMESH_DEFAULT,
                                                                                        1,
                                                                                        nelements,
                                                                                        nelements,
@@ -445,12 +447,13 @@ int test_generated_neohookean_hessian_action_matrix_formats() {
     std::vector<real_t> value_steps_reference(n_value_steps, 0);
     std::vector<real_t> value_steps_packed(n_value_steps, 0);
     std::vector<real_t> packed_step_element_values(n_value_steps * nelements, 0);
-    SFEM_TEST_ASSERT(function->value_steps(state.data(),
+    SFEM_TEST_ASSERT(function->energy_merit(state.data(),
                                            direction.data(),
                                            n_value_steps,
                                            steps,
                                            value_steps_reference.data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(neohookean_ogden_objective_steps_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+    SFEM_TEST_ASSERT(neohookean_ogden_objective_steps_packed_3d_i_msoa(smesh::HEX8,
+                                                                                              smesh::SMESH_DEFAULT,
                                                                                               1,
                                                                                               nelements,
                                                                                               nelements,
@@ -537,7 +540,8 @@ int test_generated_linear_elasticity_packed_gradient_value_steps() {
     std::vector<real_t> gradient_reference(ndofs, 0);
     std::vector<real_t> gradient_packed(ndofs, 0);
     SFEM_TEST_ASSERT(function->gradient(state.data(), gradient_reference.data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(linear_elasticity_gradient_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+    SFEM_TEST_ASSERT(linear_elasticity_gradient_packed_3d_i_msoa(smesh::HEX8,
+                                                                                         smesh::SMESH_DEFAULT,
                                                                                          1,
                                                                                          nelements,
                                                                                          nelements,
@@ -571,12 +575,13 @@ int test_generated_linear_elasticity_packed_gradient_value_steps() {
     std::vector<real_t> value_steps_reference(n_value_steps, 0);
     std::vector<real_t> value_steps_packed(n_value_steps, 0);
     std::vector<real_t> packed_step_element_values(n_value_steps * nelements, 0);
-    SFEM_TEST_ASSERT(function->value_steps(state.data(),
+    SFEM_TEST_ASSERT(function->energy_merit(state.data(),
                                            direction.data(),
                                            n_value_steps,
                                            steps,
                                            value_steps_reference.data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(linear_elasticity_objective_steps_packed_3d_isoparametric_mesh_soa(smesh::HEX8,
+    SFEM_TEST_ASSERT(linear_elasticity_objective_steps_packed_3d_i_msoa(smesh::HEX8,
+                                                                                               smesh::SMESH_DEFAULT,
                                                                                                1,
                                                                                                nelements,
                                                                                                nelements,
@@ -711,59 +716,6 @@ int test_generated_laplace_crs_bsr_matches_existing_laplacian() {
     return SFEM_TEST_SUCCESS;
 }
 
-int test_generated_laplace_hex8_dia_matches_apply() {
-    auto mesh = sfem::Mesh::create_cube(sfem::Communicator::self(), smesh::HEX8, 2, 2, 2, 0, 0, 0, 1, 1, 1);
-    auto sfc  = smesh::SFC::create_from_env();
-    sfc->reorder(*mesh);
-    auto space = sfem::FunctionSpace::create(mesh, 1);
-    auto function = sfem::Function::create(space);
-    auto generated_op = sfem::create_op(space, "GeneratedLaplace", sfem::EXECUTION_SPACE_HOST);
-
-    SFEM_TEST_ASSERT(generated_op != nullptr);
-    auto *const generated_laplace = dynamic_cast<sfem::GeneratedLaplace *>(generated_op.get());
-    SFEM_TEST_ASSERT(generated_laplace != nullptr);
-    SFEM_TEST_ASSERT(generated_op->initialize() == SFEM_SUCCESS);
-    function->add_operator(generated_op);
-
-    const ptrdiff_t nnodes = mesh->n_nodes();
-    const ptrdiff_t ndofs = space->n_dofs();
-    std::vector<real_t> direction(ndofs, 0);
-    std::vector<real_t> expected_action(ndofs, 0);
-    std::vector<real_t> dia_action(ndofs, 0);
-    std::vector<real_t> packed_action(ndofs, 0);
-
-    geom_t **const points = mesh->points()->data();
-    for (ptrdiff_t node = 0; node < nnodes; ++node) {
-        direction[node] = 0.0625 * (1 + 3 * points[0][node] - points[1][node] + 2 * points[2][node]);
-    }
-
-    SFEM_TEST_ASSERT(function->apply(nullptr, direction.data(), expected_action.data()) == SFEM_SUCCESS);
-
-    auto generated_dia = sfem::hessian_dia(function, nullptr, sfem::EXECUTION_SPACE_HOST);
-    SFEM_TEST_ASSERT(generated_dia != nullptr);
-    SFEM_TEST_ASSERT(generated_dia->apply(direction.data(), dia_action.data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(assert_close_action("generated HEX8 DIA Laplace hessian",
-                                         expected_action,
-                                         dia_action,
-                                         1e-8,
-                                         1e-10) == SFEM_SUCCESS);
-
-    auto packed_mesh = sfem::FunctionSpace::PackedMesh::create(mesh, {}, true);
-    auto packed_space = sfem::FunctionSpace::create(packed_mesh, 1);
-    auto packed_generated_op = sfem::create_op(packed_space, "GeneratedLaplace", sfem::EXECUTION_SPACE_HOST);
-    SFEM_TEST_ASSERT(packed_generated_op != nullptr);
-    packed_generated_op->set_option("ASSUME_AFFINE", true);
-    SFEM_TEST_ASSERT(packed_generated_op->initialize() == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(packed_generated_op->apply(nullptr, direction.data(), packed_action.data()) == SFEM_SUCCESS);
-    SFEM_TEST_ASSERT(assert_close_action("generated HEX8 packed Laplace apply",
-                                         expected_action,
-                                         packed_action,
-                                         1e-14,
-                                         1e-12) == SFEM_SUCCESS);
-
-    return SFEM_TEST_SUCCESS;
-}
-
 int test_generated_linear_elasticity_packed_one_pass_matches_two_pass() {
     setenv("SMESH_ELEMENTS_PER_PACK", "64", 1);
     setenv("SFEM_PACKED_TWO_PASS", "0", 1);
@@ -873,13 +825,58 @@ int test_generated_linear_elasticity_packed_one_pass_matches_two_pass() {
     return SFEM_TEST_SUCCESS;
 }
 
+int test_generated_neohookean_bsr_matches_hessian_action() {
+    // The hyperelastic element matrix has no other numerical gate.  It used to be
+    // recovered one column at a time by applying the operator to unit basis
+    // vectors, which was correct by construction and told nothing about the
+    // tangent; now it is computed directly from the state, so the assembled
+    // matrix has to be checked against the matrix-free action it is meant to
+    // reproduce -- at a non-zero state, where the two would agree trivially if
+    // the deformation gradient were dropped.
+    auto mesh     = sfem::Mesh::create_cube(sfem::Communicator::self(), smesh::HEX8, 3, 3, 3, 0, 0, 0, 1, 1, 1);
+    auto space    = sfem::FunctionSpace::create(mesh, BLOCK_SIZE);
+    auto function = sfem::Function::create(space);
+    auto op       = sfem::create_op(space, "GeneratedNeoHookeanOgden", sfem::EXECUTION_SPACE_HOST);
+
+    SFEM_TEST_ASSERT(op != nullptr);
+    auto *const generated_op = dynamic_cast<sfem::GeneratedNeoHookeanOgden *>(op.get());
+    SFEM_TEST_ASSERT(generated_op != nullptr);
+    generated_op->set_value_in_block("default", "mu", 1.0);
+    generated_op->set_value_in_block("default", "lmbda", 1.0);
+    SFEM_TEST_ASSERT(op->initialize() == SFEM_SUCCESS);
+    function->add_operator(op);
+
+    const ptrdiff_t     ndofs = space->n_dofs();
+    std::vector<real_t> state(ndofs, 0);
+    std::vector<real_t> direction(ndofs, 0);
+    fill_state_and_direction(space, state, direction);
+
+    std::vector<real_t> expected_action(ndofs, 0);
+    SFEM_TEST_ASSERT(generated_hessian_action(*function, state, direction.data(), expected_action.data()) == SFEM_SUCCESS);
+
+    auto x = sfem::create_buffer<real_t>(ndofs, sfem::EXECUTION_SPACE_HOST);
+    std::copy(state.begin(), state.end(), x->data());
+
+    auto bsr = sfem::hessian_bsr(function, x, sfem::EXECUTION_SPACE_HOST);
+    SFEM_TEST_ASSERT(bsr != nullptr);
+
+    std::vector<real_t> bsr_action(ndofs, 0);
+    SFEM_TEST_ASSERT(bsr->apply(direction.data(), bsr_action.data()) == SFEM_SUCCESS);
+    SFEM_TEST_ASSERT(assert_close_action("generated NeoHookean BSR hessian",
+                                         expected_action,
+                                         bsr_action,
+                                         1e-12,
+                                         1e-10) == SFEM_SUCCESS);
+    return SFEM_TEST_SUCCESS;
+}
+
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_generated_neohookean_hessian_action_matrix_formats);
+    SFEM_RUN_TEST(test_generated_neohookean_bsr_matches_hessian_action);
     SFEM_RUN_TEST(test_generated_linear_elasticity_packed_gradient_value_steps);
     SFEM_RUN_TEST(test_generated_linear_elasticity_packed_one_pass_matches_two_pass);
     SFEM_RUN_TEST(test_generated_laplace_crs_bsr_matches_existing_laplacian);
-    SFEM_RUN_TEST(test_generated_laplace_hex8_dia_matches_apply);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

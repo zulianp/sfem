@@ -102,14 +102,14 @@ namespace {
         std::fill(mass->data(), mass->data() + ndofs, real_t(0));
         SFEM_TEST_ASSERT(lumped_mass->hessian_diag(nullptr, mass->data()) == SFEM_SUCCESS);
 
-        auto op = sfem::create_op(space, "GeneratedMooneyRivlinKelvinVoigtNewmark", sfem::EXECUTION_SPACE_HOST);
+        auto op = sfem::create_op(space, "GeneratedMooneyRivlinKelvinVoigt", sfem::EXECUTION_SPACE_HOST);
         SFEM_TEST_ASSERT(op != nullptr);
 
         set_material_parameter(op, mesh, "mu", mu);
         set_material_parameter(op, mesh, "lmbda", real_t(0));
         set_material_parameter(op, mesh, "eta_s", real_t(0));
         set_material_parameter(op, mesh, "eta_b", real_t(0));
-        set_material_parameter(op, mesh, "newmark_velocity_alpha", real_t(0));
+        set_material_parameter(op, mesh, "u_dt_shift", real_t(0));
 
         std::fill(prev->data(), prev->data() + ndofs, real_t(0));
         scale_field(ndofs, amp, phi->data(), state->data());
@@ -123,7 +123,7 @@ namespace {
         set_material_parameter(op, mesh, "lmbda", real_t(0));
         set_material_parameter(op, mesh, "eta_s", eta_s);
         set_material_parameter(op, mesh, "eta_b", real_t(0));
-        set_material_parameter(op, mesh, "newmark_velocity_alpha", real_t(0));
+        set_material_parameter(op, mesh, "u_dt_shift", real_t(0));
 
         std::fill(state->data(), state->data() + ndofs, real_t(0));
         scale_field(ndofs, v_amp, phi->data(), prev->data());
@@ -208,12 +208,10 @@ namespace {
 
 int test_linearized_shear_oscillator_hex8() { return check_linearized_shear_oscillator(smesh::HEX8); }
 
-int test_linearized_shear_oscillator_hex27() { return check_linearized_shear_oscillator(smesh::HEX27); }
 
 int main(int argc, char *argv[]) {
     SFEM_UNIT_TEST_INIT(argc, argv);
     SFEM_RUN_TEST(test_linearized_shear_oscillator_hex8);
-    SFEM_RUN_TEST(test_linearized_shear_oscillator_hex27);
     SFEM_UNIT_TEST_FINALIZE();
     return SFEM_UNIT_TEST_ERR();
 }

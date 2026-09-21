@@ -897,18 +897,34 @@ int test_mooney_rivlin_gravity() {
     blas->scal(ndofs, density, mass_diag->data());
     f->set_value_to_constrained_dofs(1.0, mass_diag->data());  // Set 1 for BC nodes
 
-    // **Gravity force vector**
-    auto f_gravity_neg = sfem::create_buffer<real_t>(ndofs, es);
-    blas->zeros(ndofs, f_gravity_neg->data());
-
-    // Gravity in -GRAVITY_DIR direction (positive SFEM_GRAVITY causes motion in -GRAVITY_DIR)
+    // **Gravity as an operator the Function owns**
+    //
+    // This used to be a vector built here by hand -- the lumped mass diagonal
+    // times `rho * g` -- and `axpy`'d onto the residual below.  Built outside
+    // the `Function`, it was invisible to `Function::value`, so the merit was
+    // `1/2*||R_interior||^2`: not zero at the solution being sought, and wrong
+    // for any line search along it.
+    //
+    // The operator computes the consistent load `int(rho * g . v)`.  For a
+    // constant `g` that is the same vector as the lumped construction, exactly:
+    // row-sum lumping gives `M_ii = sum_j int(phi_i phi_j) = int(phi_i)` by
+    // partition of unity, so `rho * M_ii * g` is `int(rho * g * phi_i)`.
+    // `test_body_force_matches_the_lumped_construction` pins that, which is why
+    // this trajectory does not move.
     const ptrdiff_t n_nodes = fs->mesh_ptr()->n_nodes();
     printf("Gravity: %.4f in -%s direction\n", SFEM_GRAVITY, SFEM_GRAVITY_DIR == 0 ? "x" : (SFEM_GRAVITY_DIR == 1 ? "y" : "z"));
-    for (ptrdiff_t node = 0; node < n_nodes; ++node) {
-        f_gravity_neg->data()[node * 3 + SFEM_GRAVITY_DIR] = mass_diag->data()[node * 3 + SFEM_GRAVITY_DIR] * SFEM_GRAVITY;
+    auto gravity_op = sfem::create_op(fs, "GeneratedBodyForce", es);
+    SFEM_TEST_ASSERT(gravity_op != nullptr);
+    for (auto &block : fs->mesh_ptr()->blocks()) {
+        gravity_op->set_value_in_block(block->name(), "density", density);
+        for (int component = 0; component < 3; ++component) {
+            gravity_op->set_value_in_block(
+                    block->name(),
+                    component == 0 ? "g0" : (component == 1 ? "g1" : "g2"),
+                    component == SFEM_GRAVITY_DIR ? -SFEM_GRAVITY : 0.0);
+        }
     }
-    // Apply BC to gravity force (zero at constrained DOFs)
-    f->set_value_to_constrained_dofs(0.0, f_gravity_neg->data());
+    f->add_operator(gravity_op);
 
     // Output setup
     bool SFEM_ENABLE_OUTPUT = false;
@@ -1315,28 +1331,26 @@ int test_mooney_rivlin_gravity() {
             real_t inertia_norm = blas->norm2(ndofs, inertia_term->data());
             blas->axpy(ndofs, 1.0, inertia_term->data(), rhs->data());
 
-            // F_int(x)
+            // F_int(x) and the gravity load together: `Function::gradient` runs
+            // every operator it owns, which is the point of the body force
+            // being one.
             blas->zeros(ndofs, f_int->data());
-            op->gradient(x->data(), f_int->data());
+            f->gradient(x->data(), f_int->data());
             real_t f_int_norm = blas->norm2(ndofs, f_int->data());
             blas->axpy(ndofs, 1.0, f_int->data(), rhs->data());
 
-            // F_ext (Gravity body force) - same convention as Neumann gradient
-            real_t f_grav_norm = blas->norm2(ndofs, f_gravity_neg->data());
-            blas->axpy(ndofs, 1.0, f_gravity_neg->data(), rhs->data());
 
             // Apply BC to residual
             f->set_value_to_constrained_dofs(0.0, rhs->data());
             real_t r_norm = blas->norm2(ndofs, rhs->data());
             real_t x_norm = blas->norm2(ndofs, x->data());
 
-            printf("  Iter %d: |R|=%e |u|=%e |M*a|=%e |F_int|=%e |F_grav|=%e\n",
+            printf("  Iter %d: |R|=%e |u|=%e |M*a|=%e |F_int+F_grav|=%e\n",
                    iter,
                    r_norm,
                    x_norm,
                    inertia_norm,
-                   f_int_norm,
-                   f_grav_norm);
+                   f_int_norm);
             if (r_norm < 1e-8) break;
 
             // ===== Tangent Stiffness: K_eff = K_tan + c0*M =====

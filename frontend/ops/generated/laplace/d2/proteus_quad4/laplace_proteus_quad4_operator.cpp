@@ -1,49 +1,41 @@
+#include <cstdio>
 #include <type_traits>
-#include <cstdint>
-#include <cstdlib>
-#include <string.h>
 #include "../laplace_d2_tensor_product_local.hpp"
+#include "../laplace_d2_tensor_product_hessian.hpp"
+#include "../../../reference/line_p1_q2.hpp"
+#include "../../../reference/quad_line_q2.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
-#include "../../../packed_thread_scratch.hpp"
-
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
-#ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#endif
 #ifdef _OPENMP
 #include <omp.h>
 #endif
-#include <cstdio>
+#include <cstdint>
+#include <cstdlib>
+#include "../../../packed_thread_scratch.hpp"
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
-        const int,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT,
-        std::true_type) {
-    return source;
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int,
+    const g_t *const RSTR source,
+    s_t *const RSTR,
+    std::true_type) {
+  return source;
 }
 
-template <typename scalar_t, typename jacobian_t, int VECTOR_SIZE>
-SFEM_INLINE const scalar_t *affine_geometry_stream(
-        const int nelems,
-        const jacobian_t *const SFEM_RESTRICT source,
-        scalar_t *const SFEM_RESTRICT converted,
-        std::false_type) {
-    #pragma omp simd
-    for (int lane = 0; lane < nelems; ++lane) {
-        converted[lane] = scalar_t(source[lane]);
-    }
-    return converted;
+template <typename s_t, typename g_t, int VS>
+SFEM_INLINE const s_t *ageom_stream(
+    const int ne,
+    const g_t *const RSTR source,
+    s_t *const RSTR converted,
+    std::false_type) {
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    converted[lane] = s_t(source[lane]);
+  }
+  return converted;
 }
 
 } // namespace codegen
@@ -52,1912 +44,820 @@ SFEM_INLINE const scalar_t *affine_geometry_stream(
 namespace sfem {
 namespace codegen {
 
-
-template <typename scalar_t>
-struct laplace_proteus_quad4_affine_reference_data {
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
-        return data;
-    }
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
-        return data;
-    }
-    static const scalar_t *q_weight_1d() {
-        static const scalar_t data[2] = {scalar_t(0.5), scalar_t(0.5)};
-        return data;
-    }
-};
-
-template <typename scalar_t>
-struct laplace_proteus_quad4_isoparametric_reference_data {
-    static const scalar_t *shape_1d() {
-        static const scalar_t data[4] = {scalar_t(0.78867513459481287), scalar_t(0.21132486540518708), scalar_t(0.21132486540518713), scalar_t(0.78867513459481287)};
-        return data;
-    }
-    static const scalar_t *grad_1d() {
-        static const scalar_t data[4] = {scalar_t(-1), scalar_t(1), scalar_t(-1), scalar_t(1)};
-        return data;
-    }
-    static const scalar_t *q_weight_1d() {
-        static const scalar_t data[2] = {scalar_t(0.5), scalar_t(0.5)};
-        return data;
-    }
-};
-
-} // namespace codegen
-} // namespace sfem
-
-namespace sfem {
-namespace codegen {
-
-static const KernelDiagnostics laplace_proteus_quad4_residual_element_soa_diagnostics_data = {
-    "laplace_proteus_quad4_residual_element_soa",
-    "PROTEUS_QUAD4",
-    2,
-    4,
-    4,
-    16,
-    2,
-    1,
-    3,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    5,
-    1,
-    4,
-    0,
-    0,
-    0,
-    5,
-    5,
-    8,
-    2,
-    1,
-    4,
-    0,
-    4,
-    1,
-    1,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+static const KernelDiagnostics laplace_proteus_quad4_objective_soa_diagnostics_data = {
+  "laplace_proteus_quad4_objective_soa",
+  "PROTEUS_QUAD4",
+  2,
+  4,
+  4,
+  16,
+  2,
+  1,
+  2,
+  0,
+  0,
+  2,
+  0,
+  0,
+  0,
+  2,
+  1,
+  5,
+  160,
+  332,
+  0,
+  3,
+  5,
+  8,
+  2,
+  2,
+  8,
+  0,
+  1,
+  1,
+  1,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_residual_element_soa_diagnostics(void) {
-    return &sfem::codegen::laplace_proteus_quad4_residual_element_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_objective_soa_diagnostics(void) {
+  return &sfem::codegen::laplace_proteus_quad4_objective_soa_diagnostics_data;
 }
 
-extern "C" double laplace_proteus_quad4_residual_element_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-            &sfem::codegen::laplace_proteus_quad4_residual_element_soa_diagnostics_data,
-            nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void laplace_proteus_quad4_residual_element_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "laplace_proteus_quad4_residual_element_soa",
-            &sfem::codegen::laplace_proteus_quad4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_residual_element_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "laplace_proteus_quad4_residual_element_soa_float",
-            &sfem::codegen::laplace_proteus_quad4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_residual_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "laplace_proteus_quad4_residual_affine_mesh_soa",
-            &sfem::codegen::laplace_proteus_quad4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_residual_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "laplace_proteus_quad4_residual_affine_mesh_soa_float",
-            &sfem::codegen::laplace_proteus_quad4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_residual_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "laplace_proteus_quad4_residual_isoparametric_mesh_soa",
-            &sfem::codegen::laplace_proteus_quad4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_residual_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "laplace_proteus_quad4_residual_isoparametric_mesh_soa_float",
-            &sfem::codegen::laplace_proteus_quad4_residual_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
 
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics laplace_proteus_quad4_jacobian_u_u_diagnostics_data = {
-    "laplace_proteus_quad4_jacobian_u_u",
-    "PROTEUS_QUAD4",
-    2,
-    4,
-    4,
-    16,
-    2,
-    1,
-    3,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    5,
-    1,
-    4,
-    0,
-    0,
-    0,
-    5,
-    5,
-    8,
-    2,
-    1,
-    0,
-    4,
-    4,
-    1,
-    1,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int laplace_proteus_quad4_objective_steps_i_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
+        const s_t kappa,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
+        const int nsteps,
+        const s_t *const RSTR steps,
+        s_t *const RSTR value
+) {
+  static constexpr int NC = 1;
+  static constexpr int ND = 2;
+  static constexpr int NQ = 4;
+  static constexpr int NS = 4;
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bh_data[NS * NC][VS];
+    s_t bcoordinate_data[NS * ND][VS];
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t bdet0[NQ * VS];
+
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const g_t *const coordinate_components[ND] = {x, y};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < ND; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
+        }
+      }
+    }
+
+    const s_t *const u_components[NC] = {ux};
+    const s_t *const h_components[NC] = {hx};
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+        }
+      }
+    }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    for (int step = 0; step < nsteps; ++step) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        value[(ptrdiff_t)step * nelements + evb + lane] = s_t(0);
+      }
+    }
+
+    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_proteus_quad4_objective_steps_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_objective_steps_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_objective_steps_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_objective_steps_i_msoa", -1, (int)scalar_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics laplace_proteus_quad4_gradient_soa_diagnostics_data = {
+  "laplace_proteus_quad4_gradient_soa",
+  "PROTEUS_QUAD4",
+  2,
+  4,
+  4,
+  16,
+  2,
+  0,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  2,
+  2,
+  2,
+  300,
+  472,
+  0,
+  2,
+  5,
+  8,
+  2,
+  2,
+  8,
+  0,
+  4,
+  4,
+  4,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_jacobian_u_u_diagnostics(void) {
-    return &sfem::codegen::laplace_proteus_quad4_jacobian_u_u_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_gradient_soa_diagnostics(void) {
+  return &sfem::codegen::laplace_proteus_quad4_gradient_soa_diagnostics_data;
 }
 
-extern "C" double laplace_proteus_quad4_jacobian_u_u_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-            &sfem::codegen::laplace_proteus_quad4_jacobian_u_u_diagnostics_data,
-            nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void laplace_proteus_quad4_jacobian_u_u_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "laplace_proteus_quad4_jacobian_u_u",
-            &sfem::codegen::laplace_proteus_quad4_jacobian_u_u_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_jacobian_u_u_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "laplace_proteus_quad4_jacobian_u_u_float",
-            &sfem::codegen::laplace_proteus_quad4_jacobian_u_u_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
 
 namespace sfem {
 namespace codegen {
 
-static const KernelDiagnostics laplace_proteus_quad4_jacobian_action_element_soa_diagnostics_data = {
-    "laplace_proteus_quad4_jacobian_action_element_soa",
-    "PROTEUS_QUAD4",
-    2,
-    4,
-    4,
-    16,
-    2,
-    1,
-    3,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    5,
-    1,
-    4,
-    0,
-    0,
-    0,
-    5,
-    5,
-    8,
-    2,
-    1,
-    0,
-    4,
-    4,
-    1,
-    1,
-    1.0,
-    1.0,
-    8.0,
-    12.0,
-    16.0,
-    20.0,
-    20.0,
-    24.0,
-    1.0,
-    1.0
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int laplace_proteus_quad4_gradient_i_msoa_impl(
+        const ptrdiff_t nelements,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
+        const s_t kappa,
+        const ptrdiff_t u_stride,
+        const s_t *const RSTR ux,
+        const ptrdiff_t out_stride,
+        s_t *const RSTR outx
+) {
+  static constexpr int NC = 1;
+  static constexpr int ND = 2;
+  static constexpr int NQ = 4;
+  static constexpr int NS = 4;
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
+
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bu_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
+    s_t bcoordinate_data[NS * ND][VS];
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t bdet0[NQ * VS];
+
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const g_t *const coordinate_components[ND] = {x, y};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < ND; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
+        }
+      }
+    }
+    const s_t *const u_components[NC] = {ux};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
+    }
+
+    const s_t *bu_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bu_streams[stream] = bu_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    laplace_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
+}
+
+} // namespace codegen
+} // namespace sfem
+
+extern "C" int laplace_proteus_quad4_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_gradient_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_gradient_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_gradient_i_msoa", -1, (int)scalar_bytes);
+}
+
+
+namespace sfem {
+namespace codegen {
+
+static const KernelDiagnostics laplace_proteus_quad4_apply_soa_diagnostics_data = {
+  "laplace_proteus_quad4_apply_soa",
+  "PROTEUS_QUAD4",
+  2,
+  4,
+  4,
+  16,
+  2,
+  0,
+  2,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  2,
+  2,
+  300,
+  472,
+  0,
+  2,
+  5,
+  8,
+  2,
+  2,
+  0,
+  8,
+  4,
+  4,
+  4,
+  1.0,
+  1.0,
+  8.0,
+  12.0,
+  16.0,
+  20.0,
+  20.0,
+  24.0,
+  1.0,
+  1.0
 };
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_jacobian_action_element_soa_diagnostics(void) {
-    return &sfem::codegen::laplace_proteus_quad4_jacobian_action_element_soa_diagnostics_data;
+extern "C" const sfem::codegen::KernelDiagnostics *laplace_proteus_quad4_apply_soa_diagnostics(void) {
+  return &sfem::codegen::laplace_proteus_quad4_apply_soa_diagnostics_data;
 }
 
-extern "C" double laplace_proteus_quad4_jacobian_action_element_soa_arithmetic_intensity(
-        const ptrdiff_t nelements,
-        const size_t scalar_bytes,
-        const size_t real_bytes,
-        const size_t accumulator_bytes) {
-    return sfem::codegen::KernelDiagnostics_arithmetic_intensity(
-            &sfem::codegen::laplace_proteus_quad4_jacobian_action_element_soa_diagnostics_data,
-            nelements, scalar_bytes, real_bytes, accumulator_bytes);
-}
-
-extern "C" void laplace_proteus_quad4_jacobian_action_element_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "laplace_proteus_quad4_jacobian_action_element_soa",
-            &sfem::codegen::laplace_proteus_quad4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_jacobian_action_element_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate(
-            "laplace_proteus_quad4_jacobian_action_element_soa_float",
-            &sfem::codegen::laplace_proteus_quad4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_jacobian_action_affine_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "laplace_proteus_quad4_jacobian_action_affine_mesh_soa",
-            &sfem::codegen::laplace_proteus_quad4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_jacobian_action_affine_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_affine_mesh(
-            "laplace_proteus_quad4_jacobian_action_affine_mesh_soa_float",
-            &sfem::codegen::laplace_proteus_quad4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" void laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa",
-            &sfem::codegen::laplace_proteus_quad4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(double), sizeof(double), sizeof(double));
-}
-
-extern "C" void laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float_print_rate(
-        const double elapsed,
-        const ptrdiff_t nelements,
-        const ptrdiff_t ndofs) {
-    sfem::codegen::KernelDiagnostics_print_rate_isoparametric_mesh(
-            "laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float",
-            &sfem::codegen::laplace_proteus_quad4_jacobian_action_element_soa_diagnostics_data,
-            elapsed, nelements, ndofs,
-            sizeof(float), sizeof(float), sizeof(float));
-}
-
-extern "C" int laplace_proteus_quad4_residual_element_soa(
-        const int nelems,
-        const ptrdiff_t geometry_stride,
-        const double *const SFEM_RESTRICT determinant,
-        const double *const SFEM_RESTRICT adjugate[4],
-        const double *const SFEM_RESTRICT current[4],
-        const double kappa,
-        double *const SFEM_RESTRICT output[4]
-) {
-    sfem::codegen::laplace_d2_tensor_product_residual_block<double, 4, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<double>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<double>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<double>::q_weight_1d(), current, kappa, output);
-    return SFEM_SUCCESS;
-}
-
-extern "C" int laplace_proteus_quad4_residual_element_soa_float(
-        const int nelems,
-        const ptrdiff_t geometry_stride,
-        const float *const SFEM_RESTRICT determinant,
-        const float *const SFEM_RESTRICT adjugate[4],
-        const float *const SFEM_RESTRICT current[4],
-        const float kappa,
-        float *const SFEM_RESTRICT output[4]
-) {
-    sfem::codegen::laplace_d2_tensor_product_residual_block<float, 4, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<float>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<float>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<float>::q_weight_1d(), current, kappa, output);
-    return SFEM_SUCCESS;
-}
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int laplace_proteus_quad4_residual_affine_mesh_soa_impl(
+template <typename s_t, typename g_t, int VS>
+static SFEM_INLINE int laplace_proteus_quad4_apply_i_msoa_impl(
         const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t kappa,
-        const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT u,
+        const ptrdiff_t,
+        idx_t **const RSTR elements,
+        const g_t *const *const RSTR points,
+        const s_t kappa,
+        const ptrdiff_t h_stride,
+        const s_t *const RSTR hx,
         const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u_out
+        s_t *const RSTR outx
 ) {
-    static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_FIELDS = 1;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::laplace_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::laplace_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::laplace_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
-    const idx_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
+  static constexpr int NC = 1;
+  static constexpr int ND = 2;
+  static constexpr int NQ = 4;
+  static constexpr int NS = 4;
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        const scalar_t *const current_components[N_FIELDS] = {u};
+  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
+    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+    idx_t ev[VS * NS];
+    s_t bh_data[NS * NC][VS];
+    s_t bout_data[NS * NC][VS];
+    s_t bcoordinate_data[NS * ND][VS];
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t bdet0[NQ * VS];
 
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
-                    block_current[stream][lane] = current_components[field][node * current_stride];
-                }
-            }
-        }
+    for (int element_node = 0; element_node < NS; ++element_node) {
+      const idx_t *const RSTR element_shape = elements[element_node] + evb;
+      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        ev_node[lane] = element_shape[lane];
+      }
+    }
+    const g_t *const coordinate_components[ND] = {x, y};
 
-        for (int stream = 0; stream < 4; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
-            }
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < ND; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
         }
+      }
+    }
+    const s_t *const h_components[NC] = {hx};
 
-        const jacobian_t *const affine_geometry_sources[5] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin};
-        scalar_t block_affine_geometry_data[5][VECTOR_SIZE];
-        const scalar_t *block_affine_geometry_streams[5];
-        for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
-            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        #pragma omp simd
+        for (int lane = 0; lane < ne; ++lane) {
+          const idx_t node = ev_shape[lane];
+          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
         }
-        const scalar_t *block_adjugate[4];
-        for (int component = 0; component < 4; ++component) {
-            block_adjugate[component] = block_affine_geometry_streams[component];
-        }
-
-        laplace_d2_tensor_product_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[4], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_current, kappa, block_output);
-
-        scalar_t *const output_components[N_FIELDS] = {u_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
-                for (int scatter = 0; scatter < nelems; ++scatter) {
-                    #pragma omp atomic update
-                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
-                }
-            }
-        }
+      }
+    }
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      #pragma omp simd
+      for (int lane = 0; lane < ne; ++lane) {
+        bout_data[stream][lane] = s_t(0);
+      }
     }
 
-    return SFEM_SUCCESS;
+    const s_t *bh_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bh_streams[stream] = bh_data[stream];
+    }
+    s_t *bout_streams[NS * NC];
+    for (int stream = 0; stream < NS * NC; ++stream) {
+      bout_streams[stream] = bout_data[stream];
+    }
+
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    laplace_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bh_streams, bout_streams);
+
+    s_t *const out_components[NC] = {outx};
+
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      for (int d = 0; d < NC; ++d) {
+        {
+          for (int scatter = 0; scatter < ne; ++scatter) {
+            #pragma omp atomic update
+            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+          }
+        }
+      }
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int laplace_proteus_quad4_residual_affine_mesh_soa(
+extern "C" int laplace_proteus_quad4_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 ) {
-    return sfem::codegen::laplace_proteus_quad4_residual_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, current_stride, u, out_stride, u_out);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<double, geom_t, 16>(nelements, nnodes, elements, points, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+    }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_apply_i_msoa_impl<float, geom_t, 16>(nelements, nnodes, elements, points, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_apply_i_msoa", -1, (int)scalar_bytes);
 }
 
-extern "C" int laplace_proteus_quad4_residual_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_residual_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, current_stride, u, out_stride, u_out);
-}
 
 namespace sfem {
 namespace codegen {
 
-template <typename scalar_t>
-static SFEM_INLINE int laplace_proteus_quad4_residual_isoparametric_mesh_soa_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t kappa,
-        const ptrdiff_t current_stride,
-        const scalar_t *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u_out
-) {
-    static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_FIELDS = 1;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    const idx_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_coordinates[2 * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[4][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1]};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
-                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
-                }
-            }
-        }
-        const scalar_t *const current_components[N_FIELDS] = {u};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
-                    block_current[stream][lane] = current_components[field][node * current_stride];
-                }
-            }
-        }
-
-        for (int stream = 0; stream < 4; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
-            }
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
-
-        const scalar_t *const block_adjugate[4] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-
-        laplace_d2_tensor_product_residual_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_current, kappa, block_output);
-
-        scalar_t *const output_components[N_FIELDS] = {u_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
-                for (int scatter = 0; scatter < nelems; ++scatter) {
-                    #pragma omp atomic update
-                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
-                }
-            }
-        }
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int laplace_proteus_quad4_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_residual_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, kappa, current_stride, u, out_stride, u_out);
-}
-
-extern "C" int laplace_proteus_quad4_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_residual_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, kappa, current_stride, u, out_stride, u_out);
-}
-
-extern "C" int laplace_proteus_quad4_residual_isoparametric_mesh_aos(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        double *const SFEM_RESTRICT output
-) {
-    return laplace_proteus_quad4_residual_isoparametric_mesh_soa(nelements, nnodes, elements, points, parameters[0], 1, current + 0, 1, output + 0);
-}
-
-extern "C" int laplace_proteus_quad4_residual_isoparametric_mesh_aos_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        float *const SFEM_RESTRICT output
-) {
-    return laplace_proteus_quad4_residual_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, parameters[0], 1, current + 0, 1, output + 0);
-}
-
-extern "C" int laplace_proteus_quad4_jacobian_action_element_soa(
-        const int nelems,
-        const ptrdiff_t geometry_stride,
-        const double *const SFEM_RESTRICT determinant,
-        const double *const SFEM_RESTRICT adjugate[4],
-        const double *const SFEM_RESTRICT direction[4],
-        const double kappa,
-        double *const SFEM_RESTRICT output[4]
-) {
-    sfem::codegen::laplace_d2_tensor_product_jacobian_action_block<double, 4, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<double>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<double>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<double>::q_weight_1d(), direction, kappa, output);
-    return SFEM_SUCCESS;
-}
-
-extern "C" int laplace_proteus_quad4_jacobian_action_element_soa_float(
-        const int nelems,
-        const ptrdiff_t geometry_stride,
-        const float *const SFEM_RESTRICT determinant,
-        const float *const SFEM_RESTRICT adjugate[4],
-        const float *const SFEM_RESTRICT direction[4],
-        const float kappa,
-        float *const SFEM_RESTRICT output[4]
-) {
-    sfem::codegen::laplace_d2_tensor_product_jacobian_action_block<float, 4, 4, 16>(nelems, geometry_stride, determinant, adjugate, sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<float>::shape_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<float>::grad_1d(), sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<float>::q_weight_1d(), direction, kappa, output);
-    return SFEM_SUCCESS;
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int laplace_proteus_quad4_jacobian_action_affine_mesh_soa_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t kappa,
-        const ptrdiff_t direction_stride,
-        const scalar_t *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u_out
-) {
-    static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_FIELDS = 1;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const affine_shape_1d = sfem::codegen::laplace_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::laplace_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::laplace_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
-    const idx_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        const scalar_t *const direction_components[N_FIELDS] = {u_direction};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
-                    block_direction[stream][lane] = direction_components[field][node * direction_stride];
-                }
-            }
-        }
-
-        for (int stream = 0; stream < 4; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
-            }
-        }
-
-        const jacobian_t *const affine_geometry_sources[5] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin};
-        scalar_t block_affine_geometry_data[5][VECTOR_SIZE];
-        const scalar_t *block_affine_geometry_streams[5];
-        for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
-            block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                    nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
-        }
-        const scalar_t *block_adjugate[4];
-        for (int component = 0; component < 4; ++component) {
-            block_adjugate[component] = block_affine_geometry_streams[component];
-        }
-
-        laplace_d2_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[4], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_direction, kappa, block_output);
-
-        scalar_t *const output_components[N_FIELDS] = {u_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
-                for (int scatter = 0; scatter < nelems; ++scatter) {
-                    #pragma omp atomic update
-                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
-                }
-            }
-        }
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int laplace_proteus_quad4_jacobian_action_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_affine_mesh_soa_impl<double, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_proteus_quad4_jacobian_action_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_affine_mesh_soa_impl<float, geom_t>(nelements, nnodes, elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t, typename jacobian_t>
-static SFEM_INLINE int laplace_proteus_quad4_jacobian_action_packed_affine_mesh_soa_impl(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const jacobian_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const scalar_t kappa,
-        const ptrdiff_t direction_stride,
-        const scalar_t *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u_out
-) {
-    static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_FIELDS = 1;
-    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    (void)max_nodes_per_pack;
-    const scalar_t *const affine_shape_1d = sfem::codegen::laplace_proteus_quad4_affine_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const affine_grad_1d = sfem::codegen::laplace_proteus_quad4_affine_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const affine_q_weight_1d = sfem::codegen::laplace_proteus_quad4_affine_reference_data<scalar_t>::q_weight_1d();
-    const uint16_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const idx_t node = owned_nodes_ptr[pack] + k;
-                pack_direction[k] = u_direction[node * direction_stride];
-            }
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                pack_direction[n_contiguous + k] = u_direction[ghosts[k] * direction_stride];
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
-                scalar_t block_output[N_STREAMS][VECTOR_SIZE];
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT field_shape = field_elements[shape];
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_direction[shape][lane] = pack_direction[field_shape[evbegin + lane]];
-                        block_output[shape][lane] = scalar_t(0);
-                    }
-                }
-                const jacobian_t *const affine_geometry_sources[5] = {g_jacobian_adjugate0 + evbegin, g_jacobian_adjugate1 + evbegin, g_jacobian_adjugate2 + evbegin, g_jacobian_adjugate3 + evbegin, g_jacobian_determinant0 + evbegin};
-                scalar_t block_affine_geometry_data[5][VECTOR_SIZE];
-                const scalar_t *block_affine_geometry_streams[5];
-                for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
-                    block_affine_geometry_streams[geometry_stream] = affine_geometry_stream<scalar_t, jacobian_t, VECTOR_SIZE>(
-                            nelems, affine_geometry_sources[geometry_stream], block_affine_geometry_data[geometry_stream], std::is_same<jacobian_t, scalar_t>());
-                }
-                const scalar_t *block_adjugate[4];
-                for (int component = 0; component < 4; ++component) {
-                    block_adjugate[component] = block_affine_geometry_streams[component];
-                }
-
-                laplace_d2_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, 0, block_affine_geometry_streams[4], block_adjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, block_direction, kappa, block_output);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT field_shape = field_elements[shape];
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        pack_out[field_shape[evbegin + lane]] += block_output[shape][lane];
-                    }
-                }
-            }
-
-            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
-                pack_out[k] = scalar_t(0);
-            }
-            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
-                pack_out[k] = scalar_t(0);
-            }
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                u_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];
-                pack_out[n_contiguous + k] = scalar_t(0);
-            }
-        }
-    }
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int laplace_proteus_quad4_jacobian_action_packed_affine_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_packed_affine_mesh_soa_impl<double, geom_t>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_proteus_quad4_jacobian_action_packed_affine_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_packed_affine_mesh_soa_impl<float, geom_t>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t>
-static SFEM_INLINE int laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t kappa,
-        const ptrdiff_t direction_stride,
-        const scalar_t *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u_out
-) {
-    static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_FIELDS = 1;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    const idx_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t evbegin = 0; evbegin < nelements; evbegin += VECTOR_SIZE) {
-        const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, nelements - evbegin);
-        scalar_t block_coordinates[2 * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[4][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_direction[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_FIELDS * N_SHAPE][VECTOR_SIZE];
-
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1]};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = elements[shape];
-            for (int d = 0; d < DIM; ++d) {
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
-                    block_coordinates[shape * DIM + d][lane] = coordinate_components[d][node];
-                }
-            }
-        }
-        const scalar_t *const direction_components[N_FIELDS] = {u_direction};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                #pragma omp simd
-                for (int lane = 0; lane < nelems; ++lane) {
-                    const idx_t node = element_shape[evbegin + lane];
-                    block_direction[stream][lane] = direction_components[field][node * direction_stride];
-                }
-            }
-        }
-
-        for (int stream = 0; stream < 4; ++stream) {
-            #pragma omp simd
-            for (int lane = 0; lane < nelems; ++lane) {
-                block_output[stream][lane] = scalar_t(0);
-            }
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
-
-        const scalar_t *const block_adjugate[4] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-
-        laplace_d2_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_direction, kappa, block_output);
-
-        scalar_t *const output_components[N_FIELDS] = {u_out};
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t *const SFEM_RESTRICT element_shape = field_elements[shape];
-            for (int field = 0; field < N_FIELDS; ++field) {
-                const int stream = shape * N_FIELDS + field;
-                scalar_t *const SFEM_RESTRICT out = output_components[field];
-                for (int scatter = 0; scatter < nelems; ++scatter) {
-                    #pragma omp atomic update
-                    out[element_shape[evbegin + scatter] * out_stride] += block_output[stream][scatter];
-                }
-            }
-        }
-    }
-
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t>
-static SFEM_INLINE int laplace_proteus_quad4_jacobian_action_packed_isoparametric_mesh_soa_impl(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t kappa,
-        const ptrdiff_t direction_stride,
-        const scalar_t *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u_out
-) {
-    static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_FIELDS = 1;
-    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    const uint16_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const geom_t *const coordinate_components[DIM] = {points[0], points[1]};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    pack_coordinate[k] = scalar_t(coordinate_component[owned_nodes_ptr[pack] + k]);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[ghosts[k]]);
-                }
-            }
-            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const idx_t node = owned_nodes_ptr[pack] + k;
-                pack_direction[k] = u_direction[node * direction_stride];
-            }
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                pack_direction[n_contiguous + k] = u_direction[ghosts[k] * direction_stride];
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
-                scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
-                scalar_t block_determinant[N_QP * VECTOR_SIZE];
-                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
-                scalar_t block_output[N_STREAMS][VECTOR_SIZE];
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT coordinate_shape = elements[shape];
-                    const uint16_t *const SFEM_RESTRICT field_shape = field_elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            block_coordinates[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + coordinate_shape[evbegin + lane]];
-                        }
-                    }
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_direction[shape][lane] = pack_direction[field_shape[evbegin + lane]];
-                        block_output[shape][lane] = scalar_t(0);
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
-                const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-
-                laplace_d2_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_direction, kappa, block_output);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT field_shape = field_elements[shape];
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        pack_out[field_shape[evbegin + lane]] += block_output[shape][lane];
-                    }
-                }
-            }
-
-            for (ptrdiff_t k = 0; k < n_not_shared; ++k) {
-                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
-                pack_out[k] = scalar_t(0);
-            }
-            for (ptrdiff_t k = n_not_shared; k < n_contiguous; ++k) {
-#pragma omp atomic update
-                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
-                pack_out[k] = scalar_t(0);
-            }
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-#pragma omp atomic update
-                u_out[ghosts[k] * out_stride] += pack_out[n_contiguous + k];
-                pack_out[n_contiguous + k] = scalar_t(0);
-            }
-        }
-    }
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int laplace_proteus_quad4_jacobian_action_packed_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_packed_isoparametric_mesh_soa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_proteus_quad4_jacobian_action_packed_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_packed_isoparametric_mesh_soa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t>
-static SFEM_INLINE int laplace_proteus_quad4_jacobian_action_packed_two_pass_isoparametric_mesh_soa_impl(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        scalar_t *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t kappa,
-        const ptrdiff_t direction_stride,
-        const scalar_t *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        scalar_t *const SFEM_RESTRICT u_out
-) {
-    static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_FIELDS = 1;
-    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
-    static constexpr int VECTOR_SIZE = 16;
-    (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    const uint16_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_coordinates = sfem::codegen::thread_scratch<scalar_t>(0, (size_t)DIM * (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_direction = sfem::codegen::thread_scratch<scalar_t>(2, (size_t)max_nodes_per_pack);
-        scalar_t *const SFEM_RESTRICT pack_out = sfem::codegen::thread_scratch<scalar_t>(3, (size_t)max_nodes_per_pack);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
-            const ptrdiff_t e_start = pack * n_elements_per_pack;
-            const ptrdiff_t e_end = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned_nodes_ptr[pack];
-            const ptrdiff_t n_shared = n_shared_nodes[pack];
-            const ptrdiff_t n_not_shared = n_contiguous - n_shared;
-            const ptrdiff_t n_ghost = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts = &ghost_idx[ghost_ptr[pack]];
-            const geom_t *const coordinate_components[DIM] = {points[0], points[1]};
-            for (int d = 0; d < DIM; ++d) {
-                scalar_t *const SFEM_RESTRICT pack_coordinate = pack_coordinates + d * max_nodes_per_pack;
-                const geom_t *const SFEM_RESTRICT coordinate_component = coordinate_components[d];
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                    pack_coordinate[k] = scalar_t(coordinate_component[owned_nodes_ptr[pack] + k]);
-                }
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    pack_coordinate[n_contiguous + k] = scalar_t(coordinate_component[ghosts[k]]);
-                }
-            }
-            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const idx_t node = owned_nodes_ptr[pack] + k;
-                pack_direction[k] = u_direction[node * direction_stride];
-            }
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                pack_direction[n_contiguous + k] = u_direction[ghosts[k] * direction_stride];
-            }
-
-            for (ptrdiff_t evbegin = e_start; evbegin < e_end; evbegin += VECTOR_SIZE) {
-                const int nelems = (int)MIN((ptrdiff_t)VECTOR_SIZE, e_end - evbegin);
-                scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
-                scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
-                scalar_t block_determinant[N_QP * VECTOR_SIZE];
-                scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
-                scalar_t block_output[N_STREAMS][VECTOR_SIZE];
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT coordinate_shape = elements[shape];
-                    const uint16_t *const SFEM_RESTRICT field_shape = field_elements[shape];
-                    for (int d = 0; d < DIM; ++d) {
-#pragma omp simd
-                        for (int lane = 0; lane < nelems; ++lane) {
-                            block_coordinates[shape * DIM + d][lane] = pack_coordinates[d * max_nodes_per_pack + coordinate_shape[evbegin + lane]];
-                        }
-                    }
-#pragma omp simd
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        block_direction[shape][lane] = pack_direction[field_shape[evbegin + lane]];
-                        block_output[shape][lane] = scalar_t(0);
-                    }
-                }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
-                const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-
-                laplace_d2_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(nelems, VECTOR_SIZE, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_direction, kappa, block_output);
-
-                for (int shape = 0; shape < N_SHAPE; ++shape) {
-                    const uint16_t *const SFEM_RESTRICT field_shape = field_elements[shape];
-                    for (int lane = 0; lane < nelems; ++lane) {
-                        pack_out[field_shape[evbegin + lane]] += block_output[shape][lane];
-                    }
-                }
-            }
-
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                u_out[(owned_nodes_ptr[pack] + k) * out_stride] += pack_out[k];
-                pack_out[k] = scalar_t(0);
-            }
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                ghost_buf[ghost_off + k] = pack_out[n_contiguous + k];
-                pack_out[n_contiguous + k] = scalar_t(0);
-            }
-        }
-    }
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < n_ghost_reduce_rows; ++row) {
-        const idx_t dest = ghost_reduce_dest[row];
-        const ptrdiff_t begin = ghost_reduce_ptr[row];
-        const ptrdiff_t end = ghost_reduce_ptr[row + 1];
-        scalar_t sum = scalar_t(0);
-        for (ptrdiff_t j = begin; j < end; ++j) {
-            sum += ghost_buf[ghost_reduce_idx[j]];
-        }
-        u_out[dest * out_stride] += sum;
-    }
-    return SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int laplace_proteus_quad4_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_packed_two_pass_isoparametric_mesh_soa_impl<double>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_proteus_quad4_jacobian_action_packed_two_pass_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t n_ghost_entries,
-        const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    return sfem::codegen::laplace_proteus_quad4_jacobian_action_packed_two_pass_isoparametric_mesh_soa_impl<float>(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_proteus_quad4_jacobian_action_isoparametric_mesh_aos(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
-) {
-    return laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, elements, points, parameters[0], 1, direction + 0, 1, output + 0);
-}
-
-extern "C" int laplace_proteus_quad4_jacobian_action_isoparametric_mesh_aos_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
-) {
-    return laplace_proteus_quad4_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, parameters[0], 1, direction + 0, 1, output + 0);
-}
-
-namespace sfem {
-namespace codegen {
-
-static SFEM_INLINE void laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_find_cols(
-        const idx_t *const SFEM_RESTRICT targets,
-        const idx_t *const SFEM_RESTRICT row,
-        const int lenrow,
-        idx_t *const SFEM_RESTRICT ks) {
+static SFEM_INLINE void laplace_proteus_quad4_hessian_i_msoa_find_cols(
+    const idx_t *const RSTR targets,
+    const idx_t *const RSTR row,
+    const int lenrow,
+    idx_t *const RSTR ks) {
+#pragma unroll(4)
+  for (int d = 0; d < 4; ++d) {
+    ks[d] = 0;
+  }
+  for (int k = 0; k < lenrow; ++k) {
 #pragma unroll(4)
     for (int d = 0; d < 4; ++d) {
-        ks[d] = 0;
+      ks[d] += row[k] < targets[d];
     }
-    for (int k = 0; k < lenrow; ++k) {
-#pragma unroll(4)
-        for (int d = 0; d < 4; ++d) {
-            ks[d] += row[k] < targets[d];
-        }
-    }
+  }
 }
 
-template <typename scalar_t>
-static SFEM_INLINE int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_scatter_crs(
-        const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t *const SFEM_RESTRICT element_matrix,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        scalar_t *const SFEM_RESTRICT values) {
-    static constexpr int N_SHAPE = 4;
-    count_t entries[N_SHAPE * N_SHAPE];
-    idx_t ks[N_SHAPE];
-    bool valid_graph = true;
-    for (int i = 0; i < N_SHAPE; ++i) {
-        const count_t row_begin = rowptr[ev[i]];
-        const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);
-        const idx_t *const SFEM_RESTRICT cols = &colidx[row_begin];
-        laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_find_cols(ev, cols, lenrow, ks);
-        for (int j = 0; j < N_SHAPE; ++j) {
-            if (ks[j] < 0 || ks[j] >= lenrow || cols[ks[j]] != ev[j]) {
-                if (valid_graph) {
-                    std::fprintf(stderr, "laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_scatter_crs missing graph entry (%ld, %ld)\n", (long)ev[i], (long)ev[j]);
-                }
-                entries[i * N_SHAPE + j] = row_begin;
-                valid_graph = false;
-            } else {
-                entries[i * N_SHAPE + j] = row_begin + ks[j];
-            }
-        }
+template <typename s_t>
+static SFEM_INLINE void laplace_proteus_quad4_hessian_i_msoa_scatter_bsr(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 1;
+  static constexpr int NS = 4;
+  count_t entries[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    const idx_t dof_i = ev[i];
+    const count_t row_begin = rowptr[dof_i];
+    const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
+    const idx_t *const RSTR cols = &colidx[row_begin];
+    laplace_proteus_quad4_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
+    for (int j = 0; j < NS; ++j) {
+      entries[i * NS + j] = row_begin + ks[j];
     }
-    if (!valid_graph) return SFEM_FAILURE;
-    for (int i = 0; i < N_SHAPE; ++i) {
-        for (int j = 0; j < N_SHAPE; ++j) {
+  }
+  for (int i = 0; i < NS; ++i) {
+    for (int j = 0; j < NS; ++j) {
+      s_t *const block = &values[entries[i * NS + j] * NC * NC];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
 #pragma omp atomic update
-            values[entries[i * N_SHAPE + j]] += element_matrix[i * N_SHAPE + j];
+          block[bi * NC + bj] += element_matrix[row * (NC * NS) + col];
         }
+      }
     }
-    return SFEM_SUCCESS;
+  }
 }
 
-template <typename scalar_t>
-static SFEM_INLINE int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_impl(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        scalar_t *const SFEM_RESTRICT values
-) {
-    static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int N_FIELDS = 1;
-    static constexpr int N_STREAMS = N_FIELDS * N_SHAPE;
-    static constexpr int VECTOR_SIZE = 1;
-    (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
-    const idx_t *const SFEM_RESTRICT field_elements[4] = {elements[0], elements[1], elements[3], elements[2]};
-
-    int invalid_matrix_graph = 0;
-#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)
-    for (ptrdiff_t element = 0; element < nelements; ++element) {
-        const ptrdiff_t evbegin = element;
-        const int nelems = 1;
-        idx_t ev[N_SHAPE];
-        scalar_t element_matrix[16];
-        scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_direction[N_STREAMS][VECTOR_SIZE];
-        scalar_t block_output[N_STREAMS][VECTOR_SIZE];
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1]};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t node = elements[shape][element];
-            const idx_t coordinate_node = elements[shape][element];
-            ev[shape] = node;
-            for (int d = 0; d < DIM; ++d) {
-                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);
-            }
+template <typename s_t>
+static SFEM_INLINE void laplace_proteus_quad4_hessian_i_msoa_scatter_crs(
+    const idx_t *const RSTR ev,
+    const s_t *const RSTR element_matrix,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values) {
+  static constexpr int NC = 1;
+  static constexpr int NS = 4;
+  count_t row_begin[NS];
+  int lenrow[NS];
+  int local_col[NS * NS];
+  idx_t ks[NS];
+  for (int i = 0; i < NS; ++i) {
+    row_begin[i] = rowptr[ev[i]];
+    lenrow[i] = (int)(rowptr[ev[i] + 1] - row_begin[i]);
+    const idx_t *const RSTR cols = &colidx[row_begin[i]];
+    laplace_proteus_quad4_hessian_i_msoa_find_cols(ev, cols, lenrow[i], ks);
+    for (int j = 0; j < NS; ++j) {
+      local_col[i * NS + j] = (int)ks[j];
+    }
+  }
+  for (int i = 0; i < NS; ++i) {
+    const count_t rb = row_begin[i];
+    const int lr = lenrow[i];
+    for (int j = 0; j < NS; ++j) {
+      const int lc = local_col[i * NS + j];
+      for (int bi = 0; bi < NC; ++bi) {
+        const int row = bi * NS + i;
+        s_t *const row_values = &values[rb * NC * NC + bi * lr * NC];
+        for (int bj = 0; bj < NC; ++bj) {
+          const int col = bj * NS + j;
+#pragma omp atomic update
+          row_values[lc * NC + bj] += element_matrix[row * (NC * NS) + col];
         }
+      }
+    }
+  }
+}
 
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
+template <typename s_t, typename g_t, int FORMAT>
+static int laplace_proteus_quad4_hessian_i_msoa_assemble_impl(
+    const ptrdiff_t nelements,
+    const ptrdiff_t,
+    idx_t **const RSTR elements,
+    const g_t *const *const RSTR points,
+    const s_t kappa,
+    const count_t *const RSTR rowptr,
+    const idx_t *const RSTR colidx,
+    s_t *const RSTR values,
+    const int *const RSTR,
+    const ptrdiff_t,
+    const ptrdiff_t,
+    const idx_t *const RSTR,
+    const idx_t *const RSTR,
+    idx_t *const RSTR,
+    idx_t *const RSTR) {
+  static constexpr int NC = 1;
+  static constexpr int ND = 2;
+  static constexpr int NQ = 4;
+  static constexpr int NS = 4;
+  static constexpr int VS = 1;
+  static constexpr int NDOFS = NC * NS;
+  const g_t *const RSTR x = points[0];
+  const g_t *const RSTR y = points[1];
+  const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
+  const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
+  const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
-        const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
+  static_assert(FORMAT == 0 || FORMAT == 1,
+                "this kernel has no scatter for the requested matrix format");
+#pragma omp parallel for schedule(static)
+  for (ptrdiff_t element = 0; element < nelements; ++element) {
+    idx_t ev[NS];
+    s_t element_matrix[NDOFS * NDOFS];
+    s_t bcoordinate_data[NS * ND][VS];
+    static constexpr int ne = VS;
+    s_t badj0[NQ * VS];
+    s_t badj1[NQ * VS];
+    s_t badj2[NQ * VS];
+    s_t badj3[NQ * VS];
+    s_t bdet0[NQ * VS];
+    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
 
-        const auto row_tensor_stream = [](const int local) -> int {
-            switch (local) {
-                case 0: return 0;
-                case 1: return 1;
-                case 2: return 3;
-                case 3: return 2;
-                default: return 0;
-            }
-        };
-        const auto col_tensor_stream = [](const int local) -> int {
-            switch (local) {
-                case 0: return 0;
-                case 1: return 1;
-                case 2: return 3;
-                case 3: return 2;
-                default: return 0;
-            }
-        };
-        for (int entry = 0; entry < 16; ++entry) {
-            element_matrix[entry] = scalar_t(0);
-        }
-        for (int trial_local = 0; trial_local < 4; ++trial_local) {
-            const int trial = col_tensor_stream(trial_local);
-            for (int stream = 0; stream < N_STREAMS; ++stream) {
-                block_direction[stream][0] = scalar_t(0);
-                block_output[stream][0] = scalar_t(0);
-            }
-            block_direction[trial][0] = scalar_t(1);
-            laplace_d2_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_direction, kappa, block_output);
-            for (int test_local = 0; test_local < 4; ++test_local) {
-                const int test = row_tensor_stream(test_local);
-                element_matrix[test_local * 4 + trial_local] = block_output[test][0];
-            }
-        }
-
-        invalid_matrix_graph |= (laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_scatter_crs(ev, element_matrix, rowptr, colidx, values) != SFEM_SUCCESS);
+    for (int shape = 0; shape < NS; ++shape) {
+      const idx_t node = elements[shape][element];
+      ev[shape] = node;
+      for (int d = 0; d < ND; ++d) {
+        bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
+      }
     }
 
-    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;
+    s_t coordinate_grad_ref[ND * NQ * ND * VS];
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+        coordinate_grad_ref + 0);
+    tensor_gradient_contiguous<s_t, NQ, NS, VS, 2>(
+        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND * VS);
+
+    s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+
+    laplace_d2_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, element_matrix);
+
+    if constexpr (FORMAT == 1) {
+      laplace_proteus_quad4_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+    } else if constexpr (FORMAT == 0) {
+      laplace_proteus_quad4_hessian_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
+    }
+  }
+
+  return SFEM_SUCCESS;
 }
 
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_quad4_hessian_crs_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
 ) {
-    return sfem::codegen::laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::laplace_proteus_quad4_hessian_crs_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, kappa, rowptr, colidx, values);
-}
-
-namespace sfem {
-namespace codegen {
-
-template <typename scalar_t>
-static SFEM_INLINE int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_scatter_dia(
-        const idx_t *const SFEM_RESTRICT ev,
-        const scalar_t *const SFEM_RESTRICT element_matrix,
-        const ptrdiff_t nnodes,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        scalar_t *const SFEM_RESTRICT values) {
-    static constexpr int N_SHAPE = 4;
-    ptrdiff_t diagonals[N_SHAPE * N_SHAPE];
-    bool valid_diagonal_offsets = true;
-    for (int i = 0; i < N_SHAPE; ++i) {
-        for (int j = 0; j < N_SHAPE; ++j) {
-            const int offset = (int)(ev[j] - ev[i]);
-            ptrdiff_t diagonal = 0;
-            while (diagonal < ndiag && diag_offsets[diagonal] != offset) ++diagonal;
-            if (diagonal == ndiag) {
-                if (valid_diagonal_offsets) {
-                    std::fprintf(stderr, "laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_scatter_dia missing diagonal offset %d\n", offset);
-                }
-                diagonals[i * N_SHAPE + j] = 0;
-                valid_diagonal_offsets = false;
-            } else {
-                diagonals[i * N_SHAPE + j] = diagonal;
-            }
-        }
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
-    if (!valid_diagonal_offsets) return SFEM_FAILURE;
-    for (int i = 0; i < N_SHAPE; ++i) {
-        for (int j = 0; j < N_SHAPE; ++j) {
-            const ptrdiff_t diagonal = diagonals[i * N_SHAPE + j];
-#pragma omp atomic update
-            values[diagonal * nnodes + ev[i]] += element_matrix[i * N_SHAPE + j];
-        }
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
-    return SFEM_SUCCESS;
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_hessian_crs_i_msoa", -1, (int)scalar_bytes);
 }
 
-template <typename scalar_t>
-static SFEM_INLINE int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_impl(
+extern "C" int laplace_proteus_quad4_hessian_bsr_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const scalar_t kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        scalar_t *const SFEM_RESTRICT values
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
 ) {
-    static constexpr int DIM = 2;
-    static constexpr int N_QP = 4;
-    static constexpr int N_SHAPE = 4;
-    static constexpr int VECTOR_SIZE = 1;
-    (void)nnodes;
-    const scalar_t *const isoparametric_shape_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::shape_1d();
-    const scalar_t *const isoparametric_grad_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::grad_1d();
-    const scalar_t *const isoparametric_q_weight_1d = sfem::codegen::laplace_proteus_quad4_isoparametric_reference_data<scalar_t>::q_weight_1d();
-
-    int invalid_matrix_graph = 0;
-#pragma omp parallel for schedule(static) reduction(|:invalid_matrix_graph)
-    for (ptrdiff_t element = 0; element < nelements; ++element) {
-        const ptrdiff_t evbegin = element;
-        const int nelems = 1;
-        idx_t ev[N_SHAPE];
-        scalar_t element_matrix[N_SHAPE * N_SHAPE];
-        scalar_t block_coordinates[DIM * N_SHAPE][VECTOR_SIZE];
-        scalar_t block_adjugate_data[DIM * DIM][N_QP * VECTOR_SIZE];
-        scalar_t block_determinant[N_QP * VECTOR_SIZE];
-        scalar_t block_direction[N_SHAPE][VECTOR_SIZE];
-        scalar_t block_output[N_SHAPE][VECTOR_SIZE];
-        const geom_t *const coordinate_components[DIM] = {points[0], points[1]};
-
-        for (int shape = 0; shape < N_SHAPE; ++shape) {
-            const idx_t node = elements[shape][element];
-            const idx_t coordinate_node = elements[shape][element];
-            ev[shape] = node;
-            for (int d = 0; d < DIM; ++d) {
-                block_coordinates[shape * DIM + d][0] = scalar_t(coordinate_components[d][coordinate_node]);
-            }
-        }
-
-        scalar_t coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE];
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 0,
-                coordinate_grad_ref + 0 * N_QP * DIM * VECTOR_SIZE);
-        tensor_gradient_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, 2>(
-                nelems, isoparametric_shape_1d, isoparametric_grad_1d, block_coordinates, 1,
-                coordinate_grad_ref + 1 * N_QP * DIM * VECTOR_SIZE);
-
-        scalar_t *coordinate_grad_ref_adjugate_streams[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-        geometry_jacobian_adjugate_and_determinant<scalar_t, DIM, N_QP, VECTOR_SIZE>(
-                nelems, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, block_determinant);
-        const scalar_t *const block_adjugate[DIM * DIM] = {block_adjugate_data[0], block_adjugate_data[1], block_adjugate_data[2], block_adjugate_data[3]};
-
-        for (int entry = 0; entry < N_SHAPE * N_SHAPE; ++entry) {
-            element_matrix[entry] = scalar_t(0);
-        }
-        static constexpr int TENSOR_STREAMS[N_SHAPE] = {0, 1, 3, 2};
-        for (int trial = 0; trial < N_SHAPE; ++trial) {
-            const int tensor_trial = TENSOR_STREAMS[trial];
-            for (int stream = 0; stream < N_SHAPE; ++stream) {
-                block_direction[stream][0] = scalar_t(0);
-                block_output[stream][0] = scalar_t(0);
-            }
-            block_direction[tensor_trial][0] = scalar_t(1);
-            laplace_d2_tensor_product_jacobian_action_block_contiguous<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE>(1, 1, block_determinant, block_adjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, block_direction, kappa, block_output);
-            for (int test = 0; test < N_SHAPE; ++test) {
-                const int tensor_test = TENSOR_STREAMS[test];
-                element_matrix[test * N_SHAPE + trial] = block_output[tensor_test][0];
-            }
-        }
-
-        invalid_matrix_graph |= (laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_scatter_dia(ev, element_matrix, nnodes, diag_offsets, ndiag, values) != SFEM_SUCCESS);
+  switch (scalar_bytes) {
+    case (int)sizeof(double): {
+        return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
-
-    return invalid_matrix_graph ? SFEM_FAILURE : SFEM_SUCCESS;
-}
-
-} // namespace codegen
-} // namespace sfem
-
-extern "C" int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_impl<double>(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, values);
-}
-
-extern "C" int laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-) {
-    return sfem::codegen::laplace_proteus_quad4_hessian_dia_isoparametric_mesh_soa_impl<float>(nelements, nnodes, elements, points, kappa, diag_offsets, ndiag, values);
+    case (int)sizeof(float): {
+        return sfem::codegen::laplace_proteus_quad4_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+    }
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch("laplace_proteus_quad4_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
 }

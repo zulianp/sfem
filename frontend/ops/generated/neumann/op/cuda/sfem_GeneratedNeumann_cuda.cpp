@@ -1,0 +1,694 @@
+#include "sfem_GeneratedNeumann_cuda.hpp"
+#include "sfem_GeneratedNeumann_cuda_c_abi.hpp"
+
+#include "sfem_aliases.hpp"
+#include "sfem_FunctionSpace.hpp"
+#include "sfem_MultiDomainOp.hpp"
+#include "sfem_NeumannConditions.hpp"
+#include "sfem_OpTracer.hpp"
+#include "sfem_Parameters.hpp"
+#include "smesh_mesh.hpp"
+#include "smesh_sideset.hpp"
+
+#include <cstring>
+#include <memory>
+#include <vector>
+
+
+
+namespace sfem {
+  namespace {
+    constexpr int MAX_PARAMETERS = 3;
+
+    void seed_parameters(Parameters &parameters) {
+      parameters.set_value("t0", 0);
+      parameters.set_value("t1", 0);
+      parameters.set_value("t2", 0);
+    }
+
+    void seed_material(MultiDomainOp &domains) {
+      for (auto &entry : domains.domains()) {
+        seed_parameters(*entry.second.parameters);
+      }
+    }
+
+        struct AffineOption {
+      const char *name;
+      bool       *flag;
+    };
+
+    inline bool set_affine_option(const std::string &name,
+                                      const bool val,
+                                      const AffineOption *const options,
+                                      const int n_options) {
+      if (name == "ASSUME_AFFINE" || name == "assume_affine") {
+        for (int i = 0; i < n_options; ++i) {
+          *options[i].flag = val;
+        }
+        return true;
+      }
+      bool matched = false;
+      for (int i = 0; i < n_options; ++i) {
+        if (name == options[i].name) {
+          *options[i].flag = val;
+          matched = true;
+        }
+      }
+      return matched;
+    }
+
+    void material_defaults(real_t *const values) {
+      values[0] = 0;
+      values[1] = 0;
+      values[2] = 0;
+    }
+
+#ifdef SFEM_ENABLE_RYAML
+    constexpr int N_DEFINED_MATERIAL_PARAMETERS = 3;
+    constexpr int N_MATERIAL_PARAMETERS = 3;
+    static const char *const MATERIAL_PARAMETER_NAMES[N_MATERIAL_PARAMETERS] = {"t0", "t1", "t2"};
+
+    bool yaml_read_real(const ryml::ConstNodeRef &node,
+              const char *const key,
+              real_t &value) {
+      if (!node.has_child(key)) {
+        return false;
+      }
+      node[key] >> value;
+      return true;
+    }
+
+    bool yaml_read_parameter(const ryml::ConstNodeRef &node,
+                                 const char *const key,
+                                 real_t &value) {
+      if (yaml_read_real(node, key, value)) {
+        return true;
+      }
+      if (node.has_child("parameters") &&
+        yaml_read_real(node["parameters"], key, value)) {
+        return true;
+      }
+      if (node.has_child("material") &&
+        yaml_read_real(node["material"], key, value)) {
+        return true;
+      }
+      return false;
+    }
+
+    std::string yaml_read_string(const ryml::ConstNodeRef &node) {
+      const auto value = node.val();
+      return std::string(value.str, value.len);
+    }
+
+    void copy_material_parameters(const real_t *const src,
+                                      real_t *const dst) {
+      for (int i = 0; i < N_MATERIAL_PARAMETERS; ++i) {
+        dst[i] = src[i];
+      }
+    }
+
+    bool material_from_yaml(const ryml::ConstNodeRef &node,
+                const real_t *const base,
+                real_t *const values) {
+      copy_material_parameters(base, values);
+      bool changed = false;
+      for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+        changed |= yaml_read_parameter(node,
+                                               MATERIAL_PARAMETER_NAMES[i],
+                                               values[i]);
+      }
+      return changed;
+    }
+
+    void set_material(MultiDomainOp &domains,
+                          const real_t *const values) {
+      for (auto &entry : domains.domains()) {
+        for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+          entry.second.parameters->set_value(MATERIAL_PARAMETER_NAMES[i],
+                                                       values[i]);
+        }
+      }
+    }
+
+    void set_material_in_block(MultiDomainOp &domains,
+                                   const std::string &block_name,
+                                   const real_t *const values) {
+      for (int i = 0; i < N_DEFINED_MATERIAL_PARAMETERS; ++i) {
+        domains.set_value_in_block(block_name,
+                                           MATERIAL_PARAMETER_NAMES[i],
+                                           values[i]);
+      }
+    }
+
+    bool yaml_read_bool(const ryml::ConstNodeRef &node,
+              const char *const key,
+              bool &value) {
+      if (!node.has_child(key)) {
+        return false;
+      }
+      int raw = value ? 1 : 0;
+      node[key] >> raw;
+      value = raw != 0;
+      return true;
+    }
+
+    inline void read_affine_options(const ryml::ConstNodeRef &node,
+                    const AffineOption *const options,
+                    const int n_options) {
+      bool all = true;
+      for (int i = 0; i < n_options; ++i) {
+        all = all && *options[i].flag;
+      }
+      if (yaml_read_bool(node, "ASSUME_AFFINE", all) ||
+        yaml_read_bool(node, "assume_affine", all)) {
+        for (int i = 0; i < n_options; ++i) {
+          *options[i].flag = all;
+        }
+      }
+      for (int i = 0; i < n_options; ++i) {
+        yaml_read_bool(node, options[i].name, *options[i].flag);
+      }
+    }
+#endif  // SFEM_ENABLE_RYAML
+
+    void parameter_array(const Parameters &parameters,
+                             const int dim,
+                             real_t *const values) {
+      int index = 0;
+      switch (dim) {
+        case 2:
+          values[index++] = parameters.require_real_value("t0");
+          values[index++] = parameters.require_real_value("t1");
+          break;
+        case 3:
+          values[index++] = parameters.require_real_value("t0");
+          values[index++] = parameters.require_real_value("t1");
+          values[index++] = parameters.require_real_value("t2");
+          break;
+        default:
+          SFEM_ERROR("unsupported spatial dimension %d for generated residual parameters\n", dim);
+          break;
+      }
+    }
+
+    //! Where this build's kernels read the connectivity from.
+    //!
+    //! One function rather than the same expression at every call site, because
+    //! the host and the device differ only here: a device Op hands its kernels
+    //! the block's device copy, which is what every `gpu:` Op in SFEM passes
+    //! and what a `__global__` body can dereference.
+    idx_t **element_connectivity(const OpDomain &domain) {
+      return const_cast<idx_t **>(domain.block->device_elements_SoA()->data());
+    }
+
+    //! Where the kernels read the mesh geometry from.  The mesh's own array on
+    //! the host; a device target reads smesh's device copy, because a
+    //! `__global__` body cannot dereference a host pointer -- and on a Grace
+    //! Hopper node it sometimes can, which is worse: the merit came out exact
+    //! at one mesh size and nonsense at the next.
+    const geom_t *const *element_points(const std::shared_ptr<smesh::Mesh> &mesh) {
+      return const_cast<const geom_t *const *>(mesh->device_points_SoA()->data());
+    }
+
+    ptrdiff_t block_size_for_dim(const int dim) {
+      switch (dim) {
+        case 2: return 2;
+        case 3: return 3;
+        default:
+          SFEM_ERROR("unsupported spatial dimension %d for generated block size\n", dim);
+          return 0;
+      }
+    }
+
+    smesh::block_idx_t block_id_for_domain(const smesh::Mesh &mesh,
+                                               const smesh::Mesh::Block &block) {
+      for (size_t i = 0; i < mesh.n_blocks(); ++i) {
+        if (mesh.block(i).get() == &block) {
+          return static_cast<smesh::block_idx_t>(i);
+        }
+      }
+      SFEM_ERROR("GPUGeneratedNeumann: mesh block pointer not found in mesh.blocks()\n");
+      return 0;
+    }
+
+#ifdef SFEM_ENABLE_RYAML
+    std::shared_ptr<smesh::Sideset> sideset_from_yaml(
+        const std::shared_ptr<FunctionSpace> &space,
+        const ryml::ConstNodeRef             &node) {
+      const bool is_sideset = node["type"].readable() && node["type"].val() == "sideset";
+      const bool is_file    = node["format"].readable() && node["format"].val() == "file";
+      const bool is_expr    = node["format"].readable() && node["format"].val() == "expr";
+
+      if (!is_sideset && node.has_child("type")) {
+        SFEM_ERROR("GPUGeneratedNeumann neumann condition requires type=sideset\n");
+        return nullptr;
+      }
+
+      if (is_file || node.has_child("path")) {
+        if (!node.has_child("path")) {
+          SFEM_ERROR("GPUGeneratedNeumann file sideset condition requires path\n");
+          return nullptr;
+        }
+        const std::string path = yaml_read_string(node["path"]);
+        return smesh::Sideset::create_from_file(
+            space->mesh_ptr()->comm(), smesh::Path(path));
+      }
+
+      if (is_expr || (node.has_child("parent") && node.has_child("lfi"))) {
+        if (!node["parent"].is_seq() || !node["lfi"].is_seq()) {
+          SFEM_ERROR("GPUGeneratedNeumann expr sideset condition requires parent/lfi sequences\n");
+          return nullptr;
+        }
+
+        const ptrdiff_t size = node["parent"].num_children();
+        if (node["lfi"].num_children() != size) {
+          SFEM_ERROR("GPUGeneratedNeumann expr sideset parent/lfi length mismatch\n");
+          return nullptr;
+        }
+
+        auto parent = create_host_buffer<element_idx_t>(size);
+        auto lfi    = create_host_buffer<int16_t>(size);
+
+        ptrdiff_t parent_count = 0;
+        for (auto p : node["parent"].children()) {
+          p >> parent->data()[parent_count++];
+        }
+
+        ptrdiff_t lfi_count = 0;
+        for (auto p : node["lfi"].children()) {
+          p >> lfi->data()[lfi_count++];
+        }
+
+        return std::make_shared<smesh::Sideset>(
+            space->mesh_ptr()->comm(), parent, lfi);
+      }
+
+      SFEM_ERROR("GPUGeneratedNeumann neumann condition requires format=file or format=expr\n");
+      return nullptr;
+    }
+#endif  // SFEM_ENABLE_RYAML
+  }  // namespace
+
+  class GPUGeneratedNeumann::Impl {
+  public:
+    explicit Impl(const std::shared_ptr<FunctionSpace> &space) : space(space) {}
+
+    std::shared_ptr<FunctionSpace> space;
+    std::shared_ptr<MultiDomainOp> domains;
+    std::vector<NeumannConditions::Condition> conditions;
+  };
+
+  std::unique_ptr<Op> GPUGeneratedNeumann::create(const std::shared_ptr<FunctionSpace> &space) {
+    const ptrdiff_t expected_block_size =
+        block_size_for_dim(space->mesh_ptr()->spatial_dimension());
+    if (space->block_size() != expected_block_size) {
+      SFEM_ERROR("GPUGeneratedNeumann requires block_size=%ld\n",
+                       static_cast<long>(expected_block_size));
+      return nullptr;
+    }
+    auto op = std::make_unique<GPUGeneratedNeumann>(space);
+    op->initialize();
+    return op;
+  }
+
+  GPUGeneratedNeumann::GPUGeneratedNeumann(const std::shared_ptr<FunctionSpace> &space)
+    : impl_(std::make_unique<Impl>(space)) {}
+  GPUGeneratedNeumann::~GPUGeneratedNeumann() = default;
+
+  ptrdiff_t GPUGeneratedNeumann::n_dofs_domain() const { return impl_->space->n_dofs(); }
+  ptrdiff_t GPUGeneratedNeumann::n_dofs_image() const { return impl_->space->n_dofs(); }
+
+    double GPUGeneratedNeumann::flops_value() const {
+    double total = 0;
+    if (!impl_->domains) {
+      return total;
+    }
+
+    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    impl_->domains->iterate([&](const OpDomain &domain) {
+      const ptrdiff_t nelements = domain.block->n_elements();
+
+      return SFEM_SUCCESS;
+    });
+
+    return total;
+  }
+
+    size_t GPUGeneratedNeumann::memory_traffic_bytes_value() const {
+    size_t total = 0;
+    if (!impl_->domains) {
+      return total;
+    }
+
+    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    impl_->domains->iterate([&](const OpDomain &domain) {
+      const ptrdiff_t nelements = domain.block->n_elements();
+
+      return SFEM_SUCCESS;
+    });
+
+    return total;
+  }
+
+    double GPUGeneratedNeumann::flops_gradient() const {
+    double total = 0;
+    if (!impl_->domains) {
+      return total;
+    }
+
+    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    impl_->domains->iterate([&](const OpDomain &domain) {
+      const ptrdiff_t nelements = domain.block->n_elements();
+
+      return SFEM_SUCCESS;
+    });
+
+    return total;
+  }
+
+    size_t GPUGeneratedNeumann::memory_traffic_bytes_gradient() const {
+    size_t total = 0;
+    if (!impl_->domains) {
+      return total;
+    }
+
+    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    impl_->domains->iterate([&](const OpDomain &domain) {
+      const ptrdiff_t nelements = domain.block->n_elements();
+
+      return SFEM_SUCCESS;
+    });
+
+    return total;
+  }
+
+    double GPUGeneratedNeumann::flops_apply() const {
+    double total = 0;
+    if (!impl_->domains) {
+      return total;
+    }
+
+    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    impl_->domains->iterate([&](const OpDomain &domain) {
+      const ptrdiff_t nelements = domain.block->n_elements();
+
+      return SFEM_SUCCESS;
+    });
+
+    return total;
+  }
+
+    size_t GPUGeneratedNeumann::memory_traffic_bytes_apply() const {
+    size_t total = 0;
+    if (!impl_->domains) {
+      return total;
+    }
+
+    const int dim = impl_->space->mesh_ptr()->spatial_dimension();
+    impl_->domains->iterate([&](const OpDomain &domain) {
+      const ptrdiff_t nelements = domain.block->n_elements();
+
+      return SFEM_SUCCESS;
+    });
+
+    return total;
+  }
+
+  // Establish once, at setup, that this operator's dof graph is well formed:
+  // rows in order, every column in range, each row sorted and duplicate free.
+  // The assembly kernels assume it -- they locate an entry and write to it
+  // without re-checking that it is there -- so this is where the assumption
+  // is earned.
+  //
+  // It used to be earned per element instead: every scatter walked its
+  // NS x NS candidates, tested each with a three-condition branch
+  // and reported through std::fprintf from inside the caller's parallel
+  // region.  That paid O(elements x NS^2) on every assembly for a
+  // property of the mesh and the graph together, which cannot change between
+  // elements or between calls.  Here it is O(nnz), once.
+  //
+  // Raw pointers rather than the graph type, so this does not depend on which
+  // headers the generated wrapper happens to pull in.
+  static int validate_dof_graph(const count_t *const rowptr,
+                                  const idx_t *const colidx,
+                                  const ptrdiff_t n_nodes,
+                                  const ptrdiff_t nnz) {
+    if (!rowptr || !colidx || n_nodes < 0) {
+      return SFEM_FAILURE;
+    }
+    if (rowptr[0] != 0 || (ptrdiff_t)rowptr[n_nodes] != nnz) {
+      return SFEM_FAILURE;
+    }
+    for (ptrdiff_t i = 0; i < n_nodes; ++i) {
+      const count_t begin = rowptr[i];
+      const count_t end = rowptr[i + 1];
+      if (end < begin || (ptrdiff_t)end > nnz) {
+        return SFEM_FAILURE;
+      }
+      for (count_t k = begin; k < end; ++k) {
+        if (colidx[k] < 0 || (ptrdiff_t)colidx[k] >= n_nodes) {
+          return SFEM_FAILURE;
+        }
+        if (k > begin && colidx[k] <= colidx[k - 1]) {
+          return SFEM_FAILURE;
+        }
+      }
+    }
+    return SFEM_SUCCESS;
+  }
+
+  int GPUGeneratedNeumann::initialize(const std::vector<std::string> &block_names) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::initialize");
+    impl_->domains = std::make_shared<MultiDomainOp>(impl_->space, block_names);
+    {
+      auto dof_graph = impl_->space->dof_to_dof_graph();
+      if (!dof_graph ||
+        validate_dof_graph(dof_graph->rowptr()->data(),
+                                   dof_graph->colidx()->data(),
+                                   dof_graph->n_nodes(),
+                                   dof_graph->nnz()) != SFEM_SUCCESS) {
+        SFEM_ERROR("GPUGeneratedNeumann::initialize: the dof graph is malformed; the assembly kernels assume it is not\n");
+        return SFEM_FAILURE;
+      }
+    }
+    seed_material(*impl_->domains);
+    return SFEM_SUCCESS;
+  }
+
+  void GPUGeneratedNeumann::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset) {
+    real_t values[MAX_PARAMETERS];
+    material_defaults(values);
+    add_sideset(sideset, values);
+  }
+
+  void GPUGeneratedNeumann::add_sideset(const std::shared_ptr<smesh::Sideset> &sideset,
+                             const real_t *const parameters) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::add_sideset");
+    NeumannConditions::Condition condition;
+    condition.sidesets = {sideset};
+    condition.values = create_host_buffer<real_t>(MAX_PARAMETERS);
+    for (int i = 0; i < MAX_PARAMETERS; ++i) {
+      condition.values->data()[i] = parameters[i];
+    }
+    condition.value = parameters[0];
+    condition.component = 0;
+    add_condition(condition);
+  }
+
+  void GPUGeneratedNeumann::add_condition(const NeumannConditions::Condition &condition) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::add_condition");
+    impl_->conditions.push_back(condition);
+  }
+
+  int GPUGeneratedNeumann::gradient(const real_t *const, real_t *const out) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::gradient");
+    if (impl_->conditions.empty()) {
+      return SFEM_SUCCESS;
+    }
+    auto mesh = impl_->space->mesh_ptr();
+    auto points = element_points(mesh);
+    return impl_->domains->iterate([&](const OpDomain &domain) {
+      const smesh::block_idx_t block_id = block_id_for_domain(*mesh, *domain.block);
+      int status = SFEM_SUCCESS;
+      for (const auto &condition : impl_->conditions) {
+        const auto sideset = condition.sidesets.empty() ? nullptr : condition.sidesets[0];
+        if (!sideset || !condition.values || sideset->block_id() != block_id) {
+          continue;
+        }
+        switch (domain.element_type) {
+                    case smesh::TRI3: {
+            static constexpr ptrdiff_t FIELD_STRIDE = 2;
+          real_t *const RSTR u_out[2] = {out + 0, out + 1};
+            status |= cu_neumann_edgeshell2_boundary_residual_2d_ss_soa(domain.element_type, real_type, sideset->size(), mesh->n_nodes(), element_connectivity(domain), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], FIELD_STRIDE, u_out[0], u_out[1], stream);
+            break;
+          }
+                    case smesh::QUAD4: {
+            static constexpr ptrdiff_t FIELD_STRIDE = 2;
+          real_t *const RSTR u_out[2] = {out + 0, out + 1};
+            status |= cu_neumann_edgeshell2_boundary_residual_2d_ss_soa(domain.element_type, real_type, sideset->size(), mesh->n_nodes(), element_connectivity(domain), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], FIELD_STRIDE, u_out[0], u_out[1], stream);
+            break;
+          }
+                    case smesh::TET4: {
+            static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+            status |= cu_neumann_trishell3_boundary_residual_3d_ss_soa(domain.element_type, real_type, sideset->size(), mesh->n_nodes(), element_connectivity(domain), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2], stream);
+            break;
+          }
+                    case smesh::TET10: {
+            static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+            status |= cu_neumann_trishell6_boundary_residual_3d_ss_soa(domain.element_type, real_type, sideset->size(), mesh->n_nodes(), element_connectivity(domain), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2], stream);
+            break;
+          }
+                    case smesh::HEX8: {
+            static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+            status |= cu_neumann_quadshell4_boundary_residual_3d_ss_soa(domain.element_type, real_type, sideset->size(), mesh->n_nodes(), element_connectivity(domain), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2], stream);
+            break;
+          }
+                    case smesh::PROTEUS_QUAD4: {
+            static constexpr ptrdiff_t FIELD_STRIDE = 2;
+          real_t *const RSTR u_out[2] = {out + 0, out + 1};
+            status |= cu_neumann_edgeshell2_boundary_residual_2d_ss_soa(domain.element_type, real_type, sideset->size(), mesh->n_nodes(), element_connectivity(domain), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], FIELD_STRIDE, u_out[0], u_out[1], stream);
+            break;
+          }
+                    case smesh::PROTEUS_HEX8: {
+            static constexpr ptrdiff_t FIELD_STRIDE = 3;
+          real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
+            status |= cu_neumann_proteus_quadshell4_boundary_residual_3d_ss_soa(domain.element_type, real_type, sideset->size(), mesh->n_nodes(), element_connectivity(domain), sideset->parent()->data(), sideset->lfi()->data(), points, condition.values->data()[0], condition.values->data()[1], condition.values->data()[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2], stream);
+            break;
+          }
+          default:
+            SFEM_ERROR("GPUGeneratedNeumann does not support element type %d\n",
+                                   domain.element_type);
+            return SFEM_FAILURE;
+        }
+      }
+      return status;
+    });
+  }
+
+  int GPUGeneratedNeumann::apply(const real_t *const,
+                      const real_t *const,
+                      real_t *const) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::apply");
+    return SFEM_SUCCESS;
+  }
+
+
+  int GPUGeneratedNeumann::value(const real_t *x, real_t *const out) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::value");
+    // `-t . u`, from the `g = -t` this operator's own gradient assembles.
+    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    std::vector<real_t> work(ndofs, 0);
+    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    real_t acc = 0;
+#pragma omp parallel for reduction(+ : acc)
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+      acc += work[i] * x[i];
+    }
+    *out += acc;
+    return SFEM_SUCCESS;
+  }
+
+  int GPUGeneratedNeumann::value_steps(const real_t *x,
+              const real_t *h,
+              const int nsteps,
+              const real_t *const steps,
+              real_t *const out) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::value_steps");
+    if (nsteps <= 0) {
+      return SFEM_SUCCESS;
+    }
+    // The work is linear in the state, so `g` is the same at every step and one
+    // gradient serves all of them: `g . (x + alpha * h)` splits exactly.
+    const ptrdiff_t ndofs = impl_->space->n_dofs();
+    std::vector<real_t> work(ndofs, 0);
+    if (gradient(x, work.data()) != SFEM_SUCCESS) {
+      return SFEM_FAILURE;
+    }
+    real_t gx = 0;
+    real_t gh = 0;
+#pragma omp parallel for reduction(+ : gx, gh)
+    for (ptrdiff_t i = 0; i < ndofs; ++i) {
+      gx += work[i] * x[i];
+      gh += work[i] * h[i];
+    }
+    for (int step = 0; step < nsteps; ++step) {
+      out[step] += gx + steps[step] * gh;
+    }
+    return SFEM_SUCCESS;
+  }
+
+
+  int GPUGeneratedNeumann::hessian_crs(const real_t *const,
+              const count_t *const,
+              const idx_t *const,
+              real_t *const) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::hessian_crs");
+    return SFEM_SUCCESS;
+  }
+
+  void GPUGeneratedNeumann::set_field(const char *,
+                           const std::shared_ptr<Buffer<real_t>> &,
+                           const int) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::set_field");
+  }
+
+  void GPUGeneratedNeumann::set_option(const std::string &, const bool) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::set_option");
+  }
+
+  void GPUGeneratedNeumann::set_value_in_block(const std::string &block_name,
+                  const std::string &var_name,
+                  const real_t value) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::set_value_in_block");
+    impl_->domains->set_value_in_block(block_name, var_name, value);
+  }
+
+#ifdef SFEM_ENABLE_RYAML
+  std::shared_ptr<Op> GPUGeneratedNeumann::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
+                                                 const ryml::ConstNodeRef             &node) {
+    SFEM_TRACE_SCOPE("GPUGeneratedNeumann::create_from_yaml");
+    auto ret = std::make_shared<GPUGeneratedNeumann>(space);
+
+    std::vector<std::string> block_names;
+    if (node.has_child("blocks")) {
+      for (auto block : node["blocks"].children()) {
+        if (block.has_child("name")) {
+          block_names.push_back(yaml_read_string(block["name"]));
+        }
+      }
+    }
+
+    if (ret->initialize(block_names) != SFEM_SUCCESS) {
+      return nullptr;
+    }
+
+    real_t defaults[MAX_PARAMETERS];
+    material_defaults(defaults);
+    real_t top_values[MAX_PARAMETERS];
+    copy_material_parameters(defaults, top_values);
+    material_from_yaml(node, defaults, top_values);
+
+    const auto neumann_node =
+        node.has_child("neumann_conditions") ? node["neumann_conditions"] :
+                 ryml::ConstNodeRef();
+    if (neumann_node.readable() && neumann_node.is_seq()) {
+      for (auto condition_node : neumann_node.children()) {
+        auto sideset = sideset_from_yaml(space, condition_node);
+        if (!sideset) {
+          return nullptr;
+        }
+        real_t condition_values[MAX_PARAMETERS];
+        material_from_yaml(condition_node, top_values, condition_values);
+        ret->add_sideset(sideset, condition_values);
+      }
+    }
+
+    return ret;
+  }
+#endif  // SFEM_ENABLE_RYAML
+}  // namespace sfem

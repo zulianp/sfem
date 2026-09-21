@@ -1,0 +1,335 @@
+"""How element data is ordered and indexed for a kernel.
+
+Which shape function maps to which stream, where a field's components sit in a
+packed lane buffer, how tensor-product elements reorder their nodes into
+Cartesian order, and what offset a given field/component/shape triplet lands at.
+These are layout decisions: they determine the memory access pattern of every
+generated loop and therefore whether the loads are unit stride.
+
+They are pure index arithmetic -- no expression is inspected and no text is
+produced -- and they were living in ``emitters/residual_codegen.py``, mixed in
+with the code that prints the loops they describe. Deciding a layout is
+planning; spelling the resulting subscript is emission.
+
+The mixed-order helpers here carry the Taylor-Hood cases, where the cell
+element and a field's element differ and the per-field shape counts diverge.
+"""
+
+from codegen.framework.fem.reference import (
+    sfem_field_n_shape,
+    sfem_is_tensor_product_hex_element,
+    sfem_tensor_product_hex_uses_cartesian_ordering,
+    sfem_tensor_product_quad_uses_cartesian_ordering,
+)
+from dataclasses import dataclass
+
+from codegen.framework.fem.tensor_product import (
+    tensor_product_cartesian_shape_order,
+    tensor_product_subspace_shape_order,
+)
+
+
+def _identity_order(order):
+    return tuple(order) == tuple(range(len(order)))
+
+
+def _linear_index_offset(values):
+    values = tuple(values)
+    if not values:
+        return 0
+    offset = values[0]
+    if values == tuple(offset + i for i in range(len(values))):
+        return offset
+    return None
+
+
+def uses_cartesian_ordering(element_type):
+    """Whether this element's mesh already numbers its nodes lexicographically.
+
+    The `PROTEUS_*` elements do; `HEX8`, `HEX27` and `QUAD4` carry the SFEM/VTK
+    numbering, which walks a face counter-clockwise instead. Sum factorisation
+    needs lexicographic order, so the difference has to be reconciled somewhere,
+    and asking here is what keeps every caller asking the same question.
+
+    Both families must be tested. Five sites in `emitters/residual_codegen.py`
+    tested only the hex half, which made a `PROTEUS_QUAD4` kernel -- already
+    Cartesian -- permute its fields by (0, 1, 3, 2) anyway while gathering its
+    coordinates unpermuted through this module, so geometry and fields
+    disagreed inside one isoparametric kernel.
+    """
+    return sfem_tensor_product_hex_uses_cartesian_ordering(
+        element_type
+    ) or sfem_tensor_product_quad_uses_cartesian_ordering(element_type)
+
+
+#: Which lexicographic element each mesh-ordered tensor-product element
+#: delegates its micro-kernel to, and the cell it shares with it.
+#:
+#: The rule is that a micro-kernel is written against the lexicographic basis
+#: and the mesh-order element reconciles the two in a forwarding wrapper, so the
+#: kernel itself reorders nothing.  This is the table that says which pairs
+#: exist; it was private to `emitters/energy_codegen.py`, which is the only
+#: place that had needed it until the inexact family did too.
+CARTESIAN_TWINS = (
+    ("quad4", "proteus_quad4", 2, 4),
+    ("hex8", "proteus_hex8", 3, 8),
+    ("hex27", "proteus_hex27", 3, 27),
+)
+
+
+@dataclass(frozen=True)
+class CartesianTwin:
+    """One mesh-ordered element and the lexicographic one it forwards to."""
+
+    element_name: str
+    twin_name: str
+    dim: int
+    n_shape: int
+    #: Entry `i` is the mesh node carrying lexicographic node `i`.
+    shape_order: tuple
+
+
+def cartesian_twin(element_type, dim=None, n_shape=None):
+    """This element's lexicographic twin, or ``None`` when it is one already.
+
+    ``None`` for a simplex, which has no tensor-product order to convert to,
+    and for a `PROTEUS_*` element, which is already lexicographic and is itself
+    the twin some other element forwards to.
+    """
+    name = str(element_type).lower()
+    for element_name, twin_name, twin_dim, twin_n_shape in CARTESIAN_TWINS:
+        if name != element_name:
+            continue
+        if dim is not None and int(dim) != twin_dim:
+            continue
+        if n_shape is not None and int(n_shape) != twin_n_shape:
+            continue
+        return CartesianTwin(
+            element_name=element_name,
+            twin_name=twin_name,
+            dim=twin_dim,
+            n_shape=twin_n_shape,
+            shape_order=tensor_product_cartesian_shape_order(twin_dim, twin_n_shape),
+        )
+    return None
+
+
+def gather_shape_order(element_type, dim, n_shape, tensor_product):
+    """The order a kernel's field streams are gathered in.
+
+    Identity unless the element is tensor-product *and* its mesh numbering is
+    not already Cartesian; a simplex has no tensor-product order to convert to.
+    """
+    if uses_cartesian_ordering(element_type) or not tensor_product:
+        return tuple(range(n_shape))
+    return tensor_product_cartesian_shape_order(dim, n_shape)
+
+
+def _tensor_product_coordinate_shape_order(dim, n_shape, element_type):
+    if uses_cartesian_ordering(element_type):
+        return tuple(range(n_shape))
+    return tensor_product_cartesian_shape_order(dim, n_shape)
+
+
+def _single_field_shape_order(n_shape, n_fields, field_stream_order):
+    return tuple(field_stream_order[shape * n_fields] // n_fields for shape in range(n_shape))
+
+
+def _stream_to_tensor_order(field_stream_order):
+    ordered = [0] * len(field_stream_order)
+    for tensor_stream, mesh_stream in enumerate(field_stream_order):
+        ordered[mesh_stream] = tensor_stream
+    return tuple(ordered)
+
+
+def _field_element_type(field_or_name, cell_rule, field_element_types):
+    field_name = _residual_parent_field_name(field_or_name)
+    return str(field_element_types.get(field_name, cell_rule.element_type)).upper()
+
+
+def _field_n_shape(field, cell_rule, field_element_types):
+    return _field_n_shape_by_name(
+        _residual_parent_field_name(field),
+        cell_rule,
+        field_element_types,
+    )
+
+
+def _field_n_shape_by_name(field_name, cell_rule, field_element_types):
+    element_type = _field_element_type(field_name, cell_rule, field_element_types)
+    return sfem_field_n_shape(
+        element_type,
+        cell_rule.order
+        if element_type in ("QUAD4", "PROTEUS_QUAD4") or sfem_is_tensor_product_hex_element(element_type)
+        else None,
+    )
+
+
+def is_tensor_product_family(family):
+    """Whether this basis or geometry family is the tensor-product one.
+
+    Takes the family and nothing else.  It used to take a quadrature rule
+    first and never read it -- nineteen call sites passed a `rule` or a
+    `cell_rule` that the body ignored -- which made it look like a question
+    about the rule when it is a question about the family alone.  That it is
+    also asked of `geometry_family`, not only of `basis_family`, is the
+    clearest sign of it.
+
+    Public because `emitters/residual_codegen.py` already imported the private
+    spelling across the module boundary, and because two more sites in
+    `emitters/energy_codegen.py` and one in `emitters/energy.py` wrote
+    `str(basis_family) == "tensor_product"` out by hand rather than reach for
+    something whose name said not to.
+    """
+    if family is None:
+        raise ValueError("basis family must be provided by the emission plan")
+    return str(family) == "tensor_product"
+
+
+def _residual_parent_field_name(field_or_name):
+    return str(getattr(field_or_name, "field_name", field_or_name))
+
+
+def _cell_shape_order(element_type, cell_rule, n_shape):
+    """Which cell node each of a field's nodes is gathered from.
+
+    Two different questions meet here and both have to be asked.  A cell whose
+    mesh numbering is not lexicographic needs its nodes permuted into the order
+    the tensor-product basis is written in.  A field coarser than its cell needs
+    to know which of the cell's nodes carry it -- and that is only the identity
+    because SFEM numbers a cell's corners first.  A lexicographic cell spaces
+    them out instead, so the pressure of a `PROTEUS_HEX27_PROTEUS_HEX8` pair
+    lives on cell nodes 0, 2, 6, 8, 18, 20, 24 and 26, not on 0 through 7.
+    """
+    if not uses_cartesian_ordering(element_type):
+        return tensor_product_cartesian_shape_order(cell_rule.dim, n_shape)
+    field_n_shape_1d = round(n_shape ** (1.0 / cell_rule.dim))
+    return tensor_product_subspace_shape_order(
+        cell_rule.dim,
+        cell_rule.tensor_product_n_shape_1d,
+        field_n_shape_1d,
+    )
+
+
+def _mixed_field_shape_orders(
+    layout,
+    cell_rule,
+    field_element_types,
+    basis_family,
+):
+    if not is_tensor_product_family(basis_family):
+        return tuple(tuple(range(layout.n_shape(field_index))) for field_index in range(len(layout.fields)))
+
+    field_element_types = {} if field_element_types is None else field_element_types
+    orders = []
+    for field_index, field in enumerate(layout.fields):
+        n_shape = layout.n_shape(field_index)
+        element_type = _field_element_type(
+            _residual_parent_field_name(field),
+            cell_rule,
+            field_element_types,
+        )
+        orders.append(_cell_shape_order(element_type, cell_rule, n_shape))
+    return tuple(orders)
+
+
+def _mixed_tensor_product_field_stream_order(
+    layout,
+    cell_rule,
+    field_element_types,
+    basis_family,
+):
+    if not is_tensor_product_family(basis_family):
+        return tuple(range(layout.total_streams))
+
+    field_element_types = {} if field_element_types is None else field_element_types
+    order = []
+    for field_index, field in enumerate(layout.fields):
+        n_shape = layout.n_shape(field_index)
+        element_type = _field_element_type(
+            _residual_parent_field_name(field),
+            cell_rule,
+            field_element_types,
+        )
+        shape_order = _cell_shape_order(element_type, cell_rule, n_shape)
+        order.extend(layout.stream_index(field_index, shape) for shape in shape_order)
+    return tuple(order)
+
+
+def _mixed_stream_shape_offsets(layout):
+    offsets = []
+    for field_index, _ in enumerate(layout.fields):
+        offsets.extend(range(layout.n_shape(field_index)))
+    return tuple(offsets)
+
+
+def _mixed_triplet_stream_indices(layout, group_names):
+    selected = set(group_names)
+    indices = []
+    for field_index, field in enumerate(layout.fields):
+        if _residual_parent_field_name(field) not in selected:
+            continue
+        indices.extend(
+            layout.stream_index(field_index, local_shape)
+            for local_shape in range(layout.n_shape(field_index))
+        )
+    return tuple(indices)
+
+
+def _compatible_matrix_stream_indices(field_indices, n_shape, n_fields):
+    """Kernel stream indices for an element matrix, grouped by field.
+
+    The position in this list is the element matrix's row (or column); the value
+    is the stream the kernel reads.  Those are two different orders and the
+    distinction is the whole point: the matrix is laid out component-major so the
+    scatter's component and shape tables stay the plain ones, while a kernel
+    stream is `shape * n_fields + field`, the node-major order every gather in
+    this file writes and every block kernel reads.  They used to be the same
+    expression, which assembled a matrix permuted against the kernel that filled
+    it -- and the element matrix was fed a permuted state as well, so it was not
+    even a clean permutation of the right answer.
+    """
+    streams = []
+    for field_index in field_indices:
+        streams.extend(shape * n_fields + field_index for shape in range(n_shape))
+    return tuple(streams)
+
+
+def compatible_matrix_stream_fields(streams, n_fields, n_shape):
+    """The field list a run of element-matrix streams is blocked by.
+
+    `_compatible_matrix_streams` lists the streams field-major, so entry
+    `k * n_shape + s` carries field `field_indices[k]` and shape function `s`.
+    That makes both indices closed-form in the position, and returning the field
+    list -- `n_fields` entries at most -- is what lets a scatter loop over the
+    two indices instead of looking up a stored inverse of the flattening.
+
+    Raises when the streams are not that grid.  The caller builds a loop nest on
+    the answer, and a loop nest that disagreed with the ordering would compute
+    the wrong entry with nothing in the emitted text to show for it.
+    """
+    streams = tuple(streams)
+    if not streams or len(streams) % n_shape:
+        raise ValueError(
+            "element-matrix streams must be a whole number of shape runs, got %d "
+            "for n_shape %d" % (len(streams), n_shape)
+        )
+    fields = []
+    for block in range(len(streams) // n_shape):
+        run = streams[block * n_shape : (block + 1) * n_shape]
+        field = run[0] % n_fields
+        expected = tuple(shape * n_fields + field for shape in range(n_shape))
+        if run != expected:
+            raise ValueError(
+                "element-matrix stream run %d is not one field's shapes in order: "
+                "%r against %r" % (block, run, expected)
+            )
+        fields.append(field)
+    return tuple(fields)
+
+
+#: The two per-stream tables that used to live here -- `stream % n_fields` and
+#: `stream // n_fields`, one entry per stream -- are gone with the scatter that
+#: emitted them.  `compatible_matrix_stream_fields` returns the field list the
+#: streams are blocked by, and the scatter loops over the two indices instead of
+#: reading back a table of their stored decomposition.

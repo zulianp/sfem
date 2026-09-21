@@ -18,6 +18,8 @@ namespace sfem {
         std::shared_ptr<Op>        lor_op(const std::shared_ptr<FunctionSpace> &space) override;
         std::shared_ptr<Op>        derefine_op(const std::shared_ptr<FunctionSpace> &space) override;
         const char                *name() const override;
+        //! the Dirichlet energy
+        bool energy_or_potential_based() const override { return true; }
         inline bool                is_linear() const override { return true; }
         inline ptrdiff_t           n_dofs_domain() const override { return space->n_dofs(); }
         inline ptrdiff_t           n_dofs_image() const override { return space->n_dofs(); }

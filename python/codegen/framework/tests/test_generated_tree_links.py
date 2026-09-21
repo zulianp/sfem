@@ -1,0 +1,213 @@
+"""The generated tree links, and the check that says so is not vacuous.
+
+One defect shape kept coming back, six times, one compiler error apiece: a call
+site that knows a symbol's *logical* name but not its *emitted* one.  The
+emitted spelling belongs to the target -- `TargetPlatform.entry_point_name`
+prefixes `cu_` on CUDA, and `entry_point_suffix_parameters` appends a stream
+parameter -- while `plans/conventions` strips prefixes on the way in, because it
+parses material, element and operation out of a name and `cu_` is none of those.
+An emitter that splices the logical name therefore builds a call that no longer
+names, or no longer fits, the function it meant.
+
+Every instance was found by compiling.  That is the wrong gate for two reasons:
+it needs a material that happens to publish both halves for the same element
+before anything is visible at all, and one instance -- a metric dispatch handed
+nine adjugate components where six metric components belong -- had the right
+arity for the wrong parameters, compiled cleanly, and would have given a wrong
+answer.
+
+`driver._validate_generated_call_graph` runs over the whole emitted file set at
+the end of every generation, so both shapes now fail at generation time on every
+material and every target.  The tests here pin that it still *can* fail: a
+checker that has quietly become a no-op passes every tree, including the broken
+ones, and the only way to know is to hand it a broken one.
+"""
+
+import unittest
+
+from codegen.framework.pipeline import driver
+
+
+DEFINITION = '''
+extern "C" int cu_material_hex8_residual_i_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    void *const RSTR output,
+    void *const stream
+) {
+  return 0;
+}
+'''
+
+FORWARDER = '''
+extern "C" int cu_material_hex8_residual_i_maos(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    void *const RSTR output,
+    void *const stream
+) {
+  return %s(scalar_bytes, nelements, output%s);
+}
+'''
+
+
+def _tree(callee, tail):
+    return {"d3/hex8/material_hex8_operator.cu": DEFINITION + FORWARDER % (callee, tail)}
+
+
+class GeneratedTreeLinksTest(unittest.TestCase):
+    def test_a_correct_forwarder_passes(self):
+        driver._validate_generated_call_graph(
+            _tree("cu_material_hex8_residual_i_msoa", ", stream")
+        )
+
+    def test_the_logical_name_at_a_call_site_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            driver._validate_generated_call_graph(
+                _tree("material_hex8_residual_i_msoa", ", stream")
+            )
+        message = str(caught.exception)
+        self.assertIn("which nothing defines", message)
+        self.assertIn("cu_material_hex8_residual_i_msoa", message)
+
+    def test_a_dropped_suffix_argument_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            driver._validate_generated_call_graph(
+                _tree("cu_material_hex8_residual_i_msoa", "")
+            )
+        message = str(caught.exception)
+        self.assertIn("with 3 arguments", message)
+        self.assertIn("it is emitted with 4", message)
+
+    def test_an_extra_argument_is_rejected(self):
+        # The instance that compiled and answered wrongly passed *more* than the
+        # callee wanted in one of its two spellings, so the check is two-sided.
+        with self.assertRaises(ValueError) as caught:
+            driver._validate_generated_call_graph(
+                _tree("cu_material_hex8_residual_i_msoa", ", stream, stream")
+            )
+        self.assertIn("with 5 arguments", str(caught.exception))
+
+    def test_two_files_may_not_spell_one_symbol_with_different_arities(self):
+        files = _tree("cu_material_hex8_residual_i_msoa", ", stream")
+        files["op/material_c_abi.hpp"] = (
+            'extern "C" int cu_material_hex8_residual_i_msoa('
+            "const int scalar_bytes, const ptrdiff_t nelements, void *const output);"
+        )
+        with self.assertRaises(ValueError) as caught:
+            driver._validate_generated_call_graph(files)
+        self.assertIn("disagrees with an earlier file", str(caught.exception))
+
+    def test_calls_out_of_the_generated_tree_are_not_this_check_s_business(self):
+        # `atomicAdd`, `std::fprintf`, SFEM's own entry points: the tree calls
+        # plenty it does not define, and only a name the tree defines under a
+        # prefix is evidence of the defect.
+        files = _tree("cu_material_hex8_residual_i_msoa", ", stream")
+        files["d3/hex8/material_hex8_operator.cu"] += (
+            "\nvoid use() { atomicAdd(nullptr, 1.0); "
+            "cu_laplacian_apply(1, 2, 3, 4, 5, 6, 7); }\n"
+        )
+        driver._validate_generated_call_graph(files)
+
+    def test_a_zero_argument_call_counts_as_zero(self):
+        files = {
+            "d3/hex8/material_hex8_operator.cu": (
+                'extern "C" int cu_material_hex8_setup(void) { return 0; }\n'
+                "int use() { return cu_material_hex8_setup(); }\n"
+            )
+        }
+        driver._validate_generated_call_graph(files)
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+# A vtable slot is a link fact too, and it fails later and louder than a missing
+# `extern "C"` kernel: an undefined `override` compiles, archives, and survives
+# the whole library build, because nothing emits a reference to it until an
+# executable is linked.  That is how a device `Op` came to declare
+# `inexact_supported`, `inexact_update` and `inexact_apply` while its source
+# defined none -- the declaration asked the *material*, the definitions needed
+# kernels the *target* does not lower, and the two questions were the same
+# `getattr`.
+OP_HEADER = '''
+namespace sfem {
+  class %sGeneratedThing final : public Op {
+  public:
+    const char *name() const override { return "GeneratedThing"; }
+    int gradient(const real_t *const x, real_t *const out) override;
+    int apply(const real_t *const x,
+              const real_t *const h,
+              real_t *const out) override;%s
+  };
+}
+'''
+
+INEXACT_DECLARATIONS = '''
+    bool inexact_supported() const override;'''
+
+OP_SOURCE = '''
+int %sGeneratedThing::gradient(const real_t *const x, real_t *const out) { return 0; }
+int %sGeneratedThing::apply(const real_t *const x, const real_t *const h, real_t *const out) { return 0; }
+'''
+
+
+def _op_tree(prefix, extra_declarations, extra_definitions=""):
+    return {
+        "thing/op/sfem_GeneratedThing.hpp": OP_HEADER % (prefix, extra_declarations),
+        "thing/op/sfem_GeneratedThing.cpp": OP_SOURCE % (prefix, prefix) + extra_definitions,
+    }
+
+
+class GeneratedOpOverridesTest(unittest.TestCase):
+    def test_a_class_whose_overrides_are_all_defined_passes(self):
+        driver._validate_generated_op_overrides(_op_tree("", ""))
+
+    def test_an_override_nothing_defines_is_rejected(self):
+        with self.assertRaises(ValueError) as caught:
+            driver._validate_generated_op_overrides(_op_tree("", INEXACT_DECLARATIONS))
+        self.assertIn("inexact_supported", str(caught.exception))
+
+    def test_the_same_override_with_a_definition_passes(self):
+        driver._validate_generated_op_overrides(
+            _op_tree(
+                "",
+                INEXACT_DECLARATIONS,
+                "\nbool GeneratedThing::inexact_supported() const { return true; }\n",
+            )
+        )
+
+    def test_an_inline_body_in_the_header_needs_no_definition(self):
+        # `name()` is declared *and* defined in the class body.  A checker that
+        # only looked for `override` would demand an out-of-line definition for
+        # it and fail every generated Op there is.
+        tree = _op_tree("", "")
+        self.assertIn("name() const override {", tree["thing/op/sfem_GeneratedThing.hpp"])
+        self.assertNotIn("::name", tree["thing/op/sfem_GeneratedThing.cpp"])
+        driver._validate_generated_op_overrides(tree)
+
+    def test_a_host_definition_does_not_satisfy_a_device_declaration(self):
+        # The device class name contains the host's as a suffix
+        # (`GPUGeneratedThing` ends with `GeneratedThing`), so a substring match
+        # would see `GeneratedThing::inexact_supported` inside
+        # `GPUGeneratedThing::inexact_supported` and pass a header that declares
+        # what nothing defines -- which is the exact pair that shipped.
+        tree = _op_tree("GPU", INEXACT_DECLARATIONS)
+        tree["thing/op/sfem_GeneratedThingHost.cpp"] = (
+            "\nbool GeneratedThing::inexact_supported() const { return true; }\n"
+        )
+        with self.assertRaises(ValueError):
+            driver._validate_generated_op_overrides(tree)
+
+    def test_a_multi_line_declaration_is_read_as_one(self):
+        # `apply` spans three lines in every generated Op header.  A line-wise
+        # checker reads its tail as a statement of its own and finds no name.
+        tree = _op_tree("", "")
+        self.assertIn("real_t *const out) override;", tree["thing/op/sfem_GeneratedThing.hpp"])
+        driver._validate_generated_op_overrides(tree)
+
+    def test_a_pure_virtual_declaration_is_not_this_check_s_business(self):
+        driver._validate_generated_op_overrides(
+            _op_tree("", "\n    int value(const real_t *x, real_t *const out) override = 0;")
+        )
