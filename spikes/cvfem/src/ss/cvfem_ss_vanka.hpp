@@ -239,6 +239,55 @@ namespace cvfem_ss {
         for (ptrdiff_t i = 0; i < d.nnodes; ++i)
             v.ewt[(size_t)i] = v.ewt[(size_t)i] > 0 ? scalar_t(1) / v.ewt[(size_t)i] : scalar_t(0);
 
+        // SFEM_VANKA_WEIGHT_SUM=1: are the patch multiplicities complete on OWNED nodes?
+        //
+        // Both weights above are counted from this rank's local macro-element array, which
+        // includes the aura, and the argument for their correctness is that a one-element-deep
+        // aura makes every macro-element touching an owned node local. That argument has been
+        // asserted repeatedly in this investigation and never measured, and it is now the
+        // weakest link: both Vanka variants drift under decomposition and both drift UPWARD --
+        // the owned-range |y| grows 21 percent from one rank to eight for the multiplicative
+        // sweep and 13 percent for the additive one. An inflated correction is what an
+        // UNDER-counted divisor produces, since both sweeps finish with y += (1/count) * z, and
+        // more ranks means more owned nodes near a cut. Block-Jacobi has no multiplicity at all,
+        // which is exactly why it stays flat where these do not.
+        //
+        // The quantity printed is the number of (macro-element, node) incidences over owned
+        // nodes. It counts the mesh, not the partition, so it must be identical at every rank
+        // count. If it shrinks as the cut gets finer, the aura does not cover what the argument
+        // claims and the weights owe a cross-rank completion.
+        if (smesh::Env::read<int>("SFEM_VANKA_WEIGHT_SUM", 0) && d.mesh) {
+            const bool dist = d.mesh->is_distributed() && d.mesh->comm() && d.mesh->comm()->size() > 1;
+            const ptrdiff_t nown = dist ? d.mesh->distributed()->n_nodes_owned() : d.nnodes;
+
+            long double inc_e = 0, inc_w = 0, gidw = 0;
+            for (ptrdiff_t i = 0; i < nown && i < d.nnodes; ++i) {
+                const long double gid =
+                        dist ? (long double)d.mesh->distributed()->node_mapping()->data()[i] : (long double)i;
+                const long double ce = v.ewt[(size_t)i] > 0 ? (long double)1 / (long double)v.ewt[(size_t)i] : 0;
+                const long double cw =
+                        v.weight[(size_t)i] > 0 ? (long double)1 / (long double)v.weight[(size_t)i] : 0;
+                inc_e += ce;
+                inc_w += cw;
+                gidw += ce * gid;
+            }
+
+            double ge = (double)inc_e, gw = (double)inc_w, gg = (double)gidw, gn = (double)nown;
+            int    rank = 0;
+            if (dist) {
+                ge   = d.mesh->comm()->sum(ge);
+                gw   = d.mesh->comm()->sum(gw);
+                gg   = d.mesh->comm()->sum(gg);
+                gn   = d.mesh->comm()->sum(gn);
+                rank = d.mesh->comm()->rank();
+            }
+            if (rank == 0)
+                std::printf(
+                        "vankaweight: owned_nodes %.0f  elem_incidences %.17g  patch_incidences %.17g  "
+                        "gidsum %.17g\n",
+                        gn, ge, gw, gg);
+        }
+
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
             for (int zi = 0; zi < L; ++zi)

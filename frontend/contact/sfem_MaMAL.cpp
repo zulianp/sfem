@@ -34,8 +34,8 @@ namespace sfem {
     };
 
     struct MaMALParams {
-        int    max_iterations{20};
-        real_t tolerance{1e-6};
+        int    max_iterations{60};
+        real_t tolerance{1e-8};
         real_t margin{1e-8};
         real_t search_radius{5e-2};
         real_t penalty_scale{1};

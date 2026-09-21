@@ -629,6 +629,24 @@ namespace cvfem_ss {
         if (max_gid >= n_coarse)
             SFEM_ERROR("galerkin_gid_from_rows: coarse id %lld is outside n_coarse=%lld (nmacro=%lld, nc=%d)\n",
                        (long long)max_gid, (long long)n_coarse, (long long)g.nmacro, g.nc);
+
+        // The connectivity a level is built from, as one number, so it can be compared across
+        // mesh layouts. Two sums because they fail differently: `sum` moves only if the set of
+        // ids changes, while `wsum` weights each slot by its position and so also moves when the
+        // same ids arrive in a different element order -- which is the failure this exists to
+        // catch. The coarse ids here are read from a different block than the elements are
+        // iterated over, so the two blocks must agree on element order; nothing checks that they
+        // do. Identical sums across pack counts mean the connectivity is layout-independent.
+        if (std::getenv("SFEM_GALERKIN_GID_SUM")) {
+            long long s = 0, w = 0;
+            for (size_t k = 0; k < g.gid.size(); ++k) {
+                s += (long long)g.gid[k];
+                w += (long long)(k + 1) * (long long)g.gid[k];
+            }
+            std::printf("galerkingid: nmacro %lld  nc %d  n_coarse %lld  sum %lld  wsum %lld\n",
+                        (long long)g.nmacro, g.nc, (long long)n_coarse, s, w);
+            std::fflush(stdout);
+        }
     }
 
     inline void galerkin_gid_from_spaces(const std::shared_ptr<sfem::FunctionSpace> &from_space,  // coarse
@@ -668,12 +686,52 @@ namespace cvfem_ss {
             // HEX8 corner order is not the lattice order sshex8_lidx produces -- and smesh already
             // owns that reindexing, so it is taken from there rather than re-derived here.
             (void)to_b;
-            smesh::idx_t *corner_rows[8];
-            smesh::hex8_elements_as_sshex8_level1(from_b->elements()->data(), corner_rows);
-            for (int a = 0; a < 8; ++a) rows[(size_t)a] = corner_rows[a];
+            // Diagnostic only: the read this replaced, so both can be measured from one binary.
+            // The comment above records that the two numberings agree serially. That holds for a
+            // mesh nobody has renumbered, and the packed layout renumbers the fine mesh in place
+            // (smesh_packed_mesh.cpp: mesh->renumber_nodes(node_map)) with a permutation that
+            // depends on the pack count, because ids are handed out pack by pack. Measured on the
+            // cavity at N=8 level 4: this branch's ids move between one pack and two (sum 1472876
+            // against 1482207) while the two semi-structured levels do not, and the coarse matrix
+            // then loses mass (abs 994.014 against 990.796) and the solve goes from 7 linear
+            // iterations to 14.
+            if (std::getenv("SFEM_GALERKIN_GID_LEGACY")) {
+                for (int k = 0; k < 2; ++k)
+                    for (int j = 0; j < 2; ++j)
+                        for (int i = 0; i < 2; ++i)
+                            rows[(size_t)smesh::sshex8_lidx(1, i, j, k)] =
+                                    to_b->elements()->data()[smesh::sshex8_lidx(to_level, i * to_level, j * to_level,
+                                                                                k * to_level)];
+            } else {
+                smesh::idx_t *corner_rows[8];
+                smesh::hex8_elements_as_sshex8_level1(from_b->elements()->data(), corner_rows);
+                for (int a = 0; a < 8; ++a) rows[(size_t)a] = corner_rows[a];
+            }
         }
 
         galerkin_gid_from_rows(rows, g.n_coarse, g);
+
+        // The same connectivity keyed by COORDINATES rather than by id.
+        //
+        // An id only means something inside one numbering, so a checksum of gid cannot tell a
+        // sound relabelling apart from corners attached to the wrong physical nodes. The point
+        // a given (macro-element, corner) denotes is a property of the mesh, not of the layout,
+        // so this number must not move when the pack count does. It is the invariant the id
+        // sums are blind to.
+        if (std::getenv("SFEM_GALERKIN_GID_SUM")) {
+            auto      pts  = from_m.points()->data();
+            const int sdim = from_m.spatial_dimension();
+            long double cs = 0;
+            for (ptrdiff_t e = 0; e < g.nmacro; ++e)
+                for (int a = 0; a < g.nc; ++a) {
+                    const ptrdiff_t n = (ptrdiff_t)g.gid[(size_t)e * g.nc + a];
+                    long double     h = 0;
+                    for (int d = 0; d < sdim; ++d) h += (long double)pts[d][n] * (long double)(d + 1);
+                    cs += h * (long double)((e * g.nc + a) + 1);
+                }
+            std::printf("galerkincoord: nc %d  n_coarse %lld  coordsum %.17Lg\n", g.nc, (long long)g.n_coarse, cs);
+            std::fflush(stdout);
+        }
     }
 
     // ------------------------------------------------------------------
