@@ -9,6 +9,7 @@ from ..symbolic.constitutive import (
 )
 from ..symbolic.core import KernelExpressions
 from ..symbolic.core import directional_derivative
+from codegen.framework.plans.scheduling import build_expression_graph
 
 
 @dataclass(frozen=True)
@@ -325,7 +326,8 @@ class TwoPhaseFlowImplicitEulerModel:
             )
             + self.constitutive.parameters.as_tuple()
         )
-        return expressions.build_graph(
+        return build_expression_graph(
+            expressions,
             data_symbols=data_symbols,
             temporary_prefix=temporary_prefix,
         )
@@ -386,7 +388,8 @@ class TwoPhaseFlowImplicitEulerModel:
             )
             + self.constitutive.parameters.as_tuple()
         )
-        return expressions.build_graph(
+        return build_expression_graph(
+            expressions,
             data_symbols=data_symbols,
             temporary_prefix=temporary_prefix,
         )

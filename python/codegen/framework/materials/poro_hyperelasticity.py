@@ -10,7 +10,6 @@ mu = gen.material_parameter("mu")
 lmbda = gen.material_parameter("lmbda")
 alpha = gen.material_parameter("alpha")
 storage = gen.material_parameter("storage")
-dt = gen.material_parameter("dt")
 hydraulic_conductivity = gen.material_parameter("hydraulic_conductivity")
 V = gen.FunctionSpace(
     gen.VectorElement(
@@ -48,14 +47,14 @@ def _build_system(dim):
         )
         system.add_energy("solid", psi, fields=(u,), variables=(F,))
 
+        # The storage and the coupling terms are rates, and no scheme is named
+        # for them: `gen.dt` carries the derivative and a `TimeScheme` supplies
+        # the weights at run time.  Both fields carry one, so there are two
+        # shifts -- a one-step method gives them the same value, which is what
+        # makes them one scheme rather than two.
         form = (
             -alpha * p * gen.div(v)
-            + (
-                storage * (p - gen.old(p))
-                + alpha * (gen.div(u) - gen.div(gen.old(u)))
-            )
-            * q
-            / dt
+            + (storage * gen.dt(p) + alpha * gen.div(gen.dt(u))) * q
             + hydraulic_conductivity * gen.inner(gen.grad(p), gen.grad(q))
         )
         system.add_residual("poro", form, fields=(u, p))
@@ -76,7 +75,8 @@ material = gen.CodeGenerator(
         ("lmbda", 1.0),
         ("alpha", 0.8),
         ("storage", 1.0e-3),
-        ("dt", 1.0),
+        ("u_dt_shift", 1.0),
+        ("p_dt_shift", 1.0),
         ("hydraulic_conductivity", 1.0),
     ),
 )

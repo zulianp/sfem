@@ -1352,7 +1352,8 @@ namespace sfem {
         real_t augmented_lagrangian_value(const SharedBuffer<real_t>& x) {
             static const real_t zero_step[1] = {0};
             real_t              value        = 0;
-            f->value_steps(x->data(), x->data(), 1, zero_step, &value);
+            if (f->has_energy_merit()) f->energy_merit(x->data(), &value);
+            else f->residual_merit(x->data(), &value);
 
             const int           dim        = contact_jacobi_data->surface->spatial_dimension();
             const ptrdiff_t     n_contact  = contact_jacobi_data->coupling_matrix->rows();
@@ -1398,7 +1399,10 @@ namespace sfem {
             static const real_t steps[n_line_search_steps]  = {1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.09, 0.08, 0.};
             real_t              values[n_line_search_steps] = {0};
 
-            f->value_steps(mem->solution->data(), mem->correction->data(), n_line_search_steps, steps, values);
+            if (f->has_energy_merit())
+                f->energy_merit(mem->solution->data(), mem->correction->data(), n_line_search_steps, steps, values);
+            else
+                f->residual_merit(mem->solution->data(), mem->correction->data(), n_line_search_steps, steps, values);
 
             printf("MaMAL::nonlinear_cycle step fun: [\n");
             for (int i = 0; i < n_line_search_steps; ++i) {

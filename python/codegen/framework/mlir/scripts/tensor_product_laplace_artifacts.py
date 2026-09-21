@@ -2501,7 +2501,7 @@ def _run_generated_sfem_laplace_comparison(output_dir, args, form_ir, local_meta
 def _render_generated_sfem_laplace_comparison_harness(form_ir, local_metal, generated_operator):
     sf = form_ir.sum_factor
     element_slug = sf.element_type.lower()
-    generated_kernel = "laplace_%s_residual_element_soa_float" % element_slug
+    generated_kernel = "laplace_%s_residual_esoa_float" % element_slug
     u = tuple(float(0.5 + 0.03125 * (i + 1)) for i in range(sf.n_shape))
     return _GENERATED_SFEM_LAPLACE_COMPARISON_TEMPLATE % {
         "generated_operator": str(generated_operator),

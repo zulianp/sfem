@@ -1,988 +1,420 @@
 #include "../../op/sfem_GeneratedLaplace_c_abi.hpp"
 
-extern "C" int laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_hex8_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int laplace_proteus_hex8_jacobian_action_isoparametric_mesh_aos(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
-);
-extern "C" int laplace_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
-);
-extern "C" int laplace_proteus_hex8_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_gradient_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_residual_isoparametric_mesh_aos(
+extern "C" int laplace_proteus_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        double *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
 );
-extern "C" int laplace_proteus_hex8_residual_isoparametric_mesh_aos_float(
+extern "C" int laplace_proteus_hex8_hessian_crs_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        float *const SFEM_RESTRICT output
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
 );
-extern "C" int laplace_proteus_hex8_residual_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_hex8_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+);
+extern "C" int laplace_proteus_hex8_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_residual_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_gradient_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_jacobian_action_affine_mesh_soa(
+extern "C" int laplace_proteus_hex8_objective_steps_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int laplace_proteus_hex8_jacobian_action_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-);
-extern "C" int laplace_proteus_hex8_residual_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-);
-extern "C" int laplace_proteus_hex8_residual_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-);
-extern "C" int laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_hex8_apply_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_apply_packed_two_pass_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-);
-extern "C" int laplace_proteus_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_gradient_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 );
-extern "C" int laplace_proteus_hex8_jacobian_action_packed_affine_mesh_soa(
+extern "C" int laplace_proteus_hex8_objective_steps_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int laplace_proteus_hex8_jacobian_action_packed_affine_mesh_soa_float(
+extern "C" int laplace_proteus_hex8_apply_packed_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 );
-extern "C" const sfem::codegen::KernelDiagnostics * laplace_proteus_hex8_jacobian_action_element_soa_diagnostics(
-        void
-);
-extern "C" const sfem::codegen::KernelDiagnostics * laplace_proteus_hex8_residual_element_soa_diagnostics(
-        void
-);
-
-extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_hex8_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_hex8_hessian_crs_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_hessian_crs_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
-}
-
-extern "C" int laplace_hex8_hessian_dia_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        double *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, diag_offsets, ndiag, values);
-}
-
-extern "C" int laplace_hex8_hessian_dia_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const int *const SFEM_RESTRICT diag_offsets,
-        const ptrdiff_t ndiag,
-        float *const SFEM_RESTRICT values
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_hessian_dia_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, diag_offsets, ndiag, values);
-}
-
-extern "C" int laplace_hex8_jacobian_action_isoparametric_mesh_aos(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT direction,
-        double *const SFEM_RESTRICT output
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_isoparametric_mesh_aos(nelements, nnodes, proteus_elements, points, parameters, direction, output);
-}
-
-extern "C" int laplace_hex8_jacobian_action_isoparametric_mesh_aos_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT direction,
-        float *const SFEM_RESTRICT output
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_isoparametric_mesh_aos_float(nelements, nnodes, proteus_elements, points, parameters, direction, output);
-}
-
-extern "C" int laplace_hex8_jacobian_action_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_jacobian_action_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_residual_isoparametric_mesh_aos(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double *const SFEM_RESTRICT parameters,
-        const double *const SFEM_RESTRICT current,
-        double *const SFEM_RESTRICT output
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_residual_isoparametric_mesh_aos(nelements, nnodes, proteus_elements, points, parameters, current, output);
-}
-
-extern "C" int laplace_hex8_residual_isoparametric_mesh_aos_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float *const SFEM_RESTRICT parameters,
-        const float *const SFEM_RESTRICT current,
-        float *const SFEM_RESTRICT output
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_residual_isoparametric_mesh_aos_float(nelements, nnodes, proteus_elements, points, parameters, current, output);
-}
-
-extern "C" int laplace_hex8_residual_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_residual_isoparametric_mesh_soa(nelements, nnodes, proteus_elements, points, kappa, current_stride, u, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_residual_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_residual_isoparametric_mesh_soa_float(nelements, nnodes, proteus_elements, points, kappa, current_stride, u, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_jacobian_action_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_jacobian_action_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_residual_affine_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t current_stride,
-        const double *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_residual_affine_mesh_soa(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, current_stride, u, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_residual_affine_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t current_stride,
-        const float *const SFEM_RESTRICT u,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    idx_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_residual_affine_mesh_soa_float(nelements, nnodes, proteus_elements, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, current_stride, u, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_jacobian_action_packed_isoparametric_mesh_soa(
+extern "C" int laplace_proteus_hex8_apply_packed_two_pass_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_jacobian_action_packed_isoparametric_mesh_soa_float(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_packed_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa(
-        const ptrdiff_t n_packs,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        double *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa_float(
+        void *const RSTR outx
+);
+extern "C" int laplace_proteus_hex8_gradient_packed_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+);
+extern "C" int laplace_proteus_hex8_gradient_packed_two_pass_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
         const ptrdiff_t n_ghost_entries,
         const ptrdiff_t n_ghost_reduce_rows,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
-        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
-        float *const SFEM_RESTRICT ghost_buf,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
-) {
-    uint16_t *proteus_elements[8] = {
-        elements[0],
-        elements[1],
-        elements[3],
-        elements[2],
-        elements[4],
-        elements[5],
-        elements[7],
-        elements[6]
-    };
-    return laplace_proteus_hex8_jacobian_action_packed_two_pass_isoparametric_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, direction_stride, u_direction, out_stride, u_out);
-}
-
-extern "C" int laplace_hex8_jacobian_action_packed_affine_mesh_soa(
+        void *const RSTR outx
+);
+extern "C" int laplace_proteus_hex8_objective_steps_packed_a_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const double kappa,
-        const ptrdiff_t direction_stride,
-        const double *const SFEM_RESTRICT u_direction,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+);
+extern "C" const sfem::codegen::KernelDiagnostics * laplace_proteus_hex8_apply_soa_diagnostics(
+        void
+);
+extern "C" const sfem::codegen::KernelDiagnostics * laplace_proteus_hex8_gradient_soa_diagnostics(
+        void
+);
+extern "C" const sfem::codegen::KernelDiagnostics * laplace_proteus_hex8_objective_soa_diagnostics(
+        void
+);
+
+extern "C" int laplace_hex8_apply_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 ) {
-    uint16_t *proteus_elements[8] = {
+    idx_t *proteus_elements[8] = {
         elements[0],
         elements[1],
         elements[3],
@@ -992,35 +424,233 @@ extern "C" int laplace_hex8_jacobian_action_packed_affine_mesh_soa(
         elements[7],
         elements[6]
     };
-    return laplace_proteus_hex8_jacobian_action_packed_affine_mesh_soa(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
+    return laplace_proteus_hex8_apply_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, kappa, h_stride, hx, out_stride, outx);
 }
 
-extern "C" int laplace_hex8_jacobian_action_packed_affine_mesh_soa_float(
+extern "C" int laplace_hex8_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+    idx_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_gradient_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, out_stride, outx);
+}
+
+extern "C" int laplace_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+) {
+    idx_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_hessian_bsr_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
+}
+
+extern "C" int laplace_hex8_hessian_crs_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+) {
+    idx_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_hessian_crs_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, kappa, rowptr, colidx, values);
+}
+
+extern "C" int laplace_hex8_objective_steps_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+) {
+    idx_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_objective_steps_i_msoa(scalar_bytes, nelements, nnodes, proteus_elements, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+}
+
+extern "C" int laplace_hex8_apply_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+    idx_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_apply_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+}
+
+extern "C" int laplace_hex8_gradient_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+    idx_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_gradient_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, out_stride, outx);
+}
+
+extern "C" int laplace_hex8_objective_steps_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+) {
+    idx_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_objective_steps_a_msoa(scalar_bytes, nelements, nnodes, proteus_elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+}
+
+extern "C" int laplace_hex8_apply_packed_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t n_packs,
         const ptrdiff_t n_elements_per_pack,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         const ptrdiff_t max_nodes_per_pack,
-        uint16_t **const SFEM_RESTRICT elements,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        const ptrdiff_t *const SFEM_RESTRICT n_shared_nodes,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate0,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate1,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate2,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate3,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate4,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate5,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate6,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate7,
-        const geom_t *const SFEM_RESTRICT g_jacobian_adjugate8,
-        const geom_t *const SFEM_RESTRICT g_jacobian_determinant0,
-        const float kappa,
-        const ptrdiff_t direction_stride,
-        const float *const SFEM_RESTRICT u_direction,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT u_out
+        void *const RSTR outx
 ) {
     uint16_t *proteus_elements[8] = {
         elements[0],
@@ -1032,17 +662,386 @@ extern "C" int laplace_hex8_jacobian_action_packed_affine_mesh_soa_float(
         elements[7],
         elements[6]
     };
-    return laplace_proteus_hex8_jacobian_action_packed_affine_mesh_soa_float(n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_jacobian_adjugate0, g_jacobian_adjugate1, g_jacobian_adjugate2, g_jacobian_adjugate3, g_jacobian_adjugate4, g_jacobian_adjugate5, g_jacobian_adjugate6, g_jacobian_adjugate7, g_jacobian_adjugate8, g_jacobian_determinant0, kappa, direction_stride, u_direction, out_stride, u_out);
+    return laplace_proteus_hex8_apply_packed_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, h_stride, hx, out_stride, outx);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * laplace_hex8_jacobian_action_element_soa_diagnostics(
-        void
+extern "C" int laplace_hex8_apply_packed_two_pass_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
 ) {
-    return laplace_proteus_hex8_jacobian_action_element_soa_diagnostics();
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_apply_packed_two_pass_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, h_stride, hx, out_stride, outx);
 }
 
-extern "C" const sfem::codegen::KernelDiagnostics * laplace_hex8_residual_element_soa_diagnostics(
+extern "C" int laplace_hex8_gradient_packed_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_gradient_packed_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, ux, out_stride, outx);
+}
+
+extern "C" int laplace_hex8_gradient_packed_two_pass_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_gradient_packed_two_pass_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, points, kappa, u_stride, ux, out_stride, outx);
+}
+
+extern "C" int laplace_hex8_objective_steps_packed_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_objective_steps_packed_i_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, points, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+}
+
+extern "C" int laplace_hex8_apply_packed_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_apply_packed_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+}
+
+extern "C" int laplace_hex8_apply_packed_two_pass_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_apply_packed_two_pass_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, h_stride, hx, out_stride, outx);
+}
+
+extern "C" int laplace_hex8_gradient_packed_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_gradient_packed_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, out_stride, outx);
+}
+
+extern "C" int laplace_hex8_gradient_packed_two_pass_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t *const RSTR ghost_reduce_ptr,
+        const ptrdiff_t *const RSTR ghost_reduce_idx,
+        const idx_t *const RSTR ghost_reduce_dest,
+        void *const RSTR ghost_buf,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_gradient_packed_two_pass_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, n_ghost_entries, n_ghost_reduce_rows, ghost_reduce_ptr, ghost_reduce_idx, ghost_reduce_dest, ghost_buf, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, out_stride, outx);
+}
+
+extern "C" int laplace_hex8_objective_steps_packed_a_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const ptrdiff_t max_nodes_per_pack,
+        uint16_t **const RSTR elements,
+        const ptrdiff_t *const RSTR owned_nodes_ptr,
+        const ptrdiff_t *const RSTR n_shared_nodes,
+        const ptrdiff_t *const RSTR ghost_ptr,
+        const idx_t *const RSTR ghost_idx,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const ptrdiff_t h_stride,
+        const void *const RSTR hx,
+        const int nsteps,
+        const void *const RSTR steps,
+        void *const RSTR value
+) {
+    uint16_t *proteus_elements[8] = {
+        elements[0],
+        elements[1],
+        elements[3],
+        elements[2],
+        elements[4],
+        elements[5],
+        elements[7],
+        elements[6]
+    };
+    return laplace_proteus_hex8_objective_steps_packed_a_msoa(scalar_bytes, n_packs, n_elements_per_pack, nelements, nnodes, max_nodes_per_pack, proteus_elements, owned_nodes_ptr, n_shared_nodes, ghost_ptr, ghost_idx, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, kappa, u_stride, ux, h_stride, hx, nsteps, steps, value);
+}
+
+extern "C" const sfem::codegen::KernelDiagnostics * laplace_hex8_apply_soa_diagnostics(
         void
 ) {
-    return laplace_proteus_hex8_residual_element_soa_diagnostics();
+    return laplace_proteus_hex8_apply_soa_diagnostics();
+}
+
+extern "C" const sfem::codegen::KernelDiagnostics * laplace_hex8_gradient_soa_diagnostics(
+        void
+) {
+    return laplace_proteus_hex8_gradient_soa_diagnostics();
+}
+
+extern "C" const sfem::codegen::KernelDiagnostics * laplace_hex8_objective_soa_diagnostics(
+        void
+) {
+    return laplace_proteus_hex8_objective_soa_diagnostics();
 }

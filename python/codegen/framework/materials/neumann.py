@@ -29,18 +29,7 @@ material = gen.CodeGenerator(
     "neumann",
     systems,
     op_name="GeneratedNeumann",
-    elements=(
-        "TRI3",
-        "QUAD4",
-        "TET4",
-        "TET10",
-        "HEX8",
-        "HEX27",
-        "PROTEUS_HEX8",
-        "PROTEUS_HEX27",
-        "PROTEUS_HEX64",
-        "PROTEUS_HEX125",
-    ),
+    elements=gen.sfem_default_element_types(),
     parameter_defaults=(("t0", 0.0), ("t1", 0.0), ("t2", 0.0)),
 )
 

@@ -6,6 +6,9 @@ import sympy as sp
 from codegen.framework.symbolic.constitutive import TwoPhaseFlowConstitutiveModel
 from codegen.framework.symbolic import ExpressionRole
 from codegen.framework.materials.two_phase_flow_model import TwoPhaseFlowImplicitEulerModel
+from codegen.framework.plans.scheduling import (
+    build_two_phase_flow_graph,
+)
 
 
 def parameter_values(model):
@@ -93,7 +96,8 @@ class TwoPhaseFlowConstitutiveModelTest(unittest.TestCase):
             self.model.validate_state(15.5e6, 15.0e6)
 
     def test_builds_codegen_expression_graph_with_named_outputs(self):
-        graph = self.model.build_expression_graph(
+        graph = build_two_phase_flow_graph(
+            self.model,
             self.pw,
             self.pc,
             include_derivatives=True,

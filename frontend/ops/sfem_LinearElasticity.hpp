@@ -41,6 +41,8 @@ namespace sfem {
     class LinearElasticity final : public Op {
     public:
         const char *name() const override { return "LinearElasticity"; }
+        //! the strain energy
+        bool energy_or_potential_based() const override { return true; }
         inline bool is_linear() const override { return true; }
         ptrdiff_t   n_dofs_domain() const override;
         ptrdiff_t   n_dofs_image() const override;

@@ -10,14 +10,32 @@ import sympy as sp
 
 from sfem import gen
 
-from codegen.framework.symbolic.residual import CoupledResidualSystem
+from codegen.framework.forms.residual import CoupledResidualSystem
 from codegen.framework.emitters.residual_codegen import (
-    coupled_residual_weak_coefficients,
     generate_coupled_residual_sfem_files,
+)
+from codegen.framework.forms.residual import (
+    coupled_residual_weak_coefficients,
     weak_residual_coefficients,
 )
 from codegen.framework.plans.emission import emission_plan_for_element
-from codegen.framework.symbolic import ExpressionRole, sfem_element_quadrature_rule
+from codegen.framework.symbolic import ExpressionRole
+from codegen.framework.fem.reference import sfem_element_quadrature_rule
+from codegen.framework.plans.scheduling import (
+    build_jacobian_action_graph,
+    build_residual_graph,
+)
+from codegen.framework.plans.residual_model import residual_emission_model_from_system
+
+from codegen.framework.fem.tensor_product import tensor_product_cartesian_shape_order
+
+def _ensure_parent(path):
+    """A generated path may carry a directory -- `reference/<key>.hpp` does."""
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+
 
 
 def _element_emission_plan(element, vector_size=16, quadrature_order=None):
@@ -55,6 +73,22 @@ def _reference_coordinates(element):
             (0.0, 1.0, 0.0),
             (0.0, 0.0, 1.0),
         )
+    if element in ("QUAD4", "PROTEUS_QUAD4"):
+        # The unit square. `QUAD4` numbers its corners counter-clockwise;
+        # `PROTEUS_QUAD4` numbers them lexicographically, and the caller
+        # reorders these into that numbering when it needs to.
+        return ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))
+    if element in ("HEX27", "PROTEUS_HEX27"):
+        # The unit cube's 27 nodes. Build them lexicographically and place each
+        # at the index this element's mesh numbering gives it, so the two
+        # elements describe the same cube.
+        lexicographic = tuple(
+            ((n % 3) / 2.0, ((n // 3) % 3) / 2.0, (n // 9) / 2.0) for n in range(27)
+        )
+        placed = [None] * 27
+        for position, node in enumerate(tensor_product_cartesian_shape_order(3, 27)):
+            placed[node] = lexicographic[position]
+        return tuple(placed)
     if element == "HEX8":
         return (
             (0.0, 0.0, 0.0),
@@ -303,7 +337,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
 
         for element, family in (("TRI3", "simplex"), ("QUAD4", "tensor_product")):
             files = generate_coupled_residual_sfem_files(
-                system,
+                residual_emission_model_from_system(system),
                 prefix="value_only",
                 emission_plan=_element_emission_plan(element),
             )
@@ -322,7 +356,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             self.assertNotIn("grad_coeff_ref", residual_body)
             self.assertNotIn("test_grad", residual_body)
 
-            function = "value_only_%s_residual_element_soa" % element.lower()
+            function = "value_only_%s_residual_esoa" % element.lower()
             element_signature = operator.split('extern "C" int %s(' % function, 1)[1].split(") {", 1)[0]
             self.assertNotIn("adjugate", element_signature)
             self.assertNotIn("unused", element_signature)
@@ -337,8 +371,8 @@ class CoupledResidualSystemTest(unittest.TestCase):
 
     def test_preserves_residual_and_block_identity(self):
         system, _, _ = two_field_diffusion_system()
-        residual_graph = system.build_residual_graph()
-        action_graph = system.build_jacobian_action_graph(include_blocks=True)
+        residual_graph = build_residual_graph(system)
+        action_graph = build_jacobian_action_graph(system, include_blocks=True)
 
         self.assertEqual(
             tuple(output.name for output in residual_graph.outputs),
@@ -409,8 +443,8 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     sources[os.path.relpath(path, tmpdir)] = source_file.read()
             combined = "\n".join(sources.values())
             self.assertIn("coupled_diffusion_tri3", combined)
-            self.assertIn("jacobian_action_element_soa", combined)
-            self.assertIn("jacobian_action_affine_mesh_soa", combined)
+            self.assertIn("jacobian_action_esoa", combined)
+            self.assertIn("jacobian_action_a_msoa", combined)
             self.assertNotIn("two_phase", combined)
             self.assertGreater(len(result.objects), 0)
 
@@ -429,12 +463,13 @@ class CoupledResidualSystemTest(unittest.TestCase):
             ):
                 system, _, _ = two_field_diffusion_system(dim)
                 files = generate_coupled_residual_sfem_files(
-                    system,
+                    residual_emission_model_from_system(system),
                     prefix="coupled_diffusion",
                     emission_plan=_element_emission_plan(element),
                 )
                 for generated in files:
                     path = os.path.join(tmpdir, generated.path)
+                    _ensure_parent(path)
                     with open(path, "w", encoding="utf-8") as stream:
                         stream.write(generated.source)
                 family = (
@@ -461,50 +496,50 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     "struct KernelDiagnostics",
                     diagnostics_source,
                 )
-                self.assertIn("for (int q = 0; q < N_QP; ++q)", local_source)
+                self.assertIn("for (int q = 0; q < NQ; ++q)", local_source)
                 self.assertIn("#pragma omp simd", local_source)
                 self.assertNotIn("two_phase", local_source)
                 self.assertIn(
-                    "coupled_diffusion_%s_residual_element_soa_float"
+                    "coupled_diffusion_%s_residual_esoa_float"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_jacobian_action_element_soa"
+                    "coupled_diffusion_%s_jacobian_action_esoa"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_residual_affine_mesh_soa"
+                    "coupled_diffusion_%s_residual_a_msoa"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_jacobian_action_affine_mesh_soa"
+                    "coupled_diffusion_%s_jacobian_action_a_msoa"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_residual_isoparametric_mesh_soa"
+                    "coupled_diffusion_%s_residual_i_msoa"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_jacobian_action_isoparametric_mesh_soa"
+                    "coupled_diffusion_%s_jacobian_action_i_msoa"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
-                    "block_adjugate_data[%d][N_QP * VECTOR_SIZE]"
+                    "badjugate_data[%d][NQ * VS]"
                     % (dim * dim),
                     operator_source,
                 )
                 self.assertIn(
-                    "idx_t **const SFEM_RESTRICT elements",
+                    "idx_t **const RSTR elements",
                     operator_source,
                 )
                 self.assertIn(
-                    "block_current[N_FIELDS * N_SHAPE][VECTOR_SIZE]",
+                    "bcurrent[NC * NS][VS]",
                     operator_source,
                 )
                 action_local = local_source.split(
@@ -519,7 +554,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 self.assertIn(" direction[", action_signature)
                 self.assertIn("#pragma omp atomic update", operator_source)
                 self.assertIn(
-                    "coupled_diffusion_%s_residual_element_soa_diagnostics"
+                    "coupled_diffusion_%s_residual_esoa_diagnostics"
                     % element.lower(),
                     operator_source,
                 )
@@ -529,7 +564,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     operator_source,
                 )
                 self.assertIn(
-                    "coupled_diffusion_%s_jacobian_action_element_soa_arithmetic_intensity"
+                    "coupled_diffusion_%s_jacobian_action_esoa_arithmetic_intensity"
                     % element.lower(),
                     operator_source,
                 )
@@ -539,18 +574,18 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 )
                 self.assertIn(
                     'extern "C" void '
-                    "coupled_diffusion_%s_residual_affine_mesh_soa_print_rate"
+                    "coupled_diffusion_%s_residual_a_msoa_print_rate"
                     % element.lower(),
                     operator_source,
                 )
                 self.assertIn(
                     'extern "C" void '
-                    "coupled_diffusion_%s_jacobian_action_isoparametric_mesh_soa_float_print_rate"
+                    "coupled_diffusion_%s_jacobian_action_i_msoa_float_print_rate"
                     % element.lower(),
                     operator_source,
                 )
                 regenerated = generate_coupled_residual_sfem_files(
-                    system,
+                    residual_emission_model_from_system(system),
                     prefix="coupled_diffusion",
                     emission_plan=_element_emission_plan(element),
                 )
@@ -558,9 +593,9 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     tuple(file.source for file in files),
                     tuple(file.source for file in regenerated),
                 )
-                residual_cost = system.build_residual_graph().cost
+                residual_cost = build_residual_graph(system).cost
                 diagnostic_match = re.search(
-                    r"coupled_diffusion_%s_residual_element_soa_diagnostics_data = \{"
+                    r"coupled_diffusion_%s_residual_esoa_diagnostics_data = \{"
                     r".*?\"%s\",\s*%d,\s*\d+,\s*\d+,\s*16,\s*\d+,"
                     r"\s*(\d+),\s*(\d+),\s*(\d+),"
                     % (element.lower(), element, dim),
@@ -582,25 +617,25 @@ class CoupledResidualSystemTest(unittest.TestCase):
                     for form in ("residual", "jacobian_action"):
                         marker = (
                             "static SFEM_INLINE int "
-                            "coupled_diffusion_%s_%s_isoparametric_mesh_soa_impl"
+                            "coupled_diffusion_%s_%s_i_msoa_impl"
                             % (element.lower(), form)
                         )
                         section = operator_source.split(marker, 1)[1].split(
-                            'extern "C" int coupled_diffusion_%s_%s_isoparametric_mesh_soa'
+                            'extern "C" int coupled_diffusion_%s_%s_i_msoa'
                             % (element.lower(), form),
                             1,
                         )[0]
                         self.assertIn(
-                            "coordinate_grad_ref[DIM * N_QP * DIM * VECTOR_SIZE]",
+                            "coordinate_grad_ref[ND * NQ * ND * VS]",
                             section,
                         )
                         self.assertIn(
-                            "tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>",
+                            "tensor_evaluate<s_t, NQ, NS, VS, ND, ND>",
                             section,
                         )
                         self.assertNotIn("geometry_grad_ref", section)
                         self.assertNotIn(
-                            "block_coordinates[0][lane] *",
+                            "bcoordinates[0][lane] *",
                             section,
                         )
                 else:
@@ -613,7 +648,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 subprocess.run(
                     [
                         compiler,
-                        "-std=c++14",
+                        "-std=c++17",
                         "-O3",
                         "-fopenmp-simd",
                         "-Werror",
@@ -641,7 +676,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 report = subprocess.run(
                     [
                         compiler,
-                        "-std=c++14",
+                        "-std=c++17",
                         "-O3",
                         "-fopenmp-simd",
                         "-Rpass=loop-vectorize",
@@ -666,7 +701,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
 
         system, _, _ = two_field_diffusion_system(3)
         files = generate_coupled_residual_sfem_files(
-            system,
+            residual_emission_model_from_system(system),
             prefix="coupled_diffusion_hex27",
             emission_plan=_element_emission_plan("HEX27"),
         )
@@ -676,18 +711,18 @@ class CoupledResidualSystemTest(unittest.TestCase):
         tensor_source = source_by_path["tensor_product_kernels.hpp"]
         marker = (
             "static SFEM_INLINE int "
-            "coupled_diffusion_hex27_residual_isoparametric_mesh_soa_impl"
+            "coupled_diffusion_hex27_residual_i_msoa_impl"
         )
         section = operator_source.split(marker, 1)[1].split(
             'extern "C" int '
-            "coupled_diffusion_hex27_residual_isoparametric_mesh_soa",
+            "coupled_diffusion_hex27_residual_i_msoa",
             1,
         )[0]
         self.assertIn(
-            "tensor_evaluate<scalar_t, N_QP, N_SHAPE, VECTOR_SIZE, DIM, DIM>",
+            "tensor_evaluate<s_t, NQ, NS, VS, ND, ND>",
             section,
         )
-        self.assertIn("static constexpr int N_SHAPE = 27;", section)
+        self.assertIn("static constexpr int NS = 27;", section)
         self.assertNotIn("geometry_grad_ref", section)
         self.assertNotIn("tensor_index", local_source)
         self.assertIn(
@@ -695,14 +730,15 @@ class CoupledResidualSystemTest(unittest.TestCase):
             tensor_source,
         )
         self.assertIn(
-            "block_coordinates[0], block_coordinates[1], block_coordinates[2], "
-            "block_coordinates[24], block_coordinates[25], block_coordinates[26], "
-            "block_coordinates[3], block_coordinates[4], block_coordinates[5]",
+            "bcoordinates[0], bcoordinates[1], bcoordinates[2], "
+            "bcoordinates[24], bcoordinates[25], bcoordinates[26], "
+            "bcoordinates[3], bcoordinates[4], bcoordinates[5]",
             section,
         )
 
         with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
             for generated in files:
+                _ensure_parent(os.path.join(tmpdir, generated.path))
                 with open(
                     os.path.join(tmpdir, generated.path),
                     "w",
@@ -712,7 +748,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
             subprocess.run(
                 [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fopenmp-simd",
                     "-Werror",
@@ -748,16 +784,23 @@ class CoupledResidualSystemTest(unittest.TestCase):
         if compiler is None:
             self.skipTest("c++ compiler is not available")
 
-        for element in ("TRI3", "TET4", "HEX8"):
+        # HEX8 only.  TRI3 and TET4 are constant-P1 simplices and publish no
+        # isoparametric kernel any more -- their affine one computes the same
+        # numbers from a Jacobian that does not vary over the cell -- so there
+        # is nothing here for them to match.  The simplex isoparametric path
+        # would need TET10, which this module's `_element_emission_plan` helper
+        # does not build.
+        for element in ("HEX8",):
             rule = sfem_element_quadrature_rule(element)
             system, _, _ = two_field_diffusion_system(rule.dim)
             files = generate_coupled_residual_sfem_files(
-                system,
+                residual_emission_model_from_system(system),
                 prefix="coupled_diffusion",
                 emission_plan=_element_emission_plan(element),
             )
             with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
                 for generated in files:
+                    _ensure_parent(os.path.join(tmpdir, generated.path))
                     with open(
                         os.path.join(tmpdir, generated.path),
                         "w",
@@ -771,7 +814,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
                 )
                 command = [
                     compiler,
-                    "-std=c++14",
+                    "-std=c++17",
                     "-O3",
                     "-fPIC",
                     os.path.join(
@@ -855,6 +898,133 @@ class CoupledResidualSystemTest(unittest.TestCase):
                                 places=11,
                             )
 
+    def test_a_mesh_ordered_element_agrees_with_its_cartesian_twin(self):
+        """The same cell, numbered two ways, must give the same answer.
+
+        `QUAD4`, `HEX8` and `HEX27` carry the SFEM/VTK numbering and their
+        `PROTEUS_*` twins the lexicographic one.  The kernels are written
+        against the lexicographic basis, so the mesh-order element permutes its
+        connectivity at the entry point and the Cartesian one must not permute
+        at all.
+
+        Nothing checked that, and both halves were wrong.  Five sites in
+        `emitters/residual_codegen.py` asked only whether the element was a
+        Cartesian *hex*, so a `PROTEUS_QUAD4` kernel permuted its fields by
+        (0, 1, 3, 2) anyway while gathering its coordinates unpermuted.  And no
+        `PROTEUS_HEX27` was generated at all, so `d3/hex27*` carried real
+        kernels that permuted their own connectivity instead of forwarding.
+
+        This compares the two elements directly rather than against a reference
+        basis, because the reference data is the same object for both and so
+        cannot say anything about ordering.
+        """
+        compiler = shutil.which("c++")
+        if compiler is None:
+            self.skipTest("c++ compiler is not available")
+
+        for mesh_order, cartesian, dim in (
+            ("QUAD4", "PROTEUS_QUAD4", 2),
+            ("HEX27", "PROTEUS_HEX27", 3),
+        ):
+            with self.subTest(element=mesh_order):
+                self._assert_numbering_does_not_change_the_answer(
+                    compiler, mesh_order, cartesian, dim
+                )
+
+    def _assert_numbering_does_not_change_the_answer(
+        self, compiler, mesh_order, cartesian, dim
+    ):
+        coords = _reference_coordinates(mesh_order)
+        n_shape = len(coords)
+        # Cartesian position i holds the node this element numbers order[i],
+        # so `renumber` reads a mesh-ordered list in Cartesian order and
+        # `restore` puts a Cartesian-ordered result back under mesh numbering.
+        # These are inverses, not the same map: for QUAD4 the permutation is its
+        # own inverse and using either would pass, which is exactly why HEX27
+        # has to be in this test as well.
+        order = tensor_product_cartesian_shape_order(dim, n_shape)
+
+        def renumber(values):
+            return tuple(values[i] for i in order)
+
+        def restore(values):
+            placed = [None] * n_shape
+            for position, node in enumerate(order):
+                placed[node] = values[position]
+            return tuple(placed)
+
+        current = (
+            tuple(1.0 + 0.12 * s for s in range(n_shape)),
+            tuple(0.7 - 0.05 * s for s in range(n_shape)),
+        )
+        previous = tuple(tuple(v - 0.03 for v in field) for field in current)
+        direction = (
+            tuple(0.04 * (s + 1) for s in range(n_shape)),
+            tuple(-0.025 * (s + 1) for s in range(n_shape)),
+        )
+
+        answers = {}
+        for element in (mesh_order, cartesian):
+            cartesian_twin = element == cartesian
+            with tempfile.TemporaryDirectory(dir="/tmp") as tmpdir:
+                library = self._build_residual_library(compiler, tmpdir, element, dim)
+                for form, trial in (("residual", None), ("jacobian_action", direction)):
+                    result = self._call_isoparametric_mesh_kernel(
+                        library,
+                        element,
+                        form,
+                        renumber(coords) if cartesian_twin else coords,
+                        tuple(renumber(f) for f in current) if cartesian_twin else current,
+                        tuple(renumber(f) for f in previous) if cartesian_twin else previous,
+                        (tuple(renumber(f) for f in trial) if cartesian_twin else trial)
+                        if trial is not None
+                        else None,
+                    )
+                    # Undo the renumbering so both are indexed by the same node.
+                    answers[element, form] = (
+                        tuple(restore(field) for field in result)
+                        if cartesian_twin
+                        else result
+                    )
+
+        for form in ("residual", "jacobian_action"):
+            for field in range(2):
+                for a, b in zip(answers[mesh_order, form][field], answers[cartesian, form][field]):
+                    self.assertAlmostEqual(a, b, places=11)
+                self.assertNotAlmostEqual(answers[mesh_order, form][field][0], 0.0, places=6)
+
+    def _build_residual_library(self, compiler, tmpdir, element, dim=2):
+        files = generate_coupled_residual_sfem_files(
+            residual_emission_model_from_system(two_field_diffusion_system(dim)[0]),
+            prefix="coupled_diffusion",
+            emission_plan=_element_emission_plan(element),
+        )
+        for generated in files:
+            _ensure_parent(os.path.join(tmpdir, generated.path))
+            with open(os.path.join(tmpdir, generated.path), "w", encoding="utf-8") as stream:
+                stream.write(generated.source)
+        library_path = os.path.join(
+            tmpdir,
+            "libresidual.%s" % ("dylib" if os.uname().sysname == "Darwin" else "so"),
+        )
+        subprocess.run(
+            [
+                compiler,
+                "-std=c++17",
+                "-O2",
+                "-fPIC",
+                "-dynamiclib" if os.uname().sysname == "Darwin" else "-shared",
+                os.path.join(tmpdir, "coupled_diffusion_%s_operator.cpp" % element.lower()),
+                "-o",
+                library_path,
+            ],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        return ctypes.CDLL(library_path)
+
     def _call_isoparametric_mesh_kernel(
         self,
         library,
@@ -885,10 +1055,15 @@ class CoupledResidualSystemTest(unittest.TestCase):
         output_storage = [(scalar * n_shape)(*([0.0] * n_shape)) for _ in range(2)]
         function = getattr(
             library,
-            "coupled_diffusion_%s_%s_isoparametric_mesh_soa"
+            "coupled_diffusion_%s_%s_i_msoa"
             % (element.lower(), form),
         )
+        # A generated entry point takes the width of the scalar its
+        # buffers hold and instantiates itself for it; passing the wrong
+        # width is refused rather than miscomputed, which is what the
+        # `SFEM_FAILURE` from an omitted one means.
         args = [
+            ctypes.c_int(ctypes.sizeof(scalar)),
             ctypes.c_long(1),
             ctypes.c_long(n_shape),
             elements,
@@ -975,10 +1150,15 @@ class CoupledResidualSystemTest(unittest.TestCase):
         output_storage = [(scalar * n_shape)(*([0.0] * n_shape)) for _ in range(2)]
         function = getattr(
             library,
-            "coupled_diffusion_%s_%s_affine_mesh_soa"
+            "coupled_diffusion_%s_%s_a_msoa"
             % (element.lower(), form),
         )
+        # A generated entry point takes the width of the scalar its
+        # buffers hold and instantiates itself for it; passing the wrong
+        # width is refused rather than miscomputed, which is what the
+        # `SFEM_FAILURE` from an omitted one means.
         args = [
+            ctypes.c_int(ctypes.sizeof(scalar)),
             ctypes.c_long(1),
             ctypes.c_long(n_shape),
             elements,
@@ -1044,7 +1224,7 @@ class CoupledResidualSystemTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unregistered symbols"):
             system.add_residual(u, u.value + unknown)
         with self.assertRaisesRegex(ValueError, "missing residual equations"):
-            system.build_residual_graph()
+            build_residual_graph(system)
 
 
 if __name__ == "__main__":

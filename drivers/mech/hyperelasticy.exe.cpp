@@ -325,7 +325,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
     } else {
         real_t energy         = 0;
         real_t selected_alpha = 0;
-        if (!visco_op) f->value(displacement->data(), &energy);
+        f->energy_merit(displacement->data(), &energy);
 
         // Newton solver with line search
         printf("%-10s %-5s %-14s %-14s %-14s\n", "Iteration", "CG", "gnorm", "energy", "alpha");
@@ -425,7 +425,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                                                -alpha / 128};
                     std::vector<real_t> energies(alphas.size(), 0);
 
-                    f->value_steps(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
+                    f->energy_merit(displacement->data(), increment->data(), alphas.size(), alphas.data(), energies.data());
                     const int min_energy_index =
                             std::distance(energies.begin(), std::min_element(energies.begin(), energies.end()));
                     selected_alpha = alphas[min_energy_index];
@@ -434,7 +434,7 @@ int solve_hyperelasticity(const std::shared_ptr<sfem::Communicator> &comm, int a
                 } else {
                     selected_alpha = -alpha;
                     blas->axpy(ndofs, selected_alpha, increment->data(), displacement->data());
-                    f->value(displacement->data(), &energy);
+                    f->energy_merit(displacement->data(), &energy);
                 }
             }
 

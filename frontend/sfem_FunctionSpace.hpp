@@ -51,6 +51,16 @@ namespace sfem {
         // using PackedIdxType = uint8_t;
         int initialize_packed_mesh();
         bool has_packed_mesh() const;
+
+        /**
+         * @brief old node id -> new node id for the packed renumbering, or null
+         *
+         * Building the packed mesh renumbers this space's mesh in place. Anything
+         * holding node ids from before -- a nodeset read from a file speaks the
+         * on-disk numbering -- has to come through here, or it names different
+         * nodes and says nothing about it.
+         */
+        SharedBuffer<idx_t> packed_node_map() const;
         std::shared_ptr<PackedMesh> packed_mesh();
 
         SharedBuffer<geom_t *> points();

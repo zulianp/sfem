@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "sfem_API.hpp"
-#include "sfem_BDF2InertiaPotential.hpp"
+#include "sfem_BDF2Scheme.hpp"
 #include "sfem_DirichletConditions.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_NeumannConditions.hpp"
@@ -47,6 +47,7 @@ namespace {
 
         int    nl_max_it;
         real_t nl_tol;
+        real_t nl_rtol;
         real_t lsolve_rtol;
         real_t newton_alpha;
         bool   enable_line_search;
@@ -101,6 +102,12 @@ namespace {
 
             ret.nl_max_it          = smesh::Env::read("SFEM_NL_MAX_IT", 30);
             ret.nl_tol             = smesh::Env::read("SFEM_NL_TOL", 1e-9);
+            // Relative, because the absolute one alone is not reachable.  The
+            // residual of this problem starts around 1e3, so an absolute 1e-9
+            // asks for twelve digits, and the energy line search below cannot
+            // steer that far: it stops resolving a decrease once the decrease
+            // falls under the energy's own evaluation noise.
+            ret.nl_rtol            = smesh::Env::read("SFEM_NL_RTOL", 1e-8);
             ret.lsolve_rtol        = smesh::Env::read("SFEM_LSOLVE_RTOL", 1e-3);
             ret.newton_alpha       = smesh::Env::read("SFEM_NL_ALPHA", 1.0);
             ret.enable_line_search = smesh::Env::read("SFEM_ENABLE_LINE_SEARCH", true);
@@ -151,6 +158,7 @@ namespace {
             os << "  export_freq: " << export_freq << std::endl;
             os << "  nl_max_it: " << nl_max_it << std::endl;
             os << "  nl_tol: " << nl_tol << std::endl;
+            os << "  nl_rtol: " << nl_rtol << std::endl;
             os << "  lsolve_rtol: " << lsolve_rtol << std::endl;
             os << "  newton_alpha: " << newton_alpha << std::endl;
             os << "  enable_line_search: " << enable_line_search << std::endl;
@@ -255,68 +263,6 @@ namespace {
         return ret;
     }
 
-    void bdf2_predictor_be(const ptrdiff_t     n,
-                           const real_t        dt,
-                           const real_t *const u_n,
-                           const real_t *const v_n,
-                           real_t *const       u_hat) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            u_hat[i] = u_n[i] + dt * v_n[i];
-        }
-    }
-
-    void bdf2_predictor(const ptrdiff_t     n,
-                        const real_t        dt,
-                        const real_t *const u_n,
-                        const real_t *const u_nm1,
-                        const real_t *const v_n,
-                        const real_t *const v_nm1,
-                        real_t *const       u_hat) {
-        const real_t a0 = real_t(4.0 / 3.0);
-        const real_t a1 = real_t(-1.0 / 3.0);
-        const real_t b0 = real_t(8.0 / 9.0) * dt;
-        const real_t b1 = real_t(-2.0 / 9.0) * dt;
-
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            u_hat[i] = a0 * u_n[i] + a1 * u_nm1[i] + b0 * v_n[i] + b1 * v_nm1[i];
-        }
-    }
-
-    void update_velocity_be(const ptrdiff_t     n,
-                            const real_t        inv_dt,
-                            const real_t *const u_np1,
-                            const real_t *const u_n,
-                            real_t *const       v_np1) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            v_np1[i] = inv_dt * (u_np1[i] - u_n[i]);
-        }
-    }
-
-    void update_velocity_bdf2(const ptrdiff_t     n,
-                              const real_t        inv_2dt,
-                              const real_t *const u_np1,
-                              const real_t *const u_n,
-                              const real_t *const u_nm1,
-                              real_t *const       v_np1) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            v_np1[i] = inv_2dt * (3 * u_np1[i] - 4 * u_n[i] + u_nm1[i]);
-        }
-    }
-
-    void update_acceleration(const ptrdiff_t     n,
-                             const real_t        inv_dt,
-                             const real_t *const v_np1,
-                             const real_t *const v_n,
-                             real_t *const       a_np1) {
-#pragma omp parallel for
-        for (ptrdiff_t i = 0; i < n; ++i) {
-            a_np1[i] = inv_dt * (v_np1[i] - v_n[i]);
-        }
-    }
 
     idx_t nearest_node(const std::shared_ptr<sfem::Mesh> &mesh, const geom_t target[3]) {
         const int       dim    = mesh->spatial_dimension();
@@ -410,6 +356,26 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
     const int block_size = mesh->spatial_dimension();
     auto      fs         = sfem::FunctionSpace::create(mesh, block_size);
+
+    // The packed mesh layout, which the stored-tangent apply has a kernel for.
+    //
+    // `PackedMesh::create` renumbers the mesh **in place**, so this has to happen
+    // before anything reads node ids off it -- and a Dirichlet file that lists
+    // explicit node ids is stated in the on-disk numbering and does not survive
+    // it.  A sideset, or a nodeset derived from the coordinates, does.  The run
+    // below is checked against the unpacked one rather than trusted: a
+    // constraint that moved still converges, to a different problem.
+    if (smesh::Env::read("SFEM_PACKED_MESH", false)) {
+        // `PackedMesh::create` renumbers the mesh in place, so this has to happen
+        // before anything reads node ids off it.  A Dirichlet nodeset given as
+        // explicit ids speaks the on-disk numbering and is mapped through
+        // `FunctionSpace::packed_node_map` when it is read; a sideset needs no
+        // mapping, because packing does not move elements.
+        if (fs->initialize_packed_mesh() != SFEM_SUCCESS) {
+            SFEM_ERROR("failed to build the packed mesh\n");
+            return SFEM_FAILURE;
+        }
+    }
     auto      f          = sfem::Function::create(fs);
 
     auto elastic_op = sfem::create_op(fs, env.operator_name.c_str(), sfem::EXECUTION_SPACE_HOST);
@@ -421,15 +387,35 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     if (elastic_op->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
+    // An element whose Jacobian is constant publishes only the affine kernels --
+    // TET4 and TRI3 are constant-P1 -- so without this the operator has nothing
+    // to dispatch to and every call fails.  Default off, because for HEX8 and
+    // TET10 it is an assumption about the mesh rather than a fact about the
+    // element.
+    if (smesh::Env::read("SFEM_ASSUME_AFFINE", false)) {
+        elastic_op->set_option("ASSUME_AFFINE", true);
+    }
     set_material_parameters(env, elastic_op, mesh);
-    f->add_operator(elastic_op);
 
-    auto inertia_op = std::make_shared<sfem::BDF2InertiaPotential>(fs);
-    inertia_op->set_density(env.rho);
-    if (inertia_op->initialize() != SFEM_SUCCESS) {
+    // BDF2 as an object rather than as constants in the step loop below.  The
+    // material holds it and contributes the method's inertia itself -- as a
+    // potential, because this material's 0-form is one -- so adding the
+    // material is the whole of the time-discrete problem and the inertia
+    // cannot be left out of either the residual or the energy.
+    auto scheme = std::make_shared<sfem::BDF2Scheme>(fs);
+    scheme->set_density(env.rho);
+    if (scheme->initialize() != SFEM_SUCCESS) {
         return SFEM_FAILURE;
     }
-    f->add_operator(inertia_op);
+
+    auto steppable = std::dynamic_pointer_cast<sfem::TimeSteppable>(elastic_op);
+    if (!steppable) {
+        SFEM_ERROR("%s cannot be handed a time scheme\n", env.operator_name.c_str());
+        return SFEM_FAILURE;
+    }
+    steppable->set_time_scheme(scheme);
+
+    f->add_operator(elastic_op);
 
     std::shared_ptr<sfem::DirichletConditions> dirichlet_conditions;
     if (dirichlet_path.to_string() != "NONE") {
@@ -453,36 +439,48 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
     const ptrdiff_t ndofs = fs->n_dofs();
     auto            blas  = sfem::blas<real_t>(sfem::EXECUTION_SPACE_HOST);
 
-    auto u_nm1 = sfem::create_host_buffer<real_t>(ndofs);
-    auto u_n   = sfem::create_host_buffer<real_t>(ndofs);
+    auto u_n   = scheme->state();
     auto u     = sfem::create_host_buffer<real_t>(ndofs);
-    auto v_nm1 = sfem::create_host_buffer<real_t>(ndofs);
-    auto v_n   = sfem::create_host_buffer<real_t>(ndofs);
+    auto v_n   = scheme->velocity();
     auto v     = sfem::create_host_buffer<real_t>(ndofs);
     auto a     = sfem::create_host_buffer<real_t>(ndofs);
     auto rhs   = sfem::create_host_buffer<real_t>(ndofs);
     auto incr  = sfem::create_host_buffer<real_t>(ndofs);
 
-    auto u_hat = inertia_op->u_hat();
-    blas->zeros(ndofs, u_nm1->data());
-    blas->zeros(ndofs, u_n->data());
-    blas->zeros(ndofs, u->data());
-    blas->zeros(ndofs, v_nm1->data());
-    blas->zeros(ndofs, v_n->data());
-    blas->zeros(ndofs, v->data());
-    blas->zeros(ndofs, a->data());
+    // auto u_hat = inertia_op->u_hat();
+    // blas->zeros(ndofs, u_nm1->data());
+    // blas->zeros(ndofs, u_n->data());
+    // blas->zeros(ndofs, u->data());
+    // blas->zeros(ndofs, v_nm1->data());
+    // blas->zeros(ndofs, v_n->data());
+    // blas->zeros(ndofs, v->data());
+    // blas->zeros(ndofs, a->data());
     if (read_initial_state(mesh, env.initial_displacement, env.initial_displacement_components, u_n->data()) != SFEM_SUCCESS)
         return SFEM_FAILURE;
     if (read_initial_state(mesh, env.initial_velocity, env.initial_velocity_components, v_n->data()) != SFEM_SUCCESS)
         return SFEM_FAILURE;
-    blas->copy(ndofs, u_n->data(), u_nm1->data());
-    blas->copy(ndofs, u_n->data(), u->data());
-    blas->copy(ndofs, v_n->data(), v_nm1->data());
+    // blas->copy(ndofs, u_n->data(), u_nm1->data());
+    // blas->copy(ndofs, u_n->data(), u->data());
+    // blas->copy(ndofs, v_n->data(), v_nm1->data());
     if (dirichlet_conditions && dirichlet_conditions->set_time(0) != SFEM_SUCCESS) return SFEM_FAILURE;
+
     f->apply_constraints(u_n->data());
-    f->apply_constraints(u_nm1->data());
     f->apply_constraints(u->data());
 
+    // Whether the linear operator reads a stored tangent decides whether the
+    // Newton loop has to assemble one.  Asked of the function rather than of the
+    // requested type, because the type falls back when nothing here supports it.
+    const bool        use_inexact_operator =
+            env.linear_op_type == sfem::op_type::INEXACT && f->inexact_supported();
+    // An assembled operator holds the values it was built from, so it carries the
+    // Jacobian of whatever state it saw at construction.  The matrix-free and
+    // inexact operators read the current state -- one through `Function::update`,
+    // the other through `inexact_update` -- and need no rebuilding; an assembled
+    // one does, once per linearization, or the Newton method quietly becomes a
+    // modified Newton on the initial Jacobian.  Measured on a 96-cube that cost
+    // 11206 linear iterations against 747.
+    const bool        rebuild_linear_op =
+            env.linear_op_type != sfem::op_type::MATRIX_FREE && !use_inexact_operator;
     auto              linear_op      = sfem::create_linear_operator(env.linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
     auto              cg             = sfem::create_cg<real_t>(linear_op, sfem::EXECUTION_SPACE_HOST);
     cg->verbose                      = env.verbose;
@@ -553,20 +551,18 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
         if (dirichlet_conditions && dirichlet_conditions->set_time(t) != SFEM_SUCCESS) return SFEM_FAILURE;
         if (neumann_conditions && neumann_conditions->set_time(t, load_factor(env, t)) != SFEM_SUCCESS) return SFEM_FAILURE;
 
-        if (step == 1) {
-            inertia_op->set_alpha(1 / (env.dt * env.dt));
-            bdf2_predictor_be(ndofs, env.dt, u_n->data(), v_n->data(), u_hat->data());
-        } else {
-            inertia_op->set_alpha(real_t(9.0 / 4.0) / (env.dt * env.dt));
-            bdf2_predictor(ndofs, env.dt, u_n->data(), u_nm1->data(), v_n->data(), v_nm1->data(), u_hat->data());
-        }
+        // The predictor, the shift and the inertia's alpha, including the
+        // backward-Euler first step BDF2 needs to start.  All of it belongs to
+        // the method, so none of it is spelled here any more.
+        scheme->begin_step(t, env.dt);
 
         blas->copy(ndofs, u_n->data(), u->data());
         f->apply_constraints(u->data());
 
         real_t energy = 0;
-        f->value(u->data(), &energy);
+        f->energy_merit(u->data(), &energy);
 
+        real_t gnorm_0 = 0;
         for (int it = 0; it < env.nl_max_it; ++it) {
             f->update(u->data());
             if (env.use_preconditioner) {
@@ -579,11 +575,21 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
             }
 
             blas->zeros(ndofs, rhs->data());
-            f->gradient(u->data(), rhs->data());
+            // Checked.  An operator with no kernel for this element leaves `rhs`
+            // zeroed, and an unchecked call then reads as a converged Newton
+            // step: gnorm 0, zero iterations, a printed solution that was never
+            // solved for.
+            if (f->gradient(u->data(), rhs->data()) != SFEM_SUCCESS) {
+                SFEM_ERROR("gradient failed at step %d, Newton iteration %d\n", step, it);
+                return SFEM_FAILURE;
+            }
             f->set_value_to_constrained_dofs(0, rhs->data());
 
             const real_t gnorm = blas->norm2(ndofs, rhs->data());
-            if (gnorm < env.nl_tol) {
+            if (it == 0) {
+                gnorm_0 = gnorm;
+            }
+            if (gnorm < env.nl_tol || (gnorm_0 > 0 && gnorm < env.nl_rtol * gnorm_0)) {
                 if (!comm->rank()) {
                     printf("%-8d %-10d %-5d %-14.4e %-14.4e %-10.4g (converged)\n",
                            step,
@@ -606,13 +612,30 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
             blas->zeros(ndofs, incr->data());
             f->copy_constrained_dofs(rhs->data(), incr->data());
+            // Partial assembly: the tangent is built here, once, at the iterate
+            // the Newton step linearizes about, and the CG below applies it for
+            // every one of its iterations.  That is where the split pays -- it
+            // breaks even at two or three applies per assembly and CG does tens.
+            if (use_inexact_operator && f->inexact_update(u->data()) != SFEM_SUCCESS) {
+                return SFEM_FAILURE;
+            }
+            if (rebuild_linear_op) {
+                linear_op = sfem::create_linear_operator(env.linear_op_type, f, u, sfem::EXECUTION_SPACE_HOST);
+                if (!linear_op) {
+                    SFEM_ERROR("failed to rebuild the linear operator at step %d, Newton iteration %d\n",
+                               step,
+                               it);
+                    return SFEM_FAILURE;
+                }
+            }
             cg->set_op(linear_op);
             cg->apply(rhs->data(), incr->data());
             last_iterations = cg->iterations();
             total_linear_iterations += last_iterations;
 
-            real_t selected_alpha = -env.newton_alpha;
-            bool   no_progress    = false;
+            real_t selected_alpha             = -env.newton_alpha;
+            bool   no_progress                = false;
+            bool   line_search_at_resolution  = false;
             if (env.enable_line_search) {
                 std::vector<real_t> alphas{-2 * env.newton_alpha,
                                            -env.newton_alpha,
@@ -627,7 +650,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
                                            real_t(-1.0 / 512.0) * env.newton_alpha,
                                            0};
                 std::vector<real_t> energies(alphas.size(), 0);
-                if (f->value_steps(u->data(), incr->data(), (int)alphas.size(), alphas.data(), energies.data()) != SFEM_SUCCESS) {
+                if (f->energy_merit(u->data(), incr->data(), (int)alphas.size(), alphas.data(), energies.data()) != SFEM_SUCCESS) {
                     return SFEM_FAILURE;
                 }
 
@@ -637,6 +660,18 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
                 if (selected_alpha == 0) {
                     no_progress = true;
+                    // Distinguish the two ways this happens.  An energy line
+                    // search can only see a decrease while the decrease is
+                    // larger than the noise in evaluating the energy, and near
+                    // the solution it is not: the decrease falls off with the
+                    // square of the step while the noise does not move.  That
+                    // is a resolution limit rather than a failure, and saying
+                    // so is the difference between a converged answer and an
+                    // error message.
+                    const real_t predicted = -blas->dot(ndofs, rhs->data(), incr->data());
+                    const real_t floor     = 64 * std::numeric_limits<real_t>::epsilon() *
+                                         std::max(std::abs(energies.back()), real_t(1));
+                    line_search_at_resolution = std::abs(predicted) < floor;
                 }
             }
 
@@ -645,31 +680,45 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
             if (!env.enable_line_search) {
                 energy = 0;
-                f->value(u->data(), &energy);
+                f->energy_merit(u->data(), &energy);
             }
 
+            char status[96] = "";
+            if (line_search_at_resolution) {
+                // Say how far it got, because "stopped" and "stopped at the
+                // best the merit can see" are different answers.
+                snprintf(status,
+                         sizeof(status),
+                         " (energy-limited, |r|/|r0|=%.2e)",
+                         (double)(gnorm_0 > 0 ? gnorm / gnorm_0 : 0));
+            }
             if (!comm->rank()) {
-                printf("%-8d %-10d %-5d %-14.4e %-14.4e %-10.4g\n",
+                printf("%-8d %-10d %-5d %-14.4e %-14.4e %-10.4g%s\n",
                        step,
                        it,
                        last_iterations,
                        (double)gnorm,
                        (double)energy,
-                       (double)selected_alpha);
+                       (double)selected_alpha,
+                       status);
             }
 
             if (no_progress) {
-                fprintf(stderr, "No progress made, stopping Newton iteration\n");
+                if (!line_search_at_resolution) {
+                    fprintf(stderr,
+                            "No progress made at step %d, Newton iteration %d: the line search "
+                            "found no energy decrease although one larger than the energy's "
+                            "resolution was predicted\n",
+                            step,
+                            it);
+                }
                 break;
             }
         }
 
-        if (step == 1) {
-            update_velocity_be(ndofs, 1 / env.dt, u->data(), u_n->data(), v->data());
-        } else {
-            update_velocity_bdf2(ndofs, 1 / (2 * env.dt), u->data(), u_n->data(), u_nm1->data(), v->data());
-        }
-        update_acceleration(ndofs, 1 / env.dt, v->data(), v_n->data(), a->data());
+        // Read the derived states before advancing, because `advance` rotates
+        // the history they are reconstructed from.
+        scheme->reconstruct(u->data(), v->data(), a->data());
 
         if (step % env.export_freq == 0 || step == env.n_steps) {
             out->write_time_step("disp", t, u->data());
@@ -680,10 +729,7 @@ int solve_hyperelasticity_bdf2(const std::shared_ptr<sfem::Communicator> &comm, 
 
         write_control_point(control_csv, t, block_size, control_node, u->data(), v->data(), a->data());
 
-        blas->copy(ndofs, u_n->data(), u_nm1->data());
-        blas->copy(ndofs, u->data(), u_n->data());
-        blas->copy(ndofs, v_n->data(), v_nm1->data());
-        blas->copy(ndofs, v->data(), v_n->data());
+        scheme->advance(u->data());
     }
 
     if (!comm->rank()) {

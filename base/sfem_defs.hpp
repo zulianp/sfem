@@ -24,6 +24,10 @@ namespace sfem {
         static OperatorType COO_SYM     = "COO_SYM";
         static OperatorType SPLITDACRS  = "SPLITDACRS";
         static OperatorType SELL        = "SELL";
+        //: Partial assembly: the tangent is stored once per linearization and
+        //: applied for every Krylov iteration.  Inexact wherever the tangent
+        //: varies within an element, exact where it does not.
+        static OperatorType INEXACT     = "INEXACT";
     }  // namespace op_type
 
 #define SFEM_UNSUPPORTED_ELEMENT_ERROR(element_type) SFEM_ERROR("Unsupported element type %d\n", element_type);

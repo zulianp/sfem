@@ -90,18 +90,7 @@ def create_material(polynomial_order=DEFAULT_POLYNOMIAL_ORDER):
         "neumann_general",
         systems,
         op_name="GeneratedNeumannGeneral",
-        elements=(
-            "TRI3",
-            "QUAD4",
-            "TET4",
-            "TET10",
-            "HEX8",
-            "HEX27",
-            "PROTEUS_HEX8",
-            "PROTEUS_HEX27",
-            "PROTEUS_HEX64",
-            "PROTEUS_HEX125",
-        ),
+        elements=gen.sfem_default_element_types(),
         parameter_defaults=_parameter_defaults(polynomial_order),
     )
 

@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 
 from codegen.framework.fem.basis import basis_plan_for_element_at_cell_rule
-from codegen.framework.fem.reference import sfem_simplex_grad_ref_name
+from codegen.framework.fem.reference import (
+    sfem_basis_reference_data,
+    sfem_quadrature_reference_data,
+    sfem_simplex_grad_ref_name,
+)
 from codegen.framework.fem.geometry import GeometryMode
 
 
@@ -17,6 +21,10 @@ class ReferenceBasisDataPlan:
     n_qp_1d: int = 0
     shape_accessor: str = ""
     gradient_accessors: tuple = ()
+    #: The evaluated shape and gradient tables, canonically named.  The plan
+    #: carries the numbers so that one artifact can be emitted from them; the
+    #: emitters used to recompute them from the rule at four independent sites.
+    tables: tuple = ()
 
     def __post_init__(self):
         role = str(self.role)
@@ -49,16 +57,38 @@ class ReferenceBasisDataPlan:
         object.__setattr__(self, "n_qp_1d", n_qp_1d)
         object.__setattr__(self, "shape_accessor", shape_accessor)
         object.__setattr__(self, "gradient_accessors", gradient_accessors)
+        object.__setattr__(self, "tables", tuple(self.tables))
 
     @property
     def is_tensor_product(self):
         return self.family == "tensor_product"
 
     @property
+    def key(self):
+        """The (basis, rule) identity: which shared header this basis lives in.
+
+        A basis is not identified by its element alone.  The HEX8 basis under a
+        HEX27 cell rule is sampled at three points per direction where its own
+        cell rule samples two, so `line_p1_q3` and `line_p1_q2` are different
+        tables of the same polynomial basis.  Conversely the TET4 basis under a
+        TET10 cell rule *is* the TET4 cell basis at that rule, which is why a
+        Taylor-Hood pair decomposes into headers a pure-element material already
+        uses.
+
+        Tensor-product bases key on the 1-D basis rather than the element,
+        because the tables are 1-D: PROTEUS_HEX8 and PROTEUS_QUAD4 share one.
+        """
+        return _basis_key(self.element_type, self.family, self.n_shape_1d, self.n_qp_1d, self.n_qp)
+
+    @property
+    def struct_name(self):
+        return "ref_%s" % self.key
+
+    @property
     def accessors(self):
         return (self.shape_accessor,) + self.gradient_accessors
 
-    def accessor_call(self, struct_name, accessor, scalar_type="scalar_t"):
+    def accessor_call(self, struct_name, accessor, scalar_type="s_t"):
         return "sfem::codegen::%s<%s>::%s()" % (
             str(struct_name),
             str(scalar_type),
@@ -77,13 +107,13 @@ class ReferenceBasisDataPlan:
             "n_qp_1d": self.n_qp_1d,
             "shape_accessor": self.shape_accessor,
             "gradient_accessors": list(self.gradient_accessors),
+            "key": self.key,
         }
 
 
 @dataclass(frozen=True)
 class ReferenceDataSetPlan:
     stage: str
-    struct_name: str
     geometry_mode: GeometryMode
     family: str
     cell_element_type: str
@@ -93,10 +123,12 @@ class ReferenceDataSetPlan:
     basis_entries: tuple
     field_element_types: tuple = ()
     n_qp_1d: int = 0
+    #: The rule's weights.  Kept apart from the basis tables because they are
+    #: keyed by the rule alone: two bases sharing a rule share one set.
+    weight_tables: tuple = ()
 
     def __post_init__(self):
         stage = str(self.stage)
-        struct_name = str(self.struct_name)
         geometry_mode = GeometryMode(self.geometry_mode)
         family = str(self.family)
         cell_element_type = str(self.cell_element_type).upper()
@@ -111,8 +143,6 @@ class ReferenceDataSetPlan:
         n_qp_1d = int(self.n_qp_1d)
         if stage not in ("affine", "isoparametric"):
             raise ValueError("reference-data stage must be affine or isoparametric")
-        if not struct_name:
-            raise ValueError("reference-data plan requires a struct name")
         if family not in ("simplex", "tensor_product"):
             raise ValueError("reference-data family must be simplex or tensor_product")
         if n_qp <= 0 or n_shape <= 0:
@@ -127,7 +157,6 @@ class ReferenceDataSetPlan:
             if basis.family != family:
                 raise ValueError("basis family does not match reference-data family")
         object.__setattr__(self, "stage", stage)
-        object.__setattr__(self, "struct_name", struct_name)
         object.__setattr__(self, "geometry_mode", geometry_mode)
         object.__setattr__(self, "family", family)
         object.__setattr__(self, "cell_element_type", cell_element_type)
@@ -137,10 +166,26 @@ class ReferenceDataSetPlan:
         object.__setattr__(self, "basis_entries", basis_entries)
         object.__setattr__(self, "field_element_types", field_element_types)
         object.__setattr__(self, "n_qp_1d", n_qp_1d)
+        object.__setattr__(self, "weight_tables", tuple(self.weight_tables))
 
     @property
     def is_tensor_product(self):
         return self.family == "tensor_product"
+
+    @property
+    def rule_key(self):
+        """The quadrature rule's identity, independent of any basis.
+
+        The domain rather than the element: a TET4 and a TET10 kernel at the same
+        order integrate over the same reference tetrahedron with the same points,
+        so they name the same rule.  A tensor-product rule is 1-D.
+
+        If two genuinely different rules ever produce the same key, generation
+        stops: `pipeline/driver.py _merge_files` refuses two different bodies for
+        one path, so an under-specified key is a hard error rather than a silent
+        choice between them.
+        """
+        return _rule_key(self.family, self.n_qp_1d, self.cell_element_type, self.n_qp)
 
     @property
     def accessors(self):
@@ -157,17 +202,9 @@ class ReferenceDataSetPlan:
     def is_mixed_order(self):
         return len(self.unique_element_types) > 1
 
-    def accessor_call(self, accessor, scalar_type="scalar_t"):
-        return "sfem::codegen::%s<%s>::%s()" % (
-            self.struct_name,
-            str(scalar_type),
-            str(accessor),
-        )
-
     def to_dict(self):
         return {
             "stage": self.stage,
-            "struct_name": self.struct_name,
             "geometry_mode": self.geometry_mode.value,
             "family": self.family,
             "cell_element_type": self.cell_element_type,
@@ -177,6 +214,7 @@ class ReferenceDataSetPlan:
             "weight_accessor": self.weight_accessor,
             "accessors": list(self.accessors),
             "field_element_types": list(self.field_element_types),
+            "rule_key": self.rule_key,
             "basis_entries": [basis.to_dict() for basis in self.basis_entries],
         }
 
@@ -267,6 +305,13 @@ def validate_reference_data_plan(
     isoparametric_rule,
     family,
 ):
+    # A reference-data plan is optional -- every emitter defaults it to None --
+    # so validating one that was not supplied is vacuous, and saying so here is
+    # what stops three call sites each guarding the call.  Its sibling
+    # `plans.diagnostics.validate_diagnostics_plan_names` already answered this
+    # the same way.
+    if plan is None:
+        return None
     if not isinstance(plan, ReferenceDataPlan):
         raise TypeError("reference_data_plan must be a ReferenceDataPlan")
     if plan.prefix != str(prefix):
@@ -304,7 +349,7 @@ def _validate_reference_dataset(dataset, stage, rule, family):
         )
     if dataset.is_tensor_product and dataset.n_qp_1d != rule.tensor_product_n_qp_1d:
         raise ValueError(
-            "reference-data tensor-product N_QP_1D %d does not match %d"
+            "reference-data tensor-product NQ1 %d does not match %d"
             % (dataset.n_qp_1d, rule.tensor_product_n_qp_1d)
         )
 
@@ -313,7 +358,6 @@ def _reference_dataset_plan(prefix, stage, mode, cell_rule, family, field_types)
     basis_entries = _basis_entries(cell_rule, family, field_types)
     return ReferenceDataSetPlan(
         stage,
-        "%s_%s_reference_data" % (prefix, stage),
         mode,
         family,
         cell_rule.element_type,
@@ -323,6 +367,7 @@ def _reference_dataset_plan(prefix, stage, mode, cell_rule, family, field_types)
         basis_entries,
         field_types,
         cell_rule.tensor_product_n_qp_1d if family == "tensor_product" else 0,
+        sfem_quadrature_reference_data(cell_rule),
     )
 
 
@@ -346,11 +391,18 @@ def _basis_entries(cell_rule, family, field_types):
                 % element_type
             )
         accessor_prefix = element_type.lower() if prefix_accessors else ""
-        ret.append(_basis_entry_from_basis(basis, family, accessor_prefix))
+        ret.append(
+            _basis_entry_from_basis(
+                basis,
+                family,
+                accessor_prefix,
+                sfem_basis_reference_data(element_type, cell_rule),
+            )
+        )
     return tuple(ret)
 
 
-def _basis_entry_from_basis(basis, family, accessor_prefix):
+def _basis_entry_from_basis(basis, family, accessor_prefix, tables=()):
     if family == "tensor_product":
         shape = _prefixed_name(accessor_prefix, "shape_1d")
         grads = (_prefixed_name(accessor_prefix, "grad_1d"),)
@@ -369,7 +421,66 @@ def _basis_entry_from_basis(basis, family, accessor_prefix):
         basis.n_qp_1d,
         shape,
         grads,
+        tables,
     )
+
+
+#: The reference domain each element integrates over.  Elements sharing a domain
+#: at the same order share their quadrature points and weights.
+_REFERENCE_DOMAINS = (
+    ("TET", "tet"),
+    ("TRI", "tri"),
+    ("QUAD", "quad"),
+    ("HEX", "hex"),
+    ("EDGE", "edge"),
+)
+
+
+def _basis_key(element_type, family, n_shape_1d, n_qp_1d, n_qp):
+    if family == "tensor_product":
+        return "line_p%d_q%d" % (int(n_shape_1d) - 1, int(n_qp_1d))
+    return "%s_q%d" % (str(element_type).lower(), int(n_qp))
+
+
+def _rule_key(family, n_qp_1d, cell_element_type, n_qp):
+    if family == "tensor_product":
+        return "quad_line_q%d" % int(n_qp_1d)
+    return "quad_%s_q%d" % (_reference_domain(cell_element_type), int(n_qp))
+
+
+def rule_weight_accessor(cell_rule):
+    """What a rule's weights are called: `q_weight_1d` on a tensor product,
+    `q_weight` on a simplex.
+
+    Here rather than in the emitter because choosing between two spellings by
+    inspecting a rule is a decision, and emission spells results.
+    """
+    return "q_weight_1d" if cell_rule.is_tensor_product else "q_weight"
+
+
+def basis_key_for(element_type, cell_rule):
+    """`ReferenceBasisDataPlan.key` for a basis named only by its element.
+
+    The emitters reach the key this way: they hold the rule the tables were
+    evaluated at, not the plan.
+    """
+    basis = basis_plan_for_element_at_cell_rule(element_type, cell_rule, "cell")
+    family = "tensor_product" if basis.is_tensor_product else "simplex"
+    return _basis_key(element_type, family, basis.n_shape_1d, basis.n_qp_1d, basis.n_qp)
+
+
+def rule_key_for(cell_rule):
+    """`ReferenceDataSetPlan.rule_key` for a rule on its own."""
+    family = "tensor_product" if cell_rule.is_tensor_product else "simplex"
+    return _rule_key(family, cell_rule.tensor_product_n_qp_1d, cell_rule.element_type, cell_rule.n_qp)
+
+
+def _reference_domain(element_type):
+    name = str(element_type).upper()
+    for token, domain in _REFERENCE_DOMAINS:
+        if token in name:
+            return domain
+    raise ValueError("no reference domain is known for element '%s'" % element_type)
 
 
 def _prefixed_name(prefix, suffix):
@@ -419,3 +530,43 @@ def _field_element_type_map(field_element_types):
         str(getattr(field, "name", field)): str(element).upper()
         for field, element in field_element_types
     }
+
+
+@dataclass(frozen=True)
+class MixedReferenceStream:
+    """One reference-basis buffer a mixed local kernel is handed.
+
+    ``extent`` is the array bound, or zero for a scalar.  ``from_reference_data``
+    marks the ones a caller reaches through the generated reference-data struct
+    rather than passing straight through.
+    """
+
+    name: str
+    extent: int = 0
+    from_reference_data: bool = False
+
+
+def mixed_reference_streams(dependencies, tensor_product, n_fields, dim):
+    """The reference buffers a mixed local kernel takes, in ABI order.
+
+    Shape, then the reference gradients when the form needs them, then the
+    quadrature weights.  Whether the gradients are there is the only variable,
+    and it was asked six times in the residual emitter -- once each in the
+    parameter list, the pointer setup and the call arguments, and twice over
+    because the tensor-product and simplex spellings were written out
+    separately.  A signature and its call that both come from here cannot
+    disagree about which buffers exist.
+    """
+    if tensor_product:
+        streams = [MixedReferenceStream("field_shape_1d", n_fields)]
+        if dependencies.uses_reference_gradients:
+            streams.append(MixedReferenceStream("field_grad_1d", n_fields))
+        streams.append(
+            MixedReferenceStream("q_weight_1d", from_reference_data=True)
+        )
+        return tuple(streams)
+    streams = [MixedReferenceStream("field_shape", n_fields)]
+    if dependencies.uses_reference_gradients:
+        streams.append(MixedReferenceStream("fgref", n_fields * dim))
+    streams.append(MixedReferenceStream("q_weight", from_reference_data=True))
+    return tuple(streams)

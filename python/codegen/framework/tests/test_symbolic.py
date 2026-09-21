@@ -21,14 +21,11 @@ from codegen.framework.symbolic.core import (
     ReferenceShapeValues,
     ScopeKind,
     TransformedFirstPiola,
-    build_expression_graph,
     data_layout,
     dimension_specialization,
     directional_derivative,
     displacement_gradient_from_reference,
     execution_scope,
-    generate_cpp_kernel,
-    generate_cuda_kernel,
     gradient_from_energy,
     hessian_action_from_energy,
     jacobian_action_from_residual,
@@ -44,9 +41,16 @@ from codegen.framework.symbolic.core import (
     transformed_first_piola,
     weak_gradient_from_transformed_first_piola,
     weak_hessian_action_from_linearized_transformed_first_piola,
-    _prune_dead_cse_intermediates,
 )
-from codegen.framework.symbolic.forms import (
+from codegen.framework.plans.scheduling import (
+    _prune_dead_cse_intermediates,
+    build_expression_graph,
+)
+from codegen.framework.emitters.kernel_codegen import (
+    generate_cpp_kernel,
+    generate_cuda_kernel,
+)
+from codegen.framework.forms.forms import (
     FormKind,
     FormOrder,
     PipelineStage,
@@ -54,7 +58,7 @@ from codegen.framework.symbolic.forms import (
     energy_form_pipeline,
     residual_form_pipeline,
 )
-from codegen.framework.backends.targets import (
+from codegen.framework.targets import (
     AVX512Target,
     ARMSMETarget,
     ARMSVETarget,
@@ -105,7 +109,12 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertEqual(
             [(form.kind, form.order, form.role, form.name) for form in residual_forms],
             [
-                (FormKind.RESIDUAL, FormOrder.ZERO, ExpressionRole.MERIT, "merit"),
+                (
+                    FormKind.RESIDUAL,
+                    FormOrder.ZERO,
+                    ExpressionRole.POTENTIAL,
+                    "potential",
+                ),
                 (FormKind.RESIDUAL, FormOrder.ONE, ExpressionRole.RESIDUAL, "residual"),
                 (
                     FormKind.RESIDUAL,
@@ -116,7 +125,21 @@ class SymbolicFrameworkTest(unittest.TestCase):
             ],
         )
         self.assertEqual(energy_forms[1].expression, sp.Matrix([2 * u0 + u1, u0]))
-        self.assertEqual(residual_forms[0].expression, u0**2 + u1**2)
+        # The residual's 0-form is a potential -- a scalar the residual is the
+        # gradient of -- so the property is what to assert, not the literal.
+        # It used to be `u0**2 + u1**2`, which is `1/2*||R||^2` over the local
+        # residual entries: a quantity that is not zero at the solution and
+        # does not add across operators, so it could not serve as the merit it
+        # was named for.
+        potential = residual_forms[0].expression
+        self.assertEqual(potential, u0**2 / 2 + u0 * u1 - u1**2 / 2)
+        self.assertTrue(
+            sp.simplify(
+                sp.Matrix([sp.diff(potential, u0), sp.diff(potential, u1)]) - residual
+            ).is_zero_matrix,
+            "the 0-form must be a potential of the residual: its gradient is "
+            "the residual itself",
+        )
         self.assertEqual(
             tuple(form.standard_name for form in energy_forms),
             ("form_0", "form_1", "form_2"),
@@ -150,7 +173,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertEqual(openmp.parallel_for_pragma(), "#pragma omp parallel for")
         self.assertEqual(openmp.parallel_for_pragma("static"), "#pragma omp parallel for schedule(static)")
         self.assertEqual(openmp.function_qualifier(), "static SFEM_INLINE")
-        self.assertEqual(openmp.restrict_qualifier(), "SFEM_RESTRICT")
+        self.assertEqual(openmp.restrict_qualifier(), "RSTR")
         self.assertEqual(openmp.vectorize_pragma(), "#pragma omp simd")
         self.assertEqual(openmp.atomic_update_pragma(), "#pragma omp atomic update")
         self.assertEqual(openmp.alignment_assumption("x"), "__builtin_assume_aligned(x, 64)")
@@ -169,7 +192,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         self.assertTrue(openmp_loop.vectorize_lane_loop)
         self.assertTrue(openmp_loop.parallel_element_loop)
         self.assertEqual(openmp_loop.lane_index, "lane")
-        self.assertEqual(openmp_loop.vector_size_symbol, "VECTOR_SIZE")
+        self.assertEqual(openmp_loop.vector_size_symbol, "VS")
         self.assertEqual(avx512.loop_lowering_policy().vector_isa, "avx512")
         self.assertEqual(avx512.loop_lowering_policy().preferred_vector_bits, 512)
         self.assertIn("-mavx512f", avx512.target_compile_flags())
@@ -219,7 +242,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
             .merit(sp.sqrt(x * x + y * y))
         )
 
-        graph = expressions.build_graph(data_symbols=(x, y, z))
+        graph = build_expression_graph(expressions, data_symbols=(x, y, z))
         roles = [expr.role for expr in graph.outputs]
 
         self.assertIn(ExpressionRole.ENERGY, roles)
@@ -269,7 +292,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         out = sp.symbols("element_vector[0]")
         assignment = ast.Assignment(out, x * y + y)
 
-        graph = KernelExpressions().residual(assignment).build_graph(data_symbols=(x, y))
+        graph = build_expression_graph(KernelExpressions().residual(assignment), data_symbols=(x, y))
 
         self.assertIsInstance(graph.reduced_outputs[0], ast.Assignment)
         self.assertEqual(graph.reduced_outputs[0].lhs, out)
@@ -279,7 +302,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         x, y, z = sp.symbols("x y z")
 
         graph = (
-            KernelExpressions()
+            build_expression_graph(KernelExpressions()
             .add(
                 ExpressionRole.OPERATOR_EVALUATION,
                 sp.log(x)
@@ -287,8 +310,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
                 + sp.cos(x * y)
                 + sp.atan(z)
                 + sp.tanh(x + z)
-            )
-            .build_graph(data_symbols=(x, y, z))
+            ), data_symbols=(x, y, z))
         )
 
         self.assertEqual(graph.cost.logs, 1)
@@ -298,9 +320,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
     def test_expression_cost_counts_exponential_separately(self):
         x = sp.symbols("x")
         graph = (
-            KernelExpressions()
-            .add(ExpressionRole.OPERATOR_EVALUATION, sp.exp(x))
-            .build_graph(data_symbols=(x,))
+            build_expression_graph(KernelExpressions()
+            .add(ExpressionRole.OPERATOR_EVALUATION, sp.exp(x)), data_symbols=(x,))
         )
 
         self.assertEqual(graph.cost.exps, 1)
@@ -310,9 +331,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
     def test_generated_cpp_uses_specialized_pow_helpers_for_integer_exponents(self):
         x, y = sp.symbols("x y")
         graph = (
-            KernelExpressions()
-            .add(ExpressionRole.OPERATOR_EVALUATION, (x + y) ** 2 + x ** 3 + y ** -2)
-            .build_graph(data_symbols=(x, y))
+            build_expression_graph(KernelExpressions()
+            .add(ExpressionRole.OPERATOR_EVALUATION, (x + y) ** 2 + x ** 3 + y ** -2), data_symbols=(x, y))
         )
 
         generated = generate_cpp_kernel(
@@ -332,9 +352,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
     def test_generated_cuda_kernel_uses_simt_grid_stride_lowering_and_pow_helpers(self):
         x, y = sp.symbols("x[0] y[0]")
         graph = (
-            KernelExpressions()
-            .add(ExpressionRole.OPERATOR_EVALUATION, (x + y) ** 2 + x ** 3 + y ** -2)
-            .build_graph(data_symbols=(x, y))
+            build_expression_graph(KernelExpressions()
+            .add(ExpressionRole.OPERATOR_EVALUATION, (x + y) ** 2 + x ** 3 + y ** -2), data_symbols=(x, y))
         )
 
         generated = generate_cuda_kernel(
@@ -364,7 +383,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
     def test_tags_loop_symbols(self):
         i, x = sp.symbols("i x")
 
-        graph = KernelExpressions().gradient(i * x).build_graph(
+        graph = build_expression_graph(
+            KernelExpressions().gradient(i * x),
             data_symbols=(x,),
             loop_symbols={"quadrature": (i,)},
         )
@@ -391,7 +411,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
             execution_scope(ScopeKind.THREAD, (thread,)),
         )
 
-        graph = KernelExpressions().gradient(sum(scoped_symbols)).build_graph(scopes=scopes)
+        graph = build_expression_graph(KernelExpressions().gradient(sum(scoped_symbols)), scopes=scopes)
         statement = graph.evaluation_plan.outputs[0]
 
         self.assertEqual(tuple(scope.kind for scope in graph.scopes), tuple(ScopeKind))
@@ -402,7 +422,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
     def test_scope_aliases_work_with_legacy_loop_symbols(self):
         m, lane = sp.symbols("m lane")
 
-        graph = KernelExpressions().gradient(m + lane).build_graph(
+        graph = build_expression_graph(
+            KernelExpressions().gradient(m + lane),
             loop_symbols={"mesh_wide": (m,), "vector-lane": (lane,)},
         )
 
@@ -417,7 +438,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
             execution_scope(ScopeKind.TRIAL, (trial,)),
         )
 
-        graph = KernelExpressions().gradient(elem + q + trial).build_graph(scopes=scopes)
+        graph = build_expression_graph(KernelExpressions().gradient(elem + q + trial), scopes=scopes)
         statement = graph.evaluation_plan.outputs[0]
 
         self.assertEqual(statement.scopes, (ScopeKind.ELEMENT, ScopeKind.QUADRATURE, ScopeKind.TRIAL))
@@ -433,9 +454,9 @@ class SymbolicFrameworkTest(unittest.TestCase):
             execution_scope(ScopeKind.TEST, (test,)),
         )
 
-        graph = KernelExpressions().gradient(
+        graph = build_expression_graph(KernelExpressions().gradient(
             [repeated * trial, repeated * test]
-        ).build_graph(scopes=scopes, temporary_prefix="tmp")
+        ), scopes=scopes, temporary_prefix="tmp")
 
         tmp_stmt = graph.evaluation_plan.intermediates[0]
         trial_stmt = graph.evaluation_plan.outputs[0]
@@ -457,29 +478,30 @@ class SymbolicFrameworkTest(unittest.TestCase):
     def test_scope_free_statement_is_mesh_hoistable(self):
         x, y = sp.symbols("x y")
 
-        graph = KernelExpressions().gradient(x + y).build_graph(data_symbols=(x, y))
+        graph = build_expression_graph(KernelExpressions().gradient(x + y), data_symbols=(x, y))
         statement = graph.evaluation_plan.outputs[0]
 
         self.assertEqual(statement.scopes, ())
         self.assertEqual(statement.hoist_scope, ScopeKind.MESH)
 
     def test_symbolic_objects_default_to_soa_layout(self):
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
 
         self.assertEqual(grad_u.layout.kind, LayoutKind.SOA)
 
     def test_graph_data_nodes_carry_symbolic_object_layout(self):
         aos = data_layout(LayoutKind.AOS, components=2)
-        grad_u = DisplacementGradient("grad_u", 2, layout=aos)
+        grad_u = DisplacementGradient("gu", 2, layout=aos)
         G = grad_u.as_matrix()
 
-        graph = KernelExpressions().gradient(G[0, 0] + G[1, 1]).build_graph(
+        graph = build_expression_graph(
+            KernelExpressions().gradient(G[0, 0] + G[1, 1]),
             symbolic_objects=(grad_u,),
         )
 
         self.assertEqual(graph.graph.nodes[G[0, 0]]["layout_kind"], LayoutKind.AOS)
         self.assertEqual(graph.graph.nodes[G[0, 0]]["layout"].components, 2)
-        self.assertEqual(graph.graph.nodes[G[0, 0]]["symbolic_object"], "grad_u")
+        self.assertEqual(graph.graph.nodes[G[0, 0]]["symbolic_object"], "gu")
 
     def test_aosoa_layout_requires_positive_block_size(self):
         with self.assertRaises(ValueError):
@@ -490,7 +512,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_aosoa_layout_is_preserved_on_derived_operator_objects(self):
         layout = data_layout(LayoutKind.AOSOA, block_size=8, components=4)
-        grad_u = DisplacementGradient("grad_u", 2, layout=layout)
+        grad_u = DisplacementGradient("gu", 2, layout=layout)
         mu, lmbda = sp.symbols("mu lambda")
 
         P = FirstPiolaStress.from_linear_elasticity("P", grad_u, mu, lmbda)
@@ -527,17 +549,18 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_symbolic_object_layout_offset_uses_entry_component(self):
         i = sp.symbols("i")
-        grad_u = DisplacementGradient("grad_u", 2, layout=data_layout(LayoutKind.AOS))
+        grad_u = DisplacementGradient("gu", 2, layout=data_layout(LayoutKind.AOS))
         G = grad_u.as_matrix()
 
         self.assertEqual(grad_u.component_index(G[1, 0]), 2)
         self.assertEqual(grad_u.layout_offset(G[1, 0], i), 4 * i + 2)
 
     def test_graph_data_node_carries_layout_offset(self):
-        grad_u = DisplacementGradient("grad_u", 2, layout=data_layout(LayoutKind.AOS))
+        grad_u = DisplacementGradient("gu", 2, layout=data_layout(LayoutKind.AOS))
         G = grad_u.as_matrix()
 
-        graph = KernelExpressions().gradient(G[1, 0]).build_graph(
+        graph = build_expression_graph(
+            KernelExpressions().gradient(G[1, 0]),
             symbolic_objects=(grad_u,),
         )
         node = graph.graph.nodes[G[1, 0]]
@@ -580,7 +603,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         )
         expr = grad.gradient(2, 1) + grad.gradient(0, 2)
 
-        graph = KernelExpressions().gradient(expr).build_graph(symbolic_objects=(grad,))
+        graph = build_expression_graph(KernelExpressions().gradient(expr), symbolic_objects=(grad,))
         node = graph.graph.nodes[grad.gradient(2, 1)]
 
         self.assertEqual(node["layout_kind"], LayoutKind.AOS)
@@ -593,7 +616,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
         grad = ReferenceShapeGradients("grad_ref", n_nodes=4, dim=2)
         n_qp = kernel_template_parameter("n_qp", 5, "quadrature")
 
-        graph = KernelExpressions().gradient(grad.gradient(0, 0)).build_graph(
+        graph = build_expression_graph(
+            KernelExpressions().gradient(grad.gradient(0, 0)),
             symbolic_objects=(grad,),
             template_parameters=(n_qp,),
         )
@@ -612,7 +636,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
         grad = ReferenceShapeGradients("grad_ref", n_nodes=4, dim=2)
 
         with self.assertRaises(ValueError):
-            KernelExpressions().gradient(grad.gradient(0, 0)).build_graph(
+            build_expression_graph(
+                KernelExpressions().gradient(grad.gradient(0, 0)),
                 symbolic_objects=(grad,),
                 template_parameters=(kernel_template_parameter("grad_ref_dim", 3),),
             )
@@ -621,7 +646,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
         for dim in (1, 2, 3):
             grad = ReferenceShapeGradients("grad_ref", n_nodes=4, dim=dim)
 
-            graph = KernelExpressions().gradient(grad.gradient(0, 0)).build_graph(
+            graph = build_expression_graph(
+                KernelExpressions().gradient(grad.gradient(0, 0)),
                 symbolic_objects=(grad,),
             )
 
@@ -631,7 +657,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
     def test_expression_graph_accepts_explicit_dimension_specialization(self):
         x = sp.symbols("x")
 
-        graph = KernelExpressions().gradient(x).build_graph(
+        graph = build_expression_graph(
+            KernelExpressions().gradient(x),
             data_symbols=(x,),
             specialization=dimension_specialization(3, "user"),
         )
@@ -642,7 +669,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
         grad = ReferenceShapeGradients("grad_ref", n_nodes=4, dim=2)
 
         with self.assertRaises(ValueError):
-            KernelExpressions().gradient(grad.gradient(0, 0)).build_graph(
+            build_expression_graph(
+                KernelExpressions().gradient(grad.gradient(0, 0)),
                 symbolic_objects=(grad,),
                 specialization=dimension_specialization(3, "user"),
             )
@@ -657,9 +685,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
         disp_grad0 = sp.symbols("disp_grad[0]")
 
         graph = (
-            KernelExpressions()
-            .energy(mu * disp_grad0 * disp_grad0 * jac0 * qw)
-            .build_graph(data_symbols=(mu, disp_grad0, jac0, qw))
+            build_expression_graph(KernelExpressions()
+            .energy(mu * disp_grad0 * disp_grad0 * jac0 * qw), data_symbols=(mu, disp_grad0, jac0, qw))
         )
 
         self.assertEqual(len(graph.patterns_by_kind(PatternKind.DISPLACEMENT_GRADIENT)), 0)
@@ -670,7 +697,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
         J = GeometricJacobian("any_geometry_name", 2)
 
         expr = grad_u.as_matrix()[0, 1] * J.as_matrix()[1, 0]
-        graph = KernelExpressions().energy(expr).build_graph(
+        graph = build_expression_graph(
+            KernelExpressions().energy(expr),
             symbolic_objects=(grad_u, J)
         )
 
@@ -683,7 +711,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         Fm = F.as_matrix()
 
         expr = Fm[0, 0] * Fm[1, 1] - Fm[0, 1] * Fm[1, 0]
-        graph = KernelExpressions().energy(expr).build_graph(symbolic_objects=(F,))
+        graph = build_expression_graph(KernelExpressions().energy(expr), symbolic_objects=(F,))
 
         patterns = graph.patterns_by_kind(PatternKind.DEFORMATION_GRADIENT)
         self.assertEqual(len(patterns), 1)
@@ -694,7 +722,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
         adjJ = GeometricAdjugate.from_jacobian("adjJ", J)
 
         expr = adjJ.as_matrix()[0, 0] + adjJ.as_matrix()[1, 1]
-        graph = KernelExpressions().gradient(expr).build_graph(symbolic_objects=(adjJ,))
+        graph = build_expression_graph(KernelExpressions().gradient(expr), symbolic_objects=(adjJ,))
 
         patterns = graph.patterns_by_kind(PatternKind.GEOMETRIC_ADJUGATE)
         self.assertEqual(len(patterns), 1)
@@ -704,9 +732,9 @@ class SymbolicFrameworkTest(unittest.TestCase):
         x, y = sp.symbols("x y")
         repeated = x + y
 
-        graph = KernelExpressions().residual(
+        graph = build_expression_graph(KernelExpressions().residual(
             [repeated * repeated, repeated * repeated + repeated]
-        ).build_graph(data_symbols=(x, y))
+        ), data_symbols=(x, y))
 
         repeated_patterns = graph.patterns_by_kind(PatternKind.REPEATED_SUBEXPRESSION)
         self.assertGreaterEqual(len(repeated_patterns), 1)
@@ -717,9 +745,9 @@ class SymbolicFrameworkTest(unittest.TestCase):
         x, y = sp.symbols("x y")
         repeated = x + y
 
-        graph = KernelExpressions().gradient(
+        graph = build_expression_graph(KernelExpressions().gradient(
             [repeated * repeated, repeated * repeated + repeated]
-        ).build_graph(data_symbols=(x, y), temporary_prefix="sfem_tmp")
+        ), data_symbols=(x, y), temporary_prefix="sfem_tmp")
 
         self.assertGreaterEqual(len(graph.evaluation_plan.intermediates), 1)
         self.assertEqual(str(graph.evaluation_plan.temporary_symbols[0]), "sfem_tmp0")
@@ -731,9 +759,11 @@ class SymbolicFrameworkTest(unittest.TestCase):
         custom0, custom1 = sp.symbols("qreuse0 qreuse1")
         repeated = x + y
 
-        graph = KernelExpressions().residual(
+        graph = build_expression_graph(
+            KernelExpressions().residual(
             [repeated * repeated, repeated * repeated + x]
-        ).build_graph(
+        ),
+
             data_symbols=(x, y),
             temporary_symbols=iter((custom0, custom1)),
         )
@@ -746,7 +776,8 @@ class SymbolicFrameworkTest(unittest.TestCase):
         out = sp.symbols("out[0]")
         assignment = ast.Assignment(out, x * y + z)
 
-        graph = KernelExpressions().residual(assignment).build_graph(
+        graph = build_expression_graph(
+            KernelExpressions().residual(assignment),
             data_symbols=(x, y, z)
         )
         statement = graph.evaluation_plan.outputs[0]
@@ -762,9 +793,9 @@ class SymbolicFrameworkTest(unittest.TestCase):
         x, y, z, w = sp.symbols("x y z w")
         repeated = x + y
 
-        graph = KernelExpressions().gradient(
+        graph = build_expression_graph(KernelExpressions().gradient(
             [repeated * z, repeated * w]
-        ).build_graph(data_symbols=(x, y, z, w), temporary_prefix="tmp")
+        ), data_symbols=(x, y, z, w), temporary_prefix="tmp")
 
         tmp0 = graph.evaluation_plan.temporary_symbols[0]
         liveness = graph.evaluation_plan.metrics.liveness
@@ -778,9 +809,9 @@ class SymbolicFrameworkTest(unittest.TestCase):
         x, y, z, w = sp.symbols("x y z w")
         repeated = x + y
 
-        graph = KernelExpressions().gradient(
+        graph = build_expression_graph(KernelExpressions().gradient(
             [repeated * z, repeated * w]
-        ).build_graph(data_symbols=(x, y, z, w), temporary_prefix="tmp")
+        ), data_symbols=(x, y, z, w), temporary_prefix="tmp")
 
         self.assertEqual(graph.evaluation_plan.metrics.peak_registers, 3)
         self.assertEqual(graph.cost.estimated_registers, 3)
@@ -838,11 +869,10 @@ class SymbolicFrameworkTest(unittest.TestCase):
         energy = sp.Rational(1, 2) * (u0 * u0 + u1 * u1)
 
         graph = (
-            KernelExpressions()
+            build_expression_graph(KernelExpressions()
             .energy(energy)
             .residual_from_energy(energy, (u0, u1))
-            .hessian_action_from_energy(energy, (u0, u1), (du0, du1))
-            .build_graph(data_symbols=(u0, u1, du0, du1))
+            .hessian_action_from_energy(energy, (u0, u1), (du0, du1)), data_symbols=(u0, u1, du0, du1))
         )
 
         roles = [expr.role for expr in graph.outputs]
@@ -852,7 +882,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_linear_elastic_first_piola_matches_energy_derivative(self):
         mu, lmbda = sp.symbols("mu lambda")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         G = grad_u.as_matrix()
 
         energy = linear_elastic_energy(G, mu, lmbda)
@@ -881,7 +911,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_transformed_first_piola_matches_p_tx_jinv_t_operand(self):
         mu, lmbda, measure = sp.symbols("mu lambda measure")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         Jinv = matrix_symbols("Jinv", 2, 2)
 
         P = linear_elastic_first_piola(grad_u, mu, lmbda)
@@ -904,7 +934,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_transformed_first_piola_object_is_detected_structurally(self):
         mu, lmbda, measure = sp.symbols("mu lambda measure")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         Jinv = matrix_symbols("Jinv", 2, 2)
         P = FirstPiolaStress.from_linear_elasticity("P", grad_u, mu, lmbda)
         operand = TransformedFirstPiola.from_first_piola(
@@ -920,11 +950,11 @@ class SymbolicFrameworkTest(unittest.TestCase):
             (ref_grad,),
         )
         graph = (
-            KernelExpressions()
-            .operator_evaluation(P)
-            .operator_evaluation(operand)
-            .gradient(gradient)
-            .build_graph(
+            build_expression_graph(
+                KernelExpressions()
+                .operator_evaluation(P)
+                .operator_evaluation(operand)
+                .gradient(gradient),
                 symbolic_objects=(P, operand, ref_grad),
             )
         )
@@ -952,7 +982,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_linearized_first_piola_matches_directional_derivative(self):
         mu, lmbda = sp.symbols("mu lambda")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         direction = matrix_symbols("trial_grad", 2, 2)
         G = grad_u.as_matrix()
         P = linear_elastic_first_piola(G, mu, lmbda)
@@ -976,7 +1006,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_linearized_transformed_operand_matches_direct_gradient_derivative(self):
         mu, lmbda, measure = sp.symbols("mu lambda measure")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         G = grad_u.as_matrix()
         Jinv = matrix_symbols("Jinv", 2, 2)
         trial_ref = matrix_symbols("trial_ref", 2, 2)
@@ -1005,7 +1035,7 @@ class SymbolicFrameworkTest(unittest.TestCase):
 
     def test_linearized_transformed_first_piola_object_evaluates_hessian_action(self):
         mu, lmbda, measure = sp.symbols("mu lambda measure")
-        grad_u = DisplacementGradient("grad_u", 2)
+        grad_u = DisplacementGradient("gu", 2)
         Jinv = matrix_symbols("Jinv", 2, 2)
         P = FirstPiolaStress.from_linear_elasticity("P", grad_u, mu, lmbda)
         trial_ref = ReferenceShapeGradient("trial_ref", 2)
@@ -1034,11 +1064,10 @@ class SymbolicFrameworkTest(unittest.TestCase):
             (test_ref,),
         )
         graph = (
-            KernelExpressions()
+            build_expression_graph(KernelExpressions()
             .operator_evaluation(P)
             .operator_evaluation(lin)
-            .hessian_action(action)
-            .build_graph(symbolic_objects=(P, trial_ref, test_ref, lin))
+            .hessian_action(action), symbolic_objects=(P, trial_ref, test_ref, lin))
         )
 
         self.assertGreaterEqual(

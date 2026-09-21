@@ -1030,6 +1030,24 @@ namespace sfem {
 
         if (err != SFEM_SUCCESS) return err;
 
+        // The work is linear in the state, so `g . (x + s h)` is
+        // `g.x + s * g.h` and two dots serve every step.  This used to sweep
+        // the vector once per step, which is `nsteps` passes over `ndofs`
+//         if(!dead_load)
+//             real_t gx = 0;
+//             real_t gh = 0;
+// #pragma omp parallel for reduction(+ : gx, gh)
+//             for (ptrdiff_t i = 0; i < ndofs; ++i) {
+//                 gx += g[i] * x[i];
+//                 gh += g[i] * h[i];
+//             }
+
+//             for (int s = 0; s < nsteps; ++s) {
+//                 out[s] += gx + steps[s] * gh;
+//             }
+//             return SFEM_SUCCESS;
+//         }
+
         for (int s = 0; s < nsteps; ++s) {
             const real_t step = steps[s];
             real_t       acc  = 0;

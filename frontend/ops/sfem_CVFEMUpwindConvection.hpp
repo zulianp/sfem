@@ -8,6 +8,8 @@ namespace sfem {
         std::shared_ptr<Buffer<real_t>> vel[3];
         smesh::ElemType                   element_type { smesh::INVALID };
         const char                     *name() const override { return "CVFEMUpwindConvection"; }
+        //! upwind convection is not the gradient of anything
+        bool energy_or_potential_based() const override { return false; }
         inline bool                     is_linear() const override { return true; }
         inline ptrdiff_t                       n_dofs_domain() const override { return space->n_dofs(); }
         inline ptrdiff_t                       n_dofs_image() const override { return space->n_dofs(); }

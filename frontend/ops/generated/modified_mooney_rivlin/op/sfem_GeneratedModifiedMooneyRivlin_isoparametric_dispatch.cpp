@@ -1,2591 +1,1050 @@
 #include "sfem_GeneratedModifiedMooneyRivlin_c_abi.hpp"
-#include <cstdio>
 
-#ifndef SFEM_SUCCESS
-#define SFEM_SUCCESS 0
-#endif
-#ifndef SFEM_FAILURE
-#define SFEM_FAILURE 1
-#endif
 #ifndef SFEM_CODEGEN_PUBLIC_C_ABI
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int modified_mooney_rivlin_proteus_quad4_apply_isoparametric_mesh_soa(
+static_assert((int)smesh::SMESH_FLOAT64 == (int)sizeof(double),
+              "the generated kernels select their scalar by width");
+static_assert((int)smesh::SMESH_FLOAT32 == (int)sizeof(float),
+              "the generated kernels select their scalar by width");
+
+extern "C" int modified_mooney_rivlin_proteus_quad4_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy
 );
-extern "C" int modified_mooney_rivlin_quad4_apply_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_quad4_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy
 );
-extern "C" int modified_mooney_rivlin_tri3_apply_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tri6_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy
 );
-extern "C" int modified_mooney_rivlin_tri6_apply_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_hex27_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
-extern "C" int modified_mooney_rivlin_proteus_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_hex8_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
-extern "C" int modified_mooney_rivlin_quad4_apply_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_proteus_hex27_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
-extern "C" int modified_mooney_rivlin_tri3_apply_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_proteus_hex64_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
-extern "C" int modified_mooney_rivlin_tri6_apply_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_proteus_hex8_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
-extern "C" int modified_mooney_rivlin_hex27_apply_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_apply_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 );
-extern "C" int modified_mooney_rivlin_hex8_apply_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_proteus_quad4_gradient_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+);
+extern "C" int modified_mooney_rivlin_quad4_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+);
+extern "C" int modified_mooney_rivlin_tri6_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+);
+extern "C" int modified_mooney_rivlin_hex27_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+);
+extern "C" int modified_mooney_rivlin_hex8_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+);
+extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+);
+extern "C" int modified_mooney_rivlin_proteus_hex64_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+);
+extern "C" int modified_mooney_rivlin_proteus_hex8_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+);
+extern "C" int modified_mooney_rivlin_tet10_gradient_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+);
+extern "C" int modified_mooney_rivlin_proteus_quad4_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_quad4_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_tri3_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_tri6_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_hex27_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_proteus_hex27_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_proteus_hex64_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_proteus_hex8_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_tet10_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_tet4_hessian_bsr_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+extern "C" int modified_mooney_rivlin_proteus_quad4_objective_steps_i_msoa(
+        const int scalar_bytes,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_tet4_apply_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_hex27_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_hex8_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_tet4_apply_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_quad4_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int modified_mooney_rivlin_quad4_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int modified_mooney_rivlin_tri3_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int modified_mooney_rivlin_tri6_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-);
-extern "C" int modified_mooney_rivlin_proteus_quad4_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-);
-extern "C" int modified_mooney_rivlin_quad4_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-);
-extern "C" int modified_mooney_rivlin_tri3_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-);
-extern "C" int modified_mooney_rivlin_tri6_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-);
-extern "C" int modified_mooney_rivlin_hex27_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_hex8_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_tet4_gradient_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_hex27_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_hex8_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_tet4_gradient_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-);
-extern "C" int modified_mooney_rivlin_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_quad4_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_tri3_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_tri6_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_quad4_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_tri3_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_tri6_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_hex27_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_hex8_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_tet10_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_tet4_hessian_bsr_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_hex27_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_hex8_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_tet10_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_tet4_hessian_bsr_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-);
-extern "C" int modified_mooney_rivlin_proteus_quad4_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_quad4_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tri3_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tri6_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_quad4_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_quad4_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tri3_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tri6_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_hex27_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_hex8_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tet4_objective_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_hex27_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_hex8_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tet4_objective_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_quad4_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int modified_mooney_rivlin_quad4_objective_steps_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_quad4_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int modified_mooney_rivlin_tri3_objective_steps_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tri6_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int modified_mooney_rivlin_tri6_objective_steps_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_hex27_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int modified_mooney_rivlin_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_hex8_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int modified_mooney_rivlin_quad4_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int modified_mooney_rivlin_tri3_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_proteus_hex64_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int modified_mooney_rivlin_tri6_objective_steps_isoparametric_mesh_soa_float(
+extern "C" int modified_mooney_rivlin_proteus_hex8_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
-extern "C" int modified_mooney_rivlin_hex27_objective_steps_isoparametric_mesh_soa(
+extern "C" int modified_mooney_rivlin_tet10_objective_steps_i_msoa(
+        const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_hex8_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tet10_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tet4_objective_steps_isoparametric_mesh_soa(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_hex27_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_hex8_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex64_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tet10_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-);
-extern "C" int modified_mooney_rivlin_tet4_objective_steps_isoparametric_mesh_soa_float(
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 );
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_apply_2d_i_msoa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy
 ) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return modified_mooney_rivlin_proteus_quad4_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    case smesh::QUAD4:
+      return modified_mooney_rivlin_quad4_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    case smesh::TRI6:
+      return modified_mooney_rivlin_tri6_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "modified_mooney_rivlin_apply_2d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa_float(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_apply_3d_i_msoa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
 ) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, out_stride, outx, outy);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_apply_2d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return modified_mooney_rivlin_hex27_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::HEX8:
+      return modified_mooney_rivlin_hex8_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX27:
+      return modified_mooney_rivlin_proteus_hex27_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX64:
+      return modified_mooney_rivlin_proteus_hex64_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX8:
+      return modified_mooney_rivlin_proteus_hex8_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    case smesh::TET10:
+      return modified_mooney_rivlin_tet10_apply_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "modified_mooney_rivlin_apply_3d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_gradient_2d_i_msoa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return modified_mooney_rivlin_proteus_quad4_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
+    case smesh::QUAD4:
+      return modified_mooney_rivlin_quad4_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
+    case smesh::TRI6:
+      return modified_mooney_rivlin_tri6_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "modified_mooney_rivlin_gradient_2d_i_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_gradient_3d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const ptrdiff_t out_stride,
+        void *const RSTR outx,
+        void *const RSTR outy,
+        void *const RSTR outz
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return modified_mooney_rivlin_hex27_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    case smesh::HEX8:
+      return modified_mooney_rivlin_hex8_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX27:
+      return modified_mooney_rivlin_proteus_hex27_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX64:
+      return modified_mooney_rivlin_proteus_hex64_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    case smesh::PROTEUS_HEX8:
+      return modified_mooney_rivlin_proteus_hex8_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    case smesh::TET10:
+      return modified_mooney_rivlin_tet10_gradient_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "modified_mooney_rivlin_gradient_3d_i_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_hessian_bsr_2d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return modified_mooney_rivlin_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
+    case smesh::QUAD4:
+      return modified_mooney_rivlin_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
+    case smesh::TRI3:
+      return modified_mooney_rivlin_tri3_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
+    case smesh::TRI6:
+      return modified_mooney_rivlin_tri6_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "modified_mooney_rivlin_hessian_bsr_2d_i_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_hessian_bsr_3d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+) {
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return modified_mooney_rivlin_hex27_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
+    case smesh::HEX8:
+      return modified_mooney_rivlin_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
+    case smesh::PROTEUS_HEX27:
+      return modified_mooney_rivlin_proteus_hex27_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
+    case smesh::PROTEUS_HEX64:
+      return modified_mooney_rivlin_proteus_hex64_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
+    case smesh::PROTEUS_HEX8:
+      return modified_mooney_rivlin_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
+    case smesh::TET10:
+      return modified_mooney_rivlin_tet10_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
+    case smesh::TET4:
+      return modified_mooney_rivlin_tet4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "modified_mooney_rivlin_hessian_bsr_3d_i_msoa", (int)element_type, (int)real_type);
+}
+
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_steps_2d_i_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
+        const ptrdiff_t u_stride,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
         const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_apply_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_apply_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, out_stride, outx, outy, outz);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_apply_3d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, out_stride, outx, outy);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_gradient_2d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        double *const SFEM_RESTRICT outx,
-        double *const SFEM_RESTRICT outy,
-        double *const SFEM_RESTRICT outz
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_gradient_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t out_stride,
-        float *const SFEM_RESTRICT outx,
-        float *const SFEM_RESTRICT outy,
-        float *const SFEM_RESTRICT outz
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_gradient_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, out_stride, outx, outy, outz);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_gradient_3d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_hessian_bsr_2d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        double *const SFEM_RESTRICT values
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_hessian_bsr_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const count_t *const SFEM_RESTRICT rowptr,
-        const idx_t *const SFEM_RESTRICT colidx,
-        float *const SFEM_RESTRICT values
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_hessian_bsr_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_hessian_bsr_3d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        double *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, value);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, value);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, value);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, value);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        float *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, value);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, value);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, value);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, value);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_objective_2d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        double *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_objective_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        float *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_objective_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, value);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_objective_3d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
         const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::PROTEUS_QUAD4:
+      return modified_mooney_rivlin_proteus_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    case smesh::QUAD4:
+      return modified_mooney_rivlin_quad4_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    case smesh::TRI6:
+      return modified_mooney_rivlin_tri6_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "modified_mooney_rivlin_objective_steps_2d_i_msoa", (int)element_type, (int)real_type);
 }
 
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa_float(
+SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_steps_3d_i_msoa(
         const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
+        idx_t **const RSTR elements,
+        const geom_t *const *const RSTR points,
+        const real_t c1,
+        const real_t c2,
+        const real_t kappa,
         const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
+        const void *const RSTR ux,
+        const void *const RSTR uy,
+        const void *const RSTR uz,
         const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
+        const void *const RSTR hx,
+        const void *const RSTR hy,
+        const void *const RSTR hz,
         const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
+        const void *const RSTR steps,
+        void *const RSTR value
 ) {
-    switch (element_type) {
-        case smesh::PROTEUS_QUAD4:
-            return modified_mooney_rivlin_proteus_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::QUAD4:
-            return modified_mooney_rivlin_quad4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::TRI3:
-            return modified_mooney_rivlin_tri3_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        case smesh::TRI6:
-            return modified_mooney_rivlin_tri6_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, h_stride, hx, hy, nsteps, steps, value);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_objective_steps_2d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const double c1,
-        const double c2,
-        const double kappa,
-        const ptrdiff_t u_stride,
-        const double *const SFEM_RESTRICT ux,
-        const double *const SFEM_RESTRICT uy,
-        const double *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const double *const SFEM_RESTRICT hx,
-        const double *const SFEM_RESTRICT hy,
-        const double *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const double *const SFEM_RESTRICT steps,
-        double *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_objective_steps_isoparametric_mesh_soa(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
-}
-
-SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa_float(
-        const smesh::ElemType element_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const SFEM_RESTRICT elements,
-        const geom_t *const *const SFEM_RESTRICT points,
-        const float c1,
-        const float c2,
-        const float kappa,
-        const ptrdiff_t u_stride,
-        const float *const SFEM_RESTRICT ux,
-        const float *const SFEM_RESTRICT uy,
-        const float *const SFEM_RESTRICT uz,
-        const ptrdiff_t h_stride,
-        const float *const SFEM_RESTRICT hx,
-        const float *const SFEM_RESTRICT hy,
-        const float *const SFEM_RESTRICT hz,
-        const int nsteps,
-        const float *const SFEM_RESTRICT steps,
-        float *const SFEM_RESTRICT value
-) {
-    switch (element_type) {
-        case smesh::HEX27:
-            return modified_mooney_rivlin_hex27_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::HEX8:
-            return modified_mooney_rivlin_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX27:
-            return modified_mooney_rivlin_proteus_hex27_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX64:
-            return modified_mooney_rivlin_proteus_hex64_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::PROTEUS_HEX8:
-            return modified_mooney_rivlin_proteus_hex8_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::TET10:
-            return modified_mooney_rivlin_tet10_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        case smesh::TET4:
-            return modified_mooney_rivlin_tet4_objective_steps_isoparametric_mesh_soa_float(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
-        default:
-            std::fprintf(stderr, "modified_mooney_rivlin_objective_steps_3d_isoparametric_mesh_soa_float does not support element type %d\n", (int)element_type);
-            return SFEM_FAILURE;
-    }
+  const enum smesh::PrimitiveType resolved_real_type =
+      (real_type == smesh::SMESH_DEFAULT)
+          ? smesh::TypeToEnum<real_t>::value()
+          : real_type;
+  switch (element_type) {
+    case smesh::HEX27:
+      return modified_mooney_rivlin_hex27_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    case smesh::HEX8:
+      return modified_mooney_rivlin_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    case smesh::PROTEUS_HEX27:
+      return modified_mooney_rivlin_proteus_hex27_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    case smesh::PROTEUS_HEX64:
+      return modified_mooney_rivlin_proteus_hex64_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    case smesh::PROTEUS_HEX8:
+      return modified_mooney_rivlin_proteus_hex8_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    case smesh::TET10:
+      return modified_mooney_rivlin_tet10_objective_steps_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, h_stride, hx, hy, hz, nsteps, steps, value);
+    default:
+      break;
+  }
+  return sfem::codegen::unsupported_dispatch(
+      "modified_mooney_rivlin_objective_steps_3d_i_msoa", (int)element_type, (int)real_type);
 }
