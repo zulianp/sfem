@@ -1090,6 +1090,42 @@ namespace sfem {
         // the CVFEM operator on the coarse mesh gets that right; P^T A P would inherit
         // the fine-grid stabilisation and be inconsistent.
         auto ret = std::static_pointer_cast<CVFEMNavierStokes>(clone_onto(space));
+
+        // A derefined level must not pack its mesh, because packing renumbers it.
+        //
+        // make_packed builds a PackedMesh with modify_mesh = true, which permutes the mesh's
+        // node ids in place -- non-trivially as soon as there is more than one pack, since ids
+        // are handed out pack by pack. On the fine level that permutation is load-bearing: the
+        // packed kernels index the global arrays as owned_nodes_ptr[pack] + k. On a COARSE
+        // level it is neither load-bearing nor harmless, because the hierarchy's transfers do
+        // not address the coarse vector through the coarse mesh at all. Serially both
+        // sshex8_hierarchical_prolongation (sfem_API.hpp) and sshex8_hierarchical_restriction
+        // (smesh_restrict.cpp) are handed only the FINE element table and index coarse dofs by
+        // macro-corner id. Renumbering the coarse mesh therefore desynchronises the coarse
+        // operator, which is built on that mesh, from the transfers that feed it.
+        //
+        // Measured on the cavity at N=16 refine 4 -- 4096 macro elements, 1,098,500 dof -- at
+        // the stock SFEM_PACK_SIZE=2048, which is two packs at that size. Rediscretised coarse
+        // levels went from 17 linear iterations to the 1000 cap without converging, 13.0 s to
+        // 222.7 s; the assembled-Galerkin path went from 7 to 22. Both are clean with packing
+        // off and clean at one pack, which is what identifies the renumbering rather than the
+        // packing as the cause. The one-pack case is clean because that permutation is the
+        // identity, not because the path differs.
+        //
+        // Declining here costs the coarse levels their packed kernels and nothing else: the
+        // fine level is semi-structured and returns earlier in initialize(), and a standalone
+        // unstructured run is not derefined. Announced once rather than silently, because every
+        // defect in this sequence has been a quiet fallback.
+        if (ret->pack_size > 0) {
+            static bool announced = false;
+            if (!announced) {
+                announced = true;
+                std::printf("cvfem: coarse levels are not packed -- packing renumbers the mesh that the "
+                            "hierarchy's transfers index by fine macro-corner id\n");
+            }
+            ret->pack_size = 0;
+        }
+
         ret->initialize();
         impl_->coarser = ret;
         return ret;

@@ -174,7 +174,43 @@ namespace cvfem_ss {
             // smesh owns the HEX8 -> lattice reindexing (2<->3 and 6<->7 against lexicographic
             // order); smesh_restrict.cpp reaches for the same helper in the same role.
             smesh::idx_t *from_corners[8];
-            smesh::hex8_elements_as_sshex8_level1(from_b->elements()->data(), from_corners);
+            // Diagnostic only: the read this replaced, so both can be measured from one binary.
+            // With SFEM_GMG_GALERKIN=0 there is no Galerkin fold, and these columns are the only
+            // thing cd8db4f32 left in play -- measured on the cavity at N=8 level 4, that
+            // configuration goes from 12 linear iterations at one pack to the 4000 cap at two.
+            if (smesh::Env::read<int>("SFEM_XFER_GID_LEGACY", 0)) {
+                for (int k = 0; k < 2; ++k)
+                    for (int j = 0; j < 2; ++j)
+                        for (int i = 0; i < 2; ++i)
+                            from_corners[smesh::sshex8_lidx(1, i, j, k)] =
+                                    to_b->elements()->data()[smesh::sshex8_lidx(to_level, i * to_level, j * to_level,
+                                                                                k * to_level)];
+            } else {
+                smesh::hex8_elements_as_sshex8_level1(from_b->elements()->data(), from_corners);
+            }
+
+            // The same coordinate-keyed invariant the Galerkin path carries, on the columns this
+            // pattern will use. The point a (coarse element, corner) denotes belongs to the mesh
+            // rather than to the layout, so it must not move with the pack count. An id checksum
+            // cannot tell a sound relabelling from a stale one; this can.
+            if (smesh::Env::read<int>("SFEM_XFER_GID_SUM", 0)) {
+                auto            pts  = from_m.points()->data();
+                const int       sdim = from_m.spatial_dimension();
+                const ptrdiff_t ne   = from_b->n_elements();
+                long long       s    = 0;
+                long double     cs   = 0;
+                for (ptrdiff_t e = 0; e < ne; ++e)
+                    for (int a = 0; a < 8; ++a) {
+                        const ptrdiff_t n = (ptrdiff_t)from_corners[a][e];
+                        s += (long long)n;
+                        long double h = 0;
+                        for (int d = 0; d < sdim; ++d) h += (long double)pts[d][n] * (long double)(d + 1);
+                        cs += h * (long double)((e * 8 + a) + 1);
+                    }
+                std::printf("xfergid: ne %lld  n_coarse %lld  sum %lld  coordsum %.17Lg\n",
+                            (long long)ne, (long long)n_coarse, s, cs);
+                std::fflush(stdout);
+            }
 
             build_prolongation_pattern(to_b->n_elements(),
                                        1,

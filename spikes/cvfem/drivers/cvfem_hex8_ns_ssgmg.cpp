@@ -1528,13 +1528,48 @@ private:
             // constant ratio here is exactly the factor it is out by.
             if (g.data->prolongations[i + 1]) {
                 std::vector<real_t> xr((size_t)nf), yc((size_t)nc), Rx((size_t)nc, 0), Py((size_t)nf, 0);
-                unsigned            seed = 12345;
-                auto                rnd  = [&seed]() {
-                    seed = seed * 1103515245u + 12345u;
-                    return (real_t)((seed >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
-                };
-                for (auto &e : xr) e = rnd();
-                for (auto &e : yc) e = rnd();
+
+                // The probe directions are functions of POSITION, and the inner products are
+                // taken over the OWNED range and reduced. All three were wrong under MPI and
+                // each one alone is enough to make the printed ratio meaningless.
+                //
+                // The directions used to come from an LCG seeded per local dof index. That is
+                // not a distributed vector: a node carries one local index on its owner and a
+                // different one in every rank holding it as a ghost, so the same physical
+                // node entered R and P with different values, and the vector itself changed
+                // with the decomposition -- the one rank and two rank runs were not probing
+                // the same thing at all.
+                //
+                // The dot products then ran over the whole LOCAL range, which counts every
+                // shared, ghost and aura entry once per rank that stores it, and nothing
+                // reduced them, so each rank printed its own partial sum and called it an
+                // inner product. Summed by hand afterwards those partials gave 0.866, which
+                // is not 1 and not evidence of anything either, because the two flaws above
+                // were still in force.
+                //
+                // Over the owned range only, keyed on coordinates, and allreduced, this is
+                // the actual global <Rx, y> against <x, Py>. Serial is unaffected: n_owned
+                // equals n_dofs and the reduction short circuits.
+                {
+                    auto              fs = g.data->functions[i]->space();
+                    auto              cs = g.data->functions[i + 1]->space();
+                    const auto *const fx = fs->points()->data()[0];
+                    const auto *const fy = fs->points()->data()[1];
+                    const auto *const fz = fs->points()->data()[2];
+                    const auto *const cx = cs->points()->data()[0];
+                    const auto *const cy = cs->points()->data()[1];
+                    const auto *const cz = cs->points()->data()[2];
+
+                    for (ptrdiff_t n = 0; n < nf / N_FIELDS; ++n)
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            xr[(size_t)(n * N_FIELDS + c)] = (real_t)std::sin(
+                                    1.9 * (double)fx[n] + 2.7 * (double)fy[n] + 1.3 * (double)fz[n] + 0.6 * c + 0.3);
+
+                    for (ptrdiff_t n = 0; n < nc / N_FIELDS; ++n)
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            yc[(size_t)(n * N_FIELDS + c)] = (real_t)std::cos(
+                                    2.1 * (double)cx[n] + 1.5 * (double)cy[n] + 2.9 * (double)cz[n] + 0.4 * c + 0.7);
+                }
 
                 // Both transfers zero constrained dofs on their output, so the adjoint
                 // identity only holds on vectors that already satisfy the constraints.
@@ -1546,11 +1581,28 @@ private:
                 g.data->restrictions[i]->apply(xr.data(), Rx.data());
                 g.data->prolongations[i + 1]->apply(yc.data(), Py.data());
 
-                real_t lhs = 0, rhs2 = 0;
-                for (ptrdiff_t k = 0; k < nc; ++k) lhs += Rx[(size_t)k] * yc[(size_t)k];
-                for (ptrdiff_t k = 0; k < nf; ++k) rhs2 += xr[(size_t)k] * Py[(size_t)k];
-                std::printf("  adjoint %d: <Rx,y>=%.6e  <x,Py>=%.6e  ratio=%.6f\n",
-                            i, lhs, rhs2, (rhs2 != 0) ? lhs / rhs2 : 0.0);
+                auto dom_of = [](const std::shared_ptr<sfem::FunctionSpace> &sp) {
+                    cvfem::Domain d;
+                    auto          m = sp->mesh_ptr();
+                    if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) d.comm = m->comm();
+                    d.n_owned = sp->n_owned_dofs();
+                    d.n_local = sp->n_dofs();
+                    return d;
+                };
+                const cvfem::Domain dom_f = dom_of(g.data->functions[i]->space());
+                const cvfem::Domain dom_c = dom_of(g.data->functions[i + 1]->space());
+
+                long double lhs_loc = 0, rhs_loc = 0;
+                for (ptrdiff_t k = 0; k < dom_c.n_owned && k < nc; ++k)
+                    lhs_loc += (long double)Rx[(size_t)k] * (long double)yc[(size_t)k];
+                for (ptrdiff_t k = 0; k < dom_f.n_owned && k < nf; ++k)
+                    rhs_loc += (long double)xr[(size_t)k] * (long double)Py[(size_t)k];
+
+                const double lhs  = cvfem::sum_kahan(dom_c, lhs_loc);
+                const double rhs2 = cvfem::sum_kahan(dom_f, rhs_loc);
+                if (!dom_f.distributed() || dom_f.is_root())
+                    std::printf("  adjoint %d: <Rx,y>=%.6e  <x,Py>=%.6e  ratio=%.6f\n",
+                                i, lhs, rhs2, (rhs2 != 0) ? lhs / rhs2 : 0.0);
             }
 
             // Coarse-operator consistency: A_c v against R A_f P v on a smooth coarse
@@ -1922,15 +1974,42 @@ private:
                 displs_[(size_t)r] = at;
                 at += counts_[(size_t)r];
             }
+
+            // counts_ and displs_ are kept because the factorisation still reports per-rank
+            // extents, but apply() no longer places anything by them: it scatters through l2g_
+            // and reduces, which does not care whether the owned ids happen to be contiguous.
         }
 
         int apply(const real_t *const b, real_t *const x) override {
             SFEM_TRACE_SCOPE("GlobalDenseLU::apply");
-            // The owned prefix of b is this rank's contribution, and the owned blocks tile
-            // the global vector in rank order, so the gather needs no index translation.
+            // Place each owned value at its GLOBAL index, then sum.
+            //
+            // This was an allgatherv with no index translation, which is right only while a
+            // rank's owned global ids are the contiguous block [displs_[rank], displs_[rank] +
+            // counts_[rank]). On a derefined coarse mesh they are not. Measured on the cavity
+            // at 64 macro elements: cuts into one, two or four ranks land on whole layers of
+            // the 4x4x4 lattice and every rank's ids are contiguous, while five, six and eight
+            // ranks each leave several ranks whose ids are not -- at eight, rank 1's first
+            // owned node has global id 15 where the tiling expects 30.
+            //
+            // The right-hand side was then assembled in the wrong order while the solution came
+            // back through the correct map, so every rank agreed on the same wrong coarse
+            // correction: consistent across ranks, wrong against serial, and invisible to any
+            // rank-to-rank comparison. The first linear solve took 5 iterations at 1, 2 and 4
+            // ranks against 54, 210 and 18 at 5, 6 and 8, ordered by how many ranks were out of
+            // order rather than by rank count.
+            //
+            // Scatter-then-sum is what make_dense_lu_from_bsr_global already does with the
+            // owned block rows, for the same reason and on the same disjointness argument:
+            // every global entry is written by exactly one rank, so the reduction is an
+            // assembly and not an average.
             std::fill(gb_.begin(), gb_.end(), real_t(0));
             std::fill(gx_.begin(), gx_.end(), real_t(0));
-            comm_->allgatherv(b, (int)n_owned_, gb_.data(), counts_.data(), displs_.data());
+            for (ptrdiff_t i = 0; i < n_owned_ / N_FIELDS; ++i) {
+                const ptrdiff_t g = (ptrdiff_t)l2g_[(size_t)i];
+                for (int c = 0; c < N_FIELDS; ++c) gb_[(size_t)(g * N_FIELDS + c)] = b[i * N_FIELDS + c];
+            }
+            comm_->sum(gb_.data(), (int)gb_.size(), smesh::TypeToEnum<real_t>::value());
 
             // Every rank solves the same system and gets the same answer, so there is nothing
             // to exchange afterwards.
@@ -1972,8 +2051,62 @@ private:
             const std::shared_ptr<sfem::FunctionSpace> &space,
             const ptrdiff_t                             n_local_dofs) {
         auto mesh = space->mesh_ptr();
+
+        // SFEM_GMG_COARSE_MAT_SUM=1: is the matrix handed to the coarse factorisation the same
+        // matrix however the domain was cut?
+        //
+        // The coarse SOLVE is known to differ at eight ranks: the owned-range checksum of what
+        // it returns agrees to thirteen figures at one, two and four ranks and moves in the
+        // fourth at eight. Reassociation does not explain that, because two and four ranks
+        // reduce over different orderings as well and stay at thirteen figures, so the input to
+        // the factorisation is what to look at.
+        //
+        // The assembly below takes owned rows only and trusts each one to be complete in the
+        // LOCAL matrix, whose sparsity comes from the local coarse graph. A row missing a
+        // column it has globally is then silently zero in the dense matrix, and every rank
+        // agrees on the same wrong matrix -- consistent across ranks and wrong against serial,
+        // which is the failure mode only a 1-versus-N comparison catches.
+        //
+        // Keyed by GLOBAL row and column so the same entries are summed whatever the partition,
+        // and computed from the input BSR rather than from `dense`, because the serial branch
+        // below returns before `dense` exists and would otherwise leave nothing to compare
+        // against. Blocks are counted as well as summed: a row short of a column is exactly
+        // what this is looking for, and it moves the count while barely moving the sum.
+        auto coarse_mat_sum = [&a, &mesh](const ptrdiff_t n_rows, const smesh::large_idx_t *const l2g_or_null) {
+            if (!smesh::Env::read<int>("SFEM_GMG_COARSE_MAT_SUM", 0)) return;
+            const sfem::count_t *const rp = a->row_ptr->data();
+            const sfem::idx_t *const   ci = a->col_idx->data();
+            const real_t *const        vd = a->values->data();
+
+            long double sum = 0, absum = 0, wsum = 0, nblk = 0;
+            for (ptrdiff_t r = 0; r < n_rows; ++r) {
+                const long double gr = l2g_or_null ? (long double)l2g_or_null[r] : (long double)r;
+                for (sfem::count_t k = rp[r]; k < rp[r + 1]; ++k) {
+                    const long double gc = l2g_or_null ? (long double)l2g_or_null[(ptrdiff_t)ci[k]]
+                                                       : (long double)ci[k];
+                    nblk += 1;
+                    for (int e = 0; e < 16; ++e) {
+                        const long double v = (long double)vd[(size_t)k * 16 + (size_t)e];
+                        sum += v;
+                        absum += v < 0 ? -v : v;
+                        wsum += v * (gr + 1) * (gc + 1);
+                    }
+                }
+            }
+
+            cvfem::Domain dom;
+            dom.comm         = mesh->comm();
+            const double gz  = cvfem::sum_kahan(dom, nblk);
+            const double gs  = cvfem::sum_kahan(dom, sum);
+            const double ga  = cvfem::sum_kahan(dom, absum);
+            const double gw  = cvfem::sum_kahan(dom, wsum);
+            if (dom.is_root())
+                std::printf("coarsemat: blocks %.0f  sum %.17g  abs %.17g  wsum %.17g\n", gz, gs, ga, gw);
+        };
+
         if (!mesh->is_distributed() || mesh->comm()->size() == 1) {
             // One rank: the local matrix IS the global one, and this is the old code.
+            coarse_mat_sum(n_local_dofs / N_FIELDS, nullptr);
             return make_dense_lu_from_bsr(a, n_local_dofs);
         }
 
@@ -1982,6 +2115,10 @@ private:
         const ptrdiff_t n_owned_nodes = dist->n_nodes_owned();
         const ptrdiff_t n_local_nodes = dist->n_nodes_local();
         const ptrdiff_t n_global      = space->n_dofs_global();
+
+        // Owned rows only, keyed by global id, then reduced: the same set of global rows the
+        // serial call above sums over its whole local matrix, so the two are comparable.
+        coarse_mat_sum(n_owned_nodes, l2g);
 
         // Only the owned rows are complete; the ghost and aura rows this rank also stores are
         // partial sums belonging to their owners, and including them would double-count.
@@ -2267,7 +2404,33 @@ private:
                 color[(size_t)i] = c;
             }
         }
-        const int ncolors = 1 + *std::max_element(color.begin(), color.end());
+        // The colour count has to be the same number on every rank.
+        //
+        // The colouring above is greedy over the LOCAL pattern, so each rank derives its own
+        // count: 27 and 27 at two ranks, but 18 against something else at four. The probe loop
+        // below calls composite() once per colour and component, and composite() applies the
+        // fine matrix-free operator, which is collective. Ranks that disagree on the count
+        // issue different numbers of collectives and the run deadlocks -- which is what hung
+        // every SFEM_GMG_CHECK arm at four ranks and above, while two ranks survived only
+        // because their counts happened to coincide.
+        //
+        // Looping to the global maximum keeps the collectives paired. A colour that no local
+        // node carries costs one application and writes nothing, because the scatter below
+        // only touches entries whose column actually holds that colour.
+        //
+        // This makes the probe RUN at every rank count; it does not make it a valid
+        // distributed reference. Rank A's colour c and rank B's colour c are different sets of
+        // nodes, so the composite still pairs one rank's probe direction with another's. A
+        // probed composite is comparable against serial at one rank only, until the colouring
+        // itself is made global.
+        cvfem::Domain probe_dom;
+        {
+            auto m = f_coarse->space()->mesh_ptr();
+            if (m && m->is_distributed() && m->comm() && m->comm()->size() > 1) probe_dom.comm = m->comm();
+            probe_dom.n_owned = f_coarse->space()->n_owned_dofs();
+            probe_dom.n_local = f_coarse->space()->n_dofs();
+        }
+        const int ncolors = cvfem::max(probe_dom, 1 + *std::max_element(color.begin(), color.end()));
 
         auto rowptr = smesh::create_host_buffer<count_t>((size_t)nn + 1);
         auto colidx = smesh::create_host_buffer<idx_t>((size_t)nnz);
@@ -2350,25 +2513,99 @@ private:
         // probed; anything outside it lands in the wrong row and is silently absorbed.
         {
             std::vector<real_t> v((size_t)ndc), ya((size_t)ndc, 0), yb((size_t)ndc, 0);
-            unsigned            st = 991u;
-            for (ptrdiff_t k = 0; k < ndc; ++k) {
-                st = st * 1103515245u + 12345u;
-                v[(size_t)k] = (real_t)((st >> 16) & 0x7fff) / (real_t)0x7fff - real_t(0.5);
+            // The probe direction is a function of POSITION, not of the local dof index.
+            //
+            // It used to be an LCG seeded per local index, which is not a distributed vector: a
+            // node carries one local index on its owner and a different one on every rank that
+            // holds it as a ghost. composite() runs the collective fine operator, which reads
+            // the ghost entries of its input, so each rank was handed a different field and the
+            // comparison measured the probe rather than the assembly. With the too-narrow
+            // symbolic pattern switched off, serial passes at 2.2e-16 while two, four and eight
+            // ranks reported 4.0e-2 to 1.3e-1 -- all of it this flaw, none of it a finding.
+            //
+            // Keyed on coordinates a ghost copy agrees with its owner by construction, so every
+            // rank count probes the same direction and a surviving mismatch is the assembly's.
+            {
+                const auto *const qx = f_coarse->space()->points()->data()[0];
+                const auto *const qy = f_coarse->space()->points()->data()[1];
+                const auto *const qz = f_coarse->space()->points()->data()[2];
+                for (ptrdiff_t n = 0; n < nn; ++n)
+                    for (int c = 0; c < N_FIELDS; ++c)
+                        v[(size_t)(n * N_FIELDS + c)] =
+                                (real_t)std::sin(2.3 * (double)qx[n] + 1.7 * (double)qy[n] +
+                                                 1.1 * (double)qz[n] + 0.4 * c + 1.1);
             }
             f_coarse->apply_zero_constraints(v.data());
 
             assembled->apply(v.data(), ya.data());
             composite(v.data(), yb.data());
 
-            real_t dn = 0, rnv = 0;
-            for (ptrdiff_t k = 0; k < ndc; ++k) {
-                const real_t d = ya[(size_t)k] - yb[(size_t)k];
-                dn += d * d;
-                rnv += yb[(size_t)k] * yb[(size_t)k];
+            // Compared over the OWNED range and reduced, not over the whole local range.
+            //
+            // ya comes from a local BSR apply, whose ghost and aura rows are partial by
+            // construction; yb comes from the composite, whose ghost rows the transfers fill.
+            // Those rows were never meant to agree, and comparing them dominated the result:
+            // with the probe direction already made coordinate-keyed and the too-narrow
+            // symbolic pattern switched off, serial read 4.1e-16 while two, four and eight
+            // ranks read 6.9e-1, 5.5e-1 and 1.0e+0 -- larger than before the probe was fixed,
+            // which is the tell that what remained was not the probe.
+            long double dn_l = 0, rn_l = 0;
+            for (ptrdiff_t k = 0; k < probe_dom.n_owned && k < ndc; ++k) {
+                const long double d = (long double)ya[(size_t)k] - (long double)yb[(size_t)k];
+                dn_l += d * d;
+                rn_l += (long double)yb[(size_t)k] * (long double)yb[(size_t)k];
             }
-            const real_t rel = (rnv > 0) ? std::sqrt(dn / rnv) : 0.0;
-            gate_ok          = rel < 1e-10;
-            if (gate_ok || attempt == 2)
+            const double dn2 = cvfem::sum_kahan(probe_dom, dn_l);
+            const double rn2 = cvfem::sum_kahan(probe_dom, rn_l);
+            const real_t rel = (rn2 > 0) ? (real_t)std::sqrt(dn2 / rn2) : real_t(0);
+
+            // SFEM_GMG_GATE_SPLIT=1: which of the two sides moves with the rank count?
+            //
+            // A mismatch here is not yet evidence against the assembled matrix. composite() is
+            // R o A_fine o P: P fills its fine-range output correctly on owned entries but not
+            // necessarily on ghosts, and A_fine then READS those ghosts, so the composite can
+            // be the invalid side. The adjoint check cannot exclude that -- <Rx,y> = <x,Py> is
+            // a bilinear identity and says nothing about whether P fills ghost slots.
+            //
+            // Both sides are already in hand here, so checksum them separately over the owned
+            // range and reduce. Whichever one moves as the cut gets finer is the defect:
+            //
+            //   ya moves, yb holds -> the assembled coarse matrix is wrong under decomposition
+            //   yb moves, ya holds -> the composite is, and the target is the transfers' ghost
+            //                         handling rather than the assembly. applysum already
+            //                         measured the assembled operator's owned action invariant
+            //                         to sixteen figures at 1, 2, 4 and 8 ranks, which makes
+            //                         this the outcome to expect.
+            if (smesh::Env::read<int>("SFEM_GMG_GATE_SPLIT", 0)) {
+                long double a_l = 0, b_l = 0, aa_l = 0, ab_l = 0;
+                for (ptrdiff_t k = 0; k < probe_dom.n_owned && k < ndc; ++k) {
+                    const long double a = (long double)ya[(size_t)k];
+                    const long double b = (long double)yb[(size_t)k];
+                    a_l += a;
+                    b_l += b;
+                    aa_l += a < 0 ? -a : a;
+                    ab_l += b < 0 ? -b : b;
+                }
+                const double ga  = cvfem::sum_kahan(probe_dom, a_l);
+                const double gb  = cvfem::sum_kahan(probe_dom, b_l);
+                const double gaa = cvfem::sum_kahan(probe_dom, aa_l);
+                const double gab = cvfem::sum_kahan(probe_dom, ab_l);
+                if (probe_dom.is_root())
+                    std::printf(
+                            "gatesplit: assembled sum %.17g abs %.17g   composite sum %.17g abs %.17g\n",
+                            ga, gaa, gb, gab);
+            }
+            // Agreed across ranks, for the same reason the colour count is: a rank that fails
+            // the gate alone widens its pattern and re-enters the colour loop while its peers
+            // have moved on.
+            gate_ok          = cvfem::all(probe_dom, rel < 1e-10);
+            // Reported when a pattern was supplied too. The return below accepts a supplied
+            // pattern whether or not the gate passed, so a failure here printed nothing at all,
+            // and the default symbolic pattern does fail: it is built as R G P over the fine
+            // node-to-node graph, while Rhie-Chow couples through a nodal reconstruction that
+            // makes the fine operator distance-2. Measured serially, the symbolic pattern gives
+            // 2197 blocks and no gate line, the widened pattern 6859 blocks and 2.15e-16.
+            if (gate_ok || attempt == 2 || pattern)
                 std::printf("assembly gate [%s]: rel = %.4e  %s\n", (P && R) ? "RAP" : "A", rel,
                             gate_ok ? "OK" : "MISMATCH");
         }
@@ -2705,6 +2942,72 @@ private:
                         if (rank == 0)
                             std::printf("diagsum level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g\n",
                                         i, gn, gp, gw);
+                    }
+
+                    // SFEM_GMG_APPLY_OWNED_SUM=1: is the coarse operator's ACTION the same
+                    // however the domain is cut?
+                    //
+                    // The diagonal above measured invariant at 1, 2, 4 and 8 ranks on the
+                    // pre-Newton state, and the transfers are their own adjoints at 1, 2 and 4,
+                    // so what remains of the coarse correction is the operator applied to a
+                    // vector. galerkin_apply reduces element contributions through a purely
+                    // local table and nothing exchanges the result -- the same shape the fine
+                    // nodal reconstruction had before it was gathered, which is the one defect
+                    // of this kind already found and fixed here.
+                    //
+                    // The direction is a function of POSITION, so a ghost copy agrees with its
+                    // owner by construction and every rank count probes the same vector. A
+                    // direction keyed on the local index would differ per rank and measure
+                    // nothing, which is how several earlier readings in this file were voided.
+                    //
+                    // Summed over the OWNED range only and reduced: plain, weighted by global
+                    // id, and in absolute value. The weighted sum moves when the same total
+                    // sits on different nodes, which the plain sum would hide; the absolute sum
+                    // moves when contributions cancel, which both of the others would hide.
+                    if (smesh::Env::read<int>("SFEM_GMG_APPLY_OWNED_SUM", 0) && a_c) {
+                        auto              cm = fi->space()->mesh_ptr();
+                        const auto *const px = fi->space()->points()->data()[0];
+                        const auto *const py = fi->space()->points()->data()[1];
+                        const auto *const pz = fi->space()->points()->data()[2];
+
+                        const ptrdiff_t     ndc = nn * N_FIELDS;
+                        std::vector<real_t> v((size_t)ndc, 0), y((size_t)ndc, 0);
+                        for (ptrdiff_t n = 0; n < nn; ++n)
+                            for (int c = 0; c < N_FIELDS; ++c)
+                                v[(size_t)(n * N_FIELDS + c)] =
+                                        (real_t)std::sin(1.7 * (double)px[n] + 2.3 * (double)py[n] +
+                                                         1.1 * (double)pz[n] + 0.5 * c + 0.9);
+                        fi->apply_zero_constraints(v.data());
+                        a_c->apply(v.data(), y.data());
+
+                        const bool dd = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
+                        const ptrdiff_t nown = dd ? cm->distributed()->n_nodes_owned() : nn;
+
+                        cvfem::Domain dom;
+                        dom.comm    = cm ? cm->comm() : nullptr;
+                        dom.n_owned = nown * N_FIELDS;
+                        dom.n_local = ndc;
+
+                        long double plain = 0, wsum = 0, absum = 0;
+                        for (ptrdiff_t n = 0; n < nown && n < nn; ++n) {
+                            const long double gid =
+                                    dd ? (long double)cm->distributed()->node_mapping()->data()[n]
+                                       : (long double)n;
+                            for (int c = 0; c < N_FIELDS; ++c) {
+                                const long double e = (long double)y[(size_t)(n * N_FIELDS + c)];
+                                plain += e;
+                                wsum += e * (gid * (long double)N_FIELDS + (long double)c);
+                                absum += e < 0 ? -e : e;
+                            }
+                        }
+
+                        const double ap = cvfem::sum_kahan(dom, plain);
+                        const double aw = cvfem::sum_kahan(dom, wsum);
+                        const double aa = cvfem::sum_kahan(dom, absum);
+                        const double an = cvfem::sum_kahan(dom, (long double)nown);
+                        if (dom.is_root())
+                            std::printf("applysum level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g  abs %.17g\n",
+                                        i, an, ap, aw, aa);
                     }
 
                     // Cross-check against the construction it replaces (SFEM_GMG_CHECK).
@@ -3092,9 +3395,116 @@ private:
                                                                    sfem::EXECUTION_SPACE_HOST);
                 }
 
+                // SFEM_SMOOTHER_APPLY_SUM=1: is the smoother the cycle actually uses the same
+                // operator however the domain was cut?
+                //
+                // Measured on the smoother AS WRAPPED, because that is what the cycle calls.
+                // Everything upstream of it has been cleared: the linearisation state is
+                // identical at 1, 2, 4 and 8 ranks (gmgstate level 0 sum 81, free_abs 0), the
+                // patch multiplicity weights are complete on owned nodes because they are
+                // accumulated over the local macro array including the aura, and the wrapper
+                // above gathers GhostsAndAura in place before the inner apply. Yet Vanka still
+                // took 6 / 6 / 6 / 8 / 10 / 14 linear iterations at 1 / 2 / 4 / 5 / 6 / 8 with
+                // the coarse correction contributing nothing at all.
+                //
+                // So rather than guess at a fifth cause, this measures the object directly, the
+                // way the coarse operator and its diagonal were measured: a direction defined by
+                // POSITION so every rank count probes the same vector, the output summed over
+                // the OWNED range and reduced, plain and weighted by global id and in absolute
+                // value. If this moves with the rank count the smoother's apply is provably not
+                // invariant and the bisection continues inside it; if it does not, the smoother
+                // is exonerated and the difference lives elsewhere in the cycle.
+                if (smesh::Env::read<int>("SFEM_SMOOTHER_APPLY_SUM", 0) && prec_op) {
+                    auto              sp  = fi->space();
+                    auto              cm  = sp->mesh_ptr();
+                    const auto *const px  = sp->points()->data()[0];
+                    const auto *const py  = sp->points()->data()[1];
+                    const auto *const pz  = sp->points()->data()[2];
+                    const ptrdiff_t   ndl = sp->n_dofs();
+                    const ptrdiff_t   nnl = ndl / N_FIELDS;
+
+                    std::vector<real_t> v((size_t)ndl, 0), y((size_t)ndl, 0);
+                    for (ptrdiff_t n = 0; n < nnl; ++n)
+                        for (int c = 0; c < N_FIELDS; ++c)
+                            v[(size_t)(n * N_FIELDS + c)] =
+                                    (real_t)std::sin(1.3 * (double)px[n] + 2.7 * (double)py[n] +
+                                                     1.9 * (double)pz[n] + 0.8 * c + 0.2);
+                    fi->apply_zero_constraints(v.data());
+                    prec_op->apply(v.data(), y.data());
+
+                    const bool dd = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
+                    const ptrdiff_t nown = dd ? cm->distributed()->n_nodes_owned() : nnl;
+
+                    cvfem::Domain dom;
+                    dom.comm    = cm ? cm->comm() : nullptr;
+                    dom.n_owned = nown * N_FIELDS;
+                    dom.n_local = ndl;
+
+                    long double plain = 0, wsum = 0, absum = 0;
+                    for (ptrdiff_t n = 0; n < nown && n < nnl; ++n) {
+                        const long double gid =
+                                dd ? (long double)cm->distributed()->node_mapping()->data()[n]
+                                   : (long double)n;
+                        for (int c = 0; c < N_FIELDS; ++c) {
+                            const long double e = (long double)y[(size_t)(n * N_FIELDS + c)];
+                            plain += e;
+                            wsum += e * (gid * (long double)N_FIELDS + (long double)c);
+                            absum += e < 0 ? -e : e;
+                        }
+                    }
+
+                    const double mp = cvfem::sum_kahan(dom, plain);
+                    const double mw = cvfem::sum_kahan(dom, wsum);
+                    const double ma = cvfem::sum_kahan(dom, absum);
+                    const double mn = cvfem::sum_kahan(dom, (long double)nown);
+                    if (dom.is_root())
+                        std::printf("smoothsum level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g  abs %.17g\n",
+                                    i, mn, mp, mw, ma);
+                }
+
+                // A SMOOTHED level needs the parallel face, and needs its input gathered.
+                //
+                // Multigrid asks for ParallelOperator by dynamic_pointer_cast. When the cast
+                // fails, level_owned falls back to smoother_[l]->rows() -- the LOCAL dof count,
+                // not the owned one -- and reduce_norm2 skips its allreduce in the same branch.
+                // A smoothed level then forms rhs - A x across its ghost entries and takes a
+                // per-rank partial for its residual norm.
+                //
+                // Level 0 carries the face already, because create_linear_operator hands back a
+                // ParallelMatrixFreeOperator. The coarser levels do not: with
+                // SFEM_GMG_GALERKIN=2 this loop replaces g.ops[i] with the element-matrix or
+                // assembled form, and make_em_operator returns a plain make_op while
+                // level_to_bsr returns a plain h_bsr_spmv. Measured at four levels, two ranks
+                // before this wrap: level 0 reported op_rows 10404 against true_owned 10404,
+                // while level 1 reported 2916 against 1620 and level 2 reported 500 against 300.
+                //
+                // create_parallel_preconditioner is exactly the object needed and already
+                // exists: make_parallel_op(comm, owned, owned, local, local, fn) whose fn
+                // gathers GhostsAndAura before applying. It supplies both halves at once -- the
+                // face Multigrid casts for, and the gather the apply needs -- so this reuses it
+                // rather than adding a second way to say the same thing.
+                //
+                // Built BEFORE the smoother, because the smoother is the other consumer: a
+                // stationary sweep is x += M^-1 (b - A x), and with a raw A that never gathers
+                // its input the residual is wrong at exactly the owned rows that depend on
+                // ghost values. Giving the level the face while leaving the smoother on the raw
+                // operator fixes the cycle's bookkeeping and leaves the sweep itself wrong.
+                //
+                // Only when the face is missing, so level 0 is not double wrapped and does not
+                // gather twice. The RAW lop stays in level_op_below, because the next level's
+                // Galerkin assembly consumes it as A_above and must not see the wrapper.
+                auto mg_op = lop;
+                {
+                    auto       me   = fi->space()->mesh_ptr();
+                    const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
+                    if (dist && !std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lop))
+                        mg_op = sfem::create_parallel_preconditioner(lop, fi->space(),
+                                                                     sfem::EXECUTION_SPACE_HOST);
+                }
+
                 std::shared_ptr<sfem::MatrixFreeLinearSolver<real_t>> sm;
                 if (ksmooth > 0) {
-                    auto ks = sfem::create_bcgs<real_t>(lop, sfem::EXECUTION_SPACE_HOST);
+                    auto ks = sfem::create_bcgs<real_t>(mg_op, sfem::EXECUTION_SPACE_HOST);
                     ks->set_max_it(ksmooth);
                     ks->set_rtol(1e-12);
                     ks->set_atol(1e-30);
@@ -3102,15 +3512,68 @@ private:
                     ks->set_preconditioner_op(prec_op);
                     sm = ks;
                 } else {
-                    auto st = sfem::create_stationary<real_t>(lop, prec_op, sfem::EXECUTION_SPACE_HOST);
+                    // mg_op, not lop: this is the branch that actually runs, since
+                    // SFEM_GMG_KSMOOTH defaults to 0. A stationary sweep is
+                    // x += M^-1 (b - A x), so an A that never gathers its input makes the
+                    // residual wrong at exactly the owned rows that depend on ghost values.
+                    auto st = sfem::create_stationary<real_t>(mg_op, prec_op, sfem::EXECUTION_SPACE_HOST);
                     st->set_max_it(g.smoothing_steps);
                     sm = st;
                 }
                 auto sm_unused = sm;
                 level_op_below = lop;
                 const ptrdiff_t nd_lvl = fi->space()->n_dofs();
-                g.mg->add_level(timed("op[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, lop)),
-                                timed("smooth[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, sm)),
+                // A SMOOTHED level needs the parallel face, and needs its input gathered.
+                //
+                // Multigrid asks for ParallelOperator by dynamic_pointer_cast. When the cast
+                // fails, level_owned falls back to smoother_[l]->rows() -- the LOCAL dof count,
+                // not the owned one -- and reduce_norm2 skips its allreduce in the same branch.
+                // A smoothed level then forms rhs - A x across its ghost entries and takes a
+                // per-rank partial for its residual norm.
+                //
+                // Level 0 carries the face already, because create_linear_operator hands back a
+                // ParallelMatrixFreeOperator. The coarser levels do not: with
+                // SFEM_GMG_GALERKIN=2 this loop replaces g.ops[i] with the element-matrix or
+                // assembled form, and make_em_operator returns a plain make_op while
+                // level_to_bsr returns a plain h_bsr_spmv. Measured at four levels, two ranks:
+                // level 0 reports op_rows 10404 against true_owned 10404, while level 1 reports
+                // 2916 against 1620 and level 2 reports 500 against 300.
+                //
+                auto lvl_op = timed("op[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, mg_op));
+                auto lvl_sm = timed("smooth[L" + std::to_string(i) + "]", thread_clamped(nd_lvl, sm));
+
+                // SFEM_GMG_FACE_CHECK=1: does this level's operator carry the ParallelOperator
+                // face Multigrid casts for?
+                //
+                // Multigrid::level_owned falls back to smoother_[l]->rows() when the cast
+                // fails, and that is the LOCAL dof count, not the owned one; reduce_norm2 skips
+                // its allreduce in the same branch. A level that is SMOOTHED then forms
+                // rhs - A x over its ghost entries as well and takes a per-rank partial for its
+                // residual norm. A level that is SOLVED does not care, because the coarse solve
+                // fills the whole local range by design.
+                //
+                // That asymmetry is why a two-level hierarchy shows nothing -- its only coarse
+                // level is solved -- while a four-level one drifts, and why the drift is
+                // identical for block-Jacobi and Vanka and disappears with SFEM_GMG_CGC=0.
+                //
+                // timed() and thread_clamped() both preserve a face when there is one, so this
+                // reports on what add_level actually receives.
+                if (smesh::Env::read<int>("SFEM_GMG_FACE_CHECK", 0)) {
+                    auto       pop  = std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lvl_op);
+                    const bool face = pop && pop->comm() && pop->comm()->size() > 1;
+                    auto       me   = fi->space()->mesh_ptr();
+                    const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
+                    if (!dist || me->comm()->rank() == 0)
+                        std::printf(
+                                "gmgface level %d: parallel_face %d  op_rows %td  smoother_rows %td  "
+                                "level_owned_would_be %td  true_owned %td  n_local %td\n",
+                                i, face ? 1 : 0, lvl_op->rows(), lvl_sm->rows(),
+                                face ? lvl_op->rows() : lvl_sm->rows(),
+                                fi->space()->n_owned_dofs(), fi->space()->n_dofs());
+                }
+
+                g.mg->add_level(lvl_op,
+                                lvl_sm,
                                 i == 0 ? nullptr : timed("prolong[L" + std::to_string(i) + "->" + std::to_string(i - 1) + "]", wrap_p(i)),
                                 timed("restrict[L" + std::to_string(i) + "->" + std::to_string(i + 1) + "]", g.data->restrictions[i]));
             } else {
@@ -3177,6 +3640,71 @@ private:
                                 by_comp[0], by_comp[1], by_comp[2], by_comp[3]);
                     }
 
+                    // SFEM_GMG_SOLVE_OWNED_SUM=1: does the coarse SOLVE return the same
+                    // correction however the domain was cut?
+                    //
+                    // This is the last object in the two-level correction that has never been
+                    // validly measured. The coarse operator's action, its block diagonal and
+                    // the transfer adjoint all match serial to sixteen figures at one, two,
+                    // four and eight ranks, while the one-step reproducer still takes 5 linear
+                    // iterations at one and four ranks against 18 at eight -- so what the solve
+                    // hands back is what is left to look at.
+                    //
+                    // The comparison directly below drives both factorisations with
+                    // sin(0.61 k) over the LOCAL dof index. That is a different vector on every
+                    // rank, so it has never measured anything under MPI; its serial 0.0 against
+                    // 4.8e-01 and 7.3e-01 at two ranks was the probe breaking, not the solve.
+                    //
+                    // Here the right-hand side is a function of POSITION, so every rank count
+                    // solves the same system, and the answer is summed over the OWNED range and
+                    // reduced. It works on both paths without distinguishing them: the global
+                    // factorisation that allgathers and the serial dense one are the same
+                    // object to this probe, which is what makes 1 and 8 comparable at all.
+                    if (smesh::Env::read<int>("SFEM_GMG_SOLVE_OWNED_SUM", 0) && lu) {
+                        auto              cm  = fi->space()->mesh_ptr();
+                        const auto *const px  = fi->space()->points()->data()[0];
+                        const auto *const py  = fi->space()->points()->data()[1];
+                        const auto *const pz  = fi->space()->points()->data()[2];
+                        const ptrdiff_t   ncn = nd_coarse / N_FIELDS;
+
+                        std::vector<real_t> b((size_t)nd_coarse, 0), x((size_t)nd_coarse, 0);
+                        for (ptrdiff_t n = 0; n < ncn; ++n)
+                            for (int c = 0; c < N_FIELDS; ++c)
+                                b[(size_t)(n * N_FIELDS + c)] =
+                                        (real_t)std::sin(2.9 * (double)px[n] + 1.3 * (double)py[n] +
+                                                         2.1 * (double)pz[n] + 0.7 * c + 0.4);
+                        lu->apply(b.data(), x.data());
+
+                        const bool dd = cm && cm->is_distributed() && cm->comm() && cm->comm()->size() > 1;
+                        const ptrdiff_t nown = dd ? cm->distributed()->n_nodes_owned() : ncn;
+
+                        cvfem::Domain dom;
+                        dom.comm    = cm ? cm->comm() : nullptr;
+                        dom.n_owned = nown * N_FIELDS;
+                        dom.n_local = nd_coarse;
+
+                        long double plain = 0, wsum = 0, absum = 0;
+                        for (ptrdiff_t n = 0; n < nown && n < ncn; ++n) {
+                            const long double gid =
+                                    dd ? (long double)cm->distributed()->node_mapping()->data()[n]
+                                       : (long double)n;
+                            for (int c = 0; c < N_FIELDS; ++c) {
+                                const long double e = (long double)x[(size_t)(n * N_FIELDS + c)];
+                                plain += e;
+                                wsum += e * (gid * (long double)N_FIELDS + (long double)c);
+                                absum += e < 0 ? -e : e;
+                            }
+                        }
+
+                        const double sp = cvfem::sum_kahan(dom, plain);
+                        const double sw = cvfem::sum_kahan(dom, wsum);
+                        const double sa = cvfem::sum_kahan(dom, absum);
+                        const double sn = cvfem::sum_kahan(dom, (long double)nown);
+                        if (dom.is_root())
+                            std::printf("solvesum level %d: owned_nodes %.0f  sum %.17g  gidsum %.17g  abs %.17g\n",
+                                        i, sn, sp, sw, sa);
+                    }
+
                     if (smesh::Env::read<int>("SFEM_GMG_CHECK", 0) && g.Amat[(size_t)i]) {
                         // The two densifications must agree: same operator, read two ways.
                         auto                ref = make_dense_lu(lop, nd_coarse);
@@ -3196,7 +3724,30 @@ private:
                         std::printf("coarse LU: assembled vs probed, rel = %.4e over %td dofs  %s\n", rel,
                                     nd_coarse, rel < 1e-10 ? "OK" : "MISMATCH");
                     }
-                    g.mg->add_level(timed("op[coarsest]", lop), timed("coarse_solve", lu),
+                    // The coarsest level gets the face too, for the diagnostics rather than for
+                    // the solve.
+                    //
+                    // Without it, level_owned(coarsest) falls back to smoother_[l]->rows(), and
+                    // GlobalDenseLU::rows() is deliberately the LOCAL size, so the debug
+                    // residual || r_H || is formed over ghost rows of a BSR whose ghost rows are
+                    // incomplete, and reduce_norm2 skips its allreduce for want of the face.
+                    // That reads as a broken coarse solve when nothing is broken: under
+                    // block-Jacobi at four levels, where the iteration count is flat at 43 on
+                    // one rank and eight, || r_H || still reported 8.0e-17 against 5.1e-03.
+                    //
+                    // The solve itself is unaffected either way: the cycle zeroes the whole
+                    // buffer and the factorisation fills the entire local range, and
+                    // create_parallel_preconditioner reports row/col allocation sizes equal to
+                    // the local length, so level_alloc is unchanged.
+                    auto coarse_mg_op = lop;
+                    {
+                        auto       me   = fi->space()->mesh_ptr();
+                        const bool dist = me && me->is_distributed() && me->comm() && me->comm()->size() > 1;
+                        if (dist && !std::dynamic_pointer_cast<sfem::ParallelOperator<real_t>>(lop))
+                            coarse_mg_op = sfem::create_parallel_preconditioner(lop, fi->space(),
+                                                                                sfem::EXECUTION_SPACE_HOST);
+                    }
+                    g.mg->add_level(timed("op[coarsest]", coarse_mg_op), timed("coarse_solve", lu),
                                     timed("prolong[L" + std::to_string(i) + "->" + std::to_string(i - 1) + "]", wrap_p(i)), nullptr);
                     continue;
                 }
@@ -6581,7 +7132,19 @@ int main(int argc, char **argv) {
                         g_vanka_cached   = cvfem_ss::make_diagonal_vanka(*op, f->space(), x, cb.data(), om);
                         phase_add("vanka_setup", smesh::time_seconds() - t_v);
                     }
-                    set_prec(timed("precond_total", g_vanka_cached));
+                    // The same gather the multigrid fine level does, for the same reason.
+                    //
+                    // A patch reads every node of its macro-element, and on a cut mesh some of
+                    // those are ghost or aura nodes carrying only the partial values a
+                    // distributed apply leaves behind, so the patch solve is built on values
+                    // that are not the residual. The multigrid branch wraps for exactly this
+                    // and says so; this branch never did, which is why no-multigrid Vanka grew
+                    // 434 / 443 / 509 / 535 at 1 / 2 / 4 / 8 ranks while block-Jacobi on the
+                    // same path stayed at 812 / 812 / 812 / 811 -- block-Jacobi reads only its
+                    // own row and never touches the slots that were wrong.
+                    set_prec(timed("precond_total",
+                                   sfem::create_parallel_preconditioner(g_vanka_cached, f->space(),
+                                                                        sfem::EXECUTION_SPACE_HOST)));
                 } else {
                     if (pc != "bjacobi") {
                         std::fprintf(stderr, "SFEM_PRECOND='%s' is not one of bjacobi|simple|vanka|direct\n",
