@@ -42,7 +42,7 @@ def dtype_from_path(path, default=None):
 
 
 def typed_raw_name(stem, dtype):
-    return f"{stem}.{dtype_name(dtype)}.raw"
+    return f"{stem}.{dtype_name(dtype)}"
 
 
 def write_raw(path, values, dtype=None, require_finite=False):

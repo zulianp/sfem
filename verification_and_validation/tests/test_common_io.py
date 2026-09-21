@@ -65,8 +65,8 @@ class MeshIOTests(unittest.TestCase):
 
             self.assertEqual("TRI3", metadata["element_type"])
             self.assertEqual(mesh.n_points, metadata["n_points"])
-            self.assertTrue((folder / "x.float32.raw").is_file())
-            self.assertTrue((folder / "i0.int32.raw").is_file())
+            self.assertTrue((folder / "x.float32").is_file())
+            self.assertTrue((folder / "i0.int32").is_file())
             np.testing.assert_allclose(mesh.points, loaded.points, atol=1.0e-7)
             np.testing.assert_array_equal(mesh.elements, loaded.elements)
 

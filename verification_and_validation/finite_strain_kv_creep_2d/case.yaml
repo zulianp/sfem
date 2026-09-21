@@ -42,7 +42,7 @@ variants:
     resolution: {nx: 4, ny: 2, viscosity: shear}
     driver: &driver
       executable: "{python}"
-      arguments: ["{suite_dir}/common/run_kv_creep.py", --case, "{resolved_case}", --driver, "{build_dir}/mooney_rivlin_kelvin_voigt_newmark", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --neumann, "{output}/neumann.yaml", --output, "{output}/solution"]
+      arguments: ["{suite_dir}/common/run_kv_creep.py", --case, "{resolved_case}", --driver, "{build_dir}/mooney_rivlin_kelvin_voigt", --mesh, "{mesh}", --dirichlet, "{output}/dirichlet.yaml", --neumann, "{output}/neumann.yaml", --output, "{output}/solution"]
       environment: &environment
         OMP_NUM_THREADS: 1
         SFEM_MU: "{material_mu}"
