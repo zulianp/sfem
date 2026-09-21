@@ -10654,17 +10654,49 @@ def _sfem_soa_element_api_block_call(
     output_arg,
     use_shared_weak_local,
 ):
-    block_name = "%s_%s_block" % (local_prefix, form.name)
+    # A lowest-order simplex has a kernel of its own: the basis gradients are
+    # constant over the cell, so they are folded into the body and there is no
+    # reference gradient to read.  `_local_header` has selected it at the mesh
+    # entry points for a long time; this call site never asked, so every P1
+    # element header went through the generic `NQ`-templated kernel and carried
+    # the reference tables to it -- the quadrature loop had been removed from
+    # the header while all of its data was still being passed one level down.
+    #
+    # A comprehension rather than an `if`: which kernel exists for this element
+    # is a fact to be walked, and emission printing a test on it is what the
+    # printer discipline forbids.
+    specialized = [
+        candidate
+        for candidate in (
+            _constant_p1_specialized_local_prefix(local_prefix, quadrature_rule),
+        )
+        if candidate is not None and form.weak_form is not None
+    ]
+    block_name = "%s_%s_block" % ((specialized or [local_prefix])[0], form.name)
+    reference_args = [
+        args
+        for args in (
+            _sfem_soa_element_api_reference_args(
+                prefix,
+                quadrature_rule,
+                use_tensor_product_reference,
+                use_reference_gradient_vectors,
+            ),
+        )
+        if not specialized
+    ]
+    # The expanded kernel still integrates, so it keeps the weight and nothing
+    # else.  Folding that constant too is the next step and belongs with the
+    # kernel, not here.
+    specialized_reference_args = [
+        (quadrature_reference_accessor(quadrature_rule, "q_weight"),)
+        for _ in specialized
+    ]
     args = [
         "ne",
         "VS",
         *_sfem_soa_element_api_geometry_args(dim),
-        *_sfem_soa_element_api_reference_args(
-            prefix,
-            quadrature_rule,
-            use_tensor_product_reference,
-            use_reference_gradient_vectors,
-        ),
+        *(reference_args + specialized_reference_args)[0],
         *form_material_parameter_names(form),
     ]
     args.extend(
