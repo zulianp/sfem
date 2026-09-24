@@ -2035,20 +2035,16 @@ def _tensor_weak_per_shape_tail(
             for i in range(weak_form.n_field_components * dim)
         ),
     )
-    lines.append("      s_t loperand[%d];" % (n_field_components * dim))
     _append_transformed_loperand_lines(
         lines,
         material,
         dim,
         "weak_mat_tmp",
         geometry_value,
+        scalar_temporaries=True,
+        destination=lambda index: "loperand%d[%s] =" % (index, work_item),
+        indent="      ",
     )
-    for row in range(n_field_components):
-        for col in range(dim):
-            lines.append(
-                "      loperand%d[%s] = loperand[%d];"
-                % (row * dim + col, work_item, row * dim + col)
-            )
     lines.extend(["    }", "  }"])
     for row in range(n_field_components):
         lines.append(
@@ -3014,6 +3010,14 @@ def _append_sfem_soa_weak_form_lines(
     )
 
 
+#: Where a loperand component lands, when the caller does not say.  A scalar
+#: when the body keeps it in a register, an array slot when it does not.
+_LOPERAND_TARGET = {
+    True: lambda index: "const s_t loperand%d =" % index,
+    False: lambda index: "loperand[%d] =" % index,
+}
+
+
 def _append_transformed_loperand_lines(
     lines,
     material,
@@ -3021,6 +3025,8 @@ def _append_transformed_loperand_lines(
     temporary_prefix,
     geometry_value,
     scalar_temporaries=False,
+    destination=None,
+    indent="    ",
 ):
     material_exprs = tuple(material)
     # The flux has one row per field component and one column per direction, so
@@ -3036,6 +3042,10 @@ def _append_transformed_loperand_lines(
         material_names = ["material[%d] =" % i for i in range(n_material)]
         lines.append("    s_t material[%d];" % n_material)
     _append_cse_array_assignments(lines, material_exprs, material_names, temporary_prefix)
+    # Where each component goes is the caller's to say.  A caller that stores
+    # them straight into its per-lane buffers names those buffers here, instead
+    # of taking delivery in a scratch array and copying it out a slot at a time.
+    target = destination or _LOPERAND_TARGET[bool(scalar_temporaries)]
     for row in range(n_field_components):
         for col in range(dim):
             terms = [
@@ -3048,16 +3058,10 @@ def _append_transformed_loperand_lines(
                 )
                 for k in range(dim)
             ]
-            if scalar_temporaries:
-                lines.append(
-                    "    const s_t loperand%d = qw * (%s);"
-                    % (row * dim + col, " + ".join(terms))
-                )
-            else:
-                lines.append(
-                    "    loperand[%d] = qw * (%s);"
-                    % (row * dim + col, " + ".join(terms))
-                )
+            lines.append(
+                "%s%s qw * (%s);"
+                % (indent, target(row * dim + col), " + ".join(terms))
+            )
 
 
 def _weak_form_deformation_gradient_substitutions(
