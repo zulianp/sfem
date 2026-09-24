@@ -65,8 +65,6 @@ static int laplace_total_tet4_merit_patch(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const g_t *const *const RSTR points,
-    const s_t *const RSTR grad_ref[3],
-    const s_t *const RSTR q_weight,
     const s_t kappa,
     const int nsteps,
     const s_t *const RSTR steps,
@@ -154,14 +152,7 @@ static int laplace_total_tet4_merit_patch(
             // is linear and does not depend on the step length.
             for (int c = 0; c < NC; ++c) {
               for (int d = 0; d < ND; ++d) {
-                s_t mapped = s_t(0);
-                for (int k = 0; k < ND; ++k) {
-                  s_t acc = s_t(0);
-                  for (int j = 0; j < NS; ++j) {
-                    acc += state[j * NC + c] * grad_ref[k][j];
-                  }
-                  mapped += acc * adj[k * ND + d];
-                }
+                const s_t mapped = (-state[0 * NC + c] + state[1 * NC + c]) * adj[0 * ND + d] + (-state[0 * NC + c] + state[2 * NC + c]) * adj[1 * ND + d] + (-state[0 * NC + c] + state[3 * NC + c]) * adj[2 * ND + d];
                 pm_state_grad[(c * ND + d) * VS + lane] = mapped / det;
               }
             }
@@ -170,14 +161,7 @@ static int laplace_total_tet4_merit_patch(
             // is linear and does not depend on the step length.
             for (int c = 0; c < NC; ++c) {
               for (int d = 0; d < ND; ++d) {
-                s_t mapped = s_t(0);
-                for (int k = 0; k < ND; ++k) {
-                  s_t acc = s_t(0);
-                  for (int j = 0; j < NS; ++j) {
-                    acc += direction[j * NC + c] * grad_ref[k][j];
-                  }
-                  mapped += acc * adj[k * ND + d];
-                }
+                const s_t mapped = (-direction[0 * NC + c] + direction[1 * NC + c]) * adj[0 * ND + d] + (-direction[0 * NC + c] + direction[2 * NC + c]) * adj[1 * ND + d] + (-direction[0 * NC + c] + direction[3 * NC + c]) * adj[2 * ND + d];
                 pm_direction_grad[(c * ND + d) * VS + lane] = mapped / det;
               }
             }
@@ -186,13 +170,10 @@ static int laplace_total_tet4_merit_patch(
             // `phi_0` is the same function in every element and at
             // every step, so this leaves the step loop entirely.
             for (int d = 0; d < ND; ++d) {
-              s_t mapped = s_t(0);
-              for (int k = 0; k < ND; ++k) {
-                mapped += grad_ref[k][0] * adj[k * ND + d];
-              }
+              const s_t mapped = s_t(-1) * adj[0 * ND + d] + s_t(-1) * adj[1 * ND + d] + s_t(-1) * adj[2 * ND + d];
               pm_test_grad[(d) * VS + lane] = mapped / det;
             }
-            pm_weight[lane] = q_weight[0] * det;
+            pm_weight[lane] = (s_t(1) / s_t(6)) * det;
           }
         }
         // loop 2 -- lanes are the sampled step lengths.
@@ -244,8 +225,6 @@ extern "C" int laplace_total_tet4_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR grad_ref[3],
-    const void *const RSTR q_weight,
     const real_t kappa,
     const int nsteps,
     const void *const RSTR steps,
@@ -256,10 +235,10 @@ extern "C" int laplace_total_tet4_merit_patch_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::laplace_total_tet4_merit_patch<double, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *const *)grad_ref, (const double *)q_weight, kappa, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)accumulator, (double *)merit);
+        return sfem::codegen::laplace_total_tet4_merit_patch<double, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, kappa, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)accumulator, (double *)merit);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::laplace_total_tet4_merit_patch<float, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *const *)grad_ref, (const float *)q_weight, kappa, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)accumulator, (float *)merit);
+        return sfem::codegen::laplace_total_tet4_merit_patch<float, geom_t, 1, 4, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, kappa, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)accumulator, (float *)merit);
     }
     default:
       break;

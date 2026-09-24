@@ -17,8 +17,6 @@ extern "C" int laplace_total_tri3_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR grad_ref[2],
-    const void *const RSTR q_weight,
     const real_t kappa,
     const int nsteps,
     const void *const RSTR steps,
@@ -35,8 +33,6 @@ extern "C" int laplace_total_tet4_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR grad_ref[3],
-    const void *const RSTR q_weight,
     const real_t kappa,
     const int nsteps,
     const void *const RSTR steps,
@@ -55,8 +51,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_total_merit_patch_2d_a_msoa(
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR grad_ref[2],
-        const void *const RSTR q_weight,
         const real_t kappa,
         const int nsteps,
         const void *const RSTR steps,
@@ -71,7 +65,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_total_merit_patch_2d_a_msoa(
           : real_type;
   switch (element_type) {
     case smesh::TRI3:
-      return laplace_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, grad_ref, q_weight, kappa, nsteps, steps, x, h, accumulator, merit);
+      return laplace_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, kappa, nsteps, steps, x, h, accumulator, merit);
     default:
       break;
   }
@@ -88,8 +82,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_total_merit_patch_3d_a_msoa(
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR grad_ref[3],
-        const void *const RSTR q_weight,
         const real_t kappa,
         const int nsteps,
         const void *const RSTR steps,
@@ -104,7 +96,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int laplace_total_merit_patch_3d_a_msoa(
           : real_type;
   switch (element_type) {
     case smesh::TET4:
-      return laplace_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, grad_ref, q_weight, kappa, nsteps, steps, x, h, accumulator, merit);
+      return laplace_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, kappa, nsteps, steps, x, h, accumulator, merit);
     default:
       break;
   }

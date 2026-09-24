@@ -65,8 +65,6 @@ static int body_force_total_tri3_merit_patch(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const g_t *const *const RSTR points,
-    const s_t *const RSTR shape,
-    const s_t *const RSTR q_weight,
     const s_t density,
     const s_t g0,
     const s_t g1,
@@ -88,7 +86,6 @@ static int body_force_total_tri3_merit_patch(
     s_t merit_local[VS];
     for (int lane = 0; lane < VS; ++lane) merit_local[lane] = s_t(0);
     s_t rho[NC * VS];
-    s_t pm_test[1 * VS];
     s_t pm_weight[1 * VS];
     element_idx_t pm_incident[VS];
     uint8_t pm_local_node[VS];
@@ -148,8 +145,7 @@ static int body_force_total_tri3_merit_patch(
             // integration weight.  Both are what the orientation buys:
             // `phi_0` is the same function in every element and at
             // every step, so this leaves the step loop entirely.
-            pm_test[lane] = shape[0];
-            pm_weight[lane] = q_weight[0] * det;
+            pm_weight[lane] = (s_t(1) / s_t(2)) * det;
           }
         }
         // loop 2 -- lanes are the sampled step lengths.
@@ -160,8 +156,8 @@ static int body_force_total_tri3_merit_patch(
               const s_t value_coeff0 = -density*g0;
               const s_t value_coeff1 = -density*g1;
               const s_t weight = pm_weight[lane_e];
-              rho[0 * VS + lane] += weight * (value_coeff0 * pm_test[lane_e]);
-              rho[1 * VS + lane] += weight * (value_coeff1 * pm_test[lane_e]);
+              rho[0 * VS + lane] += weight * (value_coeff0 * (s_t(1) / s_t(3)));
+              rho[1 * VS + lane] += weight * (value_coeff1 * (s_t(1) / s_t(3)));
             }
           }
         }
@@ -198,8 +194,6 @@ extern "C" int body_force_total_tri3_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR shape,
-    const void *const RSTR q_weight,
     const real_t density,
     const real_t g0,
     const real_t g1,
@@ -212,10 +206,10 @@ extern "C" int body_force_total_tri3_merit_patch_a_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::body_force_total_tri3_merit_patch<double, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const double *)shape, (const double *)q_weight, density, g0, g1, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)accumulator, (double *)merit);
+        return sfem::codegen::body_force_total_tri3_merit_patch<double, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, nsteps, (const double *)steps, (const double *)x, (const double *)h, (const double *)accumulator, (double *)merit);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::body_force_total_tri3_merit_patch<float, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, (const float *)shape, (const float *)q_weight, density, g0, g1, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)accumulator, (float *)merit);
+        return sfem::codegen::body_force_total_tri3_merit_patch<float, geom_t, 1, 3, 16>(n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, nsteps, (const float *)steps, (const float *)x, (const float *)h, (const float *)accumulator, (float *)merit);
     }
     default:
       break;
