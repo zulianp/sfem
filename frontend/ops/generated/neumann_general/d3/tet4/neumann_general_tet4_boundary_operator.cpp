@@ -51,6 +51,15 @@ struct neumann_general_tet4_trishell3_boundary_residual_soa_reference_data {
     return data;
   }
 
+  static const s_t *weight() {
+    static const s_t data[3] = {
+      s_t(0.16666666666666666),
+      s_t(0.16666666666666666),
+      s_t(0.16666666666666666)
+    };
+    return data;
+  }
+
   static const s_t *grad() {
     static const s_t data[18] = {
       s_t(-1),
@@ -75,14 +84,6 @@ struct neumann_general_tet4_trishell3_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static const s_t *weight() {
-    static const s_t data[3] = {
-      s_t(0.16666666666666666),
-      s_t(0.16666666666666666),
-      s_t(0.16666666666666666)
-    };
-    return data;
-  }
 };
 
 template <typename s_t>
@@ -155,8 +156,8 @@ static SFEM_INLINE void neumann_general_tet4_trishell3_boundary_residual_soa_ele
     s_t element_vector[3][3]) {
   const s_t *const shape = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::shape();
   const s_t *const weight = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::weight();
-  const int n_shape = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NS;
   const int n_qp = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NQ;
+  const int n_shape = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NS;
 
 
 

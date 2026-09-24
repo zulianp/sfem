@@ -47,6 +47,14 @@ struct neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_
     return data;
   }
 
+  static __host__ __device__ __forceinline__ const s_t *weight() {
+    static const s_t data[2] = {
+      s_t(0.5),
+      s_t(0.5)
+    };
+    return data;
+  }
+
   static __host__ __device__ __forceinline__ const s_t *grad() {
     static const s_t data[4] = {
       s_t(-1),
@@ -57,13 +65,6 @@ struct neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_
     return data;
   }
 
-  static __host__ __device__ __forceinline__ const s_t *weight() {
-    static const s_t data[2] = {
-      s_t(0.5),
-      s_t(0.5)
-    };
-    return data;
-  }
 };
 
 template <typename s_t>
@@ -117,8 +118,8 @@ __host__ __device__ __forceinline__ void neumann_general_proteus_quad4_edgeshell
     s_t element_vector[2][2]) {
   const s_t *const shape = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::shape();
   const s_t *const weight = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::weight();
-  const int n_shape = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
   const int n_qp = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NQ;
+  const int n_shape = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
 
 
 

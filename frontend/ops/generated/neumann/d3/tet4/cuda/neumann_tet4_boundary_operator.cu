@@ -35,22 +35,6 @@ namespace codegen {
 template <typename s_t>
 struct neumann_tet4_trishell3_boundary_residual_soa_reference_data {
   static constexpr int NS = 3;
-  static constexpr int NQ = 3;
-
-  static __host__ __device__ __forceinline__ const s_t *shape() {
-    static const s_t data[9] = {
-      s_t(0.66666666666666674),
-      s_t(0.16666666666666666),
-      s_t(0.16666666666666666),
-      s_t(0.16666666666666671),
-      s_t(0.66666666666666663),
-      s_t(0.16666666666666666),
-      s_t(0.16666666666666674),
-      s_t(0.16666666666666666),
-      s_t(0.66666666666666663)
-    };
-    return data;
-  }
 
   static __host__ __device__ __forceinline__ const s_t *grad() {
     static const s_t data[18] = {
@@ -76,14 +60,6 @@ struct neumann_tet4_trishell3_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static __host__ __device__ __forceinline__ const s_t *weight() {
-    static const s_t data[3] = {
-      s_t(0.16666666666666666),
-      s_t(0.16666666666666666),
-      s_t(0.16666666666666666)
-    };
-    return data;
-  }
 };
 
 template <typename s_t>
@@ -154,22 +130,16 @@ __host__ __device__ __forceinline__ void neumann_tet4_trishell3_boundary_residua
     const idx_t *const RSTR ev,
     const geom_t *const *const RSTR points, const s_t t0, const s_t t1, const s_t t2,
     s_t element_vector[3][3]) {
-  const s_t *const shape = neumann_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::shape();
-  const s_t *const weight = neumann_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::weight();
   const int n_shape = neumann_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NS;
-  const int n_qp = neumann_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NQ;
 
     const s_t coeff0 = -t0;
     const s_t coeff1 = -t1;
     const s_t coeff2 = -t2;
 
-  for (int q = 0; q < n_qp; ++q) {
-    const s_t dS = neumann_tet4_trishell3_boundary_residual_soa_measure<s_t>(q, ev, points);
-    const s_t qw = weight[q] * dS;
-
+  {
+    const s_t test = (s_t(1) / s_t(6)) * neumann_tet4_trishell3_boundary_residual_soa_measure<s_t>(0, ev, points);
 
     for (int i = 0; i < n_shape; ++i) {
-      const s_t test = shape[q * n_shape + i] * qw;
         element_vector[0][i] += coeff0 * test;
         element_vector[1][i] += coeff1 * test;
         element_vector[2][i] += coeff2 * test;

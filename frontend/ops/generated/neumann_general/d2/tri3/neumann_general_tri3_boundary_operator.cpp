@@ -46,6 +46,14 @@ struct neumann_general_tri3_edgeshell2_boundary_residual_soa_reference_data {
     return data;
   }
 
+  static const s_t *weight() {
+    static const s_t data[2] = {
+      s_t(0.5),
+      s_t(0.5)
+    };
+    return data;
+  }
+
   static const s_t *grad() {
     static const s_t data[4] = {
       s_t(-1),
@@ -56,13 +64,6 @@ struct neumann_general_tri3_edgeshell2_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static const s_t *weight() {
-    static const s_t data[2] = {
-      s_t(0.5),
-      s_t(0.5)
-    };
-    return data;
-  }
 };
 
 template <typename s_t>
@@ -114,8 +115,8 @@ static SFEM_INLINE void neumann_general_tri3_edgeshell2_boundary_residual_soa_el
     s_t element_vector[2][2]) {
   const s_t *const shape = neumann_general_tri3_edgeshell2_boundary_residual_soa_reference_data<s_t>::shape();
   const s_t *const weight = neumann_general_tri3_edgeshell2_boundary_residual_soa_reference_data<s_t>::weight();
-  const int n_shape = neumann_general_tri3_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
   const int n_qp = neumann_general_tri3_edgeshell2_boundary_residual_soa_reference_data<s_t>::NQ;
+  const int n_shape = neumann_general_tri3_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
 
 
 

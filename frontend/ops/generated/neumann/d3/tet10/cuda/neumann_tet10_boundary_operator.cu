@@ -79,6 +79,18 @@ struct neumann_tet10_trishell6_boundary_residual_soa_reference_data {
     return data;
   }
 
+  static __host__ __device__ __forceinline__ const s_t *weight() {
+    static const s_t data[6] = {
+      s_t(0.11169079483900569),
+      s_t(0.11169079483900569),
+      s_t(0.11169079483900569),
+      s_t(0.054975871827660998),
+      s_t(0.054975871827660998),
+      s_t(0.054975871827660998)
+    };
+    return data;
+  }
+
   static __host__ __device__ __forceinline__ const s_t *grad() {
     static const s_t data[72] = {
       s_t(0.56758792732771912),
@@ -157,17 +169,6 @@ struct neumann_tet10_trishell6_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static __host__ __device__ __forceinline__ const s_t *weight() {
-    static const s_t data[6] = {
-      s_t(0.11169079483900569),
-      s_t(0.11169079483900569),
-      s_t(0.11169079483900569),
-      s_t(0.054975871827660998),
-      s_t(0.054975871827660998),
-      s_t(0.054975871827660998)
-    };
-    return data;
-  }
 };
 
 template <typename s_t>
@@ -252,8 +253,8 @@ __host__ __device__ __forceinline__ void neumann_tet10_trishell6_boundary_residu
     s_t element_vector[3][6]) {
   const s_t *const shape = neumann_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::shape();
   const s_t *const weight = neumann_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::weight();
-  const int n_shape = neumann_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::NS;
   const int n_qp = neumann_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::NQ;
+  const int n_shape = neumann_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::NS;
 
     const s_t coeff0 = -t0;
     const s_t coeff1 = -t1;
@@ -262,7 +263,6 @@ __host__ __device__ __forceinline__ void neumann_tet10_trishell6_boundary_residu
   for (int q = 0; q < n_qp; ++q) {
     const s_t dS = neumann_tet10_trishell6_boundary_residual_soa_measure<s_t>(q, ev, points);
     const s_t qw = weight[q] * dS;
-
 
     for (int i = 0; i < n_shape; ++i) {
       const s_t test = shape[q * n_shape + i] * qw;

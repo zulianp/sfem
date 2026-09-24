@@ -35,17 +35,6 @@ namespace codegen {
 template <typename s_t>
 struct neumann_quad4_edgeshell2_boundary_residual_soa_reference_data {
   static constexpr int NS = 2;
-  static constexpr int NQ = 2;
-
-  static __host__ __device__ __forceinline__ const s_t *shape() {
-    static const s_t data[4] = {
-      s_t(0.78867513459481287),
-      s_t(0.21132486540518708),
-      s_t(0.21132486540518713),
-      s_t(0.78867513459481287)
-    };
-    return data;
-  }
 
   static __host__ __device__ __forceinline__ const s_t *grad() {
     static const s_t data[4] = {
@@ -57,13 +46,6 @@ struct neumann_quad4_edgeshell2_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static __host__ __device__ __forceinline__ const s_t *weight() {
-    static const s_t data[2] = {
-      s_t(0.5),
-      s_t(0.5)
-    };
-    return data;
-  }
 };
 
 template <typename s_t>
@@ -115,21 +97,15 @@ __host__ __device__ __forceinline__ void neumann_quad4_edgeshell2_boundary_resid
     const idx_t *const RSTR ev,
     const geom_t *const *const RSTR points, const s_t t0, const s_t t1,
     s_t element_vector[2][2]) {
-  const s_t *const shape = neumann_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::shape();
-  const s_t *const weight = neumann_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::weight();
   const int n_shape = neumann_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
-  const int n_qp = neumann_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NQ;
 
     const s_t coeff0 = -t0;
     const s_t coeff1 = -t1;
 
-  for (int q = 0; q < n_qp; ++q) {
-    const s_t dS = neumann_quad4_edgeshell2_boundary_residual_soa_measure<s_t>(q, ev, points);
-    const s_t qw = weight[q] * dS;
-
+  {
+    const s_t test = (s_t(1) / s_t(2)) * neumann_quad4_edgeshell2_boundary_residual_soa_measure<s_t>(0, ev, points);
 
     for (int i = 0; i < n_shape; ++i) {
-      const s_t test = shape[q * n_shape + i] * qw;
         element_vector[0][i] += coeff0 * test;
         element_vector[1][i] += coeff1 * test;
     }
