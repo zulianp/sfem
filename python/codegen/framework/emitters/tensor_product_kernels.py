@@ -163,6 +163,45 @@ def _weak_form_ops_source(
     return _WEAK_FORM_OPS_TEMPLATE % values
 
 
+def _residual_ops_source(inline_qualifier, work_item_index, simd_lines,
+                         single_work_item, *, lane_blocked):
+    """The residual micro-kernels, spelled for a block of work items or for one.
+
+    The twin of `_weak_form_ops_source`, and now for the same reason.  This
+    family was rendered once, in the lane-blocked spelling only, so a device
+    kernel -- whose work item is a single element -- called micro-kernels
+    written throughout in terms of a width it does not have.  Rendering the one
+    body twice is what keeps the scalar spelling from being a transcription of
+    the blocked one that drifts.
+    """
+    values = {
+        "inline_qualifier": inline_qualifier,
+        "work_item": work_item_index,
+        "residual_ops": (
+            "TensorProductResidualOps"
+            if lane_blocked
+            else "TensorProductResidualOpsScalar"
+        ),
+        "scalar_suffix": "" if lane_blocked else "_scalar",
+        "width_param": ", int VS" if lane_blocked else "",
+        "width_arg": ", VS" if lane_blocked else "",
+        "stream_extent": "[VS]" if lane_blocked else "[1]",
+        "lane_stride": " * VS" if lane_blocked else "",
+        "lane_offset": (" * VS + %s" % work_item_index) if lane_blocked else "",
+        "work_item_count_6": "      const int ne,\n" if lane_blocked else "",
+        "work_item_count_4": "    const int ne,\n" if lane_blocked else "",
+        "ne_argument": "ne, " if lane_blocked else "",
+    }
+    for indent_size in (12,):
+        values["work_item_loop_%d" % indent_size] = _work_item_loop_text(
+            " " * indent_size,
+            work_item_index,
+            simd_lines,
+            single_work_item or not lane_blocked,
+        )
+    return _RESIDUAL_OPS_TEMPLATE % values
+
+
 def _restrict_define_line(restrict_definition):
     restrict_definition = str(restrict_definition)
     if restrict_definition:
@@ -240,6 +279,19 @@ def sfem_tensor_product_kernels_header_source(
     values["weak_form_ops"] = "\n\n".join(
         _expand_residual_stream_layouts(
             _weak_form_ops_source(
+                inline_qualifier,
+                work_item_index if lane_blocked else "0",
+                simd_lines,
+                single_work_item,
+                lane_blocked=lane_blocked,
+            ),
+            lane_blocked,
+        )
+        for lane_blocked in (True, False)
+    )
+    values["residual_form_ops"] = "\n\n".join(
+        _expand_residual_stream_layouts(
+            _residual_ops_source(
                 inline_qualifier,
                 work_item_index if lane_blocked else "0",
                 simd_lines,
@@ -598,6 +650,464 @@ static %(inline_qualifier)s void tensor_test%(scalar_suffix)s(
 }'''
 
 
+_RESIDUAL_OPS_TEMPLATE = r'''template <typename s_t, int NQ, int NS%(width_param)s, int ND>
+struct %(residual_ops)s;
+
+template <typename s_t, int NQ, int NS%(width_param)s>
+struct %(residual_ops)s<s_t, NQ, NS%(width_arg)s, 2> {
+  template <int NC, typename StreamContainer>
+  static %(inline_qualifier)s void evaluate(
+%(work_item_count_6)s      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const StreamContainer streams,
+      s_t *const value,
+      s_t *const gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t vx[NC * NQ1 * NS1%(lane_stride)s];
+    s_t gx[NC * NQ1 * NS1%(lane_stride)s];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        s_t g = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * sy;
+          const s_t u = streams[s * NC + f][%(work_item)s];
+          v += u * shape_1d[qx * NS1 + sx];
+          g += u * grad_1d[qx * NS1 + sx];
+        }
+        const int i = ((f * NQ1 + qx) * NS1 + sy) %(lane_offset)s;
+        vx[i] = v;
+        gx[i] = g;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * qy;
+      s_t *const RSTR value_q = &value[(f * NQ + q)%(lane_stride)s];
+      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 2 + 0)%(lane_stride)s];
+      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 2 + 1)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        s_t g0 = s_t(0);
+        s_t g1 = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          const int i = ((f * NQ1 + qx) * NS1 + sy) %(lane_offset)s;
+          v += vx[i] * shape_1d[qy * NS1 + sy];
+          g0 += gx[i] * shape_1d[qy * NS1 + sy];
+          g1 += vx[i] * grad_1d[qy * NS1 + sy];
+        }
+        value_q[%(work_item)s] = v;
+        gradient_q0[%(work_item)s] = g0;
+        gradient_q1[%(work_item)s] = g1;
+      }
+    }
+  }
+
+  template <int NC, typename StreamContainer>
+  static %(inline_qualifier)s void evaluate_value(
+%(work_item_count_6)s      const s_t *const shape_1d,
+      const StreamContainer streams,
+      s_t *const value) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t vx[NC * NQ1 * NS1%(lane_stride)s];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+    s_t *const RSTR vx_q = &vx[((f * NQ1 + qx) * NS1 + sy)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * sy;
+          v += streams[s * NC + f][%(work_item)s] * shape_1d[qx * NS1 + sx];
+        }
+        vx_q[%(work_item)s] = v;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * qy;
+      s_t *const RSTR value_q = &value[(f * NQ + q)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          v += vx[((f * NQ1 + qx) * NS1 + sy) %(lane_offset)s] * shape_1d[qy * NS1 + sy];
+        }
+        value_q[%(work_item)s] = v;
+      }
+    }
+  }
+
+  template <int NC, typename StreamContainer>
+  static %(inline_qualifier)s void integrate(
+%(work_item_count_6)s      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t *const value_coeff,
+      const s_t *const grad_coeff,
+      StreamContainer output) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t sv[NC * NQ1 * NS1%(lane_stride)s];
+    s_t sg[NC * NQ1 * NS1%(lane_stride)s];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+%(work_item_loop_12)s
+        s_t a = s_t(0);
+        s_t b = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const int q = qx + NQ1 * qy;
+          a += value_coeff[(f * NQ + q) %(lane_offset)s] * shape_1d[qy * NS1 + sy]
+                       + grad_coeff[((f * NQ + q) * 2 + 1) %(lane_offset)s] * grad_1d[qy * NS1 + sy];
+          b += grad_coeff[((f * NQ + q) * 2 + 0) %(lane_offset)s] * shape_1d[qy * NS1 + sy];
+        }
+        const int i = ((f * NQ1 + qx) * NS1 + sy) %(lane_offset)s;
+        sv[i] = a;
+        sg[i] = b;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * sy;
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          const int i = ((f * NQ1 + qx) * NS1 + sy) %(lane_offset)s;
+          v += sv[i] * shape_1d[qx * NS1 + sx] + sg[i] * grad_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][%(work_item)s] += v;
+      }
+    }
+  }
+
+  template <int NC, typename StreamContainer>
+  static %(inline_qualifier)s void integrate_value(
+%(work_item_count_6)s      const s_t *const shape_1d,
+      const s_t *const value_coeff,
+      StreamContainer output) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t sv[NC * NQ1 * NS1%(lane_stride)s];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+    s_t *const RSTR sv_q = &sv[((f * NQ1 + qx) * NS1 + sy)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t a = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const int q = qx + NQ1 * qy;
+          a += value_coeff[(f * NQ + q) %(lane_offset)s] * shape_1d[qy * NS1 + sy];
+        }
+        sv_q[%(work_item)s] = a;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * sy;
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          v += sv[((f * NQ1 + qx) * NS1 + sy) %(lane_offset)s] * shape_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][%(work_item)s] += v;
+      }
+    }
+  }
+};
+
+template <typename s_t, int NQ, int NS%(width_param)s>
+struct %(residual_ops)s<s_t, NQ, NS%(width_arg)s, 3> {
+  template <int NC, typename StreamContainer>
+  static %(inline_qualifier)s void evaluate(
+%(work_item_count_6)s      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const StreamContainer streams,
+      s_t *const value,
+      s_t *const gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t vx[NC * NQ1 * NS1 * NS1%(lane_stride)s];
+    s_t gx[NC * NQ1 * NS1 * NS1%(lane_stride)s];
+    s_t vxy[NC * NQ1 * NQ1 * NS1%(lane_stride)s];
+    s_t g0xy[NC * NQ1 * NQ1 * NS1%(lane_stride)s];
+    s_t g1xy[NC * NQ1 * NQ1 * NS1%(lane_stride)s];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        s_t g = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * (sy + NS1 * sz);
+          const s_t u = streams[s * NC + f][%(work_item)s];
+          v += u * shape_1d[qx * NS1 + sx];
+          g += u * grad_1d[qx * NS1 + sx];
+        }
+        const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) %(lane_offset)s;
+        vx[i] = v;
+        gx[i] = g;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        s_t g0 = s_t(0);
+        s_t g1 = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) %(lane_offset)s;
+          v += vx[i] * shape_1d[qy * NS1 + sy];
+          g0 += gx[i] * shape_1d[qy * NS1 + sy];
+          g1 += vx[i] * grad_1d[qy * NS1 + sy];
+        }
+        const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) %(lane_offset)s;
+        vxy[j] = v;
+        g0xy[j] = g0;
+        g1xy[j] = g1;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * (qy + NQ1 * qz);
+      s_t *const RSTR value_q = &value[(f * NQ + q)%(lane_stride)s];
+      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 3 + 0)%(lane_stride)s];
+      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 3 + 1)%(lane_stride)s];
+      s_t *const RSTR gradient_q2 = &gradient[((f * NQ + q) * 3 + 2)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        s_t g0 = s_t(0);
+        s_t g1 = s_t(0);
+        s_t g2 = s_t(0);
+        for (int sz = 0; sz < NS1; ++sz) {
+          const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) %(lane_offset)s;
+          v += vxy[j] * shape_1d[qz * NS1 + sz];
+          g0 += g0xy[j] * shape_1d[qz * NS1 + sz];
+          g1 += g1xy[j] * shape_1d[qz * NS1 + sz];
+          g2 += vxy[j] * grad_1d[qz * NS1 + sz];
+        }
+        value_q[%(work_item)s] = v;
+        gradient_q0[%(work_item)s] = g0;
+        gradient_q1[%(work_item)s] = g1;
+        gradient_q2[%(work_item)s] = g2;
+      }
+    }
+  }
+
+  template <int NC, typename StreamContainer>
+  static %(inline_qualifier)s void evaluate_value(
+%(work_item_count_6)s      const s_t *const shape_1d,
+      const StreamContainer streams,
+      s_t *const value) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t vx[NC * NQ1 * NS1 * NS1%(lane_stride)s];
+    s_t vxy[NC * NQ1 * NQ1 * NS1%(lane_stride)s];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR vx_q = &vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * (sy + NS1 * sz);
+          v += streams[s * NC + f][%(work_item)s] * shape_1d[qx * NS1 + sx];
+        }
+        vx_q[%(work_item)s] = v;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR vxy_q = &vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) %(lane_offset)s] * shape_1d[qy * NS1 + sy];
+        }
+        vxy_q[%(work_item)s] = v;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * (qy + NQ1 * qz);
+      s_t *const RSTR value_q = &value[(f * NQ + q)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        for (int sz = 0; sz < NS1; ++sz) {
+          v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) %(lane_offset)s] * shape_1d[qz * NS1 + sz];
+        }
+        value_q[%(work_item)s] = v;
+      }
+    }
+  }
+
+  template <int NC, typename StreamContainer>
+  static %(inline_qualifier)s void integrate(
+%(work_item_count_6)s      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t *const value_coeff,
+      const s_t *const grad_coeff,
+      StreamContainer output) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t z0[NC * NQ1 * NQ1 * NS1%(lane_stride)s];
+    s_t z1[NC * NQ1 * NQ1 * NS1%(lane_stride)s];
+    s_t z2[NC * NQ1 * NQ1 * NS1%(lane_stride)s];
+    s_t yz0[NC * NQ1 * NS1 * NS1%(lane_stride)s];
+    s_t yz1[NC * NQ1 * NS1 * NS1%(lane_stride)s];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+%(work_item_loop_12)s
+        s_t a = s_t(0);
+        s_t b = s_t(0);
+        s_t c = s_t(0);
+        for (int qz = 0; qz < NQ1; ++qz) {
+          const int q = qx + NQ1 * (qy + NQ1 * qz);
+          a += value_coeff[(f * NQ + q) %(lane_offset)s] * shape_1d[qz * NS1 + sz]
+                       + grad_coeff[((f * NQ + q) * 3 + 2) %(lane_offset)s] * grad_1d[qz * NS1 + sz];
+          b += grad_coeff[((f * NQ + q) * 3 + 0) %(lane_offset)s] * shape_1d[qz * NS1 + sz];
+          c += grad_coeff[((f * NQ + q) * 3 + 1) %(lane_offset)s] * shape_1d[qz * NS1 + sz];
+        }
+        const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) %(lane_offset)s;
+        z0[i] = a;
+        z1[i] = b;
+        z2[i] = c;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+%(work_item_loop_12)s
+        s_t a = s_t(0);
+        s_t b = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) %(lane_offset)s;
+          a += z0[i] * shape_1d[qy * NS1 + sy] + z2[i] * grad_1d[qy * NS1 + sy];
+          b += z1[i] * shape_1d[qy * NS1 + sy];
+        }
+        const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) %(lane_offset)s;
+        yz0[j] = a;
+        yz1[j] = b;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * (sy + NS1 * sz);
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) %(lane_offset)s;
+          v += yz0[j] * shape_1d[qx * NS1 + sx] + yz1[j] * grad_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][%(work_item)s] += v;
+      }
+    }
+  }
+
+  template <int NC, typename StreamContainer>
+  static %(inline_qualifier)s void integrate_value(
+%(work_item_count_6)s      const s_t *const shape_1d,
+      const s_t *const value_coeff,
+      StreamContainer output) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t z0[NC * NQ1 * NQ1 * NS1%(lane_stride)s];
+    s_t yz0[NC * NQ1 * NS1 * NS1%(lane_stride)s];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR z0_q = &z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t a = s_t(0);
+        for (int qz = 0; qz < NQ1; ++qz) {
+          const int q = qx + NQ1 * (qy + NQ1 * qz);
+          a += value_coeff[(f * NQ + q) %(lane_offset)s] * shape_1d[qz * NS1 + sz];
+        }
+        z0_q[%(work_item)s] = a;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR yz0_q = &yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)%(lane_stride)s];
+%(work_item_loop_12)s
+        s_t a = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) %(lane_offset)s] * shape_1d[qy * NS1 + sy];
+        }
+        yz0_q[%(work_item)s] = a;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * (sy + NS1 * sz);
+%(work_item_loop_12)s
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) %(lane_offset)s] * shape_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][%(work_item)s] += v;
+      }
+    }
+  }
+};
+
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC>
+static %(inline_qualifier)s void tensor_evaluate%(scalar_suffix)s(
+%(work_item_count_4)s    const s_t *const shape_1d,
+    const s_t *const grad_1d,
+    const s_t *const RSTR streams[NC * NS],
+    s_t *const value,
+    s_t *const gradient) {
+  %(residual_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template evaluate<NC>(
+      %(ne_argument)sshape_1d, grad_1d, streams, value, gradient);
+}
+
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC>
+static %(inline_qualifier)s void tensor_evaluate_contiguous%(scalar_suffix)s(
+%(work_item_count_4)s    const s_t *const shape_1d,
+    const s_t *const grad_1d,
+    const s_t streams[NC * NS]%(stream_extent)s,
+    s_t *const value,
+    s_t *const gradient) {
+  %(residual_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template evaluate_contiguous<NC>(
+      %(ne_argument)sshape_1d, grad_1d, streams, value, gradient);
+}
+
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC>
+static %(inline_qualifier)s void tensor_evaluate_value%(scalar_suffix)s(
+%(work_item_count_4)s    const s_t *const shape_1d,
+    const s_t *const RSTR streams[NC * NS],
+    s_t *const value) {
+  %(residual_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template evaluate_value<NC>(
+      %(ne_argument)sshape_1d, streams, value);
+}
+
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC>
+static %(inline_qualifier)s void tensor_evaluate_value_contiguous%(scalar_suffix)s(
+%(work_item_count_4)s    const s_t *const shape_1d,
+    const s_t streams[NC * NS]%(stream_extent)s,
+    s_t *const value) {
+  %(residual_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template evaluate_value_contiguous<NC>(
+      %(ne_argument)sshape_1d, streams, value);
+}
+
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC>
+static %(inline_qualifier)s void tensor_integrate%(scalar_suffix)s(
+%(work_item_count_4)s    const s_t *const shape_1d,
+    const s_t *const grad_1d,
+    const s_t *const value_coeff,
+    const s_t *const grad_coeff,
+    s_t *const RSTR output[NC * NS]) {
+  %(residual_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template integrate<NC>(
+      %(ne_argument)sshape_1d, grad_1d, value_coeff, grad_coeff, output);
+}
+
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC>
+static %(inline_qualifier)s void tensor_integrate_contiguous%(scalar_suffix)s(
+%(work_item_count_4)s    const s_t *const shape_1d,
+    const s_t *const grad_1d,
+    const s_t *const value_coeff,
+    const s_t *const grad_coeff,
+    s_t output[NC * NS]%(stream_extent)s) {
+  %(residual_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template integrate_contiguous<NC>(
+      %(ne_argument)sshape_1d, grad_1d, value_coeff, grad_coeff, output);
+}
+
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC>
+static %(inline_qualifier)s void tensor_integrate_value%(scalar_suffix)s(
+%(work_item_count_4)s    const s_t *const shape_1d,
+    const s_t *const value_coeff,
+    s_t *const RSTR output[NC * NS]) {
+  %(residual_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template integrate_value<NC>(
+      %(ne_argument)sshape_1d, value_coeff, output);
+}
+
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC>
+static %(inline_qualifier)s void tensor_integrate_value_contiguous%(scalar_suffix)s(
+%(work_item_count_4)s    const s_t *const shape_1d,
+    const s_t *const value_coeff,
+    s_t output[NC * NS]%(stream_extent)s) {
+  %(residual_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template integrate_value_contiguous<NC>(
+      %(ne_argument)sshape_1d, value_coeff, output);
+}
+
+'''
+
+
 _TENSOR_PRODUCT_KERNELS_TEMPLATE = r'''#ifndef SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_%(header_guard_suffix)s
 #define SFEM_CODEGEN_TENSOR_PRODUCT_KERNELS_%(header_guard_suffix)s
 
@@ -623,477 +1133,7 @@ static %(kernel_callable)sconstexpr int integer_root(const int value, const int 
 
 %(weak_form_ops)s
 
-template <typename s_t, int NQ, int NS, int VS, int ND>
-struct TensorProductResidualOps;
-
-template <typename s_t, int NQ, int NS, int VS>
-struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
-  template <int NC, typename StreamContainer>
-  static %(inline_qualifier)s void evaluate(
-      const int ne,
-      const s_t *const shape_1d,
-      const s_t *const grad_1d,
-      const StreamContainer streams,
-      s_t *const value,
-      s_t *const gradient) {
-    static constexpr int NQ1 = integer_root(NQ, 2);
-    static constexpr int NS1 = integer_root(NS, 2);
-    s_t vx[NC * NQ1 * NS1 * VS];
-    s_t gx[NC * NQ1 * NS1 * VS];
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        s_t g = s_t(0);
-        for (int sx = 0; sx < NS1; ++sx) {
-          const int s = sx + NS1 * sy;
-          const s_t u = streams[s * NC + f][%(work_item)s];
-          v += u * shape_1d[qx * NS1 + sx];
-          g += u * grad_1d[qx * NS1 + sx];
-        }
-        const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + %(work_item)s;
-        vx[i] = v;
-        gx[i] = g;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
-      const int q = qx + NQ1 * qy;
-      s_t *const RSTR value_q = &value[(f * NQ + q) * VS];
-      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 2 + 0) * VS];
-      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 2 + 1) * VS];
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        s_t g0 = s_t(0);
-        s_t g1 = s_t(0);
-        for (int sy = 0; sy < NS1; ++sy) {
-          const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + %(work_item)s;
-          v += vx[i] * shape_1d[qy * NS1 + sy];
-          g0 += gx[i] * shape_1d[qy * NS1 + sy];
-          g1 += vx[i] * grad_1d[qy * NS1 + sy];
-        }
-        value_q[%(work_item)s] = v;
-        gradient_q0[%(work_item)s] = g0;
-        gradient_q1[%(work_item)s] = g1;
-      }
-    }
-  }
-
-  template <int NC, typename StreamContainer>
-  static %(inline_qualifier)s void evaluate_value(
-      const int ne,
-      const s_t *const shape_1d,
-      const StreamContainer streams,
-      s_t *const value) {
-    static constexpr int NQ1 = integer_root(NQ, 2);
-    static constexpr int NS1 = integer_root(NS, 2);
-    s_t vx[NC * NQ1 * NS1 * VS];
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
-    s_t *const RSTR vx_q = &vx[((f * NQ1 + qx) * NS1 + sy) * VS];
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        for (int sx = 0; sx < NS1; ++sx) {
-          const int s = sx + NS1 * sy;
-          v += streams[s * NC + f][%(work_item)s] * shape_1d[qx * NS1 + sx];
-        }
-        vx_q[%(work_item)s] = v;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
-      const int q = qx + NQ1 * qy;
-      s_t *const RSTR value_q = &value[(f * NQ + q) * VS];
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        for (int sy = 0; sy < NS1; ++sy) {
-          v += vx[((f * NQ1 + qx) * NS1 + sy) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy];
-        }
-        value_q[%(work_item)s] = v;
-      }
-    }
-  }
-
-  template <int NC, typename StreamContainer>
-  static %(inline_qualifier)s void integrate(
-      const int ne,
-      const s_t *const shape_1d,
-      const s_t *const grad_1d,
-      const s_t *const value_coeff,
-      const s_t *const grad_coeff,
-      StreamContainer output) {
-    static constexpr int NQ1 = integer_root(NQ, 2);
-    static constexpr int NS1 = integer_root(NS, 2);
-    s_t sv[NC * NQ1 * NS1 * VS];
-    s_t sg[NC * NQ1 * NS1 * VS];
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
-%(work_item_loop_12)s
-        s_t a = s_t(0);
-        s_t b = s_t(0);
-        for (int qy = 0; qy < NQ1; ++qy) {
-          const int q = qx + NQ1 * qy;
-          a += value_coeff[(f * NQ + q) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy]
-                       + grad_coeff[((f * NQ + q) * 2 + 1) * VS + %(work_item)s] * grad_1d[qy * NS1 + sy];
-          b += grad_coeff[((f * NQ + q) * 2 + 0) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy];
-        }
-        const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + %(work_item)s;
-        sv[i] = a;
-        sg[i] = b;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
-      const int s = sx + NS1 * sy;
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        for (int qx = 0; qx < NQ1; ++qx) {
-          const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + %(work_item)s;
-          v += sv[i] * shape_1d[qx * NS1 + sx] + sg[i] * grad_1d[qx * NS1 + sx];
-        }
-        output[s * NC + f][%(work_item)s] += v;
-      }
-    }
-  }
-
-  template <int NC, typename StreamContainer>
-  static %(inline_qualifier)s void integrate_value(
-      const int ne,
-      const s_t *const shape_1d,
-      const s_t *const value_coeff,
-      StreamContainer output) {
-    static constexpr int NQ1 = integer_root(NQ, 2);
-    static constexpr int NS1 = integer_root(NS, 2);
-    s_t sv[NC * NQ1 * NS1 * VS];
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
-    s_t *const RSTR sv_q = &sv[((f * NQ1 + qx) * NS1 + sy) * VS];
-%(work_item_loop_12)s
-        s_t a = s_t(0);
-        for (int qy = 0; qy < NQ1; ++qy) {
-          const int q = qx + NQ1 * qy;
-          a += value_coeff[(f * NQ + q) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy];
-        }
-        sv_q[%(work_item)s] = a;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
-      const int s = sx + NS1 * sy;
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        for (int qx = 0; qx < NQ1; ++qx) {
-          v += sv[((f * NQ1 + qx) * NS1 + sy) * VS + %(work_item)s] * shape_1d[qx * NS1 + sx];
-        }
-        output[s * NC + f][%(work_item)s] += v;
-      }
-    }
-  }
-};
-
-template <typename s_t, int NQ, int NS, int VS>
-struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
-  template <int NC, typename StreamContainer>
-  static %(inline_qualifier)s void evaluate(
-      const int ne,
-      const s_t *const shape_1d,
-      const s_t *const grad_1d,
-      const StreamContainer streams,
-      s_t *const value,
-      s_t *const gradient) {
-    static constexpr int NQ1 = integer_root(NQ, 3);
-    static constexpr int NS1 = integer_root(NS, 3);
-    s_t vx[NC * NQ1 * NS1 * NS1 * VS];
-    s_t gx[NC * NQ1 * NS1 * NS1 * VS];
-    s_t vxy[NC * NQ1 * NQ1 * NS1 * VS];
-    s_t g0xy[NC * NQ1 * NQ1 * NS1 * VS];
-    s_t g1xy[NC * NQ1 * NQ1 * NS1 * VS];
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        s_t g = s_t(0);
-        for (int sx = 0; sx < NS1; ++sx) {
-          const int s = sx + NS1 * (sy + NS1 * sz);
-          const s_t u = streams[s * NC + f][%(work_item)s];
-          v += u * shape_1d[qx * NS1 + sx];
-          g += u * grad_1d[qx * NS1 + sx];
-        }
-        const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + %(work_item)s;
-        vx[i] = v;
-        gx[i] = g;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        s_t g0 = s_t(0);
-        s_t g1 = s_t(0);
-        for (int sy = 0; sy < NS1; ++sy) {
-          const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + %(work_item)s;
-          v += vx[i] * shape_1d[qy * NS1 + sy];
-          g0 += gx[i] * shape_1d[qy * NS1 + sy];
-          g1 += vx[i] * grad_1d[qy * NS1 + sy];
-        }
-        const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s;
-        vxy[j] = v;
-        g0xy[j] = g0;
-        g1xy[j] = g1;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
-      const int q = qx + NQ1 * (qy + NQ1 * qz);
-      s_t *const RSTR value_q = &value[(f * NQ + q) * VS];
-      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 3 + 0) * VS];
-      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 3 + 1) * VS];
-      s_t *const RSTR gradient_q2 = &gradient[((f * NQ + q) * 3 + 2) * VS];
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        s_t g0 = s_t(0);
-        s_t g1 = s_t(0);
-        s_t g2 = s_t(0);
-        for (int sz = 0; sz < NS1; ++sz) {
-          const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s;
-          v += vxy[j] * shape_1d[qz * NS1 + sz];
-          g0 += g0xy[j] * shape_1d[qz * NS1 + sz];
-          g1 += g1xy[j] * shape_1d[qz * NS1 + sz];
-          g2 += vxy[j] * grad_1d[qz * NS1 + sz];
-        }
-        value_q[%(work_item)s] = v;
-        gradient_q0[%(work_item)s] = g0;
-        gradient_q1[%(work_item)s] = g1;
-        gradient_q2[%(work_item)s] = g2;
-      }
-    }
-  }
-
-  template <int NC, typename StreamContainer>
-  static %(inline_qualifier)s void evaluate_value(
-      const int ne,
-      const s_t *const shape_1d,
-      const StreamContainer streams,
-      s_t *const value) {
-    static constexpr int NQ1 = integer_root(NQ, 3);
-    static constexpr int NS1 = integer_root(NS, 3);
-    s_t vx[NC * NQ1 * NS1 * NS1 * VS];
-    s_t vxy[NC * NQ1 * NQ1 * NS1 * VS];
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
-    s_t *const RSTR vx_q = &vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS];
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        for (int sx = 0; sx < NS1; ++sx) {
-          const int s = sx + NS1 * (sy + NS1 * sz);
-          v += streams[s * NC + f][%(work_item)s] * shape_1d[qx * NS1 + sx];
-        }
-        vx_q[%(work_item)s] = v;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
-    s_t *const RSTR vxy_q = &vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS];
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        for (int sy = 0; sy < NS1; ++sy) {
-          v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy];
-        }
-        vxy_q[%(work_item)s] = v;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
-      const int q = qx + NQ1 * (qy + NQ1 * qz);
-      s_t *const RSTR value_q = &value[(f * NQ + q) * VS];
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        for (int sz = 0; sz < NS1; ++sz) {
-          v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s] * shape_1d[qz * NS1 + sz];
-        }
-        value_q[%(work_item)s] = v;
-      }
-    }
-  }
-
-  template <int NC, typename StreamContainer>
-  static %(inline_qualifier)s void integrate(
-      const int ne,
-      const s_t *const shape_1d,
-      const s_t *const grad_1d,
-      const s_t *const value_coeff,
-      const s_t *const grad_coeff,
-      StreamContainer output) {
-    static constexpr int NQ1 = integer_root(NQ, 3);
-    static constexpr int NS1 = integer_root(NS, 3);
-    s_t z0[NC * NQ1 * NQ1 * NS1 * VS];
-    s_t z1[NC * NQ1 * NQ1 * NS1 * VS];
-    s_t z2[NC * NQ1 * NQ1 * NS1 * VS];
-    s_t yz0[NC * NQ1 * NS1 * NS1 * VS];
-    s_t yz1[NC * NQ1 * NS1 * NS1 * VS];
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
-%(work_item_loop_12)s
-        s_t a = s_t(0);
-        s_t b = s_t(0);
-        s_t c = s_t(0);
-        for (int qz = 0; qz < NQ1; ++qz) {
-          const int q = qx + NQ1 * (qy + NQ1 * qz);
-          a += value_coeff[(f * NQ + q) * VS + %(work_item)s] * shape_1d[qz * NS1 + sz]
-                       + grad_coeff[((f * NQ + q) * 3 + 2) * VS + %(work_item)s] * grad_1d[qz * NS1 + sz];
-          b += grad_coeff[((f * NQ + q) * 3 + 0) * VS + %(work_item)s] * shape_1d[qz * NS1 + sz];
-          c += grad_coeff[((f * NQ + q) * 3 + 1) * VS + %(work_item)s] * shape_1d[qz * NS1 + sz];
-        }
-        const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s;
-        z0[i] = a;
-        z1[i] = b;
-        z2[i] = c;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
-%(work_item_loop_12)s
-        s_t a = s_t(0);
-        s_t b = s_t(0);
-        for (int qy = 0; qy < NQ1; ++qy) {
-          const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s;
-          a += z0[i] * shape_1d[qy * NS1 + sy] + z2[i] * grad_1d[qy * NS1 + sy];
-          b += z1[i] * shape_1d[qy * NS1 + sy];
-        }
-        const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + %(work_item)s;
-        yz0[j] = a;
-        yz1[j] = b;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
-      const int s = sx + NS1 * (sy + NS1 * sz);
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        for (int qx = 0; qx < NQ1; ++qx) {
-          const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + %(work_item)s;
-          v += yz0[j] * shape_1d[qx * NS1 + sx] + yz1[j] * grad_1d[qx * NS1 + sx];
-        }
-        output[s * NC + f][%(work_item)s] += v;
-      }
-    }
-  }
-
-  template <int NC, typename StreamContainer>
-  static %(inline_qualifier)s void integrate_value(
-      const int ne,
-      const s_t *const shape_1d,
-      const s_t *const value_coeff,
-      StreamContainer output) {
-    static constexpr int NQ1 = integer_root(NQ, 3);
-    static constexpr int NS1 = integer_root(NS, 3);
-    s_t z0[NC * NQ1 * NQ1 * NS1 * VS];
-    s_t yz0[NC * NQ1 * NS1 * NS1 * VS];
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
-    s_t *const RSTR z0_q = &z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS];
-%(work_item_loop_12)s
-        s_t a = s_t(0);
-        for (int qz = 0; qz < NQ1; ++qz) {
-          const int q = qx + NQ1 * (qy + NQ1 * qz);
-          a += value_coeff[(f * NQ + q) * VS + %(work_item)s] * shape_1d[qz * NS1 + sz];
-        }
-        z0_q[%(work_item)s] = a;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
-    s_t *const RSTR yz0_q = &yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS];
-%(work_item_loop_12)s
-        s_t a = s_t(0);
-        for (int qy = 0; qy < NQ1; ++qy) {
-          a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + %(work_item)s] * shape_1d[qy * NS1 + sy];
-        }
-        yz0_q[%(work_item)s] = a;
-      }
-    }
-    for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
-      const int s = sx + NS1 * (sy + NS1 * sz);
-%(work_item_loop_12)s
-        s_t v = s_t(0);
-        for (int qx = 0; qx < NQ1; ++qx) {
-          v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + %(work_item)s] * shape_1d[qx * NS1 + sx];
-        }
-        output[s * NC + f][%(work_item)s] += v;
-      }
-    }
-  }
-};
-
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
-static %(inline_qualifier)s void tensor_evaluate(
-    const int ne,
-    const s_t *const shape_1d,
-    const s_t *const grad_1d,
-    const s_t *const RSTR streams[NC * NS],
-    s_t *const value,
-    s_t *const gradient) {
-  TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate<NC>(
-      ne, shape_1d, grad_1d, streams, value, gradient);
-}
-
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
-static %(inline_qualifier)s void tensor_evaluate_contiguous(
-    const int ne,
-    const s_t *const shape_1d,
-    const s_t *const grad_1d,
-    const s_t streams[NC * NS][VS],
-    s_t *const value,
-    s_t *const gradient) {
-  TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_contiguous<NC>(
-      ne, shape_1d, grad_1d, streams, value, gradient);
-}
-
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
-static %(inline_qualifier)s void tensor_evaluate_value(
-    const int ne,
-    const s_t *const shape_1d,
-    const s_t *const RSTR streams[NC * NS],
-    s_t *const value) {
-  TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_value<NC>(
-      ne, shape_1d, streams, value);
-}
-
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
-static %(inline_qualifier)s void tensor_evaluate_value_contiguous(
-    const int ne,
-    const s_t *const shape_1d,
-    const s_t streams[NC * NS][VS],
-    s_t *const value) {
-  TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template evaluate_value_contiguous<NC>(
-      ne, shape_1d, streams, value);
-}
-
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
-static %(inline_qualifier)s void tensor_integrate(
-    const int ne,
-    const s_t *const shape_1d,
-    const s_t *const grad_1d,
-    const s_t *const value_coeff,
-    const s_t *const grad_coeff,
-    s_t *const RSTR output[NC * NS]) {
-  TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate<NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff, output);
-}
-
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
-static %(inline_qualifier)s void tensor_integrate_contiguous(
-    const int ne,
-    const s_t *const shape_1d,
-    const s_t *const grad_1d,
-    const s_t *const value_coeff,
-    const s_t *const grad_coeff,
-    s_t output[NC * NS][VS]) {
-  TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_contiguous<NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff, output);
-}
-
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
-static %(inline_qualifier)s void tensor_integrate_value(
-    const int ne,
-    const s_t *const shape_1d,
-    const s_t *const value_coeff,
-    s_t *const RSTR output[NC * NS]) {
-  TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_value<NC>(
-      ne, shape_1d, value_coeff, output);
-}
-
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC>
-static %(inline_qualifier)s void tensor_integrate_value_contiguous(
-    const int ne,
-    const s_t *const shape_1d,
-    const s_t *const value_coeff,
-    s_t output[NC * NS][VS]) {
-  TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_value_contiguous<NC>(
-      ne, shape_1d, value_coeff, output);
-}
-
+%(residual_form_ops)s
 } // namespace codegen
 } // namespace sfem
 
