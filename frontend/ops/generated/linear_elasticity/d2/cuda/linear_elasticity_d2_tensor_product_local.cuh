@@ -166,24 +166,18 @@ static __host__ __device__ __forceinline__ void linear_elasticity_d2_tensor_prod
       gu[1] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value3) * idet;
       gu[2] = (gu_ref2[0] * adj_value0 + gu_ref3[0] * adj_value2) * idet;
       gu[3] = (gu_ref2[0] * adj_value1 + gu_ref3[0] * adj_value3) * idet;
-      s_t loperand[4];
-    s_t material[4];
     const s_t weak_mat_tmp0 = s_t(2)*gu[0];
     const s_t weak_mat_tmp1 = s_t(2)*gu[3];
     const s_t weak_mat_tmp2 = ((s_t(1) / s_t(2)))*lmbda*(weak_mat_tmp0 + weak_mat_tmp1);
     const s_t weak_mat_tmp3 = mu*(gu[1] + gu[2]);
-    material[0] = mu*weak_mat_tmp0 + weak_mat_tmp2;
-    material[1] = weak_mat_tmp3;
-    material[2] = weak_mat_tmp3;
-    material[3] = mu*weak_mat_tmp1 + weak_mat_tmp2;
-    loperand[0] = qw * (material[0] * adj_value0 + material[1] * adj_value1);
-    loperand[1] = qw * (material[0] * adj_value2 + material[1] * adj_value3);
-    loperand[2] = qw * (material[2] * adj_value0 + material[3] * adj_value1);
-    loperand[3] = qw * (material[2] * adj_value2 + material[3] * adj_value3);
-      loperand0[0] = loperand[0];
-      loperand1[0] = loperand[1];
-      loperand2[0] = loperand[2];
-      loperand3[0] = loperand[3];
+    const s_t material0 = mu*weak_mat_tmp0 + weak_mat_tmp2;
+    const s_t material1 = weak_mat_tmp3;
+    const s_t material2 = weak_mat_tmp3;
+    const s_t material3 = mu*weak_mat_tmp1 + weak_mat_tmp2;
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1[0] = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2[0] = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
     }
   }
   tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
@@ -246,24 +240,18 @@ static __host__ __device__ __forceinline__ void linear_elasticity_d2_tensor_prod
       trial_grad[1] = (grad_h_ref0[0] * adj_value1 + grad_h_ref1[0] * adj_value3) * idet;
       trial_grad[2] = (grad_h_ref2[0] * adj_value0 + grad_h_ref3[0] * adj_value2) * idet;
       trial_grad[3] = (grad_h_ref2[0] * adj_value1 + grad_h_ref3[0] * adj_value3) * idet;
-      s_t loperand[4];
-    s_t material[4];
     const s_t weak_mat_tmp0 = s_t(2)*trial_grad[0];
     const s_t weak_mat_tmp1 = s_t(2)*trial_grad[3];
     const s_t weak_mat_tmp2 = ((s_t(1) / s_t(2)))*lmbda*(weak_mat_tmp0 + weak_mat_tmp1);
     const s_t weak_mat_tmp3 = mu*(trial_grad[1] + trial_grad[2]);
-    material[0] = mu*weak_mat_tmp0 + weak_mat_tmp2;
-    material[1] = weak_mat_tmp3;
-    material[2] = weak_mat_tmp3;
-    material[3] = mu*weak_mat_tmp1 + weak_mat_tmp2;
-    loperand[0] = qw * (material[0] * adj_value0 + material[1] * adj_value1);
-    loperand[1] = qw * (material[0] * adj_value2 + material[1] * adj_value3);
-    loperand[2] = qw * (material[2] * adj_value0 + material[3] * adj_value1);
-    loperand[3] = qw * (material[2] * adj_value2 + material[3] * adj_value3);
-      loperand0[0] = loperand[0];
-      loperand1[0] = loperand[1];
-      loperand2[0] = loperand[2];
-      loperand3[0] = loperand[3];
+    const s_t material0 = mu*weak_mat_tmp0 + weak_mat_tmp2;
+    const s_t material1 = weak_mat_tmp3;
+    const s_t material2 = weak_mat_tmp3;
+    const s_t material3 = mu*weak_mat_tmp1 + weak_mat_tmp2;
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1[0] = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2[0] = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
     }
   }
   tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);

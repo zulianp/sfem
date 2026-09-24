@@ -83,8 +83,6 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_elast
       gu[1] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value3) * idet;
       gu[2] = (gu_ref2[0] * adj_value0 + gu_ref3[0] * adj_value2) * idet;
       gu[3] = (gu_ref2[0] * adj_value1 + gu_ref3[0] * adj_value3) * idet;
-      s_t loperand[4];
-    s_t material[4];
     const s_t weak_mat_tmp0 = gu[3] + s_t(1);
     const s_t weak_mat_tmp1 = gu[0]*gu[3];
     const s_t weak_mat_tmp2 = gu[1]*gu[2];
@@ -101,18 +99,14 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_elast
     const s_t weak_mat_tmp13 = s_t(2)*gu[2];
     const s_t weak_mat_tmp14 = s_t(2)*gu[0];
     const s_t weak_mat_tmp15 = pow_2(gu[0]);
-    material[0] = mu*(gu[0]*weak_mat_tmp5 + s_t(6)*gu[0] - weak_mat_tmp2*weak_mat_tmp4 - weak_mat_tmp4 + weak_mat_tmp5 + weak_mat_tmp6) + weak_mat_tmp0*weak_mat_tmp3;
-    material[1] = -gu[2]*weak_mat_tmp3 + mu*(s_t(4)*gu[1] + s_t(6)*gu[2] - weak_mat_tmp10*weak_mat_tmp9 + weak_mat_tmp12*weak_mat_tmp8 - weak_mat_tmp7*weak_mat_tmp8);
-    material[2] = -gu[1]*weak_mat_tmp3 + mu*(s_t(6)*gu[1] + s_t(4)*gu[2] - weak_mat_tmp0*weak_mat_tmp10 - weak_mat_tmp11*weak_mat_tmp13 + weak_mat_tmp12*weak_mat_tmp13);
-    material[3] = mu*(s_t(6)*gu[3] - weak_mat_tmp14*weak_mat_tmp2 - weak_mat_tmp14 + weak_mat_tmp15*weak_mat_tmp4 + s_t(2)*weak_mat_tmp15 + weak_mat_tmp6) + weak_mat_tmp3*weak_mat_tmp9;
-    loperand[0] = qw * (material[0] * adj_value0 + material[1] * adj_value1);
-    loperand[1] = qw * (material[0] * adj_value2 + material[1] * adj_value3);
-    loperand[2] = qw * (material[2] * adj_value0 + material[3] * adj_value1);
-    loperand[3] = qw * (material[2] * adj_value2 + material[3] * adj_value3);
-      loperand0[0] = loperand[0];
-      loperand1[0] = loperand[1];
-      loperand2[0] = loperand[2];
-      loperand3[0] = loperand[3];
+    const s_t material0 = mu*(gu[0]*weak_mat_tmp5 + s_t(6)*gu[0] - weak_mat_tmp2*weak_mat_tmp4 - weak_mat_tmp4 + weak_mat_tmp5 + weak_mat_tmp6) + weak_mat_tmp0*weak_mat_tmp3;
+    const s_t material1 = -gu[2]*weak_mat_tmp3 + mu*(s_t(4)*gu[1] + s_t(6)*gu[2] - weak_mat_tmp10*weak_mat_tmp9 + weak_mat_tmp12*weak_mat_tmp8 - weak_mat_tmp7*weak_mat_tmp8);
+    const s_t material2 = -gu[1]*weak_mat_tmp3 + mu*(s_t(6)*gu[1] + s_t(4)*gu[2] - weak_mat_tmp0*weak_mat_tmp10 - weak_mat_tmp11*weak_mat_tmp13 + weak_mat_tmp12*weak_mat_tmp13);
+    const s_t material3 = mu*(s_t(6)*gu[3] - weak_mat_tmp14*weak_mat_tmp2 - weak_mat_tmp14 + weak_mat_tmp15*weak_mat_tmp4 + s_t(2)*weak_mat_tmp15 + weak_mat_tmp6) + weak_mat_tmp3*weak_mat_tmp9;
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1[0] = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2[0] = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
     }
   }
   tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
@@ -188,8 +182,6 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_elast
       trial_grad[2] = (grad_h_ref2[0] * adj_value0 + grad_h_ref3[0] * adj_value2) * idet;
       gu[3] = (gu_ref2[0] * adj_value1 + gu_ref3[0] * adj_value3) * idet;
       trial_grad[3] = (grad_h_ref2[0] * adj_value1 + grad_h_ref3[0] * adj_value3) * idet;
-      s_t loperand[4];
-    s_t material[4];
     const s_t weak_mat_tmp0 = gu[3] + s_t(1);
     const s_t weak_mat_tmp1 = lmbda*weak_mat_tmp0;
     const s_t weak_mat_tmp2 = s_t(2)*mu;
@@ -210,18 +202,14 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_elast
     const s_t weak_mat_tmp17 = pow_2(gu[1]);
     const s_t weak_mat_tmp18 = -gu[1]*weak_mat_tmp13 - gu[1]*weak_mat_tmp14;
     const s_t weak_mat_tmp19 = pow_2(weak_mat_tmp7);
-    material[0] = trial_grad[0]*(lmbda*weak_mat_tmp6 + mu*(s_t(2)*weak_mat_tmp6 + s_t(4))) + trial_grad[1]*weak_mat_tmp4 + trial_grad[2]*weak_mat_tmp5 + trial_grad[3]*weak_mat_tmp11;
-    material[1] = trial_grad[0]*weak_mat_tmp4 + trial_grad[1]*(lmbda*weak_mat_tmp12 + mu*(s_t(2)*weak_mat_tmp12 + s_t(4))) + trial_grad[2]*weak_mat_tmp16 + trial_grad[3]*weak_mat_tmp15;
-    material[2] = trial_grad[0]*weak_mat_tmp5 + trial_grad[1]*weak_mat_tmp16 + trial_grad[2]*(lmbda*weak_mat_tmp17 + mu*(s_t(2)*weak_mat_tmp17 + s_t(4))) + trial_grad[3]*weak_mat_tmp18;
-    material[3] = trial_grad[0]*weak_mat_tmp11 + trial_grad[1]*weak_mat_tmp15 + trial_grad[2]*weak_mat_tmp18 + trial_grad[3]*(lmbda*weak_mat_tmp19 + mu*(s_t(2)*weak_mat_tmp19 + s_t(4)));
-    loperand[0] = qw * (material[0] * adj_value0 + material[1] * adj_value1);
-    loperand[1] = qw * (material[0] * adj_value2 + material[1] * adj_value3);
-    loperand[2] = qw * (material[2] * adj_value0 + material[3] * adj_value1);
-    loperand[3] = qw * (material[2] * adj_value2 + material[3] * adj_value3);
-      loperand0[0] = loperand[0];
-      loperand1[0] = loperand[1];
-      loperand2[0] = loperand[2];
-      loperand3[0] = loperand[3];
+    const s_t material0 = trial_grad[0]*(lmbda*weak_mat_tmp6 + mu*(s_t(2)*weak_mat_tmp6 + s_t(4))) + trial_grad[1]*weak_mat_tmp4 + trial_grad[2]*weak_mat_tmp5 + trial_grad[3]*weak_mat_tmp11;
+    const s_t material1 = trial_grad[0]*weak_mat_tmp4 + trial_grad[1]*(lmbda*weak_mat_tmp12 + mu*(s_t(2)*weak_mat_tmp12 + s_t(4))) + trial_grad[2]*weak_mat_tmp16 + trial_grad[3]*weak_mat_tmp15;
+    const s_t material2 = trial_grad[0]*weak_mat_tmp5 + trial_grad[1]*weak_mat_tmp16 + trial_grad[2]*(lmbda*weak_mat_tmp17 + mu*(s_t(2)*weak_mat_tmp17 + s_t(4))) + trial_grad[3]*weak_mat_tmp18;
+    const s_t material3 = trial_grad[0]*weak_mat_tmp11 + trial_grad[1]*weak_mat_tmp15 + trial_grad[2]*weak_mat_tmp18 + trial_grad[3]*(lmbda*weak_mat_tmp19 + mu*(s_t(2)*weak_mat_tmp19 + s_t(4)));
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1[0] = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2[0] = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
     }
   }
   tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);

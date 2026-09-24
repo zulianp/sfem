@@ -185,17 +185,12 @@ static __host__ __device__ __forceinline__ void laplace_d3_tensor_product_gradie
       gu[0] = (gu_ref0[0] * adj_value0 + gu_ref1[0] * adj_value3 + gu_ref2[0] * adj_value6) * idet;
       gu[1] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value4 + gu_ref2[0] * adj_value7) * idet;
       gu[2] = (gu_ref0[0] * adj_value2 + gu_ref1[0] * adj_value5 + gu_ref2[0] * adj_value8) * idet;
-      s_t loperand[3];
-    s_t material[3];
-    material[0] = gu[0]*kappa;
-    material[1] = gu[1]*kappa;
-    material[2] = gu[2]*kappa;
-    loperand[0] = qw * (material[0] * adj_value0 + material[1] * adj_value1 + material[2] * adj_value2);
-    loperand[1] = qw * (material[0] * adj_value3 + material[1] * adj_value4 + material[2] * adj_value5);
-    loperand[2] = qw * (material[0] * adj_value6 + material[1] * adj_value7 + material[2] * adj_value8);
-      loperand0[0] = loperand[0];
-      loperand1[0] = loperand[1];
-      loperand2[0] = loperand[2];
+    const s_t material0 = gu[0]*kappa;
+    const s_t material1 = gu[1]*kappa;
+    const s_t material2 = gu[2]*kappa;
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1 + material2 * adj_value2);
+      loperand1[0] = qw * (material0 * adj_value3 + material1 * adj_value4 + material2 * adj_value5);
+      loperand2[0] = qw * (material0 * adj_value6 + material1 * adj_value7 + material2 * adj_value8);
     }
   }
   tensor_test<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
@@ -268,17 +263,12 @@ static __host__ __device__ __forceinline__ void laplace_d3_tensor_product_apply_
       trial_grad[0] = (grad_h_ref0[0] * adj_value0 + grad_h_ref1[0] * adj_value3 + grad_h_ref2[0] * adj_value6) * idet;
       trial_grad[1] = (grad_h_ref0[0] * adj_value1 + grad_h_ref1[0] * adj_value4 + grad_h_ref2[0] * adj_value7) * idet;
       trial_grad[2] = (grad_h_ref0[0] * adj_value2 + grad_h_ref1[0] * adj_value5 + grad_h_ref2[0] * adj_value8) * idet;
-      s_t loperand[3];
-    s_t material[3];
-    material[0] = kappa*trial_grad[0];
-    material[1] = kappa*trial_grad[1];
-    material[2] = kappa*trial_grad[2];
-    loperand[0] = qw * (material[0] * adj_value0 + material[1] * adj_value1 + material[2] * adj_value2);
-    loperand[1] = qw * (material[0] * adj_value3 + material[1] * adj_value4 + material[2] * adj_value5);
-    loperand[2] = qw * (material[0] * adj_value6 + material[1] * adj_value7 + material[2] * adj_value8);
-      loperand0[0] = loperand[0];
-      loperand1[0] = loperand[1];
-      loperand2[0] = loperand[2];
+    const s_t material0 = kappa*trial_grad[0];
+    const s_t material1 = kappa*trial_grad[1];
+    const s_t material2 = kappa*trial_grad[2];
+      loperand0[0] = qw * (material0 * adj_value0 + material1 * adj_value1 + material2 * adj_value2);
+      loperand1[0] = qw * (material0 * adj_value3 + material1 * adj_value4 + material2 * adj_value5);
+      loperand2[0] = qw * (material0 * adj_value6 + material1 * adj_value7 + material2 * adj_value8);
     }
   }
   tensor_test<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
