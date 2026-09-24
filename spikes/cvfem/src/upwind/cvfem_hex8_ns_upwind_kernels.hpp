@@ -2,6 +2,7 @@
 #define CVFEM_HEX8_NS_UPWIND_KERNELS_HPP
 
 #include <cmath>
+#include "cvfem_venkata_limiter.hpp"
 #include <cstddef>
 #include <cstring>
 #include <cstdint>
@@ -1045,6 +1046,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
                                                                const int limiter,
                                                                const int s, const int i, const int j,
                                                                const scalar_t mdot, const scalar_t ueps,
+                                                               const scalar_t venkat_c,
                                                                scalar_t &dfx, scalar_t &dfy, scalar_t &dfz) {
     dfx = dfy = dfz = scalar_t(0);
     if (!g) return;
@@ -1080,6 +1082,17 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     const scalar_t djx = sx - xe[j], djy = sy - ye[j], djz = sz - ze[j];
     const scalar_t *const Gi = g + i * 9;
     const scalar_t *const Gj = g + j * 9;
+
+    // Venkatakrishnan's eps^2 = coeff * h^3, with h the edge this sub-control surface cuts.
+    // d_i and d_j both run from a node to the same centroid, so their difference is the edge
+    // vector and the length costs one square root -- and only when the arm that uses it is
+    // selected with a non-zero K, so the default path pays nothing.
+    scalar_t veps2 = scalar_t(0);
+    if (limiter == 2 && venkat_c != scalar_t(0)) {
+        const scalar_t ex = dix - djx, ey = diy - djy, ez = diz - djz;
+        const scalar_t h  = std::sqrt(ex * ex + ey * ey + ez * ez);
+        veps2             = venkat_c * h * h * h;
+    }
 
     // One component's pair of increments, limited together.
     //
@@ -1187,36 +1200,30 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     // evaluated, which is the reason deferred correction is the right structure here and the
     // Jacobian stays first-order -- the paragraph above got the consequence of that wrong,
     // not the structure.
+    // limiter = 3: Darwish and Moukalled's virtual upwind node, the arm that does not use a
+    //              bound at all. See cvfem_venkata_limiter.hpp, which is where every arm's
+    //              formula lives -- this kernel selects between them and owns none of them,
+    //              so an arm cannot drift from the one it is meant to be a term away from.
     auto lim = [&](const scalar_t *const u, const scalar_t inc_i, const scalar_t inc_j,
                    scalar_t &oi, scalar_t &oj) {
         oi = inc_i;
         oj = inc_j;
-        if (limiter != 1 && limiter != 2) return;
-        const scalar_t a = u[i], b = u[j];
+        if (limiter < 1 || limiter > 3) return;
+        const scalar_t a  = u[i], b = u[j];
+        if (limiter == 3) {
+            oi = cvfem_darwish_moukalled_inc(a, b, inc_i);
+            oj = cvfem_darwish_moukalled_inc(b, a, inc_j);
+            return;
+        }
         const scalar_t lo = a < b ? a : b;
         const scalar_t hi = a < b ? b : a;
         if (limiter == 1) {
-            scalar_t fi = a + inc_i;
-            scalar_t fj = b + inc_j;
-            fi = fi < lo ? lo : (fi > hi ? hi : fi);
-            fj = fj < lo ? lo : (fj > hi ? hi : fj);
-            oi = fi - a;
-            oj = fj - b;
+            oi = cvfem_limiter_clip_inc(a, inc_i, lo, hi);
+            oj = cvfem_limiter_clip_inc(b, inc_j, lo, hi);
             return;
         }
-        // The room each node's increment has before it leaves [lo, hi], signed the same way
-        // the increment is, so D+ and D- have the same sign and psi is positive.
-        auto vk = [&](const scalar_t base, const scalar_t inc) {
-            const scalar_t dp  = (inc >= scalar_t(0)) ? (hi - base) : (lo - base);
-            const scalar_t num = dp * dp + scalar_t(2) * inc * dp;
-            const scalar_t den = dp * dp + scalar_t(2) * inc * inc + inc * dp;
-            // den = 0 only when dp and inc are both zero, and then the increment is zero and
-            // the scaling is irrelevant; returning it unchanged is the dp -> 0, inc -> 0
-            // limit of psi = 1.
-            return (den != scalar_t(0)) ? (num / den) * inc : inc;
-        };
-        oi = vk(a, inc_i);
-        oj = vk(b, inc_j);
+        oi = cvfem_venkata_inc(a, inc_i, lo, hi, veps2);
+        oj = cvfem_venkata_inc(b, inc_j, lo, hi, veps2);
     };
 
     scalar_t ii, jj;
@@ -1349,6 +1356,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                                               const scalar_t *const SFEM_RESTRICT ye = nullptr,
                                                               const scalar_t *const SFEM_RESTRICT ze = nullptr,
                                                               const int limiter = 0,
+                                                              const scalar_t venkat_c = scalar_t(0),
                                                               // Cell-Peclet blending, passed as DATA rather than read
                                                               // from the environment here: these kernels are
                                                               // SFEM_HOST_DEVICE and a function-local static with a
@@ -1434,7 +1442,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
         // Jacobian below is untouched by design; see cvfem_hex8_scs_defcor.
         if (ugrad8) {
             scalar_t dfx, dfy, dfz;
-            cvfem_hex8_scs_defcor(ugrad8, xe, ye, ze, ux, uy, uz, limiter, s, i, j, mdot, ueps,
+            cvfem_hex8_scs_defcor(ugrad8, xe, ye, ze, ux, uy, uz, limiter, s, i, j, mdot, ueps, venkat_c,
                                   dfx, dfy, dfz);
             fx += dfx;
             fy += dfy;

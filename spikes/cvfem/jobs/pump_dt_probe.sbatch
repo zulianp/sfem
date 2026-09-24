@@ -11,7 +11,7 @@
 # Does a smaller timestep pay for itself?
 #
 # The transient term puts a0 rho / dt times the control volume on each VELOCITY diagonal and
-# nothing on pressure (cvfem_hex8_layout_common.hpp:725), so halving dt doubles exactly the
+# nothing on pressure (cvfem_hex8_best_common.hpp:725), so halving dt doubles exactly the
 # block that block-Jacobi inverts. Each solve gets easier. It also doubles the number of
 # solves, so the only comparison that means anything is cost for the same PHYSICAL time --
 # which is what this measures, by holding t_end fixed and varying dt and the step count

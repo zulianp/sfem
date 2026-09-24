@@ -3,7 +3,7 @@
 
 // The packed-mesh machinery, shared by the benchmark and the steady solver.
 //
-// This existed twice, incompatibly: cvfem_hex8_layout_common.hpp had the full
+// This existed twice, incompatibly: cvfem_hex8_best_common.hpp had the full
 // definition and cvfem_hex8_ns_packed.hpp a divergent trimmed copy, so there was no
 // single thing a device path could consume. The full definition wins; the trimmed
 // copy is gone.

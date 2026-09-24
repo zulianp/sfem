@@ -1,5 +1,5 @@
-#ifndef CVFEM_HEX8_LAYOUT_COLORED_HPP
-#define CVFEM_HEX8_LAYOUT_COLORED_HPP
+#ifndef CVFEM_HEX8_BEST_COLORED_HPP
+#define CVFEM_HEX8_BEST_COLORED_HPP
 
 // Colored layout: the pack decomposition is colored so that two packs sharing a
 // color never touch a common node. Within a color the element kernels can write
@@ -30,7 +30,7 @@
 // Colors are balanced by construction (see cvfem_pack_coloring.hpp); an unbalanced
 // coloring costs the residual another ~20% in barrier waits.
 
-#include "cvfem_hex8_layout_common.hpp"
+#include "cvfem_hex8_best_common.hpp"
 #include "cvfem_pack_coloring.hpp"
 
 // ---------------------------------------------------------------------------
@@ -488,4 +488,4 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
     }
 }
 
-#endif  // CVFEM_HEX8_LAYOUT_COLORED_HPP
+#endif  // CVFEM_HEX8_BEST_COLORED_HPP

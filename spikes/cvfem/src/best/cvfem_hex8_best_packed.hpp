@@ -1,5 +1,5 @@
-#ifndef CVFEM_HEX8_LAYOUT_PACKED_HPP
-#define CVFEM_HEX8_LAYOUT_PACKED_HPP
+#ifndef CVFEM_HEX8_BEST_PACKED_HPP
+#define CVFEM_HEX8_BEST_PACKED_HPP
 
 // Packed layout: elements are grouped into packs, each pack accumulates into a
 // thread-private buffer indexed by pack-local node ids, and the buffer is folded
@@ -8,10 +8,10 @@
 //
 // The pack-local indexing lets the residual and Jacobian-action run 16-wide SIMD
 // over elements. For assembly the local matrix is large enough that the round
-// trip through it costs more than it saves; see cvfem_hex8_layout_colored.hpp
-// and cvfem_hex8_layout_store.hpp.
+// trip through it costs more than it saves; see cvfem_hex8_best_colored.hpp
+// and cvfem_hex8_best_store.hpp.
 
-#include "cvfem_hex8_layout_common.hpp"
+#include "cvfem_hex8_best_common.hpp"
 
 static void build_pack_local_crs(PackedData               &p,
                                  const ptrdiff_t           nelements,
@@ -767,4 +767,4 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
     if (g_breakdown) g_phase[PH_GHOST] += wall_time() - _tg;
 }
 
-#endif  // CVFEM_HEX8_LAYOUT_PACKED_HPP
+#endif  // CVFEM_HEX8_BEST_PACKED_HPP

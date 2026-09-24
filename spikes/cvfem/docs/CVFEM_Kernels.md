@@ -20,71 +20,33 @@ exists only to build the preconditioner.
 
 | operation | variant | Rhie-Chow | exact-RC J | state ∇p | boundary | upwind band | transient | completeness |
 |---|---|---|---|---|---|---|---|---|
-| assemble | atomic / fd | – | – | – | – | – | – | element kernel |
-| assemble | atomic / fd / isoparam | – | – | – | – | – | – | element kernel |
-| assemble | atomic / split | – | – | – | – | – | – | element kernel |
-| assemble | atomic / sumfact | frozen by design | frozen by design | hoisted | carried | – | – | partial |
-| assemble | atomic / sumfact | frozen by design | frozen by design | hoisted | – | – | – | frozen-RC |
-| assemble | atomic / sumfact | – | – | – | – | – | – | element kernel |
-| assemble | atomic / sympy | – | – | – | – | – | – | element kernel |
-| assemble | atomic / sympy_block | – | – | – | – | – | – | element kernel |
-| assemble | colored / sumfact | – | – | – | – | – | – | element kernel |
-| assemble | colored / sympy | – | – | – | – | – | – | element kernel |
-| assemble | colored / sympy_block | – | – | – | – | – | – | element kernel |
-| assemble | packed / sumfact | frozen by design | frozen by design | hoisted | carried | – | – | partial |
-| assemble | packed / sumfact | – | – | – | – | – | – | element kernel |
-| assemble | packed / sympy | – | – | – | – | – | – | element kernel |
-| assemble | packed / sympy_block | – | – | – | – | – | – | element kernel |
-| assemble | store / sumfact | – | – | – | – | – | – | element kernel |
-| assemble | store / sympy | – | – | – | – | – | – | element kernel |
-| assemble | store / sympy_block | – | – | – | – | – | – | element kernel |
-| assemble_diag | atomic / (kernel n/a) | frozen by design | frozen by design | hoisted | carried | – | carried | partial |
-| assemble_diag | atomic / (kernel n/a) | frozen by design | frozen by design | hoisted | carried | – | – | partial |
-| assemble_diag | atomic / (kernel n/a) | frozen by design | frozen by design | hoisted | – | – | – | frozen-RC |
+| assemble | atomic / sumfact / bsr f64 | – | – | – | – | – | – | element kernel |
+| assemble | atomic / sympy / bsr f64 | – | – | – | – | – | – | element kernel |
+| assemble | colored / sumfact / bsr f64 | – | – | – | – | – | – | element kernel |
+| assemble | colored / sympy / bsr f64 | – | – | – | – | – | – | element kernel |
+| assemble | packed / sumfact / bsr f64 | – | – | – | – | – | – | element kernel |
+| assemble | store / sumfact / bsr f64 | – | – | – | – | – | – | element kernel |
 | assemble_diag | atomic / (kernel n/a) | – | – | – | – | – | – | element kernel |
-| assemble_diag | atomic / (kernel n/a) / isoparam | frozen by design | frozen by design | hoisted | carried | – | – | partial |
-| bsr_apply | packed / (kernel n/a) | frozen by design | frozen by design | hoisted | carried | – | – | partial |
-| bsr_apply | packed / (kernel n/a) | frozen by design | frozen by design | hoisted | – | – | – | frozen-RC |
-| bsr_apply | packed / (kernel n/a) | – | – | – | – | – | – | element kernel |
+| bsr_apply | n/a / (kernel n/a) / bsr f32 | – | – | – | – | – | – | element kernel |
+| bsr_apply | n/a / (kernel n/a) / bsr f64 | – | – | – | – | – | – | element kernel |
 | jac_action | atomic / (kernel n/a) | carried | carried | hoisted | carried | – | – | solver operator |
+| jac_action | atomic / (kernel n/a) | carried | carried | hoisted | – | – | – | partial |
 | jac_action | atomic / (kernel n/a) | – | – | – | – | – | – | element kernel |
-| jac_action | atomic / (kernel n/a) / isoparam | – | – | – | – | – | – | element kernel |
-| jac_action | atomic / sympy_action | – | – | – | – | – | – | element kernel |
-| jac_action | atomic / sympy_action_comp | – | – | – | – | – | – | element kernel |
-| jac_action | atomic / sympy_action_face | – | – | – | – | – | – | element kernel |
-| jac_action | atomic / sympy_action_geom | – | – | – | – | – | – | element kernel |
-| jac_action | atomic / sympy_action_geomface | – | – | – | – | – | – | element kernel |
-| jac_action | atomic / sympy_action_node | – | – | – | – | – | – | element kernel |
-| jac_action | colored / (kernel n/a) | – | – | – | – | – | – | element kernel |
-| jac_action | packed / (kernel n/a) | carried | carried | hoisted | carried | – | carried | solver operator |
 | jac_action | packed / (kernel n/a) | carried | carried | hoisted | carried | – | – | solver operator |
 | jac_action | packed / (kernel n/a) | carried | carried | hoisted | – | – | – | partial |
 | jac_action | packed / (kernel n/a) | – | – | – | – | – | – | element kernel |
-| jac_action | packed / (kernel n/a) / isoparam | – | – | – | – | – | – | element kernel |
-| jac_action | store / (kernel n/a) | – | – | – | – | – | – | element kernel |
 | residual | atomic / current | – | – | – | – | – | – | element kernel |
-| residual | atomic / current / isoparam | – | – | – | – | – | – | element kernel |
+| residual | atomic / sumfact | carried | – | hoisted | carried | – | carried | solver operator |
 | residual | atomic / sumfact | carried | – | hoisted | carried | – | – | solver operator |
 | residual | atomic / sumfact | carried | – | hoisted | – | – | – | partial |
 | residual | atomic / sumfact | carried | – | per apply | – | – | – | partial |
 | residual | atomic / sumfact | – | – | – | – | – | – | element kernel |
-| residual | atomic / sympy | – | – | – | – | – | – | element kernel |
-| residual | atomic / sympy / isoparam | – | – | – | – | – | – | element kernel |
-| residual | colored / current | – | – | – | – | – | – | element kernel |
-| residual | colored / sumfact | – | – | – | – | – | – | element kernel |
-| residual | colored / sympy | – | – | – | – | – | – | element kernel |
 | residual | packed / current | – | – | – | – | – | – | element kernel |
-| residual | packed / isoparam_simd / isoparam | – | – | – | – | – | – | element kernel |
 | residual | packed / sumfact | carried | – | hoisted | carried | – | carried | solver operator |
 | residual | packed / sumfact | carried | – | hoisted | carried | – | – | solver operator |
 | residual | packed / sumfact | carried | – | hoisted | – | – | – | partial |
-| residual | packed / sumfact | carried | – | per apply | carried | – | carried | solver operator |
 | residual | packed / sumfact | carried | – | per apply | – | – | – | partial |
 | residual | packed / sumfact | – | – | – | – | – | – | element kernel |
-| residual | packed / sympy | – | – | – | – | – | – | element kernel |
-| residual | store / current | – | – | – | – | – | – | element kernel |
-| residual | store / sumfact | – | – | – | – | – | – | element kernel |
-| residual | store / sympy | – | – | – | – | – | – | element kernel |
 
 
 ## Throughput
@@ -95,77 +57,139 @@ from the table above: two rows are comparable only when it matches.
 
 | operation | variant | dof | MDOF/s | completeness | working set | threads |
 |---|---|---|---|---|---|---|
-| assemble | colored / sumfact | 4,121,204 | 87 | element kernel | warm | 72 |
-| assemble | colored / sympy | 4,121,204 | 79 | element kernel | warm | 72 |
-| assemble | colored / sympy_block | 4,121,204 | 77 | element kernel | warm | 72 |
-| assemble | store / sumfact | 4,121,204 | 72 | element kernel | warm | 72 |
-| assemble | store / sympy | 4,121,204 | 71 | element kernel | warm | 72 |
-| assemble | store / sympy_block | 4,121,204 | 70 | element kernel | warm | 72 |
-| assemble | atomic / sympy_block | 4,121,204 | 57 | element kernel | warm | 72 |
-| assemble | packed / sumfact | 4,121,204 | 56 | element kernel | warm | 72 |
-| assemble | packed / sympy | 4,121,204 | 56 | element kernel | warm | 72 |
-| assemble | atomic / sympy | 4,121,204 | 56 | element kernel | warm | 72 |
-| assemble | packed / sympy_block | 4,121,204 | 55 | element kernel | warm | 72 |
-| assemble | packed / sumfact | 4,121,204 | 53 | partial | warm | 72 |
-| assemble | atomic / sumfact | 4,121,204 | 39 | element kernel | warm | 72 |
-| assemble | atomic / sumfact | 4,121,204 | 34 | frozen-RC | warm | 72 |
-| assemble | atomic / sumfact | 4,121,204 | 34 | partial | warm | 72 |
-| assemble | atomic / fd / isoparam | 4,121,204 | 21 | element kernel | warm | 72 |
-| assemble | atomic / fd | 4,121,204 | 21 | element kernel | warm | 72 |
-| assemble | atomic / split | 4,121,204 | 14 | element kernel | warm | 72 |
-| assemble_diag | atomic / (kernel n/a) | 4,121,204 | 112 | element kernel | warm | 72 |
-| assemble_diag | atomic / (kernel n/a) | 4,121,204 | 92 | frozen-RC | warm | 72 |
-| assemble_diag | atomic / (kernel n/a) | 4,121,204 | 91 | partial | warm | 72 |
-| assemble_diag | atomic / (kernel n/a) | 4,121,204 | 89 | partial | warm | 72 |
-| assemble_diag | atomic / (kernel n/a) / isoparam | 4,121,204 | 68 | partial | warm | 72 |
-| bsr_apply | packed / (kernel n/a) | 1,098,500 | 484 | element kernel | warm | 72 |
-| bsr_apply | packed / (kernel n/a) | 4,121,204 | 458 | element kernel | warm | 72 |
-| bsr_apply | packed / (kernel n/a) | 4,121,204 | 457 | frozen-RC | warm | 72 |
-| bsr_apply | packed / (kernel n/a) | 4,121,204 | 451 | partial | warm | 72 |
-| jac_action | packed / (kernel n/a) | 4,121,204 | 2071 | element kernel | warm | 72 |
-| jac_action | store / (kernel n/a) | 4,121,204 | 2057 | element kernel | warm | 72 |
-| jac_action | packed / (kernel n/a) | 1,098,500 | 2013 | element kernel | warm | 72 |
-| jac_action | packed / (kernel n/a) | 1,098,500 | 1043 | solver operator | warm | 72 |
-| jac_action | packed / (kernel n/a) | 4,121,204 | 963 | partial | warm | 72 |
-| jac_action | colored / (kernel n/a) | 4,121,204 | 905 | element kernel | warm | 72 |
-| jac_action | packed / (kernel n/a) | 4,121,204 | 892 | solver operator | warm | 72 |
-| jac_action | packed / (kernel n/a) | 4,121,204 | 860 | solver operator | warm | 72 |
-| jac_action | packed / (kernel n/a) | 4,121,204 | 845 | solver operator | cold, 7 live | 72 |
-| jac_action | atomic / (kernel n/a) | 4,121,204 | 844 | element kernel | warm | 72 |
-| jac_action | packed / (kernel n/a) / isoparam | 4,121,204 | 810 | element kernel | warm | 72 |
-| jac_action | atomic / (kernel n/a) | 4,121,204 | 500 | solver operator | warm | 72 |
-| jac_action | atomic / sympy_action_geomface | 4,121,204 | 461 | element kernel | warm | 72 |
-| jac_action | atomic / sympy_action_face | 4,121,204 | 425 | element kernel | warm | 72 |
-| jac_action | atomic / (kernel n/a) / isoparam | 4,121,204 | 397 | element kernel | warm | 72 |
-| jac_action | atomic / sympy_action_geom | 4,121,204 | 360 | element kernel | warm | 72 |
-| jac_action | atomic / sympy_action_node | 4,121,204 | 333 | element kernel | warm | 72 |
-| jac_action | atomic / sympy_action_comp | 4,121,204 | 310 | element kernel | warm | 72 |
-| jac_action | atomic / sympy_action | 4,121,204 | 308 | element kernel | warm | 72 |
-| residual | store / sumfact | 4,121,204 | 2940 | element kernel | warm | 72 |
-| residual | packed / sumfact | 4,121,204 | 2929 | element kernel | warm | 72 |
-| residual | packed / sumfact | 1,098,500 | 2775 | element kernel | warm | 72 |
-| residual | packed / current | 4,121,204 | 2205 | element kernel | warm | 72 |
-| residual | store / current | 4,121,204 | 2194 | element kernel | warm | 72 |
-| residual | store / sympy | 4,121,204 | 2142 | element kernel | warm | 72 |
-| residual | packed / sympy | 4,121,204 | 2108 | element kernel | warm | 72 |
-| residual | packed / sumfact | 4,121,204 | 1761 | partial | warm | 72 |
-| residual | packed / sumfact | 1,098,500 | 1623 | solver operator | warm | 72 |
-| residual | packed / sumfact | 4,121,204 | 1545 | solver operator | warm | 72 |
-| residual | packed / sumfact | 4,121,204 | 1454 | partial | warm | 72 |
-| residual | packed / sumfact | 4,121,204 | 1422 | solver operator | warm | 72 |
-| residual | colored / sumfact | 4,121,204 | 1267 | element kernel | warm | 72 |
-| residual | packed / sumfact | 4,121,204 | 1206 | solver operator | warm | 72 |
-| residual | colored / current | 4,121,204 | 976 | element kernel | warm | 72 |
-| residual | colored / sympy | 4,121,204 | 939 | element kernel | warm | 72 |
-| residual | atomic / current | 4,121,204 | 888 | element kernel | warm | 72 |
-| residual | atomic / sumfact | 4,121,204 | 887 | element kernel | warm | 72 |
-| residual | packed / isoparam_simd / isoparam | 4,121,204 | 886 | element kernel | warm | 72 |
-| residual | atomic / sympy | 4,121,204 | 861 | element kernel | warm | 72 |
-| residual | atomic / sumfact | 4,121,204 | 700 | partial | warm | 72 |
-| residual | atomic / sumfact | 4,121,204 | 681 | solver operator | warm | 72 |
-| residual | atomic / sumfact | 4,121,204 | 480 | partial | warm | 72 |
-| residual | atomic / sympy / isoparam | 4,121,204 | 461 | element kernel | warm | 72 |
-| residual | atomic / current / isoparam | 4,121,204 | 413 | element kernel | warm | 72 |
+| assemble | colored / sumfact / bsr f64 | 28,756,228 | 113 | element kernel | warm | 72 |
+| assemble | colored / sumfact / bsr f64 | 16,693,124 | 107 | element kernel | warm | 72 |
+| assemble | colored / sympy / bsr f64 | 28,756,228 | 107 | element kernel | warm | 72 |
+| assemble | colored / sympy / bsr f64 | 16,693,124 | 101 | element kernel | warm | 72 |
+| assemble | colored / sumfact / bsr f64 | 8,586,756 | 94 | element kernel | warm | 72 |
+| assemble | colored / sympy / bsr f64 | 8,586,756 | 87 | element kernel | warm | 72 |
+| assemble | colored / sumfact / bsr f64 | 3,650,692 | 82 | element kernel | warm | 72 |
+| assemble | store / sumfact / bsr f64 | 8,586,756 | 76 | element kernel | warm | 72 |
+| assemble | store / sumfact / bsr f64 | 1,098,500 | 76 | element kernel | warm | 72 |
+| assemble | store / sumfact / bsr f64 | 28,756,228 | 75 | element kernel | warm | 72 |
+| assemble | store / sumfact / bsr f64 | 16,693,124 | 73 | element kernel | warm | 72 |
+| assemble | store / sumfact / bsr f64 | 3,650,692 | 73 | element kernel | warm | 72 |
+| assemble | colored / sympy / bsr f64 | 3,650,692 | 71 | element kernel | warm | 72 |
+| assemble | packed / sumfact / bsr f64 | 1,098,500 | 57 | element kernel | warm | 72 |
+| assemble | packed / sumfact / bsr f64 | 8,586,756 | 57 | element kernel | warm | 72 |
+| assemble | packed / sumfact / bsr f64 | 16,693,124 | 57 | element kernel | warm | 72 |
+| assemble | atomic / sympy / bsr f64 | 1,098,500 | 56 | element kernel | warm | 72 |
+| assemble | packed / sumfact / bsr f64 | 28,756,228 | 56 | element kernel | warm | 72 |
+| assemble | atomic / sympy / bsr f64 | 3,650,692 | 56 | element kernel | warm | 72 |
+| assemble | atomic / sympy / bsr f64 | 16,693,124 | 55 | element kernel | warm | 72 |
+| assemble | packed / sumfact / bsr f64 | 3,650,692 | 55 | element kernel | warm | 72 |
+| assemble | atomic / sympy / bsr f64 | 28,756,228 | 55 | element kernel | warm | 72 |
+| assemble | atomic / sympy / bsr f64 | 8,586,756 | 55 | element kernel | warm | 72 |
+| assemble | colored / sumfact / bsr f64 | 1,098,500 | 48 | element kernel | warm | 72 |
+| assemble | atomic / sumfact / bsr f64 | 1,098,500 | 39 | element kernel | warm | 72 |
+| assemble | colored / sympy / bsr f64 | 1,098,500 | 39 | element kernel | warm | 72 |
+| assemble | atomic / sumfact / bsr f64 | 3,650,692 | 39 | element kernel | warm | 72 |
+| assemble | atomic / sumfact / bsr f64 | 8,586,756 | 39 | element kernel | warm | 72 |
+| assemble | atomic / sumfact / bsr f64 | 16,693,124 | 39 | element kernel | warm | 72 |
+| assemble | atomic / sumfact / bsr f64 | 28,756,228 | 39 | element kernel | warm | 72 |
+| assemble_diag | atomic / (kernel n/a) | 16,693,124 | 114 | element kernel | warm | 72 |
+| assemble_diag | atomic / (kernel n/a) | 28,756,228 | 114 | element kernel | warm | 72 |
+| assemble_diag | atomic / (kernel n/a) | 8,586,756 | 113 | element kernel | warm | 72 |
+| assemble_diag | atomic / (kernel n/a) | 3,650,692 | 112 | element kernel | warm | 72 |
+| assemble_diag | atomic / (kernel n/a) | 1,098,500 | 107 | element kernel | warm | 72 |
+| bsr_apply | n/a / (kernel n/a) / bsr f32 | 1,098,500 | 1076 | element kernel | warm | 72 |
+| bsr_apply | n/a / (kernel n/a) / bsr f32 | 16,693,124 | 923 | element kernel | warm | 72 |
+| bsr_apply | n/a / (kernel n/a) / bsr f32 | 3,650,692 | 858 | element kernel | warm | 72 |
+| bsr_apply | n/a / (kernel n/a) / bsr f32 | 8,586,756 | 834 | element kernel | warm | 72 |
+| bsr_apply | n/a / (kernel n/a) / bsr f64 | 1,098,500 | 511 | element kernel | warm | 72 |
+| bsr_apply | n/a / (kernel n/a) / bsr f64 | 3,650,692 | 495 | element kernel | warm | 72 |
+| bsr_apply | n/a / (kernel n/a) / bsr f64 | 16,693,124 | 461 | element kernel | warm | 72 |
+| bsr_apply | n/a / (kernel n/a) / bsr f64 | 8,586,756 | 455 | element kernel | warm | 72 |
+| jac_action | packed / (kernel n/a) | 3,650,692 | 2117 | element kernel | warm | 72 |
+| jac_action | packed / (kernel n/a) | 1,098,500 | 2014 | element kernel | warm | 72 |
+| jac_action | packed / (kernel n/a) | 28,756,228 | 1917 | element kernel | warm | 72 |
+| jac_action | packed / (kernel n/a) | 8,586,756 | 1906 | element kernel | warm | 72 |
+| jac_action | packed / (kernel n/a) | 16,693,124 | 1884 | element kernel | warm | 72 |
+| jac_action | packed / (kernel n/a) | 1,098,500 | 1059 | partial | warm | 72 |
+| jac_action | packed / (kernel n/a) | 1,098,500 | 975 | solver operator | warm | 72 |
+| jac_action | packed / (kernel n/a) | 28,756,228 | 929 | partial | warm | 72 |
+| jac_action | packed / (kernel n/a) | 3,650,692 | 926 | partial | warm | 72 |
+| jac_action | packed / (kernel n/a) | 28,756,228 | 885 | solver operator | warm | 72 |
+| jac_action | packed / (kernel n/a) | 16,693,124 | 876 | partial | warm | 72 |
+| jac_action | packed / (kernel n/a) | 8,586,756 | 873 | partial | warm | 72 |
+| jac_action | packed / (kernel n/a) | 3,650,692 | 857 | solver operator | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 28,756,228 | 829 | element kernel | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 3,650,692 | 828 | element kernel | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 16,693,124 | 828 | element kernel | warm | 72 |
+| jac_action | packed / (kernel n/a) | 16,693,124 | 828 | solver operator | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 8,586,756 | 823 | element kernel | warm | 72 |
+| jac_action | packed / (kernel n/a) | 8,586,756 | 821 | solver operator | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 1,098,500 | 764 | element kernel | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 1,098,500 | 443 | partial | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 8,586,756 | 436 | partial | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 1,098,500 | 432 | solver operator | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 3,650,692 | 432 | partial | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 16,693,124 | 425 | partial | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 28,756,228 | 425 | partial | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 8,586,756 | 424 | solver operator | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 3,650,692 | 421 | solver operator | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 28,756,228 | 415 | solver operator | warm | 72 |
+| jac_action | atomic / (kernel n/a) | 16,693,124 | 414 | solver operator | warm | 72 |
+| residual | packed / sumfact | 3,650,692 | 2947 | element kernel | warm | 72 |
+| residual | packed / sumfact | 1,098,500 | 2740 | element kernel | warm | 72 |
+| residual | packed / sumfact | 8,586,756 | 2624 | element kernel | warm | 72 |
+| residual | packed / sumfact | 28,756,228 | 2596 | element kernel | warm | 72 |
+| residual | packed / sumfact | 16,693,124 | 2568 | element kernel | warm | 72 |
+| residual | packed / current | 3,650,692 | 2258 | element kernel | warm | 72 |
+| residual | packed / current | 16,693,124 | 2148 | element kernel | warm | 72 |
+| residual | packed / current | 28,756,228 | 2133 | element kernel | warm | 72 |
+| residual | packed / current | 8,586,756 | 2128 | element kernel | warm | 72 |
+| residual | packed / current | 1,098,500 | 2064 | element kernel | warm | 72 |
+| residual | packed / sumfact | 3,650,692 | 1499 | partial | warm | 72 |
+| residual | packed / sumfact | 1,098,500 | 1445 | partial | warm | 72 |
+| residual | packed / sumfact | 28,756,228 | 1394 | partial | warm | 72 |
+| residual | packed / sumfact | 8,586,756 | 1385 | partial | warm | 72 |
+| residual | packed / sumfact | 16,693,124 | 1380 | partial | warm | 72 |
+| residual | packed / sumfact | 3,650,692 | 1362 | solver operator | warm | 72 |
+| residual | packed / sumfact | 1,098,500 | 1344 | solver operator | warm | 72 |
+| residual | packed / sumfact | 28,756,228 | 1309 | solver operator | warm | 72 |
+| residual | packed / sumfact | 1,098,500 | 1293 | partial | warm | 72 |
+| residual | packed / sumfact | 3,650,692 | 1286 | partial | warm | 72 |
+| residual | packed / sumfact | 1,098,500 | 1283 | solver operator | warm | 72 |
+| residual | packed / sumfact | 16,693,124 | 1280 | solver operator | warm | 72 |
+| residual | packed / sumfact | 3,650,692 | 1277 | solver operator | warm | 72 |
+| residual | packed / sumfact | 8,586,756 | 1272 | solver operator | warm | 72 |
+| residual | packed / sumfact | 28,756,228 | 1211 | solver operator | warm | 72 |
+| residual | packed / sumfact | 8,586,756 | 1186 | partial | warm | 72 |
+| residual | packed / sumfact | 28,756,228 | 1180 | partial | warm | 72 |
+| residual | packed / sumfact | 8,586,756 | 1179 | solver operator | warm | 72 |
+| residual | packed / sumfact | 16,693,124 | 1177 | solver operator | warm | 72 |
+| residual | packed / sumfact | 16,693,124 | 1174 | partial | warm | 72 |
+| residual | atomic / current | 3,650,692 | 891 | element kernel | warm | 72 |
+| residual | atomic / current | 8,586,756 | 882 | element kernel | warm | 72 |
+| residual | atomic / current | 28,756,228 | 866 | element kernel | warm | 72 |
+| residual | atomic / current | 1,098,500 | 866 | element kernel | warm | 72 |
+| residual | atomic / sumfact | 3,650,692 | 865 | element kernel | warm | 72 |
+| residual | atomic / sumfact | 8,586,756 | 854 | element kernel | warm | 72 |
+| residual | atomic / sumfact | 28,756,228 | 853 | element kernel | warm | 72 |
+| residual | atomic / current | 16,693,124 | 838 | element kernel | warm | 72 |
+| residual | atomic / sumfact | 1,098,500 | 837 | element kernel | warm | 72 |
+| residual | atomic / sumfact | 16,693,124 | 814 | element kernel | warm | 72 |
+| residual | atomic / sumfact | 1,098,500 | 603 | partial | warm | 72 |
+| residual | atomic / sumfact | 8,586,756 | 595 | partial | warm | 72 |
+| residual | atomic / sumfact | 1,098,500 | 587 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 3,650,692 | 586 | partial | warm | 72 |
+| residual | atomic / sumfact | 28,756,228 | 583 | partial | warm | 72 |
+| residual | atomic / sumfact | 8,586,756 | 579 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 1,098,500 | 575 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 3,650,692 | 574 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 28,756,228 | 572 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 16,693,124 | 568 | partial | warm | 72 |
+| residual | atomic / sumfact | 3,650,692 | 565 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 8,586,756 | 562 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 16,693,124 | 556 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 28,756,228 | 550 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 16,693,124 | 538 | solver operator | warm | 72 |
+| residual | atomic / sumfact | 8,586,756 | 435 | partial | warm | 72 |
+| residual | atomic / sumfact | 28,756,228 | 432 | partial | warm | 72 |
+| residual | atomic / sumfact | 3,650,692 | 420 | partial | warm | 72 |
+| residual | atomic / sumfact | 16,693,124 | 420 | partial | warm | 72 |
+| residual | atomic / sumfact | 1,098,500 | 410 | partial | warm | 72 |
 
 
 ## What the physics costs
@@ -180,28 +204,142 @@ percentage of the best. Two rows differ meaningfully only when the gap between
 them is larger than that -- which is not true of every pair here, and saying so
 is cheaper than inviting the reader to over-read a 3% difference.
 
-### residual, 4,121,204 dof
+### residual, packed layout, 3,650,692 dof
 
 | operator | terms carried | working set | MDOF/s | spread | cost vs bare kernel |
 |---|---|---|---|---|---|
-| element kernel | none | warm | 2929 | 2% of 6 | 1.00x |
-| partial | Rhie-Chow, state ∇p (hoisted) | warm | 1761 | 1% of 3 | 1.66x |
-| solver operator | Rhie-Chow, state ∇p (hoisted), boundary | warm | 1545 | 4% of 3 | 1.90x |
-| partial | Rhie-Chow, state ∇p (per apply) | warm | 1454 | 1% of 3 | 2.01x |
-| solver operator | Rhie-Chow, state ∇p (hoisted), boundary, transient | warm | 1422 | 10% of 3 | 2.06x |
-| solver operator | Rhie-Chow, state ∇p (per apply), boundary, transient | warm | 1206 | 1% of 3 | 2.43x |
+| element kernel | none | warm | 2947 | 1% of 5 | 1.00x |
+| partial | Rhie-Chow, state ∇p (hoisted) | warm | 1499 | 1% of 5 | 1.97x |
+| solver operator | Rhie-Chow, state ∇p (hoisted), boundary | warm | 1362 | 1% of 5 | 2.16x |
+| partial | Rhie-Chow, state ∇p (per apply) | warm | 1286 | 1% of 5 | 2.29x |
+| solver operator | Rhie-Chow, state ∇p (hoisted), boundary, transient | warm | 1277 | 1% of 5 | 2.31x |
 
-### jac_action, 4,121,204 dof
+### residual, atomic layout, 3,650,692 dof
 
 | operator | terms carried | working set | MDOF/s | spread | cost vs bare kernel |
 |---|---|---|---|---|---|
-| element kernel | none | warm | 2071 | 1% of 6 | 1.00x |
-| partial | Rhie-Chow, exact-RC J, state ∇p (hoisted) | warm | 963 | 1% of 3 | 2.15x |
-| solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary | warm | 892 | 1% of 3 | 2.32x |
-| solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary, transient | warm | 860 | 0% of 3 | 2.41x |
-| solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary | cold, 7 live | 845 | 2% of 3 | 2.45x |
-| assembled matrix | SpMV of the assembled BSR — 3 term sets, 1.5% apart | warm | 458 | n=3 | 4.52x |
+| element kernel | none | warm | 865 | 4% of 5 | 1.00x |
+| partial | Rhie-Chow, state ∇p (hoisted) | warm | 586 | 1% of 5 | 1.48x |
+| solver operator | Rhie-Chow, state ∇p (hoisted), boundary | warm | 574 | 2% of 5 | 1.51x |
+| solver operator | Rhie-Chow, state ∇p (hoisted), boundary, transient | warm | 565 | 13% of 5 | 1.53x |
+| partial | Rhie-Chow, state ∇p (per apply) | warm | 420 | 10% of 5 | 2.06x |
 
+### jac_action, packed layout, 3,650,692 dof
+
+| operator | terms carried | working set | MDOF/s | spread | cost vs bare kernel |
+|---|---|---|---|---|---|
+| element kernel | none | warm | 2117 | 1% of 5 | 1.00x |
+| partial | Rhie-Chow, exact-RC J, state ∇p (hoisted) | warm | 926 | 4% of 5 | 2.29x |
+| solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary | warm | 857 | 1% of 5 | 2.47x |
+| assembled matrix | SpMV of the assembled BSR, f64 values | warm | 495 | n=1 | 4.28x |
+| assembled matrix | SpMV of the assembled BSR, f32 values | warm | 858 | n=1 | 2.47x |
+
+### jac_action, atomic layout, 3,650,692 dof
+
+| operator | terms carried | working set | MDOF/s | spread | cost vs bare kernel |
+|---|---|---|---|---|---|
+| element kernel | none | warm | 828 | 1% of 5 | 1.00x |
+| partial | Rhie-Chow, exact-RC J, state ∇p (hoisted) | warm | 432 | 1% of 5 | 1.92x |
+| solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary | warm | 421 | 3% of 5 | 1.97x |
+| assembled matrix | SpMV of the assembled BSR, f64 values | warm | 495 | n=1 | 1.67x |
+| assembled matrix | SpMV of the assembled BSR, f32 values | warm | 858 | n=1 | 0.97x |
+
+
+## Standard against packed
+
+One operator per row, measured on both layouts. The ratio is packed over the
+standard layout, so above 1.00x the packed sweep is the faster of the two.
+
+`SpMV f64` and `SpMV f32` are the assembled matrix applied at the same size --
+the same Jacobian, neither layout, and the only one of the three whose cost is
+set by the sparsity pattern rather than by the element kernel. `f32 vs f64` is
+what halving the value traffic bought; the arithmetic is identical, since the
+SpMV up-converts each entry and accumulates in double either way.
+
+The final column is the spread of the packed readings. A ratio nearer to 1.00x
+than that spread is a tie and must be read as one.
+
+| dof | operation | kernel | operator | terms carried | packed MDOF/s | standard | standard MDOF/s | packed vs standard | SpMV f64 | SpMV f32 | f32 vs f64 | spread (packed) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1,098,500 | assemble | sumfact | element kernel | none | 57 | atomic | 39 | 1.44x | 511 | 1076 | 2.10x | 4% of 5 |
+| 1,098,500 | assemble | sumfact | element kernel | none | 57 | colored | 48 | 1.19x | 511 | 1076 | 2.10x | 4% of 5 |
+| 3,650,692 | assemble | sumfact | element kernel | none | 55 | atomic | 39 | 1.42x | 495 | 858 | 1.73x | 3% of 5 |
+| 3,650,692 | assemble | sumfact | element kernel | none | 55 | colored | 82 | 0.68x | 495 | 858 | 1.73x | 3% of 5 |
+| 8,586,756 | assemble | sumfact | element kernel | none | 57 | atomic | 39 | 1.46x | 455 | 834 | 1.83x | 2% of 5 |
+| 8,586,756 | assemble | sumfact | element kernel | none | 57 | colored | 94 | 0.60x | 455 | 834 | 1.83x | 2% of 5 |
+| 16,693,124 | assemble | sumfact | element kernel | none | 57 | atomic | 39 | 1.47x | 461 | 923 | 2.00x | 4% of 5 |
+| 16,693,124 | assemble | sumfact | element kernel | none | 57 | colored | 107 | 0.53x | 461 | 923 | 2.00x | 4% of 5 |
+| 28,756,228 | assemble | sumfact | element kernel | none | 56 | atomic | 39 | 1.45x | – | – | – | 54% of 5 |
+| 28,756,228 | assemble | sumfact | element kernel | none | 56 | colored | 113 | 0.49x | – | – | – | 54% of 5 |
+| 1,098,500 | jac_action | n/a | element kernel | none | 2014 | atomic | 764 | 2.64x | 511 | 1076 | 2.10x | 2% of 5 |
+| 1,098,500 | jac_action | n/a | partial | Rhie-Chow, exact-RC J, state ∇p (hoisted) | 1059 | atomic | 443 | 2.39x | 511 | 1076 | 2.10x | 3% of 5 |
+| 1,098,500 | jac_action | n/a | solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary | 975 | atomic | 432 | 2.26x | 511 | 1076 | 2.10x | 1% of 5 |
+| 3,650,692 | jac_action | n/a | element kernel | none | 2117 | atomic | 828 | 2.56x | 495 | 858 | 1.73x | 1% of 5 |
+| 3,650,692 | jac_action | n/a | partial | Rhie-Chow, exact-RC J, state ∇p (hoisted) | 926 | atomic | 432 | 2.14x | 495 | 858 | 1.73x | 4% of 5 |
+| 3,650,692 | jac_action | n/a | solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary | 857 | atomic | 421 | 2.04x | 495 | 858 | 1.73x | 1% of 5 |
+| 8,586,756 | jac_action | n/a | element kernel | none | 1906 | atomic | 823 | 2.32x | 455 | 834 | 1.83x | 1% of 5 |
+| 8,586,756 | jac_action | n/a | partial | Rhie-Chow, exact-RC J, state ∇p (hoisted) | 873 | atomic | 436 | 2.00x | 455 | 834 | 1.83x | 1% of 5 |
+| 8,586,756 | jac_action | n/a | solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary | 821 | atomic | 424 | 1.94x | 455 | 834 | 1.83x | 2% of 5 |
+| 16,693,124 | jac_action | n/a | element kernel | none | 1884 | atomic | 828 | 2.28x | 461 | 923 | 2.00x | 1% of 5 |
+| 16,693,124 | jac_action | n/a | partial | Rhie-Chow, exact-RC J, state ∇p (hoisted) | 876 | atomic | 425 | 2.06x | 461 | 923 | 2.00x | 5% of 5 |
+| 16,693,124 | jac_action | n/a | solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary | 828 | atomic | 414 | 2.00x | 461 | 923 | 2.00x | 1% of 5 |
+| 28,756,228 | jac_action | n/a | element kernel | none | 1917 | atomic | 829 | 2.31x | – | – | – | 1% of 5 |
+| 28,756,228 | jac_action | n/a | partial | Rhie-Chow, exact-RC J, state ∇p (hoisted) | 929 | atomic | 425 | 2.19x | – | – | – | 2% of 5 |
+| 28,756,228 | jac_action | n/a | solver operator | Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary | 885 | atomic | 415 | 2.13x | – | – | – | 3% of 5 |
+| 1,098,500 | residual | sumfact | element kernel | none | 2740 | atomic | 837 | 3.28x | 511 | 1076 | 2.10x | 2% of 5 |
+| 1,098,500 | residual | current | element kernel | none | 2064 | atomic | 866 | 2.38x | 511 | 1076 | 2.10x | 2% of 5 |
+| 1,098,500 | residual | sumfact | partial | Rhie-Chow, state ∇p (hoisted) | 1445 | atomic | 603 | 2.40x | 511 | 1076 | 2.10x | 3% of 5 |
+| 1,098,500 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary | 1344 | atomic | 587 | 2.29x | 511 | 1076 | 2.10x | 2% of 5 |
+| 1,098,500 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary, transient | 1283 | atomic | 575 | 2.23x | 511 | 1076 | 2.10x | 3% of 5 |
+| 1,098,500 | residual | sumfact | partial | Rhie-Chow, state ∇p (per apply) | 1293 | atomic | 410 | 3.16x | 511 | 1076 | 2.10x | 4% of 5 |
+| 3,650,692 | residual | sumfact | element kernel | none | 2947 | atomic | 865 | 3.41x | 495 | 858 | 1.73x | 1% of 5 |
+| 3,650,692 | residual | current | element kernel | none | 2258 | atomic | 891 | 2.53x | 495 | 858 | 1.73x | 2% of 5 |
+| 3,650,692 | residual | sumfact | partial | Rhie-Chow, state ∇p (hoisted) | 1499 | atomic | 586 | 2.56x | 495 | 858 | 1.73x | 1% of 5 |
+| 3,650,692 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary | 1362 | atomic | 574 | 2.37x | 495 | 858 | 1.73x | 1% of 5 |
+| 3,650,692 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary, transient | 1277 | atomic | 565 | 2.26x | 495 | 858 | 1.73x | 1% of 5 |
+| 3,650,692 | residual | sumfact | partial | Rhie-Chow, state ∇p (per apply) | 1286 | atomic | 420 | 3.06x | 495 | 858 | 1.73x | 1% of 5 |
+| 8,586,756 | residual | sumfact | element kernel | none | 2624 | atomic | 854 | 3.07x | 455 | 834 | 1.83x | 3% of 5 |
+| 8,586,756 | residual | current | element kernel | none | 2128 | atomic | 882 | 2.41x | 455 | 834 | 1.83x | 2% of 5 |
+| 8,586,756 | residual | sumfact | partial | Rhie-Chow, state ∇p (hoisted) | 1385 | atomic | 595 | 2.33x | 455 | 834 | 1.83x | 4% of 5 |
+| 8,586,756 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary | 1272 | atomic | 579 | 2.20x | 455 | 834 | 1.83x | 1% of 5 |
+| 8,586,756 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary, transient | 1179 | atomic | 562 | 2.10x | 455 | 834 | 1.83x | 12% of 5 |
+| 8,586,756 | residual | sumfact | partial | Rhie-Chow, state ∇p (per apply) | 1186 | atomic | 435 | 2.73x | 455 | 834 | 1.83x | 1% of 5 |
+| 16,693,124 | residual | sumfact | element kernel | none | 2568 | atomic | 814 | 3.15x | 461 | 923 | 2.00x | 2% of 5 |
+| 16,693,124 | residual | current | element kernel | none | 2148 | atomic | 838 | 2.56x | 461 | 923 | 2.00x | 1% of 5 |
+| 16,693,124 | residual | sumfact | partial | Rhie-Chow, state ∇p (hoisted) | 1380 | atomic | 568 | 2.43x | 461 | 923 | 2.00x | 2% of 5 |
+| 16,693,124 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary | 1280 | atomic | 556 | 2.30x | 461 | 923 | 2.00x | 4% of 5 |
+| 16,693,124 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary, transient | 1177 | atomic | 538 | 2.19x | 461 | 923 | 2.00x | 0% of 5 |
+| 16,693,124 | residual | sumfact | partial | Rhie-Chow, state ∇p (per apply) | 1174 | atomic | 420 | 2.80x | 461 | 923 | 2.00x | 1% of 5 |
+| 28,756,228 | residual | sumfact | element kernel | none | 2596 | atomic | 853 | 3.05x | – | – | – | 3% of 5 |
+| 28,756,228 | residual | current | element kernel | none | 2133 | atomic | 866 | 2.46x | – | – | – | 1% of 5 |
+| 28,756,228 | residual | sumfact | partial | Rhie-Chow, state ∇p (hoisted) | 1394 | atomic | 583 | 2.39x | – | – | – | 1% of 5 |
+| 28,756,228 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary | 1309 | atomic | 572 | 2.29x | – | – | – | 1% of 5 |
+| 28,756,228 | residual | sumfact | solver operator | Rhie-Chow, state ∇p (hoisted), boundary, transient | 1211 | atomic | 550 | 2.20x | – | – | – | 1% of 5 |
+| 28,756,228 | residual | sumfact | partial | Rhie-Chow, state ∇p (per apply) | 1180 | atomic | 432 | 2.73x | – | – | – | 1% of 5 |
+
+
+## Reading the sections below
+
+The tables above are regenerated from `perf/campaign_grace.csv` on every run. The sections
+that follow are not: they are written by hand, they survive a regeneration through
+`--prose`, and they quote the measurements that were in front of whoever wrote them.
+
+That matters here because the two no longer share a problem size. The analyses below were
+written against 4,121,204 and 8,586,756 dof on an earlier binary; the campaign above sweeps
+1,098,500 to 28,756,228 dof and does not contain 4,121,204 at all. So a number in the prose
+will often have no counterpart in the tables, and where both exist they were taken on
+different binaries months apart.
+
+Nothing below is contradicted by the tables above -- the campaign reproduces the recorded
+baseline for the packed residual, 2624 MDOF/s against 2620.2 -- and the reasoning in each
+section is about mechanism rather than about a particular figure. But a reader who tries to
+find a prose number in a table above will not find it, and that is provenance rather than
+disagreement.
+
+One thing the campaign does add that the sections below predate: the layout comparison is
+now swept across five sizes, and the assembly ranking INVERTS inside that range. Packed
+assembly beats colored at 1,098,500 dof and loses to it by 2x at 28,756,228. Any statement
+about which layout wins assembly is a statement about a size.
 
 ## What the headline number leaves out
 
@@ -332,9 +470,19 @@ the bare kernel to 2.0x, without ever closing it.
 
 | field | value |
 |---|---|
-| generated | 2026-09-11 10:44:43 |
-| rows | 71 |
-| machines | nid006567 |
-| sources | kernels-det-4644425.csv |
+| generated | 2026-09-24 19:58:49 |
+| rows | 133 |
+| machines | nid006538 |
+| sources | campaign_grace.csv |
+| hand-written sections | 5, carried through --prose |
 
-Regenerate with `python3 python/cvfem_kernel_report.py <csv> -o docs/CVFEM_Kernels.md --html`.
+Regenerate with:
+
+```
+python3 python/cvfem_kernel_report.py perf/campaign_grace.csv -o docs/CVFEM_Kernels.md --html \
+      --prose docs/kernel_prose/05_reading_the_prose.md \
+      --prose docs/kernel_prose/10_headline_vs_operator.md \
+      --prose docs/kernel_prose/20_gradient_cache.md \
+      --prose docs/kernel_prose/30_layout_margin.md \
+      --prose docs/kernel_prose/40_spmv.md
+```

@@ -23,8 +23,8 @@
 //     the second way and the residual the first, so anything that made them differ would
 //     make the two paths disagree about the same operator.
 
-#include "cvfem_hex8_layout_common.hpp"
-#include "cvfem_hex8_layout_atomic.hpp"
+#include "cvfem_hex8_best_common.hpp"
+#include "cvfem_hex8_best_atomic.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"

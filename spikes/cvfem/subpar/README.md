@@ -105,6 +105,47 @@ gemm. And none of this was measured on a GPU, where the arithmetic-intensity arg
 different enough that the ordering could invert -- as packing already does between Grace
 and Hopper.
 
+**Status: no longer compiles, and cannot be restored as written.** (2026-09-24)
+
+`-DCVFEM_ENABLE_SUBPAR=ON` fails here with `no member named 'coeff' in 'SSMacroGeom'` at three
+sites and two calls to `sscvfem_macro_geom` with the wrong arity. The arity is trivial: the
+function gained a `Hex8RcTau` argument. The `coeff` is not.
+
+`SSMacroGeom::coeff[]` is gone because the Rhie-Chow coefficient became velocity dependent. It is
+now formed per cell by `sscvfem_rc_coeff(g, s, u2)` out of `rc_num`, `rc_base` and `inv_h2`, with
+`u2` the squared advecting velocity at the sub-control surface. The two residual/Jacobian sites in
+this file have `ux/uy/uz` in scope and could be ported mechanically, following the live pattern at
+`src/ss/cvfem_sshex8_ns.hpp:1655-1659`.
+
+`sscvfem_build_full_em` cannot. It takes `(g, rho, mu, Mf)` and no velocity, by design: the 32x32
+variant exists *because* the Rhie-Chow coupling was a constant of the geometry, which is what made
+it foldable into a matrix built once per macro-element and reused across all `L^3` micro-elements.
+Passing velocity in would make the matrix state dependent and remove the reason for it to be 32x32
+rather than 24x24; keeping a constant `c` would compute a different operator. The variant is
+superseded by a change in the physics, not merely outrun by a faster implementation.
+
+This is the one entry in this file for which the opening claim -- "kept, and kept compiling" -- is
+not true. Read a compile error here as the record of an invalidated premise, not as a mechanical
+fix waiting to be made.
+
+
+
+**These variants now have their own switch.** (2026-09-24)
+
+`-DCVFEM_ENABLE_SUBPAR=ON` builds everything in this directory again, because the element-matrix
+variants moved behind `-DCVFEM_ENABLE_SUBPAR_EM=ON`, which is OFF even when the first is ON.
+
+The split is not tidiness. One header that cannot compile made the whole quarantine
+unbuildable, and with it every other retired variant unmeasurable -- which is the single thing
+this directory exists to keep possible. A quarantine whose gate cannot go green is a deletion
+with extra steps. `cvfem_sshex8_bench` is also the agreement gate (`cvfem_sshex8_agree`), so
+while the two flags were one, asking to measure a retired kernel meant giving up the
+correctness check at the same time.
+
+Turning `CVFEM_ENABLE_SUBPAR_EM` on is therefore a request to port the two residual/Jacobian
+sites first, as described above -- and to decide what the 32x32 variant should even mean now
+that the coupling it was built on is no longer a constant of the geometry.
+
 ## `cvfem_hex8_ns_upwind_sympy_subpar.hpp` — row-wise and face-wise CSE for HEX8 assembly
 
 **Why they existed.** The generated assembly is one expression tree cut into CSE scopes, and
@@ -321,3 +362,62 @@ short, which is the same thing the scope sweep says from the other direction.
 Reproduce with `jobs/cse_action.sbatch`. Correctness is pinned by
 `tests/cvfem_sympy_action_test.cpp`, which holds all four against the hand-written action
 and against each other at 1e-16, so these remain measurable rather than merely present.
+
+## The generated Jacobian-action arrangements, and the affine generated residual
+
+**Retired 2026-09-24, on measurements taken the same day.** Grace, 72 threads,
+`OMP_PROC_BIND=true`, 8,586,756 dof, 3 repetitions, spreads 0-3%. The raw rows are in
+`perf/campaign_generated_arms.csv` and the sweep that produced them is
+`scripts/layout_campaign.sh`.
+
+### The six Jacobian-action arrangements
+
+They differ only in the scope one `sp.cse` call was given -- the whole kernel, one node, one
+component, one sub-control surface, and two forms that hoist the geometry-only
+subexpressions into their own pass. Against the hand-written atomic action at 828.9 MDOF/s,
+and the hand-written packed action at 1905.3:
+
+| arrangement | MDOF/s | vs atomic | vs packed |
+|---|---:|---:|---:|
+| `sympy_action` | 307.8 | 0.37x | 0.16x |
+| `sympy_action_componentwise` | 328.2 | 0.40x | 0.17x |
+| `sympy_action_nodewise` | 329.3 | 0.40x | 0.17x |
+| `sympy_action_geom` | 359.2 | 0.43x | 0.19x |
+| `sympy_action_facewise` | 418.6 | 0.51x | 0.22x |
+| `sympy_action_geomface` | 473.3 | 0.57x | 0.25x |
+
+The axis itself is informative and is the reason they were built: the spread across it is
+1.54x, the geometry hoist is worth 1.17x on the flat arrangement and 1.13x on the facewise
+one, and cutting the scope finer helps rather than hurts here -- the opposite of the
+assembly verdict, where facewise lost badly because it issued 2016 atomic adds against
+flat's 768 while the action accumulates into a local. None of that closes a gap of 1.75x to
+the nearest alternative.
+
+### The affine generated residual
+
+**Not a defeat everywhere, and the distinction is the point.** On the packed layout it gives
+up 21.6% (2066.9 against `sumfact`'s 2636.8). On the atomic layout it TIES `sumfact` --
+854.8 against 858.2, inside the spread -- and trails `current` by 3.9%. So it is quarantined
+for never being fastest anywhere rather than for losing everywhere, and a future change that
+moves the packed number is entitled to reopen it.
+
+`cvfem_hex8_ns_upwind_sympy_residual_isoparam` is NOT retired. It is the isoparametric
+scalar winner, this campaign measured affine geometry only, and nothing here is evidence
+about it. `--kernel sympy --geom isoparam` still runs; only `--geom affine` is refused.
+
+### What moved, and what still checks it
+
+The generator emits them to `cvfem_hex8_ns_upwind_sympy_subpar.hpp` instead of to the main
+header -- `SUBPAR_MARKERS` in `python/synthesize_cvfem_hex8_ns_upwind_sympy.py` -- so this is
+a change to the generator rather than to generated text, and
+`cvfem_sympy_kernels_hex8_are_current` is what verifies it was done properly.
+
+`tests/cvfem_sympy_action_test.cpp` follows them behind the same flag and reports ctest SKIP
+(77) otherwise: a correctness gate belongs with the code it checks, and re-enabling the
+arrangements must not bring back unverified kernels. `scripts/perf_regression.sh` lost its
+`residual_packed_sympy` row for the same reason -- a gate for a kernel that cannot launch is
+not a gate.
+
+One hardening came out of this. `SUBPAR_MARKERS` matched by substring, which cannot tell a
+name from that same name with a suffix: quarantining `_residual` would have silently taken
+`_residual_isoparam`, the winner, with it. The rule now compares whole function names.

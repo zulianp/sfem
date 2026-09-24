@@ -10,7 +10,7 @@
 #include <cuda_runtime.h>
 
 // The kernel header is not self-contained: it needs scalar_t and SFEM_RESTRICT in
-// scope, exactly as cvfem_hex8_layout_common.hpp provides them on the host.
+// scope, exactly as cvfem_hex8_best_common.hpp provides them on the host.
 using scalar_t = double;
 #ifndef SFEM_RESTRICT
 #define SFEM_RESTRICT __restrict__

@@ -39,7 +39,7 @@ A pack-local id `l` resolves to a global id as:
 | `0 <= l < n_contiguous` | owned by this pack | `owned_nodes_ptr[p] + l` |
 | `l >= n_contiguous` | ghost | `ghost_idx[ghost_ptr[p] + (l - n_contiguous)]` |
 
-Reference implementation: `pack_local_to_global`, `src/hex8/cvfem_hex8_layout_common.hpp`.
+Reference implementation: `pack_local_to_global`, `src/best/cvfem_hex8_best_common.hpp`.
 Ghost ids start exactly at `n_contiguous` — `smesh_packed_mesh.cpp:303`
 (`d_packed_elements[v][e] = nowned + d_ghost_map[node]`).
 
@@ -128,7 +128,7 @@ Anything sizing scratch or GPU shared memory must compute its own maximum:
 max over p of  (owned_nodes_ptr[p+1] - owned_nodes_ptr[p]) + (ghost_ptr[p+1] - ghost_ptr[p])
 ```
 
-`PackedData::max_actual_nodes_per_pack` (`src/hex8/cvfem_hex8_layout_common.hpp`) is that value.
+`PackedData::max_actual_nodes_per_pack` (`src/best/cvfem_hex8_best_common.hpp`) is that value.
 Using the 65,536 constant to size shared memory would ask for 16 MB per block.
 
 `pack_idx_t` also caps how large a pack may be: a pack may never reach more than
@@ -146,11 +146,11 @@ The node partition above supports two different pack-local sparse layouts. They 
 distinct and both in use, so a spec that names only one is incomplete:
 
 - **compact** — `local_rowptr` / `local_colidx` / `local_global_slot`
-  (`src/hex8/cvfem_hex8_layout_packed.hpp`). Every row of the pack gets a compact pattern; each
+  (`src/best/cvfem_hex8_best_packed.hpp`). Every row of the pack gets a compact pattern; each
   local nonzero maps to a global block id.
 - **store** — owned rows adopt the **global** row pattern, so a pack's owned blocks are
   one contiguous slice of the global values array and can be flushed with a single
-  streaming write, no zeroing pass (`src/hex8/cvfem_hex8_layout_store.hpp`).
+  streaming write, no zeroing pass (`src/best/cvfem_hex8_best_store.hpp`).
 
 Neither is part of the on-disk format; both are derived at load time.
 

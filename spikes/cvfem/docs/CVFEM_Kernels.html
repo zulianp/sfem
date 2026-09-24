@@ -40,7 +40,7 @@ exists only to build the preconditioner.</p>
 <tbody>
 <tr>
 <td>assemble</td>
-<td>atomic / fd</td>
+<td>atomic / sumfact / bsr f64</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -51,7 +51,7 @@ exists only to build the preconditioner.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / fd / isoparam</td>
+<td>atomic / sympy / bsr f64</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -62,7 +62,7 @@ exists only to build the preconditioner.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / split</td>
+<td>colored / sumfact / bsr f64</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -73,29 +73,7 @@ exists only to build the preconditioner.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / sumfact</td>
-<td>frozen by design</td>
-<td>frozen by design</td>
-<td>hoisted</td>
-<td>carried</td>
-<td>–</td>
-<td>–</td>
-<td>partial</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>atomic / sumfact</td>
-<td>frozen by design</td>
-<td>frozen by design</td>
-<td>hoisted</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>frozen-RC</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>atomic / sumfact</td>
+<td>colored / sympy / bsr f64</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -106,7 +84,7 @@ exists only to build the preconditioner.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / sympy</td>
+<td>packed / sumfact / bsr f64</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -117,117 +95,7 @@ exists only to build the preconditioner.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / sympy_block</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>colored / sumfact</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>colored / sympy</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>colored / sympy_block</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>packed / sumfact</td>
-<td>frozen by design</td>
-<td>frozen by design</td>
-<td>hoisted</td>
-<td>carried</td>
-<td>–</td>
-<td>–</td>
-<td>partial</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>packed / sumfact</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>packed / sympy</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>packed / sympy_block</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>store / sumfact</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>store / sympy</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>store / sympy_block</td>
+<td>store / sumfact / bsr f64</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -239,39 +107,6 @@ exists only to build the preconditioner.</p>
 <tr>
 <td>assemble_diag</td>
 <td>atomic / (kernel n/a)</td>
-<td>frozen by design</td>
-<td>frozen by design</td>
-<td>hoisted</td>
-<td>carried</td>
-<td>–</td>
-<td>carried</td>
-<td>partial</td>
-</tr>
-<tr>
-<td>assemble_diag</td>
-<td>atomic / (kernel n/a)</td>
-<td>frozen by design</td>
-<td>frozen by design</td>
-<td>hoisted</td>
-<td>carried</td>
-<td>–</td>
-<td>–</td>
-<td>partial</td>
-</tr>
-<tr>
-<td>assemble_diag</td>
-<td>atomic / (kernel n/a)</td>
-<td>frozen by design</td>
-<td>frozen by design</td>
-<td>hoisted</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>frozen-RC</td>
-</tr>
-<tr>
-<td>assemble_diag</td>
-<td>atomic / (kernel n/a)</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -279,43 +114,21 @@ exists only to build the preconditioner.</p>
 <td>–</td>
 <td>–</td>
 <td>element kernel</td>
-</tr>
-<tr>
-<td>assemble_diag</td>
-<td>atomic / (kernel n/a) / isoparam</td>
-<td>frozen by design</td>
-<td>frozen by design</td>
-<td>hoisted</td>
-<td>carried</td>
-<td>–</td>
-<td>–</td>
-<td>partial</td>
 </tr>
 <tr>
 <td>bsr_apply</td>
-<td>packed / (kernel n/a)</td>
-<td>frozen by design</td>
-<td>frozen by design</td>
-<td>hoisted</td>
-<td>carried</td>
+<td>n/a / (kernel n/a) / bsr f32</td>
 <td>–</td>
 <td>–</td>
-<td>partial</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
 </tr>
 <tr>
 <td>bsr_apply</td>
-<td>packed / (kernel n/a)</td>
-<td>frozen by design</td>
-<td>frozen by design</td>
-<td>hoisted</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>frozen-RC</td>
-</tr>
-<tr>
-<td>bsr_apply</td>
-<td>packed / (kernel n/a)</td>
+<td>n/a / (kernel n/a) / bsr f64</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -338,112 +151,24 @@ exists only to build the preconditioner.</p>
 <tr>
 <td>jac_action</td>
 <td>atomic / (kernel n/a)</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / (kernel n/a) / isoparam</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / sympy_action</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / sympy_action_comp</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / sympy_action_face</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / sympy_action_geom</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / sympy_action_geomface</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / sympy_action_node</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>colored / (kernel n/a)</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a)</td>
 <td>carried</td>
 <td>carried</td>
 <td>hoisted</td>
-<td>carried</td>
 <td>–</td>
-<td>carried</td>
-<td>solver operator</td>
+<td>–</td>
+<td>–</td>
+<td>partial</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>element kernel</td>
 </tr>
 <tr>
 <td>jac_action</td>
@@ -470,28 +195,6 @@ exists only to build the preconditioner.</p>
 <tr>
 <td>jac_action</td>
 <td>packed / (kernel n/a)</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a) / isoparam</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>store / (kernel n/a)</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -513,14 +216,14 @@ exists only to build the preconditioner.</p>
 </tr>
 <tr>
 <td>residual</td>
-<td>atomic / current / isoparam</td>
+<td>atomic / sumfact</td>
+<td>carried</td>
 <td>–</td>
+<td>hoisted</td>
+<td>carried</td>
 <td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
+<td>carried</td>
+<td>solver operator</td>
 </tr>
 <tr>
 <td>residual</td>
@@ -558,61 +261,6 @@ exists only to build the preconditioner.</p>
 <tr>
 <td>residual</td>
 <td>atomic / sumfact</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>atomic / sympy</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>atomic / sympy / isoparam</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>colored / current</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>colored / sumfact</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>colored / sympy</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -634,17 +282,6 @@ exists only to build the preconditioner.</p>
 </tr>
 <tr>
 <td>residual</td>
-<td>packed / isoparam_simd / isoparam</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
 <td>packed / sumfact</td>
 <td>carried</td>
 <td>–</td>
@@ -682,17 +319,6 @@ exists only to build the preconditioner.</p>
 <td>carried</td>
 <td>–</td>
 <td>per apply</td>
-<td>carried</td>
-<td>–</td>
-<td>carried</td>
-<td>solver operator</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>packed / sumfact</td>
-<td>carried</td>
-<td>–</td>
-<td>per apply</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -701,50 +327,6 @@ exists only to build the preconditioner.</p>
 <tr>
 <td>residual</td>
 <td>packed / sumfact</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>packed / sympy</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>store / current</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>store / sumfact</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>–</td>
-<td>element kernel</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>store / sympy</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -774,8 +356,53 @@ from the table above: two rows are comparable only when it matches.</p>
 <tbody>
 <tr>
 <td>assemble</td>
-<td>colored / sumfact</td>
-<td>4,121,204</td>
+<td>colored / sumfact / bsr f64</td>
+<td>28,756,228</td>
+<td>113</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sumfact / bsr f64</td>
+<td>16,693,124</td>
+<td>107</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sympy / bsr f64</td>
+<td>28,756,228</td>
+<td>107</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sympy / bsr f64</td>
+<td>16,693,124</td>
+<td>101</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sumfact / bsr f64</td>
+<td>8,586,756</td>
+<td>94</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sympy / bsr f64</td>
+<td>8,586,756</td>
 <td>87</td>
 <td>element kernel</td>
 <td>warm</td>
@@ -783,35 +410,62 @@ from the table above: two rows are comparable only when it matches.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>colored / sympy</td>
-<td>4,121,204</td>
-<td>79</td>
+<td>colored / sumfact / bsr f64</td>
+<td>3,650,692</td>
+<td>82</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>assemble</td>
-<td>colored / sympy_block</td>
-<td>4,121,204</td>
-<td>77</td>
+<td>store / sumfact / bsr f64</td>
+<td>8,586,756</td>
+<td>76</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>assemble</td>
-<td>store / sumfact</td>
-<td>4,121,204</td>
-<td>72</td>
+<td>store / sumfact / bsr f64</td>
+<td>1,098,500</td>
+<td>76</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>assemble</td>
-<td>store / sympy</td>
-<td>4,121,204</td>
+<td>store / sumfact / bsr f64</td>
+<td>28,756,228</td>
+<td>75</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>store / sumfact / bsr f64</td>
+<td>16,693,124</td>
+<td>73</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>store / sumfact / bsr f64</td>
+<td>3,650,692</td>
+<td>73</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sympy / bsr f64</td>
+<td>3,650,692</td>
 <td>71</td>
 <td>element kernel</td>
 <td>warm</td>
@@ -819,17 +473,8 @@ from the table above: two rows are comparable only when it matches.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>store / sympy_block</td>
-<td>4,121,204</td>
-<td>70</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>atomic / sympy_block</td>
-<td>4,121,204</td>
+<td>packed / sumfact / bsr f64</td>
+<td>1,098,500</td>
 <td>57</td>
 <td>element kernel</td>
 <td>warm</td>
@@ -837,8 +482,26 @@ from the table above: two rows are comparable only when it matches.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>packed / sumfact</td>
-<td>4,121,204</td>
+<td>packed / sumfact / bsr f64</td>
+<td>8,586,756</td>
+<td>57</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>packed / sumfact / bsr f64</td>
+<td>16,693,124</td>
+<td>57</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sympy / bsr f64</td>
+<td>1,098,500</td>
 <td>56</td>
 <td>element kernel</td>
 <td>warm</td>
@@ -846,8 +509,8 @@ from the table above: two rows are comparable only when it matches.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>packed / sympy</td>
-<td>4,121,204</td>
+<td>packed / sumfact / bsr f64</td>
+<td>28,756,228</td>
 <td>56</td>
 <td>element kernel</td>
 <td>warm</td>
@@ -855,8 +518,8 @@ from the table above: two rows are comparable only when it matches.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / sympy</td>
-<td>4,121,204</td>
+<td>atomic / sympy / bsr f64</td>
+<td>3,650,692</td>
 <td>56</td>
 <td>element kernel</td>
 <td>warm</td>
@@ -864,8 +527,8 @@ from the table above: two rows are comparable only when it matches.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>packed / sympy_block</td>
-<td>4,121,204</td>
+<td>atomic / sympy / bsr f64</td>
+<td>16,693,124</td>
 <td>55</td>
 <td>element kernel</td>
 <td>warm</td>
@@ -873,17 +536,44 @@ from the table above: two rows are comparable only when it matches.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>packed / sumfact</td>
-<td>4,121,204</td>
-<td>53</td>
-<td>partial</td>
+<td>packed / sumfact / bsr f64</td>
+<td>3,650,692</td>
+<td>55</td>
+<td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / sumfact</td>
-<td>4,121,204</td>
+<td>atomic / sympy / bsr f64</td>
+<td>28,756,228</td>
+<td>55</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sympy / bsr f64</td>
+<td>8,586,756</td>
+<td>55</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>colored / sumfact / bsr f64</td>
+<td>1,098,500</td>
+<td>48</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sumfact / bsr f64</td>
+<td>1,098,500</td>
 <td>39</td>
 <td>element kernel</td>
 <td>warm</td>
@@ -891,45 +581,45 @@ from the table above: two rows are comparable only when it matches.</p>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / sumfact</td>
-<td>4,121,204</td>
-<td>34</td>
-<td>frozen-RC</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>atomic / sumfact</td>
-<td>4,121,204</td>
-<td>34</td>
-<td>partial</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>assemble</td>
-<td>atomic / fd / isoparam</td>
-<td>4,121,204</td>
-<td>21</td>
+<td>colored / sympy / bsr f64</td>
+<td>1,098,500</td>
+<td>39</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / fd</td>
-<td>4,121,204</td>
-<td>21</td>
+<td>atomic / sumfact / bsr f64</td>
+<td>3,650,692</td>
+<td>39</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>assemble</td>
-<td>atomic / split</td>
-<td>4,121,204</td>
-<td>14</td>
+<td>atomic / sumfact / bsr f64</td>
+<td>8,586,756</td>
+<td>39</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sumfact / bsr f64</td>
+<td>16,693,124</td>
+<td>39</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble</td>
+<td>atomic / sumfact / bsr f64</td>
+<td>28,756,228</td>
+<td>39</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -937,7 +627,34 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>assemble_diag</td>
 <td>atomic / (kernel n/a)</td>
-<td>4,121,204</td>
+<td>16,693,124</td>
+<td>114</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>28,756,228</td>
+<td>114</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>8,586,756</td>
+<td>113</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>assemble_diag</td>
+<td>atomic / (kernel n/a)</td>
+<td>3,650,692</td>
 <td>112</td>
 <td>element kernel</td>
 <td>warm</td>
@@ -946,260 +663,359 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>assemble_diag</td>
 <td>atomic / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>92</td>
-<td>frozen-RC</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>assemble_diag</td>
-<td>atomic / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>91</td>
-<td>partial</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>assemble_diag</td>
-<td>atomic / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>89</td>
-<td>partial</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>assemble_diag</td>
-<td>atomic / (kernel n/a) / isoparam</td>
-<td>4,121,204</td>
-<td>68</td>
-<td>partial</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>bsr_apply</td>
-<td>packed / (kernel n/a)</td>
 <td>1,098,500</td>
-<td>484</td>
+<td>107</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>bsr_apply</td>
-<td>packed / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>458</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>bsr_apply</td>
-<td>packed / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>457</td>
-<td>frozen-RC</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>bsr_apply</td>
-<td>packed / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>451</td>
-<td>partial</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>2071</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>store / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>2057</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a)</td>
+<td>n/a / (kernel n/a) / bsr f32</td>
 <td>1,098,500</td>
-<td>2013</td>
+<td>1076</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a)</td>
+<td>bsr_apply</td>
+<td>n/a / (kernel n/a) / bsr f32</td>
+<td>16,693,124</td>
+<td>923</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>n/a / (kernel n/a) / bsr f32</td>
+<td>3,650,692</td>
+<td>858</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>n/a / (kernel n/a) / bsr f32</td>
+<td>8,586,756</td>
+<td>834</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>bsr_apply</td>
+<td>n/a / (kernel n/a) / bsr f64</td>
 <td>1,098,500</td>
-<td>1043</td>
-<td>solver operator</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>963</td>
-<td>partial</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>colored / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>905</td>
+<td>511</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>892</td>
-<td>solver operator</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>860</td>
-<td>solver operator</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>845</td>
-<td>solver operator</td>
-<td>cold, 7 live</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>844</td>
+<td>bsr_apply</td>
+<td>n/a / (kernel n/a) / bsr f64</td>
+<td>3,650,692</td>
+<td>495</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
-<td>jac_action</td>
-<td>packed / (kernel n/a) / isoparam</td>
-<td>4,121,204</td>
-<td>810</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / (kernel n/a)</td>
-<td>4,121,204</td>
-<td>500</td>
-<td>solver operator</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>jac_action</td>
-<td>atomic / sympy_action_geomface</td>
-<td>4,121,204</td>
+<td>bsr_apply</td>
+<td>n/a / (kernel n/a) / bsr f64</td>
+<td>16,693,124</td>
 <td>461</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
+<td>bsr_apply</td>
+<td>n/a / (kernel n/a) / bsr f64</td>
+<td>8,586,756</td>
+<td>455</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
 <td>jac_action</td>
-<td>atomic / sympy_action_face</td>
-<td>4,121,204</td>
+<td>packed / (kernel n/a)</td>
+<td>3,650,692</td>
+<td>2117</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>2014</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>28,756,228</td>
+<td>1917</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>8,586,756</td>
+<td>1906</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>16,693,124</td>
+<td>1884</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>1059</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>975</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>28,756,228</td>
+<td>929</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>3,650,692</td>
+<td>926</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>28,756,228</td>
+<td>885</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>16,693,124</td>
+<td>876</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>8,586,756</td>
+<td>873</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>3,650,692</td>
+<td>857</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>28,756,228</td>
+<td>829</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>3,650,692</td>
+<td>828</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>16,693,124</td>
+<td>828</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>16,693,124</td>
+<td>828</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>8,586,756</td>
+<td>823</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>packed / (kernel n/a)</td>
+<td>8,586,756</td>
+<td>821</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>764</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>443</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>8,586,756</td>
+<td>436</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>1,098,500</td>
+<td>432</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>3,650,692</td>
+<td>432</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>jac_action</td>
+<td>atomic / (kernel n/a)</td>
+<td>16,693,124</td>
 <td>425</td>
-<td>element kernel</td>
+<td>partial</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>jac_action</td>
-<td>atomic / (kernel n/a) / isoparam</td>
-<td>4,121,204</td>
-<td>397</td>
-<td>element kernel</td>
+<td>atomic / (kernel n/a)</td>
+<td>28,756,228</td>
+<td>425</td>
+<td>partial</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>jac_action</td>
-<td>atomic / sympy_action_geom</td>
-<td>4,121,204</td>
-<td>360</td>
-<td>element kernel</td>
+<td>atomic / (kernel n/a)</td>
+<td>8,586,756</td>
+<td>424</td>
+<td>solver operator</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>jac_action</td>
-<td>atomic / sympy_action_node</td>
-<td>4,121,204</td>
-<td>333</td>
-<td>element kernel</td>
+<td>atomic / (kernel n/a)</td>
+<td>3,650,692</td>
+<td>421</td>
+<td>solver operator</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>jac_action</td>
-<td>atomic / sympy_action_comp</td>
-<td>4,121,204</td>
-<td>310</td>
-<td>element kernel</td>
+<td>atomic / (kernel n/a)</td>
+<td>28,756,228</td>
+<td>415</td>
+<td>solver operator</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>jac_action</td>
-<td>atomic / sympy_action</td>
-<td>4,121,204</td>
-<td>308</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>store / sumfact</td>
-<td>4,121,204</td>
-<td>2940</td>
-<td>element kernel</td>
+<td>atomic / (kernel n/a)</td>
+<td>16,693,124</td>
+<td>414</td>
+<td>solver operator</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>residual</td>
 <td>packed / sumfact</td>
-<td>4,121,204</td>
-<td>2929</td>
+<td>3,650,692</td>
+<td>2947</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1208,7 +1024,34 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / sumfact</td>
 <td>1,098,500</td>
-<td>2775</td>
+<td>2740</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>8,586,756</td>
+<td>2624</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>28,756,228</td>
+<td>2596</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>16,693,124</td>
+<td>2568</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1216,35 +1059,44 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>residual</td>
 <td>packed / current</td>
-<td>4,121,204</td>
-<td>2205</td>
+<td>3,650,692</td>
+<td>2258</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>residual</td>
-<td>store / current</td>
-<td>4,121,204</td>
-<td>2194</td>
+<td>packed / current</td>
+<td>16,693,124</td>
+<td>2148</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>residual</td>
-<td>store / sympy</td>
-<td>4,121,204</td>
-<td>2142</td>
+<td>packed / current</td>
+<td>28,756,228</td>
+<td>2133</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>residual</td>
-<td>packed / sympy</td>
-<td>4,121,204</td>
-<td>2108</td>
+<td>packed / current</td>
+<td>8,586,756</td>
+<td>2128</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / current</td>
+<td>1,098,500</td>
+<td>2064</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1252,8 +1104,8 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>residual</td>
 <td>packed / sumfact</td>
-<td>4,121,204</td>
-<td>1761</td>
+<td>3,650,692</td>
+<td>1499</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
@@ -1262,25 +1114,7 @@ from the table above: two rows are comparable only when it matches.</p>
 <td>residual</td>
 <td>packed / sumfact</td>
 <td>1,098,500</td>
-<td>1623</td>
-<td>solver operator</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>packed / sumfact</td>
-<td>4,121,204</td>
-<td>1545</td>
-<td>solver operator</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>packed / sumfact</td>
-<td>4,121,204</td>
-<td>1454</td>
+<td>1445</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
@@ -1288,44 +1122,170 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>residual</td>
 <td>packed / sumfact</td>
-<td>4,121,204</td>
-<td>1422</td>
-<td>solver operator</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>colored / sumfact</td>
-<td>4,121,204</td>
-<td>1267</td>
-<td>element kernel</td>
+<td>28,756,228</td>
+<td>1394</td>
+<td>partial</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>residual</td>
 <td>packed / sumfact</td>
-<td>4,121,204</td>
-<td>1206</td>
+<td>8,586,756</td>
+<td>1385</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>16,693,124</td>
+<td>1380</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>3,650,692</td>
+<td>1362</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>residual</td>
-<td>colored / current</td>
-<td>4,121,204</td>
-<td>976</td>
-<td>element kernel</td>
+<td>packed / sumfact</td>
+<td>1,098,500</td>
+<td>1344</td>
+<td>solver operator</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>residual</td>
-<td>colored / sympy</td>
-<td>4,121,204</td>
-<td>939</td>
+<td>packed / sumfact</td>
+<td>28,756,228</td>
+<td>1309</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>1,098,500</td>
+<td>1293</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>3,650,692</td>
+<td>1286</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>1,098,500</td>
+<td>1283</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>16,693,124</td>
+<td>1280</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>3,650,692</td>
+<td>1277</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>8,586,756</td>
+<td>1272</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>28,756,228</td>
+<td>1211</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>8,586,756</td>
+<td>1186</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>28,756,228</td>
+<td>1180</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>8,586,756</td>
+<td>1179</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>16,693,124</td>
+<td>1177</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>packed / sumfact</td>
+<td>16,693,124</td>
+<td>1174</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / current</td>
+<td>3,650,692</td>
+<td>891</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1333,8 +1293,26 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>residual</td>
 <td>atomic / current</td>
-<td>4,121,204</td>
-<td>888</td>
+<td>8,586,756</td>
+<td>882</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / current</td>
+<td>28,756,228</td>
+<td>866</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / current</td>
+<td>1,098,500</td>
+<td>866</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1342,26 +1320,8 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>residual</td>
 <td>atomic / sumfact</td>
-<td>4,121,204</td>
-<td>887</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>packed / isoparam_simd / isoparam</td>
-<td>4,121,204</td>
-<td>886</td>
-<td>element kernel</td>
-<td>warm</td>
-<td>72</td>
-</tr>
-<tr>
-<td>residual</td>
-<td>atomic / sympy</td>
-<td>4,121,204</td>
-<td>861</td>
+<td>3,650,692</td>
+<td>865</td>
 <td>element kernel</td>
 <td>warm</td>
 <td>72</td>
@@ -1369,8 +1329,53 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>residual</td>
 <td>atomic / sumfact</td>
-<td>4,121,204</td>
-<td>700</td>
+<td>8,586,756</td>
+<td>854</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>28,756,228</td>
+<td>853</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / current</td>
+<td>16,693,124</td>
+<td>838</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>1,098,500</td>
+<td>837</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>16,693,124</td>
+<td>814</td>
+<td>element kernel</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>1,098,500</td>
+<td>603</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
@@ -1378,8 +1383,17 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>residual</td>
 <td>atomic / sumfact</td>
-<td>4,121,204</td>
-<td>681</td>
+<td>8,586,756</td>
+<td>595</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>1,098,500</td>
+<td>587</td>
 <td>solver operator</td>
 <td>warm</td>
 <td>72</td>
@@ -1387,27 +1401,153 @@ from the table above: two rows are comparable only when it matches.</p>
 <tr>
 <td>residual</td>
 <td>atomic / sumfact</td>
-<td>4,121,204</td>
-<td>480</td>
+<td>3,650,692</td>
+<td>586</td>
 <td>partial</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>residual</td>
-<td>atomic / sympy / isoparam</td>
-<td>4,121,204</td>
-<td>461</td>
-<td>element kernel</td>
+<td>atomic / sumfact</td>
+<td>28,756,228</td>
+<td>583</td>
+<td>partial</td>
 <td>warm</td>
 <td>72</td>
 </tr>
 <tr>
 <td>residual</td>
-<td>atomic / current / isoparam</td>
-<td>4,121,204</td>
-<td>413</td>
-<td>element kernel</td>
+<td>atomic / sumfact</td>
+<td>8,586,756</td>
+<td>579</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>1,098,500</td>
+<td>575</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>3,650,692</td>
+<td>574</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>28,756,228</td>
+<td>572</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>16,693,124</td>
+<td>568</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>3,650,692</td>
+<td>565</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>8,586,756</td>
+<td>562</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>16,693,124</td>
+<td>556</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>28,756,228</td>
+<td>550</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>16,693,124</td>
+<td>538</td>
+<td>solver operator</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>8,586,756</td>
+<td>435</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>28,756,228</td>
+<td>432</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>3,650,692</td>
+<td>420</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>16,693,124</td>
+<td>420</td>
+<td>partial</td>
+<td>warm</td>
+<td>72</td>
+</tr>
+<tr>
+<td>residual</td>
+<td>atomic / sumfact</td>
+<td>1,098,500</td>
+<td>410</td>
+<td>partial</td>
 <td>warm</td>
 <td>72</td>
 </tr>
@@ -1422,7 +1562,7 @@ quoted figure has historically meant; the solver does not run it.</p>
 percentage of the best. Two rows differ meaningfully only when the gap between
 them is larger than that -- which is not true of every pair here, and saying so
 is cheaper than inviting the reader to over-read a 3% difference.</p>
-<h3>residual, 4,121,204 dof</h3>
+<h3>residual, packed layout, 3,650,692 dof</h3>
 <table>
 <thead>
 <tr>
@@ -1439,53 +1579,45 @@ is cheaper than inviting the reader to over-read a 3% difference.</p>
 <td>element kernel</td>
 <td>none</td>
 <td>warm</td>
-<td>2929</td>
-<td>2% of 6</td>
+<td>2947</td>
+<td>1% of 5</td>
 <td>1.00x</td>
 </tr>
 <tr>
 <td>partial</td>
 <td>Rhie-Chow, state ∇p (hoisted)</td>
 <td>warm</td>
-<td>1761</td>
-<td>1% of 3</td>
-<td>1.66x</td>
+<td>1499</td>
+<td>1% of 5</td>
+<td>1.97x</td>
 </tr>
 <tr>
 <td>solver operator</td>
 <td>Rhie-Chow, state ∇p (hoisted), boundary</td>
 <td>warm</td>
-<td>1545</td>
-<td>4% of 3</td>
-<td>1.90x</td>
+<td>1362</td>
+<td>1% of 5</td>
+<td>2.16x</td>
 </tr>
 <tr>
 <td>partial</td>
 <td>Rhie-Chow, state ∇p (per apply)</td>
 <td>warm</td>
-<td>1454</td>
-<td>1% of 3</td>
-<td>2.01x</td>
+<td>1286</td>
+<td>1% of 5</td>
+<td>2.29x</td>
 </tr>
 <tr>
 <td>solver operator</td>
 <td>Rhie-Chow, state ∇p (hoisted), boundary, transient</td>
 <td>warm</td>
-<td>1422</td>
-<td>10% of 3</td>
-<td>2.06x</td>
-</tr>
-<tr>
-<td>solver operator</td>
-<td>Rhie-Chow, state ∇p (per apply), boundary, transient</td>
-<td>warm</td>
-<td>1206</td>
-<td>1% of 3</td>
-<td>2.43x</td>
+<td>1277</td>
+<td>1% of 5</td>
+<td>2.31x</td>
 </tr>
 </tbody>
 </table>
-<h3>jac_action, 4,121,204 dof</h3>
+<h3>residual, atomic layout, 3,650,692 dof</h3>
 <table>
 <thead>
 <tr>
@@ -1502,52 +1634,1028 @@ is cheaper than inviting the reader to over-read a 3% difference.</p>
 <td>element kernel</td>
 <td>none</td>
 <td>warm</td>
-<td>2071</td>
-<td>1% of 6</td>
+<td>865</td>
+<td>4% of 5</td>
+<td>1.00x</td>
+</tr>
+<tr>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (hoisted)</td>
+<td>warm</td>
+<td>586</td>
+<td>1% of 5</td>
+<td>1.48x</td>
+</tr>
+<tr>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary</td>
+<td>warm</td>
+<td>574</td>
+<td>2% of 5</td>
+<td>1.51x</td>
+</tr>
+<tr>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary, transient</td>
+<td>warm</td>
+<td>565</td>
+<td>13% of 5</td>
+<td>1.53x</td>
+</tr>
+<tr>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (per apply)</td>
+<td>warm</td>
+<td>420</td>
+<td>10% of 5</td>
+<td>2.06x</td>
+</tr>
+</tbody>
+</table>
+<h3>jac_action, packed layout, 3,650,692 dof</h3>
+<table>
+<thead>
+<tr>
+<th>operator</th>
+<th>terms carried</th>
+<th>working set</th>
+<th>MDOF/s</th>
+<th>spread</th>
+<th>cost vs bare kernel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>element kernel</td>
+<td>none</td>
+<td>warm</td>
+<td>2117</td>
+<td>1% of 5</td>
 <td>1.00x</td>
 </tr>
 <tr>
 <td>partial</td>
 <td>Rhie-Chow, exact-RC J, state ∇p (hoisted)</td>
 <td>warm</td>
-<td>963</td>
-<td>1% of 3</td>
-<td>2.15x</td>
+<td>926</td>
+<td>4% of 5</td>
+<td>2.29x</td>
 </tr>
 <tr>
 <td>solver operator</td>
 <td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
 <td>warm</td>
-<td>892</td>
-<td>1% of 3</td>
-<td>2.32x</td>
-</tr>
-<tr>
-<td>solver operator</td>
-<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary, transient</td>
-<td>warm</td>
-<td>860</td>
-<td>0% of 3</td>
-<td>2.41x</td>
-</tr>
-<tr>
-<td>solver operator</td>
-<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
-<td>cold, 7 live</td>
-<td>845</td>
-<td>2% of 3</td>
-<td>2.45x</td>
+<td>857</td>
+<td>1% of 5</td>
+<td>2.47x</td>
 </tr>
 <tr>
 <td>assembled matrix</td>
-<td>SpMV of the assembled BSR — 3 term sets, 1.5% apart</td>
+<td>SpMV of the assembled BSR, f64 values</td>
 <td>warm</td>
-<td>458</td>
-<td>n=3</td>
-<td>4.52x</td>
+<td>495</td>
+<td>n=1</td>
+<td>4.28x</td>
+</tr>
+<tr>
+<td>assembled matrix</td>
+<td>SpMV of the assembled BSR, f32 values</td>
+<td>warm</td>
+<td>858</td>
+<td>n=1</td>
+<td>2.47x</td>
 </tr>
 </tbody>
 </table>
+<h3>jac_action, atomic layout, 3,650,692 dof</h3>
+<table>
+<thead>
+<tr>
+<th>operator</th>
+<th>terms carried</th>
+<th>working set</th>
+<th>MDOF/s</th>
+<th>spread</th>
+<th>cost vs bare kernel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>element kernel</td>
+<td>none</td>
+<td>warm</td>
+<td>828</td>
+<td>1% of 5</td>
+<td>1.00x</td>
+</tr>
+<tr>
+<td>partial</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted)</td>
+<td>warm</td>
+<td>432</td>
+<td>1% of 5</td>
+<td>1.92x</td>
+</tr>
+<tr>
+<td>solver operator</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
+<td>warm</td>
+<td>421</td>
+<td>3% of 5</td>
+<td>1.97x</td>
+</tr>
+<tr>
+<td>assembled matrix</td>
+<td>SpMV of the assembled BSR, f64 values</td>
+<td>warm</td>
+<td>495</td>
+<td>n=1</td>
+<td>1.67x</td>
+</tr>
+<tr>
+<td>assembled matrix</td>
+<td>SpMV of the assembled BSR, f32 values</td>
+<td>warm</td>
+<td>858</td>
+<td>n=1</td>
+<td>0.97x</td>
+</tr>
+</tbody>
+</table>
+<h2>Standard against packed</h2>
+<p>One operator per row, measured on both layouts. The ratio is packed over the
+standard layout, so above 1.00x the packed sweep is the faster of the two.</p>
+<p><code>SpMV f64</code> and <code>SpMV f32</code> are the assembled matrix applied at the same size --
+the same Jacobian, neither layout, and the only one of the three whose cost is
+set by the sparsity pattern rather than by the element kernel. <code>f32 vs f64</code> is
+what halving the value traffic bought; the arithmetic is identical, since the
+SpMV up-converts each entry and accumulates in double either way.</p>
+<p>The final column is the spread of the packed readings. A ratio nearer to 1.00x
+than that spread is a tie and must be read as one.</p>
+<table>
+<thead>
+<tr>
+<th>dof</th>
+<th>operation</th>
+<th>kernel</th>
+<th>operator</th>
+<th>terms carried</th>
+<th>packed MDOF/s</th>
+<th>standard</th>
+<th>standard MDOF/s</th>
+<th>packed vs standard</th>
+<th>SpMV f64</th>
+<th>SpMV f32</th>
+<th>f32 vs f64</th>
+<th>spread (packed)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1,098,500</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>57</td>
+<td>atomic</td>
+<td>39</td>
+<td>1.44x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>4% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>57</td>
+<td>colored</td>
+<td>48</td>
+<td>1.19x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>4% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>55</td>
+<td>atomic</td>
+<td>39</td>
+<td>1.42x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>3% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>55</td>
+<td>colored</td>
+<td>82</td>
+<td>0.68x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>3% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>57</td>
+<td>atomic</td>
+<td>39</td>
+<td>1.46x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>57</td>
+<td>colored</td>
+<td>94</td>
+<td>0.60x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>57</td>
+<td>atomic</td>
+<td>39</td>
+<td>1.47x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>4% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>57</td>
+<td>colored</td>
+<td>107</td>
+<td>0.53x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>4% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>56</td>
+<td>atomic</td>
+<td>39</td>
+<td>1.45x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>54% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>assemble</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>56</td>
+<td>colored</td>
+<td>113</td>
+<td>0.49x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>54% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2014</td>
+<td>atomic</td>
+<td>764</td>
+<td>2.64x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>partial</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted)</td>
+<td>1059</td>
+<td>atomic</td>
+<td>443</td>
+<td>2.39x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>3% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>solver operator</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
+<td>975</td>
+<td>atomic</td>
+<td>432</td>
+<td>2.26x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2117</td>
+<td>atomic</td>
+<td>828</td>
+<td>2.56x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>partial</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted)</td>
+<td>926</td>
+<td>atomic</td>
+<td>432</td>
+<td>2.14x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>4% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>solver operator</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
+<td>857</td>
+<td>atomic</td>
+<td>421</td>
+<td>2.04x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>element kernel</td>
+<td>none</td>
+<td>1906</td>
+<td>atomic</td>
+<td>823</td>
+<td>2.32x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>partial</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted)</td>
+<td>873</td>
+<td>atomic</td>
+<td>436</td>
+<td>2.00x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>solver operator</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
+<td>821</td>
+<td>atomic</td>
+<td>424</td>
+<td>1.94x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>element kernel</td>
+<td>none</td>
+<td>1884</td>
+<td>atomic</td>
+<td>828</td>
+<td>2.28x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>partial</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted)</td>
+<td>876</td>
+<td>atomic</td>
+<td>425</td>
+<td>2.06x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>5% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>solver operator</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
+<td>828</td>
+<td>atomic</td>
+<td>414</td>
+<td>2.00x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>element kernel</td>
+<td>none</td>
+<td>1917</td>
+<td>atomic</td>
+<td>829</td>
+<td>2.31x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>partial</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted)</td>
+<td>929</td>
+<td>atomic</td>
+<td>425</td>
+<td>2.19x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>jac_action</td>
+<td>n/a</td>
+<td>solver operator</td>
+<td>Rhie-Chow, exact-RC J, state ∇p (hoisted), boundary</td>
+<td>885</td>
+<td>atomic</td>
+<td>415</td>
+<td>2.13x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>3% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2740</td>
+<td>atomic</td>
+<td>837</td>
+<td>3.28x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>residual</td>
+<td>current</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2064</td>
+<td>atomic</td>
+<td>866</td>
+<td>2.38x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (hoisted)</td>
+<td>1445</td>
+<td>atomic</td>
+<td>603</td>
+<td>2.40x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>3% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary</td>
+<td>1344</td>
+<td>atomic</td>
+<td>587</td>
+<td>2.29x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary, transient</td>
+<td>1283</td>
+<td>atomic</td>
+<td>575</td>
+<td>2.23x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>3% of 5</td>
+</tr>
+<tr>
+<td>1,098,500</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (per apply)</td>
+<td>1293</td>
+<td>atomic</td>
+<td>410</td>
+<td>3.16x</td>
+<td>511</td>
+<td>1076</td>
+<td>2.10x</td>
+<td>4% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2947</td>
+<td>atomic</td>
+<td>865</td>
+<td>3.41x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>residual</td>
+<td>current</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2258</td>
+<td>atomic</td>
+<td>891</td>
+<td>2.53x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (hoisted)</td>
+<td>1499</td>
+<td>atomic</td>
+<td>586</td>
+<td>2.56x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary</td>
+<td>1362</td>
+<td>atomic</td>
+<td>574</td>
+<td>2.37x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary, transient</td>
+<td>1277</td>
+<td>atomic</td>
+<td>565</td>
+<td>2.26x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>3,650,692</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (per apply)</td>
+<td>1286</td>
+<td>atomic</td>
+<td>420</td>
+<td>3.06x</td>
+<td>495</td>
+<td>858</td>
+<td>1.73x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2624</td>
+<td>atomic</td>
+<td>854</td>
+<td>3.07x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>3% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>residual</td>
+<td>current</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2128</td>
+<td>atomic</td>
+<td>882</td>
+<td>2.41x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (hoisted)</td>
+<td>1385</td>
+<td>atomic</td>
+<td>595</td>
+<td>2.33x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>4% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary</td>
+<td>1272</td>
+<td>atomic</td>
+<td>579</td>
+<td>2.20x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary, transient</td>
+<td>1179</td>
+<td>atomic</td>
+<td>562</td>
+<td>2.10x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>12% of 5</td>
+</tr>
+<tr>
+<td>8,586,756</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (per apply)</td>
+<td>1186</td>
+<td>atomic</td>
+<td>435</td>
+<td>2.73x</td>
+<td>455</td>
+<td>834</td>
+<td>1.83x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2568</td>
+<td>atomic</td>
+<td>814</td>
+<td>3.15x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>residual</td>
+<td>current</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2148</td>
+<td>atomic</td>
+<td>838</td>
+<td>2.56x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (hoisted)</td>
+<td>1380</td>
+<td>atomic</td>
+<td>568</td>
+<td>2.43x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>2% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary</td>
+<td>1280</td>
+<td>atomic</td>
+<td>556</td>
+<td>2.30x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>4% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary, transient</td>
+<td>1177</td>
+<td>atomic</td>
+<td>538</td>
+<td>2.19x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>0% of 5</td>
+</tr>
+<tr>
+<td>16,693,124</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (per apply)</td>
+<td>1174</td>
+<td>atomic</td>
+<td>420</td>
+<td>2.80x</td>
+<td>461</td>
+<td>923</td>
+<td>2.00x</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2596</td>
+<td>atomic</td>
+<td>853</td>
+<td>3.05x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>3% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>residual</td>
+<td>current</td>
+<td>element kernel</td>
+<td>none</td>
+<td>2133</td>
+<td>atomic</td>
+<td>866</td>
+<td>2.46x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (hoisted)</td>
+<td>1394</td>
+<td>atomic</td>
+<td>583</td>
+<td>2.39x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary</td>
+<td>1309</td>
+<td>atomic</td>
+<td>572</td>
+<td>2.29x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>solver operator</td>
+<td>Rhie-Chow, state ∇p (hoisted), boundary, transient</td>
+<td>1211</td>
+<td>atomic</td>
+<td>550</td>
+<td>2.20x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>1% of 5</td>
+</tr>
+<tr>
+<td>28,756,228</td>
+<td>residual</td>
+<td>sumfact</td>
+<td>partial</td>
+<td>Rhie-Chow, state ∇p (per apply)</td>
+<td>1180</td>
+<td>atomic</td>
+<td>432</td>
+<td>2.73x</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>1% of 5</td>
+</tr>
+</tbody>
+</table>
+<h2>Reading the sections below</h2>
+<p>The tables above are regenerated from <code>perf/campaign_grace.csv</code> on every run. The sections
+that follow are not: they are written by hand, they survive a regeneration through
+<code>--prose</code>, and they quote the measurements that were in front of whoever wrote them.</p>
+<p>That matters here because the two no longer share a problem size. The analyses below were
+written against 4,121,204 and 8,586,756 dof on an earlier binary; the campaign above sweeps
+1,098,500 to 28,756,228 dof and does not contain 4,121,204 at all. So a number in the prose
+will often have no counterpart in the tables, and where both exist they were taken on
+different binaries months apart.</p>
+<p>Nothing below is contradicted by the tables above -- the campaign reproduces the recorded
+baseline for the packed residual, 2624 MDOF/s against 2620.2 -- and the reasoning in each
+section is about mechanism rather than about a particular figure. But a reader who tries to
+find a prose number in a table above will not find it, and that is provenance rather than
+disagreement.</p>
+<p>One thing the campaign does add that the sections below predate: the layout comparison is
+now swept across five sizes, and the assembly ranking INVERTS inside that range. Packed
+assembly beats colored at 1,098,500 dof and loses to it by 2x at 28,756,228. Any statement
+about which layout wins assembly is a statement about a size.</p>
 <h2>What the headline number leaves out</h2>
 <p>The throughput this spike quotes is measured on an operator the solver never runs. That is
 a deliberate and useful thing to measure — it isolates the element kernel from everything
@@ -1696,22 +2804,32 @@ the bare kernel to 2.0x, without ever closing it.</p>
 <tbody>
 <tr>
 <td>generated</td>
-<td>2026-09-11 10:44:43</td>
+<td>2026-09-24 19:58:49</td>
 </tr>
 <tr>
 <td>rows</td>
-<td>71</td>
+<td>133</td>
 </tr>
 <tr>
 <td>machines</td>
-<td>nid006567</td>
+<td>nid006538</td>
 </tr>
 <tr>
 <td>sources</td>
-<td>kernels-det-4644425.csv</td>
+<td>campaign_grace.csv</td>
+</tr>
+<tr>
+<td>hand-written sections</td>
+<td>5, carried through --prose</td>
 </tr>
 </tbody>
 </table>
-<p>Regenerate with <code>python3 python/cvfem_kernel_report.py &lt;csv&gt; -o docs/CVFEM_Kernels.md --html</code>.</p>
+<p>Regenerate with:</p>
+<p><code>python3 python/cvfem_kernel_report.py perf/campaign_grace.csv -o docs/CVFEM_Kernels.md --html \
+      --prose docs/kernel_prose/05_reading_the_prose.md \
+      --prose docs/kernel_prose/10_headline_vs_operator.md \
+      --prose docs/kernel_prose/20_gradient_cache.md \
+      --prose docs/kernel_prose/30_layout_margin.md \
+      --prose docs/kernel_prose/40_spmv.md</code></p>
 </body>
 </html>

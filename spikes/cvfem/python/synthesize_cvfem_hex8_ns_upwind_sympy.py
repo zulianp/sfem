@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 import sympy as sp
@@ -25,7 +26,7 @@ HERE = Path(__file__).resolve().parent
 # python/ -> spike root. The emitted headers live with the sources they are
 # compiled into, not beside the generator that writes them.
 SPIKE_ROOT = HERE.parent
-OUT = SPIKE_ROOT / "src" / "generated" / "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+OUT = SPIKE_ROOT / "src" / "upwind" / "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 
 N_NODE = 8
 N_DOF = N_NODE * N_FIELD
@@ -872,8 +873,40 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
 # words, a Jacobian-action arrangement that has never been measured and that the assembly
 # verdict says nothing about. A rule that decides by substring cannot distinguish a variant
 # that lost from one that merely shares a word with it.
-SUBPAR_MARKERS = ("_add_bsr_slots_rowwise", "_add_bsr_slots_facewise",
-                  "_add_local_slots_rowwise", "_add_local_slots_facewise")
+SUBPAR_MARKERS = (
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise",
+                  # The six generated Jacobian-action arrangements, measured on Grace at
+                  # 8,586,756 dof against the hand-written atomic action's 828.9 MDOF/s
+                  # (perf/campaign_generated_arms.csv, 3 reps):
+                  #
+                  #   action           307.8   0.37x      action_geom      359.2   0.43x
+                  #   action_comp      328.2   0.40x      action_face      418.6   0.51x
+                  #   action_node      329.3   0.40x      action_geomface  473.3   0.57x
+                  #
+                  # The best of the six reaches 57% of the hand-written atomic action and 25%
+                  # of the packed one (1905.3). The axis they explore -- the scope given to one
+                  # sp.cse call -- is genuinely interesting and the spread across it is 1.5x,
+                  # which is why they were built; none of it closes a gap this size.
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_facewise",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_geom",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_geomface",
+                  "cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise",
+                  # The affine generated residual. NOT a flat loss and the entry in
+                  # subpar/README.md says so: on the packed layout it gives up 21.6%
+                  # (2066.9 against sumfact's 2636.8), on the atomic layout it TIES sumfact
+                  # (854.8 against 858.2, inside the spread) and trails `current` by 3.9%.
+                  # It is quarantined for never winning anywhere rather than for losing
+                  # everywhere, which are different findings.
+                  #
+                  # _residual_isoparam is deliberately absent: it is the isoparametric scalar
+                  # winner and this campaign measured affine geometry only, so there is no
+                  # fresh evidence about it and it is not being retired on old evidence.
+                  "cvfem_hex8_ns_upwind_sympy_residual")
 
 SUBPAR_OUT = SPIKE_ROOT / "subpar" / "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
 
@@ -895,8 +928,19 @@ def split_generated(text: str) -> tuple[str, str]:
     idx = [i for i in range(len(body)) if body.startswith(marker, i)]
     for a, b in zip(idx, idx[1:] + [len(body)]):
         chunks.append(body[a:b])
+    # EXACT function names, not substrings. The previous rule asked whether a marker was a
+    # substring of the text before the first "(", which cannot tell a name from that same name
+    # with a suffix: quarantining `_residual` would silently take `_residual_isoparam` with it,
+    # and that one is a measured WINNER. The earlier incarnation of this rule already swallowed
+    # an unmeasured kernel for the same reason, which is why the comment above says to name
+    # them precisely -- this makes the code enforce what the comment asks for.
+    def fn_name(chunk: str) -> str:
+        head = chunk.split("(")[0]
+        m = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", head)
+        return m[-1] if m else ""
+
     for c in chunks:
-        (drop if any(m in c.split("(")[0] for m in SUBPAR_MARKERS) else keep).append(c)
+        (drop if fn_name(c) in SUBPAR_MARKERS else keep).append(c)
 
     subpar_prologue = prologue.replace(
         "CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP", "CVFEM_HEX8_NS_UPWIND_SYMPY_SUBPAR_HPP"

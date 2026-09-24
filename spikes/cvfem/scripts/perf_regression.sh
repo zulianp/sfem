@@ -73,7 +73,16 @@ set -uo pipefail
 CONFIGS=(
     "residual_packed_sumfact|residual|packed|sumfact|128|5|12|"
     "residual_packed_sumfact_big|residual|packed|sumfact|160|5|12|"
-    "residual_packed_sympy|residual|packed|sympy|128|5|12|"
+    # residual_packed_sympy was here and is RETIRED WITH ITS KERNEL. The affine generated
+    # residual moved to subpar/ on measured grounds -- 2066.9 against sumfact's 2636.8 on the
+    # packed layout at 8,586,756 dof (perf/campaign_generated_arms.csv) -- so the driver now
+    # refuses `--kernel sympy --geom affine` and this row could only ever report a failure to
+    # launch. A gate for a kernel that cannot run is not a gate.
+    #
+    # It is not replaced. The row it was closest to, residual_packed_sumfact, is already here
+    # and is the configuration the retired one was measured against. Worth recording: this
+    # row was also the source of three wild low readings on this machine (see the
+    # confirmation pass below), so the gate loses a known-noisy member along with it.
     "residual_packed_current|residual|packed|current|128|5|12|"
     "jac_action_packed_sumfact|jac_action|packed|sumfact|128|5|12|"
     # `jac_action_packed_sympy` and `jac_action_packed_current` used to sit here and were

@@ -10,7 +10,7 @@
 # The boundary closure, which swept the whole mesh to touch its skin.
 #
 # This one cannot be measured with the benchmark: its --boundary pass already skips
-# elements whose face mask is zero (cvfem_hex8_layout_common.hpp). The solver's two
+# elements whose face mask is zero (cvfem_hex8_best_common.hpp). The solver's two
 # passes did not, and the solver is where the 19% figure in docs/CVFEM_Throughput.md
 # came from -- so the measurement has to come from the solver's own trace.
 #
