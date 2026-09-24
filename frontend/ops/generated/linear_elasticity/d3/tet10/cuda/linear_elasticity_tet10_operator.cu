@@ -133,7 +133,7 @@ __global__ void linear_elasticity_tet10_objective_steps_a_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
@@ -165,34 +165,34 @@ __global__ void linear_elasticity_tet10_objective_steps_a_msoa_impl(
         }
       }
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
+    s_t badj4_data[1];
     const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
+    s_t badj5_data[1];
     const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
+    s_t badj6_data[1];
     const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
+    s_t badj7_data[1];
     const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
+    s_t badj8_data[1];
     const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
@@ -202,7 +202,7 @@ __global__ void linear_elasticity_tet10_objective_steps_a_msoa_impl(
       }
     }
 
-    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, 1>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -298,7 +298,7 @@ __global__ void linear_elasticity_tet10_objective_steps_i_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -354,15 +354,15 @@ __global__ void linear_elasticity_tet10_objective_steps_i_msoa_impl(
 
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J02_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
+      s_t J12_values[1];
+      s_t J20_values[1];
+      s_t J21_values[1];
+      s_t J22_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -402,7 +402,7 @@ __global__ void linear_elasticity_tet10_objective_steps_i_msoa_impl(
         const s_t J22 = J22_values[0];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + 0);
+            badj_streams, bdet0, q * 1 + 0);
       }
     }
 
@@ -412,7 +412,7 @@ __global__ void linear_elasticity_tet10_objective_steps_i_msoa_impl(
       }
     }
 
-    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    linear_elasticity_d3_simplex_objective_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -556,7 +556,7 @@ __global__ void linear_elasticity_tet10_gradient_a_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bout_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
@@ -591,38 +591,38 @@ __global__ void linear_elasticity_tet10_gradient_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bout_streams[stream] = bout_data[stream];
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
+    s_t badj4_data[1];
     const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
+    s_t badj5_data[1];
     const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
+    s_t badj6_data[1];
     const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
+    s_t badj7_data[1];
     const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
+    s_t badj8_data[1];
     const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    linear_elasticity_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
+    linear_elasticity_d3_simplex_gradient_block<s_t, NQ, NS, 1>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -721,7 +721,7 @@ __global__ void linear_elasticity_tet10_gradient_i_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bout_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -780,15 +780,15 @@ __global__ void linear_elasticity_tet10_gradient_i_msoa_impl(
 
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J02_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
+      s_t J12_values[1];
+      s_t J20_values[1];
+      s_t J21_values[1];
+      s_t J22_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -828,11 +828,11 @@ __global__ void linear_elasticity_tet10_gradient_i_msoa_impl(
         const s_t J22 = J22_values[0];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + 0);
+            badj_streams, bdet0, q * 1 + 0);
       }
     }
 
-    linear_elasticity_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bu_streams, bout_streams);
+    linear_elasticity_d3_simplex_gradient_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -1017,38 +1017,38 @@ __global__ void linear_elasticity_tet10_apply_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bout_streams[stream] = bout_data[stream];
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
+    s_t badj4_data[1];
     const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
+    s_t badj5_data[1];
     const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
+    s_t badj6_data[1];
     const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
+    s_t badj7_data[1];
     const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
+    s_t badj8_data[1];
     const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    linear_elasticity_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, bh_streams, bout_streams);
+    linear_elasticity_d3_simplex_apply_block<s_t, NQ, NS, 1>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, lmbda, mu, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -1206,15 +1206,15 @@ __global__ void linear_elasticity_tet10_apply_i_msoa_impl(
 
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J02_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
+      s_t J12_values[1];
+      s_t J20_values[1];
+      s_t J21_values[1];
+      s_t J22_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -1254,11 +1254,11 @@ __global__ void linear_elasticity_tet10_apply_i_msoa_impl(
         const s_t J22 = J22_values[0];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + 0);
+            badj_streams, bdet0, q * 1 + 0);
       }
     }
 
-    linear_elasticity_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bh_streams, bout_streams);
+    linear_elasticity_d3_simplex_apply_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 

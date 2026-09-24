@@ -119,7 +119,7 @@ __global__ void laplace_proteus_quad4_objective_steps_i_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -186,7 +186,7 @@ __global__ void laplace_proteus_quad4_objective_steps_i_msoa_impl(
       }
     }
 
-    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    laplace_d2_tensor_product_objective_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -313,7 +313,7 @@ __global__ void laplace_proteus_quad4_gradient_i_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bout_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -377,7 +377,7 @@ __global__ void laplace_proteus_quad4_gradient_i_msoa_impl(
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    laplace_d2_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bout_streams);
+    laplace_d2_tensor_product_gradient_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx};
 
@@ -574,7 +574,7 @@ __global__ void laplace_proteus_quad4_apply_i_msoa_impl(
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    laplace_d2_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bh_streams, bout_streams);
+    laplace_d2_tensor_product_apply_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx};
 

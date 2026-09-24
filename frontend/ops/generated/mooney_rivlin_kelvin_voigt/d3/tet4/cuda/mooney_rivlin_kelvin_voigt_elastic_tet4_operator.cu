@@ -124,7 +124,7 @@ __global__ void mooney_rivlin_kelvin_voigt_elastic_tet4_gradient_a_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bout_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
@@ -159,38 +159,38 @@ __global__ void mooney_rivlin_kelvin_voigt_elastic_tet4_gradient_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bout_streams[stream] = bout_data[stream];
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
+    s_t badj4_data[1];
     const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
+    s_t badj5_data[1];
     const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
+    s_t badj6_data[1];
     const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
+    s_t badj7_data[1];
     const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
+    s_t badj8_data[1];
     const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+    mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_gradient_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -349,7 +349,7 @@ __global__ void mooney_rivlin_kelvin_voigt_elastic_tet4_apply_a_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
     s_t bout_data[NS * NC][VS];
 
@@ -391,38 +391,38 @@ __global__ void mooney_rivlin_kelvin_voigt_elastic_tet4_apply_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bout_streams[stream] = bout_data[stream];
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
+    s_t badj4_data[1];
     const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
+    s_t badj5_data[1];
     const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
+    s_t badj6_data[1];
     const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
+    s_t badj7_data[1];
     const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
+    s_t badj8_data[1];
     const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+    mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_apply_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 

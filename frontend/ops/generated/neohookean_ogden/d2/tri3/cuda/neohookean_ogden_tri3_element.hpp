@@ -9,7 +9,7 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -23,8 +23,8 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_egeo
   static constexpr int NS = 3;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -34,11 +34,11 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_egeo
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t badj0[VS];
-    s_t badj1[VS];
-    s_t badj2[VS];
-    s_t badj3[VS];
-    s_t bdet0[VS];
+    s_t badj0[1];
+    s_t badj1[1];
+    s_t badj2[1];
+    s_t badj3[1];
+    s_t bdet0[1];
     {  // TRI3 evaluates in closed form
       s_t *const RSTR badj0_q = badj0;
       const s_t *const RSTR adj0_q = adj[0] + evb;
@@ -58,12 +58,12 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_egeo
         bdet0_q[0] = det_q[0];
       }
     }
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -77,8 +77,8 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_ecoo
   static constexpr int NS = 3;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -88,17 +88,17 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_ecoo
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[VS];
-    s_t badj1[VS];
-    s_t badj2[VS];
-    s_t badj3[VS];
-    s_t bdet0[VS];
+    s_t badj0[1];
+    s_t badj1[1];
+    s_t badj2[1];
+    s_t badj3[1];
+    s_t bdet0[1];
     {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
       {
@@ -110,12 +110,12 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_ecoo
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -129,8 +129,8 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_esoa
   static constexpr int NS = 3;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -140,17 +140,17 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_esoa
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[VS];
-    s_t badj1[VS];
-    s_t badj2[VS];
-    s_t badj3[VS];
-    s_t bdet0[VS];
+    s_t badj0[1];
+    s_t badj1[1];
+    s_t badj2[1];
+    s_t badj3[1];
+    s_t bdet0[1];
     {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
       {
@@ -162,13 +162,13 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_energy_esoa
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -182,8 +182,8 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_eg
   static constexpr int NS = 3;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -195,11 +195,11 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_eg
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t badj0[VS];
-    s_t badj1[VS];
-    s_t badj2[VS];
-    s_t badj3[VS];
-    s_t bdet0[VS];
+    s_t badj0[1];
+    s_t badj1[1];
+    s_t badj2[1];
+    s_t badj3[1];
+    s_t bdet0[1];
     {  // TRI3 evaluates in closed form
       s_t *const RSTR badj0_q = badj0;
       const s_t *const RSTR adj0_q = adj[0] + evb;
@@ -219,12 +219,12 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_eg
         bdet0_q[0] = det_q[0];
       }
     }
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -238,8 +238,8 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_ec
   static constexpr int NS = 3;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -251,17 +251,17 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_ec
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[VS];
-    s_t badj1[VS];
-    s_t badj2[VS];
-    s_t badj3[VS];
-    s_t bdet0[VS];
+    s_t badj0[1];
+    s_t badj1[1];
+    s_t badj2[1];
+    s_t badj3[1];
+    s_t bdet0[1];
     {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
       {
@@ -273,12 +273,12 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_ec
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -292,8 +292,8 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_es
   static constexpr int NS = 3;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -305,17 +305,17 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_es
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[VS];
-    s_t badj1[VS];
-    s_t badj2[VS];
-    s_t badj3[VS];
-    s_t bdet0[VS];
+    s_t badj0[1];
+    s_t badj1[1];
+    s_t badj2[1];
+    s_t badj3[1];
+    s_t bdet0[1];
     {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
       {
@@ -327,13 +327,13 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_gradient_es
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -347,15 +347,15 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_ege
   static constexpr int NS = 3;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t badj0[VS];
-    s_t badj1[VS];
-    s_t badj2[VS];
-    s_t badj3[VS];
-    s_t bdet0[VS];
+    s_t badj0[1];
+    s_t badj1[1];
+    s_t badj2[1];
+    s_t badj3[1];
+    s_t bdet0[1];
     {  // TRI3 evaluates in closed form
       s_t *const RSTR badj0_q = badj0;
       const s_t *const RSTR adj0_q = adj[0] + evb;
@@ -375,8 +375,8 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_ege
         bdet0_q[0] = det_q[0];
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS][1];
+    s_t bout_data[NDOFS][1];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
@@ -390,7 +390,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_ege
           bout_data[stream][0] = s_t(0);
         }
       }
-      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -402,7 +402,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_ege
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -416,21 +416,21 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_eco
   static constexpr int NS = 3;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[VS];
-    s_t badj1[VS];
-    s_t badj2[VS];
-    s_t badj3[VS];
-    s_t bdet0[VS];
+    s_t badj0[1];
+    s_t badj1[1];
+    s_t badj2[1];
+    s_t badj3[1];
+    s_t bdet0[1];
     {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
       {
@@ -442,8 +442,8 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_eco
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS][1];
+    s_t bout_data[NDOFS][1];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
@@ -457,7 +457,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_eco
           bout_data[stream][0] = s_t(0);
         }
       }
-      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -469,7 +469,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_eco
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -483,21 +483,21 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_eso
   static constexpr int NS = 3;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[VS];
-    s_t badj1[VS];
-    s_t badj2[VS];
-    s_t badj3[VS];
-    s_t bdet0[VS];
+    s_t badj0[1];
+    s_t badj1[1];
+    s_t badj2[1];
+    s_t badj3[1];
+    s_t bdet0[1];
     {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
       {
@@ -509,8 +509,8 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_eso
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS][1];
+    s_t bout_data[NDOFS][1];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
@@ -524,7 +524,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tri3_hessian_eso
           bout_data[stream][0] = s_t(0);
         }
       }
-      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {

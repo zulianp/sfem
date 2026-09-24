@@ -56,12 +56,12 @@ static __host__ __device__ __forceinline__ void laplace_d3_simplex_objective_blo
   static_assert(VS > 0, "VS must be positive");
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
-      s_t gu_ref0_values[VS];
-      s_t grad_h_ref0_values[VS];
-      s_t gu_ref1_values[VS];
-      s_t grad_h_ref1_values[VS];
-      s_t gu_ref2_values[VS];
-      s_t grad_h_ref2_values[VS];
+      s_t gu_ref0_values[1];
+      s_t grad_h_ref0_values[1];
+      s_t gu_ref1_values[1];
+      s_t grad_h_ref1_values[1];
+      s_t gu_ref2_values[1];
+      s_t grad_h_ref2_values[1];
       {
         gu_ref0_values[0] = s_t(0);
         grad_h_ref0_values[0] = s_t(0);
@@ -262,12 +262,12 @@ static __host__ __device__ __forceinline__ void laplace_d3_simplex_gradient_bloc
   static_assert(VS > 0, "VS must be positive");
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
-      s_t gu_ref0_values[VS];
-      s_t gu_ref1_values[VS];
-      s_t gu_ref2_values[VS];
-      s_t loperand0_values[VS];
-      s_t loperand1_values[VS];
-      s_t loperand2_values[VS];
+      s_t gu_ref0_values[1];
+      s_t gu_ref1_values[1];
+      s_t gu_ref2_values[1];
+      s_t loperand0_values[1];
+      s_t loperand1_values[1];
+      s_t loperand2_values[1];
       {
         gu_ref0_values[0] = s_t(0);
         gu_ref1_values[0] = s_t(0);
@@ -439,12 +439,12 @@ static __host__ __device__ __forceinline__ void laplace_d3_simplex_apply_block(
   static_assert(VS > 0, "VS must be positive");
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
-      s_t grad_h_ref0_values[VS];
-      s_t grad_h_ref1_values[VS];
-      s_t grad_h_ref2_values[VS];
-      s_t loperand0_values[VS];
-      s_t loperand1_values[VS];
-      s_t loperand2_values[VS];
+      s_t grad_h_ref0_values[1];
+      s_t grad_h_ref1_values[1];
+      s_t grad_h_ref2_values[1];
+      s_t loperand0_values[1];
+      s_t loperand1_values[1];
+      s_t loperand2_values[1];
       {
         grad_h_ref0_values[0] = s_t(0);
         grad_h_ref1_values[0] = s_t(0);

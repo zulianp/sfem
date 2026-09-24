@@ -6,7 +6,7 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_energy_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -21,10 +21,10 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_ener
   static constexpr int NS = 4;
   static constexpr int NDOFS = NC * NS;
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[6], u_streams[7], u_streams[4], u_streams[5]};
-  return modified_mooney_rivlin_proteus_quad4_energy_egeometry_soa<s_t, VS>(nelements, adj, det, c1, c2, kappa, ordered_u_streams, values);
+  return modified_mooney_rivlin_proteus_quad4_energy_egeometry_soa<s_t>(nelements, adj, det, c1, c2, kappa, ordered_u_streams, values);
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_energy_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -39,10 +39,10 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_ener
   static constexpr int NDOFS = NC * NS;
   const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[6], coords[7], coords[4], coords[5]};
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[6], u_streams[7], u_streams[4], u_streams[5]};
-  return modified_mooney_rivlin_proteus_quad4_energy_ecoords_soa<s_t, VS>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, values);
+  return modified_mooney_rivlin_proteus_quad4_energy_ecoords_soa<s_t>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, values);
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_energy_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -57,10 +57,10 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_ener
   static constexpr int NDOFS = NC * NS;
   const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[6], coords[7], coords[4], coords[5]};
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[6], u_streams[7], u_streams[4], u_streams[5]};
-  return modified_mooney_rivlin_proteus_quad4_energy_esoa<s_t, VS>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, values);
+  return modified_mooney_rivlin_proteus_quad4_energy_esoa<s_t>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, values);
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -76,10 +76,10 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_grad
   static constexpr int NDOFS = NC * NS;
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[6], u_streams[7], u_streams[4], u_streams[5]};
   s_t *const ordered_out_streams[NDOFS] = {out_streams[0], out_streams[1], out_streams[2], out_streams[3], out_streams[6], out_streams[7], out_streams[4], out_streams[5]};
-  return modified_mooney_rivlin_proteus_quad4_gradient_egeometry_soa<s_t, VS>(nelements, adj, det, c1, c2, kappa, ordered_u_streams, ordered_out_streams);
+  return modified_mooney_rivlin_proteus_quad4_gradient_egeometry_soa<s_t>(nelements, adj, det, c1, c2, kappa, ordered_u_streams, ordered_out_streams);
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_gradient_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -95,10 +95,10 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_grad
   const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[6], coords[7], coords[4], coords[5]};
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[6], u_streams[7], u_streams[4], u_streams[5]};
   s_t *const ordered_out_streams[NDOFS] = {out_streams[0], out_streams[1], out_streams[2], out_streams[3], out_streams[6], out_streams[7], out_streams[4], out_streams[5]};
-  return modified_mooney_rivlin_proteus_quad4_gradient_ecoords_soa<s_t, VS>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, ordered_out_streams);
+  return modified_mooney_rivlin_proteus_quad4_gradient_ecoords_soa<s_t>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, ordered_out_streams);
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_gradient_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -114,10 +114,10 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_grad
   const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[6], coords[7], coords[4], coords[5]};
   const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[6], u_streams[7], u_streams[4], u_streams[5]};
   s_t *const ordered_out_streams[NDOFS] = {out_streams[0], out_streams[1], out_streams[2], out_streams[3], out_streams[6], out_streams[7], out_streams[4], out_streams[5]};
-  return modified_mooney_rivlin_proteus_quad4_gradient_esoa<s_t, VS>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, ordered_out_streams);
+  return modified_mooney_rivlin_proteus_quad4_gradient_esoa<s_t>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, ordered_out_streams);
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_hessian_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -149,10 +149,10 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_hess
       }
     }
   }
-  return modified_mooney_rivlin_proteus_quad4_hessian_egeometry_soa<s_t, VS>(nelements, adj, det, c1, c2, kappa, ordered_u_streams, ordered_matrix_streams);
+  return modified_mooney_rivlin_proteus_quad4_hessian_egeometry_soa<s_t>(nelements, adj, det, c1, c2, kappa, ordered_u_streams, ordered_matrix_streams);
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_hessian_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -184,10 +184,10 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_hess
       }
     }
   }
-  return modified_mooney_rivlin_proteus_quad4_hessian_ecoords_soa<s_t, VS>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, ordered_matrix_streams);
+  return modified_mooney_rivlin_proteus_quad4_hessian_ecoords_soa<s_t>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, ordered_matrix_streams);
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_hessian_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -219,7 +219,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_quad4_hess
       }
     }
   }
-  return modified_mooney_rivlin_proteus_quad4_hessian_esoa<s_t, VS>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, ordered_matrix_streams);
+  return modified_mooney_rivlin_proteus_quad4_hessian_esoa<s_t>(nelements, ordered_coords, c1, c2, kappa, ordered_u_streams, ordered_matrix_streams);
 }
 
 } // namespace codegen

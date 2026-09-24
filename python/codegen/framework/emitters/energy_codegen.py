@@ -98,6 +98,13 @@ from codegen.framework.emitters.ast_printer import (
     work_item_scope_header_lines,
     render_kernel_ast_lines,
 )
+from codegen.framework.emitters.tensor_product_kernels import (
+    kernel_width as _kernel_width,
+    micro_kernel as _micro_kernel,
+    micro_kernel_count as _micro_kernel_count,
+    micro_kernel_template as _micro_kernel_template,
+    width_factors as _width_factors,
+)
 from codegen.framework.targets import current_target
 from codegen.framework.plans.diagnostics import energy_reference_data_traffic
 from codegen.framework.plans.kernel_signature import (
@@ -374,7 +381,7 @@ def _sfem_soa_affine_geometry_stream_lines(
         for stream in _soa_array_stream_names(array_input):
             lines.extend(
                 [
-                    "%ss_t b%s_data[VS];" % (indent, stream),
+                    "%ss_t b%s_data[%s];" % (indent, stream, _kernel_width()),
                     "%sconst s_t *const b%s = ageom_stream<s_t, %s, VS>("
                     % (indent, stream, geometry_scalar_type),
                     "%s    ne, %s + evb, b%s_data, std::is_same<%s, s_t>());"
@@ -1283,7 +1290,10 @@ _BLOCK_TEMPLATE_PARAMS = {
 }
 
 #: The template arguments a call passes, matching the header above.
-_BLOCK_TEMPLATE_ARGUMENTS = {True: "<s_t, NS, VS>", False: "<s_t, NQ, NS, VS>"}
+_BLOCK_TEMPLATE_ARGUMENTS = {
+    True: lambda width: "<s_t, NS, %s>" % width,
+    False: lambda width: "<s_t, NQ, NS, %s>" % width,
+}
 
 _BLOCK_TEMPLATE_ASSERTS = {
     True: (),
@@ -2870,11 +2880,11 @@ def _append_sfem_soa_weak_form_lines(
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
-                lines.append("      s_t gu_ref%d_values[VS];" % idx)
+                lines.append("      s_t gu_ref%d_values[%s];" % (idx, _kernel_width()))
             if uses_direction:
-                lines.append("      s_t grad_h_ref%d_values[VS];" % idx)
+                lines.append("      s_t grad_h_ref%d_values[%s];" % (idx, _kernel_width()))
     lines.extend(
-        "      s_t loperand%d_values[VS];" % component
+        "      s_t loperand%d_values[%s];" % (component, _kernel_width())
         for component in _LOPERAND_COMPONENTS[form_accumulation(form)](
             n_field_components, dim
         )
@@ -3475,7 +3485,7 @@ def _general_jacobian_staging_lines(
     lines = []
     for row in range(dim):
         for col in range(dim):
-            lines.append("      s_t J%d%d_values[VS];" % (row, col))
+            lines.append("      s_t J%d%d_values[%s];" % (row, col, _kernel_width()))
     lines.extend(
         _zero_lane_block_lines(
             source_builder,
@@ -3595,7 +3605,9 @@ _JACOBIAN_VALUE_LINES = {
 _GEOMETRY_OUTPUT_INDEX = {
     True: lambda q_major, work_item: work_item,
     False: (
-        lambda q_major, work_item: "q * VS + %s" % work_item if q_major else work_item
+        lambda q_major, work_item: "q * %s + %s" % (_kernel_width(), work_item)
+        if q_major
+        else work_item
     ),
 }
 
@@ -4600,7 +4612,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "        %s%s(%s);"
                 % (
                     block_name,
-                    _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)],
+                    _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)](_kernel_width()),
                     ", ".join(call_args),
                 ),
                 "      }",
@@ -4959,7 +4971,7 @@ def _append_mesh_operator_compact_buffers(
     """
     if compact_stream_buffers:
         if uses_current:
-            lines.append("    s_t bu_data[NS * NC][VS];")
+            lines.append("    s_t bu_data[NS * NC][%s];" % _kernel_width())
         if uses_direction:
             lines.append("    s_t bh_data[NS * NC][VS];")
         output = mesh_output_shape(form)
@@ -5741,7 +5753,7 @@ def _sfem_soa_mesh_operator_function(
             % (
                 call_indent,
                 block_name,
-                _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)],
+                _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)](_kernel_width()),
                 ", ".join(call_args),
             ),
         ]
@@ -6475,7 +6487,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "        %s%s(%s);"
                     % (
                         block_name,
-                        _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)],
+                        _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)](_kernel_width()),
                         ", ".join(call_args),
                     ),
                     "",
@@ -6946,7 +6958,7 @@ def _objective_steps_lines(
 
     compact_stream_buffers = use_stream_arrays
     if compact_stream_buffers:
-        lines.append("    s_t bu_data[NS * NC][VS];")
+        lines.append("    s_t bu_data[NS * NC][%s];" % _kernel_width())
         lines.append("    s_t bh_data[NS * NC][VS];")
         if compact_coordinate_buffers:
             lines.append("    s_t bcoordinate_data[NS * ND][VS];")
@@ -7208,7 +7220,7 @@ def _objective_steps_lines(
             "    %s%s(%s);"
             % (
                 block_name,
-                _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)],
+                _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)](_kernel_width()),
                 ", ".join(call_args),
             ),
             "  }",
@@ -8180,7 +8192,7 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
         % (
             indent,
             function_name,
-            _BLOCK_TEMPLATE_ARGUMENTS[bool(constant_p1)],
+            _BLOCK_TEMPLATE_ARGUMENTS[bool(constant_p1)](_kernel_width()),
             ", ".join(args),
         ),
     )
@@ -8733,7 +8745,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
         ]
     )
     if uses_current:
-        lines.append("    s_t bu_data[NS * NC][VS];")
+        lines.append("    s_t bu_data[NS * NC][%s];" % _kernel_width())
     for stream in _soa_array_stream_names(_adjugate_input(dim)):
         lines.append("    s_t b%s[NQ * VS];" % stream)
     lines.append("    s_t bdet0[NQ * VS];")
@@ -10794,7 +10806,7 @@ def _sfem_soa_element_api_alias_function_lines(
     if source_builder is None:
         source_builder = _default_openmp_energy_source_builder()
     lines = [
-        "template <typename s_t, int VS>",
+        _ELEMENT_API_TEMPLATE_HEAD[_has_width()],
         "static %s int %s(" % (_inline_qualifier(source_builder), name),
     ]
     lines.extend(parameter_list_lines(params))
@@ -10844,7 +10856,12 @@ def _sfem_soa_element_api_alias_function_lines(
             args.append("ordered_matrix_streams")
         else:
             args.append(name_)
-    lines.append("  return %s<s_t, VS>(%s);" % (target_name, ", ".join(args)))
+    # The delegation forwards whatever template arguments this element has,
+    # which on a target without a width is the scalar type alone.
+    lines.append(
+        "  return %s<%s>(%s);"
+        % (target_name, ", ".join(("s_t",) + _width_factors()), ", ".join(args))
+    )
     lines.append("}")
     return lines
 
@@ -10953,39 +10970,25 @@ _QUADRATURE_WEIGHT_PARAMETER = {
 }
 
 
-def _kernel_width():
-    """`VS`, or `1` where the target's work item is a single element."""
-    return current_target().kernel_vector_width() or "1"
+#: The template head an element-API entry opens with, the step its mesh loop
+#: takes and the count it derives, keyed on whether the target has a width.  A
+#: work item that is one element walks the mesh one element at a time and has
+#: nothing to take a minimum against.
+_ELEMENT_API_TEMPLATE_HEAD = {
+    True: "template <typename s_t, int VS>",
+    False: "template <typename s_t>",
+}
+
+_ELEMENT_API_TILE_STEP = {True: "evb += VS", False: "++evb"}
+
+_ELEMENT_API_TILE_COUNT = {
+    True: "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+    False: "    const int ne = 1;",
+}
 
 
-def _width_factors():
-    """The width, as factors of an offset -- none where there is no width."""
-    width = current_target().kernel_vector_width()
-    return (width,) if width is not None else ()
-
-
-def _micro_kernel(name):
-    """The shared micro-kernel this target calls, by name.
-
-    `tensor_test` strides over a block of work items and takes their count;
-    `tensor_test_scalar` is the same arithmetic with one element in hand.  Both
-    are rendered from one body and `tests/test_scalar_micro_kernels_match.py`
-    holds them to the same numbers, so which one a target calls is a routing
-    question rather than a numerical one.
-    """
-    return name if current_target().kernel_vector_width() is not None else "%s_scalar" % name
-
-
-def _micro_kernel_template(*arguments):
-    """The template arguments for that call, with the width where there is one."""
-    return "<%s>" % ", ".join(
-        ("s_t", "NQ", "NS") + _width_factors() + tuple(str(a) for a in arguments)
-    )
-
-
-def _micro_kernel_count():
-    """`ne, ` for a blocked call; nothing for a scalar one, which has no count."""
-    return "ne, " if current_target().kernel_vector_width() is not None else ""
+def _has_width():
+    return current_target().kernel_vector_width() is not None
 
 
 def _sfem_soa_element_api_geometry_args(dim):
@@ -11043,9 +11046,11 @@ def _sfem_soa_element_api_block_call(
     specialized_reference_args = [() for _ in specialized]
     args = [
         "ne",
+        # The stride between quadrature points of one work item's geometry.
+        # It is the width where there is one, and one element otherwise.
         *(
             name
-            for name in ("VS",)
+            for name in (_kernel_width(),)
             if not specialized
         ),
         *_sfem_soa_element_api_geometry_args(dim),
@@ -11060,7 +11065,7 @@ def _sfem_soa_element_api_block_call(
     args.append(output_arg)
     return "%s%s(%s);" % (
         block_name,
-        _BLOCK_TEMPLATE_ARGUMENTS[bool(specialized)],
+        _BLOCK_TEMPLATE_ARGUMENTS[bool(specialized)](_kernel_width()),
         ", ".join(args),
     )
 
@@ -11085,7 +11090,7 @@ def _element_api_lane_loop(source_builder, indent):
 def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind, source_builder):
     item = _work_item_index(source_builder)
     lines = [
-        "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+        _ELEMENT_API_TILE_COUNT[_has_width()],
     ]
     for _role, stream_prefix in element_api_field_roles(form):
         if stream_prefix != "u":
@@ -11118,25 +11123,31 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind, sour
 #: element carries a single quadrature point.  With one point the extent is the
 #: vector width, both strides vanish, and there is no `q` to stride with -- the
 #: reference gradients having been folded, nothing declares one any more.
-_GEOMETRY_TILE_EXTENT = {True: "VS", False: "NQ * VS"}
+#: How wide a tile's geometry buffers are, with the width coming from the
+#: target so a scalar work item sizes them `1` and `NQ`.
+_GEOMETRY_TILE_EXTENT = {
+    True: lambda width: width,
+    False: lambda width: "NQ * %s" % width,
+}
 
 _GEOMETRY_TILE_LOCAL_SLICE = {
-    True: lambda name: name,
-    False: lambda name: "&%s[q * VS]" % name,
+    True: lambda name, width: name,
+    False: lambda name, width: "&%s[q * %s]" % (name, width),
 }
 
 _GEOMETRY_TILE_MESH_SLICE = {
-    True: lambda source: "%s + evb" % source,
-    False: lambda source: "%s + q * nelements + evb" % source,
+    True: lambda source, width: "%s + evb" % source,
+    False: lambda source, width: "%s + q * nelements + evb" % source,
 }
 
 
 def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule, source_builder):
     item = _work_item_index(source_builder)
     single_point = constant_p1_simplex_reference_gradients(quadrature_rule) is not None
-    extent = _GEOMETRY_TILE_EXTENT[single_point]
-    local_slice = _GEOMETRY_TILE_LOCAL_SLICE[single_point]
-    mesh_slice = _GEOMETRY_TILE_MESH_SLICE[single_point]
+    extent = _GEOMETRY_TILE_EXTENT[single_point](_kernel_width())
+    width = _kernel_width()
+    local_slice = lambda name: _GEOMETRY_TILE_LOCAL_SLICE[single_point](name, width)
+    mesh_slice = lambda source: _GEOMETRY_TILE_MESH_SLICE[single_point](source, width)
     lines = []
     for component in range(dim * dim):
         lines.append("    s_t badj%d[%s];" % (component, extent))
@@ -11182,7 +11193,7 @@ def _sfem_soa_element_api_coords_tile_lines(
     source_builder,
 ):
     lines = [
-        "    s_t bcoordinate_data[NDOFS][VS];",
+        "    s_t bcoordinate_data[NDOFS][%s];" % _kernel_width(),
         "    for (int stream = 0; stream < NDOFS; ++stream) {",
         *_element_api_lane_loop(source_builder, "      "),
         "        bcoordinate_data[stream][%s] = coords[stream][evb + %s];"
@@ -11192,25 +11203,27 @@ def _sfem_soa_element_api_coords_tile_lines(
     ]
     extent = _GEOMETRY_TILE_EXTENT[
         constant_p1_simplex_reference_gradients(quadrature_rule) is not None
-    ]
+    ](_kernel_width())
     for component in range(dim * dim):
         lines.append("    s_t badj%d[%s];" % (component, extent))
     lines.append("    s_t bdet0[%s];" % extent)
     if use_tensor_product_reference:
         lines.extend(
             [
-                "    s_t coordinate_grad_ref[ND * NQ * ND * VS];",
+                "    s_t coordinate_grad_ref[ND * NQ * ND * %s];" % _kernel_width(),
             ]
         )
         for d in range(dim):
             lines.append(
-                "    tensor_gradient_contiguous<s_t, NQ, NS, VS, %d>(ne, %s, %s, bcoordinate_data, %d, coordinate_grad_ref + %s);"
+                "    %s%s(%s%s, %s, bcoordinate_data, %d, coordinate_grad_ref + %s);"
                 % (
-                    dim,
+                    _micro_kernel("tensor_gradient_contiguous"),
+                    _micro_kernel_template(dim),
+                    _micro_kernel_count(),
                     quadrature_reference_accessor(quadrature_rule, "shape_1d"),
                     quadrature_reference_accessor(quadrature_rule, "grad_1d"),
                     d,
-                    c_product(d, "NQ", "ND", "VS"),
+                    c_product(d, "NQ", "ND", *_width_factors()),
                 )
             )
         lines.append(
@@ -11218,7 +11231,8 @@ def _sfem_soa_element_api_coords_tile_lines(
             % ", ".join("badj%d" % component for component in range(dim * dim))
         )
         lines.append(
-            "    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
+            "    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, %s>(%scoordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
+            % (_kernel_width(), "ne, " if _has_width() else "ne, ")
         )
         return lines
     reference_declarations = []
@@ -11295,7 +11309,7 @@ def _sfem_soa_element_api_operation_lines(
         params.append(output_param)
         lines.extend(
             [
-                "template <typename s_t, int VS>",
+                _ELEMENT_API_TEMPLATE_HEAD[_has_width()],
                 "static %s int %s(" % (_inline_qualifier(source_builder), name),
             ]
         )
@@ -11309,7 +11323,8 @@ def _sfem_soa_element_api_operation_lines(
                 kernel_constant("NQ", n_qp, indent="  "),
                 kernel_constant("NDOFS", "NC * NS", indent="  "),
                 "  if (nelements <= 0) return SFEM_SUCCESS;",
-                "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
+                "  for (ptrdiff_t evb = 0; evb < nelements; %s) {"
+                % _ELEMENT_API_TILE_STEP[_has_width()],
             ]
         )
         lines.extend(_sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind, source_builder))
@@ -11370,7 +11385,7 @@ def _sfem_soa_element_api_hessian_lines(
         params.append("s_t *const *const RSTR matrix_streams")
         lines.extend(
             [
-                "template <typename s_t, int VS>",
+                _ELEMENT_API_TEMPLATE_HEAD[_has_width()],
                 "static %s int %s(" % (_inline_qualifier(source_builder), name),
             ]
         )
@@ -11384,8 +11399,9 @@ def _sfem_soa_element_api_hessian_lines(
                 kernel_constant("NQ", n_qp, indent="  "),
                 kernel_constant("NDOFS", "NC * NS", indent="  "),
                 "  if (nelements <= 0) return SFEM_SUCCESS;",
-                "  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {",
-                "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
+                "  for (ptrdiff_t evb = 0; evb < nelements; %s) {"
+                % _ELEMENT_API_TILE_STEP[_has_width()],
+                _ELEMENT_API_TILE_COUNT[_has_width()],
             ]
         )
         for _role, stream_prefix in element_api_field_roles(form):
@@ -11414,8 +11430,8 @@ def _sfem_soa_element_api_hessian_lines(
             lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule, source_builder))
         lines.extend(
             [
-                "    s_t bh_data[NDOFS][VS];",
-                "    s_t bout_data[NDOFS][VS];",
+                "    s_t bh_data[NDOFS][%s];" % _kernel_width(),
+                "    s_t bout_data[NDOFS][%s];" % _kernel_width(),
                 "    const s_t *bh_streams[NDOFS];",
                 "    s_t *bout_streams[NDOFS];",
                 "    for (int stream = 0; stream < NDOFS; ++stream) {",

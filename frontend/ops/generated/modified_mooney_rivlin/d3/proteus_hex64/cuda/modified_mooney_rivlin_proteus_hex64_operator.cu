@@ -133,7 +133,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_objective_steps_a_msoa_impl
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
@@ -165,34 +165,34 @@ __global__ void modified_mooney_rivlin_proteus_hex64_objective_steps_a_msoa_impl
         }
       }
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
+    s_t badj4_data[1];
     const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
+    s_t badj5_data[1];
     const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
+    s_t badj6_data[1];
     const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
+    s_t badj7_data[1];
     const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
+    s_t badj8_data[1];
     const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
@@ -202,7 +202,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_objective_steps_a_msoa_impl
       }
     }
 
-    modified_mooney_rivlin_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d3_tensor_product_objective_block<s_t, NQ, NS, 1>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -299,7 +299,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_objective_steps_i_msoa_impl
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -374,7 +374,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_objective_steps_i_msoa_impl
       }
     }
 
-    modified_mooney_rivlin_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d3_tensor_product_objective_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -519,7 +519,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_gradient_a_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bout_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
@@ -554,38 +554,38 @@ __global__ void modified_mooney_rivlin_proteus_hex64_gradient_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bout_streams[stream] = bout_data[stream];
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
+    s_t badj4_data[1];
     const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
+    s_t badj5_data[1];
     const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
+    s_t badj6_data[1];
     const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
+    s_t badj7_data[1];
     const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
+    s_t badj8_data[1];
     const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, 1>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -685,7 +685,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_gradient_i_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bout_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -757,7 +757,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_gradient_i_msoa_impl(
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d3_tensor_product_gradient_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -912,7 +912,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_apply_a_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
     s_t bout_data[NS * NC][VS];
 
@@ -954,38 +954,38 @@ __global__ void modified_mooney_rivlin_proteus_hex64_apply_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bout_streams[stream] = bout_data[stream];
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
+    s_t badj4_data[1];
     const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
+    s_t badj5_data[1];
     const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
+    s_t badj6_data[1];
     const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
+    s_t badj7_data[1];
     const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
+    s_t badj8_data[1];
     const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, 1>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -1093,7 +1093,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_apply_i_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
     s_t bout_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
@@ -1172,7 +1172,7 @@ __global__ void modified_mooney_rivlin_proteus_hex64_apply_i_msoa_impl(
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d3_tensor_product_apply_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 

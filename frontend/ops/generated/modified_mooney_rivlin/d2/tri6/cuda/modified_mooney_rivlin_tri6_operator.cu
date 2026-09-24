@@ -125,7 +125,7 @@ __global__ void modified_mooney_rivlin_tri6_objective_steps_i_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -176,10 +176,10 @@ __global__ void modified_mooney_rivlin_tri6_objective_steps_i_msoa_impl(
 
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -202,7 +202,7 @@ __global__ void modified_mooney_rivlin_tri6_objective_steps_i_msoa_impl(
         const s_t J10 = J10_values[0];
         const s_t J11 = J11_values[0];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
+            J00, J01, J10, J11, badj_streams, bdet0, q * 1 + 0);
       }
     }
 
@@ -212,7 +212,7 @@ __global__ void modified_mooney_rivlin_tri6_objective_steps_i_msoa_impl(
       }
     }
 
-    modified_mooney_rivlin_d2_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d2_simplex_objective_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -347,7 +347,7 @@ __global__ void modified_mooney_rivlin_tri6_gradient_i_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bout_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
     s_t badj0[NQ * VS];
@@ -401,10 +401,10 @@ __global__ void modified_mooney_rivlin_tri6_gradient_i_msoa_impl(
 
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -427,11 +427,11 @@ __global__ void modified_mooney_rivlin_tri6_gradient_i_msoa_impl(
         const s_t J10 = J10_values[0];
         const s_t J11 = J11_values[0];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
+            J00, J01, J10, J11, badj_streams, bdet0, q * 1 + 0);
       }
     }
 
-    modified_mooney_rivlin_d2_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d2_simplex_gradient_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 
@@ -575,7 +575,7 @@ __global__ void modified_mooney_rivlin_tri6_apply_i_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
     s_t bout_data[NS * NC][VS];
     s_t bcoordinate_data[NS * ND][VS];
@@ -636,10 +636,10 @@ __global__ void modified_mooney_rivlin_tri6_apply_i_msoa_impl(
 
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -662,11 +662,11 @@ __global__ void modified_mooney_rivlin_tri6_apply_i_msoa_impl(
         const s_t J10 = J10_values[0];
         const s_t J11 = J11_values[0];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
+            J00, J01, J10, J11, badj_streams, bdet0, q * 1 + 0);
       }
     }
 
-    modified_mooney_rivlin_d2_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d2_simplex_apply_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 

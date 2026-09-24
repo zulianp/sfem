@@ -117,7 +117,7 @@ __global__ void mooney_rivlin_kelvin_voigt_elastic_tri3_gradient_a_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bout_data[NS * NC][VS];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
@@ -152,23 +152,23 @@ __global__ void mooney_rivlin_kelvin_voigt_elastic_tri3_gradient_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bout_streams[stream] = bout_data[stream];
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    mooney_rivlin_kelvin_voigt_elastic_d2_simplex_tri3_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    mooney_rivlin_kelvin_voigt_elastic_d2_simplex_tri3_gradient_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 
@@ -312,7 +312,7 @@ __global__ void mooney_rivlin_kelvin_voigt_elastic_tri3_apply_a_msoa_impl(
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
     idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC][1];
     s_t bh_data[NS * NC][VS];
     s_t bout_data[NS * NC][VS];
 
@@ -354,23 +354,23 @@ __global__ void mooney_rivlin_kelvin_voigt_elastic_tri3_apply_a_msoa_impl(
     for (int stream = 0; stream < NS * NC; ++stream) {
       bout_streams[stream] = bout_data[stream];
     }
-    s_t badj0_data[VS];
+    s_t badj0_data[1];
     const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
+    s_t badj1_data[1];
     const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
+    s_t badj2_data[1];
     const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
+    s_t badj3_data[1];
     const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
         ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
+    s_t bdet0_data[1];
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    mooney_rivlin_kelvin_voigt_elastic_d2_simplex_tri3_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+    mooney_rivlin_kelvin_voigt_elastic_d2_simplex_tri3_apply_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 

@@ -11,7 +11,7 @@ namespace sfem {
 namespace codegen {
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int laplace_tet10_energy_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -25,8 +25,8 @@ static __host__ __device__ __forceinline__ int laplace_tet10_energy_egeometry_so
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -36,36 +36,36 @@ static __host__ __device__ __forceinline__ int laplace_tet10_energy_egeometry_so
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ * 1];
+    s_t badj1[NQ * 1];
+    s_t badj2[NQ * 1];
+    s_t badj3[NQ * 1];
+    s_t badj4[NQ * 1];
+    s_t badj5[NQ * 1];
+    s_t badj6[NQ * 1];
+    s_t badj7[NQ * 1];
+    s_t badj8[NQ * 1];
+    s_t bdet0[NQ * 1];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * VS];
+      s_t *const RSTR badj0_q = &badj0[q * 1];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
+      s_t *const RSTR badj1_q = &badj1[q * 1];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
+      s_t *const RSTR badj2_q = &badj2[q * 1];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
+      s_t *const RSTR badj3_q = &badj3[q * 1];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR badj4_q = &badj4[q * VS];
+      s_t *const RSTR badj4_q = &badj4[q * 1];
       const s_t *const RSTR adj4_q = adj[4] + q * nelements + evb;
-      s_t *const RSTR badj5_q = &badj5[q * VS];
+      s_t *const RSTR badj5_q = &badj5[q * 1];
       const s_t *const RSTR adj5_q = adj[5] + q * nelements + evb;
-      s_t *const RSTR badj6_q = &badj6[q * VS];
+      s_t *const RSTR badj6_q = &badj6[q * 1];
       const s_t *const RSTR adj6_q = adj[6] + q * nelements + evb;
-      s_t *const RSTR badj7_q = &badj7[q * VS];
+      s_t *const RSTR badj7_q = &badj7[q * 1];
       const s_t *const RSTR adj7_q = adj[7] + q * nelements + evb;
-      s_t *const RSTR badj8_q = &badj8[q * VS];
+      s_t *const RSTR badj8_q = &badj8[q * 1];
       const s_t *const RSTR adj8_q = adj[8] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      s_t *const RSTR bdet0_q = &bdet0[q * 1];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -80,12 +80,12 @@ static __host__ __device__ __forceinline__ int laplace_tet10_energy_egeometry_so
         bdet0_q[0] = det_q[0];
       }
     }
-    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d3_simplex_objective_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int laplace_tet10_energy_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -99,8 +99,8 @@ static __host__ __device__ __forceinline__ int laplace_tet10_energy_ecoords_soa(
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -110,36 +110,36 @@ static __host__ __device__ __forceinline__ int laplace_tet10_energy_ecoords_soa(
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ * 1];
+    s_t badj1[NQ * 1];
+    s_t badj2[NQ * 1];
+    s_t badj3[NQ * 1];
+    s_t badj4[NQ * 1];
+    s_t badj5[NQ * 1];
+    s_t badj6[NQ * 1];
+    s_t badj7[NQ * 1];
+    s_t badj8[NQ * 1];
+    s_t bdet0[NQ * 1];
     const s_t *const grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
     const s_t *const grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J02_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
+      s_t J12_values[1];
+      s_t J20_values[1];
+      s_t J21_values[1];
+      s_t J22_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -179,15 +179,15 @@ static __host__ __device__ __forceinline__ int laplace_tet10_energy_ecoords_soa(
         const s_t J22 = J22_values[0];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + 0);
+            badj_streams, bdet0, q * 1 + 0);
       }
     }
-    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d3_simplex_objective_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int laplace_tet10_energy_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -201,8 +201,8 @@ static __host__ __device__ __forceinline__ int laplace_tet10_energy_esoa(
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -212,36 +212,36 @@ static __host__ __device__ __forceinline__ int laplace_tet10_energy_esoa(
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ * 1];
+    s_t badj1[NQ * 1];
+    s_t badj2[NQ * 1];
+    s_t badj3[NQ * 1];
+    s_t badj4[NQ * 1];
+    s_t badj5[NQ * 1];
+    s_t badj6[NQ * 1];
+    s_t badj7[NQ * 1];
+    s_t badj8[NQ * 1];
+    s_t bdet0[NQ * 1];
     const s_t *const grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
     const s_t *const grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J02_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
+      s_t J12_values[1];
+      s_t J20_values[1];
+      s_t J21_values[1];
+      s_t J22_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -281,16 +281,16 @@ static __host__ __device__ __forceinline__ int laplace_tet10_energy_esoa(
         const s_t J22 = J22_values[0];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + 0);
+            badj_streams, bdet0, q * 1 + 0);
       }
     }
-    laplace_d3_simplex_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d3_simplex_objective_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int laplace_tet10_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -304,8 +304,8 @@ static __host__ __device__ __forceinline__ int laplace_tet10_gradient_egeometry_
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -317,36 +317,36 @@ static __host__ __device__ __forceinline__ int laplace_tet10_gradient_egeometry_
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ * 1];
+    s_t badj1[NQ * 1];
+    s_t badj2[NQ * 1];
+    s_t badj3[NQ * 1];
+    s_t badj4[NQ * 1];
+    s_t badj5[NQ * 1];
+    s_t badj6[NQ * 1];
+    s_t badj7[NQ * 1];
+    s_t badj8[NQ * 1];
+    s_t bdet0[NQ * 1];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * VS];
+      s_t *const RSTR badj0_q = &badj0[q * 1];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
+      s_t *const RSTR badj1_q = &badj1[q * 1];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
+      s_t *const RSTR badj2_q = &badj2[q * 1];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
+      s_t *const RSTR badj3_q = &badj3[q * 1];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR badj4_q = &badj4[q * VS];
+      s_t *const RSTR badj4_q = &badj4[q * 1];
       const s_t *const RSTR adj4_q = adj[4] + q * nelements + evb;
-      s_t *const RSTR badj5_q = &badj5[q * VS];
+      s_t *const RSTR badj5_q = &badj5[q * 1];
       const s_t *const RSTR adj5_q = adj[5] + q * nelements + evb;
-      s_t *const RSTR badj6_q = &badj6[q * VS];
+      s_t *const RSTR badj6_q = &badj6[q * 1];
       const s_t *const RSTR adj6_q = adj[6] + q * nelements + evb;
-      s_t *const RSTR badj7_q = &badj7[q * VS];
+      s_t *const RSTR badj7_q = &badj7[q * 1];
       const s_t *const RSTR adj7_q = adj[7] + q * nelements + evb;
-      s_t *const RSTR badj8_q = &badj8[q * VS];
+      s_t *const RSTR badj8_q = &badj8[q * 1];
       const s_t *const RSTR adj8_q = adj[8] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      s_t *const RSTR bdet0_q = &bdet0[q * 1];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -361,12 +361,12 @@ static __host__ __device__ __forceinline__ int laplace_tet10_gradient_egeometry_
         bdet0_q[0] = det_q[0];
       }
     }
-    laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_gradient_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int laplace_tet10_gradient_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -380,8 +380,8 @@ static __host__ __device__ __forceinline__ int laplace_tet10_gradient_ecoords_so
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -393,36 +393,36 @@ static __host__ __device__ __forceinline__ int laplace_tet10_gradient_ecoords_so
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ * 1];
+    s_t badj1[NQ * 1];
+    s_t badj2[NQ * 1];
+    s_t badj3[NQ * 1];
+    s_t badj4[NQ * 1];
+    s_t badj5[NQ * 1];
+    s_t badj6[NQ * 1];
+    s_t badj7[NQ * 1];
+    s_t badj8[NQ * 1];
+    s_t bdet0[NQ * 1];
     const s_t *const grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
     const s_t *const grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J02_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
+      s_t J12_values[1];
+      s_t J20_values[1];
+      s_t J21_values[1];
+      s_t J22_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -462,15 +462,15 @@ static __host__ __device__ __forceinline__ int laplace_tet10_gradient_ecoords_so
         const s_t J22 = J22_values[0];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + 0);
+            badj_streams, bdet0, q * 1 + 0);
       }
     }
-    laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_gradient_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int laplace_tet10_gradient_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -484,8 +484,8 @@ static __host__ __device__ __forceinline__ int laplace_tet10_gradient_esoa(
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -497,36 +497,36 @@ static __host__ __device__ __forceinline__ int laplace_tet10_gradient_esoa(
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][VS];
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ * 1];
+    s_t badj1[NQ * 1];
+    s_t badj2[NQ * 1];
+    s_t badj3[NQ * 1];
+    s_t badj4[NQ * 1];
+    s_t badj5[NQ * 1];
+    s_t badj6[NQ * 1];
+    s_t badj7[NQ * 1];
+    s_t badj8[NQ * 1];
+    s_t bdet0[NQ * 1];
     const s_t *const grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
     const s_t *const grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J02_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
+      s_t J12_values[1];
+      s_t J20_values[1];
+      s_t J21_values[1];
+      s_t J22_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -566,16 +566,16 @@ static __host__ __device__ __forceinline__ int laplace_tet10_gradient_esoa(
         const s_t J22 = J22_values[0];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + 0);
+            badj_streams, bdet0, q * 1 + 0);
       }
     }
-    laplace_d3_simplex_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_gradient_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
 
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int laplace_tet10_hessian_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,
@@ -588,38 +588,38 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_egeometry_s
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
+    s_t badj0[NQ * 1];
+    s_t badj1[NQ * 1];
+    s_t badj2[NQ * 1];
+    s_t badj3[NQ * 1];
+    s_t badj4[NQ * 1];
+    s_t badj5[NQ * 1];
+    s_t badj6[NQ * 1];
+    s_t badj7[NQ * 1];
+    s_t badj8[NQ * 1];
+    s_t bdet0[NQ * 1];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * VS];
+      s_t *const RSTR badj0_q = &badj0[q * 1];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
+      s_t *const RSTR badj1_q = &badj1[q * 1];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
+      s_t *const RSTR badj2_q = &badj2[q * 1];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
+      s_t *const RSTR badj3_q = &badj3[q * 1];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR badj4_q = &badj4[q * VS];
+      s_t *const RSTR badj4_q = &badj4[q * 1];
       const s_t *const RSTR adj4_q = adj[4] + q * nelements + evb;
-      s_t *const RSTR badj5_q = &badj5[q * VS];
+      s_t *const RSTR badj5_q = &badj5[q * 1];
       const s_t *const RSTR adj5_q = adj[5] + q * nelements + evb;
-      s_t *const RSTR badj6_q = &badj6[q * VS];
+      s_t *const RSTR badj6_q = &badj6[q * 1];
       const s_t *const RSTR adj6_q = adj[6] + q * nelements + evb;
-      s_t *const RSTR badj7_q = &badj7[q * VS];
+      s_t *const RSTR badj7_q = &badj7[q * 1];
       const s_t *const RSTR adj7_q = adj[7] + q * nelements + evb;
-      s_t *const RSTR badj8_q = &badj8[q * VS];
+      s_t *const RSTR badj8_q = &badj8[q * 1];
       const s_t *const RSTR adj8_q = adj[8] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
+      s_t *const RSTR bdet0_q = &bdet0[q * 1];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -634,8 +634,8 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_egeometry_s
         bdet0_q[0] = det_q[0];
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS][1];
+    s_t bout_data[NDOFS][1];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
@@ -649,7 +649,7 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_egeometry_s
           bout_data[stream][0] = s_t(0);
         }
       }
-      laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_apply_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -661,7 +661,7 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_egeometry_s
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int laplace_tet10_hessian_ecoords_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -674,38 +674,38 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_ecoords_soa
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
-    s_t bcoordinate_data[NDOFS][VS];
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ * 1];
+    s_t badj1[NQ * 1];
+    s_t badj2[NQ * 1];
+    s_t badj3[NQ * 1];
+    s_t badj4[NQ * 1];
+    s_t badj5[NQ * 1];
+    s_t badj6[NQ * 1];
+    s_t badj7[NQ * 1];
+    s_t badj8[NQ * 1];
+    s_t bdet0[NQ * 1];
     const s_t *const grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
     const s_t *const grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J02_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
+      s_t J12_values[1];
+      s_t J20_values[1];
+      s_t J21_values[1];
+      s_t J22_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -745,11 +745,11 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_ecoords_soa
         const s_t J22 = J22_values[0];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + 0);
+            badj_streams, bdet0, q * 1 + 0);
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS][1];
+    s_t bout_data[NDOFS][1];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
@@ -763,7 +763,7 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_ecoords_soa
           bout_data[stream][0] = s_t(0);
         }
       }
-      laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_apply_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -775,7 +775,7 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_ecoords_soa
   return SFEM_SUCCESS;
 }
 
-template <typename s_t, int VS>
+template <typename s_t>
 static __host__ __device__ __forceinline__ int laplace_tet10_hessian_esoa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR coords,
@@ -788,38 +788,38 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_esoa(
   static constexpr int NQ = 11;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
-  for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
-    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
-    s_t bcoordinate_data[NDOFS][VS];
+  for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
+    const int ne = 1;
+    s_t bcoordinate_data[NDOFS][1];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
         bcoordinate_data[stream][0] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ * 1];
+    s_t badj1[NQ * 1];
+    s_t badj2[NQ * 1];
+    s_t badj3[NQ * 1];
+    s_t badj4[NQ * 1];
+    s_t badj5[NQ * 1];
+    s_t badj6[NQ * 1];
+    s_t badj7[NQ * 1];
+    s_t badj8[NQ * 1];
+    s_t bdet0[NQ * 1];
     const s_t *const grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
     const s_t *const grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
     const s_t *const grad_ref_z = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
+      s_t J00_values[1];
+      s_t J01_values[1];
+      s_t J02_values[1];
+      s_t J10_values[1];
+      s_t J11_values[1];
+      s_t J12_values[1];
+      s_t J20_values[1];
+      s_t J21_values[1];
+      s_t J22_values[1];
       {
         J00_values[0] = s_t(0);
         J01_values[0] = s_t(0);
@@ -859,11 +859,11 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_esoa(
         const s_t J22 = J22_values[0];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + 0);
+            badj_streams, bdet0, q * 1 + 0);
       }
     }
-    s_t bh_data[NDOFS][VS];
-    s_t bout_data[NDOFS][VS];
+    s_t bh_data[NDOFS][1];
+    s_t bout_data[NDOFS][1];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
@@ -877,7 +877,7 @@ static __host__ __device__ __forceinline__ int laplace_tet10_hessian_esoa(
           bout_data[stream][0] = s_t(0);
         }
       }
-      laplace_d3_simplex_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_apply_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
