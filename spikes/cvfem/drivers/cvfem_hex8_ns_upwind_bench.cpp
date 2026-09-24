@@ -6,11 +6,11 @@
 #include <cstdint>
 #include <cstring>
 
-#include "cvfem_hex8_layout_common.hpp"
-#include "cvfem_hex8_layout_atomic.hpp"
-#include "cvfem_hex8_layout_colored.hpp"
-#include "cvfem_hex8_layout_packed.hpp"
-#include "cvfem_hex8_layout_store.hpp"
+#include "cvfem_hex8_best_common.hpp"
+#include "cvfem_hex8_best_atomic.hpp"
+#include "cvfem_hex8_best_colored.hpp"
+#include "cvfem_hex8_best_packed.hpp"
+#include "cvfem_hex8_best_store.hpp"
 
 // Consumes the churn's reduction under --live-vectors so the compiler cannot delete the
 // memory traffic that option exists to create.
@@ -168,6 +168,10 @@ struct CsvRow {
     ptrdiff_t   dofs;
     ptrdiff_t   bsr_nnz;
     double      bsr_values_mib;
+    // "f64" | "f32", or "n/a" where no matrix was built. The storage type is not
+    // recoverable from bsr_values_MiB alone, and the report keys its rows on the code path
+    // that ran -- two SpMV runs differing only in storage must not collapse onto one key.
+    const char *bsr_storage;
     int         repeat;
     double      seconds_per_call;
     double      mdofs;
@@ -187,6 +191,12 @@ struct CsvRow {
     // The three fields above record the REQUEST. That is how a row comes to claim a term
     // the code path dropped: the flag was passed, so the column says 1. These say what the
     // dispatch actually reached, and they are what a report must read.
+    // The layout whose code actually ran. --layout store has no residual or Jacobian-action
+    // sweep of its own: both branches read `layout == "packed" || layout == "store"` and call
+    // apply_residual_packed / apply_jacobian_action_packed. Recording the request made the two
+    // look like separate implementations that happened to agree to 0.4%, when they are one
+    // call site measured twice -- the same misattribution the ran_* columns exist to stop.
+    const char *ran_layout;
     const char *ran_kernel;    // the kernel that executed, or "n/a" where the operation ignores --kernel
     const char *ran_rc;        // "exact" | "frozen" | "off"
     const char *ran_boundary;  // "on" | "off"
@@ -217,8 +227,8 @@ static void csv_write(const std::string &path, const CsvRow &r) {
     // name. So the existing header is compared against the one we would write, and a
     // mismatch is refused rather than appended to.
     std::string header =
-            "tag,host,element,operation,layout,kernel,geom,warp,threads,pack_size,cube_n,"
-            "nodes,elements,dofs,bsr_nnz,bsr_values_MiB,repeat,seconds_per_call,"
+            "tag,host,element,operation,layout,ran_layout,kernel,geom,warp,threads,pack_size,cube_n,"
+            "nodes,elements,dofs,bsr_nnz,bsr_values_MiB,bsr_storage,repeat,seconds_per_call,"
             "MDOF_s,MDOF_s_element_visits,MELEM_s,GFLOP_s_model,"
             "n_colors,packs_per_color_min,packs_per_color_max,checksum,"
             "rhie_chow,rhie_chow_scale,boundary,"
@@ -261,9 +271,9 @@ static void csv_write(const std::string &path, const CsvRow &r) {
     if (need_header) std::fprintf(f, "%s\n", header.c_str());
 
     std::fprintf(f,
-                 "%s,%s,hex8,%s,%s,%s,%s,%.6e,%d,%d,%d,%td,%td,%td,%td,%.4f,%d,%.9e,%.4f,%.4f,%.4f,%.4f,%d,%td,%td,%.12e",
-                 r.tag, host, r.operation, r.layout, r.kernel, r.geom, r.warp, r.threads, r.pack_size, r.cube_n,
-                 r.nodes, r.elements, r.dofs, r.bsr_nnz, r.bsr_values_mib, r.repeat, r.seconds_per_call,
+                 "%s,%s,hex8,%s,%s,%s,%s,%s,%.6e,%d,%d,%d,%td,%td,%td,%td,%.4f,%s,%d,%.9e,%.4f,%.4f,%.4f,%.4f,%d,%td,%td,%.12e",
+                 r.tag, host, r.operation, r.layout, r.ran_layout, r.kernel, r.geom, r.warp, r.threads, r.pack_size, r.cube_n,
+                 r.nodes, r.elements, r.dofs, r.bsr_nnz, r.bsr_values_mib, r.bsr_storage, r.repeat, r.seconds_per_call,
                  r.mdofs, r.mdofs_element_visits, r.melems, r.gflops_model,
                  r.n_colors, r.packs_per_color_min, r.packs_per_color_max, r.checksum);
     std::fprintf(f, ",%d,%.6f,%d", r.rhie_chow, r.rhie_chow_scale, r.boundary);
@@ -296,6 +306,10 @@ int main(int argc, char **argv) {
     int         assemble   = 0;
     int         jac_action = 0;
     int         bsr_apply  = 0;
+    // --bsr-precision single: hold the assembled values as float while still accumulating in
+    // double. h_bsr_spmv separates storage from compute, so this halves the matrix traffic the
+    // apply is bound by without changing the arithmetic it performs.
+    int         bsr_single = 0;
     int         verify     = 0;
     int         verify_jac = 0;
     int         use_sfc    = 1;
@@ -357,6 +371,12 @@ int main(int argc, char **argv) {
             jac_action = 1;
         else if (arg == "--bsr-apply")
             bsr_apply = 1;
+        else if (arg == "--bsr-precision" && i + 1 < argc) {
+            const std::string v = argv[++i];
+            if (v == "single") bsr_single = 1;
+            else if (v == "double") bsr_single = 0;
+            else { std::fprintf(stderr, "--bsr-precision takes double or single\n"); return 1; }
+        }
         else if (arg == "--verify")
             verify = 1;
         else if (arg == "--verify-jac")
@@ -402,18 +422,18 @@ int main(int argc, char **argv) {
                     "          [--csv FILE] [--tag NAME]\n"
                     "  --layout NAME  layout used by residual / jac-action / assemble (default atomic)\n"
                     "                 atomic  : flat element sweep, #pragma omp atomic per entry\n"
-                    "                           (cvfem_hex8_layout_atomic.hpp)\n"
+                    "                           (cvfem_hex8_best_atomic.hpp)\n"
                     "                 packed  : pack-local buffer folded back into the global one,\n"
-                    "                           ghost rows reduced after (cvfem_hex8_layout_packed.hpp)\n"
+                    "                           ghost rows reduced after (cvfem_hex8_best_packed.hpp)\n"
                     "                 colored : colored pack sweep, no reduction and no atomics\n"
-                    "                           (cvfem_hex8_layout_colored.hpp). Best for\n"
+                    "                           (cvfem_hex8_best_colored.hpp). Best for\n"
                     "                           --assemble; for residual and --jac-action the\n"
                     "                           color barriers cost more than the ghost reduce\n"
                     "                           they replace, so prefer packed there\n"
                     "                 store   : packed assembly whose owned rows carry the global\n"
                     "                           pattern and are flushed with one streaming memcpy;\n"
                     "                           every block written once, no zeroing pass\n"
-                    "                           (cvfem_hex8_layout_store.hpp; residual/jac-action\n"
+                    "                           (cvfem_hex8_best_store.hpp; residual/jac-action\n"
                     "                           fall back to packed)\n"
                     "  --breakdown    per-phase timing of the assembly (thread-summed ms/call)\n"
                     "  --kernel-only  element kernel writes to a dense stack buffer (no scatter);\n"
@@ -427,6 +447,8 @@ int main(int argc, char **argv) {
                     "  --geom NAME    affine (constant J) or isoparam (12 SCS trilinear J)\n"
                     "  --warp EPS     x += EPS * sin(pi y) nodal perturbation\n"
                     "  --bsr-apply    assemble once, then time BSR SpMV y = J(u) v\n"
+                    "  --bsr-precision double|single   SpMV value storage (default double);\n"
+                    "                 single stores float and still accumulates in double\n"
                     "  --rhie-chow [S]  include the Rhie-Chow pressure-velocity coupling at scale\n"
                     "                 S (default 1), and the nodal pressure gradient it needs.\n"
                     "                 sumfact only -- the hand-written and generated kernels carry\n"
@@ -484,6 +506,13 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
+
+    // The float storage belongs to the SpMV, not to the matrix. Assembly always writes
+    // scalar_t whatever --bsr-precision says, so on an assembly run the flag would relabel
+    // a double matrix as single and halve a footprint that did not change. Clamping it here
+    // -- rather than qualifying it at each of the four sites downstream -- keeps one meaning
+    // for the variable: "the SpMV reads float values".
+    bsr_single &= bsr_apply;
 
     // --boundary used to be refused for an assembly on anything but --layout atomic,
     // because the boundary blocks had to be written through the element BSR slots and only
@@ -705,7 +734,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     // sympy_row and sympy_face lost the saturated evaluation and were moved to subpar/.
-    // Rejected by name here, which is what keeps the stubs in cvfem_hex8_layout_common.hpp
+    // Rejected by name here, which is what keeps the stubs in cvfem_hex8_best_common.hpp
     // unreachable -- and, more to the point, means a run cannot report a throughput under
     // a kernel name that did not execute. This spike has produced that failure three
     // times; a rejection is cheap insurance against a fourth.
@@ -716,6 +745,43 @@ int main(int argc, char **argv) {
                      "measured configuration (see subpar/README.md).\n"
                      "Rebuild with -DCVFEM_ENABLE_SUBPAR=ON to measure it again.\n",
                      kernel.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // The six generated Jacobian-action arrangements, all of them. Measured on Grace at
+    // 8,586,756 dof they reach 0.37x to 0.57x of the hand-written atomic action and 0.16x to
+    // 0.25x of the packed one (perf/campaign_generated_arms.csv).
+    if (kernel_is_action_only(kernel_kind)) {
+        std::fprintf(stderr,
+                     "--kernel %s was moved to subpar/: every generated Jacobian-action "
+                     "arrangement is between 0.37x and 0.57x of the hand-written one "
+                     "(see subpar/README.md).\n"
+                     "Rebuild with -DCVFEM_ENABLE_SUBPAR=ON to measure it again.\n",
+                     kernel.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // AFFINE ONLY. KernelKind::Sympy names two different generated functions and the geometry
+    // picks between them: the affine `_sympy_residual`, which is quarantined, and
+    // `_sympy_residual_isoparam`, which is the isoparametric scalar WINNER and stays. A
+    // rejection that ignored --geom would retire a winner along with a loser, which is the
+    // same conflation the split rule in the generator was just hardened against.
+    // RESIDUAL ONLY, and affine only. KernelKind::Sympy selects a different generated
+    // function for each operation: the retired affine `_sympy_residual` for the residual, and
+    // `_jacobian_add_bsr_slots` for --assemble, which is the atomic-assembly WINNER and stays.
+    // A rejection on the kernel name alone takes the winner down with the loser -- exactly the
+    // conflation the generator's split rule was hardened against a few lines of work earlier,
+    // reproduced here. cvfem_bench_staging is what caught it.
+    const bool sympy_residual_run = kernel_kind == KernelKind::Sympy && geom == "affine" &&
+                                    !assemble && !assemble_diag && !jac_action && !bsr_apply;
+    if (sympy_residual_run) {
+        std::fprintf(stderr,
+                     "--kernel sympy --geom affine was moved to subpar/: it gives up 21.6%% "
+                     "on the packed layout and ties sumfact on the atomic one, so it is "
+                     "fastest nowhere (see subpar/README.md).\n"
+                     "Its isoparametric form is NOT retired -- `--kernel sympy --geom "
+                     "isoparam` still runs. Rebuild with -DCVFEM_ENABLE_SUBPAR=ON for the "
+                     "affine one.\n");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -1306,11 +1372,20 @@ int main(int argc, char **argv) {
     };
 
     if (bsr_apply) jac_fn();
-    decltype(sfem::h_bsr_spmv<smesh::count_t, smesh::idx_t, scalar_t>(
-            d.nnodes, d.nnodes, 4, bsr.graph->rowptr(), bsr.graph->colidx(), bsr.values, scalar_t(0))) bsr_apply_op;
+    // Operator<scalar_t> rather than the concrete BSR type: BSR<R, C, float, double> and
+    // BSR<R, C, double, double> are different types and both derive from it, so this is what can
+    // hold either. A decltype of one call pins the storage type and makes the other unreachable.
+    std::shared_ptr<sfem::Operator<scalar_t>> bsr_apply_op;
+    smesh::SharedBuffer<float>                bsr_values_f32;
     if (bsr_apply) {
-        bsr_apply_op = sfem::h_bsr_spmv<smesh::count_t, smesh::idx_t, scalar_t>(
-                d.nnodes, d.nnodes, 4, bsr.graph->rowptr(), bsr.graph->colidx(), bsr.values, scalar_t(0));
+        if (bsr_single) {
+            bsr_values_f32 = bsr4_values_f32(bsr);
+            bsr_apply_op   = sfem::h_bsr_spmv<smesh::count_t, smesh::idx_t, float, scalar_t>(
+                    d.nnodes, d.nnodes, 4, bsr.graph->rowptr(), bsr.graph->colidx(), bsr_values_f32, scalar_t(0));
+        } else {
+            bsr_apply_op = sfem::h_bsr_spmv<smesh::count_t, smesh::idx_t, scalar_t>(
+                    d.nnodes, d.nnodes, 4, bsr.graph->rowptr(), bsr.graph->colidx(), bsr.values, scalar_t(0));
+        }
     }
     auto bsr_apply_fn = [&]() { bsr_apply_op->apply(jac_dir.data(), jac_out.data()); };
 
@@ -1704,7 +1779,8 @@ int main(int argc, char **argv) {
             }
             std::printf("  bsr_row_nnz_min: %d\n", (int)dmin);
             std::printf("  bsr_row_nnz_max: %d\n", (int)dmax);
-            std::printf("  bsr_values_MiB: %.3f\n", double(bsr.nnz) * 16.0 * 8.0 / (1024.0 * 1024.0));
+            std::printf("  bsr_values_MiB: %.3f\n",
+                    double(bsr.nnz) * 16.0 * (bsr_single ? 4.0 : double(sizeof(scalar_t))) / (1024.0 * 1024.0));
             std::printf("  bsr_x_KiB: %.3f\n", double(d.nnodes) * 4.0 * 8.0 / 1024.0);
         }
     }
@@ -1735,7 +1811,8 @@ int main(int argc, char **argv) {
     }
     if (bsr_apply) {
         const double bsr_apply_flops = double(bsr.nnz) * 2.0 * 16.0;
-        const double bsr_apply_bytes = double(bsr.nnz) * 16.0 * double(sizeof(scalar_t)) +
+        // The values carry the storage type; x and y stay scalar_t whatever the storage is.
+        const double bsr_apply_bytes = double(bsr.nnz) * 16.0 * (bsr_single ? 4.0 : double(sizeof(scalar_t))) +
                                        double(d.nnodes) * 8.0 * double(sizeof(scalar_t)) +
                                        double(bsr.nnz) * double(sizeof(smesh::idx_t));
         std::printf("  seconds_per_bsr_apply: %.6e\n", seconds_per_call);
@@ -1759,6 +1836,11 @@ int main(int argc, char **argv) {
                                    : assemble_diag ? "assemble_diag"
                                                    : "residual";
         row.layout               = layout.c_str();
+        row.ran_layout           = bsr_apply     ? "n/a"      // a matvec over CRS rows has no layout
+                                 : assemble_diag ? "atomic"   // always the atomic diagonal, whatever was asked
+                                 : assemble      ? layout.c_str()
+                                 : (layout == "store") ? "packed"
+                                                       : layout.c_str();
         row.kernel               = kernel.c_str();
         row.geom                 = geom.c_str();
         row.threads              = threads_active();
@@ -1768,7 +1850,11 @@ int main(int argc, char **argv) {
         row.elements             = d.nelements;
         row.dofs                 = n_dofs;
         row.bsr_nnz              = (assemble || bsr_apply) ? bsr.nnz : 0;
-        row.bsr_values_mib       = (assemble || bsr_apply) ? double(bsr.nnz) * 16.0 * 8.0 / (1024.0 * 1024.0) : 0.0;
+        row.bsr_storage          = (assemble || bsr_apply) ? (bsr_single ? "f32" : "f64") : "n/a";
+        row.bsr_values_mib       = (assemble || bsr_apply)
+                                           ? double(bsr.nnz) * 16.0 * (bsr_single ? 4.0 : double(sizeof(scalar_t))) /
+                                                     (1024.0 * 1024.0)
+                                           : 0.0;
         row.repeat               = repeat;
         row.seconds_per_call     = seconds_per_call;
         row.mdofs                = mdofs;

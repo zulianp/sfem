@@ -3,7 +3,7 @@
 
 // Geometry and pack-staging helpers shared by the two packed implementations.
 //
-// The benchmark (cvfem_hex8_layout_*.hpp) and the Newton solver
+// The benchmark (cvfem_hex8_best_*.hpp) and the Newton solver
 // (cvfem_hex8_ns_packed.hpp) each carry their own MeshData: the solver's is the
 // NOT self-contained: include it after the CVFEM kernel headers and after scalar_t /
 // MeshData are in scope. It uses CVFEM_HEX8_N_NODES, CVFEM_HEX8_VEC_SIZE,

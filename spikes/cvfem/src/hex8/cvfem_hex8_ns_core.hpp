@@ -2,14 +2,14 @@
 
 // Two families of HEX8 CVFEM headers live in this directory and they are not
 // interchangeable. This one backs the steady solver and the sfem::Op; the
-// cvfem_hex8_layout_*.hpp family backs the throughput benchmark. They define sixteen
+// cvfem_hex8_best_*.hpp family backs the throughput benchmark. They define sixteen
 // of the same names -- MeshData, BSR4, GeomKind, assemble_jacobian_atomic_sumfact and
 // the residual entry points among them -- and the assembly ones differ in physics, not
 // just in layout: the benchmark's carry no boundary sub-control-surface or Rhie-Chow
 // terms, because the benchmark has no boundaries to close. Including both would
 // otherwise produce a page of redefinition errors that says nothing about why.
-#if defined(CVFEM_HEX8_LAYOUT_COMMON_HPP)
-#error "cvfem_hex8_ns_core.hpp (solver) and cvfem_hex8_layout_*.hpp (benchmark) define the same names with different physics -- include one family per translation unit. Drivers that only need the operator should include cvfem_hex8_ns_op.hpp instead, which exposes neither."
+#if defined(CVFEM_HEX8_BEST_COMMON_HPP)
+#error "cvfem_hex8_ns_core.hpp (solver) and cvfem_hex8_best_*.hpp (benchmark) define the same names with different physics -- include one family per translation unit. Drivers that only need the operator should include cvfem_hex8_ns_op.hpp instead, which exposes neither."
 #endif
 #define CVFEM_HEX8_NS_CORE_HPP
 // Core of the HEX8 CVFEM Navier-Stokes spike: mesh state, kernels, assembly and
@@ -97,6 +97,16 @@ struct MeshData {
     int                   conv_limiter{0};
     // The cell-Peclet blend, resolved from the environment once per residual and carried as
     // data because the kernels that read it are SFEM_HOST_DEVICE. form 0 is off.
+    // Limiter freezing, the same mechanism the semi-structured residual carries. Four output
+    // arrays here against one interleaved one there, so the held correction is one vector of
+    // 4 * nnodes read as [node * 4 + component].
+    int                   conv_freeze{0};
+    std::vector<scalar_t> conv_frozen;
+
+    // Venkatakrishnan's eps^2 coefficient, already carrying the units: eps^2 = this times the
+    // local edge length cubed. Zero unless SFEM_VENKAT_K is set, and zero is bit-for-bit the
+    // limiter as it behaved before the deactivation term existed.
+    scalar_t                   conv_venkat_c{0};
     Hex8PecletConfig<scalar_t> conv_peclet{};
     // The PREVIOUS step size, for variable-step BDF2. Zero -- the default -- means no step
     // has been recorded and the uniform coefficients apply, which is every existing caller.
@@ -630,7 +640,7 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
                                               d.upwind_eps, ho ? g8 : nullptr,
                                               ho ? x : nullptr, ho ? y : nullptr, ho ? z : nullptr,
-                                              d.conv_limiter, d.conv_peclet);
+                                              d.conv_limiter, d.conv_venkat_c, d.conv_peclet);
         boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
                                   d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
                                   d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
@@ -784,7 +794,7 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
 // This is what a block-Jacobi smoother wants, and it is the reason the multigrid work
 // does not have to keep assembling a BSR on the fine level.
 //
-// The bench has a diagonal assembly (assemble_diag_atomic in cvfem_hex8_layout_atomic.hpp)
+// The bench has a diagonal assembly (assemble_diag_atomic in cvfem_hex8_best_atomic.hpp)
 // that masks the off-diagonal slots with -1 and lets the element kernel drop them, since
 // cvfem_hex8_bsr_acc returns on a negative slot. That trick cannot be reused here, for
 // two independent reasons:
@@ -1119,7 +1129,10 @@ inline void apply_transient_action(MeshData &d, const scalar_t rho,
     }
 }
 
-inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom) {
+// ho_override: -1 takes SFEM_CONV_HO from the environment as before; 0 or 1 forces it, which
+// is what the freezing path needs to evaluate the same residual both ways on one state.
+inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
+                           const int ho_override = -1) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual");
     assemble_nodal_p_grad(d, geom);
     // SFEM_CONV_HO: deferred-correction convection. Off by default, and off is bit-for-bit the
@@ -1137,7 +1150,7 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
     // directly. At equal resolution the two agree to every digit -- u_l2 2.422124e-02 at
     // 19,652 dofs on both -- which is what says the semi-structured wiring is right, since
     // a lattice at level 4 and a flat mesh of the same spacing are the same discretisation.
-    d.conv_ho      = smesh::Env::read<int>("SFEM_CONV_HO", 0);
+    d.conv_ho      = (ho_override >= 0) ? ho_override : smesh::Env::read<int>("SFEM_CONV_HO", 0);
     // 0 = unlimited, 1 = bounded face. Default 1 when the correction is on: an unlimited
     // reconstruction is right only where the field is smooth, and defaulting to the setting
     // that is correct on a manufactured solution and wrong on a step would be exactly the
@@ -1149,6 +1162,18 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
     // The limiter is the cause, not the reconstruction. Both remain reachable, because
     // a bounded scheme is still wanted and reproducing the failure is a legitimate need.
     d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 0);
+    // SFEM_VENKAT_K: the dimensionless K in Venkatakrishnan's eps^2 = (K dx)^3, which is his
+    // deactivation threshold -- below it the limiter switches itself off and the increment
+    // passes through untouched. DEFAULT 0, which is the zero-severity control: it recovers
+    // the arm measured above exactly, so a sweep over K starts from a known point rather than
+    // from a different scheme. K is dimensionless and the scales are restored here, from the
+    // reference velocity and the box length, because the kernel has neither.
+    {
+        const scalar_t k = smesh::Env::read<scalar_t>("SFEM_VENKAT_K", 0);
+        const scalar_t u = smesh::Env::read<scalar_t>("SFEM_U", 1);
+        d.conv_venkat_c  = cvfem_venkata_eps2_coeff(k, u, d.Lx);
+    }
+
     // CELL-PECLET BLENDING takes the same route as the deferred correction, and for the same
     // two reasons. It is a residual-only change -- the Jacobian keeps the full first-order
     // upwind dissipation -- which is defect correction, the structure this file already uses
@@ -1177,6 +1202,73 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
         }
         std::abort();
     }
+    // SFEM_CONV_FREEZE: the deferred correction built once per continuation stage and held.
+    //
+    // Same mechanism and same reason as sscvfem_residual, and built the same way: R(ho) - R(lo)
+    // on one state IS the correction's contribution, because every other term is identical
+    // between them, so this reuses the residual rather than adding a second path that computes
+    // the same quantity. Four output arrays here rather than one interleaved, so the held
+    // vector is 4 * nnodes read as [node * 4 + component].
+    //
+    // It makes Newton consistent rather than merely damped: frozen, the residual is R_lo(u)
+    // plus a constant, whose exact Jacobian is the first-order one this path already
+    // assembles. Measured on the semi-structured path, that took every limiter arm to the
+    // first-order step count -- 12 against 303 for the same arm unfrozen.
+    //
+    // The recursion terminates because the inner calls pass ho_override and this branch runs
+    // only for the outer, environment-driven call.
+    if (ho_override < 0) {
+    // DEFAULT 1, BECAUSE 1 IS WHAT WORKS. Measured on Grace, backward-facing step at Re = 40
+    // and the manufactured solution at Re = 100:
+    //
+    //                          Newton steps          u L2 rate
+    //                       7,060      47,268        (8/16/32)
+    //   unfrozen, K = 0       103         303          2.120
+    //   unfrozen, unlimited    24    NO CONVERGENCE    2.227
+    //   FROZEN,   K = 0        15          12          2.272
+    //
+    // Frozen is better on every axis measured: fewer Newton steps, 3.3x fewer linear
+    // iterations, final residuals of 1e-9 against 5e-7, a HIGHER fitted order of accuracy,
+    // and it converges where the unlimited arm does not. It also keeps the bound fully
+    // intact, which Venkatakrishnan's eps^2 buys its convergence by giving up.
+    //
+    // It is an approximation and the default should say so: frozen, the converged state
+    // solves R_lo(u) + frozen = 0 rather than R_ho(u) = 0, with the correction taken at the
+    // stage's opening state. The accuracy ladder is what licenses the default -- if the
+    // correction were too stale the order would fall toward 1, and it rises instead.
+    //
+    // SFEM_CONV_FREEZE=0 restores the unfrozen scheme. This changes nothing when
+    // SFEM_CONV_HO is off, which is still the overall default: the branch is guarded on it.
+        d.conv_freeze = smesh::Env::read<int>("SFEM_CONV_FREEZE", 1);
+        if (d.conv_freeze && d.conv_ho) {
+            const ptrdiff_t n = d.nnodes;
+            if ((ptrdiff_t)d.conv_frozen.size() != n * 4) {
+                std::vector<scalar_t> hx, hy, hz, hc;
+                apply_residual(d, rho, mu, geom, 1);
+                hx = d.rx; hy = d.ry; hz = d.rz; hc = d.rc;
+                apply_residual(d, rho, mu, geom, 0);
+                d.conv_frozen.assign((size_t)n * 4, scalar_t(0));
+                for (ptrdiff_t i = 0; i < n; ++i) {
+                    d.conv_frozen[(size_t)i * 4 + 0] = hx[(size_t)i] - d.rx[(size_t)i];
+                    d.conv_frozen[(size_t)i * 4 + 1] = hy[(size_t)i] - d.ry[(size_t)i];
+                    d.conv_frozen[(size_t)i * 4 + 2] = hz[(size_t)i] - d.rz[(size_t)i];
+                    d.conv_frozen[(size_t)i * 4 + 3] = hc[(size_t)i] - d.rc[(size_t)i];
+                }
+            }
+            apply_residual(d, rho, mu, geom, 0);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                d.rx[(size_t)i] += d.conv_frozen[(size_t)i * 4 + 0];
+                d.ry[(size_t)i] += d.conv_frozen[(size_t)i * 4 + 1];
+                d.rz[(size_t)i] += d.conv_frozen[(size_t)i * 4 + 2];
+                d.rc[(size_t)i] += d.conv_frozen[(size_t)i * 4 + 3];
+            }
+            return;
+        }
+        // Drop a correction held under a different configuration, so turning freezing off
+        // mid-run cannot keep adding a stale source.
+        if (!d.conv_freeze && !d.conv_frozen.empty()) d.conv_frozen.clear();
+    }
+
     if (d.conv_ho || d.conv_peclet.form) {
         assemble_nodal_u_grad(d, geom);
         apply_residual_atomic_sumfact(d, rho, mu);

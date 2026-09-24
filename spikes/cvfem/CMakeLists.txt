@@ -59,7 +59,20 @@ include(CVFEMCMakeFunctions)
 # directory goes on the include path. This mirrors the SFEM_MODULES / scan_directories
 # loop in SFEM's own top-level CMakeLists.txt, and reuses its function where the SFEM
 # source tree is reachable -- the spike already compiles against ../../algebra.
-set(CVFEM_MODULES src/core src/hex8 src/tet4 src/generated src/ss src/op src/cases src/diag)
+# src/upwind holds the convective SCHEME -- the hand-written and generated upwind kernels
+# for both elements -- because that is the part a different flux replaces, and collecting it
+# is what makes the limiter work a substitution rather than a search. src/tet4 and
+# src/generated held nothing else and are gone: an element family that is one header, and a
+# directory named after how its contents were produced rather than what they compute.
+# src/best holds the surviving operator implementations -- the layouts the benchmark drives.
+# It is header-only ON PURPOSE: the same glob feeds CVFEM_SOURCES into add_library(cvfem_ns_op),
+# so a .cpp here would drag the whole benchmark family into the one target that must not see
+# it, and the two families define thirteen of the same names.
+# src/venkata holds the slope limiters the deferred-correction flux selects between. They
+# are separated from src/upwind because the scheme and the limiter vary independently: the
+# same reconstruction runs under every arm, and an arm has to be replaceable without
+# touching the kernel that calls it.
+set(CVFEM_MODULES src/core src/hex8 src/upwind src/venkata src/best src/ss src/op src/cases src/diag)
 
 set(_sfem_cmake_functions ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/SFEMCMakeFunctions.cmake)
 if(EXISTS ${_sfem_cmake_functions})
@@ -78,6 +91,46 @@ else()
         list(APPEND CVFEM_HEADERS ${_mod_headers})
     endforeach()
 endif()
+
+# ------------------------------------------------------- the two ways a file goes missing
+#
+# Neither glob above is recursive and neither is an error when it matches nothing, so both
+# of these failures are SILENT. They cost real time to find, because the symptom is an
+# undefined symbol or a kernel that mysteriously did not change, a long way from the cause.
+#
+# 1. A directory added under src/ and not listed in CVFEM_MODULES is never globbed and never
+#    put on the include path. Its headers do not exist as far as the build is concerned.
+#    This is the trap that makes src/hex8/best/ a bad idea: a subfolder of a listed module
+#    is not scanned either, so the files vanish just as quietly.
+# 2. Every module directory goes FLAT onto one include path, so two headers sharing a
+#    basename are one header as far as `#include "x.hpp"` is concerned, and which of them
+#    wins is the order the directories happen to appear in. That is a coin toss that
+#    reproduces perfectly on one machine and differently on another.
+file(GLOB _cvfem_src_dirs LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/src/*")
+foreach(_dir ${_cvfem_src_dirs})
+    if(IS_DIRECTORY ${_dir})
+        file(RELATIVE_PATH _rel ${CMAKE_CURRENT_SOURCE_DIR} ${_dir})
+        list(FIND CVFEM_MODULES ${_rel} _found)
+        if(_found EQUAL -1)
+            message(FATAL_ERROR
+                "${_rel} exists but is not in CVFEM_MODULES, so nothing in it is compiled "
+                "or reachable by #include. Add it to the CVFEM_MODULES list above.")
+        endif()
+    endif()
+endforeach()
+
+set(_cvfem_seen_names "")
+foreach(_hdr ${CVFEM_HEADERS})
+    get_filename_component(_name ${_hdr} NAME)
+    list(FIND _cvfem_seen_names ${_name} _dup)
+    if(NOT _dup EQUAL -1)
+        message(FATAL_ERROR
+            "two modules both provide a header named '${_name}'. The module directories "
+            "share one flat include path, so which one an #include resolves to is decided "
+            "by directory order. Rename one of them.")
+    endif()
+    list(APPEND _cvfem_seen_names ${_name})
+endforeach()
 
 # The SFEM source tree, for the two headers that are reached in place rather than through
 # the install. Kept explicit so it is obvious which targets pay for the coupling.
@@ -172,6 +225,13 @@ foreach(TEST_SOURCE ${CVFEM_TESTS})
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
 endforeach()
 
+# cvfem_sympy_action_test gates the generated Jacobian-action arrangements, which are
+# quarantined in subpar/ by default, so it exits 77 (ctest's SKIP) unless CVFEM_ENABLE_SUBPAR
+# is on. Declared here rather than beside the option because the glob loop above is what
+# creates the test. Without this the skip would be recorded as a FAILURE, which is the worst
+# of both: a red suite that means nothing, training people to ignore it.
+set_tests_properties(cvfem_sympy_action_test PROPERTIES SKIP_RETURN_CODE 77)
+
 # ------------------------------------------------------------ verification report machinery
 #
 # The report generator draws the conclusions -- it fits the convergence rates, decides which
@@ -232,6 +292,14 @@ set_tests_properties(cvfem_flat_vs_ss_packed PROPERTIES ENVIRONMENT "SFEM_SS_PAC
 
 # ------------------------------------------------------------------- restart round trip
 #
+# The deferred correction's freezing path, and the default that selects it. Registered
+# because nothing else in this suite sets SFEM_CONV_HO: without it the entire higher-order
+# convection path, and the branch its default now takes, sit outside the local gate.
+add_test(NAME cvfem_conv_freeze
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_conv_freeze_test.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
+set_tests_properties(cvfem_conv_freeze PROPERTIES TIMEOUT 300)
+
 # A run cut in two must be the run that was not cut. The pump is used because it is the
 # cheapest case with an exact identity AND a time-varying boundary condition, so a segment
 # that mistook its own step index for the absolute one drives the diaphragm at the wrong
@@ -263,7 +331,7 @@ set_tests_properties(cvfem_mg_transient PROPERTIES TIMEOUT 300)
 
 # ------------------------------------------------ generated headers match their generators
 #
-# The three headers under src/generated/ and src/cases/ are committed artifacts compiled as
+# The three generated headers, under src/upwind/ and src/cases/, are committed artifacts compiled as
 # ordinary source, and nothing regenerated or diffed them, so they could drift from the
 # scripts that emit them unnoticed. Each generator now has a --check mode that regenerates
 # in memory and compares, writing nothing.

@@ -75,6 +75,14 @@ namespace sfem {
         return impl_->semi_structured ? &impl_->ss : nullptr;
     }
 
+    void CVFEMNavierStokes::begin_continuation_stage() {
+        // Dropping it is enough: the residual rebuilds the correction on the next call when it
+        // finds none, from whatever state the new stage opens with.
+        impl_->ss.conv_frozen.clear();
+        impl_->d.conv_frozen.clear();
+        if (impl_->coarser) impl_->coarser->begin_continuation_stage();
+    }
+
     std::shared_ptr<CVFEMNavierStokes> CVFEMNavierStokes::coarser() const { return impl_->coarser; }
 
     ptrdiff_t CVFEMNavierStokes::n_dofs_domain() const { return impl_->space->n_dofs(); }

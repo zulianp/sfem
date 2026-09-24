@@ -6422,6 +6422,10 @@ int main(int argc, char **argv) {
     vanka_freeze_step_begin();
 
     for (size_t stage = 0; stage < rho_schedule.size(); ++stage) {
+    // A change of continuation parameter moves the state, so anything the operator holds that
+    // was built from the previous stage's state is stale. Unconditional and free when nothing
+    // is held; today only SFEM_CONV_FREEZE's deferred correction is.
+    op->begin_continuation_stage();
     const real_t rho_use = rho_schedule[stage];
     // The stage's share of the prescribed pressure: one of the increments still owed,
     // measured from the last converged level. With none owed this is the target itself, so

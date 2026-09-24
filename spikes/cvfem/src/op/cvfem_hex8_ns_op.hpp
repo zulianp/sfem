@@ -8,7 +8,7 @@
 //
 // That matters more here than it usually would. Two families of HEX8 CVFEM headers live
 // in this directory: cvfem_hex8_ns_core.hpp behind the solver, and the
-// cvfem_hex8_layout_*.hpp family behind the throughput benchmark. They define sixteen of
+// cvfem_hex8_best_*.hpp family behind the throughput benchmark. They define sixteen of
 // the same names and disagree on the physics behind several of them -- the benchmark's
 // assembly carries no boundary sub-control-surface or Rhie-Chow terms. A header that
 // leaked the core would settle that argument for every driver that included it, and
@@ -58,6 +58,22 @@ namespace sfem {
         const char *name() const override { return "cvfem:NavierStokes"; }
         bool        is_linear() const override { return false; }
 
+        // The incompressible Navier-Stokes residual is the gradient of nothing: no scalar
+        // functional has the momentum and continuity rows as its variation, so this operator's
+        // 0-form is not additive across operators and its merit is the residual one, reduced
+        // node-wise. Op leaves this pure with no default precisely because a wrong answer is
+        // silent -- an operator that wrongly claims a potential has its number summed into a
+        // total it does not belong in.
+        //
+        // Deliberately NOT marked `override`: SFEM's Op gained this as a pure virtual in
+        // af2a9b26f, and the installed SFEM the spike builds against is not the same vintage
+        // everywhere -- the Alps prefixes still predate it. `override` would then fail to
+        // compile there for want of a base method, while an unmarked definition satisfies the
+        // pure virtual where it exists and is merely an unused member where it does not. The
+        // failure mode stays loud either way: if the base signature ever moves, this stops
+        // overriding and the class goes abstract again.
+        bool energy_or_potential_based() const { return false; }
+
         // True when initialize() found a semi-structured mesh on the space and the
         // operator is running the sshex8 kernels over macro-elements.
         //
@@ -73,6 +89,17 @@ namespace sfem {
         // the arithmetic that could drift from this one. Valid only after initialize(), and
         // its state fields only after update().
         const ::SSMeshData *semi_structured_data() const;
+
+        // Tell the operator a continuation stage is starting.
+        //
+        // Only SFEM_CONV_FREEZE uses it today: the frozen deferred correction is built from
+        // a stage's opening state and must be rebuilt when that state jumps, which is what a
+        // change of continuation parameter is. A named hook rather than the driver reaching
+        // into the mesh data, because WHEN the correction is stale is the operator's business
+        // and a caller should not have to know which field holds it.
+        //
+        // Harmless and free when nothing is frozen, so a driver may call it unconditionally.
+        void begin_continuation_stage();
 
         // Body force, one vector per node, in the node numbering the operator uses.
         // MUST be called after initialize(): the packed path renumbers mesh nodes, so a

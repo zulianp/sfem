@@ -36,6 +36,13 @@ static constexpr int N_FIELDS = 4;
 
 #include "cvfem_hex8_ns_upwind_kernels.hpp"
 #include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#ifdef CVFEM_ENABLE_SUBPAR
+// The arrangements this file checks are quarantined, so they are emitted here rather
+// than into the main header. Including both is what lets the test compare a retired
+// kernel against the surviving hand-written one, which is the only comparison that
+// could ever justify bringing one back.
+#include "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
+#endif
 
 static int g_failures = 0;
 
@@ -81,6 +88,22 @@ static void state(scalar_t x[8], scalar_t y[8], scalar_t z[8], scalar_t ux[8], s
     }
 }
 
+// QUARANTINED WITH THE KERNELS IT GATES. All six arrangements moved to subpar/ on measured
+// grounds -- 0.37x to 0.57x of the hand-written atomic action at 8,586,756 dof
+// (perf/campaign_generated_arms.csv) -- and a correctness gate belongs with the code it
+// checks. Retiring the kernels and keeping the test would leave a test of nothing; retiring
+// both would mean that re-enabling the arrangements brings back unverified kernels.
+//
+// So it follows them behind the same flag and skips otherwise. Exit 77 is ctest's SKIP,
+// which reports as skipped rather than passed: a gate that cannot run must not look like a
+// gate that ran.
+#ifndef CVFEM_ENABLE_SUBPAR
+int main() {
+    std::printf("cvfem_sympy_action_test: SKIP -- the generated Jacobian-action arrangements\n"
+                "are in subpar/. Rebuild with -DCVFEM_ENABLE_SUBPAR=ON to check them.\n");
+    return 77;
+}
+#else
 int main() {
     scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8];
     state(x, y, z, ux, uy, uz, p, vx, vy, vz, q);
@@ -174,3 +197,4 @@ int main() {
     std::printf("all generated Jacobian-action checks passed\n");
     return 0;
 }
+#endif  // CVFEM_ENABLE_SUBPAR

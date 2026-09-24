@@ -72,8 +72,8 @@ quietly fits the wrong slope is worse than no report.
 
 | script | writes | consumed by |
 |---|---|---|
-| `synthesize_cvfem_hex8_ns_upwind_sympy.py` | `src/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp`, `subpar/cvfem_hex8_ns_upwind_sympy_subpar.hpp` | `src/hex8/cvfem_hex8_layout_common.hpp`, `src/hex8/cvfem_hex8_ns_core.hpp`, `cuda/cvfem_hex8_ns_cuda.cu` |
-| `synthesize_cvfem_tet4_ns_upwind_sympy.py` | `src/generated/cvfem_tet4_ns_upwind_sympy_kernels.hpp` | `src/tet4/cvfem_tet4_ns_upwind_kernels.hpp` |
+| `synthesize_cvfem_hex8_ns_upwind_sympy.py` | `src/upwind/cvfem_hex8_ns_upwind_sympy_kernels.hpp`, `subpar/cvfem_hex8_ns_upwind_sympy_subpar.hpp` | `src/best/cvfem_hex8_best_common.hpp`, `src/hex8/cvfem_hex8_ns_core.hpp`, `cuda/cvfem_hex8_ns_cuda.cu` |
+| `synthesize_cvfem_tet4_ns_upwind_sympy.py` | `src/upwind/cvfem_tet4_ns_upwind_sympy_kernels.hpp` | `src/upwind/cvfem_tet4_ns_upwind_kernels.hpp` |
 | `gen_mms_case.py` | `src/cases/cvfem_ns_mms_case.hpp` (stdout by default) | `drivers/cvfem_hex8_ns_ssgmg.cpp` |
 
 The generated headers are **committed artifacts**, compiled as ordinary source. Nothing in

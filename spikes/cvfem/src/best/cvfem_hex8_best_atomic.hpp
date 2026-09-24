@@ -1,12 +1,12 @@
-#ifndef CVFEM_HEX8_LAYOUT_ATOMIC_HPP
-#define CVFEM_HEX8_LAYOUT_ATOMIC_HPP
+#ifndef CVFEM_HEX8_BEST_ATOMIC_HPP
+#define CVFEM_HEX8_BEST_ATOMIC_HPP
 
 // Atomic layout: a flat parallel sweep over elements that writes into the global
 // residual / matrix with #pragma omp atomic on every entry. No mesh partitioning
 // and no scratch, which makes it the simplest and the reference for correctness,
 // but assembly pays ~1024 atomic read-modify-writes per element.
 
-#include "cvfem_hex8_layout_common.hpp"
+#include "cvfem_hex8_best_common.hpp"
 
 static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
                                                        const scalar_t        rho,
@@ -234,7 +234,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, cons
 // since the beginning; the isoparametric atomic path did not, so `--kernel fd --geom
 // isoparam --layout atomic` silently ran the hand-written kernel and reported its speed
 // under the name `fd`. The kernel it needs already existed and was already used by the
-// packed layout (cvfem_hex8_layout_packed.hpp), which is why that layout reported the
+// packed layout (cvfem_hex8_best_packed.hpp), which is why that layout reported the
 // honest -- and much slower, as a finite-difference Jacobian should be -- figure.
 static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
                                                                BSR4          &b,
@@ -633,4 +633,4 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear_isoparam(
     }
 }
 
-#endif  // CVFEM_HEX8_LAYOUT_ATOMIC_HPP
+#endif  // CVFEM_HEX8_BEST_ATOMIC_HPP

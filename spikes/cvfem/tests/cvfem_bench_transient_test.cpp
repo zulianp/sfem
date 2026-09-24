@@ -2,7 +2,7 @@
 //
 // The term is a duplicate. The benchmark family and the solver core cannot include each
 // other -- each #errors on the other's guard -- so build_node_volume, bdf_coeffs,
-// apply_transient and its Jacobian exist twice, in cvfem_hex8_layout_common.hpp and in
+// apply_transient and its Jacobian exist twice, in cvfem_hex8_best_common.hpp and in
 // cvfem_hex8_ns_core.hpp. Duplicates drift, and nothing here can compare the two copies
 // directly. What can be done, and is what this test does, is pin the benchmark's copy to
 // things that are true of the mathematics rather than of either implementation:
@@ -22,8 +22,8 @@
 //     condition every BDF scheme satisfies, and a direct check that the coefficients were
 //     not transcribed wrongly.
 
-#include "cvfem_hex8_layout_common.hpp"
-#include "cvfem_hex8_layout_atomic.hpp"
+#include "cvfem_hex8_best_common.hpp"
+#include "cvfem_hex8_best_atomic.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"

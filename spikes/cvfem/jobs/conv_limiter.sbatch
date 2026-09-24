@@ -72,13 +72,40 @@ echo
 
 BASE="SFEM_CASE=step SFEM_U=1 SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0"
 
+# A cap per ARM, set from the first-order run rather than guessed.
+#
+# The whole subject of this job is arms that do not converge, and an arm that does not
+# converge does not fail quickly -- the bounded-face clip ran 399 Newton steps and 103,441
+# linear iterations before giving up. With twenty arms in a 28-minute debug allocation, one
+# of those consumes the wall clock and every arm after it is missing, which reads as a job
+# that crashed rather than as one arm that stalled.
+#
+# The reference is the first-order run in the same cell, on the same mesh and hardware, so
+# the cap travels with the problem size instead of being a number that has to be revisited.
+# Eight times it is deliberately generous: the deferred correction is a fixed-point iteration
+# on a lagged source and is EXPECTED to take more steps than first order, so the cap must
+# only catch an arm that is stuck, never one that is merely slow. REF_SECS is set by the
+# first run_one of each cell and the floor keeps the cap sane when that run is quick.
+REF_SECS=0
+arm_timeout() {
+    local cap=$(( REF_SECS * 8 ))
+    [ "$cap" -lt 120 ] && cap=120
+    [ "$cap" -gt 900 ] && cap=900
+    echo "$cap"
+}
+
 run_one() {
     local tag=$1; shift
     local log="$OUT/$tag.log"
     local t0=$SECONDS
-    stdbuf -oL -eL env $BASE "$@" SFEM_DIAG_CSV="$OUT/$tag.csv" \
+    timeout "$(arm_timeout)" \
+      stdbuf -oL -eL env $BASE "$@" SFEM_DIAG_CSV="$OUT/$tag.csv" \
         uenv run $U -- "$D" "$OUT/$tag" > "$log" 2>&1
-    local rc=$? ndof conv nt li en rel
+    local rc=$?
+    # 124 is the cap firing. Reported as its own state: "stalled past the cap" and "diverged"
+    # are different findings and collapsing them into one exit code loses the distinction the
+    # job exists to draw.
+    [ "$rc" -eq 124 ] && echo "TIMEOUT after $(arm_timeout)s" >> "$log" ndof conv nt li en rel
     ndof=$(sed -n 's/.*ndof: \([0-9]*\).*/\1/p' "$log" | head -1)
     conv=$(sed -n 's/.*newton_converged: \([0-9]*\).*/\1/p' "$log" | head -1)
     nt=$(sed -n 's/.*newton_total: \([0-9]*\).*/\1/p' "$log" | head -1)
@@ -102,11 +129,58 @@ for CELL in "0.05:2:4" "0.05:4:4"; do
     MU=${CELL%%:*}; REST=${CELL#*:}; NN=${REST%%:*}; LV=${REST##*:}
     RE=$(python3 -c "print(int(1*1*2/$MU))")
     # First order, for the reference this is all measured against.
+    REF_SECS=0
+    REF_T0=$SECONDS
     run_one "re${RE}_n${NN}l${LV}_lo" SFEM_MU=$MU SFEM_N=$NN \
         SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=0
-    for LM in 0 1 2; do
+    REF_SECS=$(( SECONDS - REF_T0 ))
+    for LM in 0 1 2 3; do
         run_one "re${RE}_n${NN}l${LV}_ho_lim${LM}" SFEM_MU=$MU SFEM_N=$NN \
             SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=1 SFEM_CONV_LIMITER=$LM
+    done
+    # Venkatakrishnan's eps^2 deactivation, swept over its severity.
+    #
+    # K is the knob that decides how much local variation counts as "smooth enough to leave
+    # alone", so sweeping it is sweeping the severity of the approximation the arm makes --
+    # and K = 0 is the zero-severity control, which is why lim2 above is run without it: that
+    # run and K = 0 are the same arithmetic bit for bit (tests/cvfem_venkata_test.cpp proves
+    # it over 512 input combinations), so the sweep starts from a point already in the table
+    # rather than from a different scheme.
+    #
+    # The hypothesis being tested is specific. The stall is not a smoothness failure -- the
+    # smooth arm stalls too -- it is the two-node bound collapsing as h -> 0 on flow-aligned
+    # edges, where u_i and u_j agree to round-off and the clip is decided by noise. eps^2 is
+    # the only mechanism in the scheme that can switch the limiter OFF there. If stall_Re
+    # climbs with K towards the unlimited arm's reach, that is the diagnosis confirmed; if it
+    # does not move, the bound needs replacing and limiter 3 is the arm that replaces it.
+    #
+    # The range spans four decades because the right K is not known a priori and is the
+    # quantity being measured: Venkatakrishnan's own values are O(1) for a non-dimensional
+    # solution, but this scheme's eps^2 is compared against velocity differences on a
+    # flow-aligned edge, which are far smaller than the field itself.
+    for K in 0.01 0.1 1 5 30; do
+        run_one "re${RE}_n${NN}l${LV}_ho_lim2_k${K}" SFEM_MU=$MU SFEM_N=$NN \
+            SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_VENKAT_K=$K
+    done
+    # Limiter freezing, which is the OTHER remedy and the interesting one.
+    #
+    # eps^2 buys convergence by relaxing the bound, and the transfer-function table in
+    # tests/cvfem_venkata_test.cpp shows it relaxes it everywhere rather than only where the
+    # field is smooth: at eps^2 = 1 the arm already retains more than the room available.
+    # Freezing buys convergence a different way -- it removes the fixed point the lagged
+    # source has to reach, by building the correction once per continuation stage and holding
+    # it -- and costs nothing in boundedness, because the correction it holds is one the
+    # unfrozen arm would also have produced.
+    #
+    # So the two are orthogonal and the question is which is needed. Frozen at K = 0 is the
+    # decisive arm: if it converges like K = 5 while keeping K = 0's bound, freezing is the
+    # remedy and eps^2 is a knob nobody has to spend. The clip is frozen too, because it is
+    # the arm with the hardest active set and therefore the most to gain.
+    for FA in "lim0:0:0" "lim1:1:0" "lim2:2:0" "lim2k5:2:5"; do
+        LBL=${FA%%:*}; REST=${FA#*:}; LM=${REST%%:*}; KK=${REST##*:}
+        run_one "re${RE}_n${NN}l${LV}_ho_${LBL}_frozen" SFEM_MU=$MU SFEM_N=$NN \
+            SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=1 SFEM_CONV_LIMITER=$LM \
+            SFEM_VENKAT_K=$KK SFEM_CONV_FREEZE=1
     done
     echo
 done

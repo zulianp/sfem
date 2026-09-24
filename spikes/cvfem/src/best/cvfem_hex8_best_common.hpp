@@ -1,10 +1,10 @@
-#ifndef CVFEM_HEX8_LAYOUT_COMMON_HPP
-#define CVFEM_HEX8_LAYOUT_COMMON_HPP
+#ifndef CVFEM_HEX8_BEST_COMMON_HPP
+#define CVFEM_HEX8_BEST_COMMON_HPP
 
 // See the note at the top of cvfem_hex8_ns_core.hpp: this benchmark family and the
 // solver core share sixteen names and disagree on the physics behind several of them.
 #if defined(CVFEM_HEX8_NS_CORE_HPP)
-#error "cvfem_hex8_layout_*.hpp (benchmark) and cvfem_hex8_ns_core.hpp (solver) define the same names with different physics -- include one family per translation unit."
+#error "cvfem_hex8_best_*.hpp (benchmark) and cvfem_hex8_ns_core.hpp (solver) define the same names with different physics -- include one family per translation unit."
 #endif
 
 // Shared foundation for the HEX8 CVFEM Navier-Stokes assembly/apply layouts.
@@ -14,10 +14,10 @@
 // scratch allocator, and the element gather/scatter primitives. Each layout then
 // lives in its own header:
 //
-//   cvfem_hex8_layout_atomic.hpp   element sweep, #pragma omp atomic per entry
-//   cvfem_hex8_layout_packed.hpp   pack-local buffer, reduced into the global one
-//   cvfem_hex8_layout_colored.hpp  colored pack sweep straight into the global one
-//   cvfem_hex8_layout_store.hpp    write-once packed assembly (packed variant)
+//   cvfem_hex8_best_atomic.hpp   element sweep, #pragma omp atomic per entry
+//   cvfem_hex8_best_packed.hpp   pack-local buffer, reduced into the global one
+//   cvfem_hex8_best_colored.hpp  colored pack sweep straight into the global one
+//   cvfem_hex8_best_store.hpp    write-once packed assembly (packed variant)
 //
 // This header is self-contained: it pulls in the smesh/SFEM headers, the HEX8
 // element kernels, and the scalar/index types the layouts are written against.
@@ -110,6 +110,17 @@ CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise)
 CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise)
 CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise)
 CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise)
+// The generated affine residual and all six generated Jacobian-action arrangements,
+// measured on Grace at 8,586,756 dof (perf/campaign_generated_arms.csv). The actions
+// reach 0.37x to 0.57x of the hand-written atomic action; the residual gives up 21.6%
+// on the packed layout and ties sumfact on the atomic one. None is fastest anywhere.
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_facewise)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_geom)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_geomface)
 #undef CVFEM_SUBPAR_STUB
 #endif
 
@@ -437,6 +448,25 @@ static BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
     b.nnz    = b.graph->nnz();
     b.values = smesh::create_host_buffer<scalar_t>((size_t)b.nnz * 16);
     return b;
+}
+
+// The assembled values, down-cast to single precision, for the SpMV storage comparison.
+//
+// h_bsr_spmv separates storage from compute -- BSR<R, C, TStorage, T> up-converts each entry in
+// bsr_spmv_block_fma_4x4 -- so a float-storage operator still accumulates in double. What it
+// halves is the matrix traffic, which at these sizes is what the apply is bound by, and that is
+// the whole subject of the measurement.
+//
+// A separate buffer rather than a templated BSR4 on purpose: this family already collides with the
+// solver's on MeshData and BSR4, and adding a second BSR4 type would widen a collision that
+// tests/cvfem_ns_op_isolation.cpp exists to keep narrow.
+static smesh::SharedBuffer<float> bsr4_values_f32(const BSR4 &b) {
+    auto              out = smesh::create_host_buffer<float>((size_t)b.nnz * 16);
+    float *const      dst = out->data();
+    const scalar_t *const src = b.values->data();
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < b.nnz * 16; ++i) dst[i] = (float)src[i];
+    return out;
 }
 
 static void zero_bsr4(BSR4 &b) {
@@ -1177,4 +1207,4 @@ static SFEM_INLINE void hex8_local_slots_to_bsr4(const int *const SFEM_RESTRICT 
     }
 }
 
-#endif  // CVFEM_HEX8_LAYOUT_COMMON_HPP
+#endif  // CVFEM_HEX8_BEST_COMMON_HPP

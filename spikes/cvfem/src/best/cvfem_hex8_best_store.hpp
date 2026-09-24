@@ -1,5 +1,5 @@
-#ifndef CVFEM_HEX8_LAYOUT_STORE_HPP
-#define CVFEM_HEX8_LAYOUT_STORE_HPP
+#ifndef CVFEM_HEX8_BEST_STORE_HPP
+#define CVFEM_HEX8_BEST_STORE_HPP
 
 // Store layout: a packed assembly whose pack-local matrix has its *owned* rows
 // laid out in the global sparsity pattern. A pack's owned block is then a
@@ -7,7 +7,7 @@
 // memcpy, so every global block is written exactly once: no zero_bsr4 pass and no
 // read-modify-write. Only the ghost rows still need a reduction.
 
-#include "cvfem_hex8_layout_common.hpp"
+#include "cvfem_hex8_best_common.hpp"
 
 // Build the "store" layout. Owned rows of a pack map 1:1 onto the contiguous
 // global slice [rowptr_g[owned], rowptr_g[owned + n_contiguous]), so assembling
@@ -298,4 +298,4 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
     if (g_breakdown) g_phase[PH_GHOST] += wall_time() - _tg;
 }
 
-#endif  // CVFEM_HEX8_LAYOUT_STORE_HPP
+#endif  // CVFEM_HEX8_BEST_STORE_HPP

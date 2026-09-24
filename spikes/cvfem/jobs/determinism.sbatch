@@ -11,7 +11,7 @@
 # five times at 72, and compare the linear iteration count and the residual at a fixed
 # iteration. At one thread every reduction has a single fixed order and the repeats agree;
 # at 72 they do not, because the boundary closure scatters into shared nodes with
-# atomic_add (src/hex8/cvfem_hex8_layout_common.hpp) and the Vanka smoother has atomics of
+# atomic_add (src/best/cvfem_hex8_best_common.hpp) and the Vanka smoother has atomics of
 # its own -- and floating-point addition is not associative.
 #
 # This exists because "the same binary gave a different answer" is otherwise indistinguishable

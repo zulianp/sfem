@@ -22,7 +22,7 @@
 #
 # The finer timestep is not only for accuracy, it is what pays for the larger mesh. The
 # transient term puts a0 rho/dt times the control volume on each velocity diagonal
-# (cvfem_hex8_layout_common.hpp:725), so quartering dt quadruples the block that block-Jacobi
+# (cvfem_hex8_best_common.hpp:725), so quartering dt quadruples the block that block-Jacobi
 # inverts and each solve gets correspondingly better conditioned. It does nothing for the
 # pressure coupling, which stays the hard part.
 #

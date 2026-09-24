@@ -8,7 +8,7 @@
 // the accumulation into a shared destination. Every such site in the spike routes
 // through one of three places:
 //
-//   1. atomic_add()                        - cvfem_hex8_layout_common.hpp
+//   1. atomic_add()                        - cvfem_hex8_best_common.hpp
 //   2. cvfem_hex8_acc<true>                - cvfem_hex8_ns_upwind_kernels.hpp
 //   3. the emit line in                    - synthesize_cvfem_hex8_ns_upwind_sympy.py
 //      synthesize_..._sympy.py, which
