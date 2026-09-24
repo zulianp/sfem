@@ -71,17 +71,18 @@ static __host__ __device__ __forceinline__ void laplace_d3_simplex_objective_blo
         grad_h_ref2_values[0] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[shape];
+        const s_t *const RSTR h_shape0 = h_streams[shape];
         {
-          gu_ref0_values[0] += u_streams[shape][0] * grad_ref_x[q * NS + shape];
-          grad_h_ref0_values[0] += h_streams[shape][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref1_values[0] += u_streams[shape][0] * grad_ref_y[q * NS + shape];
-          grad_h_ref1_values[0] += h_streams[shape][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref2_values[0] += u_streams[shape][0] * grad_ref_z[q * NS + shape];
-          grad_h_ref2_values[0] += h_streams[shape][0] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[0] += u_shape0[0] * gref0;
+          grad_h_ref0_values[0] += h_shape0[0] * gref0;
+          gu_ref1_values[0] += u_shape0[0] * gref1;
+          grad_h_ref1_values[0] += h_shape0[0] * gref1;
+          gu_ref2_values[0] += u_shape0[0] * gref2;
+          grad_h_ref2_values[0] += h_shape0[0] * gref2;
         }
       }
       s_t gu_base_v[3 * VS];
@@ -273,14 +274,14 @@ static __host__ __device__ __forceinline__ void laplace_d3_simplex_gradient_bloc
         gu_ref2_values[0] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[shape];
         {
-          gu_ref0_values[0] += u_streams[shape][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref1_values[0] += u_streams[shape][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref2_values[0] += u_streams[shape][0] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[0] += u_shape0[0] * gref0;
+          gu_ref1_values[0] += u_shape0[0] * gref1;
+          gu_ref2_values[0] += u_shape0[0] * gref2;
         }
       }
       {
@@ -313,8 +314,12 @@ static __host__ __device__ __forceinline__ void laplace_d3_simplex_gradient_bloc
       loperand2_values[0] = loperand2;
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        const s_t tref2 = grad_ref_z[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[shape];
         {
-          out_streams[shape][0] += loperand0_values[0] * grad_ref_x[q * NS + shape] + loperand1_values[0] * grad_ref_y[q * NS + shape] + loperand2_values[0] * grad_ref_z[q * NS + shape];
+          out_shape0[0] += loperand0_values[0] * tref0 + loperand1_values[0] * tref1 + loperand2_values[0] * tref2;
         }
       }
     }
@@ -446,14 +451,14 @@ static __host__ __device__ __forceinline__ void laplace_d3_simplex_apply_block(
         grad_h_ref2_values[0] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR h_shape0 = h_streams[shape];
         {
-          grad_h_ref0_values[0] += h_streams[shape][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          grad_h_ref1_values[0] += h_streams[shape][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          grad_h_ref2_values[0] += h_streams[shape][0] * grad_ref_z[q * NS + shape];
+          grad_h_ref0_values[0] += h_shape0[0] * gref0;
+          grad_h_ref1_values[0] += h_shape0[0] * gref1;
+          grad_h_ref2_values[0] += h_shape0[0] * gref2;
         }
       }
       {
@@ -486,8 +491,12 @@ static __host__ __device__ __forceinline__ void laplace_d3_simplex_apply_block(
       loperand2_values[0] = loperand2;
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        const s_t tref2 = grad_ref_z[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[shape];
         {
-          out_streams[shape][0] += loperand0_values[0] * grad_ref_x[q * NS + shape] + loperand1_values[0] * grad_ref_y[q * NS + shape] + loperand2_values[0] * grad_ref_z[q * NS + shape];
+          out_shape0[0] += loperand0_values[0] * tref0 + loperand1_values[0] * tref1 + loperand2_values[0] * tref2;
         }
       }
     }

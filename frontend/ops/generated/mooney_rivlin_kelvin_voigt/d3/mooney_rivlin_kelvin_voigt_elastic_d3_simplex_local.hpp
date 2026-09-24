@@ -101,50 +101,35 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_objective_
         grad_h_ref8_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[3 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[3 * shape + 1];
+        const s_t *const RSTR u_shape2 = u_streams[3 * shape + 2];
+        const s_t *const RSTR h_shape0 = h_streams[3 * shape];
+        const s_t *const RSTR h_shape1 = h_streams[3 * shape + 1];
+        const s_t *const RSTR h_shape2 = h_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref0_values[lane] += h_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref1_values[lane] += h_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref2_values[lane] += h_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref3_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref3_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref4_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref4_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref5_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref5_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref6_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref6_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref7_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref7_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref8_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref8_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[lane] += u_shape0[lane] * gref0;
+          grad_h_ref0_values[lane] += h_shape0[lane] * gref0;
+          gu_ref1_values[lane] += u_shape0[lane] * gref1;
+          grad_h_ref1_values[lane] += h_shape0[lane] * gref1;
+          gu_ref2_values[lane] += u_shape0[lane] * gref2;
+          grad_h_ref2_values[lane] += h_shape0[lane] * gref2;
+          gu_ref3_values[lane] += u_shape1[lane] * gref0;
+          grad_h_ref3_values[lane] += h_shape1[lane] * gref0;
+          gu_ref4_values[lane] += u_shape1[lane] * gref1;
+          grad_h_ref4_values[lane] += h_shape1[lane] * gref1;
+          gu_ref5_values[lane] += u_shape1[lane] * gref2;
+          grad_h_ref5_values[lane] += h_shape1[lane] * gref2;
+          gu_ref6_values[lane] += u_shape2[lane] * gref0;
+          grad_h_ref6_values[lane] += h_shape2[lane] * gref0;
+          gu_ref7_values[lane] += u_shape2[lane] * gref1;
+          grad_h_ref7_values[lane] += h_shape2[lane] * gref1;
+          gu_ref8_values[lane] += u_shape2[lane] * gref2;
+          grad_h_ref8_values[lane] += h_shape2[lane] * gref2;
         }
       }
       s_t gu_base_v[9 * VS];
@@ -406,41 +391,23 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_gradient_b
         gu_ref8_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[3 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[3 * shape + 1];
+        const s_t *const RSTR u_shape2 = u_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref3_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref4_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref5_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref6_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref7_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref8_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[lane] += u_shape0[lane] * gref0;
+          gu_ref1_values[lane] += u_shape0[lane] * gref1;
+          gu_ref2_values[lane] += u_shape0[lane] * gref2;
+          gu_ref3_values[lane] += u_shape1[lane] * gref0;
+          gu_ref4_values[lane] += u_shape1[lane] * gref1;
+          gu_ref5_values[lane] += u_shape1[lane] * gref2;
+          gu_ref6_values[lane] += u_shape2[lane] * gref0;
+          gu_ref7_values[lane] += u_shape2[lane] * gref1;
+          gu_ref8_values[lane] += u_shape2[lane] * gref2;
         }
       }
       #pragma omp simd
@@ -558,17 +525,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_gradient_b
       loperand8_values[lane] = loperand8;
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        const s_t tref2 = grad_ref_z[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[3 * shape];
+        s_t *const RSTR out_shape1 = out_streams[3 * shape + 1];
+        s_t *const RSTR out_shape2 = out_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape + 1][lane] += loperand3_values[lane] * grad_ref_x[q * NS + shape] + loperand4_values[lane] * grad_ref_y[q * NS + shape] + loperand5_values[lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape + 2][lane] += loperand6_values[lane] * grad_ref_x[q * NS + shape] + loperand7_values[lane] * grad_ref_y[q * NS + shape] + loperand8_values[lane] * grad_ref_z[q * NS + shape];
+          out_shape0[lane] += loperand0_values[lane] * tref0 + loperand1_values[lane] * tref1 + loperand2_values[lane] * tref2;
+          out_shape1[lane] += loperand3_values[lane] * tref0 + loperand4_values[lane] * tref1 + loperand5_values[lane] * tref2;
+          out_shape2[lane] += loperand6_values[lane] * tref0 + loperand7_values[lane] * tref1 + loperand8_values[lane] * tref2;
         }
       }
     }
@@ -792,50 +759,35 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_apply_bloc
         grad_h_ref8_values[lane] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[3 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[3 * shape + 1];
+        const s_t *const RSTR u_shape2 = u_streams[3 * shape + 2];
+        const s_t *const RSTR h_shape0 = h_streams[3 * shape];
+        const s_t *const RSTR h_shape1 = h_streams[3 * shape + 1];
+        const s_t *const RSTR h_shape2 = h_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          gu_ref0_values[lane] += u_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref0_values[lane] += h_streams[3 * shape][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref1_values[lane] += u_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref1_values[lane] += h_streams[3 * shape][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref2_values[lane] += u_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref2_values[lane] += h_streams[3 * shape][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref3_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref3_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref4_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref4_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref5_values[lane] += u_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref5_values[lane] += h_streams[3 * shape + 1][lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref6_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
-          grad_h_ref6_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_x[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref7_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
-          grad_h_ref7_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_y[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          gu_ref8_values[lane] += u_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
-          grad_h_ref8_values[lane] += h_streams[3 * shape + 2][lane] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[lane] += u_shape0[lane] * gref0;
+          grad_h_ref0_values[lane] += h_shape0[lane] * gref0;
+          gu_ref1_values[lane] += u_shape0[lane] * gref1;
+          grad_h_ref1_values[lane] += h_shape0[lane] * gref1;
+          gu_ref2_values[lane] += u_shape0[lane] * gref2;
+          grad_h_ref2_values[lane] += h_shape0[lane] * gref2;
+          gu_ref3_values[lane] += u_shape1[lane] * gref0;
+          grad_h_ref3_values[lane] += h_shape1[lane] * gref0;
+          gu_ref4_values[lane] += u_shape1[lane] * gref1;
+          grad_h_ref4_values[lane] += h_shape1[lane] * gref1;
+          gu_ref5_values[lane] += u_shape1[lane] * gref2;
+          grad_h_ref5_values[lane] += h_shape1[lane] * gref2;
+          gu_ref6_values[lane] += u_shape2[lane] * gref0;
+          grad_h_ref6_values[lane] += h_shape2[lane] * gref0;
+          gu_ref7_values[lane] += u_shape2[lane] * gref1;
+          grad_h_ref7_values[lane] += h_shape2[lane] * gref1;
+          gu_ref8_values[lane] += u_shape2[lane] * gref2;
+          grad_h_ref8_values[lane] += h_shape2[lane] * gref2;
         }
       }
       #pragma omp simd
@@ -1073,17 +1025,17 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_apply_bloc
       loperand8_values[lane] = loperand8;
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        const s_t tref2 = grad_ref_z[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[3 * shape];
+        s_t *const RSTR out_shape1 = out_streams[3 * shape + 1];
+        s_t *const RSTR out_shape2 = out_streams[3 * shape + 2];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape][lane] += loperand0_values[lane] * grad_ref_x[q * NS + shape] + loperand1_values[lane] * grad_ref_y[q * NS + shape] + loperand2_values[lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape + 1][lane] += loperand3_values[lane] * grad_ref_x[q * NS + shape] + loperand4_values[lane] * grad_ref_y[q * NS + shape] + loperand5_values[lane] * grad_ref_z[q * NS + shape];
-        }
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          out_streams[3 * shape + 2][lane] += loperand6_values[lane] * grad_ref_x[q * NS + shape] + loperand7_values[lane] * grad_ref_y[q * NS + shape] + loperand8_values[lane] * grad_ref_z[q * NS + shape];
+          out_shape0[lane] += loperand0_values[lane] * tref0 + loperand1_values[lane] * tref1 + loperand2_values[lane] * tref2;
+          out_shape1[lane] += loperand3_values[lane] * tref0 + loperand4_values[lane] * tref1 + loperand5_values[lane] * tref2;
+          out_shape2[lane] += loperand6_values[lane] * tref0 + loperand7_values[lane] * tref1 + loperand8_values[lane] * tref2;
         }
       }
     }

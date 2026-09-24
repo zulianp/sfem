@@ -2725,26 +2725,37 @@ def _simplex_weak_per_shape_tail(
     for component in range(n_field_components * dim):
         lines.append("      loperand%d_values[%s] = loperand%d;" % (component, work_item, component))
     lines.append("      }")
+    op = output_assignment(form)
+    output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
     lines.append("      for (int shape = 0; shape < NS; ++shape) {")
-    for row in range(n_field_components):
-        terms = [
-            "loperand%d_values[%s] * %s" % (row * dim + col, work_item, reference_gradient(col))
-            for col in range(dim)
-        ]
-        op = output_assignment(form)
-        output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
-        lines.extend(_work_item_loop_lines(source_builder, "        "))
+    # The contraction's other half, hoisted for the same reason as the
+    # accumulation above it: the reference gradient and the output stream's
+    # base address are the same in every lane, and one lane loop does the
+    # stores that were taking one region each.
+    for col in range(dim):
         lines.append(
-            "          %s[%s][%s] %s %s;"
+            "        const s_t tref%d = %s;" % (col, reference_gradient(col))
+        )
+    for row in range(n_field_components):
+        lines.append(
+            "        s_t *const RSTR out_shape%d = %s[%s];"
             % (
+                row,
                 output_streams,
                 c_sum(c_product("shape", n_field_components), row),
-                work_item,
-                op,
-                " + ".join(terms),
             )
         )
-        lines.append("        }")
+    lines.extend(_work_item_loop_lines(source_builder, "        "))
+    for row in range(n_field_components):
+        terms = [
+            "loperand%d_values[%s] * tref%d" % (row * dim + col, work_item, col)
+            for col in range(dim)
+        ]
+        lines.append(
+            "          out_shape%d[%s] %s %s;"
+            % (row, work_item, op, " + ".join(terms))
+        )
+    lines.append("        }")
     lines.extend(["      }", "    }"])
 
 
@@ -2825,6 +2836,19 @@ def _append_sfem_soa_weak_form_lines(
             work_item,
         )
 
+    def field_stream(field, row, shape="shape"):
+        """The same stream as a pointer: everything but the work item.
+
+        What is left is the part that does not vary over the lanes, which is
+        the part that belongs above the lane loop.
+        """
+        stream_prefix = "" if use_stream_arrays else "weak_"
+        return "%s%s_streams[%s]" % (
+            stream_prefix,
+            field,
+            c_sum(c_product(shape, n_field_components), row),
+        )
+
     def geometry_value(name, component):
         return _work_item_name(source_builder, name, component)
 
@@ -2861,21 +2885,39 @@ def _append_sfem_soa_weak_form_lines(
         _zero_lane_block_lines(source_builder, "      ", zeroed, work_item)
     )
     lines.append("      for (int shape = 0; shape < NS; ++shape) {")
+    # Named once per shape, above the lane loop: neither the reference gradient
+    # nor the stream's base address varies over the lanes, and re-deriving them
+    # inside a vector loop is address arithmetic where there should be none.
+    for col in range(dim):
+        lines.append(
+            "        const s_t gref%d = %s;" % (col, reference_gradient(col))
+        )
+    for field, reads in (("u", uses_current), ("h", uses_direction)):
+        lines.extend(
+            "        const s_t *const RSTR %s_shape%d = %s;"
+            % (field, row, field_stream(field, row))
+            for row in range(n_field_components)
+            if reads
+        )
+    # And one lane loop for every accumulation rather than one apiece: the
+    # bound and the pragma are the same for all of them, so a 3D vector field
+    # opened nine `#pragma omp simd` regions to do nine stores that belong
+    # together.
+    lines.extend(_work_item_loop_lines(source_builder, "        "))
     for row in range(n_field_components):
         for col in range(dim):
             idx = row * dim + col
-            lines.extend(_work_item_loop_lines(source_builder, "        "))
             if uses_current:
                 lines.append(
-                    "          gu_ref%d_values[%s] += %s * %s;"
-                    % (idx, work_item, field_value("u", row), reference_gradient(col))
+                    "          gu_ref%d_values[%s] += u_shape%d[%s] * gref%d;"
+                    % (idx, work_item, row, work_item, col)
                 )
             if uses_direction:
                 lines.append(
-                    "          grad_h_ref%d_values[%s] += %s * %s;"
-                    % (idx, work_item, field_value("h", row), reference_gradient(col))
+                    "          grad_h_ref%d_values[%s] += h_shape%d[%s] * gref%d;"
+                    % (idx, work_item, row, work_item, col)
                 )
-            lines.append("        }")
+    lines.append("        }")
     lines.append("      }")
     step_loop = _objective_step_loop(
         form,

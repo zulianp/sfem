@@ -96,41 +96,34 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d3_simplex_obje
         grad_h_ref8_values[0] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[3 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[3 * shape + 1];
+        const s_t *const RSTR u_shape2 = u_streams[3 * shape + 2];
+        const s_t *const RSTR h_shape0 = h_streams[3 * shape];
+        const s_t *const RSTR h_shape1 = h_streams[3 * shape + 1];
+        const s_t *const RSTR h_shape2 = h_streams[3 * shape + 2];
         {
-          gu_ref0_values[0] += u_streams[3 * shape][0] * grad_ref_x[q * NS + shape];
-          grad_h_ref0_values[0] += h_streams[3 * shape][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref1_values[0] += u_streams[3 * shape][0] * grad_ref_y[q * NS + shape];
-          grad_h_ref1_values[0] += h_streams[3 * shape][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref2_values[0] += u_streams[3 * shape][0] * grad_ref_z[q * NS + shape];
-          grad_h_ref2_values[0] += h_streams[3 * shape][0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          gu_ref3_values[0] += u_streams[3 * shape + 1][0] * grad_ref_x[q * NS + shape];
-          grad_h_ref3_values[0] += h_streams[3 * shape + 1][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref4_values[0] += u_streams[3 * shape + 1][0] * grad_ref_y[q * NS + shape];
-          grad_h_ref4_values[0] += h_streams[3 * shape + 1][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref5_values[0] += u_streams[3 * shape + 1][0] * grad_ref_z[q * NS + shape];
-          grad_h_ref5_values[0] += h_streams[3 * shape + 1][0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          gu_ref6_values[0] += u_streams[3 * shape + 2][0] * grad_ref_x[q * NS + shape];
-          grad_h_ref6_values[0] += h_streams[3 * shape + 2][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref7_values[0] += u_streams[3 * shape + 2][0] * grad_ref_y[q * NS + shape];
-          grad_h_ref7_values[0] += h_streams[3 * shape + 2][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref8_values[0] += u_streams[3 * shape + 2][0] * grad_ref_z[q * NS + shape];
-          grad_h_ref8_values[0] += h_streams[3 * shape + 2][0] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[0] += u_shape0[0] * gref0;
+          grad_h_ref0_values[0] += h_shape0[0] * gref0;
+          gu_ref1_values[0] += u_shape0[0] * gref1;
+          grad_h_ref1_values[0] += h_shape0[0] * gref1;
+          gu_ref2_values[0] += u_shape0[0] * gref2;
+          grad_h_ref2_values[0] += h_shape0[0] * gref2;
+          gu_ref3_values[0] += u_shape1[0] * gref0;
+          grad_h_ref3_values[0] += h_shape1[0] * gref0;
+          gu_ref4_values[0] += u_shape1[0] * gref1;
+          grad_h_ref4_values[0] += h_shape1[0] * gref1;
+          gu_ref5_values[0] += u_shape1[0] * gref2;
+          grad_h_ref5_values[0] += h_shape1[0] * gref2;
+          gu_ref6_values[0] += u_shape2[0] * gref0;
+          grad_h_ref6_values[0] += h_shape2[0] * gref0;
+          gu_ref7_values[0] += u_shape2[0] * gref1;
+          grad_h_ref7_values[0] += h_shape2[0] * gref1;
+          gu_ref8_values[0] += u_shape2[0] * gref2;
+          grad_h_ref8_values[0] += h_shape2[0] * gref2;
         }
       }
       s_t gu_base_v[9 * VS];
@@ -369,32 +362,22 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d3_simplex_grad
         gu_ref8_values[0] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[3 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[3 * shape + 1];
+        const s_t *const RSTR u_shape2 = u_streams[3 * shape + 2];
         {
-          gu_ref0_values[0] += u_streams[3 * shape][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref1_values[0] += u_streams[3 * shape][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref2_values[0] += u_streams[3 * shape][0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          gu_ref3_values[0] += u_streams[3 * shape + 1][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref4_values[0] += u_streams[3 * shape + 1][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref5_values[0] += u_streams[3 * shape + 1][0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          gu_ref6_values[0] += u_streams[3 * shape + 2][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref7_values[0] += u_streams[3 * shape + 2][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref8_values[0] += u_streams[3 * shape + 2][0] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[0] += u_shape0[0] * gref0;
+          gu_ref1_values[0] += u_shape0[0] * gref1;
+          gu_ref2_values[0] += u_shape0[0] * gref2;
+          gu_ref3_values[0] += u_shape1[0] * gref0;
+          gu_ref4_values[0] += u_shape1[0] * gref1;
+          gu_ref5_values[0] += u_shape1[0] * gref2;
+          gu_ref6_values[0] += u_shape2[0] * gref0;
+          gu_ref7_values[0] += u_shape2[0] * gref1;
+          gu_ref8_values[0] += u_shape2[0] * gref2;
         }
       }
       {
@@ -477,14 +460,16 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d3_simplex_grad
       loperand8_values[0] = loperand8;
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        const s_t tref2 = grad_ref_z[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[3 * shape];
+        s_t *const RSTR out_shape1 = out_streams[3 * shape + 1];
+        s_t *const RSTR out_shape2 = out_streams[3 * shape + 2];
         {
-          out_streams[3 * shape][0] += loperand0_values[0] * grad_ref_x[q * NS + shape] + loperand1_values[0] * grad_ref_y[q * NS + shape] + loperand2_values[0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          out_streams[3 * shape + 1][0] += loperand3_values[0] * grad_ref_x[q * NS + shape] + loperand4_values[0] * grad_ref_y[q * NS + shape] + loperand5_values[0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          out_streams[3 * shape + 2][0] += loperand6_values[0] * grad_ref_x[q * NS + shape] + loperand7_values[0] * grad_ref_y[q * NS + shape] + loperand8_values[0] * grad_ref_z[q * NS + shape];
+          out_shape0[0] += loperand0_values[0] * tref0 + loperand1_values[0] * tref1 + loperand2_values[0] * tref2;
+          out_shape1[0] += loperand3_values[0] * tref0 + loperand4_values[0] * tref1 + loperand5_values[0] * tref2;
+          out_shape2[0] += loperand6_values[0] * tref0 + loperand7_values[0] * tref1 + loperand8_values[0] * tref2;
         }
       }
     }
@@ -672,41 +657,34 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d3_simplex_appl
         grad_h_ref8_values[0] = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t gref0 = grad_ref_x[q * NS + shape];
+        const s_t gref1 = grad_ref_y[q * NS + shape];
+        const s_t gref2 = grad_ref_z[q * NS + shape];
+        const s_t *const RSTR u_shape0 = u_streams[3 * shape];
+        const s_t *const RSTR u_shape1 = u_streams[3 * shape + 1];
+        const s_t *const RSTR u_shape2 = u_streams[3 * shape + 2];
+        const s_t *const RSTR h_shape0 = h_streams[3 * shape];
+        const s_t *const RSTR h_shape1 = h_streams[3 * shape + 1];
+        const s_t *const RSTR h_shape2 = h_streams[3 * shape + 2];
         {
-          gu_ref0_values[0] += u_streams[3 * shape][0] * grad_ref_x[q * NS + shape];
-          grad_h_ref0_values[0] += h_streams[3 * shape][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref1_values[0] += u_streams[3 * shape][0] * grad_ref_y[q * NS + shape];
-          grad_h_ref1_values[0] += h_streams[3 * shape][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref2_values[0] += u_streams[3 * shape][0] * grad_ref_z[q * NS + shape];
-          grad_h_ref2_values[0] += h_streams[3 * shape][0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          gu_ref3_values[0] += u_streams[3 * shape + 1][0] * grad_ref_x[q * NS + shape];
-          grad_h_ref3_values[0] += h_streams[3 * shape + 1][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref4_values[0] += u_streams[3 * shape + 1][0] * grad_ref_y[q * NS + shape];
-          grad_h_ref4_values[0] += h_streams[3 * shape + 1][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref5_values[0] += u_streams[3 * shape + 1][0] * grad_ref_z[q * NS + shape];
-          grad_h_ref5_values[0] += h_streams[3 * shape + 1][0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          gu_ref6_values[0] += u_streams[3 * shape + 2][0] * grad_ref_x[q * NS + shape];
-          grad_h_ref6_values[0] += h_streams[3 * shape + 2][0] * grad_ref_x[q * NS + shape];
-        }
-        {
-          gu_ref7_values[0] += u_streams[3 * shape + 2][0] * grad_ref_y[q * NS + shape];
-          grad_h_ref7_values[0] += h_streams[3 * shape + 2][0] * grad_ref_y[q * NS + shape];
-        }
-        {
-          gu_ref8_values[0] += u_streams[3 * shape + 2][0] * grad_ref_z[q * NS + shape];
-          grad_h_ref8_values[0] += h_streams[3 * shape + 2][0] * grad_ref_z[q * NS + shape];
+          gu_ref0_values[0] += u_shape0[0] * gref0;
+          grad_h_ref0_values[0] += h_shape0[0] * gref0;
+          gu_ref1_values[0] += u_shape0[0] * gref1;
+          grad_h_ref1_values[0] += h_shape0[0] * gref1;
+          gu_ref2_values[0] += u_shape0[0] * gref2;
+          grad_h_ref2_values[0] += h_shape0[0] * gref2;
+          gu_ref3_values[0] += u_shape1[0] * gref0;
+          grad_h_ref3_values[0] += h_shape1[0] * gref0;
+          gu_ref4_values[0] += u_shape1[0] * gref1;
+          grad_h_ref4_values[0] += h_shape1[0] * gref1;
+          gu_ref5_values[0] += u_shape1[0] * gref2;
+          grad_h_ref5_values[0] += h_shape1[0] * gref2;
+          gu_ref6_values[0] += u_shape2[0] * gref0;
+          grad_h_ref6_values[0] += h_shape2[0] * gref0;
+          gu_ref7_values[0] += u_shape2[0] * gref1;
+          grad_h_ref7_values[0] += h_shape2[0] * gref1;
+          gu_ref8_values[0] += u_shape2[0] * gref2;
+          grad_h_ref8_values[0] += h_shape2[0] * gref2;
         }
       }
       {
@@ -903,14 +881,16 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d3_simplex_appl
       loperand8_values[0] = loperand8;
       }
       for (int shape = 0; shape < NS; ++shape) {
+        const s_t tref0 = grad_ref_x[q * NS + shape];
+        const s_t tref1 = grad_ref_y[q * NS + shape];
+        const s_t tref2 = grad_ref_z[q * NS + shape];
+        s_t *const RSTR out_shape0 = out_streams[3 * shape];
+        s_t *const RSTR out_shape1 = out_streams[3 * shape + 1];
+        s_t *const RSTR out_shape2 = out_streams[3 * shape + 2];
         {
-          out_streams[3 * shape][0] += loperand0_values[0] * grad_ref_x[q * NS + shape] + loperand1_values[0] * grad_ref_y[q * NS + shape] + loperand2_values[0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          out_streams[3 * shape + 1][0] += loperand3_values[0] * grad_ref_x[q * NS + shape] + loperand4_values[0] * grad_ref_y[q * NS + shape] + loperand5_values[0] * grad_ref_z[q * NS + shape];
-        }
-        {
-          out_streams[3 * shape + 2][0] += loperand6_values[0] * grad_ref_x[q * NS + shape] + loperand7_values[0] * grad_ref_y[q * NS + shape] + loperand8_values[0] * grad_ref_z[q * NS + shape];
+          out_shape0[0] += loperand0_values[0] * tref0 + loperand1_values[0] * tref1 + loperand2_values[0] * tref2;
+          out_shape1[0] += loperand3_values[0] * tref0 + loperand4_values[0] * tref1 + loperand5_values[0] * tref2;
+          out_shape2[0] += loperand6_values[0] * tref0 + loperand7_values[0] * tref1 + loperand8_values[0] * tref2;
         }
       }
     }

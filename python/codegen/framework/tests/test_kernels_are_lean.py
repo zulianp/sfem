@@ -87,8 +87,20 @@ DEAD_ASSIGNMENT_BUDGET = 10
 #: three; the Jacobian zero-fill and accumulation account for almost all of
 #: them and are now fused, leaving 7 nines and 7 fours in paths that build the
 #: same values a different way.  A ratchet, not a target that has been met.
-LONGEST_LANE_LOOP_RUN = 9
-LANE_LOOP_RUNS_LONGER_THAN_ONE = 32
+#: 9 -> 3 and 36 -> 20 when the reference-gradient accumulation stopped opening
+#: a lane loop per component.  A 3D vector field contracted nine products of a
+#: stream and a reference gradient, each in its own `#pragma omp simd` region;
+#: the nine share a bound, a pragma and a trip count, so they are now nine
+#: statements in one region.  The same change hoisted `grad_ref_*[q * NS +
+#: shape]` and the stream's base address above the loop, which is ISSUES.md
+#: item 3 -- the two are one defect seen from either end, and fixing the loop
+#: structure is what made the hoist possible.
+#: 3 -> 1 and 20 -> 0 when the contraction onto the test functions followed --
+#: the snippet ISSUES.md item 3 actually quotes.  Nothing in the generated tree
+#: now opens a second single-statement lane loop where the first would do, so
+#: this is a floor that has been reached rather than a ratchet with room left.
+LONGEST_LANE_LOOP_RUN = 1
+LANE_LOOP_RUNS_LONGER_THAN_ONE = 0
 
 #: `(void)name;` statements, and the declarations that made them necessary.
 #:
