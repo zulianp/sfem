@@ -87,6 +87,8 @@ from codegen.framework.plans.kernel_signature import (
     packed_mesh_ghost_reduce_arguments,
 )
 from codegen.framework.plans.layout import (
+    component_major_index_decomposition,
+    is_identity_order,
     _compatible_matrix_stream_indices,
     compatible_matrix_stream_fields,
     _field_element_type,
@@ -7934,6 +7936,99 @@ def _scalar_crs_precision_entry_points(
         )
 
 
+def _node_order_lines(name, order, indent):
+    """The node order, where the element does not already have it.
+
+    An element whose mesh numbers its nodes the way the kernel wants emits
+    nothing; the rest emit the convention itself, which is `n_shape` entries
+    rather than the `n_fields * n_shape` product a flattened table would hold.
+    """
+    return [
+        "%sstatic const int %s[%d] = {%s};"
+        % (indent, name, len(order), ", ".join(str(value) for value in order))
+        for _ in (order,)
+        if not is_identity_order(order)
+    ]
+
+
+def _node_order_expr(name, order, index):
+    """`order[index]`, or `index` where the order is the identity."""
+    return (
+        [index]
+        + ["%s[%s]" % (name, index) for _ in (order,) if not is_identity_order(order)]
+    )[-1]
+
+
+def _nested_element_matrix_fill_lines(
+    indent,
+    row_streams,
+    column_streams,
+    row_order,
+    column_order,
+    n_fields,
+    n_shape,
+    block_function,
+    call_args,
+):
+    """Probing, with the local index nested rather than tabulated.
+
+    The local index is component-major over a node-major stream layout, and
+    every part of that but the node order is arithmetic.  So the loops that
+    produce it are nested and the index is computed; what is left is the node
+    convention, and only for the elements that do not already carry the
+    kernel's one.
+
+    This is still probing, which is the defect `plans.direct_assembly` exists
+    to retire.  Nesting the index does not make it less so; it makes it read as
+    what it is instead of hiding the shape behind a twenty-four case switch.
+    """
+    n_columns = len(column_streams)
+    lines = [
+        "%sfor (int entry = 0; entry < %d; ++entry) {"
+        % (indent, len(row_streams) * n_columns),
+        "%s  element_matrix[entry] = s_t(0);" % indent,
+        "%s}" % indent,
+    ]
+    lines.extend(_node_order_lines("trial_node_order", column_order, indent))
+    lines.extend(_node_order_lines("test_node_order", row_order, indent))
+    trial = _node_order_expr("trial_node_order", column_order, "trial_node")
+    test = _node_order_expr("test_node_order", row_order, "test_node")
+    lines.extend(
+        [
+            "%sfor (int trial_component = 0; trial_component < %d; ++trial_component) {"
+            % (indent, n_fields),
+            "%s  for (int trial_node = 0; trial_node < %d; ++trial_node) {"
+            % (indent, n_shape),
+            "%s    const int trial_local = trial_component * %d + trial_node;"
+            % (indent, n_shape),
+            "%s    const int trial = %s * %d + trial_component;"
+            % (indent, trial, n_fields),
+            "%s    for (int stream = 0; stream < N_STREAMS; ++stream) {" % indent,
+            "%s      bdirection[stream][0] = s_t(0);" % indent,
+            "%s      boutput[stream][0] = s_t(0);" % indent,
+            "%s    }" % indent,
+            "%s    bdirection[trial][0] = s_t(1);" % indent,
+            "%s    %s<s_t, NQ, NS, VS>(%s);"
+            % (indent, block_function, ", ".join(call_args)),
+            "%s    for (int test_component = 0; test_component < %d; ++test_component) {"
+            % (indent, n_fields),
+            "%s      for (int test_node = 0; test_node < %d; ++test_node) {"
+            % (indent, n_shape),
+            "%s        const int test_local = test_component * %d + test_node;"
+            % (indent, n_shape),
+            "%s        const int test = %s * %d + test_component;"
+            % (indent, test, n_fields),
+            "%s        element_matrix[test_local * %d + trial_local] = boutput[test][0];"
+            % (indent, n_columns),
+            "%s      }" % indent,
+            "%s    }" % indent,
+            "%s  }" % indent,
+            "%s}" % indent,
+        ]
+    )
+    return lines
+
+
 def _element_matrix_fill_lines(
     indent,
     row_streams,
@@ -7944,6 +8039,8 @@ def _element_matrix_fill_lines(
     call_args,
     element_matrix_kernel=None,
     element_matrix_args=(),
+    n_fields=None,
+    n_shape=None,
 ):
     """Fill `element_matrix` with this element's entries.
 
@@ -7964,6 +8061,32 @@ def _element_matrix_fill_lines(
             "%s%s<s_t, NQ, NS, VS>(%s);"
             % (indent, element_matrix_kernel, ", ".join(element_matrix_args))
         ]
+    # Nested where the mapping decomposes, tabulated where it does not.
+    # `component_major_index_decomposition` is the question, so this site walks
+    # the answer rather than deciding what the index looks like.
+    row_order = component_major_index_decomposition(
+        row_tensor_streams, n_fields, n_shape
+    )
+    column_order = component_major_index_decomposition(
+        column_tensor_streams, n_fields, n_shape
+    )
+    nested = [
+        _nested_element_matrix_fill_lines(
+            indent,
+            row_streams,
+            column_streams,
+            row_order,
+            column_order,
+            n_fields,
+            n_shape,
+            block_function,
+            call_args,
+        )
+        for _ in (row_order,)
+        if row_order is not None and column_order is not None
+    ]
+    if nested:
+        return nested[0]
     lines = list(
         _local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, indent)
     )
@@ -8435,6 +8558,8 @@ def _scalar_crs_matrix_assembly_source(
             call_args,
             element_matrix_kernel=element_matrix_call,
             element_matrix_args=element_matrix_call_args,
+            n_fields=n_fields,
+            n_shape=n_shape,
         )
     )
     lines.extend(
@@ -8774,6 +8899,8 @@ def _scalar_crs_matrix_assembly_source(
                 packed_call_args,
                 element_matrix_kernel=element_matrix_call,
                 element_matrix_args=element_matrix_call_args,
+                n_fields=n_fields,
+                n_shape=n_shape,
             )
         )
         lines.extend(
