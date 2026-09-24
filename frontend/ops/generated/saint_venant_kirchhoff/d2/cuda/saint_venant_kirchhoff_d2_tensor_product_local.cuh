@@ -56,10 +56,10 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
   static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
   s_t gu_ref_q[NQ * 4 * VS];
   s_t grad_h_ref_q[NQ * 4 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ * VS]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = q / NQ1;
@@ -137,8 +137,8 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
   static_assert(ipow(NS1, 2) == NS, "NS must be tensor-product compatible");
   s_t gu_ref_q[NQ * 4 * VS];
   s_t loperand_q[NQ * 4 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ * VS]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = q / NQ1;
@@ -188,8 +188,8 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
       loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
-  tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[2 * NQ * VS], out_streams, 1);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[2 * NQ], out_streams, 1);
 }
 
 template <typename s_t, int NQ, int NS, int VS>
@@ -219,10 +219,10 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
   s_t gu_ref_q[NQ * 4 * VS];
   s_t grad_h_ref_q[NQ * 4 * VS];
   s_t loperand_q[NQ * 4 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ * VS]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[2 * NQ]);
+  tensor_gradient_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[2 * NQ]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = q / NQ1;
@@ -292,8 +292,8 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_tensor
       loperand3[0] = qw * (material2 * adj_value2 + material3 * adj_value3);
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
-  tensor_test<s_t, NQ, NS, VS, 2, 2>(ne, shape_1d, grad_1d, &loperand_q[2 * NQ * VS], out_streams, 1);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 2, 2>(shape_1d, grad_1d, &loperand_q[2 * NQ], out_streams, 1);
 }
 
 } // namespace codegen

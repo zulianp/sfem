@@ -60,8 +60,8 @@ static __host__ __device__ __forceinline__ void laplace_d3_tensor_product_object
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
   s_t gu_ref_q[NQ * 9 * VS];
   s_t grad_h_ref_q[NQ * 9 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 1>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 1>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -147,7 +147,7 @@ static __host__ __device__ __forceinline__ void laplace_d3_tensor_product_gradie
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
   s_t gu_ref_q[NQ * 9 * VS];
   s_t loperand_q[NQ * 9 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 1>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -193,7 +193,7 @@ static __host__ __device__ __forceinline__ void laplace_d3_tensor_product_gradie
       loperand2[0] = qw * (material0 * adj_value6 + material1 * adj_value7 + material2 * adj_value8);
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 3, 1>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
 }
 
 template <typename s_t, int NQ, int NS, int VS>
@@ -225,7 +225,7 @@ static __host__ __device__ __forceinline__ void laplace_d3_tensor_product_apply_
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
   s_t grad_h_ref_q[NQ * 9 * VS];
   s_t loperand_q[NQ * 9 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 1>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -271,7 +271,7 @@ static __host__ __device__ __forceinline__ void laplace_d3_tensor_product_apply_
       loperand2[0] = qw * (material0 * adj_value6 + material1 * adj_value7 + material2 * adj_value8);
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 3, 1>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 3, 1>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
 }
 
 } // namespace codegen

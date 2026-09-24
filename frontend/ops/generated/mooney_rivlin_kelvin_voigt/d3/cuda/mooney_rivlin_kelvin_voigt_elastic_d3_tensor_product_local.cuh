@@ -57,9 +57,9 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_elast
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
   s_t gu_ref_q[NQ * 9 * VS];
   s_t loperand_q[NQ * 9 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[6 * NQ * VS]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 2, &gu_ref_q[6 * NQ]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -189,9 +189,9 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_elast
       loperand8[0] = qw * (material6 * adj_value6 + material7 * adj_value7 + material8 * adj_value8);
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[3 * NQ * VS], out_streams, 1);
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[6 * NQ * VS], out_streams, 2);
+  tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[3 * NQ], out_streams, 1);
+  tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[6 * NQ], out_streams, 2);
 }
 
 template <typename s_t, int NQ, int NS, int VS>
@@ -226,12 +226,12 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_elast
   s_t gu_ref_q[NQ * 9 * VS];
   s_t grad_h_ref_q[NQ * 9 * VS];
   s_t loperand_q[NQ * 9 * VS];
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[3 * NQ * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[6 * NQ * VS]);
-  tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 2, &grad_h_ref_q[6 * NQ * VS]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[3 * NQ]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 2, &gu_ref_q[6 * NQ]);
+  tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, h_streams, 2, &grad_h_ref_q[6 * NQ]);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -482,9 +482,9 @@ static __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_elast
       loperand8[0] = qw * (material6 * adj_value6 + material7 * adj_value7 + material8 * adj_value8);
     }
   }
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[3 * NQ * VS], out_streams, 1);
-  tensor_test<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, &loperand_q[6 * NQ * VS], out_streams, 2);
+  tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[0], out_streams, 0);
+  tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[3 * NQ], out_streams, 1);
+  tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[6 * NQ], out_streams, 2);
 }
 
 } // namespace codegen
