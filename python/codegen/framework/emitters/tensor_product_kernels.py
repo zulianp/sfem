@@ -202,6 +202,45 @@ def _residual_ops_source(inline_qualifier, work_item_index, simd_lines,
     return _RESIDUAL_OPS_TEMPLATE % values
 
 
+def kernel_width():
+    """`VS`, or `1` where the target's work item is a single element."""
+    return current_target().kernel_vector_width() or "1"
+
+
+def width_factors():
+    """The width, as factors of an offset -- none where there is no width."""
+    width = current_target().kernel_vector_width()
+    return (width,) if width is not None else ()
+
+
+def micro_kernel(name):
+    """The shared micro-kernel this target calls, by name.
+
+    `tensor_test` strides over a block of work items and takes their count;
+    `tensor_test_scalar` is the same arithmetic with one element in hand.  Both
+    are rendered from one body and `tests/test_scalar_micro_kernels_match.py`
+    holds them to the same numbers, so which one a target calls is a routing
+    question rather than a numerical one.
+    """
+    return name if current_target().kernel_vector_width() is not None else "%s_scalar" % name
+
+
+def micro_kernel_template(*arguments, shape="NS"):
+    """The template arguments for that call, with the width where there is one.
+
+    `shape` because a mixed-order body names its own shape count per field
+    rather than using the cell's `NS`.
+    """
+    return "<%s>" % ", ".join(
+        ("s_t", "NQ", str(shape)) + width_factors() + tuple(str(a) for a in arguments)
+    )
+
+
+def micro_kernel_count():
+    """`ne, ` for a blocked call; nothing for a scalar one, which has no count."""
+    return "ne, " if current_target().kernel_vector_width() is not None else ""
+
+
 def _restrict_define_line(restrict_definition):
     restrict_definition = str(restrict_definition)
     if restrict_definition:

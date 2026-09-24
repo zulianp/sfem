@@ -28,6 +28,11 @@ from codegen.framework.emitters.runtime_typed_abi import (
     cast_arguments,
     runtime_typed_entry_point_lines,
 )
+from codegen.framework.emitters.tensor_product_kernels import (
+    micro_kernel as _micro_kernel,
+    micro_kernel_count as _micro_kernel_count,
+    micro_kernel_template as _micro_kernel_template,
+)
 from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
 from codegen.framework.plans.dependencies import (
@@ -2791,8 +2796,13 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     # One fact -- whether the streams arrive contiguous -- decided once and
     # spelled into four helper names, rather than asked four times.
     contiguous_suffix = _STREAM_HELPER_SUFFIX[field_stream_layout(stream_layout)]
-    tensor_evaluate_name = "tensor_evaluate" + contiguous_suffix
-    tensor_evaluate_value_name = "tensor_evaluate_value" + contiguous_suffix
+    # The scalar suffix goes outside the contiguous one -- the rendered name is
+    # `tensor_evaluate_contiguous_scalar` -- so the target's choice wraps the
+    # stream layout's rather than competing with it.
+    tensor_evaluate_name = _micro_kernel("tensor_evaluate" + contiguous_suffix)
+    tensor_evaluate_value_name = _micro_kernel(
+        "tensor_evaluate_value" + contiguous_suffix
+    )
 
     for field_index, field in enumerate(system.fields):
         reference_index = layout.reference_index(field_index)
@@ -2820,10 +2830,14 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             if read.uses_gradient:
                 lines.extend(
                     [
-                        "  %s<s_t, NQ, %s, VS, ND, 1>("
-                        % (tensor_evaluate_name, shape_name),
-                        "      ne, field_shape_1d[%d], field_grad_1d[%d], %s, %s_%s_value, %s_%s_grad_ref);"
+                        "  %s%s("
                         % (
+                            tensor_evaluate_name,
+                            _micro_kernel_template("ND", 1, shape=shape_name),
+                        ),
+                        "      %sfield_shape_1d[%d], field_grad_1d[%d], %s, %s_%s_value, %s_%s_grad_ref);"
+                        % (
+                            _micro_kernel_count(),
                             reference_index,
                             reference_index,
                             stream_arg,
@@ -2837,10 +2851,19 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             elif read.uses_value:
                 lines.extend(
                     [
-                        "  %s<s_t, NQ, %s, VS, ND, 1>("
-                        % (tensor_evaluate_value_name, shape_name),
-                        "      ne, field_shape_1d[%d], %s, %s_%s_value);"
-                        % (reference_index, stream_arg, group.name, field.name),
+                        "  %s%s("
+                        % (
+                            tensor_evaluate_value_name,
+                            _micro_kernel_template("ND", 1, shape=shape_name),
+                        ),
+                        "      %sfield_shape_1d[%d], %s, %s_%s_value);"
+                        % (
+                            _micro_kernel_count(),
+                            reference_index,
+                            stream_arg,
+                            group.name,
+                            field.name,
+                        ),
                     ]
                 )
 
@@ -2968,10 +2991,18 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         ]
         lines.extend(
             [
-                "  %s%s<s_t, NQ, %s, VS, ND, 1>("
-                % (stem, contiguous_suffix, shape_name),
+                "  %s%s("
+                % (
+                    _micro_kernel(stem + contiguous_suffix),
+                    _micro_kernel_template("ND", 1, shape=shape_name),
+                ),
                 argument_format
-                % {"i": reference_index, "f": field.name, "out": output_arg},
+                % {
+                    "ne": _micro_kernel_count(),
+                    "i": reference_index,
+                    "f": field.name,
+                    "out": output_arg,
+                },
             ]
         )
     return lines
@@ -6874,11 +6905,11 @@ _STAGED_COEFFICIENT_BUFFER = {
 _TENSOR_INTEGRATE_CALL_BY_QUANTITIES = {
     ("value",): (
         "tensor_integrate_value",
-        "      ne, field_shape_1d[%(i)d], %(f)s_value_coeff, %(out)s);",
+        "      %(ne)sfield_shape_1d[%(i)d], %(f)s_value_coeff, %(out)s);",
     ),
     ("value", "gradient"): (
         "tensor_integrate",
-        "      ne, field_shape_1d[%(i)d], field_grad_1d[%(i)d], "
+        "      %(ne)sfield_shape_1d[%(i)d], field_grad_1d[%(i)d], "
         "%(f)s_value_coeff, %(f)s_grad_coeff_ref, %(out)s);",
     ),
 }
