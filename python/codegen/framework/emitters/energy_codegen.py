@@ -2048,8 +2048,15 @@ def _tensor_weak_per_shape_tail(
     lines.extend(["    }", "  }"])
     for row in range(n_field_components):
         lines.append(
-            "  tensor_test<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, &loperand_q[%s], %s, %d);"
-            % (dim, n_field_components, c_product(row, "NQ", dim, "VS"), out_streams, row)
+            "  %s%s(%sshape_1d, grad_1d, &loperand_q[%s], %s, %d);"
+            % (
+                _micro_kernel("tensor_test"),
+                _micro_kernel_template(dim, n_field_components),
+                _micro_kernel_count(),
+                c_product(row, "NQ", dim, *_width_factors()),
+                out_streams,
+                row,
+            )
         )
 
 
@@ -2090,16 +2097,19 @@ def _append_sfem_soa_tensor_weak_form_lines(
     )
 
     for row in range(n_field_components):
-        output_offset = c_product(row, "NQ", dim, "VS")
+        output_offset = c_product(row, "NQ", dim, *_width_factors())
+        gradient = _micro_kernel("tensor_gradient")
+        template = _micro_kernel_template(dim, n_field_components)
+        count = _micro_kernel_count()
         if uses_current:
             lines.append(
-                "  tensor_gradient<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, %s, %d, &gu_ref_q[%s]);"
-                % (dim, n_field_components, u_streams, row, output_offset)
+                "  %s%s(%sshape_1d, grad_1d, %s, %d, &gu_ref_q[%s]);"
+                % (gradient, template, count, u_streams, row, output_offset)
             )
         if uses_direction:
             lines.append(
-                "  tensor_gradient<s_t, NQ, NS, VS, %d, %d>(ne, shape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
-                % (dim, n_field_components, h_streams, row, output_offset)
+                "  %s%s(%sshape_1d, grad_1d, %s, %d, &grad_h_ref_q[%s]);"
+                % (gradient, template, count, h_streams, row, output_offset)
             )
 
     lines.append("  for (int q = 0; q < NQ; ++q) {")
@@ -10941,6 +10951,41 @@ _QUADRATURE_WEIGHT_PARAMETER = {
     True: "const s_t *const RSTR q_weight_1d",
     False: "const s_t *const RSTR q_weight",
 }
+
+
+def _kernel_width():
+    """`VS`, or `1` where the target's work item is a single element."""
+    return current_target().kernel_vector_width() or "1"
+
+
+def _width_factors():
+    """The width, as factors of an offset -- none where there is no width."""
+    width = current_target().kernel_vector_width()
+    return (width,) if width is not None else ()
+
+
+def _micro_kernel(name):
+    """The shared micro-kernel this target calls, by name.
+
+    `tensor_test` strides over a block of work items and takes their count;
+    `tensor_test_scalar` is the same arithmetic with one element in hand.  Both
+    are rendered from one body and `tests/test_scalar_micro_kernels_match.py`
+    holds them to the same numbers, so which one a target calls is a routing
+    question rather than a numerical one.
+    """
+    return name if current_target().kernel_vector_width() is not None else "%s_scalar" % name
+
+
+def _micro_kernel_template(*arguments):
+    """The template arguments for that call, with the width where there is one."""
+    return "<%s>" % ", ".join(
+        ("s_t", "NQ", "NS") + _width_factors() + tuple(str(a) for a in arguments)
+    )
+
+
+def _micro_kernel_count():
+    """`ne, ` for a blocked call; nothing for a scalar one, which has no count."""
+    return "ne, " if current_target().kernel_vector_width() is not None else ""
 
 
 def _sfem_soa_element_api_geometry_args(dim):

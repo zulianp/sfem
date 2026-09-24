@@ -222,6 +222,18 @@ class TargetPlatform:
             "%sconst %s %s = 0;" % (indent, policy.lane_index_type, policy.lane_index),
         )
 
+    def kernel_vector_width(self):
+        """What a kernel calls the number of elements one work item holds.
+
+        `VS` where a work item strides over a block of them, so the kernel is
+        parameterised by how many and sizes its buffers in terms of it.  `None`
+        where a work item *is* one element -- a device thread -- and there is
+        no width to be parameterised by: no template argument, no width-sized
+        buffers, no tile loop over blocks of that width, and the scalar
+        rendering of the shared micro-kernels rather than the blocked one.
+        """
+        return "VS"
+
     def work_item_subscript(self):
         """How a staged buffer is indexed at this work item: `[lane]`, or `[0]`."""
         return "[%s]" % self.work_item_index()
@@ -829,6 +841,10 @@ class CUDATarget(TargetPlatform):
     def effective_vector_size(self, vector_size):
         #: One thread, one element.
         return 1
+
+    def kernel_vector_width(self):
+        #: And so no width: see `Target.kernel_vector_width`.
+        return None
 
     def execution_space(self):
         return "EXECUTION_SPACE_DEVICE"
