@@ -978,7 +978,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
           v += u * shape_1d[qx * NS1 + sx];
           g += u * grad_1d[qx * NS1 + sx];
         }
-        const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + 0;
+        const int i = ((f * NQ1 + qx) * NS1 + sy)  * VS + 0;
         vx[i] = v;
         gx[i] = g;
       }
@@ -993,7 +993,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t g0 = s_t(0);
         s_t g1 = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
-          const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + 0;
+          const int i = ((f * NQ1 + qx) * NS1 + sy)  * VS + 0;
           v += vx[i] * shape_1d[qy * NS1 + sy];
           g0 += gx[i] * shape_1d[qy * NS1 + sy];
           g1 += vx[i] * grad_1d[qy * NS1 + sy];
@@ -1027,7 +1027,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
           v += u * shape_1d[qx * NS1 + sx];
           g += u * grad_1d[qx * NS1 + sx];
         }
-        const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + 0;
+        const int i = ((f * NQ1 + qx) * NS1 + sy)  * VS + 0;
         vx[i] = v;
         gx[i] = g;
       }
@@ -1042,7 +1042,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t g0 = s_t(0);
         s_t g1 = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
-          const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + 0;
+          const int i = ((f * NQ1 + qx) * NS1 + sy)  * VS + 0;
           v += vx[i] * shape_1d[qy * NS1 + sy];
           g0 += gx[i] * shape_1d[qy * NS1 + sy];
           g1 += vx[i] * grad_1d[qy * NS1 + sy];
@@ -1080,7 +1080,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
             {
         s_t v = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
-          v += vx[((f * NQ1 + qx) * NS1 + sy) * VS + 0] * shape_1d[qy * NS1 + sy];
+          v += vx[((f * NQ1 + qx) * NS1 + sy)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
         value_q[0] = v;
       }
@@ -1113,7 +1113,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
             {
         s_t v = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
-          v += vx[((f * NQ1 + qx) * NS1 + sy) * VS + 0] * shape_1d[qy * NS1 + sy];
+          v += vx[((f * NQ1 + qx) * NS1 + sy)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
         value_q[0] = v;
       }
@@ -1138,11 +1138,11 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t b = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
           const int q = qx + NQ1 * qy;
-          a += value_coeff[(f * NQ + q) * VS + 0] * shape_1d[qy * NS1 + sy]
-                       + grad_coeff[((f * NQ + q) * 2 + 1) * VS + 0] * grad_1d[qy * NS1 + sy];
-          b += grad_coeff[((f * NQ + q) * 2 + 0) * VS + 0] * shape_1d[qy * NS1 + sy];
+          a += value_coeff[(f * NQ + q)  * VS + 0] * shape_1d[qy * NS1 + sy]
+                       + grad_coeff[((f * NQ + q) * 2 + 1)  * VS + 0] * grad_1d[qy * NS1 + sy];
+          b += grad_coeff[((f * NQ + q) * 2 + 0)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
-        const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + 0;
+        const int i = ((f * NQ1 + qx) * NS1 + sy)  * VS + 0;
         sv[i] = a;
         sg[i] = b;
       }
@@ -1152,7 +1152,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
             {
         s_t v = s_t(0);
         for (int qx = 0; qx < NQ1; ++qx) {
-          const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + 0;
+          const int i = ((f * NQ1 + qx) * NS1 + sy)  * VS + 0;
           v += sv[i] * shape_1d[qx * NS1 + sx] + sg[i] * grad_1d[qx * NS1 + sx];
         }
         output[s * NC + f][0] += v;
@@ -1178,11 +1178,11 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t b = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
           const int q = qx + NQ1 * qy;
-          a += value_coeff[(f * NQ + q) * VS + 0] * shape_1d[qy * NS1 + sy]
-                       + grad_coeff[((f * NQ + q) * 2 + 1) * VS + 0] * grad_1d[qy * NS1 + sy];
-          b += grad_coeff[((f * NQ + q) * 2 + 0) * VS + 0] * shape_1d[qy * NS1 + sy];
+          a += value_coeff[(f * NQ + q)  * VS + 0] * shape_1d[qy * NS1 + sy]
+                       + grad_coeff[((f * NQ + q) * 2 + 1)  * VS + 0] * grad_1d[qy * NS1 + sy];
+          b += grad_coeff[((f * NQ + q) * 2 + 0)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
-        const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + 0;
+        const int i = ((f * NQ1 + qx) * NS1 + sy)  * VS + 0;
         sv[i] = a;
         sg[i] = b;
       }
@@ -1192,7 +1192,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
             {
         s_t v = s_t(0);
         for (int qx = 0; qx < NQ1; ++qx) {
-          const int i = ((f * NQ1 + qx) * NS1 + sy) * VS + 0;
+          const int i = ((f * NQ1 + qx) * NS1 + sy)  * VS + 0;
           v += sv[i] * shape_1d[qx * NS1 + sx] + sg[i] * grad_1d[qx * NS1 + sx];
         }
         output[s * NC + f][0] += v;
@@ -1215,7 +1215,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t a = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
           const int q = qx + NQ1 * qy;
-          a += value_coeff[(f * NQ + q) * VS + 0] * shape_1d[qy * NS1 + sy];
+          a += value_coeff[(f * NQ + q)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
         sv_q[0] = a;
       }
@@ -1225,7 +1225,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
             {
         s_t v = s_t(0);
         for (int qx = 0; qx < NQ1; ++qx) {
-          v += sv[((f * NQ1 + qx) * NS1 + sy) * VS + 0] * shape_1d[qx * NS1 + sx];
+          v += sv[((f * NQ1 + qx) * NS1 + sy)  * VS + 0] * shape_1d[qx * NS1 + sx];
         }
         output[s * NC + f][0] += v;
       }
@@ -1247,7 +1247,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
         s_t a = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
           const int q = qx + NQ1 * qy;
-          a += value_coeff[(f * NQ + q) * VS + 0] * shape_1d[qy * NS1 + sy];
+          a += value_coeff[(f * NQ + q)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
         sv_q[0] = a;
       }
@@ -1257,7 +1257,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 2> {
             {
         s_t v = s_t(0);
         for (int qx = 0; qx < NQ1; ++qx) {
-          v += sv[((f * NQ1 + qx) * NS1 + sy) * VS + 0] * shape_1d[qx * NS1 + sx];
+          v += sv[((f * NQ1 + qx) * NS1 + sy)  * VS + 0] * shape_1d[qx * NS1 + sx];
         }
         output[s * NC + f][0] += v;
       }
@@ -1292,7 +1292,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
           v += u * shape_1d[qx * NS1 + sx];
           g += u * grad_1d[qx * NS1 + sx];
         }
-        const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0;
+        const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0;
         vx[i] = v;
         gx[i] = g;
       }
@@ -1303,12 +1303,12 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t g0 = s_t(0);
         s_t g1 = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
-          const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0;
+          const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0;
           v += vx[i] * shape_1d[qy * NS1 + sy];
           g0 += gx[i] * shape_1d[qy * NS1 + sy];
           g1 += vx[i] * grad_1d[qy * NS1 + sy];
         }
-        const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0;
+        const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0;
         vxy[j] = v;
         g0xy[j] = g0;
         g1xy[j] = g1;
@@ -1326,7 +1326,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t g1 = s_t(0);
         s_t g2 = s_t(0);
         for (int sz = 0; sz < NS1; ++sz) {
-          const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0;
+          const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0;
           v += vxy[j] * shape_1d[qz * NS1 + sz];
           g0 += g0xy[j] * shape_1d[qz * NS1 + sz];
           g1 += g1xy[j] * shape_1d[qz * NS1 + sz];
@@ -1365,7 +1365,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
           v += u * shape_1d[qx * NS1 + sx];
           g += u * grad_1d[qx * NS1 + sx];
         }
-        const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0;
+        const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0;
         vx[i] = v;
         gx[i] = g;
       }
@@ -1376,12 +1376,12 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t g0 = s_t(0);
         s_t g1 = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
-          const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0;
+          const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0;
           v += vx[i] * shape_1d[qy * NS1 + sy];
           g0 += gx[i] * shape_1d[qy * NS1 + sy];
           g1 += vx[i] * grad_1d[qy * NS1 + sy];
         }
-        const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0;
+        const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0;
         vxy[j] = v;
         g0xy[j] = g0;
         g1xy[j] = g1;
@@ -1399,7 +1399,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t g1 = s_t(0);
         s_t g2 = s_t(0);
         for (int sz = 0; sz < NS1; ++sz) {
-          const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0;
+          const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0;
           v += vxy[j] * shape_1d[qz * NS1 + sz];
           g0 += g0xy[j] * shape_1d[qz * NS1 + sz];
           g1 += g1xy[j] * shape_1d[qz * NS1 + sz];
@@ -1439,7 +1439,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t v = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
-          v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0] * shape_1d[qy * NS1 + sy];
+          v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
         vxy_q[0] = v;
       }
@@ -1450,7 +1450,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t v = s_t(0);
         for (int sz = 0; sz < NS1; ++sz) {
-          v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0] * shape_1d[qz * NS1 + sz];
+          v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0] * shape_1d[qz * NS1 + sz];
         }
         value_q[0] = v;
       }
@@ -1483,7 +1483,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t v = s_t(0);
         for (int sy = 0; sy < NS1; ++sy) {
-          v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0] * shape_1d[qy * NS1 + sy];
+          v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
         vxy_q[0] = v;
       }
@@ -1494,7 +1494,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t v = s_t(0);
         for (int sz = 0; sz < NS1; ++sz) {
-          v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0] * shape_1d[qz * NS1 + sz];
+          v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0] * shape_1d[qz * NS1 + sz];
         }
         value_q[0] = v;
       }
@@ -1523,12 +1523,12 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t c = s_t(0);
         for (int qz = 0; qz < NQ1; ++qz) {
           const int q = qx + NQ1 * (qy + NQ1 * qz);
-          a += value_coeff[(f * NQ + q) * VS + 0] * shape_1d[qz * NS1 + sz]
-                       + grad_coeff[((f * NQ + q) * 3 + 2) * VS + 0] * grad_1d[qz * NS1 + sz];
-          b += grad_coeff[((f * NQ + q) * 3 + 0) * VS + 0] * shape_1d[qz * NS1 + sz];
-          c += grad_coeff[((f * NQ + q) * 3 + 1) * VS + 0] * shape_1d[qz * NS1 + sz];
+          a += value_coeff[(f * NQ + q)  * VS + 0] * shape_1d[qz * NS1 + sz]
+                       + grad_coeff[((f * NQ + q) * 3 + 2)  * VS + 0] * grad_1d[qz * NS1 + sz];
+          b += grad_coeff[((f * NQ + q) * 3 + 0)  * VS + 0] * shape_1d[qz * NS1 + sz];
+          c += grad_coeff[((f * NQ + q) * 3 + 1)  * VS + 0] * shape_1d[qz * NS1 + sz];
         }
-        const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0;
+        const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0;
         z0[i] = a;
         z1[i] = b;
         z2[i] = c;
@@ -1539,11 +1539,11 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t a = s_t(0);
         s_t b = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
-          const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0;
+          const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0;
           a += z0[i] * shape_1d[qy * NS1 + sy] + z2[i] * grad_1d[qy * NS1 + sy];
           b += z1[i] * shape_1d[qy * NS1 + sy];
         }
-        const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0;
+        const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0;
         yz0[j] = a;
         yz1[j] = b;
       }
@@ -1553,7 +1553,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t v = s_t(0);
         for (int qx = 0; qx < NQ1; ++qx) {
-          const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0;
+          const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0;
           v += yz0[j] * shape_1d[qx * NS1 + sx] + yz1[j] * grad_1d[qx * NS1 + sx];
         }
         output[s * NC + f][0] += v;
@@ -1583,12 +1583,12 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t c = s_t(0);
         for (int qz = 0; qz < NQ1; ++qz) {
           const int q = qx + NQ1 * (qy + NQ1 * qz);
-          a += value_coeff[(f * NQ + q) * VS + 0] * shape_1d[qz * NS1 + sz]
-                       + grad_coeff[((f * NQ + q) * 3 + 2) * VS + 0] * grad_1d[qz * NS1 + sz];
-          b += grad_coeff[((f * NQ + q) * 3 + 0) * VS + 0] * shape_1d[qz * NS1 + sz];
-          c += grad_coeff[((f * NQ + q) * 3 + 1) * VS + 0] * shape_1d[qz * NS1 + sz];
+          a += value_coeff[(f * NQ + q)  * VS + 0] * shape_1d[qz * NS1 + sz]
+                       + grad_coeff[((f * NQ + q) * 3 + 2)  * VS + 0] * grad_1d[qz * NS1 + sz];
+          b += grad_coeff[((f * NQ + q) * 3 + 0)  * VS + 0] * shape_1d[qz * NS1 + sz];
+          c += grad_coeff[((f * NQ + q) * 3 + 1)  * VS + 0] * shape_1d[qz * NS1 + sz];
         }
-        const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0;
+        const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0;
         z0[i] = a;
         z1[i] = b;
         z2[i] = c;
@@ -1599,11 +1599,11 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t a = s_t(0);
         s_t b = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
-          const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0;
+          const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0;
           a += z0[i] * shape_1d[qy * NS1 + sy] + z2[i] * grad_1d[qy * NS1 + sy];
           b += z1[i] * shape_1d[qy * NS1 + sy];
         }
-        const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0;
+        const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0;
         yz0[j] = a;
         yz1[j] = b;
       }
@@ -1613,7 +1613,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t v = s_t(0);
         for (int qx = 0; qx < NQ1; ++qx) {
-          const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0;
+          const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0;
           v += yz0[j] * shape_1d[qx * NS1 + sx] + yz1[j] * grad_1d[qx * NS1 + sx];
         }
         output[s * NC + f][0] += v;
@@ -1637,7 +1637,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t a = s_t(0);
         for (int qz = 0; qz < NQ1; ++qz) {
           const int q = qx + NQ1 * (qy + NQ1 * qz);
-          a += value_coeff[(f * NQ + q) * VS + 0] * shape_1d[qz * NS1 + sz];
+          a += value_coeff[(f * NQ + q)  * VS + 0] * shape_1d[qz * NS1 + sz];
         }
         z0_q[0] = a;
       }
@@ -1647,7 +1647,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t a = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
-          a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0] * shape_1d[qy * NS1 + sy];
+          a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
         yz0_q[0] = a;
       }
@@ -1657,7 +1657,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t v = s_t(0);
         for (int qx = 0; qx < NQ1; ++qx) {
-          v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0] * shape_1d[qx * NS1 + sx];
+          v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0] * shape_1d[qx * NS1 + sx];
         }
         output[s * NC + f][0] += v;
       }
@@ -1680,7 +1680,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
         s_t a = s_t(0);
         for (int qz = 0; qz < NQ1; ++qz) {
           const int q = qx + NQ1 * (qy + NQ1 * qz);
-          a += value_coeff[(f * NQ + q) * VS + 0] * shape_1d[qz * NS1 + sz];
+          a += value_coeff[(f * NQ + q)  * VS + 0] * shape_1d[qz * NS1 + sz];
         }
         z0_q[0] = a;
       }
@@ -1690,7 +1690,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t a = s_t(0);
         for (int qy = 0; qy < NQ1; ++qy) {
-          a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) * VS + 0] * shape_1d[qy * NS1 + sy];
+          a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)  * VS + 0] * shape_1d[qy * NS1 + sy];
         }
         yz0_q[0] = a;
       }
@@ -1700,7 +1700,7 @@ struct TensorProductResidualOps<s_t, NQ, NS, VS, 3> {
             {
         s_t v = s_t(0);
         for (int qx = 0; qx < NQ1; ++qx) {
-          v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) * VS + 0] * shape_1d[qx * NS1 + sx];
+          v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)  * VS + 0] * shape_1d[qx * NS1 + sx];
         }
         output[s * NC + f][0] += v;
       }
@@ -1795,6 +1795,830 @@ static __host__ __device__ __forceinline__ void tensor_integrate_value_contiguou
   TensorProductResidualOps<s_t, NQ, NS, VS, ND>::template integrate_value_contiguous<NC>(
       ne, shape_1d, value_coeff, output);
 }
+
+
+
+template <typename s_t, int NQ, int NS, int ND>
+struct TensorProductResidualOpsScalar;
+
+template <typename s_t, int NQ, int NS>
+struct TensorProductResidualOpsScalar<s_t, NQ, NS, 2> {
+  template <int NC>
+  static __host__ __device__ __forceinline__ void evaluate(
+      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t *const RSTR streams[NC * NS],
+      s_t *const value,
+      s_t *const gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t vx[NC * NQ1 * NS1];
+    s_t gx[NC * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+            {
+        s_t v = s_t(0);
+        s_t g = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * sy;
+          const s_t u = streams[s * NC + f][0];
+          v += u * shape_1d[qx * NS1 + sx];
+          g += u * grad_1d[qx * NS1 + sx];
+        }
+        const int i = ((f * NQ1 + qx) * NS1 + sy) ;
+        vx[i] = v;
+        gx[i] = g;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * qy;
+      s_t *const RSTR value_q = &value[(f * NQ + q)];
+      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 2 + 0)];
+      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 2 + 1)];
+            {
+        s_t v = s_t(0);
+        s_t g0 = s_t(0);
+        s_t g1 = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          const int i = ((f * NQ1 + qx) * NS1 + sy) ;
+          v += vx[i] * shape_1d[qy * NS1 + sy];
+          g0 += gx[i] * shape_1d[qy * NS1 + sy];
+          g1 += vx[i] * grad_1d[qy * NS1 + sy];
+        }
+        value_q[0] = v;
+        gradient_q0[0] = g0;
+        gradient_q1[0] = g1;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void evaluate_contiguous(
+      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t streams[NC * NS][1],
+      s_t *const value,
+      s_t *const gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t vx[NC * NQ1 * NS1];
+    s_t gx[NC * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+            {
+        s_t v = s_t(0);
+        s_t g = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * sy;
+          const s_t u = streams[s * NC + f][0];
+          v += u * shape_1d[qx * NS1 + sx];
+          g += u * grad_1d[qx * NS1 + sx];
+        }
+        const int i = ((f * NQ1 + qx) * NS1 + sy) ;
+        vx[i] = v;
+        gx[i] = g;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * qy;
+      s_t *const RSTR value_q = &value[(f * NQ + q)];
+      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 2 + 0)];
+      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 2 + 1)];
+            {
+        s_t v = s_t(0);
+        s_t g0 = s_t(0);
+        s_t g1 = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          const int i = ((f * NQ1 + qx) * NS1 + sy) ;
+          v += vx[i] * shape_1d[qy * NS1 + sy];
+          g0 += gx[i] * shape_1d[qy * NS1 + sy];
+          g1 += vx[i] * grad_1d[qy * NS1 + sy];
+        }
+        value_q[0] = v;
+        gradient_q0[0] = g0;
+        gradient_q1[0] = g1;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void evaluate_value(
+      const s_t *const shape_1d,
+      const s_t *const RSTR streams[NC * NS],
+      s_t *const value) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t vx[NC * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+    s_t *const RSTR vx_q = &vx[((f * NQ1 + qx) * NS1 + sy)];
+            {
+        s_t v = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * sy;
+          v += streams[s * NC + f][0] * shape_1d[qx * NS1 + sx];
+        }
+        vx_q[0] = v;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * qy;
+      s_t *const RSTR value_q = &value[(f * NQ + q)];
+            {
+        s_t v = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          v += vx[((f * NQ1 + qx) * NS1 + sy) ] * shape_1d[qy * NS1 + sy];
+        }
+        value_q[0] = v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void evaluate_value_contiguous(
+      const s_t *const shape_1d,
+      const s_t streams[NC * NS][1],
+      s_t *const value) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t vx[NC * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+    s_t *const RSTR vx_q = &vx[((f * NQ1 + qx) * NS1 + sy)];
+            {
+        s_t v = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * sy;
+          v += streams[s * NC + f][0] * shape_1d[qx * NS1 + sx];
+        }
+        vx_q[0] = v;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * qy;
+      s_t *const RSTR value_q = &value[(f * NQ + q)];
+            {
+        s_t v = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          v += vx[((f * NQ1 + qx) * NS1 + sy) ] * shape_1d[qy * NS1 + sy];
+        }
+        value_q[0] = v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void integrate(
+      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t *const value_coeff,
+      const s_t *const grad_coeff,
+      s_t *const RSTR output[NC * NS]) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t sv[NC * NQ1 * NS1];
+    s_t sg[NC * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+            {
+        s_t a = s_t(0);
+        s_t b = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const int q = qx + NQ1 * qy;
+          a += value_coeff[(f * NQ + q) ] * shape_1d[qy * NS1 + sy]
+                       + grad_coeff[((f * NQ + q) * 2 + 1) ] * grad_1d[qy * NS1 + sy];
+          b += grad_coeff[((f * NQ + q) * 2 + 0) ] * shape_1d[qy * NS1 + sy];
+        }
+        const int i = ((f * NQ1 + qx) * NS1 + sy) ;
+        sv[i] = a;
+        sg[i] = b;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * sy;
+            {
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          const int i = ((f * NQ1 + qx) * NS1 + sy) ;
+          v += sv[i] * shape_1d[qx * NS1 + sx] + sg[i] * grad_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][0] += v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void integrate_contiguous(
+      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t *const value_coeff,
+      const s_t *const grad_coeff,
+      s_t output[NC * NS][1]) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t sv[NC * NQ1 * NS1];
+    s_t sg[NC * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+            {
+        s_t a = s_t(0);
+        s_t b = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const int q = qx + NQ1 * qy;
+          a += value_coeff[(f * NQ + q) ] * shape_1d[qy * NS1 + sy]
+                       + grad_coeff[((f * NQ + q) * 2 + 1) ] * grad_1d[qy * NS1 + sy];
+          b += grad_coeff[((f * NQ + q) * 2 + 0) ] * shape_1d[qy * NS1 + sy];
+        }
+        const int i = ((f * NQ1 + qx) * NS1 + sy) ;
+        sv[i] = a;
+        sg[i] = b;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * sy;
+            {
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          const int i = ((f * NQ1 + qx) * NS1 + sy) ;
+          v += sv[i] * shape_1d[qx * NS1 + sx] + sg[i] * grad_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][0] += v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void integrate_value(
+      const s_t *const shape_1d,
+      const s_t *const value_coeff,
+      s_t *const RSTR output[NC * NS]) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t sv[NC * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+    s_t *const RSTR sv_q = &sv[((f * NQ1 + qx) * NS1 + sy)];
+            {
+        s_t a = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const int q = qx + NQ1 * qy;
+          a += value_coeff[(f * NQ + q) ] * shape_1d[qy * NS1 + sy];
+        }
+        sv_q[0] = a;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * sy;
+            {
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          v += sv[((f * NQ1 + qx) * NS1 + sy) ] * shape_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][0] += v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void integrate_value_contiguous(
+      const s_t *const shape_1d,
+      const s_t *const value_coeff,
+      s_t output[NC * NS][1]) {
+    static constexpr int NQ1 = integer_root(NQ, 2);
+    static constexpr int NS1 = integer_root(NS, 2);
+    s_t sv[NC * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) {
+    s_t *const RSTR sv_q = &sv[((f * NQ1 + qx) * NS1 + sy)];
+            {
+        s_t a = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const int q = qx + NQ1 * qy;
+          a += value_coeff[(f * NQ + q) ] * shape_1d[qy * NS1 + sy];
+        }
+        sv_q[0] = a;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * sy;
+            {
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          v += sv[((f * NQ1 + qx) * NS1 + sy) ] * shape_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][0] += v;
+      }
+    }
+  }
+};
+
+template <typename s_t, int NQ, int NS>
+struct TensorProductResidualOpsScalar<s_t, NQ, NS, 3> {
+  template <int NC>
+  static __host__ __device__ __forceinline__ void evaluate(
+      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t *const RSTR streams[NC * NS],
+      s_t *const value,
+      s_t *const gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t vx[NC * NQ1 * NS1 * NS1];
+    s_t gx[NC * NQ1 * NS1 * NS1];
+    s_t vxy[NC * NQ1 * NQ1 * NS1];
+    s_t g0xy[NC * NQ1 * NQ1 * NS1];
+    s_t g1xy[NC * NQ1 * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+            {
+        s_t v = s_t(0);
+        s_t g = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * (sy + NS1 * sz);
+          const s_t u = streams[s * NC + f][0];
+          v += u * shape_1d[qx * NS1 + sx];
+          g += u * grad_1d[qx * NS1 + sx];
+        }
+        const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ;
+        vx[i] = v;
+        gx[i] = g;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+            {
+        s_t v = s_t(0);
+        s_t g0 = s_t(0);
+        s_t g1 = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ;
+          v += vx[i] * shape_1d[qy * NS1 + sy];
+          g0 += gx[i] * shape_1d[qy * NS1 + sy];
+          g1 += vx[i] * grad_1d[qy * NS1 + sy];
+        }
+        const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ;
+        vxy[j] = v;
+        g0xy[j] = g0;
+        g1xy[j] = g1;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * (qy + NQ1 * qz);
+      s_t *const RSTR value_q = &value[(f * NQ + q)];
+      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 3 + 0)];
+      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 3 + 1)];
+      s_t *const RSTR gradient_q2 = &gradient[((f * NQ + q) * 3 + 2)];
+            {
+        s_t v = s_t(0);
+        s_t g0 = s_t(0);
+        s_t g1 = s_t(0);
+        s_t g2 = s_t(0);
+        for (int sz = 0; sz < NS1; ++sz) {
+          const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ;
+          v += vxy[j] * shape_1d[qz * NS1 + sz];
+          g0 += g0xy[j] * shape_1d[qz * NS1 + sz];
+          g1 += g1xy[j] * shape_1d[qz * NS1 + sz];
+          g2 += vxy[j] * grad_1d[qz * NS1 + sz];
+        }
+        value_q[0] = v;
+        gradient_q0[0] = g0;
+        gradient_q1[0] = g1;
+        gradient_q2[0] = g2;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void evaluate_contiguous(
+      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t streams[NC * NS][1],
+      s_t *const value,
+      s_t *const gradient) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t vx[NC * NQ1 * NS1 * NS1];
+    s_t gx[NC * NQ1 * NS1 * NS1];
+    s_t vxy[NC * NQ1 * NQ1 * NS1];
+    s_t g0xy[NC * NQ1 * NQ1 * NS1];
+    s_t g1xy[NC * NQ1 * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+            {
+        s_t v = s_t(0);
+        s_t g = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * (sy + NS1 * sz);
+          const s_t u = streams[s * NC + f][0];
+          v += u * shape_1d[qx * NS1 + sx];
+          g += u * grad_1d[qx * NS1 + sx];
+        }
+        const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ;
+        vx[i] = v;
+        gx[i] = g;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+            {
+        s_t v = s_t(0);
+        s_t g0 = s_t(0);
+        s_t g1 = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          const int i = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ;
+          v += vx[i] * shape_1d[qy * NS1 + sy];
+          g0 += gx[i] * shape_1d[qy * NS1 + sy];
+          g1 += vx[i] * grad_1d[qy * NS1 + sy];
+        }
+        const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ;
+        vxy[j] = v;
+        g0xy[j] = g0;
+        g1xy[j] = g1;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * (qy + NQ1 * qz);
+      s_t *const RSTR value_q = &value[(f * NQ + q)];
+      s_t *const RSTR gradient_q0 = &gradient[((f * NQ + q) * 3 + 0)];
+      s_t *const RSTR gradient_q1 = &gradient[((f * NQ + q) * 3 + 1)];
+      s_t *const RSTR gradient_q2 = &gradient[((f * NQ + q) * 3 + 2)];
+            {
+        s_t v = s_t(0);
+        s_t g0 = s_t(0);
+        s_t g1 = s_t(0);
+        s_t g2 = s_t(0);
+        for (int sz = 0; sz < NS1; ++sz) {
+          const int j = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ;
+          v += vxy[j] * shape_1d[qz * NS1 + sz];
+          g0 += g0xy[j] * shape_1d[qz * NS1 + sz];
+          g1 += g1xy[j] * shape_1d[qz * NS1 + sz];
+          g2 += vxy[j] * grad_1d[qz * NS1 + sz];
+        }
+        value_q[0] = v;
+        gradient_q0[0] = g0;
+        gradient_q1[0] = g1;
+        gradient_q2[0] = g2;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void evaluate_value(
+      const s_t *const shape_1d,
+      const s_t *const RSTR streams[NC * NS],
+      s_t *const value) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t vx[NC * NQ1 * NS1 * NS1];
+    s_t vxy[NC * NQ1 * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR vx_q = &vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)];
+            {
+        s_t v = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * (sy + NS1 * sz);
+          v += streams[s * NC + f][0] * shape_1d[qx * NS1 + sx];
+        }
+        vx_q[0] = v;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR vxy_q = &vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)];
+            {
+        s_t v = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ] * shape_1d[qy * NS1 + sy];
+        }
+        vxy_q[0] = v;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * (qy + NQ1 * qz);
+      s_t *const RSTR value_q = &value[(f * NQ + q)];
+            {
+        s_t v = s_t(0);
+        for (int sz = 0; sz < NS1; ++sz) {
+          v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ] * shape_1d[qz * NS1 + sz];
+        }
+        value_q[0] = v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void evaluate_value_contiguous(
+      const s_t *const shape_1d,
+      const s_t streams[NC * NS][1],
+      s_t *const value) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t vx[NC * NQ1 * NS1 * NS1];
+    s_t vxy[NC * NQ1 * NQ1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR vx_q = &vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)];
+            {
+        s_t v = s_t(0);
+        for (int sx = 0; sx < NS1; ++sx) {
+          const int s = sx + NS1 * (sy + NS1 * sz);
+          v += streams[s * NC + f][0] * shape_1d[qx * NS1 + sx];
+        }
+        vx_q[0] = v;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR vxy_q = &vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)];
+            {
+        s_t v = s_t(0);
+        for (int sy = 0; sy < NS1; ++sy) {
+          v += vx[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ] * shape_1d[qy * NS1 + sy];
+        }
+        vxy_q[0] = v;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qz = 0; qz < NQ1; ++qz) for (int qy = 0; qy < NQ1; ++qy) for (int qx = 0; qx < NQ1; ++qx) {
+      const int q = qx + NQ1 * (qy + NQ1 * qz);
+      s_t *const RSTR value_q = &value[(f * NQ + q)];
+            {
+        s_t v = s_t(0);
+        for (int sz = 0; sz < NS1; ++sz) {
+          v += vxy[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ] * shape_1d[qz * NS1 + sz];
+        }
+        value_q[0] = v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void integrate(
+      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t *const value_coeff,
+      const s_t *const grad_coeff,
+      s_t *const RSTR output[NC * NS]) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t z0[NC * NQ1 * NQ1 * NS1];
+    s_t z1[NC * NQ1 * NQ1 * NS1];
+    s_t z2[NC * NQ1 * NQ1 * NS1];
+    s_t yz0[NC * NQ1 * NS1 * NS1];
+    s_t yz1[NC * NQ1 * NS1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+            {
+        s_t a = s_t(0);
+        s_t b = s_t(0);
+        s_t c = s_t(0);
+        for (int qz = 0; qz < NQ1; ++qz) {
+          const int q = qx + NQ1 * (qy + NQ1 * qz);
+          a += value_coeff[(f * NQ + q) ] * shape_1d[qz * NS1 + sz]
+                       + grad_coeff[((f * NQ + q) * 3 + 2) ] * grad_1d[qz * NS1 + sz];
+          b += grad_coeff[((f * NQ + q) * 3 + 0) ] * shape_1d[qz * NS1 + sz];
+          c += grad_coeff[((f * NQ + q) * 3 + 1) ] * shape_1d[qz * NS1 + sz];
+        }
+        const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ;
+        z0[i] = a;
+        z1[i] = b;
+        z2[i] = c;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+            {
+        s_t a = s_t(0);
+        s_t b = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ;
+          a += z0[i] * shape_1d[qy * NS1 + sy] + z2[i] * grad_1d[qy * NS1 + sy];
+          b += z1[i] * shape_1d[qy * NS1 + sy];
+        }
+        const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ;
+        yz0[j] = a;
+        yz1[j] = b;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * (sy + NS1 * sz);
+            {
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ;
+          v += yz0[j] * shape_1d[qx * NS1 + sx] + yz1[j] * grad_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][0] += v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void integrate_contiguous(
+      const s_t *const shape_1d,
+      const s_t *const grad_1d,
+      const s_t *const value_coeff,
+      const s_t *const grad_coeff,
+      s_t output[NC * NS][1]) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t z0[NC * NQ1 * NQ1 * NS1];
+    s_t z1[NC * NQ1 * NQ1 * NS1];
+    s_t z2[NC * NQ1 * NQ1 * NS1];
+    s_t yz0[NC * NQ1 * NS1 * NS1];
+    s_t yz1[NC * NQ1 * NS1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+            {
+        s_t a = s_t(0);
+        s_t b = s_t(0);
+        s_t c = s_t(0);
+        for (int qz = 0; qz < NQ1; ++qz) {
+          const int q = qx + NQ1 * (qy + NQ1 * qz);
+          a += value_coeff[(f * NQ + q) ] * shape_1d[qz * NS1 + sz]
+                       + grad_coeff[((f * NQ + q) * 3 + 2) ] * grad_1d[qz * NS1 + sz];
+          b += grad_coeff[((f * NQ + q) * 3 + 0) ] * shape_1d[qz * NS1 + sz];
+          c += grad_coeff[((f * NQ + q) * 3 + 1) ] * shape_1d[qz * NS1 + sz];
+        }
+        const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ;
+        z0[i] = a;
+        z1[i] = b;
+        z2[i] = c;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+            {
+        s_t a = s_t(0);
+        s_t b = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          const int i = (((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ;
+          a += z0[i] * shape_1d[qy * NS1 + sy] + z2[i] * grad_1d[qy * NS1 + sy];
+          b += z1[i] * shape_1d[qy * NS1 + sy];
+        }
+        const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ;
+        yz0[j] = a;
+        yz1[j] = b;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * (sy + NS1 * sz);
+            {
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ;
+          v += yz0[j] * shape_1d[qx * NS1 + sx] + yz1[j] * grad_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][0] += v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void integrate_value(
+      const s_t *const shape_1d,
+      const s_t *const value_coeff,
+      s_t *const RSTR output[NC * NS]) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t z0[NC * NQ1 * NQ1 * NS1];
+    s_t yz0[NC * NQ1 * NS1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR z0_q = &z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)];
+            {
+        s_t a = s_t(0);
+        for (int qz = 0; qz < NQ1; ++qz) {
+          const int q = qx + NQ1 * (qy + NQ1 * qz);
+          a += value_coeff[(f * NQ + q) ] * shape_1d[qz * NS1 + sz];
+        }
+        z0_q[0] = a;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR yz0_q = &yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)];
+            {
+        s_t a = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ] * shape_1d[qy * NS1 + sy];
+        }
+        yz0_q[0] = a;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * (sy + NS1 * sz);
+            {
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ] * shape_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][0] += v;
+      }
+    }
+  }
+
+  template <int NC>
+  static __host__ __device__ __forceinline__ void integrate_value_contiguous(
+      const s_t *const shape_1d,
+      const s_t *const value_coeff,
+      s_t output[NC * NS][1]) {
+    static constexpr int NQ1 = integer_root(NQ, 3);
+    static constexpr int NS1 = integer_root(NS, 3);
+    s_t z0[NC * NQ1 * NQ1 * NS1];
+    s_t yz0[NC * NQ1 * NS1 * NS1];
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int qy = 0; qy < NQ1; ++qy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR z0_q = &z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz)];
+            {
+        s_t a = s_t(0);
+        for (int qz = 0; qz < NQ1; ++qz) {
+          const int q = qx + NQ1 * (qy + NQ1 * qz);
+          a += value_coeff[(f * NQ + q) ] * shape_1d[qz * NS1 + sz];
+        }
+        z0_q[0] = a;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int qx = 0; qx < NQ1; ++qx) for (int sy = 0; sy < NS1; ++sy) for (int sz = 0; sz < NS1; ++sz) {
+    s_t *const RSTR yz0_q = &yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz)];
+            {
+        s_t a = s_t(0);
+        for (int qy = 0; qy < NQ1; ++qy) {
+          a += z0[(((f * NQ1 + qx) * NQ1 + qy) * NS1 + sz) ] * shape_1d[qy * NS1 + sy];
+        }
+        yz0_q[0] = a;
+      }
+    }
+    for (int f = 0; f < NC; ++f) for (int sz = 0; sz < NS1; ++sz) for (int sy = 0; sy < NS1; ++sy) for (int sx = 0; sx < NS1; ++sx) {
+      const int s = sx + NS1 * (sy + NS1 * sz);
+            {
+        s_t v = s_t(0);
+        for (int qx = 0; qx < NQ1; ++qx) {
+          v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ] * shape_1d[qx * NS1 + sx];
+        }
+        output[s * NC + f][0] += v;
+      }
+    }
+  }
+};
+
+template <typename s_t, int NQ, int NS, int ND, int NC>
+static __host__ __device__ __forceinline__ void tensor_evaluate_scalar(
+    const s_t *const shape_1d,
+    const s_t *const grad_1d,
+    const s_t *const RSTR streams[NC * NS],
+    s_t *const value,
+    s_t *const gradient) {
+  TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template evaluate<NC>(
+      shape_1d, grad_1d, streams, value, gradient);
+}
+
+template <typename s_t, int NQ, int NS, int ND, int NC>
+static __host__ __device__ __forceinline__ void tensor_evaluate_contiguous_scalar(
+    const s_t *const shape_1d,
+    const s_t *const grad_1d,
+    const s_t streams[NC * NS][1],
+    s_t *const value,
+    s_t *const gradient) {
+  TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template evaluate_contiguous<NC>(
+      shape_1d, grad_1d, streams, value, gradient);
+}
+
+template <typename s_t, int NQ, int NS, int ND, int NC>
+static __host__ __device__ __forceinline__ void tensor_evaluate_value_scalar(
+    const s_t *const shape_1d,
+    const s_t *const RSTR streams[NC * NS],
+    s_t *const value) {
+  TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template evaluate_value<NC>(
+      shape_1d, streams, value);
+}
+
+template <typename s_t, int NQ, int NS, int ND, int NC>
+static __host__ __device__ __forceinline__ void tensor_evaluate_value_contiguous_scalar(
+    const s_t *const shape_1d,
+    const s_t streams[NC * NS][1],
+    s_t *const value) {
+  TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template evaluate_value_contiguous<NC>(
+      shape_1d, streams, value);
+}
+
+template <typename s_t, int NQ, int NS, int ND, int NC>
+static __host__ __device__ __forceinline__ void tensor_integrate_scalar(
+    const s_t *const shape_1d,
+    const s_t *const grad_1d,
+    const s_t *const value_coeff,
+    const s_t *const grad_coeff,
+    s_t *const RSTR output[NC * NS]) {
+  TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template integrate<NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff, output);
+}
+
+template <typename s_t, int NQ, int NS, int ND, int NC>
+static __host__ __device__ __forceinline__ void tensor_integrate_contiguous_scalar(
+    const s_t *const shape_1d,
+    const s_t *const grad_1d,
+    const s_t *const value_coeff,
+    const s_t *const grad_coeff,
+    s_t output[NC * NS][1]) {
+  TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template integrate_contiguous<NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff, output);
+}
+
+template <typename s_t, int NQ, int NS, int ND, int NC>
+static __host__ __device__ __forceinline__ void tensor_integrate_value_scalar(
+    const s_t *const shape_1d,
+    const s_t *const value_coeff,
+    s_t *const RSTR output[NC * NS]) {
+  TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template integrate_value<NC>(
+      shape_1d, value_coeff, output);
+}
+
+template <typename s_t, int NQ, int NS, int ND, int NC>
+static __host__ __device__ __forceinline__ void tensor_integrate_value_contiguous_scalar(
+    const s_t *const shape_1d,
+    const s_t *const value_coeff,
+    s_t output[NC * NS][1]) {
+  TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template integrate_value_contiguous<NC>(
+      shape_1d, value_coeff, output);
+}
+
 
 } // namespace codegen
 } // namespace sfem
