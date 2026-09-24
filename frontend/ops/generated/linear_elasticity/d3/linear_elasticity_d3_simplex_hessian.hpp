@@ -122,7 +122,7 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_direct_hessian_reference_el
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_direct_hessian_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -138,7 +138,6 @@ static SFEM_INLINE void linear_elasticity_d3_simplex_tet4_direct_hessian_element
     const s_t mu,
     s_t *const RSTR element_matrix
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(NS > 0, "NS must be positive");
   static_assert(VS > 0, "VS must be positive");
   const int lane = 0;

@@ -1,0 +1,597 @@
+{
+  "c_abi": [
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_apply_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "neohookean_ogden_apply_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_apply_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "neohookean_ogden_apply_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_apply_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_apply_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_apply_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_apply_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_apply_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_apply_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_apply_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_apply_packed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_apply_packed_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_apply_packed_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_apply_packed_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_apply_packed_two_pass_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_apply_packed_two_pass_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_apply_packed_two_pass_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_apply_packed_two_pass_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_gradient_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "neohookean_ogden_gradient_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_gradient_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "neohookean_ogden_gradient_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_gradient_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_gradient_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_gradient_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_gradient_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_gradient_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_gradient_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_gradient_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_gradient_packed_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_gradient_packed_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_two_pass_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_gradient_packed_two_pass_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_gradient_packed_two_pass_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_gradient_packed_two_pass_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_hessian_bsr_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "neohookean_ogden_hessian_bsr_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_hessian_bsr_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "neohookean_ogden_hessian_bsr_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void neohookean_ogden_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "neohookean_ogden_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_hex8_matrix_assembly_variant(const int variant);",
+      "name": "neohookean_ogden_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_hex8_matrix_assembly_variant_count();",
+      "name": "neohookean_ogden_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_inexact_apply_compressed_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_component_stride,\n        const compressed_t *const RSTR tangent,\n        const scaling_t *const RSTR scaling,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "neohookean_ogden_inexact_apply_compressed_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_inexact_apply_compressed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_component_stride,\n        const compressed_t *const RSTR tangent,\n        const scaling_t *const RSTR scaling,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_inexact_apply_compressed_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_inexact_apply_compressed_a_2d_msoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_inexact_apply_compressed_a_2d_msoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_inexact_apply_compressed_a_3d_msoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_inexact_apply_compressed_a_3d_msoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_inexact_apply_stored_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_component_stride,\n        const metric_tensor_t *const RSTR tangent,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy\n);",
+      "name": "neohookean_ogden_inexact_apply_stored_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_inexact_apply_stored_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const ptrdiff_t tangent_component_stride,\n        const metric_tensor_t *const RSTR tangent,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_inexact_apply_stored_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_inexact_apply_stored_a_2d_msoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_inexact_apply_stored_a_2d_msoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_inexact_apply_stored_a_3d_msoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_inexact_apply_stored_a_3d_msoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_inexact_apply_stored_packed_two_pass_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t n_ghost_entries,\n        const ptrdiff_t n_ghost_reduce_rows,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const ptrdiff_t *const RSTR ghost_reduce_ptr,\n        const ptrdiff_t *const RSTR ghost_reduce_idx,\n        const idx_t *const RSTR ghost_reduce_dest,\n        void *const RSTR ghost_buf,\n        const ptrdiff_t tangent_component_stride,\n        const metric_tensor_t *const RSTR tangent,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const ptrdiff_t out_stride,\n        void *const RSTR outx,\n        void *const RSTR outy,\n        void *const RSTR outz\n);",
+      "name": "neohookean_ogden_inexact_apply_stored_packed_two_pass_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_inexact_apply_tangent_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t tangent_component_stride,\n        metric_tensor_t *const RSTR tangent\n);",
+      "name": "neohookean_ogden_inexact_apply_tangent_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_inexact_apply_tangent_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t tangent_component_stride,\n        metric_tensor_t *const RSTR tangent\n);",
+      "name": "neohookean_ogden_inexact_apply_tangent_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_inexact_apply_tangent_a_2d_msoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_inexact_apply_tangent_a_2d_msoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_inexact_apply_tangent_a_3d_msoa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_inexact_apply_tangent_a_3d_msoa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_2d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_objective_2d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" const sfem::codegen::KernelDiagnostics *neohookean_ogden_objective_3d_soa_diagnostics(\n    const smesh::ElemType element_type);",
+      "name": "neohookean_ogden_objective_3d_soa_diagnostics"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_objective_steps_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "neohookean_ogden_objective_steps_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_objective_steps_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "neohookean_ogden_objective_steps_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_objective_steps_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "neohookean_ogden_objective_steps_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_objective_steps_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "neohookean_ogden_objective_steps_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_objective_steps_packed_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "neohookean_ogden_objective_steps_packed_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_objective_steps_packed_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_packs,\n        const ptrdiff_t n_elements_per_pack,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        const ptrdiff_t max_nodes_per_pack,\n        uint16_t **const RSTR elements,\n        const ptrdiff_t *const RSTR owned_nodes_ptr,\n        const ptrdiff_t *const RSTR n_shared_nodes,\n        const ptrdiff_t *const RSTR ghost_ptr,\n        const idx_t *const RSTR ghost_idx,\n        const geom_t *const *const RSTR points,\n        const real_t lmbda,\n        const real_t mu,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const ptrdiff_t h_stride,\n        const void *const RSTR hx,\n        const void *const RSTR hy,\n        const void *const RSTR hz,\n        const int nsteps,\n        const void *const RSTR steps,\n        void *const RSTR value\n);",
+      "name": "neohookean_ogden_objective_steps_packed_3d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void neohookean_ogden_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "neohookean_ogden_proteus_hex8_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_proteus_hex8_matrix_assembly_variant(const int variant);",
+      "name": "neohookean_ogden_proteus_hex8_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_proteus_hex8_matrix_assembly_variant_count();",
+      "name": "neohookean_ogden_proteus_hex8_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void neohookean_ogden_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "neohookean_ogden_proteus_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_proteus_quad4_matrix_assembly_variant(const int variant);",
+      "name": "neohookean_ogden_proteus_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_proteus_quad4_matrix_assembly_variant_count();",
+      "name": "neohookean_ogden_proteus_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void neohookean_ogden_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "neohookean_ogden_quad4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_quad4_matrix_assembly_variant(const int variant);",
+      "name": "neohookean_ogden_quad4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_quad4_matrix_assembly_variant_count();",
+      "name": "neohookean_ogden_quad4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void neohookean_ogden_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "neohookean_ogden_tet10_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_tet10_matrix_assembly_variant(const int variant);",
+      "name": "neohookean_ogden_tet10_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_tet10_matrix_assembly_variant_count();",
+      "name": "neohookean_ogden_tet10_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" void neohookean_ogden_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "neohookean_ogden_tet4_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_tet4_matrix_assembly_variant(const int variant);",
+      "name": "neohookean_ogden_tet4_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_tet4_matrix_assembly_variant_count();",
+      "name": "neohookean_ogden_tet4_matrix_assembly_variant_count"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_total_merit_patch_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_owned_nodes,\n        const count_t *const RSTR n2e_ptr,\n        const element_idx_t *const RSTR n2e_idx,\n        const uint8_t *const RSTR n2e_local,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR grad_ref[2],\n        const void *const RSTR q_weight,\n        const real_t lmbda,\n        const real_t mu,\n        const int nsteps,\n        const void *const RSTR steps,\n        const void *const RSTR x,\n        const void *const RSTR h,\n        const void *const RSTR accumulator,\n        void *const RSTR merit\n);",
+      "name": "neohookean_ogden_total_merit_patch_2d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_total_merit_patch_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t n_owned_nodes,\n        const count_t *const RSTR n2e_ptr,\n        const element_idx_t *const RSTR n2e_idx,\n        const uint8_t *const RSTR n2e_local,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const void *const RSTR grad_ref[3],\n        const void *const RSTR q_weight,\n        const real_t lmbda,\n        const real_t mu,\n        const int nsteps,\n        const void *const RSTR steps,\n        const void *const RSTR x,\n        const void *const RSTR h,\n        const void *const RSTR accumulator,\n        void *const RSTR merit\n);",
+      "name": "neohookean_ogden_total_merit_patch_3d_a_msoa"
+    },
+    {
+      "declaration": "extern \"C\" void neohookean_ogden_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);",
+      "name": "neohookean_ogden_tri3_matrix_assembly_print_variant"
+    },
+    {
+      "declaration": "extern \"C\" const sfem_MatrixAssemblyDiagnostics *neohookean_ogden_tri3_matrix_assembly_variant(const int variant);",
+      "name": "neohookean_ogden_tri3_matrix_assembly_variant"
+    },
+    {
+      "declaration": "extern \"C\" int neohookean_ogden_tri3_matrix_assembly_variant_count();",
+      "name": "neohookean_ogden_tri3_matrix_assembly_variant_count"
+    }
+  ],
+  "factory": {
+    "class": "sfem::GeneratedNeoHookeanOgden",
+    "create": "sfem::GeneratedNeoHookeanOgden::create",
+    "create_from_yaml": "sfem::GeneratedNeoHookeanOgden::create_from_yaml"
+  },
+  "generated_include_paths": [
+    ".",
+    "d2",
+    "d2/proteus_quad4",
+    "d2/quad4",
+    "d2/tri3",
+    "d3",
+    "d3/hex8",
+    "d3/proteus_hex8",
+    "d3/tet10",
+    "d3/tet4",
+    "op",
+    "reference"
+  ],
+  "header_api": [
+    {
+      "gather_scatter": "external",
+      "header": "d2/proteus_quad4/neohookean_ogden_proteus_quad4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d2/quad4/neohookean_ogden_quad4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d2/tri3/neohookean_ogden_tri3_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/hex8/neohookean_ogden_hex8_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/proteus_hex8/neohookean_ogden_proteus_hex8_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/tet10/neohookean_ogden_tet10_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "d3/tet4/neohookean_ogden_tet4_element.hpp",
+      "kind": "dense_element",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    },
+    {
+      "gather_scatter": "external",
+      "header": "op/sfem_GeneratedNeoHookeanOgden_element_api.hpp",
+      "kind": "dense_element_dispatch",
+      "layout": "soa_streams",
+      "scope": "element_local"
+    }
+  ],
+  "material": "neohookean_ogden",
+  "matrix_formats": [
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/proteus_quad4/neohookean_ogden_proteus_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/quad4/neohookean_ogden_quad4_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d2/tri3/neohookean_ogden_tri3_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/hex8/neohookean_ogden_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/proteus_hex8/neohookean_ogden_proteus_hex8_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet10/neohookean_ogden_tet10_matrix_format_operator.cpp"
+    },
+    {
+      "header": "matrix_formats.hpp",
+      "source": "d3/tet4/neohookean_ogden_tet4_matrix_format_operator.cpp"
+    }
+  ],
+  "op_name": "GeneratedNeoHookeanOgden",
+  "registration": {
+    "function": "sfem::register_GeneratedNeoHookeanOgden_generated_op",
+    "operator_name": "GeneratedNeoHookeanOgden",
+    "source": "op/sfem_GeneratedNeoHookeanOgden_registration.cpp"
+  },
+  "runtime_operations": [
+    {
+      "name": "apply",
+      "variants": [
+        {
+          "function": "neohookean_ogden_apply_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_apply_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_apply_packed_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_apply_packed_two_pass_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_inexact_apply_compressed_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden_inexact",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_inexact_apply_compressed_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden_inexact",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_inexact_apply_stored_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden_inexact",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_inexact_apply_stored_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden_inexact",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_inexact_apply_stored_packed_two_pass_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden_inexact",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_inexact_apply_tangent_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden_inexact",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_inexact_apply_tangent_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden_inexact",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_apply_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "neohookean_ogden_apply_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "neohookean_ogden_apply_packed_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "neohookean_ogden_apply_packed_two_pass_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "gradient",
+      "variants": [
+        {
+          "function": "neohookean_ogden_gradient_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_gradient_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_gradient_packed_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_gradient_packed_two_pass_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_gradient_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "neohookean_ogden_gradient_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "neohookean_ogden_gradient_packed_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "neohookean_ogden_gradient_packed_two_pass_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "hessian_bsr",
+      "variants": [
+        {
+          "function": "neohookean_ogden_hessian_bsr_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "neohookean_ogden_hessian_bsr_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        }
+      ]
+    },
+    {
+      "name": "objective_steps",
+      "variants": [
+        {
+          "function": "neohookean_ogden_objective_steps_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_objective_steps_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_objective_steps_packed_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "affine"
+        },
+        {
+          "function": "neohookean_ogden_objective_steps_2d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "neohookean_ogden_objective_steps_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        },
+        {
+          "function": "neohookean_ogden_objective_steps_packed_3d_i_msoa",
+          "scalar_type": "real_t",
+          "target": "neohookean_ogden",
+          "variant": "isoparametric"
+        }
+      ]
+    }
+  ],
+  "schema": "sfem.generated_op_manifest.v1",
+  "target": "openmp",
+  "wrapper": {
+    "c_abi_header": "op/sfem_GeneratedNeoHookeanOgden_c_abi.hpp",
+    "header": "op/sfem_GeneratedNeoHookeanOgden.hpp",
+    "source": "op/sfem_GeneratedNeoHookeanOgden.cpp"
+  }
+}

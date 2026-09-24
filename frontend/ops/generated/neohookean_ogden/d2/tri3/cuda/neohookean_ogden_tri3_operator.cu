@@ -114,7 +114,6 @@ __global__ void neohookean_ogden_tri3_objective_steps_a_msoa_impl(
         s_t *const RSTR value
 ) {
   static constexpr int NC = 2;
-  static constexpr int NQ = 1;
   static constexpr int NS = 3;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
@@ -175,7 +174,7 @@ __global__ void neohookean_ogden_tri3_objective_steps_a_msoa_impl(
       }
     }
 
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -304,7 +303,6 @@ __global__ void neohookean_ogden_tri3_gradient_a_msoa_impl(
         s_t *const RSTR outy
 ) {
   static constexpr int NC = 2;
-  static constexpr int NQ = 1;
   static constexpr int NS = 3;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
@@ -362,7 +360,7 @@ __global__ void neohookean_ogden_tri3_gradient_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 
@@ -500,7 +498,6 @@ __global__ void neohookean_ogden_tri3_apply_a_msoa_impl(
         s_t *const RSTR outy
 ) {
   static constexpr int NC = 2;
-  static constexpr int NQ = 1;
   static constexpr int NS = 3;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
@@ -565,7 +562,7 @@ __global__ void neohookean_ogden_tri3_apply_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 

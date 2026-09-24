@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include "../saint_venant_kirchhoff_d3_simplex_local.hpp"
 #include "../../../geometry_kernels.hpp"
-#include "../../../reference/quad_tet_q1.hpp"
-#include "../../../reference/tet4_q1.hpp"
 
 namespace sfem {
 namespace codegen {
@@ -23,7 +21,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_energy_egeometry_soa(
 ) {
   static constexpr int NC = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -83,7 +80,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_energy_egeometry_soa(
         bdet0_q[lane] = det_q[lane];
       }
     }
-    saint_venant_kirchhoff_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    saint_venant_kirchhoff_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -100,7 +97,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_energy_ecoords_soa(
   static constexpr int NC = 3;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -150,7 +146,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_energy_ecoords_soa(
             badj_streams, bdet0, lane);
       }
     }
-    saint_venant_kirchhoff_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    saint_venant_kirchhoff_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -167,7 +163,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_energy_esoa(
   static constexpr int NC = 3;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -217,7 +212,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_energy_esoa(
             badj_streams, bdet0, lane);
       }
     }
-    saint_venant_kirchhoff_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    saint_venant_kirchhoff_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -235,7 +230,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_gradient_egeometry_soa(
 ) {
   static constexpr int NC = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -297,7 +291,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_gradient_egeometry_soa(
         bdet0_q[lane] = det_q[lane];
       }
     }
-    saint_venant_kirchhoff_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -314,7 +308,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_gradient_ecoords_soa(
   static constexpr int NC = 3;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -366,7 +359,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_gradient_ecoords_soa(
             badj_streams, bdet0, lane);
       }
     }
-    saint_venant_kirchhoff_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -383,7 +376,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_gradient_esoa(
   static constexpr int NC = 3;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -435,7 +427,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_gradient_esoa(
             badj_streams, bdet0, lane);
       }
     }
-    saint_venant_kirchhoff_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -453,7 +445,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_hessian_egeometry_soa(
 ) {
   static constexpr int NC = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -521,7 +512,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_hessian_egeometry_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      saint_venant_kirchhoff_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+      saint_venant_kirchhoff_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -546,7 +537,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_hessian_ecoords_soa(
   static constexpr int NC = 3;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -604,7 +594,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_hessian_ecoords_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      saint_venant_kirchhoff_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+      saint_venant_kirchhoff_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -629,7 +619,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_hessian_esoa(
   static constexpr int NC = 3;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -687,7 +676,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tet4_hessian_esoa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      saint_venant_kirchhoff_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+      saint_venant_kirchhoff_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd

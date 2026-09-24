@@ -184,7 +184,7 @@ static SFEM_INLINE void modified_mooney_rivlin_d2_simplex_direct_hessian_referen
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void modified_mooney_rivlin_d2_simplex_tri3_direct_hessian_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -197,7 +197,6 @@ static SFEM_INLINE void modified_mooney_rivlin_d2_simplex_tri3_direct_hessian_el
     const s_t bu_data[NS * 2][VS],
     s_t *const RSTR element_matrix
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(NS > 0, "NS must be positive");
   static_assert(VS > 0, "VS must be positive");
   const int lane = 0;

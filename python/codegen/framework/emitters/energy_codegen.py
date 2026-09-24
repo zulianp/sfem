@@ -1147,14 +1147,16 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     params.append("s_t *const RSTR element_matrix")
 
     lines = [
-        "template <typename s_t, int NQ, int NS, int VS>",
+        # Same rule as every other block: a kernel whose single quadrature point
+        # is folded into its arithmetic is not parameterised by a point count.
+        _BLOCK_TEMPLATE_HEADER[constant_p1 is not None],
         "static %s void %s(" % (_inline_qualifier(source_builder), name),
     ]
     lines.extend(parameter_list_lines(params))
+    lines.append(") {")
+    lines.extend(_BLOCK_TEMPLATE_ASSERTS[constant_p1 is not None])
     lines.extend(
         [
-            ") {",
-            "  static_assert(NQ > 0, \"NQ must be positive\");",
             "  static_assert(NS > 0, \"NS must be positive\");",
             "  static_assert(VS > 0, \"VS must be positive\");",
             kernel_constant("NC", n_field_components, indent="  "),
@@ -1231,12 +1233,10 @@ def _sfem_soa_direct_hessian_element_matrix_function(
                 ),
             ),
             qualifier="static %s" % _inline_qualifier(source_builder),
-            template_params=(
-                "typename s_t",
-                "int NQ",
-                "int NS",
-                "int VS",
-            ),
+            # The header the IR actually prints; the `lines` built above
+            # only supply the body slice, which is why changing the literal
+            # there left the emitted `int NQ` in place.
+            template_params=_BLOCK_TEMPLATE_PARAMS[constant_p1 is not None],
         )
     )
 
@@ -1266,20 +1266,41 @@ class _BlockKernelInputs:
             setattr(self, field, fields[field])
 
 
-def _sfem_soa_block_signature_lines(name, params, source_builder):
+#: The template header a block opens with, and the assert that goes with it,
+#: keyed on whether the kernel has a quadrature point to be parameterised by.
+#: An expanded kernel has its single point folded into its body, so `NQ` would
+#: be a template argument nothing mentions and an assert about a number that
+#: cannot vary.
+_BLOCK_TEMPLATE_HEADER = {
+    True: "template <typename s_t, int NS, int VS>",
+    False: "template <typename s_t, int NQ, int NS, int VS>",
+}
+
+#: The same header as a tuple, for the IR path that prints its own.
+_BLOCK_TEMPLATE_PARAMS = {
+    True: ("typename s_t", "int NS", "int VS"),
+    False: ("typename s_t", "int NQ", "int NS", "int VS"),
+}
+
+#: The template arguments a call passes, matching the header above.
+_BLOCK_TEMPLATE_ARGUMENTS = {True: "<s_t, NS, VS>", False: "<s_t, NQ, NS, VS>"}
+
+_BLOCK_TEMPLATE_ASSERTS = {
+    True: (),
+    False: ('  static_assert(NQ > 0, "NQ must be positive");',),
+}
+
+
+def _sfem_soa_block_signature_lines(name, params, source_builder, expanded=False):
     """The template header, parameter list and asserts both kernels open with."""
     lines = [
-        "template <typename s_t, int NQ, int NS, int VS>",
+        _BLOCK_TEMPLATE_HEADER[bool(expanded)],
         "static %s void %s(" % (_inline_qualifier(source_builder), name),
     ]
     lines.extend(parameter_list_lines(params))
-    lines.extend(
-        [
-            ") {",
-            '  static_assert(NQ > 0, \"NQ must be positive\");',
-            '  static_assert(VS > 0, \"VS must be positive\");',
-        ]
-    )
+    lines.append(") {")
+    lines.extend(_BLOCK_TEMPLATE_ASSERTS[bool(expanded)])
+    lines.append('  static_assert(VS > 0, "VS must be positive");')
     return lines
 
 
@@ -1651,7 +1672,9 @@ def _sfem_soa_weak_form_block_function(
             for name in _output_stream_names(form, n_field_components, n_nodes)
         )
 
-    lines = _sfem_soa_block_signature_lines(shared.name, params, source_builder)
+    lines = _sfem_soa_block_signature_lines(
+        shared.name, params, source_builder, expanded=omit_reference_basis_inputs
+    )
     if not use_stream_arrays:
         lines.append(
             '  static_assert(NS == %d, \"NS does not match generated expression\");'
@@ -4518,8 +4541,12 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "          }",
                 "        }",
                 "",
-                "        %s<s_t, NQ, NS, VS>(%s);"
-                % (block_name, ", ".join(call_args)),
+                "        %s%s(%s);"
+                % (
+                    block_name,
+                    _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)],
+                    ", ".join(call_args),
+                ),
                 "      }",
             ]
         )
@@ -5654,8 +5681,13 @@ def _sfem_soa_mesh_operator_function(
     lines.extend(
         [
             "",
-            "%s%s<s_t, NQ, NS, VS>(%s);"
-            % (call_indent, block_name, ", ".join(call_args)),
+            "%s%s%s(%s);"
+            % (
+                call_indent,
+                block_name,
+                _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)],
+                ", ".join(call_args),
+            ),
         ]
     )
     lines.extend(_MESH_QUADRATURE_SCOPE_CLOSE[form_contraction(form)])
@@ -6384,8 +6416,12 @@ def _sfem_soa_packed_apply_public_wrappers(
             lines.extend(
                 [
                     "",
-                    "        %s<s_t, NQ, NS, VS>(%s);"
-                    % (block_name, ", ".join(call_args)),
+                    "        %s%s(%s);"
+                    % (
+                        block_name,
+                        _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)],
+                        ", ".join(call_args),
+                    ),
                     "",
                     "        for (int shape = 0; shape < NS; ++shape) {",
                     "          const uint16_t *const RSTR element_shape = elements[shape];",
@@ -7113,8 +7149,12 @@ def _objective_steps_lines(
             "      }",
             "    }",
             "",
-            "    %s<s_t, NQ, NS, VS>(%s);"
-            % (block_name, ", ".join(call_args)),
+            "    %s%s(%s);"
+            % (
+                block_name,
+                _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)],
+                ", ".join(call_args),
+            ),
             "  }",
             "",
             *source_builder.success_return_lines(),
@@ -8080,8 +8120,13 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
         args.append("bu_data")
     args.append("element_matrix")
     return (
-        "%s%s<s_t, NQ, NS, VS>(%s);"
-        % (indent, function_name, ", ".join(args)),
+        "%s%s%s(%s);"
+        % (
+            indent,
+            function_name,
+            _BLOCK_TEMPLATE_ARGUMENTS[bool(constant_p1)],
+            ", ".join(args),
+        ),
     )
 
 
@@ -10491,8 +10536,16 @@ def _sfem_soa_element_api_header(
         "#include <stddef.h>",
         '#include "%s"' % local_name,
         '#include "%s"' % geometry_name,
-        *reference_include_lines(
-            quadrature_rule, sfem_mesh_reference_data(quadrature_rule)
+        # An expanded element reads no reference table, so it includes none.
+        # The tables it used to forward -- the shape values, the reference
+        # gradients and the quadrature weights -- are all folded into the
+        # kernels this header calls.
+        *(
+            line
+            for line in reference_include_lines(
+                quadrature_rule, sfem_mesh_reference_data(quadrature_rule)
+            )
+            if constant_p1_simplex_reference_gradients(quadrature_rule) is None
         ),
         "",
         "namespace sfem {",
@@ -10914,8 +10967,9 @@ def _sfem_soa_element_api_block_call(
     )
     args.extend(_plain_objective_step_arguments(form, "bu_streams", "0"))
     args.append(output_arg)
-    return "%s<s_t, NQ, NS, VS>(%s);" % (
+    return "%s%s(%s);" % (
         block_name,
+        _BLOCK_TEMPLATE_ARGUMENTS[bool(specialized)],
         ", ".join(args),
     )
 

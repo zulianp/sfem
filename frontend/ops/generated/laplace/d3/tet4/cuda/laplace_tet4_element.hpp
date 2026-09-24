@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include "../../cuda/laplace_d3_simplex_local.cuh"
 #include "../../../../cuda/geometry_kernels.cuh"
-#include "../../../../reference/cuda/quad_tet_q1.hpp"
-#include "../../../../reference/cuda/tet4_q1.hpp"
 
 namespace sfem {
 namespace codegen {
@@ -22,7 +20,6 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_egeometry_soa
 ) {
   static constexpr int NC = 1;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -80,7 +77,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_egeometry_soa
         bdet0_q[0] = det_q[0];
       }
     }
-    laplace_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -96,7 +93,6 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_ecoords_soa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -143,7 +139,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_ecoords_soa(
             badj_streams, bdet0, 0);
       }
     }
-    laplace_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -159,7 +155,6 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_esoa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -206,7 +201,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_esoa(
             badj_streams, bdet0, 0);
       }
     }
-    laplace_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -223,7 +218,6 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_egeometry_s
 ) {
   static constexpr int NC = 1;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -283,7 +277,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_egeometry_s
         bdet0_q[0] = det_q[0];
       }
     }
-    laplace_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -299,7 +293,6 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_ecoords_soa
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -348,7 +341,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_ecoords_soa
             badj_streams, bdet0, 0);
       }
     }
-    laplace_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -364,7 +357,6 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_esoa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -413,7 +405,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_esoa(
             badj_streams, bdet0, 0);
       }
     }
-    laplace_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -429,7 +421,6 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_egeometry_so
 ) {
   static constexpr int NC = 1;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -493,7 +484,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_egeometry_so
           bout_data[stream][0] = s_t(0);
         }
       }
-      laplace_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -515,7 +506,6 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_ecoords_soa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -568,7 +558,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_ecoords_soa(
           bout_data[stream][0] = s_t(0);
         }
       }
-      laplace_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -590,7 +580,6 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_esoa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -643,7 +632,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_esoa(
           bout_data[stream][0] = s_t(0);
         }
       }
-      laplace_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {

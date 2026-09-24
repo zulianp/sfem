@@ -122,7 +122,6 @@ __global__ void modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
         s_t *const RSTR value
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -198,7 +197,7 @@ __global__ void modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -343,7 +342,6 @@ __global__ void modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
         s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -416,7 +414,7 @@ __global__ void modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -571,7 +569,6 @@ __global__ void modified_mooney_rivlin_tet4_apply_a_msoa_impl(
         s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -651,7 +648,7 @@ __global__ void modified_mooney_rivlin_tet4_apply_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 

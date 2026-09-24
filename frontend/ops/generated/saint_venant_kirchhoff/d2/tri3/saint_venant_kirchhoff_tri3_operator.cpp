@@ -122,7 +122,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl(
         s_t *const RSTR value
 ) {
   static constexpr int NC = 2;
-  static constexpr int NQ = 1;
   static constexpr int NS = 3;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
@@ -187,7 +186,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl(
       }
     }
 
-    saint_venant_kirchhoff_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    saint_venant_kirchhoff_d2_simplex_tri3_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
   return SFEM_SUCCESS;
@@ -310,7 +309,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri3_gradient_a_msoa_impl(
         s_t *const RSTR outy
 ) {
   static constexpr int NC = 2;
-  static constexpr int NQ = 1;
   static constexpr int NS = 3;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
@@ -372,7 +370,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri3_gradient_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    saint_venant_kirchhoff_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d2_simplex_tri3_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 
@@ -509,7 +507,6 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri3_apply_a_msoa_impl(
         s_t *const RSTR outy
 ) {
   static constexpr int NC = 2;
-  static constexpr int NQ = 1;
   static constexpr int NS = 3;
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
@@ -578,7 +575,7 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri3_apply_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    saint_venant_kirchhoff_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+    saint_venant_kirchhoff_d2_simplex_tri3_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 
@@ -766,7 +763,7 @@ static int saint_venant_kirchhoff_tri3_hessian_i_msoa_assemble_impl(
       }
     }
 
-    saint_venant_kirchhoff_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_data, element_matrix);
+    saint_venant_kirchhoff_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS, VS>(badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_data, element_matrix);
 
     if constexpr (FORMAT == 1) {
       saint_venant_kirchhoff_tri3_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

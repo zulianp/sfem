@@ -130,7 +130,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
         s_t *const RSTR value
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -210,7 +209,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
   return SFEM_SUCCESS;
@@ -303,7 +302,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_packed_a_msoa
     s_t *const RSTR value
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
@@ -401,7 +399,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_objective_steps_packed_a_msoa
           }
         }
 
-        modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+        modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
       }
     }
   }
@@ -548,7 +546,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
         s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -625,7 +622,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -726,7 +723,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_a_msoa_impl(
     s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
@@ -825,7 +821,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_a_msoa_impl(
         const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
             ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-        modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
+        modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
@@ -949,7 +945,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_two_pass_a_ms
     s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
@@ -1047,7 +1042,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_gradient_packed_two_pass_a_ms
         const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
             ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-        modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
+        modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
@@ -1241,7 +1236,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_a_msoa_impl(
         s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
@@ -1325,7 +1319,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -1434,7 +1428,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_a_msoa_impl(
     s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
@@ -1545,7 +1538,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_a_msoa_impl(
         const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
             ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-        modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+        modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
@@ -1677,7 +1670,6 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_
     s_t *const RSTR outz
 ) {
   static constexpr int NC = 3;
-  static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int VS = 16;
 
@@ -1787,7 +1779,7 @@ static SFEM_INLINE int modified_mooney_rivlin_tet4_apply_packed_two_pass_a_msoa_
         const s_t *const bdet0 = ageom_stream<s_t, geom_t, VS>(
             ne, g_det0 + evb, bdet0_data, std::is_same<geom_t, s_t>());
 
-        modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+        modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
@@ -2039,7 +2031,7 @@ static int modified_mooney_rivlin_tet4_hessian_i_msoa_assemble_impl(
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_tet4_direct_hessian_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_data, element_matrix);
+    modified_mooney_rivlin_d3_simplex_tet4_direct_hessian_element_matrix<s_t, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_data, element_matrix);
 
     if constexpr (FORMAT == 1) {
       modified_mooney_rivlin_tet4_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

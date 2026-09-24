@@ -108,7 +108,7 @@ static SFEM_INLINE void laplace_d3_simplex_direct_hessian_reference_element_matr
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void laplace_d3_simplex_tet4_direct_hessian_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -123,7 +123,6 @@ static SFEM_INLINE void laplace_d3_simplex_tet4_direct_hessian_element_matrix(
     const s_t kappa,
     s_t *const RSTR element_matrix
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(NS > 0, "NS must be positive");
   static_assert(VS > 0, "VS must be positive");
   const int lane = 0;

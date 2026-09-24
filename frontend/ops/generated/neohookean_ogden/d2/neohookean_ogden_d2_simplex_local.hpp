@@ -141,7 +141,7 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_objective_block(
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void neohookean_ogden_d2_simplex_tri3_objective_block(
         const int ne,
         const s_t *const RSTR adj0,
@@ -158,7 +158,6 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_tri3_objective_block(
         const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     {
       const s_t qw = (s_t(1) / s_t(2));
@@ -313,7 +312,7 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_gradient_block(
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void neohookean_ogden_d2_simplex_tri3_gradient_block(
         const int ne,
         const s_t *const RSTR adj0,
@@ -326,7 +325,6 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_tri3_gradient_block(
         const s_t *const RSTR u_streams[NS * 2],
         s_t *const RSTR out_streams[NS * 2]
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     {
       const s_t qw = (s_t(1) / s_t(2));
@@ -521,7 +519,7 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_apply_block(
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS, int VS>
 static SFEM_INLINE void neohookean_ogden_d2_simplex_tri3_apply_block(
         const int ne,
         const s_t *const RSTR adj0,
@@ -535,7 +533,6 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_tri3_apply_block(
         const s_t *const RSTR h_streams[NS * 2],
         s_t *const RSTR out_streams[NS * 2]
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
     {
       const s_t qw = (s_t(1) / s_t(2));

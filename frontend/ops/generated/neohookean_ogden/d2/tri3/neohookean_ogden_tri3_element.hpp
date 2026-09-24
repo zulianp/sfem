@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include "../neohookean_ogden_d2_simplex_local.hpp"
 #include "../../../geometry_kernels.hpp"
-#include "../../../reference/quad_tri_q1.hpp"
-#include "../../../reference/tri3_q1.hpp"
 
 namespace sfem {
 namespace codegen {
@@ -23,7 +21,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_egeometry_soa(
 ) {
   static constexpr int NC = 2;
   static constexpr int NS = 3;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -63,7 +60,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_egeometry_soa(
         bdet0_q[lane] = det_q[lane];
       }
     }
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -80,7 +77,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_ecoords_soa(
   static constexpr int NC = 2;
   static constexpr int ND = 2;
   static constexpr int NS = 3;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -119,7 +115,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_ecoords_soa(
             J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -136,7 +132,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_esoa(
   static constexpr int NC = 2;
   static constexpr int ND = 2;
   static constexpr int NS = 3;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -175,7 +170,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_esoa(
             J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -193,7 +188,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_egeometry_soa(
 ) {
   static constexpr int NC = 2;
   static constexpr int NS = 3;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -235,7 +229,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_egeometry_soa(
         bdet0_q[lane] = det_q[lane];
       }
     }
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -252,7 +246,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_ecoords_soa(
   static constexpr int NC = 2;
   static constexpr int ND = 2;
   static constexpr int NS = 3;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -293,7 +286,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_ecoords_soa(
             J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -310,7 +303,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_esoa(
   static constexpr int NC = 2;
   static constexpr int ND = 2;
   static constexpr int NS = 3;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -351,7 +343,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_esoa(
             J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -369,7 +361,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_egeometry_soa(
 ) {
   static constexpr int NC = 2;
   static constexpr int NS = 3;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -417,7 +408,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_egeometry_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -442,7 +433,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_ecoords_soa(
   static constexpr int NC = 2;
   static constexpr int ND = 2;
   static constexpr int NS = 3;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -489,7 +479,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_ecoords_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -514,7 +504,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_esoa(
   static constexpr int NC = 2;
   static constexpr int ND = 2;
   static constexpr int NS = 3;
-  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -561,7 +550,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_esoa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
