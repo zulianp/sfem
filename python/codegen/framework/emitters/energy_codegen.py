@@ -7386,7 +7386,7 @@ def _sfem_soa_direct_hessian_state_gradient_lines(dim, reference_prefix, indent)
     return [
         "%ss_t state_gradient_ref[%s];" % (indent, c_product("NC", "NQ", "ND")),
         "%sfor (int component = 0; component < NC; ++component) {" % indent,
-        "%s  tensor_gradient_contiguous_scalar<s_t, NQ, NS, VS, %d, NC>(" % (indent, dim),
+        "%s  tensor_gradient_contiguous_scalar<s_t, NQ, NS, %d, NC>(" % (indent, dim),
         "%s      %sshape_1d, %sgrad_1d, bu_data, component,"
         % (indent, reference_prefix, reference_prefix),
         "%s      state_gradient_ref + %s);"
@@ -7882,7 +7882,7 @@ def _sfem_soa_direct_hessian_sum_factorized_assembly_lines(
     for row in range(n_field_components):
         lines.extend(
             [
-                "%s    tensor_test_scalar<s_t, NQ, NS, VS, %d, NC>(" % (indent, dim),
+                "%s    tensor_test_scalar<s_t, NQ, NS, %d, NC>(" % (indent, dim),
                 "%s        %sshape_1d, %sgrad_1d, flux + %s, column, %d);"
                 % (
                     indent,
