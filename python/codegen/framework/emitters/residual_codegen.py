@@ -6443,7 +6443,7 @@ def _mixed_isoparametric_function(
                     "        const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
                 )
-        lines.extend(_isoparametric_geometry_assignment_lines(dim, "        "))
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "        ", cell_rule))
         lines.extend(["      }", "    }"])
     lines.extend([""])
     lines.extend(
@@ -8350,23 +8350,12 @@ def _scalar_crs_matrix_assembly_source(
         )
         for i in range(dim):
             for j in range(dim):
-                terms = [
-                    ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
-                    % (
-                        shape * dim + i,
-                        _mesh_reference_name(
-                            ISOPARAMETRIC_MODE,
-                            sfem_simplex_grad_ref_name("grad_ref", j),
-                        ),
-                        shape,
-                    )
-                    for shape in range(n_shape)
-                ]
+                terms = _isoparametric_jacobian_terms(rule, dim, n_shape, i, j)
                 lines.append(
                     "      const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
                 )
-        lines.extend(_isoparametric_geometry_assignment_lines(dim, "      "))
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "      ", rule))
         lines.extend(["    }"])
     if field_element_lines:
         state_stream_args = {
@@ -8718,23 +8707,12 @@ def _scalar_crs_matrix_assembly_source(
             )
             for i in range(dim):
                 for j in range(dim):
-                    terms = [
-                        ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
-                        % (
-                            shape * dim + i,
-                            _mesh_reference_name(
-                                ISOPARAMETRIC_MODE,
-                                sfem_simplex_grad_ref_name("grad_ref", j),
-                            ),
-                            shape,
-                        )
-                        for shape in range(n_shape)
-                    ]
+                    terms = _isoparametric_jacobian_terms(rule, dim, n_shape, i, j)
                     lines.append(
                         "        const s_t J%d%d = %s;"
                         % (i, j, " + ".join(terms))
                     )
-            lines.extend(_isoparametric_geometry_assignment_lines(dim, "        "))
+            lines.extend(_isoparametric_geometry_assignment_lines(dim, "        ", rule))
             lines.extend(["      }"])
         if packed_field_element_lines:
             state_stream_args.update(
@@ -8987,23 +8965,12 @@ def _isoparametric_mesh_operator_source(
         )
         for i in range(dim):
             for j in range(dim):
-                terms = [
-                    ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
-                    % (
-                        shape * dim + i,
-                        _mesh_reference_name(
-                            ISOPARAMETRIC_MODE,
-                            sfem_simplex_grad_ref_name("grad_ref", j),
-                        ),
-                        shape,
-                    )
-                    for shape in range(n_shape)
-                ]
+                terms = _isoparametric_jacobian_terms(rule, dim, n_shape, i, j)
                 lines.append(
                     "        const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
                 )
-        lines.extend(_isoparametric_geometry_assignment_lines(dim, "        "))
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "        ", rule))
         lines.extend(["      }", "    }"])
     if gradient_metric is not None:
         lines.extend(
@@ -9343,23 +9310,12 @@ def _scalar_packed_jacobian_action_source(
         )
         for i in range(dim):
             for j in range(dim):
-                terms = [
-                    ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
-                    % (
-                        shape * dim + i,
-                        _mesh_reference_name(
-                            ISOPARAMETRIC_MODE,
-                            sfem_simplex_grad_ref_name("grad_ref", j),
-                        ),
-                        shape,
-                    )
-                    for shape in range(n_shape)
-                ]
+                terms = _isoparametric_jacobian_terms(rule, dim, n_shape, i, j)
                 lines.append(
                     "            const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
                 )
-        lines.extend(_isoparametric_geometry_assignment_lines(dim, "            "))
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "            ", rule))
         lines.extend(["          }", "        }"])
     lines.extend(
         _blocked_adjugate_array_lines(dependencies, dim, "ND * ND", "        ")
@@ -9874,11 +9830,71 @@ def _scalar_packed_affine_jacobian_action_source(
     return lines
 
 
-def _isoparametric_geometry_assignment_lines(dim, indent):
+def _isoparametric_jacobian_terms(rule, dim, n_shape, row, col):
+    """One Jacobian entry's terms: a sum over the shape functions, or its fold.
+
+    An affine simplex has constant reference gradients, so the sum collapses to
+    the edge from the element's first vertex to its `col`-th neighbour and the
+    reference table disappears with it.  Folded as exact rationals, and the
+    zero terms drop out by arithmetic rather than by a test written here.
+
+    The energy path folds the same sum in
+    `emitters/energy_codegen._constant_p1_jacobian_value_lines`; this is the
+    residual path's four copies of it reaching the same answer.
+    """
+    gradients = constant_p1_simplex_reference_gradients(rule)
+    folded = [
+        [
+            _sfem_ccode(
+                sum(
+                    (
+                        sp.sympify(gradients[shape][col])
+                        * sp.Symbol("bcoordinates[%d]%s" % (shape * dim + row, _wi()))
+                        for shape in range(n_shape)
+                    ),
+                    sp.S.Zero,
+                )
+            )
+        ]
+        for _ in (gradients,)
+        if gradients is not None
+    ]
+    general = [
+        [
+            ("bcoordinates[%d]" + _wi() + " * %s[q * NS + %d]")
+            % (
+                shape * dim + row,
+                _mesh_reference_name(
+                    ISOPARAMETRIC_MODE,
+                    sfem_simplex_grad_ref_name("grad_ref", col),
+                ),
+                shape,
+            )
+            for shape in range(n_shape)
+        ]
+        for _ in (gradients,)
+        if gradients is None
+    ]
+    return (folded + general)[0]
+
+
+#: Where an isoparametric tile writes its adjugate, keyed on whether the
+#: element carries a single quadrature point.  With one point there is no
+#: stride, and after the Jacobian above is folded there is no `q` in scope to
+#: stride with either.
+_ISOPARAMETRIC_GEOMETRY_INDEX = {
+    True: lambda: _wi().strip("[]"),
+    False: lambda: _offset("q", "VS"),
+}
+
+
+def _isoparametric_geometry_assignment_lines(dim, indent, rule=None):
     return isoparametric_adjugate_call_lines(
         dim=dim,
         indent=indent,
-        index=_offset("q", "VS"),
+        index=_ISOPARAMETRIC_GEOMETRY_INDEX[
+            constant_p1_simplex_reference_gradients(rule) is not None
+        ](),
         stream_array_name="badjugate_streams",
         determinant_stream="bdeterminant",
     )

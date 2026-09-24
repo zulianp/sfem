@@ -86,10 +86,10 @@ static int laplace_total_tet4_merit_patch(
     s_t merit_local[VS];
     for (int lane = 0; lane < VS; ++lane) merit_local[lane] = s_t(0);
     s_t rho[NC * VS];
-    s_t pm_test_grad[NQ * 3 * VS];
-    s_t pm_weight[NQ * 1 * VS];
-    s_t pm_state_grad[NQ * 3 * VS];
-    s_t pm_direction_grad[NQ * 3 * VS];
+    s_t pm_test_grad[3 * VS];
+    s_t pm_weight[1 * VS];
+    s_t pm_state_grad[3 * VS];
+    s_t pm_direction_grad[3 * VS];
     element_idx_t pm_incident[VS];
     uint8_t pm_local_node[VS];
 
@@ -112,8 +112,7 @@ static int laplace_total_tet4_merit_patch(
           pm_local_node[lane] = n2e_local[block + lane];
         }
         // loop 1 -- lanes are the elements incident on this node.
-        {
-            const int q = 0;  // TET4 evaluates in closed form
+        {  // TET4 evaluates in closed form
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
             const idx_t element = pm_incident[lane];
@@ -159,11 +158,11 @@ static int laplace_total_tet4_merit_patch(
                 for (int k = 0; k < ND; ++k) {
                   s_t acc = s_t(0);
                   for (int j = 0; j < NS; ++j) {
-                    acc += state[j * NC + c] * grad_ref[k][q * NS + j];
+                    acc += state[j * NC + c] * grad_ref[k][j];
                   }
                   mapped += acc * adj[k * ND + d];
                 }
-                pm_state_grad[(q * 3 + c * ND + d) * VS + lane] = mapped / det;
+                pm_state_grad[(c * ND + d) * VS + lane] = mapped / det;
               }
             }
             // physical gradient of the direction: summed over shape functions,
@@ -175,11 +174,11 @@ static int laplace_total_tet4_merit_patch(
                 for (int k = 0; k < ND; ++k) {
                   s_t acc = s_t(0);
                   for (int j = 0; j < NS; ++j) {
-                    acc += direction[j * NC + c] * grad_ref[k][q * NS + j];
+                    acc += direction[j * NC + c] * grad_ref[k][j];
                   }
                   mapped += acc * adj[k * ND + d];
                 }
-                pm_direction_grad[(q * 3 + c * ND + d) * VS + lane] = mapped / det;
+                pm_direction_grad[(c * ND + d) * VS + lane] = mapped / det;
               }
             }
             // the fixed basis function's quantities, and the
@@ -189,28 +188,27 @@ static int laplace_total_tet4_merit_patch(
             for (int d = 0; d < ND; ++d) {
               s_t mapped = s_t(0);
               for (int k = 0; k < ND; ++k) {
-                mapped += grad_ref[k][q * NS + 0] * adj[k * ND + d];
+                mapped += grad_ref[k][0] * adj[k * ND + d];
               }
-              pm_test_grad[(q * 3 + d) * VS + lane] = mapped / det;
+              pm_test_grad[(d) * VS + lane] = mapped / det;
             }
-            pm_weight[q * VS + lane] = q_weight[q] * det;
+            pm_weight[lane] = q_weight[0] * det;
           }
         }
         // loop 2 -- lanes are the sampled step lengths.
         for (int lane_e = 0; lane_e < ne; ++lane_e) {
-          {
-              const int q = 0;  // TET4 evaluates in closed form
+          {  // TET4 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nsteps; ++lane) {
               const s_t alpha = steps[lane];
-              const s_t u_grad_0 = pm_state_grad[(q * 3 + 0) * VS + lane_e] + alpha * pm_direction_grad[(q * 3 + 0) * VS + lane_e];
-              const s_t u_grad_1 = pm_state_grad[(q * 3 + 1) * VS + lane_e] + alpha * pm_direction_grad[(q * 3 + 1) * VS + lane_e];
-              const s_t u_grad_2 = pm_state_grad[(q * 3 + 2) * VS + lane_e] + alpha * pm_direction_grad[(q * 3 + 2) * VS + lane_e];
+              const s_t u_grad_0 = pm_state_grad[(0) * VS + lane_e] + alpha * pm_direction_grad[(0) * VS + lane_e];
+              const s_t u_grad_1 = pm_state_grad[(1) * VS + lane_e] + alpha * pm_direction_grad[(1) * VS + lane_e];
+              const s_t u_grad_2 = pm_state_grad[(2) * VS + lane_e] + alpha * pm_direction_grad[(2) * VS + lane_e];
               const s_t grad_coeff0_0 = kappa*u_grad_0;
               const s_t grad_coeff0_1 = kappa*u_grad_1;
               const s_t grad_coeff0_2 = kappa*u_grad_2;
-              const s_t weight = pm_weight[q * VS + lane_e];
-              rho[0 * VS + lane] += weight * (grad_coeff0_0 * pm_test_grad[(q * 3 + 0) * VS + lane_e] + grad_coeff0_1 * pm_test_grad[(q * 3 + 1) * VS + lane_e] + grad_coeff0_2 * pm_test_grad[(q * 3 + 2) * VS + lane_e]);
+              const s_t weight = pm_weight[lane_e];
+              rho[0 * VS + lane] += weight * (grad_coeff0_0 * pm_test_grad[(0) * VS + lane_e] + grad_coeff0_1 * pm_test_grad[(1) * VS + lane_e] + grad_coeff0_2 * pm_test_grad[(2) * VS + lane_e]);
             }
           }
         }

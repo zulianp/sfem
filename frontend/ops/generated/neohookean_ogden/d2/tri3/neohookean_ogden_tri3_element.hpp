@@ -38,23 +38,22 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_egeometry_soa(
       bvalue[lane] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
-      s_t *const RSTR badj0_q = &badj0[q * VS];
-      const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
-      const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
-      const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
-      const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
-      const s_t *const RSTR det_q = det + q * nelements + evb;
+    s_t badj0[VS];
+    s_t badj1[VS];
+    s_t badj2[VS];
+    s_t badj3[VS];
+    s_t bdet0[VS];
+    {  // TRI3 evaluates in closed form
+      s_t *const RSTR badj0_q = badj0;
+      const s_t *const RSTR adj0_q = adj[0] + evb;
+      s_t *const RSTR badj1_q = badj1;
+      const s_t *const RSTR adj1_q = adj[1] + evb;
+      s_t *const RSTR badj2_q = badj2;
+      const s_t *const RSTR adj2_q = adj[2] + evb;
+      s_t *const RSTR badj3_q = badj3;
+      const s_t *const RSTR adj3_q = adj[3] + evb;
+      s_t *const RSTR bdet0_q = bdet0;
+      const s_t *const RSTR det_q = det + evb;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         badj0_q[lane] = adj0_q[lane];
@@ -103,46 +102,21 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_ecoords_soa(
         bcoordinate_data[stream][lane] = coords[stream][evb + lane];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
+    s_t badj0[VS];
+    s_t badj1[VS];
+    s_t badj2[VS];
+    s_t badj3[VS];
+    s_t bdet0[VS];
+    {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = grad_ref_x[q * NS + shape];
-        const s_t g1 = grad_ref_y[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
+        const s_t J00 = -bcoordinate_data[0][lane] + bcoordinate_data[2][lane];
+        const s_t J01 = -bcoordinate_data[0][lane] + bcoordinate_data[4][lane];
+        const s_t J10 = -bcoordinate_data[1][lane] + bcoordinate_data[3][lane];
+        const s_t J11 = -bcoordinate_data[1][lane] + bcoordinate_data[5][lane];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
+            J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
     neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
@@ -184,46 +158,21 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_esoa(
         bcoordinate_data[stream][lane] = coords[stream][evb + lane];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
+    s_t badj0[VS];
+    s_t badj1[VS];
+    s_t badj2[VS];
+    s_t badj3[VS];
+    s_t bdet0[VS];
+    {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = grad_ref_x[q * NS + shape];
-        const s_t g1 = grad_ref_y[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
+        const s_t J00 = -bcoordinate_data[0][lane] + bcoordinate_data[2][lane];
+        const s_t J01 = -bcoordinate_data[0][lane] + bcoordinate_data[4][lane];
+        const s_t J10 = -bcoordinate_data[1][lane] + bcoordinate_data[3][lane];
+        const s_t J11 = -bcoordinate_data[1][lane] + bcoordinate_data[5][lane];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
+            J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
     neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
@@ -261,23 +210,22 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_egeometry_soa(
         bout_streams[stream][lane] = s_t(0);
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
-      s_t *const RSTR badj0_q = &badj0[q * VS];
-      const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
-      const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
-      const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
-      const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
-      const s_t *const RSTR det_q = det + q * nelements + evb;
+    s_t badj0[VS];
+    s_t badj1[VS];
+    s_t badj2[VS];
+    s_t badj3[VS];
+    s_t bdet0[VS];
+    {  // TRI3 evaluates in closed form
+      s_t *const RSTR badj0_q = badj0;
+      const s_t *const RSTR adj0_q = adj[0] + evb;
+      s_t *const RSTR badj1_q = badj1;
+      const s_t *const RSTR adj1_q = adj[1] + evb;
+      s_t *const RSTR badj2_q = badj2;
+      const s_t *const RSTR adj2_q = adj[2] + evb;
+      s_t *const RSTR badj3_q = badj3;
+      const s_t *const RSTR adj3_q = adj[3] + evb;
+      s_t *const RSTR bdet0_q = bdet0;
+      const s_t *const RSTR det_q = det + evb;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         badj0_q[lane] = adj0_q[lane];
@@ -328,46 +276,21 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_ecoords_soa(
         bcoordinate_data[stream][lane] = coords[stream][evb + lane];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
+    s_t badj0[VS];
+    s_t badj1[VS];
+    s_t badj2[VS];
+    s_t badj3[VS];
+    s_t bdet0[VS];
+    {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = grad_ref_x[q * NS + shape];
-        const s_t g1 = grad_ref_y[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
+        const s_t J00 = -bcoordinate_data[0][lane] + bcoordinate_data[2][lane];
+        const s_t J01 = -bcoordinate_data[0][lane] + bcoordinate_data[4][lane];
+        const s_t J10 = -bcoordinate_data[1][lane] + bcoordinate_data[3][lane];
+        const s_t J11 = -bcoordinate_data[1][lane] + bcoordinate_data[5][lane];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
+            J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
     neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
@@ -411,46 +334,21 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_esoa(
         bcoordinate_data[stream][lane] = coords[stream][evb + lane];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
+    s_t badj0[VS];
+    s_t badj1[VS];
+    s_t badj2[VS];
+    s_t badj3[VS];
+    s_t bdet0[VS];
+    {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = grad_ref_x[q * NS + shape];
-        const s_t g1 = grad_ref_y[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
+        const s_t J00 = -bcoordinate_data[0][lane] + bcoordinate_data[2][lane];
+        const s_t J01 = -bcoordinate_data[0][lane] + bcoordinate_data[4][lane];
+        const s_t J10 = -bcoordinate_data[1][lane] + bcoordinate_data[3][lane];
+        const s_t J11 = -bcoordinate_data[1][lane] + bcoordinate_data[5][lane];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
+            J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
     neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
@@ -478,23 +376,22 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_egeometry_soa(
     const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
-      s_t *const RSTR badj0_q = &badj0[q * VS];
-      const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * VS];
-      const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * VS];
-      const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * VS];
-      const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * VS];
-      const s_t *const RSTR det_q = det + q * nelements + evb;
+    s_t badj0[VS];
+    s_t badj1[VS];
+    s_t badj2[VS];
+    s_t badj3[VS];
+    s_t bdet0[VS];
+    {  // TRI3 evaluates in closed form
+      s_t *const RSTR badj0_q = badj0;
+      const s_t *const RSTR adj0_q = adj[0] + evb;
+      s_t *const RSTR badj1_q = badj1;
+      const s_t *const RSTR adj1_q = adj[1] + evb;
+      s_t *const RSTR badj2_q = badj2;
+      const s_t *const RSTR adj2_q = adj[2] + evb;
+      s_t *const RSTR badj3_q = badj3;
+      const s_t *const RSTR adj3_q = adj[3] + evb;
+      s_t *const RSTR bdet0_q = bdet0;
+      const s_t *const RSTR det_q = det + evb;
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         badj0_q[lane] = adj0_q[lane];
@@ -559,46 +456,21 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_ecoords_soa(
         bcoordinate_data[stream][lane] = coords[stream][evb + lane];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
+    s_t badj0[VS];
+    s_t badj1[VS];
+    s_t badj2[VS];
+    s_t badj3[VS];
+    s_t bdet0[VS];
+    {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = grad_ref_x[q * NS + shape];
-        const s_t g1 = grad_ref_y[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
+        const s_t J00 = -bcoordinate_data[0][lane] + bcoordinate_data[2][lane];
+        const s_t J01 = -bcoordinate_data[0][lane] + bcoordinate_data[4][lane];
+        const s_t J10 = -bcoordinate_data[1][lane] + bcoordinate_data[3][lane];
+        const s_t J11 = -bcoordinate_data[1][lane] + bcoordinate_data[5][lane];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
+            J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
     s_t bh_data[NDOFS][VS];
@@ -656,46 +528,21 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_esoa(
         bcoordinate_data[stream][lane] = coords[stream][evb + lane];
       }
     }
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    const s_t *const grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-    const s_t *const grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
+    s_t badj0[VS];
+    s_t badj1[VS];
+    s_t badj2[VS];
+    s_t badj3[VS];
+    s_t bdet0[VS];
+    {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = grad_ref_x[q * NS + shape];
-        const s_t g1 = grad_ref_y[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
+        const s_t J00 = -bcoordinate_data[0][lane] + bcoordinate_data[2][lane];
+        const s_t J01 = -bcoordinate_data[0][lane] + bcoordinate_data[4][lane];
+        const s_t J10 = -bcoordinate_data[1][lane] + bcoordinate_data[3][lane];
+        const s_t J11 = -bcoordinate_data[1][lane] + bcoordinate_data[5][lane];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
+            J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
     s_t bh_data[NDOFS][VS];

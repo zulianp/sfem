@@ -757,39 +757,16 @@ static int linear_elasticity_tri3_hessian_i_msoa_assemble_impl(
     }
 
 
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
+    {  // TRI3 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
-        const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
+        const s_t J00 = -bcoordinate_data[0][lane] + bcoordinate_data[2][lane];
+        const s_t J01 = -bcoordinate_data[0][lane] + bcoordinate_data[4][lane];
+        const s_t J10 = -bcoordinate_data[1][lane] + bcoordinate_data[3][lane];
+        const s_t J11 = -bcoordinate_data[1][lane] + bcoordinate_data[5][lane];
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
+            J00, J01, J10, J11, badj_streams, bdet0, lane);
       }
     }
 

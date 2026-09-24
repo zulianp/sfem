@@ -113,14 +113,14 @@ static int two_phase_flow_total_tet4_merit_patch(
     s_t merit_local[VS];
     for (int lane = 0; lane < VS; ++lane) merit_local[lane] = s_t(0);
     s_t rho[NC * VS];
-    s_t pm_test[NQ * 1 * VS];
-    s_t pm_test_grad[NQ * 3 * VS];
-    s_t pm_weight[NQ * 1 * VS];
-    s_t pm_state_value[NQ * 2 * VS];
-    s_t pm_state_grad[NQ * 6 * VS];
-    s_t pm_direction_value[NQ * 2 * VS];
-    s_t pm_direction_grad[NQ * 6 * VS];
-    s_t pm_previous_value[NQ * 2 * VS];
+    s_t pm_test[1 * VS];
+    s_t pm_test_grad[3 * VS];
+    s_t pm_weight[1 * VS];
+    s_t pm_state_value[2 * VS];
+    s_t pm_state_grad[6 * VS];
+    s_t pm_direction_value[2 * VS];
+    s_t pm_direction_grad[6 * VS];
+    s_t pm_previous_value[2 * VS];
     element_idx_t pm_incident[VS];
     uint8_t pm_local_node[VS];
 
@@ -143,8 +143,7 @@ static int two_phase_flow_total_tet4_merit_patch(
           pm_local_node[lane] = n2e_local[block + lane];
         }
         // loop 1 -- lanes are the elements incident on this node.
-        {
-            const int q = 0;  // TET4 evaluates in closed form
+        {  // TET4 evaluates in closed form
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
             const idx_t element = pm_incident[lane];
@@ -187,9 +186,9 @@ static int two_phase_flow_total_tet4_merit_patch(
             for (int c = 0; c < NC; ++c) {
               s_t acc = s_t(0);
               for (int j = 0; j < NS; ++j) {
-                acc += state[j * NC + c] * shape[q * NS + j];
+                acc += state[j * NC + c] * shape[j];
               }
-              pm_state_value[(q * 2 + c) * VS + lane] = acc;
+              pm_state_value[(c) * VS + lane] = acc;
             }
             // physical gradient of the state: summed over shape functions,
             // then mapped.  Mapped here and not in loop 2 because the map
@@ -200,20 +199,20 @@ static int two_phase_flow_total_tet4_merit_patch(
                 for (int k = 0; k < ND; ++k) {
                   s_t acc = s_t(0);
                   for (int j = 0; j < NS; ++j) {
-                    acc += state[j * NC + c] * grad_ref[k][q * NS + j];
+                    acc += state[j * NC + c] * grad_ref[k][j];
                   }
                   mapped += acc * adj[k * ND + d];
                 }
-                pm_state_grad[(q * 6 + c * ND + d) * VS + lane] = mapped / det;
+                pm_state_grad[(c * ND + d) * VS + lane] = mapped / det;
               }
             }
             // interpolated direction value
             for (int c = 0; c < NC; ++c) {
               s_t acc = s_t(0);
               for (int j = 0; j < NS; ++j) {
-                acc += direction[j * NC + c] * shape[q * NS + j];
+                acc += direction[j * NC + c] * shape[j];
               }
-              pm_direction_value[(q * 2 + c) * VS + lane] = acc;
+              pm_direction_value[(c) * VS + lane] = acc;
             }
             // physical gradient of the direction: summed over shape functions,
             // then mapped.  Mapped here and not in loop 2 because the map
@@ -224,53 +223,52 @@ static int two_phase_flow_total_tet4_merit_patch(
                 for (int k = 0; k < ND; ++k) {
                   s_t acc = s_t(0);
                   for (int j = 0; j < NS; ++j) {
-                    acc += direction[j * NC + c] * grad_ref[k][q * NS + j];
+                    acc += direction[j * NC + c] * grad_ref[k][j];
                   }
                   mapped += acc * adj[k * ND + d];
                 }
-                pm_direction_grad[(q * 6 + c * ND + d) * VS + lane] = mapped / det;
+                pm_direction_grad[(c * ND + d) * VS + lane] = mapped / det;
               }
             }
             // interpolated previous value
             for (int c = 0; c < NC; ++c) {
               s_t acc = s_t(0);
               for (int j = 0; j < NS; ++j) {
-                acc += previous[j * NC + c] * shape[q * NS + j];
+                acc += previous[j * NC + c] * shape[j];
               }
-              pm_previous_value[(q * 2 + c) * VS + lane] = acc;
+              pm_previous_value[(c) * VS + lane] = acc;
             }
             // the fixed basis function's quantities, and the
             // integration weight.  Both are what the orientation buys:
             // `phi_0` is the same function in every element and at
             // every step, so this leaves the step loop entirely.
-            pm_test[q * VS + lane] = shape[q * NS + 0];
+            pm_test[lane] = shape[0];
             for (int d = 0; d < ND; ++d) {
               s_t mapped = s_t(0);
               for (int k = 0; k < ND; ++k) {
-                mapped += grad_ref[k][q * NS + 0] * adj[k * ND + d];
+                mapped += grad_ref[k][0] * adj[k * ND + d];
               }
-              pm_test_grad[(q * 3 + d) * VS + lane] = mapped / det;
+              pm_test_grad[(d) * VS + lane] = mapped / det;
             }
-            pm_weight[q * VS + lane] = q_weight[q] * det;
+            pm_weight[lane] = q_weight[0] * det;
           }
         }
         // loop 2 -- lanes are the sampled step lengths.
         for (int lane_e = 0; lane_e < ne; ++lane_e) {
-          {
-              const int q = 0;  // TET4 evaluates in closed form
+          {  // TET4 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nsteps; ++lane) {
               const s_t alpha = steps[lane];
-              const s_t p_w = pm_state_value[(q * 2 + 0) * VS + lane_e] + alpha * pm_direction_value[(q * 2 + 0) * VS + lane_e];
-              const s_t p_c = pm_state_value[(q * 2 + 1) * VS + lane_e] + alpha * pm_direction_value[(q * 2 + 1) * VS + lane_e];
-              const s_t p_w_grad_0 = pm_state_grad[(q * 6 + 0) * VS + lane_e] + alpha * pm_direction_grad[(q * 6 + 0) * VS + lane_e];
-              const s_t p_w_grad_1 = pm_state_grad[(q * 6 + 1) * VS + lane_e] + alpha * pm_direction_grad[(q * 6 + 1) * VS + lane_e];
-              const s_t p_w_grad_2 = pm_state_grad[(q * 6 + 2) * VS + lane_e] + alpha * pm_direction_grad[(q * 6 + 2) * VS + lane_e];
-              const s_t p_c_grad_0 = pm_state_grad[(q * 6 + 3) * VS + lane_e] + alpha * pm_direction_grad[(q * 6 + 3) * VS + lane_e];
-              const s_t p_c_grad_1 = pm_state_grad[(q * 6 + 4) * VS + lane_e] + alpha * pm_direction_grad[(q * 6 + 4) * VS + lane_e];
-              const s_t p_c_grad_2 = pm_state_grad[(q * 6 + 5) * VS + lane_e] + alpha * pm_direction_grad[(q * 6 + 5) * VS + lane_e];
-              const s_t p_w_old = pm_previous_value[(q * 2 + 0) * VS + lane_e];
-              const s_t p_c_old = pm_previous_value[(q * 2 + 1) * VS + lane_e];
+              const s_t p_w = pm_state_value[(0) * VS + lane_e] + alpha * pm_direction_value[(0) * VS + lane_e];
+              const s_t p_c = pm_state_value[(1) * VS + lane_e] + alpha * pm_direction_value[(1) * VS + lane_e];
+              const s_t p_w_grad_0 = pm_state_grad[(0) * VS + lane_e] + alpha * pm_direction_grad[(0) * VS + lane_e];
+              const s_t p_w_grad_1 = pm_state_grad[(1) * VS + lane_e] + alpha * pm_direction_grad[(1) * VS + lane_e];
+              const s_t p_w_grad_2 = pm_state_grad[(2) * VS + lane_e] + alpha * pm_direction_grad[(2) * VS + lane_e];
+              const s_t p_c_grad_0 = pm_state_grad[(3) * VS + lane_e] + alpha * pm_direction_grad[(3) * VS + lane_e];
+              const s_t p_c_grad_1 = pm_state_grad[(4) * VS + lane_e] + alpha * pm_direction_grad[(4) * VS + lane_e];
+              const s_t p_c_grad_2 = pm_state_grad[(5) * VS + lane_e] + alpha * pm_direction_grad[(5) * VS + lane_e];
+              const s_t p_w_old = pm_previous_value[(0) * VS + lane_e];
+              const s_t p_c_old = pm_previous_value[(1) * VS + lane_e];
               const s_t residual_tmp0 = -p_wr;
               const s_t residual_tmp1 = exp(kappa_T*(p_w + residual_tmp0));
               const s_t residual_tmp2 = S_res + s_t(-1);
@@ -294,9 +292,9 @@ static int two_phase_flow_total_tet4_merit_patch(
               const s_t grad_coeff1_0 = residual_tmp14*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
               const s_t grad_coeff1_1 = residual_tmp14*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
               const s_t grad_coeff1_2 = residual_tmp14*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-              const s_t weight = pm_weight[q * VS + lane_e];
-              rho[0 * VS + lane] += weight * (value_coeff0 * pm_test[q * VS + lane_e] + grad_coeff0_0 * pm_test_grad[(q * 3 + 0) * VS + lane_e] + grad_coeff0_1 * pm_test_grad[(q * 3 + 1) * VS + lane_e] + grad_coeff0_2 * pm_test_grad[(q * 3 + 2) * VS + lane_e]);
-              rho[1 * VS + lane] += weight * (value_coeff1 * pm_test[q * VS + lane_e] + grad_coeff1_0 * pm_test_grad[(q * 3 + 0) * VS + lane_e] + grad_coeff1_1 * pm_test_grad[(q * 3 + 1) * VS + lane_e] + grad_coeff1_2 * pm_test_grad[(q * 3 + 2) * VS + lane_e]);
+              const s_t weight = pm_weight[lane_e];
+              rho[0 * VS + lane] += weight * (value_coeff0 * pm_test[lane_e] + grad_coeff0_0 * pm_test_grad[(0) * VS + lane_e] + grad_coeff0_1 * pm_test_grad[(1) * VS + lane_e] + grad_coeff0_2 * pm_test_grad[(2) * VS + lane_e]);
+              rho[1 * VS + lane] += weight * (value_coeff1 * pm_test[lane_e] + grad_coeff1_0 * pm_test_grad[(0) * VS + lane_e] + grad_coeff1_1 * pm_test_grad[(1) * VS + lane_e] + grad_coeff1_2 * pm_test_grad[(2) * VS + lane_e]);
             }
           }
         }

@@ -531,21 +531,20 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_viscous_tet4_hessian_crs_i_mso
     }
 
     s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    {
-        const int q = 0;  // TET4 evaluates in closed form
+    {  // TET4 evaluates in closed form
       const int lane = 0;
-      const s_t J00 = bcoordinates[0][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[6][lane] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[9][lane] * isoparametric_grad_ref_x[q * NS + 3];
-      const s_t J01 = bcoordinates[0][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[6][lane] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[9][lane] * isoparametric_grad_ref_y[q * NS + 3];
-      const s_t J02 = bcoordinates[0][lane] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[3][lane] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[6][lane] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[9][lane] * isoparametric_grad_ref_z[q * NS + 3];
-      const s_t J10 = bcoordinates[1][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[4][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[7][lane] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[10][lane] * isoparametric_grad_ref_x[q * NS + 3];
-      const s_t J11 = bcoordinates[1][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[4][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[7][lane] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[10][lane] * isoparametric_grad_ref_y[q * NS + 3];
-      const s_t J12 = bcoordinates[1][lane] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[4][lane] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[7][lane] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[10][lane] * isoparametric_grad_ref_z[q * NS + 3];
-      const s_t J20 = bcoordinates[2][lane] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[5][lane] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[8][lane] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[11][lane] * isoparametric_grad_ref_x[q * NS + 3];
-      const s_t J21 = bcoordinates[2][lane] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[5][lane] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[8][lane] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[11][lane] * isoparametric_grad_ref_y[q * NS + 3];
-      const s_t J22 = bcoordinates[2][lane] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[5][lane] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[8][lane] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[11][lane] * isoparametric_grad_ref_z[q * NS + 3];
+      const s_t J00 = -bcoordinates[0][lane] + bcoordinates[3][lane];
+      const s_t J01 = -bcoordinates[0][lane] + bcoordinates[6][lane];
+      const s_t J02 = -bcoordinates[0][lane] + bcoordinates[9][lane];
+      const s_t J10 = -bcoordinates[1][lane] + bcoordinates[4][lane];
+      const s_t J11 = -bcoordinates[1][lane] + bcoordinates[7][lane];
+      const s_t J12 = bcoordinates[10][lane] - bcoordinates[1][lane];
+      const s_t J20 = -bcoordinates[2][lane] + bcoordinates[5][lane];
+      const s_t J21 = -bcoordinates[2][lane] + bcoordinates[8][lane];
+      const s_t J22 = bcoordinates[11][lane] - bcoordinates[2][lane];
       geometry_jacobian_adjugate_and_determinant_3<s_t>(
           J00, J01, J02, J10, J11, J12, J20, J21, J22,
-          badjugate_streams, bdeterminant, q * VS + lane);
+          badjugate_streams, bdeterminant, lane);
     }
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 

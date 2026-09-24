@@ -2003,61 +2003,22 @@ static int saint_venant_kirchhoff_tet4_hessian_i_msoa_assemble_impl(
     }
 
 
-    {
-        const int q = 0;  // TET4 evaluates in closed form
+    {  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J02_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      s_t J12_values[VS];
-      s_t J20_values[VS];
-      s_t J21_values[VS];
-      s_t J22_values[VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J02_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-        J12_values[lane] = s_t(0);
-        J20_values[lane] = s_t(0);
-        J21_values[lane] = s_t(0);
-        J22_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
-        const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
-        const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[3 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[3 * shape][lane] * g1;
-          J02_values[lane] += bcoordinate_data[3 * shape][lane] * g2;
-          J10_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g1;
-          J12_values[lane] += bcoordinate_data[3 * shape + 1][lane] * g2;
-          J20_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g0;
-          J21_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g1;
-          J22_values[lane] += bcoordinate_data[3 * shape + 2][lane] * g2;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J02 = J02_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
-        const s_t J12 = J12_values[lane];
-        const s_t J20 = J20_values[lane];
-        const s_t J21 = J21_values[lane];
-        const s_t J22 = J22_values[lane];
+        const s_t J00 = -bcoordinate_data[0][lane] + bcoordinate_data[3][lane];
+        const s_t J01 = -bcoordinate_data[0][lane] + bcoordinate_data[6][lane];
+        const s_t J02 = -bcoordinate_data[0][lane] + bcoordinate_data[9][lane];
+        const s_t J10 = -bcoordinate_data[1][lane] + bcoordinate_data[4][lane];
+        const s_t J11 = -bcoordinate_data[1][lane] + bcoordinate_data[7][lane];
+        const s_t J12 = bcoordinate_data[10][lane] - bcoordinate_data[1][lane];
+        const s_t J20 = -bcoordinate_data[2][lane] + bcoordinate_data[5][lane];
+        const s_t J21 = -bcoordinate_data[2][lane] + bcoordinate_data[8][lane];
+        const s_t J22 = bcoordinate_data[11][lane] - bcoordinate_data[2][lane];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * VS + lane);
+            badj_streams, bdet0, lane);
       }
     }
 

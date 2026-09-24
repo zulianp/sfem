@@ -89,8 +89,8 @@ static int body_force_total_tet4_merit_patch(
     s_t merit_local[VS];
     for (int lane = 0; lane < VS; ++lane) merit_local[lane] = s_t(0);
     s_t rho[NC * VS];
-    s_t pm_test[NQ * 1 * VS];
-    s_t pm_weight[NQ * 1 * VS];
+    s_t pm_test[1 * VS];
+    s_t pm_weight[1 * VS];
     element_idx_t pm_incident[VS];
     uint8_t pm_local_node[VS];
 
@@ -113,8 +113,7 @@ static int body_force_total_tet4_merit_patch(
           pm_local_node[lane] = n2e_local[block + lane];
         }
         // loop 1 -- lanes are the elements incident on this node.
-        {
-            const int q = 0;  // TET4 evaluates in closed form
+        {  // TET4 evaluates in closed form
           #pragma omp simd
           for (int lane = 0; lane < ne; ++lane) {
             const idx_t element = pm_incident[lane];
@@ -155,23 +154,22 @@ static int body_force_total_tet4_merit_patch(
             // integration weight.  Both are what the orientation buys:
             // `phi_0` is the same function in every element and at
             // every step, so this leaves the step loop entirely.
-            pm_test[q * VS + lane] = shape[q * NS + 0];
-            pm_weight[q * VS + lane] = q_weight[q] * det;
+            pm_test[lane] = shape[0];
+            pm_weight[lane] = q_weight[0] * det;
           }
         }
         // loop 2 -- lanes are the sampled step lengths.
         for (int lane_e = 0; lane_e < ne; ++lane_e) {
-          {
-              const int q = 0;  // TET4 evaluates in closed form
+          {  // TET4 evaluates in closed form
             #pragma omp simd
             for (int lane = 0; lane < nsteps; ++lane) {
               const s_t value_coeff0 = -density*g0;
               const s_t value_coeff1 = -density*g1;
               const s_t value_coeff2 = -density*g2;
-              const s_t weight = pm_weight[q * VS + lane_e];
-              rho[0 * VS + lane] += weight * (value_coeff0 * pm_test[q * VS + lane_e]);
-              rho[1 * VS + lane] += weight * (value_coeff1 * pm_test[q * VS + lane_e]);
-              rho[2 * VS + lane] += weight * (value_coeff2 * pm_test[q * VS + lane_e]);
+              const s_t weight = pm_weight[lane_e];
+              rho[0 * VS + lane] += weight * (value_coeff0 * pm_test[lane_e]);
+              rho[1 * VS + lane] += weight * (value_coeff1 * pm_test[lane_e]);
+              rho[2 * VS + lane] += weight * (value_coeff2 * pm_test[lane_e]);
             }
           }
         }
