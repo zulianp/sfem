@@ -514,11 +514,11 @@ static SFEM_INLINE void tensor_test(
       ne, shape_1d, grad_1d, flux, out_streams, component);
 }
 
-template <typename s_t, int NQ, int NS, int VS, int ND>
+template <typename s_t, int NQ, int NS, int ND>
 struct TensorProductWeakOpsScalar;
 
-template <typename s_t, int NQ, int NS, int VS>
-struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 2> {
+template <typename s_t, int NQ, int NS>
+struct TensorProductWeakOpsScalar<s_t, NQ, NS, 2> {
   template <int NC>
   static SFEM_INLINE void gradient_impl(
       const s_t *const RSTR shape_1d,
@@ -571,7 +571,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 2> {
   static SFEM_INLINE void gradient_impl(
       const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NC * NS][VS],
+      const s_t streams[NC * NS][1],
       const int component,
       s_t *const RSTR gradient) {
     static constexpr int NQ1 = integer_root(NQ, 2);
@@ -629,7 +629,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 2> {
   static SFEM_INLINE void gradient_contiguous(
       const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NS * NC][VS],
+      const s_t streams[NS * NC][1],
       const int component,
       s_t *const RSTR gradient) {
     gradient_impl<NC>(shape_1d, grad_1d, streams, component, gradient);
@@ -679,8 +679,8 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 2> {
   }
 };
 
-template <typename s_t, int NQ, int NS, int VS>
-struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 3> {
+template <typename s_t, int NQ, int NS>
+struct TensorProductWeakOpsScalar<s_t, NQ, NS, 3> {
   template <int NC>
   static SFEM_INLINE void gradient_impl(
       const s_t *const RSTR shape_1d,
@@ -765,7 +765,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 3> {
   static SFEM_INLINE void gradient_impl(
       const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NC * NS][VS],
+      const s_t streams[NC * NS][1],
       const int component,
       s_t *const RSTR gradient) {
     static constexpr int NQ1 = integer_root(NQ, 3);
@@ -855,7 +855,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 3> {
   static SFEM_INLINE void gradient_contiguous(
       const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NS * NC][VS],
+      const s_t streams[NS * NC][1],
       const int component,
       s_t *const RSTR gradient) {
     gradient_impl<NC>(shape_1d, grad_1d, streams, component, gradient);
@@ -937,36 +937,36 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, VS, 3> {
   }
 };
 
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
+template <typename s_t, int NQ, int NS, int ND, int NC = ND>
 static SFEM_INLINE void tensor_gradient_scalar(
     const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
     const s_t *const RSTR streams[NS * NC],
     const int component,
     s_t *const RSTR gradient) {
-  TensorProductWeakOpsScalar<s_t, NQ, NS, VS, ND>::template gradient<NC>(
+  TensorProductWeakOpsScalar<s_t, NQ, NS, ND>::template gradient<NC>(
       shape_1d, grad_1d, streams, component, gradient);
 }
 
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
+template <typename s_t, int NQ, int NS, int ND, int NC = ND>
 static SFEM_INLINE void tensor_gradient_contiguous_scalar(
     const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
-    const s_t streams[NS * NC][VS],
+    const s_t streams[NS * NC][1],
     const int component,
     s_t *const RSTR gradient) {
-  TensorProductWeakOpsScalar<s_t, NQ, NS, VS, ND>::template gradient_contiguous<NC>(
+  TensorProductWeakOpsScalar<s_t, NQ, NS, ND>::template gradient_contiguous<NC>(
       shape_1d, grad_1d, streams, component, gradient);
 }
 
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
+template <typename s_t, int NQ, int NS, int ND, int NC = ND>
 static SFEM_INLINE void tensor_test_scalar(
     const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
     const s_t *const RSTR flux,
     s_t *const RSTR out_streams[NS * NC],
     const int component) {
-  TensorProductWeakOpsScalar<s_t, NQ, NS, VS, ND>::template test<NC>(
+  TensorProductWeakOpsScalar<s_t, NQ, NS, ND>::template test<NC>(
       shape_1d, grad_1d, flux, out_streams, component);
 }
 

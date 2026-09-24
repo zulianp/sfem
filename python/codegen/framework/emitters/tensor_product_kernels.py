@@ -28,7 +28,13 @@ def _residual_stream_method_end(text, start):
     return close_brace + 1
 
 
-def _expand_residual_stream_method(method):
+#: The contiguous stream layout, per rendering.  The lane-blocked family takes
+#: a slot per work item; the scalar family has one element in hand and says so
+#: with a literal, rather than with a width it is no longer parameterised by.
+_CONTIGUOUS_STREAM_EXTENT = {True: "[VS]", False: "[1]"}
+
+
+def _expand_residual_stream_method(method, lane_blocked=True):
     pointer_method = method.replace(
         "template <int NC, typename StreamContainer>",
         "template <int NC>",
@@ -70,20 +76,21 @@ def _expand_residual_stream_method(method):
         "void integrate_value_contiguous(",
         1,
     )
+    extent = _CONTIGUOUS_STREAM_EXTENT[bool(lane_blocked)]
     contiguous_method = contiguous_method.replace(
         "const StreamContainer streams,",
-        "const s_t streams[NC * NS][VS],",
+        "const s_t streams[NC * NS]%s," % extent,
         1,
     )
     contiguous_method = contiguous_method.replace(
         "StreamContainer output)",
-        "s_t output[NC * NS][VS])",
+        "s_t output[NC * NS]%s)" % extent,
         1,
     )
     return "%s\n\n%s" % (pointer_method, contiguous_method)
 
 
-def _expand_residual_stream_layouts(header):
+def _expand_residual_stream_layouts(header, lane_blocked=True):
     generic_template = "  template <int NC, typename StreamContainer>\n"
     chunks = []
     cursor = 0
@@ -94,7 +101,9 @@ def _expand_residual_stream_layouts(header):
             return "".join(chunks)
         end = _residual_stream_method_end(header, start)
         chunks.append(header[cursor:start])
-        chunks.append(_expand_residual_stream_method(header[start:end]))
+        chunks.append(
+            _expand_residual_stream_method(header[start:end], lane_blocked)
+        )
         cursor = end
 
 
@@ -135,6 +144,9 @@ def _weak_form_ops_source(
         "work_item": work_item_index,
         "weak_ops": "TensorProductWeakOps" if lane_blocked else "TensorProductWeakOpsScalar",
         "scalar_suffix": "" if lane_blocked else "_scalar",
+        "width_param": ", int VS" if lane_blocked else "",
+        "width_arg": ", VS" if lane_blocked else "",
+        "stream_extent": "[VS]" if lane_blocked else "[1]",
         "lane_stride": " * VS" if lane_blocked else "",
         "lane_offset": (" * VS + %s" % work_item_index) if lane_blocked else "",
         "work_item_count_6": "      const int ne,\n" if lane_blocked else "",
@@ -233,7 +245,8 @@ def sfem_tensor_product_kernels_header_source(
                 simd_lines,
                 single_work_item,
                 lane_blocked=lane_blocked,
-            )
+            ),
+            lane_blocked,
         )
         for lane_blocked in (True, False)
     )
@@ -256,11 +269,11 @@ def sfem_tensor_product_kernels_header_source(
 # Everything whose base does *not* move with the reduction -- every store, and
 # the reads the surrounding loops already fix -- is named outside the loop.
 
-_WEAK_FORM_OPS_TEMPLATE = r'''template <typename s_t, int NQ, int NS, int VS, int ND>
+_WEAK_FORM_OPS_TEMPLATE = r'''template <typename s_t, int NQ, int NS%(width_param)s, int ND>
 struct %(weak_ops)s;
 
-template <typename s_t, int NQ, int NS, int VS>
-struct %(weak_ops)s<s_t, NQ, NS, VS, 2> {
+template <typename s_t, int NQ, int NS%(width_param)s>
+struct %(weak_ops)s<s_t, NQ, NS%(width_arg)s, 2> {
   template <int NC, typename StreamContainer>
   static %(inline_qualifier)s void gradient_impl(
 %(work_item_count_6)s      const s_t *const RSTR shape_1d,
@@ -323,7 +336,7 @@ struct %(weak_ops)s<s_t, NQ, NS, VS, 2> {
   static %(inline_qualifier)s void gradient_contiguous(
 %(work_item_count_6)s      const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NS * NC][VS],
+      const s_t streams[NS * NC]%(stream_extent)s,
       const int component,
       s_t *const RSTR gradient) {
     gradient_impl<NC>(%(ne_argument)sshape_1d, grad_1d, streams, component, gradient);
@@ -373,8 +386,8 @@ struct %(weak_ops)s<s_t, NQ, NS, VS, 2> {
   }
 };
 
-template <typename s_t, int NQ, int NS, int VS>
-struct %(weak_ops)s<s_t, NQ, NS, VS, 3> {
+template <typename s_t, int NQ, int NS%(width_param)s>
+struct %(weak_ops)s<s_t, NQ, NS%(width_arg)s, 3> {
   template <int NC, typename StreamContainer>
   static %(inline_qualifier)s void gradient_impl(
 %(work_item_count_6)s      const s_t *const RSTR shape_1d,
@@ -469,7 +482,7 @@ struct %(weak_ops)s<s_t, NQ, NS, VS, 3> {
   static %(inline_qualifier)s void gradient_contiguous(
 %(work_item_count_6)s      const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NS * NC][VS],
+      const s_t streams[NS * NC]%(stream_extent)s,
       const int component,
       s_t *const RSTR gradient) {
     gradient_impl<NC>(%(ne_argument)sshape_1d, grad_1d, streams, component, gradient);
@@ -551,36 +564,36 @@ struct %(weak_ops)s<s_t, NQ, NS, VS, 3> {
   }
 };
 
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_gradient%(scalar_suffix)s(
 %(work_item_count_4)s    const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
     const s_t *const RSTR streams[NS * NC],
     const int component,
     s_t *const RSTR gradient) {
-  %(weak_ops)s<s_t, NQ, NS, VS, ND>::template gradient<NC>(
+  %(weak_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template gradient<NC>(
       %(ne_argument)sshape_1d, grad_1d, streams, component, gradient);
 }
 
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_gradient_contiguous%(scalar_suffix)s(
 %(work_item_count_4)s    const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
-    const s_t streams[NS * NC][VS],
+    const s_t streams[NS * NC]%(stream_extent)s,
     const int component,
     s_t *const RSTR gradient) {
-  %(weak_ops)s<s_t, NQ, NS, VS, ND>::template gradient_contiguous<NC>(
+  %(weak_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template gradient_contiguous<NC>(
       %(ne_argument)sshape_1d, grad_1d, streams, component, gradient);
 }
 
-template <typename s_t, int NQ, int NS, int VS, int ND, int NC = ND>
+template <typename s_t, int NQ, int NS%(width_param)s, int ND, int NC = ND>
 static %(inline_qualifier)s void tensor_test%(scalar_suffix)s(
 %(work_item_count_4)s    const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
     const s_t *const RSTR flux,
     s_t *const RSTR out_streams[NS * NC],
     const int component) {
-  %(weak_ops)s<s_t, NQ, NS, VS, ND>::template test<NC>(
+  %(weak_ops)s<s_t, NQ, NS%(width_arg)s, ND>::template test<NC>(
       %(ne_argument)sshape_1d, grad_1d, flux, out_streams, component);
 }'''
 

@@ -66,7 +66,7 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_tensor_product_direct_hessian_
   }
   s_t state_gradient_ref[NC * NQ * ND];
   for (int component = 0; component < NC; ++component) {
-    tensor_gradient_contiguous_scalar<s_t, NQ, NS, VS, 3, NC>(
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3, NC>(
         shape_1d, grad_1d, bu_data, component,
         state_gradient_ref + component * NQ * ND);
   }
@@ -518,11 +518,11 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_tensor_product_direct_hessian_
         column[out_shape * NC + 1] = &element_matrix[(1 * NS + out_shape) * NDOFS + trial_component * NS + trial_shape];
         column[out_shape * NC + 2] = &element_matrix[(2 * NS + out_shape) * NDOFS + trial_component * NS + trial_shape];
       }
-      tensor_test_scalar<s_t, NQ, NS, VS, 3, NC>(
+      tensor_test_scalar<s_t, NQ, NS, 3, NC>(
           shape_1d, grad_1d, flux + 0, column, 0);
-      tensor_test_scalar<s_t, NQ, NS, VS, 3, NC>(
+      tensor_test_scalar<s_t, NQ, NS, 3, NC>(
           shape_1d, grad_1d, flux + NQ * ND, column, 1);
-      tensor_test_scalar<s_t, NQ, NS, VS, 3, NC>(
+      tensor_test_scalar<s_t, NQ, NS, 3, NC>(
           shape_1d, grad_1d, flux + 2 * NQ * ND, column, 2);
     }
   }
