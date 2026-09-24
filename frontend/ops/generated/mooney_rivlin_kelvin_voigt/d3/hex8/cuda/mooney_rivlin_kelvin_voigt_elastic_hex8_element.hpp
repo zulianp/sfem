@@ -7,57 +7,6 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, int VS>
-static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_elastic_hex8_energy_egeometry_soa(
-        const ptrdiff_t nelements,
-        const s_t *const *const RSTR adj,
-        const s_t *const RSTR det,
-        const s_t lmbda,
-        const s_t mu,
-        const s_t *const *const RSTR u_streams,
-        s_t *const RSTR values
-) {
-  static constexpr int NC = 3;
-  static constexpr int NS = 8;
-  static constexpr int NDOFS = NC * NS;
-  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
-  return mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, values);
-}
-
-template <typename s_t, int VS>
-static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_elastic_hex8_energy_ecoords_soa(
-        const ptrdiff_t nelements,
-        const s_t *const *const RSTR coords,
-        const s_t lmbda,
-        const s_t mu,
-        const s_t *const *const RSTR u_streams,
-        s_t *const RSTR values
-) {
-  static constexpr int NC = 3;
-  static constexpr int NS = 8;
-  static constexpr int NDOFS = NC * NS;
-  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
-  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
-  return mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_energy_ecoords_soa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, values);
-}
-
-template <typename s_t, int VS>
-static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_elastic_hex8_energy_esoa(
-        const ptrdiff_t nelements,
-        const s_t *const *const RSTR coords,
-        const s_t lmbda,
-        const s_t mu,
-        const s_t *const *const RSTR u_streams,
-        s_t *const RSTR values
-) {
-  static constexpr int NC = 3;
-  static constexpr int NS = 8;
-  static constexpr int NDOFS = NC * NS;
-  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[4], coords[5], coords[9], coords[10], coords[11], coords[6], coords[7], coords[8], coords[12], coords[13], coords[14], coords[15], coords[16], coords[17], coords[21], coords[22], coords[23], coords[18], coords[19], coords[20]};
-  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[4], u_streams[5], u_streams[9], u_streams[10], u_streams[11], u_streams[6], u_streams[7], u_streams[8], u_streams[12], u_streams[13], u_streams[14], u_streams[15], u_streams[16], u_streams[17], u_streams[21], u_streams[22], u_streams[23], u_streams[18], u_streams[19], u_streams[20]};
-  return mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_energy_esoa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, values);
-}
-
-template <typename s_t, int VS>
 static __host__ __device__ __forceinline__ int mooney_rivlin_kelvin_voigt_elastic_hex8_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,

@@ -7,57 +7,6 @@ namespace sfem {
 namespace codegen {
 
 template <typename s_t, int VS>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_elastic_quad4_energy_egeometry_soa(
-        const ptrdiff_t nelements,
-        const s_t *const *const RSTR adj,
-        const s_t *const RSTR det,
-        const s_t lmbda,
-        const s_t mu,
-        const s_t *const *const RSTR u_streams,
-        s_t *const RSTR values
-) {
-  static constexpr int NC = 2;
-  static constexpr int NS = 4;
-  static constexpr int NDOFS = NC * NS;
-  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[6], u_streams[7], u_streams[4], u_streams[5]};
-  return mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_energy_egeometry_soa<s_t, VS>(nelements, adj, det, lmbda, mu, ordered_u_streams, values);
-}
-
-template <typename s_t, int VS>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_elastic_quad4_energy_ecoords_soa(
-        const ptrdiff_t nelements,
-        const s_t *const *const RSTR coords,
-        const s_t lmbda,
-        const s_t mu,
-        const s_t *const *const RSTR u_streams,
-        s_t *const RSTR values
-) {
-  static constexpr int NC = 2;
-  static constexpr int NS = 4;
-  static constexpr int NDOFS = NC * NS;
-  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[6], coords[7], coords[4], coords[5]};
-  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[6], u_streams[7], u_streams[4], u_streams[5]};
-  return mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_energy_ecoords_soa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, values);
-}
-
-template <typename s_t, int VS>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_elastic_quad4_energy_esoa(
-        const ptrdiff_t nelements,
-        const s_t *const *const RSTR coords,
-        const s_t lmbda,
-        const s_t mu,
-        const s_t *const *const RSTR u_streams,
-        s_t *const RSTR values
-) {
-  static constexpr int NC = 2;
-  static constexpr int NS = 4;
-  static constexpr int NDOFS = NC * NS;
-  const s_t *const ordered_coords[NDOFS] = {coords[0], coords[1], coords[2], coords[3], coords[6], coords[7], coords[4], coords[5]};
-  const s_t *const ordered_u_streams[NDOFS] = {u_streams[0], u_streams[1], u_streams[2], u_streams[3], u_streams[6], u_streams[7], u_streams[4], u_streams[5]};
-  return mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_energy_esoa<s_t, VS>(nelements, ordered_coords, lmbda, mu, ordered_u_streams, values);
-}
-
-template <typename s_t, int VS>
 static SFEM_INLINE int mooney_rivlin_kelvin_voigt_elastic_quad4_gradient_egeometry_soa(
         const ptrdiff_t nelements,
         const s_t *const *const RSTR adj,

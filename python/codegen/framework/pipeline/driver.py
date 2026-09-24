@@ -96,6 +96,7 @@ from codegen.framework.forms.equations import (
     EquationSystemBuilder,
     EquationSystems,
     TOTAL_RESIDUAL_UNIT_NAME,
+    system_mixes_energy_and_residual,
     total_residual_collection,
 )
 from codegen.framework.symbolic.fields import (
@@ -242,6 +243,7 @@ from codegen.framework.plans.residual_structure import (
     residual_mesh_phase_plans as _residual_mesh_phase_plans,
     residual_mesh_phases as _residual_mesh_phases,
     published_block_kernels as _published_block_kernels,
+    published_unit_kernels as _published_unit_kernels,
     publishes_inexact_apply as _publishes_inexact_apply,
 )
 
@@ -1038,6 +1040,7 @@ def _evaluate_forms(user_input):
                     orders=_equation_form_orders(equation),
                 ),
                 user_input.matrix_format_plan,
+                system_mixes_energy_and_residual(material_system),
             )
             for equation in material_system.equations
         )
@@ -2328,7 +2331,13 @@ def _total_residual_unit(material_system, mixed_order=False):
     )
 
 
-def _evaluate_equation(dim, equation, form_collection, matrix_format_plan=None):
+def _evaluate_equation(
+    dim,
+    equation,
+    form_collection,
+    matrix_format_plan=None,
+    mixes_energy_and_residual=False,
+):
     if not isinstance(form_collection, FormCollection):
         raise TypeError("equation evaluation requires a lowered FormCollection")
     if equation.is_energy:
@@ -2342,7 +2351,9 @@ def _evaluate_equation(dim, equation, form_collection, matrix_format_plan=None):
             equation.name,
             form_collection,
             data_symbols=data_symbols,
-            kernels=equation.kernels,
+            kernels=_published_unit_kernels(
+                equation.kernels, mixes_energy_and_residual
+            ),
             diagnostics=equation.diagnostics,
             matrix_format_plan=matrix_format_plan if "apply" in equation.kernels else None,
         )
