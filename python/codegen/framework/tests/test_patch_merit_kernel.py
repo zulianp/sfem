@@ -83,7 +83,10 @@ def test_loop_two_reads_loop_one_by_the_element_lane():
     for line in _loop_two().splitlines():
         for buffer_name, _ in patch_loop_one_buffers(DIM, 1, dependencies):
             if buffer_name in line:
-                assert "+ lane_e]" in line, line
+                # `lane_e]`, not `+ lane_e]`: the element is the only index
+                # left now that the single quadrature point is folded away, so
+                # a buffer with one slot per element is read as `[lane_e]`.
+                assert line.rstrip().endswith("lane_e];") or "lane_e]" in line, line
 
 
 def test_the_step_lane_carries_alpha_and_the_accumulator():

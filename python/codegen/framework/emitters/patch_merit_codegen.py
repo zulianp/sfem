@@ -117,13 +117,13 @@ _TEST_QUANTITY_BUFFER = {
 #: whole residual is the value term.
 _TEST_QUANTITY_FILL = {
     "value": lambda indent, dim: [
-        "%s    pm_test[q * VS + %s] = shape[q * NS + 0];" % (indent, _lane()),
+        "%s    pm_test[%s] = shape[0];" % (indent, _lane()),
     ],
     "gradient": lambda indent, dim: [
         "%s    for (int d = 0; d < ND; ++d) {" % indent,
         "%s      s_t mapped = s_t(0);" % indent,
         "%s      for (int k = 0; k < ND; ++k) {" % indent,
-        "%s        mapped += grad_ref[k][q * NS + 0] * adj[k * ND + d];" % indent,
+        "%s        mapped += grad_ref[k][0] * adj[k * ND + d];" % indent,
         "%s      }" % indent,
         "%s      pm_test_grad[%s] = mapped / det;" % (indent, _buffer_index("d", dim)),
         "%s    }" % indent,
@@ -146,7 +146,7 @@ _TEST_QUANTITY_PARAMETER = {
 #: `live_test_coefficients` names the coefficient and says which kind it is;
 #: this is the other half of the product.
 _TEST_FACTOR = {
-    "value": lambda dim, axis: "pm_test[q * VS + lane_e]",
+    "value": lambda dim, axis: "pm_test[lane_e]",
     "gradient": lambda dim, axis: "pm_test_grad[%s]"
     % _buffer_index("%d" % axis, dim, lane="lane_e"),
 }
@@ -283,7 +283,7 @@ def _lane():
 
 
 def _buffer_index(offset, count, lane=None):
-    """`(q * count + offset) * VS + <element lane>`.
+    """`offset * VS + <element lane>`.
 
     The lane axis of every loop-1 buffer is the *element*, in both loops.  That
     is worth being explicit about, because loop 2's own lane variable is the
@@ -291,7 +291,11 @@ def _buffer_index(offset, count, lane=None):
     element's value for another's, which is why the lane is a parameter here
     rather than the word `lane` written into the format string.
     """
-    return "(q * %d + %s) * VS + %s" % (count, offset, lane or _lane())
+    # Parenthesised, because the offset is not always an atom: the staged
+    # gradient passes `c * ND + d`, and `c * ND + d * VS + lane` binds the
+    # stride to the wrong term.  The quadrature index that used to supply these
+    # parentheses is gone, so they are written here.
+    return "(%s) * VS + %s" % (offset, lane or _lane())
 
 
 def _stage_value_lines(indent, name, dim, n_fields):
@@ -301,7 +305,7 @@ def _stage_value_lines(indent, name, dim, n_fields):
         "%s    for (int c = 0; c < NC; ++c) {" % indent,
         "%s      s_t acc = s_t(0);" % indent,
         "%s      for (int j = 0; j < NS; ++j) {" % indent,
-        "%s        acc += %s[j * NC + c] * shape[q * NS + j];" % (indent, name),
+        "%s        acc += %s[j * NC + c] * shape[j];" % (indent, name),
         "%s      }" % indent,
         "%s      %s[%s] = acc;" % (indent, target, _buffer_index("c", n_fields)),
         "%s    }" % indent,
@@ -320,7 +324,7 @@ def _stage_gradient_lines(indent, name, dim, n_fields):
         "%s        for (int k = 0; k < ND; ++k) {" % indent,
         "%s          s_t acc = s_t(0);" % indent,
         "%s          for (int j = 0; j < NS; ++j) {" % indent,
-        "%s            acc += %s[j * NC + c] * grad_ref[k][q * NS + j];" % (indent, name),
+        "%s            acc += %s[j * NC + c] * grad_ref[k][j];" % (indent, name),
         "%s          }" % indent,
         "%s          mapped += acc * adj[k * ND + d];" % indent,
         "%s        }" % indent,
@@ -415,7 +419,7 @@ def patch_loop_one_lines(system, rule, dependencies, indent="  "):
         lines.extend(_TEST_QUANTITY_FILL[quantity](indent, dim))
     lines.extend(
         [
-            "%s    pm_weight[q * VS + %s] = q_weight[q] * det;" % (indent, _lane()),
+            "%s    pm_weight[%s] = q_weight[0] * det;" % (indent, _lane()),
             "%s  }" % indent,
             "%s}" % indent,
         ]
@@ -513,7 +517,7 @@ def patch_loop_two_lines(system, coefficients, dependencies, material_lines,
                 )
     lines.extend("%s      %s" % (indent, line) for line in material_lines)
     lines.append(
-        "%s      const s_t weight = pm_weight[q * VS + lane_e];" % indent
+        "%s      const s_t weight = pm_weight[lane_e];" % indent
     )
     # Every coefficient the row has live, against the test quantity it
     # multiplies -- the value as well as the gradient.  This used to spell the
@@ -675,7 +679,7 @@ def patch_merit_kernel_lines(system, rule, coefficients, dependencies,
         ]
     )
     lines.extend(
-        "    s_t %s[NQ * %d * VS];" % (name, count) for name, count in buffers
+        "    s_t %s[%d * VS];" % (name, count) for name, count in buffers
     )
     lines.extend(
         [

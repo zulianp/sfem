@@ -3381,32 +3381,19 @@ def _append_tensor_product_reference_gradient_lines(lines, name, quadrature_rule
             )
 
 
-def _sfem_soa_isoparametric_geometry_lines(
+def _general_jacobian_staging_lines(
     dim,
-    n_nodes,
+    source_builder,
+    work_item,
+    coordinate_streams,
     quadrature_rule,
     use_tensor_product_reference,
     use_reference_gradient_vectors,
     reference_inputs,
-    q_major=False,
-    reference_prefix="",
-    source_builder=None,
-    coordinate_streams="bcoordinate_data",
+    reference_prefix,
 ):
-    if source_builder is None:
-        source_builder = _default_openmp_energy_source_builder()
-    work_item = _work_item_index(source_builder)
-    stream_array_name = "badj_streams"
-    lines = isoparametric_adjugate_stream_array_lines(
-        dim_name="ND",
-        dim=dim,
-        indent="      ",
-        stream_array_name=stream_array_name,
-        adjugate_streams=tuple(
-            "badj%d" % component
-            for component in range(dim * dim)
-        ),
-    )
+    """Accumulate the Jacobian over the shape functions, reading the tables."""
+    lines = []
     for row in range(dim):
         for col in range(dim):
             lines.append("      s_t J%d%d_values[VS];" % (row, col))
@@ -3461,14 +3448,131 @@ def _sfem_soa_isoparametric_geometry_lines(
     )
     lines.append("        }")
     lines.append("      }")
-    lines.extend(_work_item_loop_lines(source_builder, "      "))
+    return lines
+
+
+def _constant_p1_jacobian_staging_lines(*_arguments):
+    """Nothing to stage: the closed form is written where the value is read."""
+    return []
+
+
+def _general_jacobian_value_lines(dim, work_item, coordinate_streams, gradients):
+    return [
+        "        const s_t J%d%d = J%d%d_values[%s];" % (row, col, row, col, work_item)
+        for row in range(dim)
+        for col in range(dim)
+    ]
+
+
+def _constant_p1_jacobian_value_lines(dim, work_item, coordinate_streams, gradients):
+    """The Jacobian of an affine simplex, in closed form.
+
+    Column `c` is the edge from the element's first vertex to its `c`-th
+    neighbour, which is what the sum over shape functions collapses to once the
+    constant reference gradients are folded in.  Built as an expression and
+    printed, so the zero terms drop out by arithmetic rather than by a test
+    here, and the surviving coefficients are exact rationals.
+    """
+    lines = []
     for row in range(dim):
         for col in range(dim):
-            lines.append(
-                "        const s_t J%d%d = J%d%d_values[%s];"
-                % (row, col, row, col, work_item)
+            expression = sum(
+                (
+                    sp.sympify(gradients[shape][col])
+                    * sp.Symbol(
+                        "%s[%s][%s]"
+                        % (
+                            coordinate_streams,
+                            c_sum(c_product(shape, dim), row),
+                            work_item,
+                        )
+                    )
+                    for shape in range(len(gradients))
+                ),
+                sp.S.Zero,
             )
-    output_index = "q * VS + %s" % work_item if q_major else work_item
+            lines.append(
+                "        const s_t J%d%d = %s;" % (row, col, _sfem_ccode(expression))
+            )
+    return lines
+
+
+#: How the Jacobian is produced, keyed on whether the element's reference
+#: gradients are constant.  A table because this is the element's evaluation
+#: strategy reaching the geometry, the same decision the kernel body already
+#: takes -- not a special case bolted onto the general path.
+_JACOBIAN_STAGING_LINES = {
+    True: _constant_p1_jacobian_staging_lines,
+    False: _general_jacobian_staging_lines,
+}
+
+_JACOBIAN_VALUE_LINES = {
+    True: _constant_p1_jacobian_value_lines,
+    False: _general_jacobian_value_lines,
+}
+
+#: Where the adjugate is written.  A element with one quadrature point has no
+#: `q` to stride by, and after the fold above there is no `q` in scope either.
+_GEOMETRY_OUTPUT_INDEX = {
+    True: lambda q_major, work_item: work_item,
+    False: (
+        lambda q_major, work_item: "q * VS + %s" % work_item if q_major else work_item
+    ),
+}
+
+
+def _sfem_soa_isoparametric_geometry_lines(
+    dim,
+    n_nodes,
+    quadrature_rule,
+    use_tensor_product_reference,
+    use_reference_gradient_vectors,
+    reference_inputs,
+    q_major=False,
+    reference_prefix="",
+    source_builder=None,
+    coordinate_streams="bcoordinate_data",
+):
+    if source_builder is None:
+        source_builder = _default_openmp_energy_source_builder()
+    work_item = _work_item_index(source_builder)
+    stream_array_name = "badj_streams"
+    lines = isoparametric_adjugate_stream_array_lines(
+        dim_name="ND",
+        dim=dim,
+        indent="      ",
+        stream_array_name=stream_array_name,
+        adjugate_streams=tuple(
+            "badj%d" % component
+            for component in range(dim * dim)
+        ),
+    )
+    # An affine simplex has constant basis gradients, so the sum over shape
+    # functions that builds its Jacobian has a closed form and is folded.  The
+    # element then stages nothing: no `_values` arrays, no zeroing pass, no
+    # shape loop, and no reference table to read them from.
+    gradients = constant_p1_simplex_reference_gradients(quadrature_rule)
+    constant_p1 = gradients is not None
+    lines.extend(
+        _JACOBIAN_STAGING_LINES[constant_p1](
+            dim,
+            source_builder,
+            work_item,
+            coordinate_streams,
+            quadrature_rule,
+            use_tensor_product_reference,
+            use_reference_gradient_vectors,
+            reference_inputs,
+            reference_prefix,
+        )
+    )
+    lines.extend(_work_item_loop_lines(source_builder, "      "))
+    lines.extend(
+        _JACOBIAN_VALUE_LINES[constant_p1](
+            dim, work_item, coordinate_streams, gradients
+        )
+    )
+    output_index = _GEOMETRY_OUTPUT_INDEX[constant_p1](q_major, work_item)
     lines.extend(
         isoparametric_adjugate_call_lines(
             dim=dim,
@@ -10865,12 +10969,33 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind, sour
     return lines
 
 
+#: How a tile sizes and slices its geometry buffers, keyed on whether the
+#: element carries a single quadrature point.  With one point the extent is the
+#: vector width, both strides vanish, and there is no `q` to stride with -- the
+#: reference gradients having been folded, nothing declares one any more.
+_GEOMETRY_TILE_EXTENT = {True: "VS", False: "NQ * VS"}
+
+_GEOMETRY_TILE_LOCAL_SLICE = {
+    True: lambda name: name,
+    False: lambda name: "&%s[q * VS]" % name,
+}
+
+_GEOMETRY_TILE_MESH_SLICE = {
+    True: lambda source: "%s + evb" % source,
+    False: lambda source: "%s + q * nelements + evb" % source,
+}
+
+
 def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule, source_builder):
     item = _work_item_index(source_builder)
+    single_point = constant_p1_simplex_reference_gradients(quadrature_rule) is not None
+    extent = _GEOMETRY_TILE_EXTENT[single_point]
+    local_slice = _GEOMETRY_TILE_LOCAL_SLICE[single_point]
+    mesh_slice = _GEOMETRY_TILE_MESH_SLICE[single_point]
     lines = []
     for component in range(dim * dim):
-        lines.append("    s_t badj%d[NQ * VS];" % component)
-    lines.append("    s_t bdet0[NQ * VS];")
+        lines.append("    s_t badj%d[%s];" % (component, extent))
+    lines.append("    s_t bdet0[%s];" % extent)
     # The element API tiles are per element, so the scope the
     # element calls for can be printed here without the shared
     # local header disagreeing with itself about it.
@@ -10881,14 +11006,15 @@ def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule, source_build
     # and the point is fixed for the whole loop, so name both slices out here.
     for component in range(dim * dim):
         lines.append(
-            "      s_t *const RSTR badj%d_q = &badj%d[q * VS];" % (component, component)
+            "      s_t *const RSTR badj%d_q = %s;"
+            % (component, local_slice("badj%d" % component))
         )
         lines.append(
-            "      const s_t *const RSTR adj%d_q = adj[%d] + q * nelements + evb;"
-            % (component, component)
+            "      const s_t *const RSTR adj%d_q = %s;"
+            % (component, mesh_slice("adj[%d]" % component))
         )
-    lines.append("      s_t *const RSTR bdet0_q = &bdet0[q * VS];")
-    lines.append("      const s_t *const RSTR det_q = det + q * nelements + evb;")
+    lines.append("      s_t *const RSTR bdet0_q = %s;" % local_slice("bdet0"))
+    lines.append("      const s_t *const RSTR det_q = %s;" % mesh_slice("det"))
     lines.extend(_element_api_lane_loop(source_builder, "      "))
     for component in range(dim * dim):
         lines.append(
@@ -10919,9 +11045,12 @@ def _sfem_soa_element_api_coords_tile_lines(
         "      }",
         "    }",
     ]
+    extent = _GEOMETRY_TILE_EXTENT[
+        constant_p1_simplex_reference_gradients(quadrature_rule) is not None
+    ]
     for component in range(dim * dim):
-        lines.append("    s_t badj%d[NQ * VS];" % component)
-    lines.append("    s_t bdet0[NQ * VS];")
+        lines.append("    s_t badj%d[%s];" % (component, extent))
+    lines.append("    s_t bdet0[%s];" % extent)
     if use_tensor_product_reference:
         lines.extend(
             [
@@ -10947,10 +11076,11 @@ def _sfem_soa_element_api_coords_tile_lines(
             "    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
         )
         return lines
+    reference_declarations = []
     if use_reference_gradient_vectors:
         for component in range(dim):
             reference_name = _sfem_reference_gradient_vector_name(component)
-            lines.append(
+            reference_declarations.append(
                 "    const s_t *const %s = %s;"
                 % (
                     reference_name,
@@ -10958,10 +11088,19 @@ def _sfem_soa_element_api_coords_tile_lines(
                 )
             )
     else:
-        lines.append(
+        reference_declarations.append(
             "    const s_t *const grad_ref = %s;"
             % quadrature_reference_accessor(quadrature_rule, "grad_ref")
         )
+    # An affine simplex folded these into its Jacobian, so the aliases would
+    # name a table nothing reads -- which is the shape `test_kernels_are_lean`
+    # exists to forbid, and the last reference to quadrature data in a P1
+    # element header.
+    lines.extend(
+        declaration
+        for declaration in reference_declarations
+        if constant_p1_simplex_reference_gradients(quadrature_rule) is None
+    )
     # The element API tiles are per element, so the scope the
     # element calls for can be printed here without the shared
     # local header disagreeing with itself about it.
