@@ -82,7 +82,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tet4_energy_egeo
         bdet0_q[0] = det_q[0];
       }
     }
-    neohookean_ogden_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::quad_tet_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -186,7 +186,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tet4_energy_ecoo
             badj_streams, bdet0, q * VS + 0);
       }
     }
-    neohookean_ogden_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::quad_tet_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -290,7 +290,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tet4_energy_esoa
             badj_streams, bdet0, q * VS + 0);
       }
     }
-    neohookean_ogden_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::quad_tet_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -369,7 +369,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tet4_gradient_eg
         bdet0_q[0] = det_q[0];
       }
     }
-    neohookean_ogden_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::quad_tet_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -475,7 +475,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tet4_gradient_ec
             badj_streams, bdet0, q * VS + 0);
       }
     }
-    neohookean_ogden_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::quad_tet_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -581,7 +581,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tet4_gradient_es
             badj_streams, bdet0, q * VS + 0);
       }
     }
-    neohookean_ogden_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::quad_tet_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -666,7 +666,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tet4_hessian_ege
           bout_data[stream][0] = s_t(0);
         }
       }
-      neohookean_ogden_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::quad_tet_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -785,7 +785,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tet4_hessian_eco
           bout_data[stream][0] = s_t(0);
         }
       }
-      neohookean_ogden_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::quad_tet_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -904,7 +904,7 @@ static __host__ __device__ __forceinline__ int neohookean_ogden_tet4_hessian_eso
           bout_data[stream][0] = s_t(0);
         }
       }
-      neohookean_ogden_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::quad_tet_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {

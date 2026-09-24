@@ -198,7 +198,7 @@ __global__ void modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -416,7 +416,7 @@ __global__ void modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -651,7 +651,7 @@ __global__ void modified_mooney_rivlin_tet4_apply_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
         ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 

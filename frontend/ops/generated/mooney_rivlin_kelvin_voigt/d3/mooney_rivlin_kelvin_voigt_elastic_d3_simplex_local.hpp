@@ -238,7 +238,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_objective_
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_objective_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -249,7 +248,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_objec
         const s_t *const RSTR adj7,
         const s_t *const RSTR adj8,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 3],
@@ -261,13 +259,13 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_objec
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(6));
       s_t gu_base_v[9 * VS];
       s_t trial_grad_v[9 * VS];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+      const ptrdiff_t goff = lane;
       const s_t adj_lane0 = adj0[goff];
       const s_t adj_lane1 = adj1[goff];
       const s_t adj_lane2 = adj2[goff];
@@ -320,7 +318,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_objec
         const s_t alpha = steps[step];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          const ptrdiff_t goff = q * geometry_stride + lane;
+          const ptrdiff_t goff = lane;
           const s_t det_lane0 = det0[goff];
           const s_t gu0 = gu_base_v[0 * VS + lane] + alpha * trial_grad_v[0 * VS + lane];
           const s_t gu1 = gu_base_v[1 * VS + lane] + alpha * trial_grad_v[1 * VS + lane];
@@ -580,7 +578,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_gradient_b
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_gradient_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -591,7 +588,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_gradi
         const s_t *const RSTR adj7,
         const s_t *const RSTR adj8,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 3],
@@ -599,11 +595,11 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_gradi
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(6));
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+      const ptrdiff_t goff = lane;
       const s_t adj_lane0 = adj0[goff];
       const s_t adj_lane1 = adj1[goff];
       const s_t adj_lane2 = adj2[goff];
@@ -1098,7 +1094,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_apply_bloc
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_apply_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -1109,7 +1104,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_apply
         const s_t *const RSTR adj7,
         const s_t *const RSTR adj8,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 3],
@@ -1118,11 +1112,11 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_elastic_d3_simplex_tet4_apply
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(6));
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+      const ptrdiff_t goff = lane;
       const s_t adj_lane0 = adj0[goff];
       const s_t adj_lane1 = adj1[goff];
       const s_t adj_lane2 = adj2[goff];

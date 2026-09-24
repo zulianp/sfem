@@ -64,7 +64,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_egeometry_soa(
         bdet0_q[lane] = det_q[lane];
       }
     }
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -145,7 +145,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_ecoords_soa(
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -226,7 +226,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_energy_esoa(
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    neohookean_ogden_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -287,7 +287,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_egeometry_soa(
         bdet0_q[lane] = det_q[lane];
       }
     }
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -370,7 +370,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_ecoords_soa(
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -453,7 +453,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_esoa(
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
       }
     }
-    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -520,7 +520,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_egeometry_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -617,7 +617,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_ecoords_soa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd
@@ -714,7 +714,7 @@ static SFEM_INLINE int neohookean_ogden_tri3_hessian_esoa(
           bout_data[stream][lane] = s_t(0);
         }
       }
-      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      neohookean_ogden_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         #pragma omp simd

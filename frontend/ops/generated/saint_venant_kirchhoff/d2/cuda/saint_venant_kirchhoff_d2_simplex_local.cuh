@@ -134,13 +134,11 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
 template <typename s_t, int NQ, int NS, int VS>
 static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simplex_tri3_objective_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
         const s_t *const RSTR adj3,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 2],
@@ -152,12 +150,12 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(2));
       s_t gu_base_v[4 * VS];
       s_t trial_grad_v[4 * VS];
       {
-      const ptrdiff_t goff = q * geometry_stride + 0;
+      const ptrdiff_t goff = 0;
       const s_t adj_value0 = adj0[goff];
       const s_t adj_value1 = adj1[goff];
       const s_t adj_value2 = adj2[goff];
@@ -184,7 +182,7 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
       for (int step = 0; step < nsteps; ++step) {
         const s_t alpha = steps[step];
         {
-          const ptrdiff_t goff = q * geometry_stride + 0;
+          const ptrdiff_t goff = 0;
           const s_t det_value0 = det0[goff];
           const s_t gu0 = gu_base_v[0 * VS + 0] + alpha * trial_grad_v[0 * VS + 0];
           const s_t gu1 = gu_base_v[1 * VS + 0] + alpha * trial_grad_v[1 * VS + 0];
@@ -300,13 +298,11 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
 template <typename s_t, int NQ, int NS, int VS>
 static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simplex_tri3_gradient_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
         const s_t *const RSTR adj3,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 2],
@@ -314,10 +310,10 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(2));
       {
-      const ptrdiff_t goff = q * geometry_stride + 0;
+      const ptrdiff_t goff = 0;
       const s_t adj_value0 = adj0[goff];
       const s_t adj_value1 = adj1[goff];
       const s_t adj_value2 = adj2[goff];
@@ -494,13 +490,11 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
 template <typename s_t, int NQ, int NS, int VS>
 static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simplex_tri3_apply_block(
         const int ne,
-        const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
         const s_t *const RSTR adj3,
         const s_t *const RSTR det0,
-        const s_t *const RSTR q_weight,
         const s_t lmbda,
         const s_t mu,
         const s_t *const RSTR u_streams[NS * 2],
@@ -509,10 +503,10 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(VS > 0, "VS must be positive");
-    { const int q = 0;  // constant-P1 simplex
-      const s_t qw = q_weight[q];
+    {
+      const s_t qw = (s_t(1) / s_t(2));
       {
-      const ptrdiff_t goff = q * geometry_stride + 0;
+      const ptrdiff_t goff = 0;
       const s_t adj_value0 = adj0[goff];
       const s_t adj_value1 = adj1[goff];
       const s_t adj_value2 = adj2[goff];

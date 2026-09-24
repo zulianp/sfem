@@ -1594,15 +1594,32 @@ def _sfem_soa_weak_form_block_function(
         constant_p1_gradient_expansion and not shared.use_tensor_product_reference
     )
 
-    params = ["const int ne", "const ptrdiff_t geometry_stride"]
+    params = ["const int ne"]
+    # The expanded kernel indexes no quadrature point, so it needs neither the
+    # stride between points nor the weight table.  The weight is a constant of
+    # the element and is folded into the body; the stride multiplied an index
+    # that is gone.  Naming them anyway would make every caller produce data
+    # for a computation that no longer happens, which is the half of "no
+    # per-point data" that survives removing the loop.
+    #
+    # Comprehensions rather than tests, for the same reason the reference basis
+    # inputs beside them are already filtered this way.
+    params.extend(
+        name
+        for name in ("const ptrdiff_t geometry_stride",)
+        if not omit_reference_basis_inputs
+    )
     params.extend(_sfem_soa_element_stream_params(shared))
     params.extend(
         _sfem_soa_reference_basis_params(dim, shared, omit_reference_basis_inputs)
     )
-    if shared.use_tensor_product_reference:
-        params.append("const s_t *const RSTR q_weight_1d")
-    else:
-        params.append("const s_t *const RSTR q_weight")
+    params.extend(
+        name
+        for name in (
+            _QUADRATURE_WEIGHT_PARAMETER[bool(shared.use_tensor_product_reference)],
+        )
+        if not omit_reference_basis_inputs
+    )
     params.extend(_form_material_parameter_declarations(form))
     if use_stream_arrays:
         if shared.uses_current:
@@ -2480,6 +2497,7 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
     reference_gradients,
     use_stream_arrays,
     source_builder,
+    quadrature_weight,
 ):
     n_field_components = form_n_field_components(form, dim)
     work_item = _work_item_index(source_builder)
@@ -2521,17 +2539,29 @@ def _append_constant_p1_sfem_soa_weak_form_lines(
         # The density is scaled by the measure, so the second work-item loop
         # reads the determinant again rather than carrying it across.
         [
-            "const ptrdiff_t goff = q * geometry_stride + %s;" % work_item,
+            "const ptrdiff_t goff = %s;" % work_item,
             "const s_t %s = det0[goff];" % geometry_value("det", 0),
         ],
         "      ",
     )
-    lines.append("    { const int q = 0;  // constant-P1 simplex")
-    lines.append("      const s_t qw = q_weight[q];")
+    # No quadrature point, and so no name for one.  The rule of a lowest-order
+    # simplex has a single point whose weight is a constant of the element, so
+    # the weight is folded here rather than read from a table, and with `q`
+    # gone the geometry offset below is the work item alone.  This is what the
+    # architecture's "no per-point data" means below the loop that used to be
+    # here: removing the loop and keeping the table it indexed leaves the cost
+    # exactly where it was.
+    #
+    # Folded as an exact rational, so the emitted constant is the same double
+    # the table held and the kernel's answer is bit-identical.
+    lines.append("    {")
+    lines.append(
+        "      const s_t qw = %s;" % _sfem_ccode(sp.nsimplify(quadrature_weight))
+    )
     if step_loop is not None:
         lines.extend(step_loop.buffer_lines())
     lines.extend(_work_item_loop_lines(source_builder, "      "))
-    lines.append("      const ptrdiff_t goff = q * geometry_stride + %s;" % work_item)
+    lines.append("      const ptrdiff_t goff = %s;" % work_item)
     for component in range(dim * dim):
         lines.append(
             "      const s_t %s = adj%d[goff];"
@@ -2751,6 +2781,7 @@ def _append_sfem_soa_weak_form_lines(
             reference_gradients,
             use_stream_arrays,
             source_builder,
+            quadrature_rule.weights[0],
         )
         return
 
@@ -4327,7 +4358,14 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             )
             lines.extend("  %s" % line if line else line for line in geometry_lines)
             lines.append("        }")
-        call_args = ["ne", "0" if is_affine else "VS"]
+        call_args = ["ne"]
+        # An expanded kernel indexes no quadrature point, so it takes
+        # neither the stride between points nor the weight below.
+        call_args.extend(
+            argument
+            for argument in ("0" if is_affine else "VS",)
+            if not omit_reference_basis_inputs
+        )
         if is_affine:
             call_args.extend(
                 _BLOCK_FMT % stream
@@ -4353,7 +4391,13 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "%s%s" % (reference_prefix, array_input.name)
                 for array_input in reference_inputs
             )
-        call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
+        call_args.extend(
+            argument
+            for argument in (
+                tensor_weight_name if use_tensor_product_reference else scalar_weight_name,
+            )
+            if not omit_reference_basis_inputs
+        )
         call_args.extend(material_parameter_names)
         # The packed half of the same arrangement the mesh kernel makes: the
         # block owns the step loop, so this gathers once and calls once.
@@ -5444,8 +5488,16 @@ def _sfem_soa_mesh_operator_function(
     )
 
     call_args = ["ne"]
-    call_args.append(
-        _MESH_GEOMETRY_CALL_ARGUMENT[form_contraction(form)](geometry_mode)
+    # The expanded kernel reads no quadrature point, so it is handed neither
+    # the stride between points nor, below, the weight table -- the same two
+    # arguments its signature stopped naming.  Both are gated on the one flag,
+    # so a call and a signature cannot disagree about them.
+    call_args.extend(
+        argument
+        for argument in (
+            _MESH_GEOMETRY_CALL_ARGUMENT[form_contraction(form)](geometry_mode),
+        )
+        if not omit_reference_basis_inputs
     )
     if geometry_mode == "affine":
         call_args.extend(
@@ -5470,10 +5522,14 @@ def _sfem_soa_mesh_operator_function(
         )
     else:
         call_args.extend("%s%s" % (reference_prefix, array_input.name) for array_input in reference_inputs)
-    call_args.append(
-        _MESH_WEIGHT_CALL_ARGUMENT[form_contraction(form)](
-            use_tensor_product_reference, tensor_weight_name, scalar_weight_name
+    call_args.extend(
+        argument
+        for argument in (
+            _MESH_WEIGHT_CALL_ARGUMENT[form_contraction(form)](
+                use_tensor_product_reference, tensor_weight_name, scalar_weight_name
+            ),
         )
+        if not omit_reference_basis_inputs
     )
     call_args.extend(material_parameter_names)
     if use_stream_arrays:
@@ -6175,7 +6231,14 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend("  %s" % line if line else line for line in geometry_lines)
                 lines.append("        }")
 
-            call_args = ["ne", "0" if is_affine else "VS"]
+            call_args = ["ne"]
+            # An expanded kernel indexes no quadrature point, so it takes
+            # neither the stride between points nor the weight below.
+            call_args.extend(
+                argument
+                for argument in ("0" if is_affine else "VS",)
+                if not omit_reference_basis_inputs
+            )
             if is_affine:
                 call_args.extend(
                     _BLOCK_FMT % stream
@@ -6201,7 +6264,13 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "%s%s" % (reference_prefix, array_input.name)
                     for array_input in reference_inputs
                 )
-            call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
+            call_args.extend(
+                argument
+                for argument in (
+                    tensor_weight_name if use_tensor_product_reference else scalar_weight_name,
+                )
+                if not omit_reference_basis_inputs
+            )
             call_args.extend(material_parameter_names)
             if uses_current:
                 call_args.append("bu_streams")
@@ -6873,7 +6942,14 @@ def _objective_steps_lines(
         )
 
     call_args = ["ne"]
-    call_args.append("0" if geometry_mode == "affine" else "VS")
+    # Same as the operator call: an expanded kernel indexes no quadrature
+    # point, so it takes neither the stride between points nor the weight
+    # table below, and both are gated on the flag that gated its signature.
+    call_args.extend(
+        argument
+        for argument in (_MESH_GEOMETRY_STRIDE_ARGUMENT[geometry_mode],)
+        if not omit_reference_basis_inputs
+    )
     if geometry_mode == "affine":
         call_args.extend(
             _BLOCK_FMT % stream
@@ -6897,7 +6973,15 @@ def _objective_steps_lines(
         )
     else:
         call_args.extend("%s%s" % (reference_prefix, array_input.name) for array_input in reference_inputs)
-    call_args.append(tensor_weight_name if use_tensor_product_reference else scalar_weight_name)
+    call_args.extend(
+        argument
+        for argument in (
+            _QUADRATURE_WEIGHT_ARGUMENT[bool(use_tensor_product_reference)](
+                tensor_weight_name, scalar_weight_name
+            ),
+        )
+        if not omit_reference_basis_inputs
+    )
     call_args.extend(material_parameter_names)
     if use_stream_arrays:
         call_args.extend(("bu_streams", "bh_streams"))
@@ -10636,6 +10720,26 @@ def _sfem_soa_element_api_reference_args(prefix, quadrature_rule, use_tensor_pro
     )
 
 
+#: The stride a mesh call passes between quadrature points, per geometry mode.
+#: `affine` has one point of cached geometry per element, so the stride is zero.
+_MESH_GEOMETRY_STRIDE_ARGUMENT = {"affine": "0", "isoparametric": "VS"}
+
+
+#: Which weight name a call passes, per reference family.
+_QUADRATURE_WEIGHT_ARGUMENT = {
+    True: lambda tensor, scalar: tensor,
+    False: lambda tensor, scalar: scalar,
+}
+
+
+#: What a block calls its quadrature weights, per reference family.  A table
+#: because the two spellings are two values of one fact, not a decision.
+_QUADRATURE_WEIGHT_PARAMETER = {
+    True: "const s_t *const RSTR q_weight_1d",
+    False: "const s_t *const RSTR q_weight",
+}
+
+
 def _sfem_soa_element_api_geometry_args(dim):
     return tuple("badj%d" % component for component in range(dim * dim)) + (
         "bdet0",
@@ -10685,16 +10789,17 @@ def _sfem_soa_element_api_block_call(
         )
         if not specialized
     ]
-    # The expanded kernel still integrates, so it keeps the weight and nothing
-    # else.  Folding that constant too is the next step and belongs with the
-    # kernel, not here.
-    specialized_reference_args = [
-        (quadrature_reference_accessor(quadrature_rule, "q_weight"),)
-        for _ in specialized
-    ]
+    # The expanded kernel carries no quadrature argument at all now: its weight
+    # is a folded constant and its geometry offset is the work item, so the
+    # stride it used to multiply is gone with the index.
+    specialized_reference_args = [() for _ in specialized]
     args = [
         "ne",
-        "VS",
+        *(
+            name
+            for name in ("VS",)
+            if not specialized
+        ),
         *_sfem_soa_element_api_geometry_args(dim),
         *(reference_args + specialized_reference_args)[0],
         *form_material_parameter_names(form),

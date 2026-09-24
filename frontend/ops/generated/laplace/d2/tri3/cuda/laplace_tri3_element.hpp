@@ -61,7 +61,7 @@ static __host__ __device__ __forceinline__ int laplace_tri3_energy_egeometry_soa
         bdet0_q[0] = det_q[0];
       }
     }
-    laplace_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -136,7 +136,7 @@ static __host__ __device__ __forceinline__ int laplace_tri3_energy_ecoords_soa(
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
       }
     }
-    laplace_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -211,7 +211,7 @@ static __host__ __device__ __forceinline__ int laplace_tri3_energy_esoa(
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
       }
     }
-    laplace_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d2_simplex_tri3_objective_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -269,7 +269,7 @@ static __host__ __device__ __forceinline__ int laplace_tri3_gradient_egeometry_s
         bdet0_q[0] = det_q[0];
       }
     }
-    laplace_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+    laplace_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -346,7 +346,7 @@ static __host__ __device__ __forceinline__ int laplace_tri3_gradient_ecoords_soa
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
       }
     }
-    laplace_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+    laplace_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -423,7 +423,7 @@ static __host__ __device__ __forceinline__ int laplace_tri3_gradient_esoa(
             J00, J01, J10, J11, badj_streams, bdet0, q * VS + 0);
       }
     }
-    laplace_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bu_streams, bout_streams);
+    laplace_d2_simplex_tri3_gradient_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -484,7 +484,7 @@ static __host__ __device__ __forceinline__ int laplace_tri3_hessian_egeometry_so
           bout_data[stream][0] = s_t(0);
         }
       }
-      laplace_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+      laplace_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -571,7 +571,7 @@ static __host__ __device__ __forceinline__ int laplace_tri3_hessian_ecoords_soa(
           bout_data[stream][0] = s_t(0);
         }
       }
-      laplace_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+      laplace_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -658,7 +658,7 @@ static __host__ __device__ __forceinline__ int laplace_tri3_hessian_esoa(
           bout_data[stream][0] = s_t(0);
         }
       }
-      laplace_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::quad_tri_q1<s_t>::q_weight(), kappa, bh_streams, bout_streams);
+      laplace_d2_simplex_tri3_apply_block<s_t, NQ, NS, VS>(ne, badj0, badj1, badj2, badj3, bdet0, kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
