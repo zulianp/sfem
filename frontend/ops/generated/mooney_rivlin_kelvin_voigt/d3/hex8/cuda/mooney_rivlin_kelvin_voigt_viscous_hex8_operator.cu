@@ -923,78 +923,28 @@ __global__ void mooney_rivlin_kelvin_voigt_viscous_hex8_hessian_crs_i_msoa_impl(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    const auto row_tensor_stream = [](const int local) -> int {
-      switch (local) {
-        case 0: return 0;
-        case 1: return 3;
-        case 2: return 9;
-        case 3: return 6;
-        case 4: return 12;
-        case 5: return 15;
-        case 6: return 21;
-        case 7: return 18;
-        case 8: return 1;
-        case 9: return 4;
-        case 10: return 10;
-        case 11: return 7;
-        case 12: return 13;
-        case 13: return 16;
-        case 14: return 22;
-        case 15: return 19;
-        case 16: return 2;
-        case 17: return 5;
-        case 18: return 11;
-        case 19: return 8;
-        case 20: return 14;
-        case 21: return 17;
-        case 22: return 23;
-        case 23: return 20;
-        default: return 0;
-      }
-    };
-    const auto col_tensor_stream = [](const int local) -> int {
-      switch (local) {
-        case 0: return 0;
-        case 1: return 3;
-        case 2: return 9;
-        case 3: return 6;
-        case 4: return 12;
-        case 5: return 15;
-        case 6: return 21;
-        case 7: return 18;
-        case 8: return 1;
-        case 9: return 4;
-        case 10: return 10;
-        case 11: return 7;
-        case 12: return 13;
-        case 13: return 16;
-        case 14: return 22;
-        case 15: return 19;
-        case 16: return 2;
-        case 17: return 5;
-        case 18: return 11;
-        case 19: return 8;
-        case 20: return 14;
-        case 21: return 17;
-        case 22: return 23;
-        case 23: return 20;
-        default: return 0;
-      }
-    };
     for (int entry = 0; entry < 576; ++entry) {
       element_matrix[entry] = s_t(0);
     }
-    for (int trial_local = 0; trial_local < 24; ++trial_local) {
-      const int trial = col_tensor_stream(trial_local);
-      for (int stream = 0; stream < N_STREAMS; ++stream) {
-        bdirection[stream][0] = s_t(0);
-        boutput[stream][0] = s_t(0);
-      }
-      bdirection[trial][0] = s_t(1);
-      mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, u_dt_shift, boutput);
-      for (int test_local = 0; test_local < 24; ++test_local) {
-        const int test = row_tensor_stream(test_local);
-        element_matrix[test_local * 24 + trial_local] = boutput[test][0];
+    static const int trial_node_order[8] = {0, 1, 3, 2, 4, 5, 7, 6};
+    static const int test_node_order[8] = {0, 1, 3, 2, 4, 5, 7, 6};
+    for (int trial_component = 0; trial_component < 3; ++trial_component) {
+      for (int trial_node = 0; trial_node < 8; ++trial_node) {
+        const int trial_local = trial_component * 8 + trial_node;
+        const int trial = trial_node_order[trial_node] * 3 + trial_component;
+        for (int stream = 0; stream < N_STREAMS; ++stream) {
+          bdirection[stream][0] = s_t(0);
+          boutput[stream][0] = s_t(0);
+        }
+        bdirection[trial][0] = s_t(1);
+        mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, u_dt_shift, boutput);
+        for (int test_component = 0; test_component < 3; ++test_component) {
+          for (int test_node = 0; test_node < 8; ++test_node) {
+            const int test_local = test_component * 8 + test_node;
+            const int test = test_node_order[test_node] * 3 + test_component;
+            element_matrix[test_local * 24 + trial_local] = boutput[test][0];
+          }
+        }
       }
     }
 
