@@ -41,6 +41,26 @@ def residual_local_phase_plans():
 RESIDUAL_FORMS = ("residual", "jacobian_action")
 
 
+def published_unit_kernels(kernels, mixes_energy_and_residual):
+    """Which of a unit's declared kernels it still publishes.
+
+    A material that mixes an energy with a residual has no valid energy: the
+    0-form of the whole material is its residual merit, and the energy's own
+    0-form is one addend of a quantity that does not add.  `Op::value` on such
+    a material already refuses to answer with it, so the objective kernels were
+    generated, exported and never called -- ABI surface standing behind a
+    number nothing may read.
+
+    Only the 0-form goes.  The gradient and the apply are 1- and 2-forms, and
+    those do add, which is what lets the combined unit sum them.
+    """
+    return tuple(
+        kernel
+        for kernel in kernels
+        if not (mixes_energy_and_residual and kernel == "objective")
+    )
+
+
 def unit_exists_for_the_merit(unit_name):
     """Whether this unit is the one carrying the material's whole residual.
 
