@@ -100,6 +100,10 @@ struct MeshData {
     // Limiter freezing, the same mechanism the semi-structured residual carries. Four output
     // arrays here against one interleaved one there, so the held correction is one vector of
     // 4 * nnodes read as [node * 4 + component].
+    // Non-null turns on the limiter's boundedness counting (src/venkata). Diagnostic only:
+    // the deferred correction is unreachable without a nodal gradient, so the default path
+    // never evaluates the null test this adds.
+    Hex8LimiterStats     *limiter_stats{nullptr};
     int                   conv_freeze{0};
     std::vector<scalar_t> conv_frozen;
 
@@ -640,7 +644,8 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
                                               d.upwind_eps, ho ? g8 : nullptr,
                                               ho ? x : nullptr, ho ? y : nullptr, ho ? z : nullptr,
-                                              d.conv_limiter, d.conv_venkat_c, d.conv_peclet);
+                                              d.conv_limiter, d.conv_venkat_c, d.limiter_stats,
+                                              d.conv_peclet);
         boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r,
                                   d.face_mask.empty() ? -1 : (int)d.face_mask[(size_t)e],
                                   d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
@@ -1172,6 +1177,9 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
         const scalar_t k = smesh::Env::read<scalar_t>("SFEM_VENKAT_K", 0);
         const scalar_t u = smesh::Env::read<scalar_t>("SFEM_U", 1);
         d.conv_venkat_c  = cvfem_venkata_eps2_coeff(k, u, d.Lx);
+    }
+    {
+        d.limiter_stats = cvfem_limiter_stats_sink();
     }
 
     // CELL-PECLET BLENDING takes the same route as the deferred correction, and for the same

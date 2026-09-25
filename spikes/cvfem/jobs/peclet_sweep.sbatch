@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #SBATCH --account=c40
-#SBATCH --job-name=cvfem-limiter
+#SBATCH --job-name=cvfem-peclet
 #SBATCH --partition=debug
 #SBATCH --nodes=1 --ntasks=1 --cpus-per-task=72
 #SBATCH --time=00:28:00
 #SBATCH --exclusive --hint=nomultithread --uenv-passthrough=ignore
-#SBATCH --output=limiter_%j.out
-#SBATCH --error=limiter_%j.err
+#SBATCH --output=peclet_%j.out
+#SBATCH --error=peclet_%j.err
 #
 # WHY THE DEFERRED CORRECTION WILL NOT CONVERGE ON THE STEP.
 #
@@ -60,6 +60,21 @@
 #
 # Two cells, then, not for redundancy but because the ratio between them is the measurement.
 set -u
+# THE PECLET SWEEP. One mesh, one geometry, viscosity varied -- so the cell Peclet number
+# is the only thing moving and the dissipation reduction can be read against it.
+#
+#   mu = 0.05  -> Re  40, cell Peclet ~1.7   (the default cell; upwinding barely active)
+#   mu = 0.02  -> Re 100, cell Peclet ~4.2
+#   mu = 0.01  -> Re 200, cell Peclet ~8.3
+#   mu = 0.005 -> Re 400, cell Peclet ~17
+#
+# Raising Re rather than coarsening is deliberate: it is how a real run reaches high cell
+# Peclet, and it keeps the mesh -- and therefore eps_visc's discretisation -- fixed. The cost
+# is that the physical solution changes down the sweep, so the comparison that means anything
+# is ALWAYS first-order against higher-order AT THE SAME mu, never across mu.
+CELLS=${CELLS:-"0.05:2:4" "0.02:2:4" "0.01:2:4" "0.005:2:4"}
+QUICK=${QUICK:-1}
+
 ROOT=${SLURM_SUBMIT_DIR:-$PWD}
 D=${BIN:-$ROOT/build_solver/cvfem_hex8_ns_ssgmg}
 [ -x "$D" ] || { echo "limiter: no driver at $D" >&2; exit 1; }
@@ -70,7 +85,11 @@ U=$(grep '^uenv start' ~/init.sh | sed 's/^uenv start //')
 echo "host $(hostname)  cores 72 (Grace Neoverse V2)  $(date)"
 echo
 
-BASE="SFEM_CASE=step SFEM_U=1 SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0"
+# SFEM_LIMITER_STATS=1 so each arm also reports how often the reconstruction left the
+# bound and how often the limiter acted. That is the other half of "less diffusive":
+# a dissipation reduction is only attributable to the limiter if the limiter did
+# something, and on the cavity at Re 100 it acts on half to four fifths of samples.
+BASE="SFEM_CASE=step SFEM_U=1 SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0 SFEM_LIMITER_STATS=1"
 
 # A cap per ARM, set from the first-order run rather than guessed.
 #
@@ -135,21 +154,11 @@ HDR() { printf '%-26s %9s %5s %7s %9s %12s %9s %8s %13s\n' \
 # unlimited frozen as the ceiling, bounded frozen as the scheme one would run. The unfrozen
 # arms and the K sweep are already measured and would cost the time the Peclet axis wants.
 if [ -n "${QUICK:-}" ]; then
-    LM_ARMS="${LM_ARMS-}"; K_ARMS="${K_ARMS-}"; FROZEN_ARMS="${FROZEN_ARMS-lim0:0:0 lim2:2:0}"
+    LM_ARMS=""; K_ARMS=""; FROZEN_ARMS="lim0:0:0 lim2:2:0"
 else
-    LM_ARMS="${LM_ARMS-0 1 2 3}"; K_ARMS="${K_ARMS-0.01 0.1 1 5 30}"
-    FROZEN_ARMS="${FROZEN_ARMS-lim0:0:0 lim1:1:0 lim2:2:0 lim2k5:2:5}"
+    LM_ARMS="0 1 2 3"; K_ARMS="0.01 0.1 1 5 30"
+    FROZEN_ARMS="lim0:0:0 lim1:1:0 lim2:2:0 lim2k5:2:5"
 fi
-# Overridable individually, and the reason is SFEM_LIMITER_STATS. Under freezing the
-# correction is built once per continuation stage, so the diagnostic samples stage-OPENING
-# states and never the converged flow -- which is why a Re 100 and a Re 200 run whose rho
-# ramps share all five stages reported byte-identical counts. Measuring boundedness at
-# convergence means running an UNFROZEN arm, where the correction is rebuilt every residual:
-#
-#   QUICK=1 LM_ARMS=2 FROZEN_ARMS= sbatch jobs/peclet_sweep.sbatch
-#
-# The empty assignment matters: ${VAR-default} substitutes only when VAR is UNSET, so an
-# explicitly empty FROZEN_ARMS turns those arms off rather than falling back.
 
 HDR
 for CELL in ${CELLS:-"0.05:2:4" "0.05:4:4"}; do

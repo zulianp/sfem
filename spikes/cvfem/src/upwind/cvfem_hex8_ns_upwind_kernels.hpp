@@ -1047,6 +1047,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
                                                                const int s, const int i, const int j,
                                                                const scalar_t mdot, const scalar_t ueps,
                                                                const scalar_t venkat_c,
+                                                               Hex8LimiterStats *const stats,
                                                                scalar_t &dfx, scalar_t &dfy, scalar_t &dfz) {
     dfx = dfy = dfz = scalar_t(0);
     if (!g) return;
@@ -1208,22 +1209,26 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
                    scalar_t &oi, scalar_t &oj) {
         oi = inc_i;
         oj = inc_j;
-        if (limiter < 1 || limiter > 3) return;
         const scalar_t a  = u[i], b = u[j];
-        if (limiter == 3) {
-            oi = cvfem_darwish_moukalled_inc(a, b, inc_i);
-            oj = cvfem_darwish_moukalled_inc(b, a, inc_j);
-            return;
-        }
         const scalar_t lo = a < b ? a : b;
         const scalar_t hi = a < b ? b : a;
-        if (limiter == 1) {
-            oi = cvfem_limiter_clip_inc(a, inc_i, lo, hi);
-            oj = cvfem_limiter_clip_inc(b, inc_j, lo, hi);
-            return;
+        if (limiter >= 1 && limiter <= 3) {
+            if (limiter == 3) {
+                oi = cvfem_darwish_moukalled_inc(a, b, inc_i);
+                oj = cvfem_darwish_moukalled_inc(b, a, inc_j);
+            } else if (limiter == 1) {
+                oi = cvfem_limiter_clip_inc(a, inc_i, lo, hi);
+                oj = cvfem_limiter_clip_inc(b, inc_j, lo, hi);
+            } else {
+                oi = cvfem_venkata_inc(a, inc_i, lo, hi, veps2);
+                oj = cvfem_venkata_inc(b, inc_j, lo, hi, veps2);
+            }
         }
-        oi = cvfem_venkata_inc(a, inc_i, lo, hi, veps2);
-        oj = cvfem_venkata_inc(b, inc_j, lo, hi, veps2);
+        // Recorded for EVERY arm including limiter 0, because the count that matters is how
+        // often the unlimited reconstruction leaves the bound -- that is a property of the
+        // case, not of the arm, and it is what says whether a case can test a limiter at all.
+        cvfem_limiter_record(stats, a, inc_i, oi, lo, hi);
+        cvfem_limiter_record(stats, b, inc_j, oj, lo, hi);
     };
 
     scalar_t ii, jj;
@@ -1357,6 +1362,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                                               const scalar_t *const SFEM_RESTRICT ze = nullptr,
                                                               const int limiter = 0,
                                                               const scalar_t venkat_c = scalar_t(0),
+                                                              Hex8LimiterStats *const stats = nullptr,
                                                               // Cell-Peclet blending, passed as DATA rather than read
                                                               // from the environment here: these kernels are
                                                               // SFEM_HOST_DEVICE and a function-local static with a
@@ -1442,7 +1448,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
         // Jacobian below is untouched by design; see cvfem_hex8_scs_defcor.
         if (ugrad8) {
             scalar_t dfx, dfy, dfz;
-            cvfem_hex8_scs_defcor(ugrad8, xe, ye, ze, ux, uy, uz, limiter, s, i, j, mdot, ueps, venkat_c,
+            cvfem_hex8_scs_defcor(ugrad8, xe, ye, ze, ux, uy, uz, limiter, s, i, j, mdot, ueps, venkat_c, stats,
                                   dfx, dfy, dfz);
             fx += dfx;
             fy += dfy;

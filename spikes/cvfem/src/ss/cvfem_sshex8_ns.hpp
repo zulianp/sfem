@@ -78,6 +78,10 @@ struct SSMeshData {
     // Freezing buys convergence by removing the fixed point the lagged source has to reach,
     // and costs nothing in boundedness at all: the correction it holds is a correction the
     // unfrozen arm would also have produced.
+    // Non-null turns on the limiter's boundedness counting (src/venkata). Diagnostic only:
+    // the deferred correction is unreachable without a nodal gradient, so the default path
+    // never evaluates the null test this adds.
+    Hex8LimiterStats     *limiter_stats{nullptr};
     int                        conv_freeze{0};
     std::vector<scalar_t>      conv_frozen;  // empty until the stage's correction is built
 
@@ -2685,7 +2689,7 @@ inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t r
                                                          (const scalar_t *)nullptr,
                                                          (const scalar_t *)nullptr,
                                                          (const scalar_t *)nullptr, 0, scalar_t(0),
-                                                         d.conv_peclet);
+                                                         nullptr, d.conv_peclet);
                     boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
                     for (int a = 0; a < 8; ++a)
                         for (int c = 0; c < N_FIELDS; ++c)
@@ -2747,6 +2751,9 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
         const scalar_t k = smesh::Env::read<scalar_t>("SFEM_VENKAT_K", 0);
         const scalar_t u = smesh::Env::read<scalar_t>("SFEM_U", 1);
         d.conv_venkat_c  = cvfem_venkata_eps2_coeff(k, u, d.Lx);
+    }
+    {
+        d.limiter_stats = cvfem_limiter_stats_sink();
     }
 
     d.conv_peclet = cvfem_hex8_peclet_config<scalar_t>();
@@ -2941,7 +2948,8 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                                                              ho ? g8 : nullptr,
                                                              ho ? x : nullptr, ho ? y : nullptr,
                                                              ho ? z : nullptr, d.conv_limiter,
-                                                             d.conv_venkat_c, d.conv_peclet);
+                                                             d.conv_venkat_c, d.limiter_stats,
+                                                             d.conv_peclet);
                         boundary_scs_add_residual(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                   ux, uy, uz, p, r,
                                                   d.macro_face_mask.empty()
