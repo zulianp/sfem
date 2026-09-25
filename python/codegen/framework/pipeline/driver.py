@@ -855,7 +855,16 @@ def generate(
         # generation would quietly emit a host-shaped Op.
         with use_target(backend.target):
             files.update(_generate_op_wrapper_files(material, selected, user_input, files))
-        _replace_legacy_tensor_product_sources_with_proteus_aliases(files)
+            # Inside the target, because the alias pass asks it what a mesh
+            # source is called.  Run outside, it asked whatever was ambient --
+            # OpenMP -- and looked for `.cpp` in a CUDA generation, so no
+            # device source ever matched its own suffix and the mesh-order
+            # element kept its own kernels on the device while delegating to
+            # the PROTEUS twin on the host.  `_tensor_product_proteus_alias`
+            # records that the extension moved into the alias; this is where
+            # the alias is built, and it was still being built under the wrong
+            # target.
+            _replace_legacy_tensor_product_sources_with_proteus_aliases(files)
 
     files = _relocate_generated_primitive_headers(files, out_dir, material.name)
     files = _collapse_duplicate_operators(files)

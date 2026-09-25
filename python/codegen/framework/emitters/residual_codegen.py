@@ -320,36 +320,6 @@ def _target():
 
 
 
-def _local_index_mapping_expr(name, values, index_expr):
-    offset = _linear_index_offset(values)
-    if offset is None:
-        return "%s(%s)" % (name, index_expr)
-    if offset == 0:
-        return index_expr
-    return "(%s + %d)" % (index_expr, offset)
-
-
-def _local_index_mapping_lambda_lines(name, values, indent):
-    if _linear_index_offset(values) is not None:
-        return []
-    lines = [
-        "%sconst auto %s = [](const int local) -> int {" % (indent, name),
-        "%s  switch (local) {" % indent,
-    ]
-    lines.extend(
-        "%s    case %d: return %d;" % (indent, local, value)
-        for local, value in enumerate(values)
-    )
-    lines.extend(
-        [
-            "%s    default: return 0;" % indent,
-            "%s  }" % indent,
-            "%s};" % indent,
-        ]
-    )
-    return lines
-
-
 def _single_field_element_alias_lines(n_shape, shape_order, indent, array_name="field_elements", pointer_type="idx_t"):
     if _identity_order(shape_order):
         return [], "elements"
@@ -8424,50 +8394,21 @@ def _element_matrix_fill_lines(
     ]
     if nested:
         return nested[0]
-    lines = list(
-        _local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, indent)
+    # The index used to be tabulated here, as a switch from local index to
+    # stream with one case per degree of freedom, and the loop under it probed
+    # -- one apply per trial degree of freedom, through a unit basis vector.
+    # Both are banned: the table is the flattening `plans/layout` says to nest,
+    # and probing is what `plans/direct_assembly` exists to retire.  Nothing
+    # the generator produces reaches here, because every element either writes
+    # its entries where the kernel puts them or delegates to the twin that
+    # does, so refusing is the honest end rather than a third spelling nobody
+    # may have.
+    raise ValueError(
+        "no element-matrix kernel and no nested index for this block: the "
+        "mapping from local index to stream does not decompose into a node "
+        "order and a component, so the only shapes left are a lookup table "
+        "and probing, and neither is allowed"
     )
-    lines.extend(
-        _local_index_mapping_lambda_lines("col_tensor_stream", column_tensor_streams, indent)
-    )
-    lines.extend(
-        [
-            "%sfor (int entry = 0; entry < %d; ++entry) {"
-            % (indent, len(row_streams) * len(column_streams)),
-            "%s  element_matrix[entry] = s_t(0);" % indent,
-            "%s}" % indent,
-            "%sfor (int trial_local = 0; trial_local < %d; ++trial_local) {"
-            % (indent, len(column_streams)),
-            "%s  const int trial = %s;"
-            % (
-                indent,
-                _local_index_mapping_expr(
-                    "col_tensor_stream", column_tensor_streams, "trial_local"
-                ),
-            ),
-            "%s  for (int stream = 0; stream < N_STREAMS; ++stream) {" % indent,
-            "%s    bdirection[stream][0] = s_t(0);" % indent,
-            "%s    boutput[stream][0] = s_t(0);" % indent,
-            "%s  }" % indent,
-            "%s  bdirection[trial][0] = s_t(1);" % indent,
-            "%s  %s<s_t, NQ, NS, VS>(%s);"
-            % (indent, block_function, ", ".join(call_args)),
-            "%s  for (int test_local = 0; test_local < %d; ++test_local) {"
-            % (indent, len(row_streams)),
-            "%s    const int test = %s;"
-            % (
-                indent,
-                _local_index_mapping_expr(
-                    "row_tensor_stream", row_tensor_streams, "test_local"
-                ),
-            ),
-            "%s    element_matrix[test_local * %d + trial_local] = boutput[test][0];"
-            % (indent, len(column_streams)),
-            "%s  }" % indent,
-            "%s}" % indent,
-        ]
-    )
-    return lines
 
 
 #: What an element settles for when its own shape declines the form.  A
