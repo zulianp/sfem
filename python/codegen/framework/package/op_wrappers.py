@@ -1411,13 +1411,32 @@ namespace sfem {
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
 %(metric_cache_field)s%(inexact_cache_field)s        };
 
+    //! Whether this element leaves the operator no choice of geometry.
+    //!
+    //! A constant-P1 simplex publishes no isoparametric kernel -- its affine
+    //! kernel computes the same numbers on a constant Jacobian -- so the
+    //! operator takes the affine route for it whatever the caller asked, and
+    //! has to have cached the adjugate it reads.  Every other element still
+    //! caches only when asked, which is what keeps an isoparametric run from
+    //! paying for geometry it never reads.
+    bool geometry_is_forced_affine(const smesh::ElemType element_type) {
+      switch (element_type) {
+%(forced_affine_element_cases)s        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
-                                  MultiDomainOp &domains) {
+                                  MultiDomainOp &domains,
+                                  const bool requested) {
       auto mesh = space->mesh_ptr();
       const bool needs_jacobian_aos =
           %(gradient_affine_uses_jacobian_aos)s ||
           %(apply_affine_uses_jacobian_aos)s;
       for (auto &entry : domains.domains()) {
+        if (!requested && !geometry_is_forced_affine(entry.second.element_type)) {
+          continue;
+        }
         const smesh::block_idx_t block_id =
             block_id_for_domain(*mesh, *entry.second.block);
         auto cache = std::make_shared<AffineGeometryCache>();
@@ -1556,6 +1575,9 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
+    // Not only what the caller asked for.  An element whose geometry is
+    // constant by construction has no isoparametric kernel, so the operator
+    // takes the affine route for it either way and needs the cache either way.
     const bool needs_affine_geometry =
         impl_->objective_uses_affine ||
         impl_->gradient_uses_affine ||
@@ -1570,8 +1592,11 @@ namespace sfem {
     // one never built the metric, so an operator whose affine kernels read
     // it worked when the option was set after initialize and failed when it
     // was set before.
-    if (needs_affine_geometry &&
-      cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+    // Unconditionally, because the loop skips a domain that neither asked for
+    // affine geometry nor is an element that forces it.  Gating the call on
+    // the request alone left an operator meshing a constant-P1 simplex with no
+    // cached adjugate and an affine kernel as its only route to that element.
+    if (cache_affine_geometry(impl_->space, *impl_->domains, needs_affine_geometry) != SFEM_SUCCESS) {
       return SFEM_FAILURE;
     }
 %(element_scratch_alloc)s
@@ -1603,7 +1628,7 @@ namespace sfem {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
       const geom_t *determinant = nullptr;
-%(metric_declaration)s            if (impl_->gradient_uses_affine) {
+%(metric_declaration)s            if (%(gradient_affine_condition)s) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -1645,7 +1670,7 @@ namespace sfem {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
       const geom_t *determinant = nullptr;
-%(metric_declaration)s            if (impl_->apply_uses_affine) {
+%(metric_declaration)s            if (%(apply_affine_condition)s) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -1719,7 +1744,7 @@ namespace sfem {
       const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-%(metric_declaration)s            if (impl_->objective_uses_affine) {
+%(metric_declaration)s            if (%(objective_affine_condition)s) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -1814,7 +1839,7 @@ namespace sfem {
     };
     const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
     if (matched && val && impl_->domains) {
-      if (cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+      if (cache_affine_geometry(impl_->space, *impl_->domains, true) != SFEM_SUCCESS) {
         SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
       }
     }
@@ -1920,6 +1945,34 @@ namespace sfem {
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(n_field_components_by_dim),
         "metric_declaration": _metric_declaration(any(affine_metric_flags)),
+        "forced_affine_element_cases": _forced_affine_element_cases(
+            operation_forced_affine_elements(
+                kernel_sources,
+                material.name,
+                ("objective", "objective_steps", "gradient", "apply"),
+            )
+        ),
+        "gradient_affine_condition": _affine_preamble_condition(
+            kernel_sources, material.name, ("gradient",), "gradient_uses_affine"
+        ),
+        "apply_affine_condition": _affine_preamble_condition(
+            kernel_sources, material.name, ("apply",), "apply_uses_affine"
+        ),
+        "objective_affine_condition": _affine_preamble_condition(
+            kernel_sources,
+            material.name,
+            ("objective", "objective_steps"),
+            "objective_uses_affine",
+        ),
+        "affine_geometry_is_required": _cpp_bool(
+            bool(
+                operation_forced_affine_elements(
+                    kernel_sources,
+                    material.name,
+                    ("objective", "objective_steps", "gradient", "apply"),
+                )
+            )
+        ),
         "gradient_metric_binding": _metric_binding(
             any(affine_metric_flags), _op_class_name(material), "gradient"
         ),
@@ -8461,6 +8514,134 @@ def _residual_hessian_dispatch_body(
     return "\n".join(lines)
 
 
+def _affine_dispatch_elements(kernel_sources, affine_names):
+    """Every element the affine route can serve, over all its entry points.
+
+    More than one, because the geometry an affine kernel takes depends on what
+    it contracts: a linear simplex Laplacian asks for the symmetric metric and
+    gets a dispatch of its own beside the adjugate one, and both stand inside
+    the same branch.
+    """
+    elements = []
+    for name in affine_names:
+        if not name or not _c_abi_function_exists(
+            kernel_sources, name, public_only=True
+        ):
+            continue
+        for element in _c_abi_public_dispatch_case_elements(kernel_sources, name):
+            if element not in elements:
+                elements.append(element)
+    return tuple(elements)
+
+
+def forced_affine_elements(kernel_sources, affine_names, isoparametric_name):
+    """The elements the affine route is the only route for.
+
+    A constant-P1 simplex publishes no isoparametric kernel, because its affine
+    kernel already computes the same numbers on a constant Jacobian.  The
+    operator therefore has to take the affine route for it whatever the caller
+    asked, and -- since that route reads a cached adjugate -- has to have
+    cached the geometry for it whether or not anybody asked for that either.
+    """
+    affine_elements = _affine_dispatch_elements(kernel_sources, affine_names)
+    isoparametric_elements = (
+        _c_abi_public_dispatch_case_elements(kernel_sources, isoparametric_name)
+        if isoparametric_name
+        and _c_abi_function_exists(kernel_sources, isoparametric_name, public_only=True)
+        else ()
+    )
+    return tuple(
+        element for element in affine_elements if element not in isoparametric_elements
+    )
+
+
+def operation_forced_affine_elements(kernel_sources, material_name, operations):
+    """`forced_affine_elements` over every dimension and every operation named.
+
+    The geometry preamble sits outside the dimension switch and above every
+    dispatch body it feeds, so it has to hold for all of them: it binds the
+    cached adjugate that those bodies then pass, and a body reaching an affine
+    entry point with the preamble skipped passes a null pointer.
+    """
+    forced = []
+    for operation in operations:
+        for dim in (2, 3):
+            affine = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
+            names = (
+                affine,
+                _metric_dispatch_name(affine),
+                "%s_a_msoa_aos_unit" % affine[: -len("_a_msoa")],
+            )
+            isoparametric = "%s_%s_%dd_i_msoa" % (material_name, operation, dim)
+            for element in forced_affine_elements(kernel_sources, names, isoparametric):
+                if element not in forced:
+                    forced.append(element)
+    return tuple(forced)
+
+
+def _forced_affine_element_cases(forced_elements):
+    """The switch arms of `geometry_is_forced_affine`, one per element."""
+    return "".join(
+        "        case smesh::%s:\n          return true;\n" % element
+        for element in sorted(set(forced_elements))
+    )
+
+
+def _affine_preamble_condition(kernel_sources, material_name, operations, affine_flag):
+    """The preamble's guard: the flag, widened by the elements that force it."""
+    forced = operation_forced_affine_elements(kernel_sources, material_name, operations)
+    condition = "impl_->%s" % affine_flag
+    if forced:
+        condition = "%s || %s" % (
+            condition,
+            _element_condition("domain.element_type", forced),
+        )
+    return condition
+
+
+def _affine_branch_condition(kernel_sources, affine_flag, affine_names, isoparametric_name):
+    """When this dimension takes the affine route.
+
+    The flag is the caller's preference, and a preference is all it can be.
+    Which elements each mode serves is settled when the kernels are generated,
+    and the two modes do not serve the same ones: a constant-P1 simplex has no
+    isoparametric kernel, because its affine kernel already computes the same
+    numbers, and a quadrilateral has no affine kernel in 2D.  Reading the flag
+    alone therefore sent TET4 and TRI3 to a dispatch with no case for them
+    whenever it was off, and QUAD4 to one with no case for it whenever it was
+    on -- `unsupported_dispatch` at runtime either way, on an element the
+    operator meshes.
+
+    So the preference is widened by the elements the affine route is the only
+    one for, and narrowed to the ones it can serve at all.  Both clauses are
+    omitted when they would be vacuous, which is why a material whose modes
+    cover the same elements is spelled exactly as before.
+    """
+    affine_elements = _affine_dispatch_elements(kernel_sources, affine_names)
+    isoparametric_elements = (
+        _c_abi_public_dispatch_case_elements(kernel_sources, isoparametric_name)
+        if isoparametric_name
+        and _c_abi_function_exists(kernel_sources, isoparametric_name, public_only=True)
+        else ()
+    )
+    condition = "impl_->%s" % affine_flag
+    forced = forced_affine_elements(kernel_sources, affine_names, isoparametric_name)
+    if forced:
+        condition = "%s || %s" % (
+            condition,
+            _element_condition("domain.element_type", forced),
+        )
+    unserved = tuple(
+        element for element in isoparametric_elements if element not in affine_elements
+    )
+    if unserved and affine_elements:
+        condition = "(%s) && (%s)" % (
+            condition,
+            _element_condition("domain.element_type", affine_elements),
+        )
+    return condition
+
+
 def _element_condition(variable_name, mesh_elements):
     names = tuple(sorted(set(mesh_elements)))
     if not names:
@@ -8588,7 +8769,18 @@ def _residual_apply_dispatch_body(
             "domain.element_type", affine_aos_unit_elements_by_dim.get(dim, ())
         )
 
-        lines.append("%s  if (impl_->%s) {" % (indent, affine_flag))
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    affine_flag,
+                    (affine_soa, _metric_dispatch_name(affine_soa)),
+                    isop,
+                ),
+            )
+        )
         if operation == "jacobian_action" and _c_abi_function_exists(
             kernel_sources, packed_affine, public_only=True
         ):
@@ -9041,7 +9233,18 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
         affine_aos_unit = "%s_gradient_%dd_a_msoa_aos_unit" % (material_name, dim)
         isop = "%s_gradient_%dd_i_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s  if (impl_->gradient_uses_affine) {" % indent)
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    "gradient_uses_affine",
+                    (affine, _metric_dispatch_name(affine), affine_aos_unit),
+                    isop,
+                ),
+            )
+        )
         affine_aos_unit_elements = _c_abi_public_dispatch_case_elements(
             kernel_sources,
             affine_aos_unit,
@@ -9160,7 +9363,18 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
         affine = "%s_objective_%dd_a_msoa" % (material_name, dim)
         isop = "%s_objective_%dd_i_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s  if (impl_->objective_uses_affine) {" % indent)
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    "objective_uses_affine",
+                    (affine, _metric_dispatch_name(affine)),
+                    isop,
+                ),
+            )
+        )
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             lines.append(
                 "%s    status = %s(%s);"
@@ -9238,7 +9452,18 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
         affine = "%s_objective_steps_%dd_a_msoa" % (material_name, dim)
         isop = "%s_objective_steps_%dd_i_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s  if (impl_->objective_uses_affine) {" % indent)
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    "objective_uses_affine",
+                    (affine, _metric_dispatch_name(affine)),
+                    isop,
+                ),
+            )
+        )
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             lines.extend(
                 _affine_dispatch_status_lines(
@@ -9327,7 +9552,18 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
         packed = "%s_apply_packed_%dd_i_msoa" % (material_name, dim)
         packed_affine = "%s_apply_packed_%dd_a_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s  if (impl_->apply_uses_affine) {" % indent)
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    "apply_uses_affine",
+                    (affine, _metric_dispatch_name(affine)),
+                    isop,
+                ),
+            )
+        )
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             if _c_abi_function_exists(kernel_sources, packed_affine, public_only=True):
                 lines.extend(

@@ -663,7 +663,7 @@ namespace sfem {
           const real_t *const RSTR u_data[2] = {state + 0, state + 1};
           const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
           real_t *const RSTR u_out[2] = {out + 0, out + 1};
-        if (impl_->residual_uses_affine) {
+        if (impl_->residual_uses_affine || domain.element_type == smesh::TRI3) {
           return mooney_rivlin_kelvin_voigt_total_residual_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
         }
         return mooney_rivlin_kelvin_voigt_total_residual_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
@@ -673,7 +673,7 @@ namespace sfem {
           const real_t *const RSTR u_data[3] = {state + 0, state + 1, state + 2};
           const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
           real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
-        if (impl_->residual_uses_affine) {
+        if (impl_->residual_uses_affine || domain.element_type == smesh::TET4) {
           return mooney_rivlin_kelvin_voigt_total_residual_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
         }
         return mooney_rivlin_kelvin_voigt_total_residual_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
@@ -752,7 +752,7 @@ namespace sfem {
           const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
           const real_t *const RSTR u_direction_data[2] = {direction + 0, direction + 1};
           real_t *const RSTR u_out[2] = {out + 0, out + 1};
-        if (impl_->jacobian_action_uses_affine) {
+        if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TRI3) {
           return mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
         }
         return mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], FIELD_STRIDE, u_out[0], u_out[1]);
@@ -763,7 +763,7 @@ namespace sfem {
           const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
           const real_t *const RSTR u_direction_data[3] = {direction + 0, direction + 1, direction + 2};
           real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
-        if (impl_->jacobian_action_uses_affine) {
+        if (impl_->jacobian_action_uses_affine || domain.element_type == smesh::TET4) {
           return mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
         }
         return mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], FIELD_STRIDE, u_direction_data[0], u_direction_data[1], u_direction_data[2], FIELD_STRIDE, u_out[0], u_out[1], u_out[2]);
