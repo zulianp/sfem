@@ -3949,6 +3949,11 @@ int main(int argc, char **argv) {
     // Everything that is true of the step's GEOMETRY is true of this one's, so the two share
     // every branch that asks about shape rather than about physics.
     const bool        want_any_step  = want_step || want_step_turb;
+    // Smith-Hutton: the box is the paper's [-1,1] x [0,1] shifted to the origin, and thin in
+    // z because the problem is two-dimensional -- one cell, with w uniform along it, is what
+    // makes the z-momentum equation reduce to the scalar transport the benchmark is.
+    const bool        want_sh     = case_req == "smith_hutton" || case_req == "smithhutton" ||
+                                    case_req == "sh";
     const bool        want_cavity = smesh::Env::read_string("SFEM_CASE", "") == "cavity" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid" ||
                              smesh::Env::read_string("SFEM_CASE", "") == "lid_driven_cavity";
@@ -3968,8 +3973,8 @@ int main(int argc, char **argv) {
     // shear layer has room to break down and reattach well clear of the outflow, and a span
     // of four step heights -- the box width the reference DNS uses, which is the narrowest
     // that does not constrain the spanwise structures it is there to permit.
-    const real_t      Lx         = want_nozzle ? nozzle.x_out - nozzle.x_in : smesh::Env::read<real_t>("SFEM_LX", want_step_turb ? 21 : (want_step ? 10 : ((want_mms || want_cavreg) ? 2 : ((want_cavity || want_pump) ? 1 : 4))));
-    const real_t      Ly         = want_nozzle ? 2 * nozzle.r_inlet : smesh::Env::read<real_t>("SFEM_LY", (want_mms || want_cavreg || want_any_step) ? 2 : 1);
+    const real_t      Lx         = want_nozzle ? nozzle.x_out - nozzle.x_in : smesh::Env::read<real_t>("SFEM_LX", want_sh ? 2 : (want_step_turb ? 21 : (want_step ? 10 : ((want_mms || want_cavreg) ? 2 : ((want_cavity || want_pump) ? 1 : 4)))));
+    const real_t      Ly         = want_nozzle ? 2 * nozzle.r_inlet : smesh::Env::read<real_t>("SFEM_LY", want_sh ? 1 : ((want_mms || want_cavreg || want_any_step) ? 2 : 1));
     const real_t      Lz         = want_nozzle ? 2 * nozzle.r_inlet : smesh::Env::read<real_t>("SFEM_LZ", want_step_turb ? 4 : ((want_mms || want_cavreg) ? 2 : 1));
     const real_t      rho        = smesh::Env::read<real_t>("SFEM_RHO", want_nozzle ? 1056 : 1);
     const real_t      mu         = smesh::Env::read<real_t>("SFEM_MU", want_nozzle ? 0.0035 : 0.01);
@@ -4971,6 +4976,12 @@ int main(int argc, char **argv) {
 
         std::vector<idx_t>  uvw_nodes, uz_nodes;
         std::vector<real_t> uvw_ux, uvw_uy, uvw_uz, uz_vals;
+        // Smith-Hutton constrains u and v at EVERY node -- that is what turns the z-momentum
+        // equation into the benchmark's scalar transport -- and phi (= w) only on the boundary
+        // minus the outlet. Two components at interior nodes is a shape none of the other
+        // cases needs, hence its own lists rather than a flag on uvw_nodes.
+        std::vector<idx_t>  sh_uv_nodes, sh_w_nodes;
+        std::vector<real_t> sh_u_vals, sh_v_vals, sh_w_vals, sh_p_vals;
         // Which entries of uvw_nodes are the convective outflow's, so the time loop can
         // rewrite those values and only those. Recorded as an index into uvw_nodes rather
         // than as a second node list, because the time loop writes into the Condition's
@@ -4998,6 +5009,36 @@ int main(int argc, char **argv) {
             const bool outlet = cvfem_case::on_plane(x, Lx, Lx);
             const bool span   = cvfem_case::on_plane(z, real_t(0), Lz) || cvfem_case::on_plane(z, Lz, Lz);
 
+            if (flow == cvfem_case::FlowCase::SmithHutton) {
+                // u and v everywhere: the prescribed rotating field is the problem statement,
+                // not something to be solved for. exact_state already returned it.
+                sh_uv_nodes.push_back((idx_t)i);
+                sh_u_vals.push_back(ux);
+                sh_v_vals.push_back(uy);
+                // PRESSURE TOO, and this is what makes the case the benchmark rather than an
+                // approximation of it. Smith-Hutton is a scalar transported by a PRESCRIBED
+                // field: there is no continuity equation to satisfy and no pressure in the
+                // problem. Leaving p free instead left Newton with a floor near 1e-3, because
+                // the prescribed field is divergence-free in the continuum but not discretely,
+                // so the continuity rows had no solution and Rhie-Chow could only absorb part
+                // of the defect. Constraining p removes those rows and leaves exactly one
+                // unknown per node -- phi -- which is the problem as posed.
+                sh_p_vals.push_back(real_t(0));
+                // phi where the boundary prescribes one. The outlet (y = 0, x > 0) is left
+                // free, which is how this discretisation spells zero-gradient.
+                //
+                // The spanwise planes are NOT excluded, and the first version of this excluded
+                // them: with one cell in z every node lies on z = 0 or z = Lz, so the guard
+                // removed every constraint and the run reported sh_phi = 0. phi depends only on
+                // (x, y) and is uniform along z by construction, so a z-face node carries the
+                // same value as any other node at that (x, y) and constraining it is right.
+                real_t phi = 0;
+                if (cvfem_smith_hutton::phi_dirichlet(x, y, Lx, Ly, phi)) {
+                    sh_w_nodes.push_back((idx_t)i);
+                    sh_w_vals.push_back(phi);
+                }
+                continue;
+            }
             if (flow == cvfem_case::FlowCase::StepTurb) {
                 // The step's skin treatment, with two differences that are the case.
                 //
@@ -5215,6 +5256,12 @@ int main(int argc, char **argv) {
         };
 
         std::vector<sfem::DirichletConditions::Condition> conds;
+        if (!sh_uv_nodes.empty()) {
+            conds.push_back(make_cond(sh_uv_nodes, sh_u_vals, 0));
+            conds.push_back(make_cond(sh_uv_nodes, sh_v_vals, 1));
+            conds.push_back(make_cond(sh_uv_nodes, sh_p_vals, 3));
+        }
+        if (!sh_w_nodes.empty()) conds.push_back(make_cond(sh_w_nodes, sh_w_vals, 2));
         conds.push_back(make_cond(uvw_nodes, uvw_ux, 0));
         conds.push_back(make_cond(uvw_nodes, uvw_uy, 1));
         conds.push_back(make_cond(uvw_nodes, uvw_uz, 2));
@@ -5246,10 +5293,12 @@ int main(int argc, char **argv) {
             std::printf("mms: forcing recomputed per continuation stage (rho varies, mu=%g, Re=%g)\n",
                         (double)mu, (double)(1.0 / mu));
 
-        std::printf("constraints: uvw_nodes=%td  uz_nodes=%td  p_pin=%td\n",
+        std::printf("constraints: uvw_nodes=%td  uz_nodes=%td  p_pin=%td  sh_uv=%td  sh_phi=%td\n",
                     (ptrdiff_t)uvw_nodes.size(),
                     (ptrdiff_t)uz_nodes.size(),
-                    pin);
+                    pin,
+                    (ptrdiff_t)sh_uv_nodes.size(),
+                    (ptrdiff_t)sh_w_nodes.size());
     }
 
     std::printf("case: %s  geom: %s  refine_level: %d  semi_structured: %d\n",
@@ -8412,6 +8461,46 @@ int main(int argc, char **argv) {
             return EXIT_SUCCESS;
         }
     std::printf("u_linf: %.6e  p_linf: %.6e\n", u_linf, p_linf);
+
+    // Smith-Hutton's two verdicts. Neither is a norm against a tabulated solution: the first
+    // is a maximum principle, which either holds or does not, and the second compares the
+    // outlet against an EXACT statement about the pure-convection limit.
+    if (flow == cvfem_case::FlowCase::SmithHutton) {
+        real_t lo_b, hi_b;
+        cvfem_smith_hutton::phi_bounds(lo_b, hi_b);
+        real_t phi_min = std::numeric_limits<real_t>::max();
+        real_t phi_max = -std::numeric_limits<real_t>::max();
+        for (ptrdiff_t i = 0; i < nnodes; ++i) {
+            const real_t w = x[(size_t)i * 4 + 2];
+            phi_min        = std::min(phi_min, w);
+            phi_max        = std::max(phi_max, w);
+        }
+        const real_t under = lo_b - phi_min, over = phi_max - hi_b;
+        const real_t worst = std::max(real_t(0), std::max(under, over));
+        std::printf("smith_hutton: phi in [%.6e, %.6e]  bounds [%.6e, %.6e]  overshoot %.6e\n",
+                    phi_min, phi_max, lo_b, hi_b, worst);
+        std::printf("smith_hutton: BOUNDED=%d  (a maximum principle holds for this problem, so\n"
+                    "              any excursion is the scheme's and nothing else)\n",
+                    worst <= real_t(1e-10) ? 1 : 0);
+        // The outlet, against the pure-convection limit. At finite rho/Gamma the true profile
+        // is smeared relative to this, so the comparison is one-sided and diagnostic: it says
+        // how much of the front survived the half turn, not whether the answer is wrong.
+        std::printf("smith_hutton: outlet      x        phi        phi_ref(pure convection)\n");
+        for (int k = 0; k <= 10; ++k) {
+            const real_t Xr = real_t(k) / 10;            // paper coordinate, 0 .. 1
+            const real_t xm = Xr + 1;                     // mesh coordinate
+            real_t best = std::numeric_limits<real_t>::max(); ptrdiff_t at = -1;
+            for (ptrdiff_t i = 0; i < nnodes; ++i) {
+                if ((real_t)py[i] > real_t(1e-9)) continue;   // outlet edge only
+                const real_t d = std::fabs((real_t)px[i] - xm);
+                if (d < best) { best = d; at = i; }
+            }
+            if (at >= 0)
+                std::printf("smith_hutton: outlet %8.3f %12.6f %12.6f\n", (double)Xr,
+                            (double)x[(size_t)at * 4 + 2],
+                            (double)cvfem_smith_hutton::phi_outlet_pure_convection(Xr));
+        }
+    }
         std::printf("cvfem_hex8_ns_ssgmg: %g seconds\n", smesh::time_seconds() - tick);
 
         // The pump and the turbulent step have no closed-form solution, so u_linf against
