@@ -880,7 +880,18 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
             r"for \(int trial_local = 0; trial_local < (\d+); \+\+trial_local\)"
         )
         found = {}
-        for path in sorted(self._shipped_tree().rglob("*_operator.cpp")):
+        # Every target's mesh source, not just the host's.  Scanning `.cpp`
+        # alone left the device tree unread, and the device tree was where the
+        # probing lived: the mesh-order elements never delegated to their
+        # PROTEUS twins there, so their assemblies fell back to recovering the
+        # matrix one column at a time -- invisible to this gate for as long as
+        # it only knew one extension.
+        paths = sorted(
+            path
+            for suffix in ("cpp", "cu", "hip")
+            for path in self._shipped_tree().rglob("*_operator.%s" % suffix)
+        )
+        for path in paths:
             source = path.read_text()
             if not unit_direction.search(source):
                 continue
