@@ -59,6 +59,27 @@
 # growing is not the thing the correction is meant to be.
 #
 # Two cells, then, not for redundancy but because the ratio between them is the measurement.
+# ONE JOB, PARAMETERISED BY --export. There were briefly three of these -- this one plus a
+# peclet_sweep and a peclet_bounded, each a sed copy of the last -- and the copies are exactly
+# why the third silently ran the wrong arms: it was taken before this file's arm lists became
+# overridable, so it carried a hardcoded block that overwrote the environment it was handed.
+# The job reported success and measured something nobody had asked for. A copied script drifts
+# the same way a copied kernel does.
+#
+#   the limiter arms (default):
+#     sbatch jobs/conv_limiter.sbatch
+#
+#   the cell-Peclet sweep -- dissipation per arm at fixed mesh, viscosity varying:
+#     sbatch --export=ALL,QUICK=1,SFEM_STATS=1,CELLS="0.05:2:4 0.02:2:4 0.01:2:4 0.005:2:4" \
+#            jobs/conv_limiter.sbatch
+#
+#   boundedness at CONVERGENCE rather than at stage openings. Freezing builds the correction
+#   once per stage, so a frozen arm only ever samples stage-opening states -- which is why two
+#   runs whose rho ramps shared all five stages reported byte-identical counts. An unfrozen arm
+#   rebuilds it every residual:
+#     sbatch --export=ALL,QUICK=1,LM_ARMS=2,FROZEN_ARMS=,SFEM_STATS=1,CELLS="0.05:2:4 0.01:2:4" \
+#            jobs/conv_limiter.sbatch
+
 set -u
 ROOT=${SLURM_SUBMIT_DIR:-$PWD}
 D=${BIN:-$ROOT/build_solver/cvfem_hex8_ns_ssgmg}
@@ -70,7 +91,9 @@ U=$(grep '^uenv start' ~/init.sh | sed 's/^uenv start //')
 echo "host $(hostname)  cores 72 (Grace Neoverse V2)  $(date)"
 echo
 
-BASE="SFEM_CASE=step SFEM_U=1 SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0"
+# SFEM_STATS=1 turns on the limiter boundedness counting; off by default so the ordinary
+# limiter run is unchanged.
+BASE="SFEM_CASE=step SFEM_U=1 SFEM_LIMITER_STATS=${SFEM_STATS:-0} SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=vanka SFEM_GMG_OMEGA=1.0"
 
 # A cap per ARM, set from the first-order run rather than guessed.
 #
@@ -162,7 +185,13 @@ for CELL in ${CELLS:-"0.05:2:4" "0.05:4:4"}; do
         SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=0
     REF_SECS=$(( SECONDS - REF_T0 ))
     for LM in $LM_ARMS; do
-        run_one "re${RE}_n${NN}l${LV}_ho_lim${LM}" SFEM_MU=$MU SFEM_N=$NN \
+        # SFEM_CONV_FREEZE=0 EXPLICITLY. These arms are the unfrozen ones -- that is what
+        # distinguishes them from the _frozen arms below -- and freezing became the DEFAULT
+        # once it was shown to dominate. Without this line the default silently applied and
+        # these runs were frozen under unfrozen names: the boundedness counts came back
+        # byte-identical to the frozen arms', which is the signature of one instrumented
+        # residual per continuation stage rather than one per Newton step.
+        run_one "re${RE}_n${NN}l${LV}_ho_lim${LM}" SFEM_MU=$MU SFEM_N=$NN SFEM_CONV_FREEZE=0 \
             SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=1 SFEM_CONV_LIMITER=$LM
     done
     # Venkatakrishnan's eps^2 deactivation, swept over its severity.
@@ -186,7 +215,7 @@ for CELL in ${CELLS:-"0.05:2:4" "0.05:4:4"}; do
     # solution, but this scheme's eps^2 is compared against velocity differences on a
     # flow-aligned edge, which are far smaller than the field itself.
     for K in $K_ARMS; do
-        run_one "re${RE}_n${NN}l${LV}_ho_lim2_k${K}" SFEM_MU=$MU SFEM_N=$NN \
+        run_one "re${RE}_n${NN}l${LV}_ho_lim2_k${K}" SFEM_MU=$MU SFEM_N=$NN SFEM_CONV_FREEZE=0 \
             SFEM_ELEMENT_REFINE_LEVEL=$LV SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_VENKAT_K=$K
     done
     # Limiter freezing, which is the OTHER remedy and the interesting one.
