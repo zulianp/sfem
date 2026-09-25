@@ -54,6 +54,13 @@ struct Hex8LimiterStats {
     long   n_samples{0};   // (sub-control surface, velocity component, donor) triples visited
     long   n_outside{0};   // ... where the UNLIMITED reconstruction leaves [lo, hi]
     long   n_changed{0};   // ... where the selected arm altered the increment
+    // ... where the LIMITED face value is still outside [lo, hi]. This is the correctness
+    // assertion, as opposed to the activity counts above: an arm that claims to bound must
+    // leave nothing outside. Expected zero for the clip, for Venkatakrishnan at K = 0 and for
+    // Darwish-Moukalled; expected NON-zero for the unlimited arm, which is the control that
+    // says the counter can see a violation at all, and for any K > 0, which relaxes the bound
+    // by construction.
+    long   n_still_out{0};
     double max_excess{0};  // worst unlimited excursion past the bound, relative to the range
 };
 
@@ -96,6 +103,12 @@ static SFEM_INLINE void cvfem_limiter_record(Hex8LimiterStats *const stats, cons
     const scalar_t abase = base < scalar_t(0) ? -base : base;
     const scalar_t scale = (ainc > abase ? ainc : abase);
     const bool     changed = adiff > scalar_t(1e-12) * (scale > scalar_t(0) ? scale : scalar_t(1));
+    // The limited face, tested against the same bound. A tolerance rather than a strict
+    // comparison because the arms compute the increment and the face is base + out, so a
+    // result that is mathematically exactly on the bound lands a rounding either side of it.
+    const scalar_t fout = base + out;
+    const scalar_t tol  = scalar_t(1e-12) * (scale > scalar_t(0) ? scale : scalar_t(1));
+    const bool     still_out = fout > hi + tol || fout < lo - tol;
 #pragma omp atomic
     stats->n_samples += 1;
     if (over > scalar_t(0)) {
@@ -105,6 +118,10 @@ static SFEM_INLINE void cvfem_limiter_record(Hex8LimiterStats *const stats, cons
     if (changed) {
 #pragma omp atomic
         stats->n_changed += 1;
+    }
+    if (still_out) {
+#pragma omp atomic
+        stats->n_still_out += 1;
     }
     if (rel > 0.0) {
 #pragma omp critical(cvfem_limiter_stats_max)
@@ -130,8 +147,9 @@ inline void cvfem_limiter_stats_report() {
     const double chg = 100.0 * (double)s.n_changed / (double)s.n_samples;
     std::fprintf(stderr,
                  "limiter_stats: samples %ld  outside_bound %ld (%.4f%%)  changed %ld (%.4f%%)  "
-                 "max_excess %.6g\n",
-                 s.n_samples, s.n_outside, out, s.n_changed, chg, s.max_excess);
+                 "still_out %ld (%.4f%%)  max_excess %.6g\n",
+                 s.n_samples, s.n_outside, out, s.n_changed, chg, s.n_still_out,
+                 100.0 * (double)s.n_still_out / (double)s.n_samples, s.max_excess);
     if (s.n_outside == 0)
         std::fprintf(stderr,
                      "limiter_stats: the reconstruction never left the bound, so THIS CASE "
@@ -205,6 +223,33 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_venkata_inc(const scalar_t ba
     return (den != scalar_t(0)) ? (num / den) * inc : inc;
 }
 
+// AND THE BOUND HOLDS, WHICH IS THE CORRECTNESS CLAIM. Same case, unfrozen so the limiter is
+// re-evaluated at every residual, ~2M samples over a converged solve:
+//
+//   arm                  outside before   altered   OUTSIDE AFTER
+//   unlimited (control)      60.96%         0.00%      60.96%
+//   bounded-face clip        61.17%        61.17%       0.0000%
+//   Venkatakrishnan K=0      61.11%        99.29%       0.0000%
+//   Darwish-Moukalled        61.13%        99.26%       0.0000%
+//   Venkatakrishnan K=5      60.98%        65.84%      60.86%
+//
+// The unlimited row is the control and it is what makes the zeros mean anything: it alters
+// nothing, so every violation survives, and "outside after" equals "outside before" to the
+// sample. Against that, three arms leave EXACTLY zero.
+//
+// The K = 5 row is the eps^2 trade measured rather than argued. It fixes 0.12 of the 60.98
+// percentage points that were outside -- eps^2 at that size does not soften the bound, it
+// very nearly abolishes it. K = 5 is also the value with the best convergence (41 Newton
+// steps against 303), so the two properties point opposite ways, and that is exactly why the
+// default is K = 0 with the convergence taken from freezing instead.
+//
+// WHAT THIS DOES NOT COVER. Under SFEM_CONV_FREEZE the correction is applied as a nodal
+// source and this kernel is not called during the stage, so a frozen run reports zero and the
+// zero means nothing. The limiter bounded the reconstruction against the stage-OPENING state;
+// whether the held correction is still bounded against the converged one is unmeasured, and
+// measuring it needs the per-face increments retained rather than collapsed into the nodal
+// vector. Freezing is the default, so this is an open question about the default.
+//
 // MEASURED: THE LIMITER IS ACTIVE, NOT DORMANT. Cavity at Re 100, 7,060 dof, counted over
 // the whole solve with SFEM_LIMITER_STATS=1:
 //
