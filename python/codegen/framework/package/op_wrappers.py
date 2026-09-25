@@ -23,6 +23,7 @@ import os
 import re
 
 from codegen.framework.emitters.cprinter import parameter_list_lines
+from codegen.framework.forms.equations import total_residual_collection
 from codegen.framework.symbolic.fields import is_time_rate_shift
 from codegen.framework.plans.form_transformations import (
     symmetric_metric_component_count,
@@ -61,9 +62,40 @@ def generate_op_files(material, elements, kernel_sources=None):
     abi_sources.update(dispatch_sources)
     systems_by_dim = _systems_by_dim(material, elements)
     equations = _representative_equations(systems_by_dim)
-    if len(equations) > 1:
+    if len(equations) > 1 and _uses_mixed_field_arrays(elements):
+        # A mixed-order element has no combined unit: `_total_residual_unit`
+        # refuses one, because `total_residual_collection` would sum forms
+        # living on two different spaces.  Its parts therefore still publish,
+        # and the wrapper that forwards to them is still the right one.
         header, source = _coupled_energy_residual_op(
             material, elements, c_abi_header, systems_by_dim, abi_sources
+        )
+    elif len(equations) > 1:
+        # A material written as several units exports from the one carrying its
+        # whole residual and from none of its parts, so its wrapper is an
+        # ordinary residual wrapper over that unit's forms.  It used to be a
+        # shape of its own, forwarding two calls per operation -- one per unit,
+        # two traversals of the data -- which is what ISSUES.md item 6 objects
+        # to.  The forms were always summable; what was missing was letting the
+        # sum be the thing that is published.
+        form_collections = {
+            dim: total_residual_collection(
+                system,
+                # The same three orders a hand-written residual material
+                # arrives with.  The 0-form is what tells the wrapper its
+                # merit is a norm over the assembled residual rather than a
+                # potential; without it `value` falls back to the stub that
+                # says the material has no scalar at all.
+                orders=(
+                    _form_order_zero(),
+                    _form_order_one(),
+                    _form_order_two(),
+                ),
+            )
+            for dim, system in systems_by_dim.items()
+        }
+        header, source = _residual_op(
+            material, elements, c_abi_header, form_collections, abi_sources
         )
     elif not equations:
         raise ValueError("generated Op wrappers require at least one equation")
@@ -2044,6 +2076,33 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     if "ds" in measures:
         raise ValueError("generated residual Op wrappers cannot mix dx and ds forms yet")
 
+    # The dimension-generic entry points carry the unit's name too.  The
+    # per-element kernels spell it -- `mooney_rivlin_kelvin_voigt_total_tet4_*`
+    # -- and `_dispatch_mapping` keeps it when it splices the dimension in, so
+    # the roll-up it publishes is `..._total_residual_3d_a_msoa`.  Rebuilding
+    # that name from the material alone finds nothing, and the wrapper then
+    # emits its "dispatch was not generated" arm for a dispatch that is sitting
+    # right there in the generated source.
+    # The same question the header asks: does this material carry a rate,
+    # and so hold a scheme?  Until now only the coupled wrapper could
+    # answer it, which is why its machinery lived only there.
+    holds_scheme = _has_time_rate(material)
+    # Where the history comes from.  A scheme owns it, so a wrapper holding
+    # one has to ask the scheme rather than the buffer a caller set -- that
+    # buffer is null for the whole run, and every body guarding on it refuses
+    # before it computes anything.
+    previous_state = _RESIDUAL_PREVIOUS_STATE[holds_scheme]
+    dispatch_stem = "_".join(
+        part
+        for part in (
+            material.name,
+            str(
+                next(iter(form_collections.values())).equation_name or ""
+            ),
+        )
+        if part
+    )
+
     # A residual whose 0-form is a merit can compute it here: it is half the
     # squared norm of what `gradient` already produces.  One whose 0-form is a
     # potential generally needs an element kernel this emitter cannot yet build,
@@ -2102,7 +2161,20 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         parameter_index = {
             name: index for index, name in enumerate(parameter_names_by_dim[dim])
         }
-        stem = "%s_%s" % (material.name, _element_name(element).lower())
+        # The unit's name sits between the material and the element, exactly
+        # as the kernels spell it.  It is empty for a material written as one
+        # unnamed equation, and `total` for one whose wrapper is built over the
+        # unit carrying its whole residual -- which is what lets a mixed
+        # material reach this path at all.
+        stem = "_".join(
+            part
+            for part in (
+                material.name,
+                str(collection.equation_name or ""),
+                _element_name(element).lower(),
+            )
+            if part
+        )
         performance_cases["gradient"].append(
             _performance_case(
                 element,
@@ -2495,7 +2567,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                 condition
                 for condition in (
                     "!current" if action_uses_current else "",
-                    "!impl_->previous" if action_uses_previous else "",
+                    "!%s" % previous_state if action_uses_previous else "",
                 )
                 if condition
             ),
@@ -2514,7 +2586,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         else ""
     )
     hessian_previous_alias = (
-        "      const real_t *const previous = impl_->previous;"
+        "      const real_t *const previous = %s;" % previous_state
         if action_uses_previous
         else ""
     )
@@ -2525,7 +2597,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     action_packed_affine_uses_metric_soa = any(
         _c_abi_function_uses_cached_metric(
             kernel_sources,
-            "%s_jacobian_action_packed_%dd_a_msoa" % (material.name, dim),
+            "%s_jacobian_action_packed_%dd_a_msoa" % (dispatch_stem, dim),
         )
         for dim in (2, 3)
     )
@@ -2732,7 +2804,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
 
 namespace sfem {
   namespace {
-    constexpr int MAX_PARAMETERS = %(max_parameters)d;
+%(scheme_term_helper)s    constexpr int MAX_PARAMETERS = %(max_parameters)d;
 
     void seed_parameters(Parameters &parameters) {
 %(defaults)s
@@ -2813,7 +2885,7 @@ namespace sfem {
       return SFEM_SUCCESS;
     }
 
-    void parameter_array(const Parameters &parameters,
+    void parameter_array(const Parameters &parameters,%(scheme_parameter)s
                              const int dim,
                              real_t *const values) {
       int index = 0;
@@ -2852,12 +2924,12 @@ namespace sfem {
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
 %(laplace_packed_member)s
-    std::shared_ptr<Buffer<real_t>> previous_buffer;
+%(time_scheme_member)s    std::shared_ptr<Buffer<real_t>> previous_buffer;
     const real_t *previous{nullptr};
     const real_t *current{nullptr};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
-  };
+%(previous_state_accessor)s  };
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
@@ -2980,7 +3052,7 @@ namespace sfem {
 
   int %(op)s::gradient(const real_t *const state, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
-%(gradient_previous_check)s
+%(gradient_previous_check)s%(scheme_gradient_term)s
     impl_->current = state;
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
@@ -3024,7 +3096,7 @@ namespace sfem {
         }
       }
       real_t storage[MAX_PARAMETERS];
-      parameter_array(*domain.parameters,
+      parameter_array(*domain.parameters,%(scheme_argument)s
               mesh->spatial_dimension(),
               storage);
 %(gradient_previous_alias)s
@@ -3037,7 +3109,7 @@ namespace sfem {
                       real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::apply");
     const real_t *const current = state ? state : impl_->current;
-%(apply_state_check)s
+%(apply_state_check)s%(scheme_apply_term)s
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
 %(laplace_packed_apply_fast_path)s
@@ -3081,7 +3153,7 @@ namespace sfem {
         }
       }
       real_t storage[MAX_PARAMETERS];
-      parameter_array(*domain.parameters,
+      parameter_array(*domain.parameters,%(scheme_argument)s
               mesh->spatial_dimension(),
               storage);
 %(apply_previous_alias)s
@@ -3136,7 +3208,7 @@ namespace sfem {
       }
     }
   }
-
+%(set_time_scheme_method)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -3237,6 +3309,19 @@ namespace sfem {
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "laplace_packed_helpers": laplace_packed_helpers,
         "laplace_packed_member": laplace_packed_member,
+        # The time scheme, which used to reach only the coupled wrapper.
+        # A material carrying a rate needs the same six hooks whichever
+        # shape its wrapper has, and they were already factored into
+        # tables keyed on exactly that question.
+        "time_scheme_member": _COUPLED_SCHEME_MEMBER[holds_scheme],
+        "previous_state_accessor": _RESIDUAL_PREVIOUS_STATE_ACCESSOR[holds_scheme],
+        "scheme_term_helper": _COUPLED_SCHEME_TERM_HELPER[holds_scheme],
+        "set_time_scheme_method": _COUPLED_SET_TIME_SCHEME[holds_scheme]
+        % {"op": _op_class_name(material)},
+        "scheme_gradient_term": _RESIDUAL_SCHEME_GRADIENT[holds_scheme],
+        "scheme_apply_term": _RESIDUAL_SCHEME_APPLY[holds_scheme],
+        "scheme_parameter": _COUPLED_SCHEME_PARAMETER[holds_scheme],
+        "scheme_argument": _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
         "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
         "inexact_cache_field": _inexact_cache_field(material),
         "inexact_needs_affine": _inexact_needs_affine(material),
@@ -3260,7 +3345,7 @@ namespace sfem {
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
         "residual_dispatch_body": _residual_apply_dispatch_body(
-            material.name,
+            dispatch_stem,
             "residual",
             "residual_uses_affine",
             "state",
@@ -3275,7 +3360,7 @@ namespace sfem {
                     mixed_order=mixed_order,
                 ),
         "action_dispatch_body": _residual_apply_dispatch_body(
-            material.name,
+            dispatch_stem,
             "jacobian_action",
             "jacobian_action_uses_affine",
             "current",
@@ -3296,7 +3381,11 @@ namespace sfem {
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
-            "      parameter_array(*domain.parameters,\n"
+            # The scheme's shift arrives through the same parameter array the
+            # gradient and the apply fill, so this call takes the same
+            # argument.  Spelling it without the scheme compiled only while no
+            # material reaching this path held one.
+            "      parameter_array(*domain.parameters,%s\n"
             "              mesh->spatial_dimension(),\n"
             "              storage);\n"
             "%s\n"
@@ -3305,9 +3394,10 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
+                _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
-                    material.name,
+                    dispatch_stem,
                     "hessian_crs",
                     kernel_sources,
                     {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
@@ -3329,7 +3419,11 @@ namespace sfem {
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
-            "      parameter_array(*domain.parameters,\n"
+            # The scheme's shift arrives through the same parameter array the
+            # gradient and the apply fill, so this call takes the same
+            # argument.  Spelling it without the scheme compiled only while no
+            # material reaching this path held one.
+            "      parameter_array(*domain.parameters,%s\n"
             "              mesh->spatial_dimension(),\n"
             "              storage);\n"
             "%s\n"
@@ -3338,9 +3432,10 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
+                _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
-                    material.name,
+                    dispatch_stem,
                     "hessian_bsr",
                     kernel_sources,
                     {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
@@ -3373,7 +3468,7 @@ namespace sfem {
             owner="ret->impl_",
         ),
         "gradient_previous_check": (
-            "    if (!impl_->previous) {\n"
+            "    if (!%s) {\n" % previous_state +
             '      SFEM_ERROR("%s requires a previous state\\n");\n'
             "      return SFEM_FAILURE;\n"
             "    }" % _op_class_name(material)
@@ -3381,7 +3476,7 @@ namespace sfem {
             else ""
         ),
         "gradient_previous_alias": (
-            "      const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = %s;" % previous_state
             if residual_uses_previous
             else ""
         ),
@@ -3395,7 +3490,7 @@ namespace sfem {
                     condition
                     for condition in (
                         "!current" if action_uses_current else "",
-                        "!impl_->previous" if action_uses_previous else "",
+                        "!%s" % previous_state if action_uses_previous else "",
                     )
                     if condition
                 ),
@@ -3414,7 +3509,7 @@ namespace sfem {
             else ""
         ),
         "apply_previous_alias": (
-            "      const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = %s;" % previous_state
             if action_uses_previous
             else ""
         ),
@@ -5318,6 +5413,37 @@ def _coupled_parameter_array_lines(defaults):
     return "\n".join(lines)
 
 
+#: How the residual wrapper's bodies name the history.  With a scheme attached
+#: the scheme owns it and `previous` stays null for the whole run, so reading
+#: the buffer makes every body guarding on it refuse before it computes
+#: anything -- which is what `sfem_TimeSchemeIndependenceTest` saw.
+_RESIDUAL_PREVIOUS_STATE = {
+    False: "impl_->previous",
+    True: "impl_->previous_state()",
+}
+
+
+#: The history accessor, for the residual wrapper.  Absent without a scheme:
+#: its bodies read `impl_->previous` directly, and an accessor nothing calls is
+#: what `test_kernels_are_lean` counts.
+_RESIDUAL_PREVIOUS_STATE_ACCESSOR = {
+    False: "",
+    True: """
+    //! The history the form reads: the scheme's when one is attached, and the
+    //! buffer a caller set otherwise.
+    const real_t *previous_state() const {
+      return time_scheme ? time_scheme->history() : previous;
+    }
+""",
+}
+
+
+#: The scheme argument at a `parameter_array` call whose arguments continue on
+#: the next line, spelled so that its absence leaves that line exactly as it
+#: was rather than trailing a space.
+_RESIDUAL_SCHEME_ARGUMENT = {False: "", True: " impl_->time_scheme.get(),"}
+
+
 #: The scheme reaches `parameter_array` as an argument because that function is
 #: a free one in an anonymous namespace and has no `impl_`.  It is declared only
 #: when the material has a rate: a parameter no body reads is what
@@ -5365,6 +5491,21 @@ _COUPLED_SCHEME_APPLY = {
       }
     }
 """,
+}
+
+#: The same two terms, for the residual template, which places them directly
+#: after the state check rather than on a line of their own.  The check is
+#: itself a hook and is empty for a material that needs no previous state, so
+#: the separating newline has to travel with the term: putting it in the
+#: template would leave a blank line in every wrapper that has neither.
+_RESIDUAL_SCHEME_GRADIENT = {
+    False: "",
+    True: "\n" + _COUPLED_SCHEME_GRADIENT[True],
+}
+
+_RESIDUAL_SCHEME_APPLY = {
+    False: "",
+    True: "\n" + _COUPLED_SCHEME_APPLY[True],
 }
 
 _COUPLED_SCHEME_HESSIAN_BSR = {
@@ -5740,14 +5881,32 @@ def _form_order_two():
     return FormOrder.TWO
 
 
+#: Where one parameter's value comes from, keyed on whether it is a rate's
+#: shift.  The indexed twin of `_COUPLED_PARAMETER_SOURCE`.
+_RESIDUAL_PARAMETER_SOURCE = {
+    False: lambda name: (
+        '          values[index++] = parameters.require_real_value("%s");' % name
+    ),
+    True: lambda name: (
+        "          values[index++] = time_scheme ? time_scheme->shift()\n"
+        '                                        : parameters.require_real_value("%s");'
+        % name
+    ),
+}
+
+
 def _residual_parameter_array_lines(parameter_names_by_dim):
     lines = ["      switch (dim) {"]
     for dim in sorted(parameter_names_by_dim):
         lines.append("        case %d:" % dim)
         for name in parameter_names_by_dim[dim]:
+            # A rate's shift comes from the scheme when one is attached, and
+            # from the parameters otherwise, so a material carrying a rate
+            # stays usable without a scheme.  Same rule as the coupled path's
+            # `_COUPLED_PARAMETER_SOURCE`, spelled for the indexed form this
+            # switch uses.
             lines.append(
-                '          values[index++] = parameters.require_real_value("%s");'
-                % name
+                _RESIDUAL_PARAMETER_SOURCE[is_time_rate_shift(name)](name)
             )
         lines.append("          break;")
     lines.extend(

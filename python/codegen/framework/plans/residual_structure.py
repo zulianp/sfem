@@ -51,14 +51,12 @@ def published_unit_kernels(kernels, mixes_energy_and_residual):
     generated, exported and never called -- ABI surface standing behind a
     number nothing may read.
 
-    Only the 0-form goes.  The gradient and the apply are 1- and 2-forms, and
-    those do add, which is what lets the combined unit sum them.
+    Nor does it publish the other two.  The gradient and the apply *do* add,
+    and that is why they belong to the combined unit rather than to this one:
+    summing them in the form layer gives one kernel over one form and one
+    traversal, where a kernel per unit gives two of each.
     """
-    return tuple(
-        kernel
-        for kernel in kernels
-        if not (mixes_energy_and_residual and kernel == "objective")
-    )
+    return () if mixes_energy_and_residual else tuple(kernels)
 
 
 def unit_exists_for_the_merit(unit_name):
@@ -80,7 +78,9 @@ def unit_exists_for_the_merit(unit_name):
     return str(unit_name) == TOTAL_RESIDUAL_UNIT_NAME
 
 
-def published_residual_forms(form_dependencies, unit_name=""):
+def published_residual_forms(
+    form_dependencies, unit_name="", mixes_energy_and_residual=False
+):
     """Which of `RESIDUAL_FORMS` a unit publishes.
 
     Two conditions, and neither is emission's to decide.
@@ -97,12 +97,21 @@ def published_residual_forms(form_dependencies, unit_name=""):
     single-unit material they would be the same arithmetic twice; for a
     multi-unit one they are a second spelling of the sum.
     """
-    if unit_exists_for_the_merit(unit_name):
-        return ()
+    # Exactly one unit publishes, and which one is the material's shape.  A
+    # material written as one formulation publishes from its own unit, and the
+    # combined unit exists only for the merit.  A material mixing an energy
+    # with a residual is the other way round: its parts do not separately mean
+    # anything a caller may use, so the combined unit publishes and the parts
+    # publish nothing.
+    publishing = unit_exists_for_the_merit(unit_name) == bool(
+        mixes_energy_and_residual
+    )
     return tuple(
         form
         for form in RESIDUAL_FORMS
-        if form in form_dependencies and publishes_kernel(form_dependencies[form])
+        if publishing
+        and form in form_dependencies
+        and publishes_kernel(form_dependencies[form])
     )
 
 

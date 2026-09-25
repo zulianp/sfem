@@ -1894,6 +1894,7 @@ def generate_coupled_residual_sfem_files(
     diagnostics_plan=None,
     matrix_format_plan=None,
     unit_name="",
+    mixes_energy_and_residual=False,
 ):
     if not isinstance(system, ResidualEmissionModel):
         raise TypeError(
@@ -1963,6 +1964,7 @@ def generate_coupled_residual_sfem_files(
             ),
         },
         unit_name,
+        mixes_energy_and_residual,
     )
     local_files = published_local_kernel_files(published_here, unit_name)
     operator_files = published_mesh_operator_files(
@@ -1985,6 +1987,7 @@ def generate_coupled_residual_sfem_files(
             *_compatible_matrix_field_indices_from_prefix(prefix, system, element_type)
         ),
         unit_name=unit_name,
+        mixes_energy_and_residual=mixes_energy_and_residual,
     )
     operator_source = _operator_source(
         system,
@@ -2000,6 +2003,7 @@ def generate_coupled_residual_sfem_files(
         matrix_format_plan=matrix_format_plan,
         emit_diagnostics=diagnostics_plan is not None,
         unit_name=unit_name,
+        mixes_energy_and_residual=mixes_energy_and_residual,
         local_files=local_files,
     )
     diagnostics_name = _header("kernel_diagnostics")
@@ -2362,6 +2366,7 @@ def _local_header(
     matrix_format_plan=None,
     matrix_block=None,
     unit_name="",
+    mixes_energy_and_residual=False,
 ):
     """The element-local header for one kernel.
 
@@ -2443,6 +2448,7 @@ def _local_header(
     published = _published_forms(
         {"residual": residual_dependencies, "jacobian_action": action_dependencies},
         unit_name,
+        mixes_energy_and_residual,
     )
     for _residual in [form for form in published if form == "residual"]:
         lines.extend(
@@ -4723,7 +4729,7 @@ def _test_value_nodes(dependencies):
 
 #: The forms a coupled residual unit emits, in the order it has always emitted
 #: them.
-def _published_forms(form_dependencies, unit_name=""):
+def _published_forms(form_dependencies, unit_name="", mixes_energy_and_residual=False):
     """Those of `RESIDUAL_FORMS` this unit publishes, from the plan.
 
     The sequence is `plans.residual_structure.published_residual_forms`; this is
@@ -4731,7 +4737,9 @@ def _published_forms(form_dependencies, unit_name=""):
     nor dispatched to, and an empty sequence emits nothing at all -- which is
     what a unit carrying only the material's whole residual for the merit gets.
     """
-    return published_residual_forms(form_dependencies, unit_name)
+    return published_residual_forms(
+        form_dependencies, unit_name, mixes_energy_and_residual
+    )
 
 
 def _geometry_value_nodes(dependencies, dim):
@@ -5619,6 +5627,7 @@ def _operator_source(
     matrix_format_plan=None,
     emit_diagnostics=True,
     unit_name="",
+    mixes_energy_and_residual=False,
     local_files=("local",),
 ):
     rule = specialization.quadrature_rule
@@ -5688,7 +5697,9 @@ def _operator_source(
     # Which forms publish a kernel is the plan's answer, and the loop walks
     # what it returns: a form that contracts nothing has no element entry
     # point, rather than one wrapping an empty loop nest.
-    for form in _published_forms(form_dependencies, unit_name):
+    for form in _published_forms(
+        form_dependencies, unit_name, mixes_energy_and_residual
+    ):
         dependencies = form_dependencies[form]
         coefficients = residual_coeffs if form == "residual" else action_coeffs
         gradient_metric = None
