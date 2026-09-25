@@ -3456,6 +3456,154 @@ def _tensor_index_nodes(name, extent, dim):
     ]
 
 
+#: The trial function's own value as a direction, where the flux contracts it.
+_TRIAL_VALUE_DIRECTION = {False: [], True: [("value", None)]}
+
+#: What one direction substitutes for the trial function's value: one when it
+#: *is* that direction, zero when the flux reads a value it is not varying, and
+#: nothing at all where the flux reads no value.
+_TRIAL_VALUE_SUBSTITUTION = {
+    (False, False): None,
+    (False, True): sp.Integer(0),
+    (True, True): sp.Integer(1),
+    (True, False): sp.Integer(1),
+}
+
+
+def _trial_directions(dependencies, dim, contracts_value):
+    """The trial degrees of freedom one column field carries, as directions.
+
+    A trial basis function enters the flux through its gradient -- one direction
+    per live axis -- and, where the flux contracts it, through its value as
+    well.  Each is a unit direction the flux is linear in, so substituting it
+    gives that column of the tangent rather than the whole column of the matrix.
+    """
+    return tuple(
+        [("grad", axis) for axis in live_gradient_directions(dependencies, dim)]
+        + _TRIAL_VALUE_DIRECTION[bool(contracts_value)]
+    )
+
+
+#: A unit direction's components, by whether this is the one being varied.
+_UNIT_DIRECTION = {False: sp.Integer(0), True: sp.Integer(1)}
+
+#: Which half of a coefficient a tangent target names.
+_COEFFICIENT_COMPONENT = {
+    False: lambda coefficient, index: coefficient.gradient[index],
+    True: lambda coefficient, index: coefficient.value,
+}
+
+
+def _tangent_targets_for_row(row, dependencies, dim):
+    """One row field's coefficients: what each is called and where it lives.
+
+    The name carries the row and the component; the index says which entry of
+    the coefficient record holds it, so the staging reads the expression and
+    the contraction writes the coefficient without either spelling the other's
+    layout.
+    """
+    return tuple(
+        [("value%d" % row, "value_coeff%d" % row, 0)]
+        * bool(dependencies.value_coefficients[row])
+        + [
+            ("grad%d_%d" % (row, d), "grad_coeff%d_%d" % (row, d), d)
+            for d in range(dim)
+            if dependencies.gradient_coefficients[row][d]
+        ]
+    )
+
+
+def _tangent_entry_name(column_field, kind, axis, target):
+    """What one entry of the staged tangent is called.
+
+    Indexed by the trial degree of freedom it differentiates -- the column
+    field and which of its quantities -- and by the coefficient it contributes
+    to.  Spelled in one place because the staging writes it and the trial loop
+    reads it.
+    """
+    trial = "d%d" % column_field if axis is None else "d%d_%d" % (column_field, axis)
+    return "tangent_%s_%s_%s" % (kind, trial, target)
+
+
+def _tangent_targets_for_column(block, dependencies, dim):
+    """The coefficients one column pass builds, and what each is called.
+
+    The same sequence `_tangent_evaluation_nodes` named its entries after, so
+    the staging and the contraction agree on which entry feeds which
+    coefficient without either of them saying it twice.
+    """
+    return tuple(
+        (suffix, coefficient)
+        for row in block.row_fields
+        for suffix, coefficient, _index in _tangent_targets_for_row(
+            row, dependencies, dim
+        )
+    )
+
+
+def _tangent_evaluation_nodes(system, coefficients, block, dependencies, dim, contracts_value):
+    """The tangent itself, eliminated once for every column and every direction.
+
+    The flux is linear in the direction, so the column belonging to one trial
+    degree of freedom is the flux with that basis function substituted -- and
+    the coefficient of each of the basis function's own quantities is the
+    tangent.  Substituting the *symbol* `trial_grad<e>`, as this used to, leaves
+    the tangent inside the loop over trial functions: measured on Mooney-Rivlin
+    Kelvin-Voigt in 3D, 188 temporaries and 2,358 operations that do not depend
+    on the trial function at all, recomputed once per trial function and
+    emitted again for each of the three column fields.
+
+    Substituting a unit direction instead gives the same tangent as an
+    expression that can be hoisted.  It is not the expansion
+    `plans/direct_assembly` measured at 56.7 million operations and rejected:
+    nothing is expanded, the substitution just puts a one and some zeros where
+    a symbol was, which is why it comes out *cheaper* -- 444 temporaries and
+    2,221 operations for all 81 entries, against 437 and 2,358 for the 27
+    coefficients it replaces, and 3.7 seconds of sympy against 6.7.
+    """
+    entries = []
+    for column_field in block.column_fields:
+        for kind, axis in _trial_directions(dependencies, dim, contracts_value):
+            column = _trial_substituted_coefficients(
+                system,
+                coefficients,
+                column_field,
+                [_UNIT_DIRECTION[(kind, axis) == ("grad", d)] for d in range(dim)],
+                _TRIAL_VALUE_SUBSTITUTION[(kind == "value", bool(contracts_value))],
+            )
+            entries.extend(
+                (
+                    _tangent_entry_name(column_field, kind, axis, suffix),
+                    _COEFFICIENT_COMPONENT[suffix.startswith("value")](
+                        column[row], index
+                    ),
+                )
+                for row in block.row_fields
+                for suffix, _coefficient, index in _tangent_targets_for_row(
+                    row, dependencies, dim
+                )
+            )
+    targets = tuple(name for name, _ in entries)
+    expressions = [expression for _, expression in entries]
+    if not expressions:
+        return [], ()
+    temporaries, reduced = sp.cse(
+        expressions, symbols=sp.numbered_symbols("tangent_tmp")
+    )
+    temporaries = _prune_dead_cse_intermediates(temporaries, reduced)
+    nodes = [
+        BufferDeclNode(
+            "const s_t", str(symbol), (), expr_ref(_sfem_ccode(expression))
+        )
+        for symbol, expression in temporaries
+    ]
+    nodes.extend(
+        BufferDeclNode("const s_t", target, (), expr_ref(_sfem_ccode(expression)))
+        for target, expression in zip(targets, reduced)
+    )
+    return nodes, tuple(targets)
+
+
 def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
     """Every entry of the element matrix, one column at a time, factorised.
 
@@ -3573,15 +3721,84 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         for quantity in substituted_trial_quantities(dependencies)
         if quantity == "value"
     ]
-    for trial_component in block.column_fields:
-        column = _trial_substituted_coefficients(
-            system,
-            coefficients,
-            trial_component,
-            [sp.Symbol("trial_grad%d" % d) for d in range(dim)],
-            sp.Symbol("trial_value") if trial_value_nodes else None,
+    # The tangent, staged once for every quadrature point.
+    #
+    # It is what the flux becomes when the direction is a trial basis function,
+    # and it does not depend on *which* trial function that is -- so it belongs
+    # outside the loop over them and outside the unrolled column fields, both
+    # of which it used to sit inside.
+    tangent_nodes, tangent_targets = _tangent_evaluation_nodes(
+        system, coefficients, block, dependencies, dim, bool(trial_value_nodes)
+    )
+    if tangent_targets:
+        nodes.extend(
+            [
+                BufferDeclNode(
+                    "static constexpr int",
+                    "N_TANGENT",
+                    (),
+                    expr_ref("%d" % len(tangent_targets)),
+                ),
+                BufferDeclNode("s_t", "tangent", ("N_TANGENT * NQ * VS",)),
+            ]
         )
+        staging_quadrature_body = []
+        staging_lane_body = []
+        if uses_determinant:
+            staging_quadrature_body.append(
+                BufferDeclNode(
+                    "const s_t *const RSTR", "det_q", (),
+                    expr_ref("determinant + q * geometry_stride"),
+                )
+            )
+            staging_lane_body.append(
+                BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _wi()))
+            )
+        for i in _adjugate_components(dependencies, dim):
+            staging_quadrature_body.append(
+                BufferDeclNode(
+                    "const s_t *const RSTR", "adj_q%d" % i, (),
+                    expr_ref("adjugate[%d] + q * geometry_stride" % i),
+                )
+            )
+            staging_lane_body.append(
+                BufferDeclNode(
+                    "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _wi()) % i)
+                )
+            )
+        staging_hoists, staging_aliases = _tensor_field_alias_nodes(system, assembled)
+        staging_quadrature_body.extend(staging_hoists)
+        staging_lane_body.extend(staging_aliases)
+        staging_lane_body.extend(tangent_nodes)
+        for index, target in enumerate(tangent_targets):
+            staging_quadrature_body.append(
+                BufferDeclNode(
+                    "s_t *const RSTR", "%s_q" % target, (),
+                    expr_ref(
+                        "&tangent[%s * VS]"
+                        % c_group(c_sum(c_product("%d" % index, "NQ"), "q"))
+                    ),
+                )
+            )
+            staging_lane_body.append(
+                AssignmentNode(
+                    expr_ref(('%s_q' % target) + _wi()), expr_ref(target)
+                )
+            )
+        staging_quadrature_body.append(_work_item_loop_node(staging_lane_body))
+        staging_quadrature = iterator("q", "int")
+        nodes.append(
+            LoopNode(
+                LoopKind.QUADRATURE,
+                staging_quadrature,
+                iteration_range(0, expr_ref("NQ", "quadrature_count")),
+                pre_increment(staging_quadrature),
+                body=tuple(staging_quadrature_body),
+            )
+        )
+    tangent_index = {target: index for index, target in enumerate(tangent_targets)}
 
+    for trial_component in block.column_fields:
         quadrature_body = list(_tensor_index_nodes("q", "NQ", dim))
         quadrature_body.append(
             BufferDeclNode(
@@ -3619,9 +3836,8 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                     "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _wi()) % i)
                 )
             )
-        field_hoists, field_aliases = _tensor_field_alias_nodes(system, assembled)
-        quadrature_body.extend(field_hoists)
-        lane_body.extend(field_aliases)
+        # No state here any more: this loop contracts the staged tangent with
+        # the trial function, and the tangent is all the state it needs.
         lane_body.extend(
             _basis_gradient_nodes(
                 "trial_grad",
@@ -3632,9 +3848,36 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
             )
         )
         lane_body.extend(trial_value_nodes)
-        lane_body.extend(
-            _coefficient_evaluation_nodes(system, column, dependencies)
-        )
+        directions = _trial_directions(dependencies, dim, bool(trial_value_nodes))
+        for target_suffix, wanted in _tangent_targets_for_column(
+            block, dependencies, dim
+        ):
+            terms = []
+            for kind, axis in directions:
+                name = _tangent_entry_name(trial_component, kind, axis, target_suffix)
+                if name not in tangent_index:
+                    continue
+                quantity = "trial_value" if kind == "value" else "trial_grad%d" % axis
+                quadrature_body.append(
+                    BufferDeclNode(
+                        "const s_t *const RSTR", "%s_q" % name, (),
+                        expr_ref(
+                            "&tangent[%s * VS]"
+                            % c_group(
+                                c_sum(c_product("%d" % tangent_index[name], "NQ"), "q")
+                            )
+                        ),
+                    )
+                )
+                terms.append("%s * %s" % (quantity, ('%s_q' % name) + _wi()))
+            lane_body.append(
+                BufferDeclNode(
+                    "const s_t",
+                    wanted,
+                    (),
+                    expr_ref(" + ".join(terms) if terms else "s_t(0)"),
+                )
+            )
         for row in block.row_fields:
             value = _VALUE_COEFFICIENT_TERM[
                 bool(dependencies.value_coefficients[row])
@@ -3787,25 +4030,64 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
         for quantity in substituted_trial_quantities(dependencies)
         if quantity == "value"
     ]
+    # The tangent, once per quadrature point rather than once per trial
+    # function and column field.  It is the flux with a trial degree of freedom
+    # substituted for the direction, and which trial function that is does not
+    # reach it -- so the state transform and the material both belong out here,
+    # where they used to sit inside the loop over trial functions and be
+    # emitted again for every column field.
+    tangent_nodes, tangent_targets = _tangent_evaluation_nodes(
+        system, coefficients, block, dependencies, dim, bool(trial_value_nodes)
+    )
+    tangent_index = {target: index for index, target in enumerate(tangent_targets)}
+    tangent_staging = []
+    if tangent_targets:
+        body.append(
+            BufferDeclNode("s_t", "tangent", ("%d" % len(tangent_targets), "VS"))
+        )
+        staging_lane_body = list(_simplex_state_transform_nodes(system, assembled, usage))
+        staging_lane_body.extend(tangent_nodes)
+        staging_lane_body.extend(
+            AssignmentNode(
+                expr_ref(('tangent[%d]' % index) + _wi()), expr_ref(target)
+            )
+            for target, index in tangent_index.items()
+        )
+        tangent_staging.append(_work_item_loop_node(staging_lane_body))
+
     trial_body = []
     for trial_component in block.column_fields:
-        column = _trial_substituted_coefficients(
-            system,
-            coefficients,
-            trial_component,
-            [sp.Symbol("trial_grad%d" % d) for d in range(dim)],
-            sp.Symbol("trial_value") if trial_value_nodes else None,
-        )
-        # The transform is rebuilt per trial component rather than staged: it is
-        # a handful of multiplies and one divide per field direction, while the
-        # material block beside it is thousands of operations, and staging it
-        # would cost a buffer per field and role.
-        material = list(_simplex_state_transform_nodes(system, assembled, usage))
+        # The geometry, because the trial function's gradient is pushed forward
+        # here.  It used to arrive with the state transform, which has moved
+        # out to the staging pass above.
+        material = list(_geometry_value_nodes(dependencies, dim))
         material.extend(
             _basis_gradient_nodes("trial_grad", "trial", dim, directions=directions)
         )
         material.extend(trial_value_nodes)
-        material.extend(_coefficient_evaluation_nodes(system, column, dependencies))
+        for target_suffix, wanted in _tangent_targets_for_column(
+            block, dependencies, dim
+        ):
+            terms = []
+            for kind, axis in _trial_directions(
+                dependencies, dim, bool(trial_value_nodes)
+            ):
+                name = _tangent_entry_name(trial_component, kind, axis, target_suffix)
+                if name not in tangent_index:
+                    continue
+                quantity = "trial_value" if kind == "value" else "trial_grad%d" % axis
+                terms.append(
+                    "%s * %s"
+                    % (quantity, ('tangent[%d]' % tangent_index[name]) + _wi())
+                )
+            material.append(
+                BufferDeclNode(
+                    "const s_t",
+                    wanted,
+                    (),
+                    expr_ref(" + ".join(terms) if terms else "s_t(0)"),
+                )
+            )
         material.extend(
             AssignmentNode(expr_ref(('%s_values' + _wi()) % name), expr_ref(name))
             for row in range(n_fields)
@@ -3837,6 +4119,7 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
         )
 
     quadrature_body = list(_simplex_state_gather_nodes(system, assembled, usage))
+    quadrature_body.extend(tangent_staging)
     quadrature_body.append(_shape_loop_node("trial", trial_body))
     quadrature = iterator("q", "int")
     body.append(
