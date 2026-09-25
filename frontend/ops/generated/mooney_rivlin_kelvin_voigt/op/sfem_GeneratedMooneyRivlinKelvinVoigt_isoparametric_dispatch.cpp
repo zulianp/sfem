@@ -51,27 +51,6 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_hessian_bsr_i_msoa(
     const idx_t *const RSTR colidx,
     void *const RSTR values
 );
-extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_hessian_bsr_i_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
-    const ptrdiff_t current_stride,
-    const void *const RSTR u0,
-    const void *const RSTR u1,
-    const ptrdiff_t previous_stride,
-    const void *const RSTR u0_old,
-    const void *const RSTR u1_old,
-    const count_t *const RSTR rowptr,
-    const idx_t *const RSTR colidx,
-    void *const RSTR values
-);
 extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_hessian_bsr_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -119,29 +98,6 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_hessian_bsr_i_msoa(
     void *const RSTR values
 );
 extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_hessian_bsr_i_msoa(
-    const int scalar_bytes,
-    const ptrdiff_t nelements,
-    const ptrdiff_t nnodes,
-    idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
-    const real_t eta_b,
-    const real_t eta_s,
-    const real_t lmbda,
-    const real_t mu,
-    const real_t u_dt_shift,
-    const ptrdiff_t current_stride,
-    const void *const RSTR u0,
-    const void *const RSTR u1,
-    const void *const RSTR u2,
-    const ptrdiff_t previous_stride,
-    const void *const RSTR u0_old,
-    const void *const RSTR u1_old,
-    const void *const RSTR u2_old,
-    const count_t *const RSTR rowptr,
-    const idx_t *const RSTR colidx,
-    void *const RSTR values
-);
-extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_i_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -557,8 +513,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_hessia
       return mooney_rivlin_kelvin_voigt_total_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values);
     case smesh::QUAD4:
       return mooney_rivlin_kelvin_voigt_total_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values);
-    case smesh::TRI3:
-      return mooney_rivlin_kelvin_voigt_total_tri3_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, previous_stride, u0_old, u1_old, rowptr, colidx, values);
     default:
       break;
   }
@@ -601,8 +555,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int mooney_rivlin_kelvin_voigt_total_hessia
       return mooney_rivlin_kelvin_voigt_total_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, rowptr, colidx, values);
     case smesh::TET10:
       return mooney_rivlin_kelvin_voigt_total_tet10_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, rowptr, colidx, values);
-    case smesh::TET4:
-      return mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, u0, u1, u2, previous_stride, u0_old, u1_old, u2_old, rowptr, colidx, values);
     default:
       break;
   }

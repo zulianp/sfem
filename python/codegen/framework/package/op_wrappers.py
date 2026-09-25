@@ -8440,7 +8440,48 @@ def _residual_hessian_dispatch_body(
     indent,
     mixed_order=False,
 ):
-    lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
+    lines = []
+    # Assembly takes the element's own geometry, like every other kernel it
+    # publishes.  An element with no isoparametric kernel assembles through its
+    # affine one, reading the adjugate the operator has already cached rather
+    # than rebuilding it from the coordinates.
+    affine_by_dim = {
+        dim: _c_abi_public_dispatch_case_elements(
+            kernel_sources, "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
+        )
+        if _c_abi_function_exists(
+            kernel_sources,
+            "%s_%s_%dd_a_msoa" % (material_name, operation, dim),
+            public_only=True,
+        )
+        else ()
+        for dim in (2, 3)
+    }
+    affine_elements = tuple(
+        element for dim in (2, 3) for element in affine_by_dim[dim]
+    )
+    if affine_elements:
+        lines.extend(
+            [
+                "%sconst geom_t *const *adjugate = nullptr;" % indent,
+                "%sconst geom_t *determinant = nullptr;" % indent,
+                "%sif (%s) {"
+                % (indent, _element_condition("domain.element_type", affine_elements)),
+                "%s  auto cache = std::static_pointer_cast<AffineGeometryCache>(" % indent,
+                "%s      domain.user_data);" % indent,
+                "%s  if (!cache || !cache->jacobian) {" % indent,
+                '%s    SFEM_ERROR("%s affine %s requires cached geometry\\n");'
+                % (indent, material_name, operation),
+                "%s    return SFEM_FAILURE;" % indent,
+                "%s  }" % indent,
+                "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
+                "%s      cache->jacobian->jacobian_adjugate_SoA()->data());" % indent,
+                "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
+                "%s      cache->jacobian->jacobian_determinant()->data());" % indent,
+                "%s}" % indent,
+            ]
+        )
+    lines.append("%sconst int dim = mesh->spatial_dimension();" % indent)
     for dim in (2, 3):
         dependencies = action_dependencies_by_dim.get(dim)
         if dependencies is None:
@@ -8450,24 +8491,30 @@ def _residual_hessian_dispatch_body(
             operation,
             dim,
         )
-        prefix = "if" if not any(line.endswith("{") for line in lines) else "else if"
+        affine_function = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
+        prefix = "if" if not any(line.endswith("(dim == 2) {") or line.endswith("(dim == 3) {") for line in lines) else "else if"
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append(
             "%s  static constexpr ptrdiff_t FIELD_STRIDE = %d;"
             % (indent, block_size_by_dim[dim])
         )
         setup = []
-        args = [
+        common = [
             "domain.element_type",
             "real_type",
             "domain.block->n_elements()",
             "mesh->n_nodes()",
             "element_connectivity(domain)",
-            "points",
+        ]
+        args = [*common, "points"]
+        affine_args = [
+            *common,
+            *_affine_geometry_call_args(kernel_sources, affine_function, dim),
         ]
         parameter_index = {
             name: index for index, name in enumerate(parameter_names_by_dim[dim])
         }
+        trailing_start = len(args)
         args.extend(_dependency_storage_args(dependencies.parameters, parameter_index))
         fields = fields_by_dim[dim]
         if dependencies.current:
@@ -8493,14 +8540,38 @@ def _residual_hessian_dispatch_body(
             args.append("FIELD_STRIDE")
             args.extend(_residual_soa_field_argument_names(fields, "old_data", mixed_order))
         args.extend(tail_args)
+        affine_args.extend(args[trailing_start:])
         for line in setup:
             lines.append(line)
+        if affine_by_dim[dim]:
+            lines.append(
+                "%s  if (%s) {"
+                % (
+                    indent,
+                    _element_condition("domain.element_type", affine_by_dim[dim]),
+                )
+            )
+            lines.append(
+                "%s    return %s(%s);"
+                % (
+                    indent,
+                    _entry_point_name(affine_function),
+                    _with_stream(", ".join(affine_args)),
+                )
+            )
+            lines.append("%s  }" % indent)
         if _c_abi_function_exists(kernel_sources, function, public_only=True):
             lines.append("%s  return %s(%s);" % (indent, _entry_point_name(function), _with_stream(", ".join(args))))
-        else:
+        elif not affine_by_dim[dim]:
             lines.append(
                 '%s  SFEM_ERROR("%s %s %dd dispatch was not generated\\n");'
                 % (indent, material_name, operation, dim)
+            )
+            lines.append("%s  return SFEM_FAILURE;" % indent)
+        else:
+            lines.append(
+                '%s  SFEM_ERROR("%s %s does not support element type %%d\\n", domain.element_type);'
+                % (indent, material_name, operation)
             )
             lines.append("%s  return SFEM_FAILURE;" % indent)
         lines.append("%s}" % indent)
@@ -9960,7 +10031,49 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
 
 
 def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources, apply_dependencies_by_dim, tail_args, indent, n_field_components_by_dim=None):
-    lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
+    lines = []
+    # Assembly takes the element's own geometry, like every other kernel.  An
+    # element with no isoparametric kernel assembles through its affine one,
+    # which reads the adjugate the operator has already cached rather than
+    # rebuilding it from the coordinates -- the second spelling of the same
+    # Jacobian that ISSUES.md item 1 objects to.
+    affine_by_dim = {
+        dim: _c_abi_public_dispatch_case_elements(
+            kernel_sources, "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
+        )
+        if _c_abi_function_exists(
+            kernel_sources,
+            "%s_%s_%dd_a_msoa" % (material_name, operation, dim),
+            public_only=True,
+        )
+        else ()
+        for dim in (2, 3)
+    }
+    affine_elements = tuple(
+        element for dim in (2, 3) for element in affine_by_dim[dim]
+    )
+    if affine_elements:
+        lines.extend(
+            [
+                "%sconst geom_t *const *adjugate = nullptr;" % indent,
+                "%sconst geom_t *determinant = nullptr;" % indent,
+                "%sif (%s) {"
+                % (indent, _element_condition("domain.element_type", affine_elements)),
+                "%s  auto cache = std::static_pointer_cast<AffineGeometryCache>(" % indent,
+                "%s      domain.user_data);" % indent,
+                "%s  if (!cache || !cache->jacobian_soa) {" % indent,
+                '%s    SFEM_ERROR("%s affine %s requires cached geometry\\n");'
+                % (indent, material_name, operation),
+                "%s    return SFEM_FAILURE;" % indent,
+                "%s  }" % indent,
+                "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
+                "%s      cache->jacobian_soa->jacobian_adjugate_SoA()->data());" % indent,
+                "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
+                "%s      cache->jacobian_soa->jacobian_determinant()->data());" % indent,
+                "%s}" % indent,
+            ]
+        )
+    lines.append("%sconst int dim = mesh->spatial_dimension();" % indent)
     for dim in (2, 3):
         prefix = "if" if dim == 2 else "else if"
         function = "%s_%s_%dd_i_msoa" % (
@@ -9968,6 +10081,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
             operation,
             dim,
         )
+        affine_function = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
         dependencies = apply_dependencies_by_dim.get(dim)
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         # The stride and the offsets are the field's component count, not the
@@ -9981,6 +10095,35 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
             else []
         )
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
+        if affine_by_dim[dim]:
+            lines.append(
+                "%s  if (%s) {"
+                % (
+                    indent,
+                    _element_condition("domain.element_type", affine_by_dim[dim]),
+                )
+            )
+            lines.append(
+                "%s    return %s(%s);"
+                % (
+                    indent, _entry_point_name(affine_function), _with_stream(", ".join(
+                        [
+                            "domain.element_type",
+                            "real_type",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "element_connectivity(domain)",
+                            *_affine_geometry_call_args(
+                                kernel_sources, affine_function, dim
+                            ),
+                            *parameter_args,
+                            *current_args,
+                            *tail_args,
+                        ]
+                    )),
+                )
+            )
+            lines.append("%s  }" % indent)
         if _c_abi_function_exists(kernel_sources, function, public_only=True):
             lines.append(
                 "%s  return %s(%s);"
@@ -10000,8 +10143,11 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                     )),
                 )
             )
-        else:
+        elif not affine_by_dim[dim]:
             lines.append('%s  SFEM_ERROR("%s %s %dd dispatch was not generated\\n");' % (indent, material_name, operation, dim))
+            lines.append("%s  return SFEM_FAILURE;" % indent)
+        else:
+            lines.append('%s  SFEM_ERROR("%s %s does not support element type %%d\\n", domain.element_type);' % (indent, material_name, operation))
             lines.append("%s  return SFEM_FAILURE;" % indent)
         lines.append("%s}" % indent)
     lines.extend(

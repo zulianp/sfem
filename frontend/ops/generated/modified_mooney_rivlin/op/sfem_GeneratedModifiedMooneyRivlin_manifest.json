@@ -81,8 +81,16 @@
       "name": "modified_mooney_rivlin_gradient_packed_two_pass_3d_i_msoa"
     },
     {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_hessian_bsr_2d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_det0,\n        const real_t c1,\n        const real_t c2,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "modified_mooney_rivlin_hessian_bsr_2d_a_msoa"
+    },
+    {
       "declaration": "extern \"C\" int modified_mooney_rivlin_hessian_bsr_2d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t c1,\n        const real_t c2,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
       "name": "modified_mooney_rivlin_hessian_bsr_2d_i_msoa"
+    },
+    {
+      "declaration": "extern \"C\" int modified_mooney_rivlin_hessian_bsr_3d_a_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const RSTR g_adj0,\n        const geom_t *const RSTR g_adj1,\n        const geom_t *const RSTR g_adj2,\n        const geom_t *const RSTR g_adj3,\n        const geom_t *const RSTR g_adj4,\n        const geom_t *const RSTR g_adj5,\n        const geom_t *const RSTR g_adj6,\n        const geom_t *const RSTR g_adj7,\n        const geom_t *const RSTR g_adj8,\n        const geom_t *const RSTR g_det0,\n        const real_t c1,\n        const real_t c2,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
+      "name": "modified_mooney_rivlin_hessian_bsr_3d_a_msoa"
     },
     {
       "declaration": "extern \"C\" int modified_mooney_rivlin_hessian_bsr_3d_i_msoa(\n        const smesh::ElemType element_type,\n        const enum smesh::PrimitiveType real_type,\n        const ptrdiff_t nelements,\n        const ptrdiff_t nnodes,\n        idx_t **const RSTR elements,\n        const geom_t *const *const RSTR points,\n        const real_t c1,\n        const real_t c2,\n        const real_t kappa,\n        const ptrdiff_t u_stride,\n        const void *const RSTR ux,\n        const void *const RSTR uy,\n        const void *const RSTR uz,\n        const count_t *const RSTR rowptr,\n        const idx_t *const RSTR colidx,\n        void *const RSTR values\n);",
@@ -533,6 +541,18 @@
     {
       "name": "hessian_bsr",
       "variants": [
+        {
+          "function": "modified_mooney_rivlin_hessian_bsr_2d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
+        {
+          "function": "modified_mooney_rivlin_hessian_bsr_3d_a_msoa",
+          "scalar_type": "real_t",
+          "target": "modified_mooney_rivlin",
+          "variant": "affine"
+        },
         {
           "function": "modified_mooney_rivlin_hessian_bsr_2d_i_msoa",
           "scalar_type": "real_t",

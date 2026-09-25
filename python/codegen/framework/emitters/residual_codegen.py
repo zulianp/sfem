@@ -12,6 +12,7 @@ from codegen.framework.emitters.kernel_prologue import (
 from codegen.framework.plans.conventions import (
     PREFIXES,
     abi_geometry_name,
+    abi_mesh_fragment,
     restrict_prelude,
     sfem_scalar_type_fallback,
     sfem_scalar_type_prelude,
@@ -5857,19 +5858,27 @@ def _operator_source(
                     dependencies,
                 )
             )
-    lines.extend(
-        _scalar_crs_matrix_assembly_source(
-            system,
-            prefix,
-            local_prefix,
-            specialization,
-            form_dependencies["jacobian_action"],
-            action_coeffs,
-            basis_family,
-            geometry_family,
-            matrix_format_plan,
+    # Assembly takes the element's own geometry, which is the plan's answer and
+    # not this emitter's: an element with an isoparametric kernel assembles
+    # through it, and one without has an affine kernel that computes the same
+    # numbers on a constant Jacobian.
+    for _assembly_mode in geometry_variant_plan(
+        None, rule, specialized=False, assembles_matrix=True
+    ).assembly_modes:
+        lines.extend(
+            _scalar_crs_matrix_assembly_source(
+                system,
+                prefix,
+                local_prefix,
+                specialization,
+                form_dependencies["jacobian_action"],
+                action_coeffs,
+                basis_family,
+                geometry_family,
+                matrix_format_plan,
+                geometry_mode=_assembly_mode,
+            )
         )
-    )
     # The node-centric merit kernel, where the unit and the element admit one.
     # It goes in the per-element source rather than the family header because
     # it is both: it needs an orientation, which only the affine simplices
@@ -7833,6 +7842,7 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
 
 
 def _scalar_crs_precision_entry_points(
+    geometry_streams,
     dependencies,
     function_base,
     impl,
@@ -7856,7 +7866,9 @@ def _scalar_crs_precision_entry_points(
     converted.  A material with both, Mooney-Rivlin Kelvin-Voigt, published one
     symbol for its elastic block and two for its viscous one.
     """
-    matrix_arguments = ["nelements", "nnodes", "elements", "points"]
+    # The geometry the implementation takes, which is the element's own: the
+    # coordinates, or the cached Jacobian an affine assembly reads.
+    matrix_arguments = ["nelements", "nnodes", "elements", *geometry_streams]
     matrix_arguments.extend(map(str, dependencies.parameters))
     matrix_arguments.extend(
         _mesh_stream_arguments(state_dependencies, system.fields, output=False)
@@ -8197,6 +8209,18 @@ def _element_matrix_kernel_for(strategy, kernels):
     return kernels.get(_ELEMENT_MATRIX_FALLBACK.get(strategy))
 
 
+def _assembly_geometry_stream_names(dim):
+    """The adjugate and determinant an assembly kernel stages, in ABI order.
+
+    The block kernel takes the adjugate and the determinant whatever the
+    element, so an affine assembly reads exactly those two streams; the metric
+    form is a matrix-free contraction and has no bearing here.
+    """
+    return tuple(
+        ["adj%d" % component for component in range(dim * dim)] + ["det0"]
+    )
+
+
 def _scalar_crs_matrix_assembly_source(
     system,
     prefix,
@@ -8207,6 +8231,7 @@ def _scalar_crs_matrix_assembly_source(
     basis_family,
     geometry_family,
     matrix_format_plan,
+    geometry_mode=ISOPARAMETRIC_MODE,
 ):
     matrix_formats = published_matrix_formats(matrix_format_plan)
     if not {"crs", "bsr"}.intersection(matrix_formats):
@@ -8331,15 +8356,29 @@ def _scalar_crs_matrix_assembly_source(
         if tensor_product_geometry
         else ([], "elements")
     )
-    function_base = "%s_hessian_crs_i_msoa" % prefix
+    is_affine_assembly = geometry_mode == AFFINE_MODE
+    # `crs` stays in the base: the `bsr` twin and the packed passes are spliced
+    # out of this name, so dropping it renames every format at once.
+    function_base = "%s_hessian_crs_%s" % (prefix, abi_mesh_fragment(geometry_mode))
     impl = "%s_impl" % function_base
     block = "%s_jacobian_action_block" % local_prefix
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
         "idx_t **const RSTR elements",
-        "const geom_t *const *const RSTR points",
     ]
+    # The geometry this element's other kernels already read, or the
+    # coordinates.  An element whose Jacobian is constant has it cached once,
+    # and rebuilding it here is the same quantity computed a second way --
+    # which is what left a constant-P1 simplex affine everywhere except in the
+    # kernel that assembles its matrix.
+    if is_affine_assembly:
+        params.extend(
+            "const geom_t *const RSTR %s" % abi_geometry_name(stream)
+            for stream in _assembly_geometry_stream_names(dim)
+        )
+    else:
+        params.append("const geom_t *const *const RSTR points")
     params.extend(
         "const s_t %s" % parameter for parameter in dependencies.parameters
     )
@@ -8422,7 +8461,7 @@ def _scalar_crs_matrix_assembly_source(
             "    const int ne = 1;",
             "    idx_t ev[NS];",
             "    s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
-            "    s_t bcoordinates[ND * NS][VS];",
+            *([] if is_affine_assembly else ["    s_t bcoordinates[ND * NS][VS];"]),
             "    s_t badjugate_data[ND * ND][NQ * VS];",
             "    s_t bdeterminant[NQ * VS];",
         ]
@@ -8442,16 +8481,35 @@ def _scalar_crs_matrix_assembly_source(
         )
     lines.extend(
         [
-            "    const geom_t *const coordinate_components[ND] = {%s};"
-            % ", ".join("points[%d]" % d for d in range(dim)),
+            *(
+                []
+                if is_affine_assembly
+                else [
+                    "    const geom_t *const coordinate_components[ND] = {%s};"
+                    % ", ".join("points[%d]" % d for d in range(dim))
+                ]
+            ),
             "",
             "    for (int shape = 0; shape < NS; ++shape) {",
             "      const idx_t node = elements[shape][element];",
-            "      const idx_t coordinate_node = %s[shape][element];" % coordinate_element_array,
+            *(
+                []
+                if is_affine_assembly
+                else [
+                    "      const idx_t coordinate_node = %s[shape][element];"
+                    % coordinate_element_array
+                ]
+            ),
             "      ev[shape] = node;",
-            "      for (int d = 0; d < ND; ++d) {",
-            "        bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);",
-            "      }",
+            *(
+                []
+                if is_affine_assembly
+                else [
+                    "      for (int d = 0; d < ND; ++d) {",
+                    "        bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);",
+                    "      }",
+                ]
+            ),
         ]
     )
     for position, role in enumerate(live_field_roles(state_dependencies)):
@@ -8477,7 +8535,20 @@ def _scalar_crs_matrix_assembly_source(
             "",
         ]
     )
-    if tensor_product_geometry:
+    if is_affine_assembly:
+        # One element's worth: this is the mode a constant-P1 simplex takes and
+        # its Jacobian does not vary over the element, so `NQ` and `VS` are both
+        # one and the staged buffers hold a single entry each.
+        lines.append("")
+        lines.extend(
+            "    badjugate_data[%d][0] = s_t(%s[element]);"
+            % (component, abi_geometry_name("adj%d" % component))
+            for component in range(dim * dim)
+        )
+        lines.append(
+            "    bdeterminant[0] = s_t(%s[element]);" % abi_geometry_name("det0")
+        )
+    elif tensor_product_geometry:
         lines.extend(
             tensor_product_gradient_isoparametric_geometry_lines(
                 dim=dim,
@@ -8970,6 +9041,9 @@ def _scalar_crs_matrix_assembly_source(
         ]
     )
     _scalar_crs_precision_entry_points(
+        tuple(abi_geometry_name(stream) for stream in _assembly_geometry_stream_names(dim))
+        if is_affine_assembly
+        else ("points",),
         dependencies,
         function_base,
         impl,

@@ -1025,7 +1025,7 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_msoa(
 namespace sfem {
 namespace codegen {
 
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_find_cols(
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_find_cols(
     const idx_t *const RSTR targets,
     const idx_t *const RSTR row,
     const int lenrow,
@@ -1043,7 +1043,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa
 }
 
 template <typename s_t>
-static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_scatter_crs(
+static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_scatter_crs(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
@@ -1058,7 +1058,7 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa
     const count_t row_begin = rowptr[ev[i]];
     const int lenrow = (int)(rowptr[ev[i] + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
-    mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_find_cols(ev, cols, lenrow, ks);
+    mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
     }
@@ -1078,11 +1078,20 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa
 }
 
 template <typename s_t>
-static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_impl(
+static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
     const s_t eta_b,
     const s_t eta_s,
     const s_t lmbda,
@@ -1116,20 +1125,14 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_
     const int ne = 1;
     idx_t ev[NS];
     s_t element_matrix[144];
-    s_t bcoordinates[ND * NS][VS];
     s_t badjugate_data[ND * ND][NQ * VS];
     s_t bdeterminant[NQ * VS];
     s_t bcurrent[N_STREAMS][VS];
     s_t bprevious[N_STREAMS][VS];
-    const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];
-      const idx_t coordinate_node = elements[shape][element];
       ev[shape] = node;
-      for (int d = 0; d < ND; ++d) {
-        bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);
-      }
       bcurrent[shape * NC + 0][0] = u0[node * current_stride];
       bcurrent[shape * NC + 1][0] = u1[node * current_stride];
       bcurrent[shape * NC + 2][0] = u2[node * current_stride];
@@ -1138,27 +1141,22 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_
       bprevious[shape * NC + 2][0] = u2_old[node * previous_stride];
     }
 
-    s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    {  // TET4 evaluates in closed form
-      const int lane = 0;
-      const s_t J00 = -bcoordinates[0][lane] + bcoordinates[3][lane];
-      const s_t J01 = -bcoordinates[0][lane] + bcoordinates[6][lane];
-      const s_t J02 = -bcoordinates[0][lane] + bcoordinates[9][lane];
-      const s_t J10 = -bcoordinates[1][lane] + bcoordinates[4][lane];
-      const s_t J11 = -bcoordinates[1][lane] + bcoordinates[7][lane];
-      const s_t J12 = bcoordinates[10][lane] - bcoordinates[1][lane];
-      const s_t J20 = -bcoordinates[2][lane] + bcoordinates[5][lane];
-      const s_t J21 = -bcoordinates[2][lane] + bcoordinates[8][lane];
-      const s_t J22 = bcoordinates[11][lane] - bcoordinates[2][lane];
-      geometry_jacobian_adjugate_and_determinant_3<s_t>(
-          J00, J01, J02, J10, J11, J12, J20, J21, J22,
-          badjugate_streams, bdeterminant, lane);
-    }
+
+    badjugate_data[0][0] = s_t(g_adj0[element]);
+    badjugate_data[1][0] = s_t(g_adj1[element]);
+    badjugate_data[2][0] = s_t(g_adj2[element]);
+    badjugate_data[3][0] = s_t(g_adj3[element]);
+    badjugate_data[4][0] = s_t(g_adj4[element]);
+    badjugate_data[5][0] = s_t(g_adj5[element]);
+    badjugate_data[6][0] = s_t(g_adj6[element]);
+    badjugate_data[7][0] = s_t(g_adj7[element]);
+    badjugate_data[8][0] = s_t(g_adj8[element]);
+    bdeterminant[0] = s_t(g_det0[element]);
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
     mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian_block<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
 
-    mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
+    mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
   }
 
   return SFEM_SUCCESS;
@@ -1167,12 +1165,21 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_i_msoa(
+extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
     idx_t **const RSTR elements,
-    const geom_t *const *const RSTR points,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
     const real_t eta_b,
     const real_t eta_s,
     const real_t lmbda,
@@ -1192,15 +1199,15 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-      return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_impl<double>(nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, rowptr, colidx, (double *)values);
+      return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl<double>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const double *)u0, (const double *)u1, (const double *)u2, previous_stride, (const double *)u0_old, (const double *)u1_old, (const double *)u2_old, rowptr, colidx, (double *)values);
     }
     case (int)sizeof(float): {
-      return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_i_msoa_impl<float>(nelements, nnodes, elements, points, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, rowptr, colidx, (float *)values);
+      return sfem::codegen::mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl<float>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, eta_b, eta_s, lmbda, mu, u_dt_shift, current_stride, (const float *)u0, (const float *)u1, (const float *)u2, previous_stride, (const float *)u0_old, (const float *)u1_old, (const float *)u2_old, rowptr, colidx, (float *)values);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("mooney_rivlin_kelvin_voigt_total_tet4_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
 }
 
 

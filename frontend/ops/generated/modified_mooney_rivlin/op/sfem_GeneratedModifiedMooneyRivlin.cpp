@@ -989,11 +989,31 @@ namespace sfem {
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
     return impl_->domains->iterate([&](const OpDomain &domain) {
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      if (domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            domain.user_data);
+        if (!cache || !cache->jacobian_soa) {
+          SFEM_ERROR("modified_mooney_rivlin affine hessian_bsr requires cached geometry\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            cache->jacobian_soa->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            cache->jacobian_soa->jacobian_determinant()->data());
+      }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
+        if (domain.element_type == smesh::TRI3) {
+          return modified_mooney_rivlin_hessian_bsr_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, domain.parameters->require_real_value("c1"), domain.parameters->require_real_value("c2"), domain.parameters->require_real_value("kappa"), 2, current + 0, current + 1, rowptr, colidx, values);
+        }
         return modified_mooney_rivlin_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("c1"), domain.parameters->require_real_value("c2"), domain.parameters->require_real_value("kappa"), 2, current + 0, current + 1, rowptr, colidx, values);
       }
       else if (dim == 3) {
+        if (domain.element_type == smesh::TET4) {
+          return modified_mooney_rivlin_hessian_bsr_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, domain.parameters->require_real_value("c1"), domain.parameters->require_real_value("c2"), domain.parameters->require_real_value("kappa"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
+        }
         return modified_mooney_rivlin_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("c1"), domain.parameters->require_real_value("c2"), domain.parameters->require_real_value("kappa"), 3, current + 0, current + 1, current + 2, rowptr, colidx, values);
       }
       SFEM_ERROR("modified_mooney_rivlin hessian_bsr does not support spatial dimension %d\n", dim);

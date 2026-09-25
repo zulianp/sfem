@@ -250,8 +250,12 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
                         (root / "op" / ("sfem_%s_manifest.json" % op_name)).read_text()
                     )
 
-                    assembly_base = "%s_tet4_hessian_i_msoa" % material_name
-                    public_name = "%s_hessian_block_diag_sym_3d_i_msoa" % material_name
+                    # TET4 assembles through its affine kernel, because it has
+                    # no isoparametric one: its Jacobian is constant and the
+                    # affine kernel computes the same numbers from the cached
+                    # adjugate instead of rebuilding it from the coordinates.
+                    assembly_base = "%s_tet4_hessian_a_msoa" % material_name
+                    public_name = "%s_hessian_block_diag_sym_3d_a_msoa" % material_name
                     self.assertIn("%s_scatter_block_diag_sym" % assembly_base, source)
                     self.assertIn("static constexpr int SYM_DIM = (NC * (NC + 1)) / 2;", source)
                     self.assertIn("values[(ptrdiff_t)ev[i] * SYM_DIM]", source)
@@ -456,11 +460,11 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
 
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow_c_abi.hpp").read_text()
             self.assertIn(
-                "two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_i_msoa",
+                "two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_a_msoa",
                 c_abi_header,
             )
             declaration_begin = c_abi_header.index(
-                "extern \"C\" int two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_i_msoa"
+                "extern \"C\" int two_phase_flow_form_2_p_w_p_w_hessian_bsr_2d_a_msoa"
             )
             declaration_end = c_abi_header.index(");", declaration_begin)
             bsr_declaration = c_abi_header[declaration_begin:declaration_end]
@@ -564,8 +568,10 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             c_abi_header = (Path(out_dir) / "op/sfem_GeneratedLaplace_c_abi.hpp").read_text()
             for matrix_format in ("crs", "bsr", "block_diag_sym"):
                 with self.subTest(matrix_format=matrix_format):
+                    # TRI3 is a constant-P1 simplex, so 2D assembly is affine
+                    # for the same reason its matrix-free kernels are.
                     self.assertIn(
-                        "laplace_hessian_%s_2d_i_msoa" % matrix_format,
+                        "laplace_hessian_%s_2d_a_msoa" % matrix_format,
                         c_abi_header,
                     )
             # The formats that were removed must not come back by accident.

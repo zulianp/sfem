@@ -564,6 +564,23 @@ extern "C" int laplace_gradient_packed_two_pass_3d_i_msoa(
         void *const RSTR outx
 );
 
+extern "C" int laplace_hessian_bsr_2d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+
 extern "C" int laplace_hessian_bsr_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -571,6 +588,28 @@ extern "C" int laplace_hessian_bsr_2d_i_msoa(
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+
+extern "C" int laplace_hessian_bsr_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
@@ -590,6 +629,23 @@ extern "C" int laplace_hessian_bsr_3d_i_msoa(
         void *const RSTR values
 );
 
+extern "C" int laplace_hessian_crs_2d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+
 extern "C" int laplace_hessian_crs_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -597,6 +653,28 @@ extern "C" int laplace_hessian_crs_2d_i_msoa(
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
+        const real_t kappa,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+
+extern "C" int laplace_hessian_crs_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,

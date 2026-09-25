@@ -925,17 +925,37 @@ namespace sfem {
               mesh->spatial_dimension(),
               storage);
       const real_t *const previous = impl_->previous_state();
+      const geom_t *const *adjugate = nullptr;
+      const geom_t *determinant = nullptr;
+      if (domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
+        auto cache = std::static_pointer_cast<AffineGeometryCache>(
+            domain.user_data);
+        if (!cache || !cache->jacobian) {
+          SFEM_ERROR("mooney_rivlin_kelvin_voigt_total affine hessian_bsr requires cached geometry\n");
+          return SFEM_FAILURE;
+        }
+        adjugate = reinterpret_cast<const geom_t *const *>(
+            cache->jacobian->jacobian_adjugate_SoA()->data());
+        determinant = reinterpret_cast<const geom_t *>(
+            cache->jacobian->jacobian_determinant()->data());
+      }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
         static constexpr ptrdiff_t FIELD_STRIDE = 2;
           const real_t *const RSTR u_data[2] = {current + 0, current + 1};
           const real_t *const RSTR u_old_data[2] = {previous + 0, previous + 1};
+        if (domain.element_type == smesh::TRI3) {
+          return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], rowptr, colidx, values, stream);
+        }
         return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], FIELD_STRIDE, u_old_data[0], u_old_data[1], rowptr, colidx, values, stream);
       }
       else if (dim == 3) {
         static constexpr ptrdiff_t FIELD_STRIDE = 3;
           const real_t *const RSTR u_data[3] = {current + 0, current + 1, current + 2};
           const real_t *const RSTR u_old_data[3] = {previous + 0, previous + 1, previous + 2};
+        if (domain.element_type == smesh::TET4) {
+          return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), adjugate[0], adjugate[1], adjugate[2], adjugate[3], adjugate[4], adjugate[5], adjugate[6], adjugate[7], adjugate[8], determinant, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], rowptr, colidx, values, stream);
+        }
         return cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], storage[4], FIELD_STRIDE, u_data[0], u_data[1], u_data[2], FIELD_STRIDE, u_old_data[0], u_old_data[1], u_old_data[2], rowptr, colidx, values, stream);
       }
       SFEM_ERROR("mooney_rivlin_kelvin_voigt_total hessian_bsr does not support spatial dimension %d\n", dim);

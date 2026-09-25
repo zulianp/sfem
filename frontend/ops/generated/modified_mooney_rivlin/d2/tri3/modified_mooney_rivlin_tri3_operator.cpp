@@ -643,7 +643,7 @@ extern "C" int modified_mooney_rivlin_tri3_apply_a_msoa(
 namespace sfem {
 namespace codegen {
 
-static SFEM_INLINE void modified_mooney_rivlin_tri3_hessian_i_msoa_find_cols(
+static SFEM_INLINE void modified_mooney_rivlin_tri3_hessian_a_msoa_find_cols(
     const idx_t *const RSTR targets,
     const idx_t *const RSTR row,
     const int lenrow,
@@ -661,7 +661,7 @@ static SFEM_INLINE void modified_mooney_rivlin_tri3_hessian_i_msoa_find_cols(
 }
 
 template <typename s_t>
-static SFEM_INLINE void modified_mooney_rivlin_tri3_hessian_i_msoa_scatter_bsr(
+static SFEM_INLINE void modified_mooney_rivlin_tri3_hessian_a_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
@@ -676,7 +676,7 @@ static SFEM_INLINE void modified_mooney_rivlin_tri3_hessian_i_msoa_scatter_bsr(
     const count_t row_begin = rowptr[dof_i];
     const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
-    modified_mooney_rivlin_tri3_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
+    modified_mooney_rivlin_tri3_hessian_a_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
     }
@@ -697,11 +697,15 @@ static SFEM_INLINE void modified_mooney_rivlin_tri3_hessian_i_msoa_scatter_bsr(
 }
 
 template <typename s_t, typename g_t, int FORMAT>
-static int modified_mooney_rivlin_tri3_hessian_i_msoa_assemble_impl(
+static int modified_mooney_rivlin_tri3_hessian_a_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
-    const g_t *const *const RSTR points,
+    const g_t *const RSTR g_adj0,
+    const g_t *const RSTR g_adj1,
+    const g_t *const RSTR g_adj2,
+    const g_t *const RSTR g_adj3,
+    const g_t *const RSTR g_det0,
     const s_t c1,
     const s_t c2,
     const s_t kappa,
@@ -725,11 +729,9 @@ static int modified_mooney_rivlin_tri3_hessian_i_msoa_assemble_impl(
   static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
   const s_t *const u_components[NC] = {ux, uy};
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
-  const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-  const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-  const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
+  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
+  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
+  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
   static_assert(FORMAT == 1,
                 "this kernel has no scatter for the requested matrix format");
@@ -737,43 +739,32 @@ static int modified_mooney_rivlin_tri3_hessian_i_msoa_assemble_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
-    s_t bcoordinate_data[NS * ND][VS];
-    static constexpr int ne = VS;
     s_t bu_data[NS * NC][VS];
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
     s_t badj2[NQ * VS];
     s_t badj3[NQ * VS];
     s_t bdet0[NQ * VS];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];
       ev[shape] = node;
       for (int d = 0; d < ND; ++d) {
-        bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
         bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
       }
     }
 
 
-    {  // TRI3 evaluates in closed form
-      s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = -bcoordinate_data[0][lane] + bcoordinate_data[2][lane];
-        const s_t J01 = -bcoordinate_data[0][lane] + bcoordinate_data[4][lane];
-        const s_t J10 = -bcoordinate_data[1][lane] + bcoordinate_data[3][lane];
-        const s_t J11 = -bcoordinate_data[1][lane] + bcoordinate_data[5][lane];
-        geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, lane);
-      }
-    }
+    badj0[0] = s_t(g_adj0[element]);
+    badj1[0] = s_t(g_adj1[element]);
+    badj2[0] = s_t(g_adj2[element]);
+    badj3[0] = s_t(g_adj3[element]);
+    bdet0[0] = s_t(g_det0[element]);
 
     modified_mooney_rivlin_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS, VS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_data, element_matrix);
 
     if constexpr (FORMAT == 1) {
-      modified_mooney_rivlin_tri3_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+      modified_mooney_rivlin_tri3_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
     }
   }
 
@@ -783,12 +774,16 @@ static int modified_mooney_rivlin_tri3_hessian_i_msoa_assemble_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int modified_mooney_rivlin_tri3_hessian_bsr_i_msoa(
+extern "C" int modified_mooney_rivlin_tri3_hessian_bsr_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const real_t c1,
         const real_t c2,
         const real_t kappa,
@@ -801,13 +796,13 @@ extern "C" int modified_mooney_rivlin_tri3_hessian_bsr_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::modified_mooney_rivlin_tri3_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::modified_mooney_rivlin_tri3_hessian_a_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::modified_mooney_rivlin_tri3_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::modified_mooney_rivlin_tri3_hessian_a_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tri3_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("modified_mooney_rivlin_tri3_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
 }

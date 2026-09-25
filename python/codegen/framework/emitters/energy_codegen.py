@@ -3955,6 +3955,7 @@ def _sfem_soa_operator_source(
                         geometry_family,
                         use_shared_weak_local,
                         matrix_format_plan,
+                        geometry_mode=_assembly_mode,
                         source_builder=source_builder,
                     )
                 )
@@ -8544,6 +8545,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
     geometry_family=None,
     use_shared_weak_local=False,
     matrix_format_plan=None,
+    geometry_mode="isoparametric",
     source_builder=None,
 ):
     n_field_components = form_n_field_components(form, dim)
@@ -8618,13 +8620,14 @@ def _sfem_soa_hessian_matrix_assembly_function(
         )
     )
 
+    is_affine_assembly = geometry_mode == "affine"
     function_base = _sfem_soa_hessian_matrix_public_function_base(
         prefix,
         quadrature_rule,
-        "isoparametric",
+        geometry_mode,
     )
     implementation_name = "%s_assemble_impl" % function_base
-    reference_prefix = "isoparametric_"
+    reference_prefix = "%s_" % geometry_mode
     tensor_shape_name = "%sshape_1d" % reference_prefix
     tensor_grad_name = "%sgrad_1d" % reference_prefix
     tensor_weight_name = "%sq_weight_1d" % reference_prefix
@@ -8648,9 +8651,21 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "    const ptrdiff_t nelements,",
             "    const ptrdiff_t nnodes,",
             "    idx_t **const RSTR elements,",
-            "    const g_t *const *const RSTR points,",
         ]
     )
+    if is_affine_assembly:
+        # The geometry this element's every other kernel already reads.  An
+        # element whose Jacobian is constant has it cached once per element,
+        # and rebuilding it here from the coordinates is the same quantity
+        # computed a second way -- which is what left TET4 affine in its
+        # matrix-free kernels and isoparametric in its assembly.
+        lines.extend(
+            "    const g_t *const RSTR %s," % abi_geometry_name(stream)
+            for array_input in _packed_affine_geometry_inputs(dim, None)
+            for stream in _soa_array_stream_names(array_input)
+        )
+    else:
+        lines.append("    const g_t *const *const RSTR points,")
     lines.extend(
         "    const s_t %s," % parameter
         for parameter in material_parameter_names
@@ -8708,20 +8723,21 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "  const s_t *const u_components[NC] = {%s};"
             % ", ".join("u%s" % _component_name(d) for d in range(n_field_components))
         )
-    for d in range(dim):
-        lines.append(
-            "  const g_t *const RSTR %s = points[%d];"
-            % (_component_name(d), d)
+    if not is_affine_assembly:
+        for d in range(dim):
+            lines.append(
+                "  const g_t *const RSTR %s = points[%d];"
+                % (_component_name(d), d)
+            )
+        lines.extend(
+            _ordered_element_pointer_array_lines(
+                "idx_t",
+                "coordinate_elements",
+                "elements",
+                stream_shape_order,
+                "  ",
+            )
         )
-    lines.extend(
-        _ordered_element_pointer_array_lines(
-            "idx_t",
-            "coordinate_elements",
-            "elements",
-            stream_shape_order,
-            "  ",
-        )
-    )
     lines.extend(
         _sfem_soa_mesh_reference_alias_lines(
             prefix,
@@ -8729,7 +8745,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
             reference_inputs,
             use_tensor_product_reference,
             use_reference_gradient_vectors,
-            "isoparametric",
+            geometry_mode,
             emit_reference_basis=True,
         )
     )
@@ -8740,7 +8756,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
             *source_builder.element_loop_lines(),
             "    idx_t ev[NS];",
             "    s_t element_matrix[NDOFS * NDOFS];",
-            "    s_t bcoordinate_data[NS * ND][VS];",
+            *([] if is_affine_assembly else ["    s_t bcoordinate_data[NS * ND][VS];"]),
             kernel_constant("ne", "VS", indent="    "),
         ]
     )
@@ -8749,7 +8765,8 @@ def _sfem_soa_hessian_matrix_assembly_function(
     for stream in _soa_array_stream_names(_adjugate_input(dim)):
         lines.append("    s_t b%s[NQ * VS];" % stream)
     lines.append("    s_t bdet0[NQ * VS];")
-    lines.append(
+    if not is_affine_assembly:
+        lines.append(
             "    s_t *badj_streams[ND * ND] = {%s};"
             % ", ".join("badj%d" % i for i in range(dim * dim))
         )
@@ -8758,22 +8775,53 @@ def _sfem_soa_hessian_matrix_assembly_function(
             "",
             "    for (int shape = 0; shape < NS; ++shape) {",
             "      const idx_t node = elements[shape][element];",
-            *([] if identity_stream_shape_order else ["      const idx_t coordinate_node = coordinate_elements[shape][element];"]),
+            *(
+                []
+                if is_affine_assembly or identity_stream_shape_order
+                else ["      const idx_t coordinate_node = coordinate_elements[shape][element];"]
+            ),
             "      ev[shape] = node;",
-            "      for (int d = 0; d < ND; ++d) {",
-            "        bcoordinate_data[shape * ND + d][0] = s_t(points[d][%s]);" % ("node" if identity_stream_shape_order else "coordinate_node"),
         ]
     )
-    if uses_current:
-        lines.append("        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];")
+    component_loop_body = [
+        *(
+            []
+            if is_affine_assembly
+            else [
+                "        bcoordinate_data[shape * ND + d][0] = s_t(points[d][%s]);"
+                % ("node" if identity_stream_shape_order else "coordinate_node")
+            ]
+        ),
+        *(
+            ["        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];"]
+            if uses_current
+            else []
+        ),
+    ]
+    if component_loop_body:
+        lines.extend(
+            ["      for (int d = 0; d < ND; ++d) {", *component_loop_body, "      }"]
+        )
     lines.extend(
         [
-            "      }",
             "    }",
             "",
         ]
     )
-    if use_tensor_product_geometry:
+    if is_affine_assembly:
+        # One element's worth, because this is the mode a constant-P1 simplex
+        # takes and its Jacobian does not vary over the element: the buffers
+        # the direct kernel reads are `NQ * VS` entries with both at one.
+        lines.append("")
+        lines.extend(
+            "    badj%d[0] = s_t(%s[element]);"
+            % (component, abi_geometry_name("adj%d" % component))
+            for component in range(dim * dim)
+        )
+        lines.append(
+            "    bdet0[0] = s_t(%s[element]);" % abi_geometry_name("det0")
+        )
+    elif use_tensor_product_geometry:
         lines.extend(
             tensor_product_gradient_isoparametric_geometry_lines(
                 dim_name="ND",
@@ -8892,6 +8940,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
             material_parameter_names,
             uses_current,
             crs_passes,
+            geometry_mode=geometry_mode,
         )
     )
     return lines
@@ -9500,6 +9549,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
     material_parameter_names,
     uses_current,
     packed_crs_passes=(),
+    geometry_mode="isoparametric",
 ):
     # The ids the `FORMAT` template parameter is instantiated with.  They are
     # sparse because DIA, COO and patch were removed; the remaining three keep
@@ -9522,6 +9572,7 @@ def _sfem_soa_hessian_matrix_public_wrappers(
                     format_tags[emitted_format],
                     material_parameter_names,
                     uses_current,
+                    geometry_mode=geometry_mode,
                 )
             )
     if "crs" in formats:
@@ -9633,6 +9684,7 @@ def _sfem_soa_hessian_matrix_public_wrapper(
     format_tag,
     material_parameter_names,
     uses_current,
+    geometry_mode="isoparametric",
 ):
     params = _hessian_matrix_public_params(
         matrix_format,
@@ -9640,12 +9692,14 @@ def _sfem_soa_hessian_matrix_public_wrapper(
         "s_t",
         material_parameter_names,
         uses_current,
+        geometry_mode=geometry_mode,
     )
     impl_args = _hessian_matrix_impl_args(
         matrix_format,
         dim,
         material_parameter_names,
         uses_current,
+        geometry_mode=geometry_mode,
     )
     return runtime_typed_entry_point_lines(
         public_name,
@@ -9669,13 +9723,14 @@ def _hessian_matrix_public_params(
     scalar_type,
     material_parameter_names,
     uses_current,
+    geometry_mode="isoparametric",
 ):
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
         "idx_t **const RSTR elements",
-        "const geom_t *const *const RSTR points",
     ]
+    params.extend(_hessian_matrix_geometry_params(dim, geometry_mode))
     params.extend(
         "const %s %s" % (scalar_type, parameter)
         for parameter in material_parameter_names
@@ -9770,18 +9825,38 @@ def _hessian_packed_crs_public_params(
     return params
 
 
+def _hessian_matrix_geometry_params(dim, geometry_mode):
+    """What an assembly entry point takes to place its element in space.
+
+    The coordinates, or the cached Jacobian the element's every other kernel
+    already reads.  The two are the same quantity, and an element whose
+    Jacobian is constant should not have it computed both ways.
+    """
+    if geometry_mode != "affine":
+        return ("const geom_t *const *const RSTR points",)
+    return tuple(
+        "const geom_t *const RSTR %s" % abi_geometry_name(stream)
+        for array_input in _packed_affine_geometry_inputs(dim, None)
+        for stream in _soa_array_stream_names(array_input)
+    )
+
+
 def _hessian_matrix_impl_args(
     matrix_format,
     dim,
     material_parameter_names,
     uses_current,
+    geometry_mode="isoparametric",
 ):
     n_field_components = dim
     args = [
         "nelements",
         "nnodes",
         "elements",
-        "points",
+        *(
+            param.rsplit(" ", 1)[-1]
+            for param in _hessian_matrix_geometry_params(dim, geometry_mode)
+        ),
         *material_parameter_names,
     ]
     if uses_current:
