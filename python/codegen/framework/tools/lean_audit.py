@@ -91,10 +91,19 @@ _PARAMETER = re.compile(r"(\w+)\s*(?:\[[^\]]*\])?\s*$")
 #: The trailing identifier of an *unnamed* parameter is its type, and a local
 #: declaration picked up by the signature pattern carries an initializer, so
 #: neither is a named parameter that nothing reads.
+#:
+#: `RSTR` is here because a pointer parameter ends in the restrict macro rather
+#: than in its type, so an unnamed one reads as a parameter called `RSTR`.  That
+#: went unseen while every such signature also had a body mentioning `RSTR` --
+#: `const g_t *const RSTR x = points[0];` in an isoparametric kernel -- because
+#: the word-boundary search below then found the macro and called the parameter
+#: read.  A kernel that stopped aliasing coordinates lost the token and the
+#: audit reported five placeholders per file as ignored parameters, which is
+#: the opposite of what leaving them unnamed means.
 _TYPE_NAMES = frozenset(
     """void bool char short int long float double unsigned signed size_t
     ptrdiff_t idx_t geom_t real_t count_t element_idx_t int16_t uint16_t
-    s_t g_t compressed_t metric_tensor_t""".split()
+    s_t g_t compressed_t metric_tensor_t RSTR""".split()
 )
 
 

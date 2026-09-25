@@ -164,7 +164,7 @@ UNUSED_CONSTANT_BUDGET = 0
 #: they cannot disagree about which tables the kernel wants.
 #: What remains is `geometry_stride` and `q_weight`, 6 each, which are a
 #: different shape and still a ratchet to drive down.
-UNUSED_PARAMETER_BUDGET = 12
+UNUSED_PARAMETER_BUDGET = 0
 
 #: Node-ordering permutations built inside a kernel.
 #:

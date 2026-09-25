@@ -100,8 +100,19 @@ class GeometryVariantPlan:
         `hessian_bsr` with it -- which is why the P1 rule had to keep that mode
         alive for anything that assembles.  It is its own axis now, and the
         matrix-free rule can say what it means.
+
+        Exactly one mode, and it is the element's own.  Fixing it at
+        `isoparametric` made a constant-P1 simplex affine in every kernel it
+        publishes and isoparametric in the one that assembles its matrix, so
+        the element's Jacobian was cached once and then rebuilt from the
+        coordinates a second time -- the two spellings ISSUES.md item 1 names.
+        An element with an isoparametric kernel assembles through it; one
+        without has an affine kernel that computes the same numbers, and
+        assembles through that.
         """
-        return ("isoparametric",) if self.assembles_matrix else ()
+        if not self.assembles_matrix:
+            return ()
+        return self.isoparametric_modes or self.affine_modes
 
     @property
     def geometry_modes(self):
