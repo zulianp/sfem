@@ -217,7 +217,11 @@ int main(int argc, char *argv[]) {
         if (SFEM_ELEMENT_REFINE_LEVEL > 1) {
             ssmesh = smesh::to_semistructured(SFEM_ELEMENT_REFINE_LEVEL, m, true, false);
             nnodes = ssmesh->n_nodes();
-        } else {
+        } else if (smesh::Env::read("SFEM_USE_PACKED", true)) {
+            // On by default, because packed is the layout that decides.  The
+            // switch exists so the standard layout can be measured beside it
+            // in the same job: a number for one layout alone is not a result,
+            // and there was no way to ask for the other one.
             packed_mesh = sfem::FunctionSpace::PackedMesh::create(m, {}, true);
         }
 
