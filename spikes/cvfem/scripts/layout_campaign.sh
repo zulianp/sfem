@@ -35,6 +35,20 @@
 # cores, and this whole sweep exists to compare numbers with each other. The laptop can run
 # it with a small SIZES to check the plumbing; that output is not a result.
 #
+# DO NOT COMPARE TWO CAMPAIGNS AGAINST EACH OTHER. Measured, 2026-09-24/25: the same sweep
+# run before and after a change that a controlled A/B had just shown to be performance-neutral
+# came back 5.7%, 6.4% and 6.5% SLOWER on the packed residual at the three largest sizes, and
+# by the same amount on the packed Jacobian action. The two jobs landed on nid006538 and
+# nid005669. Two independent kernels moving together, only at the memory-bound sizes while the
+# cache-resident ones moved slightly the other way, is the node and not the code.
+#
+# That is the documented 5-11% node-to-node variation, and it is larger than most differences
+# worth finding. This sweep characterises ONE binary across sizes and layouts, which is what
+# its rows are interleaved for. Comparing two binaries is scripts/perf_regression.sh --against,
+# which measures both in one allocation with the order alternating; nothing else is entitled to
+# that claim. The temptation is real -- the numbers sit in two CSVs and subtract cleanly -- so
+# it is written down here rather than left to be rediscovered.
+#
 # ON SATURATION. n=64 and n=96 are in the default list to SHOW the knee, not to be compared
 # across layouts: the packed residual saturates by n=128 (2620.2 at n=128 against 2617.0 at
 # n=160 on Grace). Cross-layout conclusions are drawn at n >= 128, and the smaller sizes are
@@ -101,25 +115,19 @@ CONFIGS=(
     "residual_current|residual|atomic|current|"
     "residual_current|residual|packed|current|"
 
-    # -- the generated arrangements, so retiring them rests on a fresh measurement ---------
+    # -- the generated arrangements are GONE from this sweep, and that is the result ------
     #
-    # These are the candidates for subpar/. The recorded numbers that condemn them -- the
-    # generated residual at 2041.7 against sumfact's 2620.2, and all six generated Jacobian
-    # actions at 429.3 against 760.8 hand-written -- were taken months ago on a different
-    # binary, and "what is dead must go to subpar" deserves better evidence than that when
-    # collecting it costs one arm each.
+    # They were added here to decide their retirement on fresh evidence rather than on months-
+    # old numbers, they lost (0.37x-0.57x of the hand-written action; the residual fastest
+    # nowhere), and they moved to subpar/. The binary now refuses them by name, so leaving
+    # them in the table costs 200 of 875 launches and 40 warning lines per sweep -- and a
+    # sweep whose warnings are routine is a sweep whose warnings stop being read.
     #
-    # The six action arrangements differ only in the scope one sp.cse call was given, and the
-    # driver refuses them outside --jac-action --layout atomic, so that is how they appear.
-    # No --rhie-chow on any of them: they carry no such term and the driver refuses the pair.
-    "residual_sympy|residual|packed|sympy|"
-    "residual_sympy|residual|atomic|sympy|"
-    "jac_sympy_action|jac_action|atomic|sympy_action|"
-    "jac_sympy_action_node|jac_action|atomic|sympy_action_node|"
-    "jac_sympy_action_comp|jac_action|atomic|sympy_action_comp|"
-    "jac_sympy_action_face|jac_action|atomic|sympy_action_face|"
-    "jac_sympy_action_geom|jac_action|atomic|sympy_action_geom|"
-    "jac_sympy_action_geomface|jac_action|atomic|sympy_action_geomface|"
+    # The measurement that retired them is perf/campaign_generated_arms.csv, and re-running it
+    # needs -DCVFEM_ENABLE_SUBPAR=ON plus these five lines back:
+    #
+    #   "residual_sympy|residual|packed|sympy|"          "residual_sympy|residual|atomic|sympy|"
+    #   "jac_sympy_action{,_node,_comp,_face,_geom,_geomface}|jac_action|atomic|sympy_action{...}|"
 
     # -- the operator the solver actually evaluates, in stages --------------------------
     #
