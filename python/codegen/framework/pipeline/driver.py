@@ -675,6 +675,12 @@ class LoweredEquationEvaluation:
     kernels: tuple = ()
     diagnostics: bool = True
     matrix_format_plan: object = None
+    #: Whether this unit's material is written as an energy *and* a residual.
+    #: Such a material publishes everything from the unit carrying its whole
+    #: residual and nothing from its parts, so the answer travels with the
+    #: unit: an emitter sees one unit's forms and cannot see the other beside
+    #: it.
+    mixes_energy_and_residual: bool = False
 
 
 @dataclass(frozen=True)
@@ -704,6 +710,7 @@ class CodeGenerationKind(Enum):
 class CodeGenerationUnit(KernelPlan):
     material_name: str = ""
     unit_name: str = ""
+    mixes_energy_and_residual: bool = False
 
 
 CodeGenerationPlan = _GenerationPlan
@@ -1031,6 +1038,25 @@ def _evaluate_forms(user_input):
         if dim in by_dim:
             continue
         material_system = user_input.material.systems.for_dim(dim)
+        # The combined unit is built first, because whether it exists is what
+        # decides whether the material's own units publish.  A mixed
+        # energy/residual material exports from the combined unit and from
+        # none of its parts -- but the combined unit is refused for a
+        # mixed-order element, and a Taylor-Hood poro-hyperelastic material is
+        # exactly that.  Silencing the parts on the material's shape alone
+        # therefore left it publishing nothing at all: no gradient, no apply,
+        # no operator to compile.
+        combined = _total_residual_unit(
+            material_system,
+            matrix_format_plan=user_input.matrix_format_plan,
+            mixed_order=any(
+                isinstance(element, SfemCompatibleElement)
+                and element.is_mixed_order
+                and _element_dim(element) == dim
+                for element in user_input.elements
+            ),
+        )
+        combined_publishes = combined is not None and combined.mixes_energy_and_residual
         units = tuple(
             _evaluate_equation(
                 dim,
@@ -1040,21 +1066,12 @@ def _evaluate_forms(user_input):
                     orders=_equation_form_orders(equation),
                 ),
                 user_input.matrix_format_plan,
-                system_mixes_energy_and_residual(material_system),
+                combined_publishes,
             )
             for equation in material_system.equations
         )
         if not units:
             raise ValueError("material '%s' did not define any equations" % user_input.material.name)
-        combined = _total_residual_unit(
-            material_system,
-            mixed_order=any(
-                isinstance(element, SfemCompatibleElement)
-                and element.is_mixed_order
-                and _element_dim(element) == dim
-                for element in user_input.elements
-            ),
-        )
         if combined is not None:
             units = units + (combined,)
         by_dim[dim] = DimensionFormEvaluation(dim, units)
@@ -1069,6 +1086,14 @@ def _codegen_plan_from_form_evaluation(form_evaluation):
     units = []
     for dim_eval in form_evaluation.by_dim.values():
         for evaluated in dim_eval.units:
+            # A unit publishing no kernel builds no code-generation unit.  A
+            # mixed material's own units are that case, and a plan built for
+            # them is rejected one layer down rather than simply not built.
+            # The merit unit is named because it declares no kernels for a
+            # material that is not mixed and still publishes the patch merit,
+            # which does not travel in `kernels`.
+            if not evaluated.kernels and evaluated.name != TOTAL_RESIDUAL_UNIT_NAME:
+                continue
             if evaluated.form_evaluation.kind is FormKind.ENERGY:
                 units.append(
                     _energy_codegen_unit(
@@ -1154,6 +1179,7 @@ def _energy_codegen_unit(material_name, dim, evaluated):
         coupling=KernelCoupling.SINGLE_FIELD,
         material_name=material_name,
         unit_name=evaluated.name,
+        mixes_energy_and_residual=evaluated.mixes_energy_and_residual,
     )
 
 
@@ -1177,6 +1203,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
             payload={"diagnostics": evaluated.diagnostics},
             material_name=material_name,
             unit_name=evaluated.name,
+            mixes_energy_and_residual=evaluated.mixes_energy_and_residual,
         )
     block_kernels = (
         _block_codegen_units(
@@ -1205,6 +1232,7 @@ def _residual_codegen_unit(material_name, dim, evaluated):
         payload={"diagnostics": evaluated.diagnostics},
         material_name=material_name,
         unit_name=evaluated.name,
+        mixes_energy_and_residual=evaluated.mixes_energy_and_residual,
     )
 
 
@@ -2270,7 +2298,7 @@ def _generate_op_wrapper_files(material, selected, user_input, kernel_sources):
     return generate_op_files(material, selected, kernel_sources)
 
 
-def _total_residual_unit(material_system, mixed_order=False):
+def _total_residual_unit(material_system, mixed_order=False, matrix_format_plan=None):
     """One more unit carrying the material's whole residual.
 
     A residual merit squares a node's complete value, so it has to be
@@ -2296,6 +2324,7 @@ def _total_residual_unit(material_system, mixed_order=False):
     that had already been removed.
     """
     equations = material_system.equations
+    mixes_energy_and_residual = system_mixes_energy_and_residual(material_system)
     if any(equation.measure != "dx" for equation in equations):
         # A surface form.  `total_residual_collection` builds its sum on `dx`,
         # so a traction unit would come back claiming a volume measure it was
@@ -2326,8 +2355,24 @@ def _total_residual_unit(material_system, mixed_order=False):
         total_residual_collection(
             material_system, orders=(FormOrder.ONE, FormOrder.TWO)
         ),
-        kernels=(),
-        diagnostics=False,
+        # Everything a mixed material exports, because its own units now
+        # export none: one gradient over the summed 1-form and one apply over
+        # its tangent, in place of one of each per unit.
+        kernels=_published_unit_kernels(
+            ("gradient", "apply"), not mixes_energy_and_residual
+        ),
+        mixes_energy_and_residual=mixes_energy_and_residual,
+        # Assembly follows publication.  The parts of a mixed material no
+        # longer emit a matrix block, so the sparse formats have to come from
+        # the unit that does, or the material loses assembly entirely -- which
+        # is the wrapper's `hessian_bsr` quietly becoming a failing stub.
+        matrix_format_plan=matrix_format_plan if mixes_energy_and_residual else None,
+        # Diagnostics follow publication for the same reason assembly does.
+        # The wrapper's flop and byte methods read a per-kernel accessor, and
+        # once the parts stop publishing there is no accessor left for them to
+        # read -- the roofline numbers a mixed material had would simply
+        # vanish, and the wrapper would name a symbol nothing defines.
+        diagnostics=mixes_energy_and_residual,
     )
 
 
@@ -2354,6 +2399,7 @@ def _evaluate_equation(
             kernels=_published_unit_kernels(
                 equation.kernels, mixes_energy_and_residual
             ),
+            mixes_energy_and_residual=mixes_energy_and_residual,
             diagnostics=equation.diagnostics,
             matrix_format_plan=matrix_format_plan if "apply" in equation.kernels else None,
         )
@@ -2363,7 +2409,10 @@ def _evaluate_equation(
         return LoweredEquationEvaluation(
             equation.name,
             form_collection,
-            kernels=equation.kernels,
+            kernels=_published_unit_kernels(
+                equation.kernels, mixes_energy_and_residual
+            ),
+            mixes_energy_and_residual=mixes_energy_and_residual,
             diagnostics=equation.diagnostics,
             matrix_format_plan=matrix_format_plan,
         )

@@ -36,253 +36,7 @@ typedef double geom_t;
 #define SFEM_CODEGEN_PUBLIC_C_ABI
 #endif
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_apply_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_det0,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const ptrdiff_t h_stride,
-        const void *const RSTR hx,
-        const void *const RSTR hy,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx,
-        void *const RSTR outy,
-        void *const stream
-);
-
-extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_apply_2d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const ptrdiff_t h_stride,
-        const void *const RSTR hx,
-        const void *const RSTR hy,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx,
-        void *const RSTR outy,
-        void *const stream
-);
-
-extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt_elastic_apply_2d_soa_diagnostics(
-    const smesh::ElemType element_type);
-
-extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_apply_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const void *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const void *const RSTR hx,
-        const void *const RSTR hy,
-        const void *const RSTR hz,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx,
-        void *const RSTR outy,
-        void *const RSTR outz,
-        void *const stream
-);
-
-extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_apply_3d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const void *const RSTR uz,
-        const ptrdiff_t h_stride,
-        const void *const RSTR hx,
-        const void *const RSTR hy,
-        const void *const RSTR hz,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx,
-        void *const RSTR outy,
-        void *const RSTR outz,
-        void *const stream
-);
-
-extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt_elastic_apply_3d_soa_diagnostics(
-    const smesh::ElemType element_type);
-
-extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_gradient_2d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_det0,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx,
-        void *const RSTR outy,
-        void *const stream
-);
-
-extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_gradient_2d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx,
-        void *const RSTR outy,
-        void *const stream
-);
-
-extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt_elastic_gradient_2d_soa_diagnostics(
-    const smesh::ElemType element_type);
-
-extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_gradient_3d_a_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const RSTR g_adj0,
-        const geom_t *const RSTR g_adj1,
-        const geom_t *const RSTR g_adj2,
-        const geom_t *const RSTR g_adj3,
-        const geom_t *const RSTR g_adj4,
-        const geom_t *const RSTR g_adj5,
-        const geom_t *const RSTR g_adj6,
-        const geom_t *const RSTR g_adj7,
-        const geom_t *const RSTR g_adj8,
-        const geom_t *const RSTR g_det0,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const void *const RSTR uz,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx,
-        void *const RSTR outy,
-        void *const RSTR outz,
-        void *const stream
-);
-
-extern "C" int cu_mooney_rivlin_kelvin_voigt_elastic_gradient_3d_i_msoa(
-        const smesh::ElemType element_type,
-        const enum smesh::PrimitiveType real_type,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t lmbda,
-        const real_t mu,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const void *const RSTR uz,
-        const ptrdiff_t out_stride,
-        void *const RSTR outx,
-        void *const RSTR outy,
-        void *const RSTR outz,
-        void *const stream
-);
-
-extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt_elastic_gradient_3d_soa_diagnostics(
-    const smesh::ElemType element_type);
-
-extern "C" void mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_assembly_variant(const int variant);
-
-extern "C" int mooney_rivlin_kelvin_voigt_elastic_hex8_matrix_assembly_variant_count();
-
-extern "C" void mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_assembly_variant(const int variant);
-
-extern "C" int mooney_rivlin_kelvin_voigt_elastic_proteus_hex8_matrix_assembly_variant_count();
-
-extern "C" void mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_assembly_variant(const int variant);
-
-extern "C" int mooney_rivlin_kelvin_voigt_elastic_proteus_quad4_matrix_assembly_variant_count();
-
-extern "C" void mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_assembly_variant(const int variant);
-
-extern "C" int mooney_rivlin_kelvin_voigt_elastic_quad4_matrix_assembly_variant_count();
-
-extern "C" void mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_assembly_variant(const int variant);
-
-extern "C" int mooney_rivlin_kelvin_voigt_elastic_tet10_matrix_assembly_variant_count();
-
-extern "C" void mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_assembly_variant(const int variant);
-
-extern "C" int mooney_rivlin_kelvin_voigt_elastic_tet4_matrix_assembly_variant_count();
-
-extern "C" void mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
-
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_variant(const int variant);
-
-extern "C" int mooney_rivlin_kelvin_voigt_elastic_tri3_matrix_assembly_variant_count();
-
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_2d_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -291,6 +45,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_2d_i_msoa(
         const geom_t *const *const RSTR points,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -304,7 +60,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_2d_i_msoa(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_3d_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_hessian_bsr_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -313,6 +69,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_3d_i_msoa(
         const geom_t *const *const RSTR points,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -328,13 +86,13 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_hessian_bsr_3d_i_msoa(
         void *const stream
 );
 
-extern "C" void mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+extern "C" void mooney_rivlin_kelvin_voigt_total_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_assembly_variant(const int variant);
+extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_total_hex8_matrix_assembly_variant(const int variant);
 
-extern "C" int mooney_rivlin_kelvin_voigt_viscous_hex8_matrix_assembly_variant_count();
+extern "C" int mooney_rivlin_kelvin_voigt_total_hex8_matrix_assembly_variant_count();
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_a_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -347,6 +105,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_a_msoa(
         const geom_t *const RSTR g_det0,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -363,7 +123,10 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_a_msoa(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_maos(
+extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_esoa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -378,7 +141,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_maos(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -387,6 +150,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_msoa(
         const geom_t *const *const RSTR points,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -403,7 +168,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_2d_i_msoa(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_a_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -421,6 +186,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_a_msoa(
         const geom_t *const RSTR g_det0,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -441,7 +208,10 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_a_msoa(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_maos(
+extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_esoa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -456,7 +226,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_maos(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_jacobian_action_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -465,6 +235,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_msoa(
         const geom_t *const *const RSTR points,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -485,25 +257,25 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_jacobian_action_3d_i_msoa(
         void *const stream
 );
 
-extern "C" void mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+extern "C" void mooney_rivlin_kelvin_voigt_total_proteus_hex8_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_assembly_variant(const int variant);
+extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_total_proteus_hex8_matrix_assembly_variant(const int variant);
 
-extern "C" int mooney_rivlin_kelvin_voigt_viscous_proteus_hex8_matrix_assembly_variant_count();
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_hex8_matrix_assembly_variant_count();
 
-extern "C" void mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+extern "C" void mooney_rivlin_kelvin_voigt_total_proteus_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_assembly_variant(const int variant);
+extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_total_proteus_quad4_matrix_assembly_variant(const int variant);
 
-extern "C" int mooney_rivlin_kelvin_voigt_viscous_proteus_quad4_matrix_assembly_variant_count();
+extern "C" int mooney_rivlin_kelvin_voigt_total_proteus_quad4_matrix_assembly_variant_count();
 
-extern "C" void mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+extern "C" void mooney_rivlin_kelvin_voigt_total_quad4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_assembly_variant(const int variant);
+extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_total_quad4_matrix_assembly_variant(const int variant);
 
-extern "C" int mooney_rivlin_kelvin_voigt_viscous_quad4_matrix_assembly_variant_count();
+extern "C" int mooney_rivlin_kelvin_voigt_total_quad4_matrix_assembly_variant_count();
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_2d_a_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_2d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -516,6 +288,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_2d_a_msoa(
         const geom_t *const RSTR g_det0,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -529,7 +303,10 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_2d_a_msoa(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_maos(
+extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt_total_residual_2d_esoa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_2d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -543,7 +320,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_maos(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -552,6 +329,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_msoa(
         const geom_t *const *const RSTR points,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -565,7 +344,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_2d_i_msoa(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_3d_a_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_3d_a_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -583,6 +362,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_3d_a_msoa(
         const geom_t *const RSTR g_det0,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -599,7 +380,10 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_3d_a_msoa(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_maos(
+extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt_total_residual_3d_esoa_diagnostics(
+    const smesh::ElemType element_type);
+
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_3d_i_maos(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -613,7 +397,7 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_maos(
         void *const stream
 );
 
-extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_msoa(
+extern "C" int cu_mooney_rivlin_kelvin_voigt_total_residual_3d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
         const ptrdiff_t nelements,
@@ -622,6 +406,8 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_msoa(
         const geom_t *const *const RSTR points,
         const real_t eta_b,
         const real_t eta_s,
+        const real_t lmbda,
+        const real_t mu,
         const real_t u_dt_shift,
         const ptrdiff_t current_stride,
         const void *const RSTR u0,
@@ -638,20 +424,20 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_viscous_residual_3d_i_msoa(
         void *const stream
 );
 
-extern "C" void mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+extern "C" void mooney_rivlin_kelvin_voigt_total_tet10_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_assembly_variant(const int variant);
+extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_total_tet10_matrix_assembly_variant(const int variant);
 
-extern "C" int mooney_rivlin_kelvin_voigt_viscous_tet10_matrix_assembly_variant_count();
+extern "C" int mooney_rivlin_kelvin_voigt_total_tet10_matrix_assembly_variant_count();
 
-extern "C" void mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+extern "C" void mooney_rivlin_kelvin_voigt_total_tet4_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_assembly_variant(const int variant);
+extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_total_tet4_matrix_assembly_variant(const int variant);
 
-extern "C" int mooney_rivlin_kelvin_voigt_viscous_tet4_matrix_assembly_variant_count();
+extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_matrix_assembly_variant_count();
 
-extern "C" void mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
+extern "C" void mooney_rivlin_kelvin_voigt_total_tri3_matrix_assembly_print_variant(const int variant, const ptrdiff_t nelements);
 
-extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_assembly_variant(const int variant);
+extern "C" const sfem_MatrixAssemblyDiagnostics *mooney_rivlin_kelvin_voigt_total_tri3_matrix_assembly_variant(const int variant);
 
-extern "C" int mooney_rivlin_kelvin_voigt_viscous_tri3_matrix_assembly_variant_count();
+extern "C" int mooney_rivlin_kelvin_voigt_total_tri3_matrix_assembly_variant_count();

@@ -831,6 +831,14 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
     #: written as an energy, assembles directly on the same elements -- which is
     #: what says this is the path and not the mathematics.
     #:
+    #: The unit those kernels belonged to is gone: a material mixing an energy
+    #: with a residual now publishes one combined unit, `total`, and none of
+    #: its parts, so there is no longer an `elastic` unit to stand beside a
+    #: `viscous` one as the counter-example.  The test that pinned that
+    #: counter-example is retired rather than kept up to date, because the
+    #: empty list below says something strictly stronger about every element in
+    #: the tree than "the energy path assembles directly" said about one.
+    #:
     #: Empty, and it stays empty.  Every element in the tree now builds its
     #: matrix from the substituted flux, in the shape its own evaluation
     #: strategy asks for: entry by entry with no loop where the element
@@ -899,29 +907,6 @@ class NoProbingAssemblyRatchetTest(unittest.TestCase):
                     % (name, found[name], self.PROBING[name]),
                 )
 
-    def test_the_energy_path_assembles_directly_on_the_same_elements(self):
-        """The counter-example, pinned, because it is what makes the case.
-
-        Mooney-Rivlin Kelvin-Voigt Newmark carries both an energy unit and a
-        residual one.  If the elastic unit ever started probing too, the
-        argument that this is fixable would have quietly stopped being true.
-        """
-        import re
-
-        direct = re.compile(r"direct_hessian[a-z_]*element_matrix<")
-        for path in sorted(self._shipped_tree().rglob("*elastic*_operator.cpp")):
-            source = path.read_text()
-            if "element_matrix" not in source:
-                continue
-            with self.subTest(kernel=path.name):
-                self.assertTrue(
-                    direct.search(source),
-                    "%s assembles without calling a direct element-matrix "
-                    "kernel" % path.name,
-                )
-                self.assertNotIn("bdirection[trial][0] = s_t(1);", source)
-
-
 class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
     """The element matrix and the operator it assembles are one bilinear form.
 
@@ -947,52 +932,52 @@ class ElementMatrixAgreesWithTheApplyTest(unittest.TestCase):
     CASES = (
         {
             'element': 'TET4',
-            'header': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_local.hpp',
             'dim': 3,
             'n_fields': 3,
             'n_qp': 1,
             'n_shape': 4,
-            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_tet4_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_tet4_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobian_action_block_contiguous',
             'reference': 'ref_tet4_q1',
             'quadrature': 'quad_tet_q1',
             'includes': ('tet4_q1.hpp', 'quad_tet_q1.hpp'),
         },
         {
             'element': 'TET10',
-            'header': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_local.hpp',
             'dim': 3,
             'n_fields': 3,
             'n_qp': 11,
             'n_shape': 10,
-            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d3_simplex_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block_contiguous',
             'reference': 'ref_tet10_q11',
             'quadrature': 'quad_tet_q11',
             'includes': ('tet10_q11.hpp', 'quad_tet_q11.hpp'),
         },
         {
             'element': 'PROTEUS_HEX8',
-            'header': 'mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_total_d3_tensor_product_local.hpp',
             'dim': 3,
             'n_fields': 3,
             'n_qp': 8,
             'n_shape': 8,
-            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d3_tensor_product_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block_contiguous',
             'reference': 'ref_line_p1_q2',
             'quadrature': 'quad_line_q2',
             'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),
         },
         {
             'element': 'PROTEUS_QUAD4',
-            'header': 'mooney_rivlin_kelvin_voigt_viscous_d2_tensor_product_local.hpp',
+            'header': 'mooney_rivlin_kelvin_voigt_total_d2_tensor_product_local.hpp',
             'dim': 2,
             'n_fields': 2,
             'n_qp': 4,
             'n_shape': 4,
-            'assembly': 'mooney_rivlin_kelvin_voigt_viscous_d2_tensor_product_hessian_block',
-            'apply': 'mooney_rivlin_kelvin_voigt_viscous_d2_tensor_product_jacobian_action_block_contiguous',
+            'assembly': 'mooney_rivlin_kelvin_voigt_total_d2_tensor_product_hessian_block',
+            'apply': 'mooney_rivlin_kelvin_voigt_total_d2_tensor_product_jacobian_action_block_contiguous',
             'reference': 'ref_line_p1_q2',
             'quadrature': 'quad_line_q2',
             'includes': ('line_p1_q2.hpp', 'quad_line_q2.hpp'),

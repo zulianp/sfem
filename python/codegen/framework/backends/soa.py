@@ -518,6 +518,9 @@ class SoABackend:
                 diagnostics_plan=traversal.diagnostics_plan,
                 matrix_format_plan=traversal.matrix_format_plan,
                 unit_name=getattr(traversal.unit, "unit_name", ""),
+                mixes_energy_and_residual=getattr(
+                    traversal.unit, "mixes_energy_and_residual", False
+                ),
             ))
         elif traversal.kind == "mixed_residual_soa":
             files = tuple(generate_mixed_residual_sfem_files(
