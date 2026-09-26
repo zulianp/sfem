@@ -11,7 +11,7 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -20,7 +20,7 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -91,7 +91,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_laplace_tri3_objective_soa
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void laplace_tri3_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -160,13 +160,13 @@ extern "C" int cu_laplace_tri3_objective_steps_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::laplace_tri3_objective_steps_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
+        sfem::codegen::laplace_tri3_objective_steps_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, (const double *)ux, h_stride, (const double *)hx, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("laplace_tri3_objective_steps_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::laplace_tri3_objective_steps_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
+        sfem::codegen::laplace_tri3_objective_steps_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, (const float *)ux, h_stride, (const float *)hx, nsteps, (const float *)steps, (float *)value);
         return sfem::codegen::launch_status("laplace_tri3_objective_steps_a_msoa_impl");
     }
     default:
@@ -234,7 +234,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_laplace_tri3_gradient_soa_
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void laplace_tri3_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -295,13 +295,13 @@ extern "C" int cu_laplace_tri3_gradient_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::laplace_tri3_gradient_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
+        sfem::codegen::laplace_tri3_gradient_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, (const double *)ux, out_stride, (double *)outx);
         return sfem::codegen::launch_status("laplace_tri3_gradient_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::laplace_tri3_gradient_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
+        sfem::codegen::laplace_tri3_gradient_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, u_stride, (const float *)ux, out_stride, (float *)outx);
         return sfem::codegen::launch_status("laplace_tri3_gradient_a_msoa_impl");
     }
     default:
@@ -369,7 +369,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_laplace_tri3_apply_soa_dia
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void laplace_tri3_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -430,13 +430,13 @@ extern "C" int cu_laplace_tri3_apply_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::laplace_tri3_apply_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
+        sfem::codegen::laplace_tri3_apply_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, h_stride, (const double *)hx, out_stride, (double *)outx);
         return sfem::codegen::launch_status("laplace_tri3_apply_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::laplace_tri3_apply_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
+        sfem::codegen::laplace_tri3_apply_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_met0, g_met1, g_met2, kappa, h_stride, (const float *)hx, out_stride, (float *)outx);
         return sfem::codegen::launch_status("laplace_tri3_apply_a_msoa_impl");
     }
     default:

@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -73,70 +73,70 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_bloc
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_grad_0_ref_values[VS];
-    s_t p_w_grad_1_ref_values[VS];
-    s_t p_w_grad_2_ref_values[VS];
-    s_t p_w_old_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_grad_2_ref_values[VS];
-    s_t p_c_old_values[VS];
-    s_t value_coeff0_values[VS];
-    s_t grad_coeff0_0_values[VS];
-    s_t grad_coeff0_1_values[VS];
-    s_t grad_coeff0_2_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
-    s_t grad_coeff1_2_values[VS];
+    s_t p_w_values;
+    s_t p_w_grad_0_ref_values;
+    s_t p_w_grad_1_ref_values;
+    s_t p_w_grad_2_ref_values;
+    s_t p_w_old_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_grad_2_ref_values;
+    s_t p_c_old_values;
+    s_t value_coeff0_values;
+    s_t grad_coeff0_0_values;
+    s_t grad_coeff0_1_values;
+    s_t grad_coeff0_2_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
+    s_t grad_coeff1_2_values;
     {
-      p_w_values[0] = s_t(0);
-      p_w_grad_0_ref_values[0] = s_t(0);
-      p_w_grad_1_ref_values[0] = s_t(0);
-      p_w_grad_2_ref_values[0] = s_t(0);
+      p_w_values = s_t(0);
+      p_w_grad_0_ref_values = s_t(0);
+      p_w_grad_1_ref_values = s_t(0);
+      p_w_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
-        p_w_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_w_values += coeff * shape[q * NS + trial];
+        p_w_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_w_old_values[0] = s_t(0);
+      p_w_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = previous[trial * NC][0];
-        p_w_old_values[0] += coeff * shape[q * NS + trial];
+        p_w_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
-      p_c_grad_2_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
+      p_c_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_old_values[0] = s_t(0);
+      p_c_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = previous[trial * NC + 1][0];
-        p_c_old_values[0] += coeff * shape[q * NS + trial];
+        p_c_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
@@ -151,22 +151,22 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_bloc
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values[0];
-      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values[0];
-      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values;
+      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values;
+      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values;
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-      const s_t p_w_old = p_w_old_values[0];
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
-      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values[0];
+      const s_t p_w_old = p_w_old_values;
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
+      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_old = p_c_old_values[0];
+      const s_t p_c_old = p_c_old_values;
       const s_t residual_tmp0 = -p_wr;
       const s_t residual_tmp1 = exp(kappa_T*(p_w + residual_tmp0));
       const s_t residual_tmp2 = S_res + s_t(-1);
@@ -190,14 +190,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_bloc
       const s_t grad_coeff1_0 = residual_tmp14*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
       const s_t grad_coeff1_1 = residual_tmp14*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
       const s_t grad_coeff1_2 = residual_tmp14*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff0_values[0] = value_coeff0;
-      grad_coeff0_0_values[0] = grad_coeff0_0;
-      grad_coeff0_1_values[0] = grad_coeff0_1;
-      grad_coeff0_2_values[0] = grad_coeff0_2;
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
-      grad_coeff1_2_values[0] = grad_coeff1_2;
+      value_coeff0_values = value_coeff0;
+      grad_coeff0_0_values = grad_coeff0_0;
+      grad_coeff0_1_values = grad_coeff0_1;
+      grad_coeff0_2_values = grad_coeff0_2;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
+      grad_coeff1_2_values = grad_coeff1_2;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -216,14 +216,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_bloc
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values[0] * test_value + grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values * test_value + grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -234,8 +234,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_bloc
     const s_t *const RSTR grad_ref_y,
     const s_t *const RSTR grad_ref_z,
     const s_t *const RSTR q_weight,
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
     const s_t C_ka1,
     const s_t C_ka2,
     const s_t C_kw1,
@@ -262,74 +262,74 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_bloc
     const s_t p_wr,
     const s_t porosity,
     const s_t rho_w0,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_grad_0_ref_values[VS];
-    s_t p_w_grad_1_ref_values[VS];
-    s_t p_w_grad_2_ref_values[VS];
-    s_t p_w_old_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_grad_2_ref_values[VS];
-    s_t p_c_old_values[VS];
-    s_t value_coeff0_values[VS];
-    s_t grad_coeff0_0_values[VS];
-    s_t grad_coeff0_1_values[VS];
-    s_t grad_coeff0_2_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
-    s_t grad_coeff1_2_values[VS];
+    s_t p_w_values;
+    s_t p_w_grad_0_ref_values;
+    s_t p_w_grad_1_ref_values;
+    s_t p_w_grad_2_ref_values;
+    s_t p_w_old_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_grad_2_ref_values;
+    s_t p_c_old_values;
+    s_t value_coeff0_values;
+    s_t grad_coeff0_0_values;
+    s_t grad_coeff0_1_values;
+    s_t grad_coeff0_2_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
+    s_t grad_coeff1_2_values;
     {
-      p_w_values[0] = s_t(0);
-      p_w_grad_0_ref_values[0] = s_t(0);
-      p_w_grad_1_ref_values[0] = s_t(0);
-      p_w_grad_2_ref_values[0] = s_t(0);
+      p_w_values = s_t(0);
+      p_w_grad_0_ref_values = s_t(0);
+      p_w_grad_1_ref_values = s_t(0);
+      p_w_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
-        p_w_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = current[trial * NC];
+        p_w_values += coeff * shape[q * NS + trial];
+        p_w_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_w_old_values[0] = s_t(0);
+      p_w_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = previous[trial * NC][0];
-        p_w_old_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = previous[trial * NC];
+        p_w_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
-      p_c_grad_2_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
+      p_c_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = current[trial * NC + 1];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_old_values[0] = s_t(0);
+      p_c_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = previous[trial * NC + 1][0];
-        p_c_old_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = previous[trial * NC + 1];
+        p_c_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
@@ -344,22 +344,22 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_bloc
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values[0];
-      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values[0];
-      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values;
+      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values;
+      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values;
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-      const s_t p_w_old = p_w_old_values[0];
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
-      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values[0];
+      const s_t p_w_old = p_w_old_values;
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
+      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_old = p_c_old_values[0];
+      const s_t p_c_old = p_c_old_values;
       const s_t residual_tmp0 = -p_wr;
       const s_t residual_tmp1 = exp(kappa_T*(p_w + residual_tmp0));
       const s_t residual_tmp2 = S_res + s_t(-1);
@@ -383,14 +383,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_bloc
       const s_t grad_coeff1_0 = residual_tmp14*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
       const s_t grad_coeff1_1 = residual_tmp14*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
       const s_t grad_coeff1_2 = residual_tmp14*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff0_values[0] = value_coeff0;
-      grad_coeff0_0_values[0] = grad_coeff0_0;
-      grad_coeff0_1_values[0] = grad_coeff0_1;
-      grad_coeff0_2_values[0] = grad_coeff0_2;
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
-      grad_coeff1_2_values[0] = grad_coeff1_2;
+      value_coeff0_values = value_coeff0;
+      grad_coeff0_0_values = grad_coeff0_0;
+      grad_coeff0_1_values = grad_coeff0_1;
+      grad_coeff0_2_values = grad_coeff0_2;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
+      grad_coeff1_2_values = grad_coeff1_2;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -409,14 +409,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_residual_bloc
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values[0] * test_value + grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC] += q_weight[q] * det * (value_coeff0_values * test_value + grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+        output[test * NC + 1] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -459,70 +459,70 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_grad_0_ref_values[VS];
-    s_t p_w_grad_1_ref_values[VS];
-    s_t p_w_grad_2_ref_values[VS];
-    s_t p_w_old_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_grad_2_ref_values[VS];
-    s_t p_c_old_values[VS];
-    s_t value_coeff0_values[VS];
-    s_t grad_coeff0_0_values[VS];
-    s_t grad_coeff0_1_values[VS];
-    s_t grad_coeff0_2_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
-    s_t grad_coeff1_2_values[VS];
+    s_t p_w_values;
+    s_t p_w_grad_0_ref_values;
+    s_t p_w_grad_1_ref_values;
+    s_t p_w_grad_2_ref_values;
+    s_t p_w_old_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_grad_2_ref_values;
+    s_t p_c_old_values;
+    s_t value_coeff0_values;
+    s_t grad_coeff0_0_values;
+    s_t grad_coeff0_1_values;
+    s_t grad_coeff0_2_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
+    s_t grad_coeff1_2_values;
     {
-      p_w_values[0] = s_t(0);
-      p_w_grad_0_ref_values[0] = s_t(0);
-      p_w_grad_1_ref_values[0] = s_t(0);
-      p_w_grad_2_ref_values[0] = s_t(0);
+      p_w_values = s_t(0);
+      p_w_grad_0_ref_values = s_t(0);
+      p_w_grad_1_ref_values = s_t(0);
+      p_w_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
-        p_w_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_w_values += coeff * shape[q * NS + trial];
+        p_w_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_w_old_values[0] = s_t(0);
+      p_w_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = previous[trial * NC][0];
-        p_w_old_values[0] += coeff * shape[q * NS + trial];
+        p_w_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
-      p_c_grad_2_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
+      p_c_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_old_values[0] = s_t(0);
+      p_c_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = previous[trial * NC + 1][0];
-        p_c_old_values[0] += coeff * shape[q * NS + trial];
+        p_c_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
@@ -537,22 +537,22 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values[0];
-      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values[0];
-      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values;
+      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values;
+      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values;
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-      const s_t p_w_old = p_w_old_values[0];
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
-      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values[0];
+      const s_t p_w_old = p_w_old_values;
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
+      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_old = p_c_old_values[0];
+      const s_t p_c_old = p_c_old_values;
       const s_t residual_tmp0 = -p_wr;
       const s_t residual_tmp1 = exp(kappa_T*(p_w + residual_tmp0));
       const s_t residual_tmp2 = S_res + s_t(-1);
@@ -576,14 +576,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual
       const s_t grad_coeff1_0 = residual_tmp14*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
       const s_t grad_coeff1_1 = residual_tmp14*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
       const s_t grad_coeff1_2 = residual_tmp14*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff0_values[0] = value_coeff0;
-      grad_coeff0_0_values[0] = grad_coeff0_0;
-      grad_coeff0_1_values[0] = grad_coeff0_1;
-      grad_coeff0_2_values[0] = grad_coeff0_2;
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
-      grad_coeff1_2_values[0] = grad_coeff1_2;
+      value_coeff0_values = value_coeff0;
+      grad_coeff0_0_values = grad_coeff0_0;
+      grad_coeff0_1_values = grad_coeff0_1;
+      grad_coeff0_2_values = grad_coeff0_2;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
+      grad_coeff1_2_values = grad_coeff1_2;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -602,14 +602,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values[0] * test_value + grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values * test_value + grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -620,8 +620,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual
     const s_t *const RSTR grad_ref_y,
     const s_t *const RSTR grad_ref_z,
     const s_t *const RSTR q_weight,
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
     const s_t C_ka1,
     const s_t C_ka2,
     const s_t C_kw1,
@@ -648,74 +648,74 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual
     const s_t p_wr,
     const s_t porosity,
     const s_t rho_w0,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_grad_0_ref_values[VS];
-    s_t p_w_grad_1_ref_values[VS];
-    s_t p_w_grad_2_ref_values[VS];
-    s_t p_w_old_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_grad_2_ref_values[VS];
-    s_t p_c_old_values[VS];
-    s_t value_coeff0_values[VS];
-    s_t grad_coeff0_0_values[VS];
-    s_t grad_coeff0_1_values[VS];
-    s_t grad_coeff0_2_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
-    s_t grad_coeff1_2_values[VS];
+    s_t p_w_values;
+    s_t p_w_grad_0_ref_values;
+    s_t p_w_grad_1_ref_values;
+    s_t p_w_grad_2_ref_values;
+    s_t p_w_old_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_grad_2_ref_values;
+    s_t p_c_old_values;
+    s_t value_coeff0_values;
+    s_t grad_coeff0_0_values;
+    s_t grad_coeff0_1_values;
+    s_t grad_coeff0_2_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
+    s_t grad_coeff1_2_values;
     {
-      p_w_values[0] = s_t(0);
-      p_w_grad_0_ref_values[0] = s_t(0);
-      p_w_grad_1_ref_values[0] = s_t(0);
-      p_w_grad_2_ref_values[0] = s_t(0);
+      p_w_values = s_t(0);
+      p_w_grad_0_ref_values = s_t(0);
+      p_w_grad_1_ref_values = s_t(0);
+      p_w_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
-        p_w_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = current[trial * NC];
+        p_w_values += coeff * shape[q * NS + trial];
+        p_w_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_w_old_values[0] = s_t(0);
+      p_w_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = previous[trial * NC][0];
-        p_w_old_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = previous[trial * NC];
+        p_w_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
-      p_c_grad_2_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
+      p_c_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = current[trial * NC + 1];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_old_values[0] = s_t(0);
+      p_c_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = previous[trial * NC + 1][0];
-        p_c_old_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = previous[trial * NC + 1];
+        p_c_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
@@ -730,22 +730,22 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values[0];
-      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values[0];
-      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values;
+      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values;
+      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values;
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-      const s_t p_w_old = p_w_old_values[0];
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
-      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values[0];
+      const s_t p_w_old = p_w_old_values;
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
+      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_old = p_c_old_values[0];
+      const s_t p_c_old = p_c_old_values;
       const s_t residual_tmp0 = -p_wr;
       const s_t residual_tmp1 = exp(kappa_T*(p_w + residual_tmp0));
       const s_t residual_tmp2 = S_res + s_t(-1);
@@ -769,14 +769,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual
       const s_t grad_coeff1_0 = residual_tmp14*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
       const s_t grad_coeff1_1 = residual_tmp14*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
       const s_t grad_coeff1_2 = residual_tmp14*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff0_values[0] = value_coeff0;
-      grad_coeff0_0_values[0] = grad_coeff0_0;
-      grad_coeff0_1_values[0] = grad_coeff0_1;
-      grad_coeff0_2_values[0] = grad_coeff0_2;
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
-      grad_coeff1_2_values[0] = grad_coeff1_2;
+      value_coeff0_values = value_coeff0;
+      grad_coeff0_0_values = grad_coeff0_0;
+      grad_coeff0_1_values = grad_coeff0_1;
+      grad_coeff0_2_values = grad_coeff0_2;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
+      grad_coeff1_2_values = grad_coeff1_2;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -795,14 +795,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_residual
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values[0] * test_value + grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC] += q_weight[q] * det * (value_coeff0_values * test_value + grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+        output[test * NC + 1] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -845,88 +845,88 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_acti
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_grad_0_ref_values[VS];
-    s_t p_w_grad_1_ref_values[VS];
-    s_t p_w_grad_2_ref_values[VS];
-    s_t p_w_direction_values[VS];
-    s_t p_w_direction_grad_0_ref_values[VS];
-    s_t p_w_direction_grad_1_ref_values[VS];
-    s_t p_w_direction_grad_2_ref_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_grad_2_ref_values[VS];
-    s_t p_c_direction_values[VS];
-    s_t p_c_direction_grad_0_ref_values[VS];
-    s_t p_c_direction_grad_1_ref_values[VS];
-    s_t p_c_direction_grad_2_ref_values[VS];
-    s_t value_coeff0_values[VS];
-    s_t grad_coeff0_0_values[VS];
-    s_t grad_coeff0_1_values[VS];
-    s_t grad_coeff0_2_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
-    s_t grad_coeff1_2_values[VS];
+    s_t p_w_values;
+    s_t p_w_grad_0_ref_values;
+    s_t p_w_grad_1_ref_values;
+    s_t p_w_grad_2_ref_values;
+    s_t p_w_direction_values;
+    s_t p_w_direction_grad_0_ref_values;
+    s_t p_w_direction_grad_1_ref_values;
+    s_t p_w_direction_grad_2_ref_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_grad_2_ref_values;
+    s_t p_c_direction_values;
+    s_t p_c_direction_grad_0_ref_values;
+    s_t p_c_direction_grad_1_ref_values;
+    s_t p_c_direction_grad_2_ref_values;
+    s_t value_coeff0_values;
+    s_t grad_coeff0_0_values;
+    s_t grad_coeff0_1_values;
+    s_t grad_coeff0_2_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
+    s_t grad_coeff1_2_values;
     {
-      p_w_values[0] = s_t(0);
-      p_w_grad_0_ref_values[0] = s_t(0);
-      p_w_grad_1_ref_values[0] = s_t(0);
-      p_w_grad_2_ref_values[0] = s_t(0);
+      p_w_values = s_t(0);
+      p_w_grad_0_ref_values = s_t(0);
+      p_w_grad_1_ref_values = s_t(0);
+      p_w_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
-        p_w_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_w_values += coeff * shape[q * NS + trial];
+        p_w_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_w_direction_values[0] = s_t(0);
-      p_w_direction_grad_0_ref_values[0] = s_t(0);
-      p_w_direction_grad_1_ref_values[0] = s_t(0);
-      p_w_direction_grad_2_ref_values[0] = s_t(0);
+      p_w_direction_values = s_t(0);
+      p_w_direction_grad_0_ref_values = s_t(0);
+      p_w_direction_grad_1_ref_values = s_t(0);
+      p_w_direction_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = direction[trial * NC][0];
-        p_w_direction_values[0] += coeff * shape[q * NS + trial];
-        p_w_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_w_direction_values += coeff * shape[q * NS + trial];
+        p_w_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_direction_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
-      p_c_grad_2_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
+      p_c_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_direction_values[0] = s_t(0);
-      p_c_direction_grad_0_ref_values[0] = s_t(0);
-      p_c_direction_grad_1_ref_values[0] = s_t(0);
-      p_c_direction_grad_2_ref_values[0] = s_t(0);
+      p_c_direction_values = s_t(0);
+      p_c_direction_grad_0_ref_values = s_t(0);
+      p_c_direction_grad_1_ref_values = s_t(0);
+      p_c_direction_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = direction[trial * NC + 1][0];
-        p_c_direction_values[0] += coeff * shape[q * NS + trial];
-        p_c_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_c_direction_values += coeff * shape[q * NS + trial];
+        p_c_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_direction_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
@@ -941,31 +941,31 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_acti
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values[0];
-      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values[0];
-      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values;
+      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values;
+      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values;
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-      const s_t p_w_direction = p_w_direction_values[0];
-      const s_t p_w_direction_grad_0_ref = p_w_direction_grad_0_ref_values[0];
-      const s_t p_w_direction_grad_1_ref = p_w_direction_grad_1_ref_values[0];
-      const s_t p_w_direction_grad_2_ref = p_w_direction_grad_2_ref_values[0];
+      const s_t p_w_direction = p_w_direction_values;
+      const s_t p_w_direction_grad_0_ref = p_w_direction_grad_0_ref_values;
+      const s_t p_w_direction_grad_1_ref = p_w_direction_grad_1_ref_values;
+      const s_t p_w_direction_grad_2_ref = p_w_direction_grad_2_ref_values;
       const s_t p_w_direction_grad_0 = (p_w_direction_grad_0_ref * adj0 + p_w_direction_grad_1_ref * adj3 + p_w_direction_grad_2_ref * adj6) / det;
       const s_t p_w_direction_grad_1 = (p_w_direction_grad_0_ref * adj1 + p_w_direction_grad_1_ref * adj4 + p_w_direction_grad_2_ref * adj7) / det;
       const s_t p_w_direction_grad_2 = (p_w_direction_grad_0_ref * adj2 + p_w_direction_grad_1_ref * adj5 + p_w_direction_grad_2_ref * adj8) / det;
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
-      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values[0];
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
+      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_direction = p_c_direction_values[0];
-      const s_t p_c_direction_grad_0_ref = p_c_direction_grad_0_ref_values[0];
-      const s_t p_c_direction_grad_1_ref = p_c_direction_grad_1_ref_values[0];
-      const s_t p_c_direction_grad_2_ref = p_c_direction_grad_2_ref_values[0];
+      const s_t p_c_direction = p_c_direction_values;
+      const s_t p_c_direction_grad_0_ref = p_c_direction_grad_0_ref_values;
+      const s_t p_c_direction_grad_1_ref = p_c_direction_grad_1_ref_values;
+      const s_t p_c_direction_grad_2_ref = p_c_direction_grad_2_ref_values;
       const s_t p_c_direction_grad_0 = (p_c_direction_grad_0_ref * adj0 + p_c_direction_grad_1_ref * adj3 + p_c_direction_grad_2_ref * adj6) / det;
       const s_t p_c_direction_grad_1 = (p_c_direction_grad_0_ref * adj1 + p_c_direction_grad_1_ref * adj4 + p_c_direction_grad_2_ref * adj7) / det;
       const s_t p_c_direction_grad_2 = (p_c_direction_grad_0_ref * adj2 + p_c_direction_grad_1_ref * adj5 + p_c_direction_grad_2_ref * adj8) / det;
@@ -1055,14 +1055,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_acti
       const s_t grad_coeff1_0 = -K_0*residual_tmp60 - K_1*residual_tmp61 - K_2*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp65 + residual_tmp67 - residual_tmp69) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp65 + residual_tmp69);
       const s_t grad_coeff1_1 = -K_3*residual_tmp60 - K_4*residual_tmp61 - K_5*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp71 + residual_tmp72 - residual_tmp73) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp71 + residual_tmp73);
       const s_t grad_coeff1_2 = -K_6*residual_tmp60 - K_7*residual_tmp61 - K_8*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp75 + residual_tmp76 - residual_tmp77) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp75 + residual_tmp77);
-      value_coeff0_values[0] = value_coeff0;
-      grad_coeff0_0_values[0] = grad_coeff0_0;
-      grad_coeff0_1_values[0] = grad_coeff0_1;
-      grad_coeff0_2_values[0] = grad_coeff0_2;
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
-      grad_coeff1_2_values[0] = grad_coeff1_2;
+      value_coeff0_values = value_coeff0;
+      grad_coeff0_0_values = grad_coeff0_0;
+      grad_coeff0_1_values = grad_coeff0_1;
+      grad_coeff0_2_values = grad_coeff0_2;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
+      grad_coeff1_2_values = grad_coeff1_2;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -1081,14 +1081,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_acti
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values[0] * test_value + grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values * test_value + grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_action_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -1099,8 +1099,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_acti
     const s_t *const RSTR grad_ref_y,
     const s_t *const RSTR grad_ref_z,
     const s_t *const RSTR q_weight,
-    const s_t current[2 * NS][VS],
-    const s_t direction[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t direction[2 * NS],
     const s_t C_ka1,
     const s_t C_ka2,
     const s_t C_kw1,
@@ -1127,92 +1127,92 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_acti
     const s_t p_wr,
     const s_t porosity,
     const s_t rho_w0,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_grad_0_ref_values[VS];
-    s_t p_w_grad_1_ref_values[VS];
-    s_t p_w_grad_2_ref_values[VS];
-    s_t p_w_direction_values[VS];
-    s_t p_w_direction_grad_0_ref_values[VS];
-    s_t p_w_direction_grad_1_ref_values[VS];
-    s_t p_w_direction_grad_2_ref_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_grad_2_ref_values[VS];
-    s_t p_c_direction_values[VS];
-    s_t p_c_direction_grad_0_ref_values[VS];
-    s_t p_c_direction_grad_1_ref_values[VS];
-    s_t p_c_direction_grad_2_ref_values[VS];
-    s_t value_coeff0_values[VS];
-    s_t grad_coeff0_0_values[VS];
-    s_t grad_coeff0_1_values[VS];
-    s_t grad_coeff0_2_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
-    s_t grad_coeff1_2_values[VS];
+    s_t p_w_values;
+    s_t p_w_grad_0_ref_values;
+    s_t p_w_grad_1_ref_values;
+    s_t p_w_grad_2_ref_values;
+    s_t p_w_direction_values;
+    s_t p_w_direction_grad_0_ref_values;
+    s_t p_w_direction_grad_1_ref_values;
+    s_t p_w_direction_grad_2_ref_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_grad_2_ref_values;
+    s_t p_c_direction_values;
+    s_t p_c_direction_grad_0_ref_values;
+    s_t p_c_direction_grad_1_ref_values;
+    s_t p_c_direction_grad_2_ref_values;
+    s_t value_coeff0_values;
+    s_t grad_coeff0_0_values;
+    s_t grad_coeff0_1_values;
+    s_t grad_coeff0_2_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
+    s_t grad_coeff1_2_values;
     {
-      p_w_values[0] = s_t(0);
-      p_w_grad_0_ref_values[0] = s_t(0);
-      p_w_grad_1_ref_values[0] = s_t(0);
-      p_w_grad_2_ref_values[0] = s_t(0);
+      p_w_values = s_t(0);
+      p_w_grad_0_ref_values = s_t(0);
+      p_w_grad_1_ref_values = s_t(0);
+      p_w_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
-        p_w_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = current[trial * NC];
+        p_w_values += coeff * shape[q * NS + trial];
+        p_w_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_w_direction_values[0] = s_t(0);
-      p_w_direction_grad_0_ref_values[0] = s_t(0);
-      p_w_direction_grad_1_ref_values[0] = s_t(0);
-      p_w_direction_grad_2_ref_values[0] = s_t(0);
+      p_w_direction_values = s_t(0);
+      p_w_direction_grad_0_ref_values = s_t(0);
+      p_w_direction_grad_1_ref_values = s_t(0);
+      p_w_direction_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = direction[trial * NC][0];
-        p_w_direction_values[0] += coeff * shape[q * NS + trial];
-        p_w_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = direction[trial * NC];
+        p_w_direction_values += coeff * shape[q * NS + trial];
+        p_w_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_direction_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
-      p_c_grad_2_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
+      p_c_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = current[trial * NC + 1];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_direction_values[0] = s_t(0);
-      p_c_direction_grad_0_ref_values[0] = s_t(0);
-      p_c_direction_grad_1_ref_values[0] = s_t(0);
-      p_c_direction_grad_2_ref_values[0] = s_t(0);
+      p_c_direction_values = s_t(0);
+      p_c_direction_grad_0_ref_values = s_t(0);
+      p_c_direction_grad_1_ref_values = s_t(0);
+      p_c_direction_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = direction[trial * NC + 1][0];
-        p_c_direction_values[0] += coeff * shape[q * NS + trial];
-        p_c_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = direction[trial * NC + 1];
+        p_c_direction_values += coeff * shape[q * NS + trial];
+        p_c_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_direction_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
@@ -1227,31 +1227,31 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_acti
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values[0];
-      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values[0];
-      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values;
+      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values;
+      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values;
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-      const s_t p_w_direction = p_w_direction_values[0];
-      const s_t p_w_direction_grad_0_ref = p_w_direction_grad_0_ref_values[0];
-      const s_t p_w_direction_grad_1_ref = p_w_direction_grad_1_ref_values[0];
-      const s_t p_w_direction_grad_2_ref = p_w_direction_grad_2_ref_values[0];
+      const s_t p_w_direction = p_w_direction_values;
+      const s_t p_w_direction_grad_0_ref = p_w_direction_grad_0_ref_values;
+      const s_t p_w_direction_grad_1_ref = p_w_direction_grad_1_ref_values;
+      const s_t p_w_direction_grad_2_ref = p_w_direction_grad_2_ref_values;
       const s_t p_w_direction_grad_0 = (p_w_direction_grad_0_ref * adj0 + p_w_direction_grad_1_ref * adj3 + p_w_direction_grad_2_ref * adj6) / det;
       const s_t p_w_direction_grad_1 = (p_w_direction_grad_0_ref * adj1 + p_w_direction_grad_1_ref * adj4 + p_w_direction_grad_2_ref * adj7) / det;
       const s_t p_w_direction_grad_2 = (p_w_direction_grad_0_ref * adj2 + p_w_direction_grad_1_ref * adj5 + p_w_direction_grad_2_ref * adj8) / det;
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
-      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values[0];
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
+      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_direction = p_c_direction_values[0];
-      const s_t p_c_direction_grad_0_ref = p_c_direction_grad_0_ref_values[0];
-      const s_t p_c_direction_grad_1_ref = p_c_direction_grad_1_ref_values[0];
-      const s_t p_c_direction_grad_2_ref = p_c_direction_grad_2_ref_values[0];
+      const s_t p_c_direction = p_c_direction_values;
+      const s_t p_c_direction_grad_0_ref = p_c_direction_grad_0_ref_values;
+      const s_t p_c_direction_grad_1_ref = p_c_direction_grad_1_ref_values;
+      const s_t p_c_direction_grad_2_ref = p_c_direction_grad_2_ref_values;
       const s_t p_c_direction_grad_0 = (p_c_direction_grad_0_ref * adj0 + p_c_direction_grad_1_ref * adj3 + p_c_direction_grad_2_ref * adj6) / det;
       const s_t p_c_direction_grad_1 = (p_c_direction_grad_0_ref * adj1 + p_c_direction_grad_1_ref * adj4 + p_c_direction_grad_2_ref * adj7) / det;
       const s_t p_c_direction_grad_2 = (p_c_direction_grad_0_ref * adj2 + p_c_direction_grad_1_ref * adj5 + p_c_direction_grad_2_ref * adj8) / det;
@@ -1341,14 +1341,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_acti
       const s_t grad_coeff1_0 = -K_0*residual_tmp60 - K_1*residual_tmp61 - K_2*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp65 + residual_tmp67 - residual_tmp69) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp65 + residual_tmp69);
       const s_t grad_coeff1_1 = -K_3*residual_tmp60 - K_4*residual_tmp61 - K_5*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp71 + residual_tmp72 - residual_tmp73) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp71 + residual_tmp73);
       const s_t grad_coeff1_2 = -K_6*residual_tmp60 - K_7*residual_tmp61 - K_8*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp75 + residual_tmp76 - residual_tmp77) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp75 + residual_tmp77);
-      value_coeff0_values[0] = value_coeff0;
-      grad_coeff0_0_values[0] = grad_coeff0_0;
-      grad_coeff0_1_values[0] = grad_coeff0_1;
-      grad_coeff0_2_values[0] = grad_coeff0_2;
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
-      grad_coeff1_2_values[0] = grad_coeff1_2;
+      value_coeff0_values = value_coeff0;
+      grad_coeff0_0_values = grad_coeff0_0;
+      grad_coeff0_1_values = grad_coeff0_1;
+      grad_coeff0_2_values = grad_coeff0_2;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
+      grad_coeff1_2_values = grad_coeff1_2;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -1367,14 +1367,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_jacobian_acti
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values[0] * test_value + grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC] += q_weight[q] * det * (value_coeff0_values * test_value + grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+        output[test * NC + 1] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -1417,88 +1417,88 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_grad_0_ref_values[VS];
-    s_t p_w_grad_1_ref_values[VS];
-    s_t p_w_grad_2_ref_values[VS];
-    s_t p_w_direction_values[VS];
-    s_t p_w_direction_grad_0_ref_values[VS];
-    s_t p_w_direction_grad_1_ref_values[VS];
-    s_t p_w_direction_grad_2_ref_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_grad_2_ref_values[VS];
-    s_t p_c_direction_values[VS];
-    s_t p_c_direction_grad_0_ref_values[VS];
-    s_t p_c_direction_grad_1_ref_values[VS];
-    s_t p_c_direction_grad_2_ref_values[VS];
-    s_t value_coeff0_values[VS];
-    s_t grad_coeff0_0_values[VS];
-    s_t grad_coeff0_1_values[VS];
-    s_t grad_coeff0_2_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
-    s_t grad_coeff1_2_values[VS];
+    s_t p_w_values;
+    s_t p_w_grad_0_ref_values;
+    s_t p_w_grad_1_ref_values;
+    s_t p_w_grad_2_ref_values;
+    s_t p_w_direction_values;
+    s_t p_w_direction_grad_0_ref_values;
+    s_t p_w_direction_grad_1_ref_values;
+    s_t p_w_direction_grad_2_ref_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_grad_2_ref_values;
+    s_t p_c_direction_values;
+    s_t p_c_direction_grad_0_ref_values;
+    s_t p_c_direction_grad_1_ref_values;
+    s_t p_c_direction_grad_2_ref_values;
+    s_t value_coeff0_values;
+    s_t grad_coeff0_0_values;
+    s_t grad_coeff0_1_values;
+    s_t grad_coeff0_2_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
+    s_t grad_coeff1_2_values;
     {
-      p_w_values[0] = s_t(0);
-      p_w_grad_0_ref_values[0] = s_t(0);
-      p_w_grad_1_ref_values[0] = s_t(0);
-      p_w_grad_2_ref_values[0] = s_t(0);
+      p_w_values = s_t(0);
+      p_w_grad_0_ref_values = s_t(0);
+      p_w_grad_1_ref_values = s_t(0);
+      p_w_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
-        p_w_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_w_values += coeff * shape[q * NS + trial];
+        p_w_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_w_direction_values[0] = s_t(0);
-      p_w_direction_grad_0_ref_values[0] = s_t(0);
-      p_w_direction_grad_1_ref_values[0] = s_t(0);
-      p_w_direction_grad_2_ref_values[0] = s_t(0);
+      p_w_direction_values = s_t(0);
+      p_w_direction_grad_0_ref_values = s_t(0);
+      p_w_direction_grad_1_ref_values = s_t(0);
+      p_w_direction_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = direction[trial * NC][0];
-        p_w_direction_values[0] += coeff * shape[q * NS + trial];
-        p_w_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_w_direction_values += coeff * shape[q * NS + trial];
+        p_w_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_direction_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
-      p_c_grad_2_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
+      p_c_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_direction_values[0] = s_t(0);
-      p_c_direction_grad_0_ref_values[0] = s_t(0);
-      p_c_direction_grad_1_ref_values[0] = s_t(0);
-      p_c_direction_grad_2_ref_values[0] = s_t(0);
+      p_c_direction_values = s_t(0);
+      p_c_direction_grad_0_ref_values = s_t(0);
+      p_c_direction_grad_1_ref_values = s_t(0);
+      p_c_direction_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = direction[trial * NC + 1][0];
-        p_c_direction_values[0] += coeff * shape[q * NS + trial];
-        p_c_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        p_c_direction_values += coeff * shape[q * NS + trial];
+        p_c_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_direction_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
@@ -1513,31 +1513,31 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values[0];
-      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values[0];
-      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values;
+      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values;
+      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values;
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-      const s_t p_w_direction = p_w_direction_values[0];
-      const s_t p_w_direction_grad_0_ref = p_w_direction_grad_0_ref_values[0];
-      const s_t p_w_direction_grad_1_ref = p_w_direction_grad_1_ref_values[0];
-      const s_t p_w_direction_grad_2_ref = p_w_direction_grad_2_ref_values[0];
+      const s_t p_w_direction = p_w_direction_values;
+      const s_t p_w_direction_grad_0_ref = p_w_direction_grad_0_ref_values;
+      const s_t p_w_direction_grad_1_ref = p_w_direction_grad_1_ref_values;
+      const s_t p_w_direction_grad_2_ref = p_w_direction_grad_2_ref_values;
       const s_t p_w_direction_grad_0 = (p_w_direction_grad_0_ref * adj0 + p_w_direction_grad_1_ref * adj3 + p_w_direction_grad_2_ref * adj6) / det;
       const s_t p_w_direction_grad_1 = (p_w_direction_grad_0_ref * adj1 + p_w_direction_grad_1_ref * adj4 + p_w_direction_grad_2_ref * adj7) / det;
       const s_t p_w_direction_grad_2 = (p_w_direction_grad_0_ref * adj2 + p_w_direction_grad_1_ref * adj5 + p_w_direction_grad_2_ref * adj8) / det;
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
-      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values[0];
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
+      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_direction = p_c_direction_values[0];
-      const s_t p_c_direction_grad_0_ref = p_c_direction_grad_0_ref_values[0];
-      const s_t p_c_direction_grad_1_ref = p_c_direction_grad_1_ref_values[0];
-      const s_t p_c_direction_grad_2_ref = p_c_direction_grad_2_ref_values[0];
+      const s_t p_c_direction = p_c_direction_values;
+      const s_t p_c_direction_grad_0_ref = p_c_direction_grad_0_ref_values;
+      const s_t p_c_direction_grad_1_ref = p_c_direction_grad_1_ref_values;
+      const s_t p_c_direction_grad_2_ref = p_c_direction_grad_2_ref_values;
       const s_t p_c_direction_grad_0 = (p_c_direction_grad_0_ref * adj0 + p_c_direction_grad_1_ref * adj3 + p_c_direction_grad_2_ref * adj6) / det;
       const s_t p_c_direction_grad_1 = (p_c_direction_grad_0_ref * adj1 + p_c_direction_grad_1_ref * adj4 + p_c_direction_grad_2_ref * adj7) / det;
       const s_t p_c_direction_grad_2 = (p_c_direction_grad_0_ref * adj2 + p_c_direction_grad_1_ref * adj5 + p_c_direction_grad_2_ref * adj8) / det;
@@ -1627,14 +1627,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian
       const s_t grad_coeff1_0 = -K_0*residual_tmp60 - K_1*residual_tmp61 - K_2*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp65 + residual_tmp67 - residual_tmp69) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp65 + residual_tmp69);
       const s_t grad_coeff1_1 = -K_3*residual_tmp60 - K_4*residual_tmp61 - K_5*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp71 + residual_tmp72 - residual_tmp73) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp71 + residual_tmp73);
       const s_t grad_coeff1_2 = -K_6*residual_tmp60 - K_7*residual_tmp61 - K_8*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp75 + residual_tmp76 - residual_tmp77) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp75 + residual_tmp77);
-      value_coeff0_values[0] = value_coeff0;
-      grad_coeff0_0_values[0] = grad_coeff0_0;
-      grad_coeff0_1_values[0] = grad_coeff0_1;
-      grad_coeff0_2_values[0] = grad_coeff0_2;
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
-      grad_coeff1_2_values[0] = grad_coeff1_2;
+      value_coeff0_values = value_coeff0;
+      grad_coeff0_0_values = grad_coeff0_0;
+      grad_coeff0_1_values = grad_coeff0_1;
+      grad_coeff0_2_values = grad_coeff0_2;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
+      grad_coeff1_2_values = grad_coeff1_2;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -1653,14 +1653,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values[0] * test_value + grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values * test_value + grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian_action_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -1671,8 +1671,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian
     const s_t *const RSTR grad_ref_y,
     const s_t *const RSTR grad_ref_z,
     const s_t *const RSTR q_weight,
-    const s_t current[2 * NS][VS],
-    const s_t direction[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t direction[2 * NS],
     const s_t C_ka1,
     const s_t C_ka2,
     const s_t C_kw1,
@@ -1699,92 +1699,92 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian
     const s_t p_wr,
     const s_t porosity,
     const s_t rho_w0,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_grad_0_ref_values[VS];
-    s_t p_w_grad_1_ref_values[VS];
-    s_t p_w_grad_2_ref_values[VS];
-    s_t p_w_direction_values[VS];
-    s_t p_w_direction_grad_0_ref_values[VS];
-    s_t p_w_direction_grad_1_ref_values[VS];
-    s_t p_w_direction_grad_2_ref_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_grad_2_ref_values[VS];
-    s_t p_c_direction_values[VS];
-    s_t p_c_direction_grad_0_ref_values[VS];
-    s_t p_c_direction_grad_1_ref_values[VS];
-    s_t p_c_direction_grad_2_ref_values[VS];
-    s_t value_coeff0_values[VS];
-    s_t grad_coeff0_0_values[VS];
-    s_t grad_coeff0_1_values[VS];
-    s_t grad_coeff0_2_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
-    s_t grad_coeff1_2_values[VS];
+    s_t p_w_values;
+    s_t p_w_grad_0_ref_values;
+    s_t p_w_grad_1_ref_values;
+    s_t p_w_grad_2_ref_values;
+    s_t p_w_direction_values;
+    s_t p_w_direction_grad_0_ref_values;
+    s_t p_w_direction_grad_1_ref_values;
+    s_t p_w_direction_grad_2_ref_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_grad_2_ref_values;
+    s_t p_c_direction_values;
+    s_t p_c_direction_grad_0_ref_values;
+    s_t p_c_direction_grad_1_ref_values;
+    s_t p_c_direction_grad_2_ref_values;
+    s_t value_coeff0_values;
+    s_t grad_coeff0_0_values;
+    s_t grad_coeff0_1_values;
+    s_t grad_coeff0_2_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
+    s_t grad_coeff1_2_values;
     {
-      p_w_values[0] = s_t(0);
-      p_w_grad_0_ref_values[0] = s_t(0);
-      p_w_grad_1_ref_values[0] = s_t(0);
-      p_w_grad_2_ref_values[0] = s_t(0);
+      p_w_values = s_t(0);
+      p_w_grad_0_ref_values = s_t(0);
+      p_w_grad_1_ref_values = s_t(0);
+      p_w_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
-        p_w_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = current[trial * NC];
+        p_w_values += coeff * shape[q * NS + trial];
+        p_w_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_w_direction_values[0] = s_t(0);
-      p_w_direction_grad_0_ref_values[0] = s_t(0);
-      p_w_direction_grad_1_ref_values[0] = s_t(0);
-      p_w_direction_grad_2_ref_values[0] = s_t(0);
+      p_w_direction_values = s_t(0);
+      p_w_direction_grad_0_ref_values = s_t(0);
+      p_w_direction_grad_1_ref_values = s_t(0);
+      p_w_direction_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = direction[trial * NC][0];
-        p_w_direction_values[0] += coeff * shape[q * NS + trial];
-        p_w_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_w_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_w_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = direction[trial * NC];
+        p_w_direction_values += coeff * shape[q * NS + trial];
+        p_w_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_w_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_w_direction_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
-      p_c_grad_2_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
+      p_c_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = current[trial * NC + 1];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
-      p_c_direction_values[0] = s_t(0);
-      p_c_direction_grad_0_ref_values[0] = s_t(0);
-      p_c_direction_grad_1_ref_values[0] = s_t(0);
-      p_c_direction_grad_2_ref_values[0] = s_t(0);
+      p_c_direction_values = s_t(0);
+      p_c_direction_grad_0_ref_values = s_t(0);
+      p_c_direction_grad_1_ref_values = s_t(0);
+      p_c_direction_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = direction[trial * NC + 1][0];
-        p_c_direction_values[0] += coeff * shape[q * NS + trial];
-        p_c_direction_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_direction_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
-        p_c_direction_grad_2_ref_values[0] += coeff * grad_ref_z[q * NS + trial];
+        const s_t coeff = direction[trial * NC + 1];
+        p_c_direction_values += coeff * shape[q * NS + trial];
+        p_c_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        p_c_direction_grad_2_ref_values += coeff * grad_ref_z[q * NS + trial];
       }
     }
     {
@@ -1799,31 +1799,31 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values[0];
-      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values[0];
-      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_grad_0_ref = p_w_grad_0_ref_values;
+      const s_t p_w_grad_1_ref = p_w_grad_1_ref_values;
+      const s_t p_w_grad_2_ref = p_w_grad_2_ref_values;
       const s_t p_w_grad_0 = (p_w_grad_0_ref * adj0 + p_w_grad_1_ref * adj3 + p_w_grad_2_ref * adj6) / det;
       const s_t p_w_grad_1 = (p_w_grad_0_ref * adj1 + p_w_grad_1_ref * adj4 + p_w_grad_2_ref * adj7) / det;
       const s_t p_w_grad_2 = (p_w_grad_0_ref * adj2 + p_w_grad_1_ref * adj5 + p_w_grad_2_ref * adj8) / det;
-      const s_t p_w_direction = p_w_direction_values[0];
-      const s_t p_w_direction_grad_0_ref = p_w_direction_grad_0_ref_values[0];
-      const s_t p_w_direction_grad_1_ref = p_w_direction_grad_1_ref_values[0];
-      const s_t p_w_direction_grad_2_ref = p_w_direction_grad_2_ref_values[0];
+      const s_t p_w_direction = p_w_direction_values;
+      const s_t p_w_direction_grad_0_ref = p_w_direction_grad_0_ref_values;
+      const s_t p_w_direction_grad_1_ref = p_w_direction_grad_1_ref_values;
+      const s_t p_w_direction_grad_2_ref = p_w_direction_grad_2_ref_values;
       const s_t p_w_direction_grad_0 = (p_w_direction_grad_0_ref * adj0 + p_w_direction_grad_1_ref * adj3 + p_w_direction_grad_2_ref * adj6) / det;
       const s_t p_w_direction_grad_1 = (p_w_direction_grad_0_ref * adj1 + p_w_direction_grad_1_ref * adj4 + p_w_direction_grad_2_ref * adj7) / det;
       const s_t p_w_direction_grad_2 = (p_w_direction_grad_0_ref * adj2 + p_w_direction_grad_1_ref * adj5 + p_w_direction_grad_2_ref * adj8) / det;
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
-      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values[0];
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
+      const s_t p_c_grad_2_ref = p_c_grad_2_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj3 + p_c_grad_2_ref * adj6) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj4 + p_c_grad_2_ref * adj7) / det;
       const s_t p_c_grad_2 = (p_c_grad_0_ref * adj2 + p_c_grad_1_ref * adj5 + p_c_grad_2_ref * adj8) / det;
-      const s_t p_c_direction = p_c_direction_values[0];
-      const s_t p_c_direction_grad_0_ref = p_c_direction_grad_0_ref_values[0];
-      const s_t p_c_direction_grad_1_ref = p_c_direction_grad_1_ref_values[0];
-      const s_t p_c_direction_grad_2_ref = p_c_direction_grad_2_ref_values[0];
+      const s_t p_c_direction = p_c_direction_values;
+      const s_t p_c_direction_grad_0_ref = p_c_direction_grad_0_ref_values;
+      const s_t p_c_direction_grad_1_ref = p_c_direction_grad_1_ref_values;
+      const s_t p_c_direction_grad_2_ref = p_c_direction_grad_2_ref_values;
       const s_t p_c_direction_grad_0 = (p_c_direction_grad_0_ref * adj0 + p_c_direction_grad_1_ref * adj3 + p_c_direction_grad_2_ref * adj6) / det;
       const s_t p_c_direction_grad_1 = (p_c_direction_grad_0_ref * adj1 + p_c_direction_grad_1_ref * adj4 + p_c_direction_grad_2_ref * adj7) / det;
       const s_t p_c_direction_grad_2 = (p_c_direction_grad_0_ref * adj2 + p_c_direction_grad_1_ref * adj5 + p_c_direction_grad_2_ref * adj8) / det;
@@ -1913,14 +1913,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian
       const s_t grad_coeff1_0 = -K_0*residual_tmp60 - K_1*residual_tmp61 - K_2*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp65 + residual_tmp67 - residual_tmp69) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp65 + residual_tmp69);
       const s_t grad_coeff1_1 = -K_3*residual_tmp60 - K_4*residual_tmp61 - K_5*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp71 + residual_tmp72 - residual_tmp73) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp71 + residual_tmp73);
       const s_t grad_coeff1_2 = -K_6*residual_tmp60 - K_7*residual_tmp61 - K_8*residual_tmp62 + M_c*p_c_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(residual_tmp75 + residual_tmp76 - residual_tmp77) + M_c*p_w_direction*residual_tmp0*residual_tmp49*residual_tmp50*residual_tmp51*residual_tmp54*(-residual_tmp75 + residual_tmp77);
-      value_coeff0_values[0] = value_coeff0;
-      grad_coeff0_0_values[0] = grad_coeff0_0;
-      grad_coeff0_1_values[0] = grad_coeff0_1;
-      grad_coeff0_2_values[0] = grad_coeff0_2;
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
-      grad_coeff1_2_values[0] = grad_coeff1_2;
+      value_coeff0_values = value_coeff0;
+      grad_coeff0_0_values = grad_coeff0_0;
+      grad_coeff0_1_values = grad_coeff0_1;
+      grad_coeff0_2_values = grad_coeff0_2;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
+      grad_coeff1_2_values = grad_coeff1_2;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -1939,8 +1939,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_simplex_tet4_jacobian
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj3 + grad_ref_z[q * NS + test] * adj6) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj4 + grad_ref_z[q * NS + test] * adj7) / det;
         const s_t test_grad2 = (grad_ref_x[q * NS + test] * adj2 + grad_ref_y[q * NS + test] * adj5 + grad_ref_z[q * NS + test] * adj8) / det;
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values[0] * test_value + grad_coeff0_0_values[0] * test_grad0 + grad_coeff0_1_values[0] * test_grad1 + grad_coeff0_2_values[0] * test_grad2);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1 + grad_coeff1_2_values[0] * test_grad2);
+        output[test * NC] += q_weight[q] * det * (value_coeff0_values * test_value + grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+        output[test * NC + 1] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
       }
     }
   }

@@ -1976,7 +1976,7 @@ static int saint_venant_kirchhoff_tet4_hessian_a_msoa_assemble_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC];
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
     s_t badj2[NQ * VS];
@@ -1992,7 +1992,7 @@ static int saint_venant_kirchhoff_tet4_hessian_a_msoa_assemble_impl(
       const idx_t node = elements[shape][element];
       ev[shape] = node;
       for (int d = 0; d < ND; ++d) {
-        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+        bu_data[shape * NC + d] = u_components[d][node * u_stride];
       }
     }
 
@@ -2008,7 +2008,7 @@ static int saint_venant_kirchhoff_tet4_hessian_a_msoa_assemble_impl(
     badj8[0] = s_t(g_adj8[element]);
     bdet0[0] = s_t(g_det0[element]);
 
-    saint_venant_kirchhoff_d3_simplex_tet4_direct_hessian_element_matrix<s_t, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_data, element_matrix);
+    saint_venant_kirchhoff_d3_simplex_tet4_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_data, element_matrix);
 
     if constexpr (FORMAT == 1) {
       saint_venant_kirchhoff_tet4_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

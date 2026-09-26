@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_tensor_product_residual_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -50,16 +50,16 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
 ) {
   static constexpr int ND = 2;
   static constexpr int NC = 2;
-  s_t current_value[NC * NQ * VS];
-  s_t current_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
-  s_t previous_value[NC * NQ * VS];
-  s_t previous_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
-  s_t value_coeff[NC * NQ * VS];
-  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  s_t current_value[NC * NQ];
+  s_t current_grad_ref[NC * NQ * ND];
+  tensor_evaluate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t previous_value[NC * NQ];
+  s_t previous_grad_ref[NC * NQ * ND];
+  tensor_evaluate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
+  s_t value_coeff[NC * NQ];
+  s_t grad_coeff_ref[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -70,20 +70,20 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
     const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
     const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
-    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1) * VS];
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
+    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND)];
+    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND)];
+    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1)];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -143,11 +143,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       grad_coeff_ref_q1_1[0] = qw * (adj2 * grad_coeff1_0 + adj3 * grad_coeff1_1);
     }
   }
-  tensor_integrate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_tensor_product_residual_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -156,27 +156,27 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
     const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
     const s_t *const RSTR q_weight_1d,
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
     const s_t eta_b,
     const s_t eta_s,
     const s_t lmbda,
     const s_t mu,
     const s_t u_dt_shift,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int ND = 2;
   static constexpr int NC = 2;
-  s_t current_value[NC * NQ * VS];
-  s_t current_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
-  s_t previous_value[NC * NQ * VS];
-  s_t previous_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
-  s_t value_coeff[NC * NQ * VS];
-  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  s_t current_value[NC * NQ];
+  s_t current_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t previous_value[NC * NQ];
+  s_t previous_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
+  s_t value_coeff[NC * NQ];
+  s_t grad_coeff_ref[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -187,20 +187,20 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
     const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
     const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
-    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1) * VS];
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
+    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND)];
+    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND)];
+    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1)];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -260,11 +260,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       grad_coeff_ref_q1_1[0] = qw * (adj2 * grad_coeff1_0 + adj3 * grad_coeff1_1);
     }
   }
-  tensor_integrate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  tensor_integrate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_tensor_product_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -285,20 +285,20 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
 ) {
   static constexpr int ND = 2;
   static constexpr int NC = 2;
-  s_t current_value[NC * NQ * VS];
-  s_t current_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
-  s_t previous_value[NC * NQ * VS];
-  s_t previous_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
-  s_t direction_value[NC * NQ * VS];
-  s_t direction_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, direction, direction_value, direction_grad_ref);
-  s_t value_coeff[NC * NQ * VS];
-  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  s_t current_value[NC * NQ];
+  s_t current_grad_ref[NC * NQ * ND];
+  tensor_evaluate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t previous_value[NC * NQ];
+  s_t previous_grad_ref[NC * NQ * ND];
+  tensor_evaluate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
+  s_t direction_value[NC * NQ];
+  s_t direction_grad_ref[NC * NQ * ND];
+  tensor_evaluate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, direction, direction_value, direction_grad_ref);
+  s_t value_coeff[NC * NQ];
+  s_t grad_coeff_ref[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -309,24 +309,24 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
     const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
     const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
-    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_grad_ref_q0_0 = &direction_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR direction_grad_ref_q0_1 = &direction_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_0 = &direction_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_1 = &direction_grad_ref[((NQ + q) * ND + 1) * VS];
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
+    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND)];
+    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND)];
+    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_grad_ref_q0_0 = &direction_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_grad_ref_q0_1 = &direction_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR direction_grad_ref_q1_0 = &direction_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR direction_grad_ref_q1_1 = &direction_grad_ref[((NQ + q) * ND + 1)];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -442,11 +442,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       grad_coeff_ref_q1_1[0] = qw * (adj2 * grad_coeff1_0 + adj3 * grad_coeff1_1);
     }
   }
-  tensor_integrate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_tensor_product_jacobian_action_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -455,32 +455,32 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
     const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
     const s_t *const RSTR q_weight_1d,
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
-    const s_t direction[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
+    const s_t direction[2 * NS],
     const s_t eta_b,
     const s_t eta_s,
     const s_t lmbda,
     const s_t mu,
     const s_t u_dt_shift,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int ND = 2;
   static constexpr int NC = 2;
-  s_t current_value[NC * NQ * VS];
-  s_t current_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
-  s_t previous_value[NC * NQ * VS];
-  s_t previous_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
-  s_t direction_value[NC * NQ * VS];
-  s_t direction_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, direction, direction_value, direction_grad_ref);
-  s_t value_coeff[NC * NQ * VS];
-  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  s_t current_value[NC * NQ];
+  s_t current_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t previous_value[NC * NQ];
+  s_t previous_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
+  s_t direction_value[NC * NQ];
+  s_t direction_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, direction, direction_value, direction_grad_ref);
+  s_t value_coeff[NC * NQ];
+  s_t grad_coeff_ref[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -491,24 +491,24 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
     const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
     const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
-    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_grad_ref_q0_0 = &direction_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR direction_grad_ref_q0_1 = &direction_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_0 = &direction_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_1 = &direction_grad_ref[((NQ + q) * ND + 1) * VS];
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
+    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND)];
+    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND)];
+    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_grad_ref_q0_0 = &direction_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_grad_ref_q0_1 = &direction_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR direction_grad_ref_q1_0 = &direction_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR direction_grad_ref_q1_1 = &direction_grad_ref[((NQ + q) * ND + 1)];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -624,11 +624,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       grad_coeff_ref_q1_1[0] = qw * (adj2 * grad_coeff1_0 + adj3 * grad_coeff1_1);
     }
   }
-  tensor_integrate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  tensor_integrate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_tensor_product_hessian_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -637,8 +637,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
     const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
     const s_t *const RSTR q_weight_1d,
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
     const s_t eta_b,
     const s_t eta_s,
     const s_t lmbda,
@@ -651,51 +651,51 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
   for (int entry = 0; entry < 2 * NS * 2 * NS; ++entry) {
     element_matrix[entry] = s_t(0);
   }
-  s_t current_value[NC * NQ * VS];
-  s_t current_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
-  s_t previous_value[NC * NQ * VS];
-  s_t previous_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
-  s_t value_coeff[NC * NQ * VS];
-  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  s_t current_value[NC * NQ];
+  s_t current_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t previous_value[NC * NQ];
+  s_t previous_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
+  s_t value_coeff[NC * NQ];
+  s_t grad_coeff_ref[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   static constexpr int NS1 = integer_root(NS, ND);
   s_t * column[NC * NS];
   static constexpr int N_TANGENT = 16;
-  s_t tangent[N_TANGENT * NQ * VS];
+  s_t tangent[N_TANGENT * NQ];
   for (int q = 0; q < NQ; ++q) {
     const s_t *const RSTR det_q = determinant + q * geometry_stride;
     const s_t *const RSTR adj_q0 = adjugate[0] + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
     const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
-    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1) * VS];
-    s_t *const RSTR tangent_grad_d0_0_grad0_0_q = &tangent[q * VS];
-    s_t *const RSTR tangent_grad_d0_0_grad0_1_q = &tangent[(NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d0_0_grad1_0_q = &tangent[(2 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d0_0_grad1_1_q = &tangent[(3 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d0_1_grad0_0_q = &tangent[(4 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d0_1_grad0_1_q = &tangent[(5 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d0_1_grad1_0_q = &tangent[(6 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d0_1_grad1_1_q = &tangent[(7 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d1_0_grad0_0_q = &tangent[(8 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d1_0_grad0_1_q = &tangent[(9 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d1_0_grad1_0_q = &tangent[(10 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d1_0_grad1_1_q = &tangent[(11 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d1_1_grad0_0_q = &tangent[(12 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d1_1_grad0_1_q = &tangent[(13 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d1_1_grad1_0_q = &tangent[(14 * NQ + q) * VS];
-    s_t *const RSTR tangent_grad_d1_1_grad1_1_q = &tangent[(15 * NQ + q) * VS];
+    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND)];
+    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q0_0 = &previous_grad_ref[(q * ND)];
+    const s_t *const RSTR previous_grad_ref_q0_1 = &previous_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR previous_grad_ref_q1_0 = &previous_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR previous_grad_ref_q1_1 = &previous_grad_ref[((NQ + q) * ND + 1)];
+    s_t *const RSTR tangent_grad_d0_0_grad0_0_q = &tangent[q];
+    s_t *const RSTR tangent_grad_d0_0_grad0_1_q = &tangent[(NQ + q)];
+    s_t *const RSTR tangent_grad_d0_0_grad1_0_q = &tangent[(2 * NQ + q)];
+    s_t *const RSTR tangent_grad_d0_0_grad1_1_q = &tangent[(3 * NQ + q)];
+    s_t *const RSTR tangent_grad_d0_1_grad0_0_q = &tangent[(4 * NQ + q)];
+    s_t *const RSTR tangent_grad_d0_1_grad0_1_q = &tangent[(5 * NQ + q)];
+    s_t *const RSTR tangent_grad_d0_1_grad1_0_q = &tangent[(6 * NQ + q)];
+    s_t *const RSTR tangent_grad_d0_1_grad1_1_q = &tangent[(7 * NQ + q)];
+    s_t *const RSTR tangent_grad_d1_0_grad0_0_q = &tangent[(8 * NQ + q)];
+    s_t *const RSTR tangent_grad_d1_0_grad0_1_q = &tangent[(9 * NQ + q)];
+    s_t *const RSTR tangent_grad_d1_0_grad1_0_q = &tangent[(10 * NQ + q)];
+    s_t *const RSTR tangent_grad_d1_0_grad1_1_q = &tangent[(11 * NQ + q)];
+    s_t *const RSTR tangent_grad_d1_1_grad0_0_q = &tangent[(12 * NQ + q)];
+    s_t *const RSTR tangent_grad_d1_1_grad0_1_q = &tangent[(13 * NQ + q)];
+    s_t *const RSTR tangent_grad_d1_1_grad1_0_q = &tangent[(14 * NQ + q)];
+    s_t *const RSTR tangent_grad_d1_1_grad1_1_q = &tangent[(15 * NQ + q)];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -838,20 +838,20 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
       const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
       const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
-      const s_t *const RSTR tangent_grad_d0_0_grad0_0_q = &tangent[q * VS];
-      const s_t *const RSTR tangent_grad_d0_1_grad0_0_q = &tangent[(4 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d0_0_grad0_1_q = &tangent[(NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d0_1_grad0_1_q = &tangent[(5 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d0_0_grad1_0_q = &tangent[(2 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d0_1_grad1_0_q = &tangent[(6 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d0_0_grad1_1_q = &tangent[(3 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d0_1_grad1_1_q = &tangent[(7 * NQ + q) * VS];
-      s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-      s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-      s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-      s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-      s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-      s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
+      const s_t *const RSTR tangent_grad_d0_0_grad0_0_q = &tangent[q];
+      const s_t *const RSTR tangent_grad_d0_1_grad0_0_q = &tangent[(4 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d0_0_grad0_1_q = &tangent[(NQ + q)];
+      const s_t *const RSTR tangent_grad_d0_1_grad0_1_q = &tangent[(5 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d0_0_grad1_0_q = &tangent[(2 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d0_1_grad1_0_q = &tangent[(6 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d0_0_grad1_1_q = &tangent[(3 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d0_1_grad1_1_q = &tangent[(7 * NQ + q)];
+      s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+      s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+      s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+      s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+      s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+      s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
       {
         const s_t det = det_q[0];
         const s_t adj0 = adj_q0[0];
@@ -878,8 +878,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       column[out_shape * NC + 0] = &element_matrix[(0 * NS + out_shape) * 2 * NS + 0 * NS + trial];
       column[out_shape * NC + 1] = &element_matrix[(1 * NS + out_shape) * 2 * NS + 0 * NS + trial];
     }
-    tensor_integrate<s_t, NQ, NS, VS, ND, NC>(
-        ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, column);
+    tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
+        shape_1d, grad_1d, value_coeff, grad_coeff_ref, column);
   }
   for (int trial = 0; trial < NS; ++trial) {
     const int trial_x = trial % NS1;
@@ -893,20 +893,20 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
       const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
       const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
-      const s_t *const RSTR tangent_grad_d1_0_grad0_0_q = &tangent[(8 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d1_1_grad0_0_q = &tangent[(12 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d1_0_grad0_1_q = &tangent[(9 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d1_1_grad0_1_q = &tangent[(13 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d1_0_grad1_0_q = &tangent[(10 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d1_1_grad1_0_q = &tangent[(14 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d1_0_grad1_1_q = &tangent[(11 * NQ + q) * VS];
-      const s_t *const RSTR tangent_grad_d1_1_grad1_1_q = &tangent[(15 * NQ + q) * VS];
-      s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-      s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-      s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-      s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-      s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-      s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
+      const s_t *const RSTR tangent_grad_d1_0_grad0_0_q = &tangent[(8 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d1_1_grad0_0_q = &tangent[(12 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d1_0_grad0_1_q = &tangent[(9 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d1_1_grad0_1_q = &tangent[(13 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d1_0_grad1_0_q = &tangent[(10 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d1_1_grad1_0_q = &tangent[(14 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d1_0_grad1_1_q = &tangent[(11 * NQ + q)];
+      const s_t *const RSTR tangent_grad_d1_1_grad1_1_q = &tangent[(15 * NQ + q)];
+      s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+      s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+      s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+      s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+      s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+      s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
       {
         const s_t det = det_q[0];
         const s_t adj0 = adj_q0[0];
@@ -933,8 +933,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       column[out_shape * NC + 0] = &element_matrix[(0 * NS + out_shape) * 2 * NS + 1 * NS + trial];
       column[out_shape * NC + 1] = &element_matrix[(1 * NS + out_shape) * 2 * NS + 1 * NS + trial];
     }
-    tensor_integrate<s_t, NQ, NS, VS, ND, NC>(
-        ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, column);
+    tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
+        shape_1d, grad_1d, value_coeff, grad_coeff_ref, column);
   }
 }
 

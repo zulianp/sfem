@@ -20,6 +20,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_egeometry_soa
 ) {
   static constexpr int NC = 1;
   static constexpr int NS = 4;
+  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
@@ -33,16 +34,16 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_egeometry_soa
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t badj0[1];
-    s_t badj1[1];
-    s_t badj2[1];
-    s_t badj3[1];
-    s_t badj4[1];
-    s_t badj5[1];
-    s_t badj6[1];
-    s_t badj7[1];
-    s_t badj8[1];
-    s_t bdet0[1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     {  // TET4 evaluates in closed form
       s_t *const RSTR badj0_q = badj0;
       const s_t *const RSTR adj0_q = adj[0] + evb;
@@ -77,7 +78,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_egeometry_soa
         bdet0_q[0] = det_q[0];
       }
     }
-    laplace_d3_simplex_tet4_objective_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d3_simplex_tet4_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -93,6 +94,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_ecoords_soa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
+  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
@@ -106,40 +108,40 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_ecoords_soa(
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[1];
-    s_t badj1[1];
-    s_t badj2[1];
-    s_t badj3[1];
-    s_t badj4[1];
-    s_t badj5[1];
-    s_t badj6[1];
-    s_t badj7[1];
-    s_t badj8[1];
-    s_t bdet0[1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     {  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
       {
-        const s_t J00 = -bcoordinate_data[0][0] + bcoordinate_data[3][0];
-        const s_t J01 = -bcoordinate_data[0][0] + bcoordinate_data[6][0];
-        const s_t J02 = -bcoordinate_data[0][0] + bcoordinate_data[9][0];
-        const s_t J10 = -bcoordinate_data[1][0] + bcoordinate_data[4][0];
-        const s_t J11 = -bcoordinate_data[1][0] + bcoordinate_data[7][0];
-        const s_t J12 = bcoordinate_data[10][0] - bcoordinate_data[1][0];
-        const s_t J20 = -bcoordinate_data[2][0] + bcoordinate_data[5][0];
-        const s_t J21 = -bcoordinate_data[2][0] + bcoordinate_data[8][0];
-        const s_t J22 = bcoordinate_data[11][0] - bcoordinate_data[2][0];
+        const s_t J00 = -bcoordinate_data[0] + bcoordinate_data[3];
+        const s_t J01 = -bcoordinate_data[0] + bcoordinate_data[6];
+        const s_t J02 = -bcoordinate_data[0] + bcoordinate_data[9];
+        const s_t J10 = -bcoordinate_data[1] + bcoordinate_data[4];
+        const s_t J11 = -bcoordinate_data[1] + bcoordinate_data[7];
+        const s_t J12 = bcoordinate_data[10] - bcoordinate_data[1];
+        const s_t J20 = -bcoordinate_data[2] + bcoordinate_data[5];
+        const s_t J21 = -bcoordinate_data[2] + bcoordinate_data[8];
+        const s_t J22 = bcoordinate_data[11] - bcoordinate_data[2];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
             badj_streams, bdet0, 0);
       }
     }
-    laplace_d3_simplex_tet4_objective_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d3_simplex_tet4_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -155,6 +157,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_esoa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
+  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
@@ -168,40 +171,40 @@ static __host__ __device__ __forceinline__ int laplace_tet4_energy_esoa(
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[1];
-    s_t badj1[1];
-    s_t badj2[1];
-    s_t badj3[1];
-    s_t badj4[1];
-    s_t badj5[1];
-    s_t badj6[1];
-    s_t badj7[1];
-    s_t badj8[1];
-    s_t bdet0[1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     {  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
       {
-        const s_t J00 = -bcoordinate_data[0][0] + bcoordinate_data[3][0];
-        const s_t J01 = -bcoordinate_data[0][0] + bcoordinate_data[6][0];
-        const s_t J02 = -bcoordinate_data[0][0] + bcoordinate_data[9][0];
-        const s_t J10 = -bcoordinate_data[1][0] + bcoordinate_data[4][0];
-        const s_t J11 = -bcoordinate_data[1][0] + bcoordinate_data[7][0];
-        const s_t J12 = bcoordinate_data[10][0] - bcoordinate_data[1][0];
-        const s_t J20 = -bcoordinate_data[2][0] + bcoordinate_data[5][0];
-        const s_t J21 = -bcoordinate_data[2][0] + bcoordinate_data[8][0];
-        const s_t J22 = bcoordinate_data[11][0] - bcoordinate_data[2][0];
+        const s_t J00 = -bcoordinate_data[0] + bcoordinate_data[3];
+        const s_t J01 = -bcoordinate_data[0] + bcoordinate_data[6];
+        const s_t J02 = -bcoordinate_data[0] + bcoordinate_data[9];
+        const s_t J10 = -bcoordinate_data[1] + bcoordinate_data[4];
+        const s_t J11 = -bcoordinate_data[1] + bcoordinate_data[7];
+        const s_t J12 = bcoordinate_data[10] - bcoordinate_data[1];
+        const s_t J20 = -bcoordinate_data[2] + bcoordinate_data[5];
+        const s_t J21 = -bcoordinate_data[2] + bcoordinate_data[8];
+        const s_t J22 = bcoordinate_data[11] - bcoordinate_data[2];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
             badj_streams, bdet0, 0);
       }
     }
-    laplace_d3_simplex_tet4_objective_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    laplace_d3_simplex_tet4_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -218,6 +221,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_egeometry_s
 ) {
   static constexpr int NC = 1;
   static constexpr int NS = 4;
+  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
@@ -233,16 +237,16 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_egeometry_s
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t badj0[1];
-    s_t badj1[1];
-    s_t badj2[1];
-    s_t badj3[1];
-    s_t badj4[1];
-    s_t badj5[1];
-    s_t badj6[1];
-    s_t badj7[1];
-    s_t badj8[1];
-    s_t bdet0[1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     {  // TET4 evaluates in closed form
       s_t *const RSTR badj0_q = badj0;
       const s_t *const RSTR adj0_q = adj[0] + evb;
@@ -277,7 +281,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_egeometry_s
         bdet0_q[0] = det_q[0];
       }
     }
-    laplace_d3_simplex_tet4_gradient_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_tet4_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -293,6 +297,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_ecoords_soa
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
+  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
@@ -308,40 +313,40 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_ecoords_soa
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[1];
-    s_t badj1[1];
-    s_t badj2[1];
-    s_t badj3[1];
-    s_t badj4[1];
-    s_t badj5[1];
-    s_t badj6[1];
-    s_t badj7[1];
-    s_t badj8[1];
-    s_t bdet0[1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     {  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
       {
-        const s_t J00 = -bcoordinate_data[0][0] + bcoordinate_data[3][0];
-        const s_t J01 = -bcoordinate_data[0][0] + bcoordinate_data[6][0];
-        const s_t J02 = -bcoordinate_data[0][0] + bcoordinate_data[9][0];
-        const s_t J10 = -bcoordinate_data[1][0] + bcoordinate_data[4][0];
-        const s_t J11 = -bcoordinate_data[1][0] + bcoordinate_data[7][0];
-        const s_t J12 = bcoordinate_data[10][0] - bcoordinate_data[1][0];
-        const s_t J20 = -bcoordinate_data[2][0] + bcoordinate_data[5][0];
-        const s_t J21 = -bcoordinate_data[2][0] + bcoordinate_data[8][0];
-        const s_t J22 = bcoordinate_data[11][0] - bcoordinate_data[2][0];
+        const s_t J00 = -bcoordinate_data[0] + bcoordinate_data[3];
+        const s_t J01 = -bcoordinate_data[0] + bcoordinate_data[6];
+        const s_t J02 = -bcoordinate_data[0] + bcoordinate_data[9];
+        const s_t J10 = -bcoordinate_data[1] + bcoordinate_data[4];
+        const s_t J11 = -bcoordinate_data[1] + bcoordinate_data[7];
+        const s_t J12 = bcoordinate_data[10] - bcoordinate_data[1];
+        const s_t J20 = -bcoordinate_data[2] + bcoordinate_data[5];
+        const s_t J21 = -bcoordinate_data[2] + bcoordinate_data[8];
+        const s_t J22 = bcoordinate_data[11] - bcoordinate_data[2];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
             badj_streams, bdet0, 0);
       }
     }
-    laplace_d3_simplex_tet4_gradient_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_tet4_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -357,6 +362,7 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_esoa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
+  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
@@ -372,40 +378,40 @@ static __host__ __device__ __forceinline__ int laplace_tet4_gradient_esoa(
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[1];
-    s_t badj1[1];
-    s_t badj2[1];
-    s_t badj3[1];
-    s_t badj4[1];
-    s_t badj5[1];
-    s_t badj6[1];
-    s_t badj7[1];
-    s_t badj8[1];
-    s_t bdet0[1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     {  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
       {
-        const s_t J00 = -bcoordinate_data[0][0] + bcoordinate_data[3][0];
-        const s_t J01 = -bcoordinate_data[0][0] + bcoordinate_data[6][0];
-        const s_t J02 = -bcoordinate_data[0][0] + bcoordinate_data[9][0];
-        const s_t J10 = -bcoordinate_data[1][0] + bcoordinate_data[4][0];
-        const s_t J11 = -bcoordinate_data[1][0] + bcoordinate_data[7][0];
-        const s_t J12 = bcoordinate_data[10][0] - bcoordinate_data[1][0];
-        const s_t J20 = -bcoordinate_data[2][0] + bcoordinate_data[5][0];
-        const s_t J21 = -bcoordinate_data[2][0] + bcoordinate_data[8][0];
-        const s_t J22 = bcoordinate_data[11][0] - bcoordinate_data[2][0];
+        const s_t J00 = -bcoordinate_data[0] + bcoordinate_data[3];
+        const s_t J01 = -bcoordinate_data[0] + bcoordinate_data[6];
+        const s_t J02 = -bcoordinate_data[0] + bcoordinate_data[9];
+        const s_t J10 = -bcoordinate_data[1] + bcoordinate_data[4];
+        const s_t J11 = -bcoordinate_data[1] + bcoordinate_data[7];
+        const s_t J12 = bcoordinate_data[10] - bcoordinate_data[1];
+        const s_t J20 = -bcoordinate_data[2] + bcoordinate_data[5];
+        const s_t J21 = -bcoordinate_data[2] + bcoordinate_data[8];
+        const s_t J22 = bcoordinate_data[11] - bcoordinate_data[2];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
             badj_streams, bdet0, 0);
       }
     }
-    laplace_d3_simplex_tet4_gradient_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
+    laplace_d3_simplex_tet4_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -421,20 +427,21 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_egeometry_so
 ) {
   static constexpr int NC = 1;
   static constexpr int NS = 4;
+  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const int ne = 1;
-    s_t badj0[1];
-    s_t badj1[1];
-    s_t badj2[1];
-    s_t badj3[1];
-    s_t badj4[1];
-    s_t badj5[1];
-    s_t badj6[1];
-    s_t badj7[1];
-    s_t badj8[1];
-    s_t bdet0[1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     {  // TET4 evaluates in closed form
       s_t *const RSTR badj0_q = badj0;
       const s_t *const RSTR adj0_q = adj[0] + evb;
@@ -469,26 +476,26 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_egeometry_so
         bdet0_q[0] = det_q[0];
       }
     }
-    s_t bh_data[NDOFS][1];
-    s_t bout_data[NDOFS][1];
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      laplace_d3_simplex_tet4_apply_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_tet4_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }
@@ -506,63 +513,64 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_ecoords_soa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
+  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const int ne = 1;
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[1];
-    s_t badj1[1];
-    s_t badj2[1];
-    s_t badj3[1];
-    s_t badj4[1];
-    s_t badj5[1];
-    s_t badj6[1];
-    s_t badj7[1];
-    s_t badj8[1];
-    s_t bdet0[1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     {  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
       {
-        const s_t J00 = -bcoordinate_data[0][0] + bcoordinate_data[3][0];
-        const s_t J01 = -bcoordinate_data[0][0] + bcoordinate_data[6][0];
-        const s_t J02 = -bcoordinate_data[0][0] + bcoordinate_data[9][0];
-        const s_t J10 = -bcoordinate_data[1][0] + bcoordinate_data[4][0];
-        const s_t J11 = -bcoordinate_data[1][0] + bcoordinate_data[7][0];
-        const s_t J12 = bcoordinate_data[10][0] - bcoordinate_data[1][0];
-        const s_t J20 = -bcoordinate_data[2][0] + bcoordinate_data[5][0];
-        const s_t J21 = -bcoordinate_data[2][0] + bcoordinate_data[8][0];
-        const s_t J22 = bcoordinate_data[11][0] - bcoordinate_data[2][0];
+        const s_t J00 = -bcoordinate_data[0] + bcoordinate_data[3];
+        const s_t J01 = -bcoordinate_data[0] + bcoordinate_data[6];
+        const s_t J02 = -bcoordinate_data[0] + bcoordinate_data[9];
+        const s_t J10 = -bcoordinate_data[1] + bcoordinate_data[4];
+        const s_t J11 = -bcoordinate_data[1] + bcoordinate_data[7];
+        const s_t J12 = bcoordinate_data[10] - bcoordinate_data[1];
+        const s_t J20 = -bcoordinate_data[2] + bcoordinate_data[5];
+        const s_t J21 = -bcoordinate_data[2] + bcoordinate_data[8];
+        const s_t J22 = bcoordinate_data[11] - bcoordinate_data[2];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
             badj_streams, bdet0, 0);
       }
     }
-    s_t bh_data[NDOFS][1];
-    s_t bout_data[NDOFS][1];
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      laplace_d3_simplex_tet4_apply_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_tet4_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }
@@ -580,63 +588,64 @@ static __host__ __device__ __forceinline__ int laplace_tet4_hessian_esoa(
   static constexpr int NC = 1;
   static constexpr int ND = 3;
   static constexpr int NS = 4;
+  static constexpr int NQ = 1;
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const int ne = 1;
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[1];
-    s_t badj1[1];
-    s_t badj2[1];
-    s_t badj3[1];
-    s_t badj4[1];
-    s_t badj5[1];
-    s_t badj6[1];
-    s_t badj7[1];
-    s_t badj8[1];
-    s_t bdet0[1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     {  // TET4 evaluates in closed form
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
       {
-        const s_t J00 = -bcoordinate_data[0][0] + bcoordinate_data[3][0];
-        const s_t J01 = -bcoordinate_data[0][0] + bcoordinate_data[6][0];
-        const s_t J02 = -bcoordinate_data[0][0] + bcoordinate_data[9][0];
-        const s_t J10 = -bcoordinate_data[1][0] + bcoordinate_data[4][0];
-        const s_t J11 = -bcoordinate_data[1][0] + bcoordinate_data[7][0];
-        const s_t J12 = bcoordinate_data[10][0] - bcoordinate_data[1][0];
-        const s_t J20 = -bcoordinate_data[2][0] + bcoordinate_data[5][0];
-        const s_t J21 = -bcoordinate_data[2][0] + bcoordinate_data[8][0];
-        const s_t J22 = bcoordinate_data[11][0] - bcoordinate_data[2][0];
+        const s_t J00 = -bcoordinate_data[0] + bcoordinate_data[3];
+        const s_t J01 = -bcoordinate_data[0] + bcoordinate_data[6];
+        const s_t J02 = -bcoordinate_data[0] + bcoordinate_data[9];
+        const s_t J10 = -bcoordinate_data[1] + bcoordinate_data[4];
+        const s_t J11 = -bcoordinate_data[1] + bcoordinate_data[7];
+        const s_t J12 = bcoordinate_data[10] - bcoordinate_data[1];
+        const s_t J20 = -bcoordinate_data[2] + bcoordinate_data[5];
+        const s_t J21 = -bcoordinate_data[2] + bcoordinate_data[8];
+        const s_t J22 = bcoordinate_data[11] - bcoordinate_data[2];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
             badj_streams, bdet0, 0);
       }
     }
-    s_t bh_data[NDOFS][1];
-    s_t bout_data[NDOFS][1];
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      laplace_d3_simplex_tet4_apply_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
+      laplace_d3_simplex_tet4_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, kappa, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }

@@ -13,7 +13,7 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -22,7 +22,7 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -93,7 +93,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_modified_mooney_rivlin_tet
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -133,13 +133,13 @@ __global__ void modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][1];
-    s_t bh_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -149,53 +149,53 @@ __global__ void modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy, hz};
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
-    s_t badj0_data[1];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[1];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[1];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[1];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[1];
-    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[1];
-    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[1];
-    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[1];
-    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[1];
-    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[1];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        ne, g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        ne, g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        ne, g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        ne, g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data;
+    const s_t *const badj4 = ageom_stream<s_t, g_t>(
+        ne, g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data;
+    const s_t *const badj5 = ageom_stream<s_t, g_t>(
+        ne, g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data;
+    const s_t *const badj6 = ageom_stream<s_t, g_t>(
+        ne, g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data;
+    const s_t *const badj7 = ageom_stream<s_t, g_t>(
+        ne, g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data;
+    const s_t *const badj8 = ageom_stream<s_t, g_t>(
+        ne, g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
     for (int step = 0; step < nsteps; ++step) {
       {
@@ -203,7 +203,7 @@ __global__ void modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl(
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_objective_block<s_t, NQ, NS, 1>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d3_simplex_objective_block<s_t, NQ, NS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -246,13 +246,13 @@ extern "C" int cu_modified_mooney_rivlin_tet10_objective_steps_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+        sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+        sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_objective_steps_a_msoa_impl");
     }
     default:
@@ -265,7 +265,7 @@ extern "C" int cu_modified_mooney_rivlin_tet10_objective_steps_a_msoa(
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -300,24 +300,24 @@ __global__ void modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][1];
-    s_t bh_data[NS * NC][VS];
-    s_t bcoordinate_data[NS * ND][VS];
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
+    s_t bcoordinate_data[NS * ND];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -325,10 +325,10 @@ __global__ void modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl(
     const g_t *const coordinate_components[ND] = {x, y, z};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < ND; ++d) {
         {
-          bcoordinate_data[shape * ND + d][0] = coordinate_components[d][ev_shape[0]];
+          bcoordinate_data[shape * ND + d] = coordinate_components[d][ev_shape[0]];
         }
       }
     }
@@ -337,75 +337,75 @@ __global__ void modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy, hz};
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
 
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[1];
-      s_t J01_values[1];
-      s_t J02_values[1];
-      s_t J10_values[1];
-      s_t J11_values[1];
-      s_t J12_values[1];
-      s_t J20_values[1];
-      s_t J21_values[1];
-      s_t J22_values[1];
+      s_t J00_values;
+      s_t J01_values;
+      s_t J02_values;
+      s_t J10_values;
+      s_t J11_values;
+      s_t J12_values;
+      s_t J20_values;
+      s_t J21_values;
+      s_t J22_values;
       {
-        J00_values[0] = s_t(0);
-        J01_values[0] = s_t(0);
-        J02_values[0] = s_t(0);
-        J10_values[0] = s_t(0);
-        J11_values[0] = s_t(0);
-        J12_values[0] = s_t(0);
-        J20_values[0] = s_t(0);
-        J21_values[0] = s_t(0);
-        J22_values[0] = s_t(0);
+        J00_values = s_t(0);
+        J01_values = s_t(0);
+        J02_values = s_t(0);
+        J10_values = s_t(0);
+        J11_values = s_t(0);
+        J12_values = s_t(0);
+        J20_values = s_t(0);
+        J21_values = s_t(0);
+        J22_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
         const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
         const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
         {
-          J00_values[0] += bcoordinate_data[3 * shape][0] * g0;
-          J01_values[0] += bcoordinate_data[3 * shape][0] * g1;
-          J02_values[0] += bcoordinate_data[3 * shape][0] * g2;
-          J10_values[0] += bcoordinate_data[3 * shape + 1][0] * g0;
-          J11_values[0] += bcoordinate_data[3 * shape + 1][0] * g1;
-          J12_values[0] += bcoordinate_data[3 * shape + 1][0] * g2;
-          J20_values[0] += bcoordinate_data[3 * shape + 2][0] * g0;
-          J21_values[0] += bcoordinate_data[3 * shape + 2][0] * g1;
-          J22_values[0] += bcoordinate_data[3 * shape + 2][0] * g2;
+          J00_values += bcoordinate_data[3 * shape] * g0;
+          J01_values += bcoordinate_data[3 * shape] * g1;
+          J02_values += bcoordinate_data[3 * shape] * g2;
+          J10_values += bcoordinate_data[3 * shape + 1] * g0;
+          J11_values += bcoordinate_data[3 * shape + 1] * g1;
+          J12_values += bcoordinate_data[3 * shape + 1] * g2;
+          J20_values += bcoordinate_data[3 * shape + 2] * g0;
+          J21_values += bcoordinate_data[3 * shape + 2] * g1;
+          J22_values += bcoordinate_data[3 * shape + 2] * g2;
         }
       }
       {
-        const s_t J00 = J00_values[0];
-        const s_t J01 = J01_values[0];
-        const s_t J02 = J02_values[0];
-        const s_t J10 = J10_values[0];
-        const s_t J11 = J11_values[0];
-        const s_t J12 = J12_values[0];
-        const s_t J20 = J20_values[0];
-        const s_t J21 = J21_values[0];
-        const s_t J22 = J22_values[0];
+        const s_t J00 = J00_values;
+        const s_t J01 = J01_values;
+        const s_t J02 = J02_values;
+        const s_t J10 = J10_values;
+        const s_t J11 = J11_values;
+        const s_t J12 = J12_values;
+        const s_t J20 = J20_values;
+        const s_t J21 = J21_values;
+        const s_t J22 = J22_values;
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * 1 + 0);
+            badj_streams, bdet0, q);
       }
     }
 
@@ -415,7 +415,7 @@ __global__ void modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl(
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_objective_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d3_simplex_objective_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -449,13 +449,13 @@ extern "C" int cu_modified_mooney_rivlin_tet10_objective_steps_i_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+        sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+        sfem::codegen::modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_objective_steps_i_msoa_impl");
     }
     default:
@@ -523,7 +523,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_modified_mooney_rivlin_tet
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void modified_mooney_rivlin_tet10_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -560,13 +560,13 @@ __global__ void modified_mooney_rivlin_tet10_gradient_a_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][1];
-    s_t bout_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bout_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -574,67 +574,67 @@ __global__ void modified_mooney_rivlin_tet10_gradient_a_msoa_impl(
     const s_t *const u_components[NC] = {ux, uy, uz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
-    s_t badj0_data[1];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[1];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[1];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[1];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[1];
-    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[1];
-    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[1];
-    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[1];
-    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[1];
-    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[1];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        ne, g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        ne, g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        ne, g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        ne, g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data;
+    const s_t *const badj4 = ageom_stream<s_t, g_t>(
+        ne, g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data;
+    const s_t *const badj5 = ageom_stream<s_t, g_t>(
+        ne, g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data;
+    const s_t *const badj6 = ageom_stream<s_t, g_t>(
+        ne, g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data;
+    const s_t *const badj7 = ageom_stream<s_t, g_t>(
+        ne, g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data;
+    const s_t *const badj8 = ageom_stream<s_t, g_t>(
+        ne, g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_gradient_block<s_t, NQ, NS, 1>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_gradient_block<s_t, NQ, NS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -676,13 +676,13 @@ extern "C" int cu_modified_mooney_rivlin_tet10_gradient_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_gradient_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::modified_mooney_rivlin_tet10_gradient_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_gradient_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_gradient_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::modified_mooney_rivlin_tet10_gradient_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_gradient_a_msoa_impl");
     }
     default:
@@ -695,7 +695,7 @@ extern "C" int cu_modified_mooney_rivlin_tet10_gradient_a_msoa(
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void modified_mooney_rivlin_tet10_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -727,24 +727,24 @@ __global__ void modified_mooney_rivlin_tet10_gradient_i_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][1];
-    s_t bout_data[NS * NC][VS];
-    s_t bcoordinate_data[NS * ND][VS];
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bout_data[NS * NC];
+    s_t bcoordinate_data[NS * ND];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -752,101 +752,101 @@ __global__ void modified_mooney_rivlin_tet10_gradient_i_msoa_impl(
     const g_t *const coordinate_components[ND] = {x, y, z};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < ND; ++d) {
         {
-          bcoordinate_data[shape * ND + d][0] = coordinate_components[d][ev_shape[0]];
+          bcoordinate_data[shape * ND + d] = coordinate_components[d][ev_shape[0]];
         }
       }
     }
     const s_t *const u_components[NC] = {ux, uy, uz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
 
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[1];
-      s_t J01_values[1];
-      s_t J02_values[1];
-      s_t J10_values[1];
-      s_t J11_values[1];
-      s_t J12_values[1];
-      s_t J20_values[1];
-      s_t J21_values[1];
-      s_t J22_values[1];
+      s_t J00_values;
+      s_t J01_values;
+      s_t J02_values;
+      s_t J10_values;
+      s_t J11_values;
+      s_t J12_values;
+      s_t J20_values;
+      s_t J21_values;
+      s_t J22_values;
       {
-        J00_values[0] = s_t(0);
-        J01_values[0] = s_t(0);
-        J02_values[0] = s_t(0);
-        J10_values[0] = s_t(0);
-        J11_values[0] = s_t(0);
-        J12_values[0] = s_t(0);
-        J20_values[0] = s_t(0);
-        J21_values[0] = s_t(0);
-        J22_values[0] = s_t(0);
+        J00_values = s_t(0);
+        J01_values = s_t(0);
+        J02_values = s_t(0);
+        J10_values = s_t(0);
+        J11_values = s_t(0);
+        J12_values = s_t(0);
+        J20_values = s_t(0);
+        J21_values = s_t(0);
+        J22_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
         const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
         const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
         {
-          J00_values[0] += bcoordinate_data[3 * shape][0] * g0;
-          J01_values[0] += bcoordinate_data[3 * shape][0] * g1;
-          J02_values[0] += bcoordinate_data[3 * shape][0] * g2;
-          J10_values[0] += bcoordinate_data[3 * shape + 1][0] * g0;
-          J11_values[0] += bcoordinate_data[3 * shape + 1][0] * g1;
-          J12_values[0] += bcoordinate_data[3 * shape + 1][0] * g2;
-          J20_values[0] += bcoordinate_data[3 * shape + 2][0] * g0;
-          J21_values[0] += bcoordinate_data[3 * shape + 2][0] * g1;
-          J22_values[0] += bcoordinate_data[3 * shape + 2][0] * g2;
+          J00_values += bcoordinate_data[3 * shape] * g0;
+          J01_values += bcoordinate_data[3 * shape] * g1;
+          J02_values += bcoordinate_data[3 * shape] * g2;
+          J10_values += bcoordinate_data[3 * shape + 1] * g0;
+          J11_values += bcoordinate_data[3 * shape + 1] * g1;
+          J12_values += bcoordinate_data[3 * shape + 1] * g2;
+          J20_values += bcoordinate_data[3 * shape + 2] * g0;
+          J21_values += bcoordinate_data[3 * shape + 2] * g1;
+          J22_values += bcoordinate_data[3 * shape + 2] * g2;
         }
       }
       {
-        const s_t J00 = J00_values[0];
-        const s_t J01 = J01_values[0];
-        const s_t J02 = J02_values[0];
-        const s_t J10 = J10_values[0];
-        const s_t J11 = J11_values[0];
-        const s_t J12 = J12_values[0];
-        const s_t J20 = J20_values[0];
-        const s_t J21 = J21_values[0];
-        const s_t J22 = J22_values[0];
+        const s_t J00 = J00_values;
+        const s_t J01 = J01_values;
+        const s_t J02 = J02_values;
+        const s_t J10 = J10_values;
+        const s_t J11 = J11_values;
+        const s_t J12 = J12_values;
+        const s_t J20 = J20_values;
+        const s_t J21 = J21_values;
+        const s_t J22 = J22_values;
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * 1 + 0);
+            badj_streams, bdet0, q);
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_gradient_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_gradient_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -879,13 +879,13 @@ extern "C" int cu_modified_mooney_rivlin_tet10_gradient_i_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_gradient_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::modified_mooney_rivlin_tet10_gradient_i_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_gradient_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_gradient_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::modified_mooney_rivlin_tet10_gradient_i_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_gradient_i_msoa_impl");
     }
     default:
@@ -953,7 +953,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_modified_mooney_rivlin_tet
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void modified_mooney_rivlin_tet10_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -994,14 +994,14 @@ __global__ void modified_mooney_rivlin_tet10_apply_a_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][1];
-    s_t bh_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
+    s_t bout_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -1010,72 +1010,72 @@ __global__ void modified_mooney_rivlin_tet10_apply_a_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy, hz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
-    s_t badj0_data[1];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[1];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[1];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[1];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[1];
-    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[1];
-    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[1];
-    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[1];
-    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[1];
-    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[1];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        ne, g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        ne, g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        ne, g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        ne, g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data;
+    const s_t *const badj4 = ageom_stream<s_t, g_t>(
+        ne, g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data;
+    const s_t *const badj5 = ageom_stream<s_t, g_t>(
+        ne, g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data;
+    const s_t *const badj6 = ageom_stream<s_t, g_t>(
+        ne, g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data;
+    const s_t *const badj7 = ageom_stream<s_t, g_t>(
+        ne, g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data;
+    const s_t *const badj8 = ageom_stream<s_t, g_t>(
+        ne, g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_apply_block<s_t, NQ, NS, 1>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_apply_block<s_t, NQ, NS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -1121,13 +1121,13 @@ extern "C" int cu_modified_mooney_rivlin_tet10_apply_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_apply_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::modified_mooney_rivlin_tet10_apply_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_apply_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_apply_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::modified_mooney_rivlin_tet10_apply_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_apply_a_msoa_impl");
     }
     default:
@@ -1140,7 +1140,7 @@ extern "C" int cu_modified_mooney_rivlin_tet10_apply_a_msoa(
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void modified_mooney_rivlin_tet10_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -1176,25 +1176,25 @@ __global__ void modified_mooney_rivlin_tet10_apply_i_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][1];
-    s_t bh_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
-    s_t bcoordinate_data[NS * ND][VS];
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
+    s_t bout_data[NS * NC];
+    s_t bcoordinate_data[NS * ND];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -1202,10 +1202,10 @@ __global__ void modified_mooney_rivlin_tet10_apply_i_msoa_impl(
     const g_t *const coordinate_components[ND] = {x, y, z};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < ND; ++d) {
         {
-          bcoordinate_data[shape * ND + d][0] = coordinate_components[d][ev_shape[0]];
+          bcoordinate_data[shape * ND + d] = coordinate_components[d][ev_shape[0]];
         }
       }
     }
@@ -1213,96 +1213,96 @@ __global__ void modified_mooney_rivlin_tet10_apply_i_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy, hz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
 
     for (int q = 0; q < NQ; ++q) {
       s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-      s_t J00_values[1];
-      s_t J01_values[1];
-      s_t J02_values[1];
-      s_t J10_values[1];
-      s_t J11_values[1];
-      s_t J12_values[1];
-      s_t J20_values[1];
-      s_t J21_values[1];
-      s_t J22_values[1];
+      s_t J00_values;
+      s_t J01_values;
+      s_t J02_values;
+      s_t J10_values;
+      s_t J11_values;
+      s_t J12_values;
+      s_t J20_values;
+      s_t J21_values;
+      s_t J22_values;
       {
-        J00_values[0] = s_t(0);
-        J01_values[0] = s_t(0);
-        J02_values[0] = s_t(0);
-        J10_values[0] = s_t(0);
-        J11_values[0] = s_t(0);
-        J12_values[0] = s_t(0);
-        J20_values[0] = s_t(0);
-        J21_values[0] = s_t(0);
-        J22_values[0] = s_t(0);
+        J00_values = s_t(0);
+        J01_values = s_t(0);
+        J02_values = s_t(0);
+        J10_values = s_t(0);
+        J11_values = s_t(0);
+        J12_values = s_t(0);
+        J20_values = s_t(0);
+        J21_values = s_t(0);
+        J22_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
         const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
         const s_t g2 = isoparametric_grad_ref_z[q * NS + shape];
         {
-          J00_values[0] += bcoordinate_data[3 * shape][0] * g0;
-          J01_values[0] += bcoordinate_data[3 * shape][0] * g1;
-          J02_values[0] += bcoordinate_data[3 * shape][0] * g2;
-          J10_values[0] += bcoordinate_data[3 * shape + 1][0] * g0;
-          J11_values[0] += bcoordinate_data[3 * shape + 1][0] * g1;
-          J12_values[0] += bcoordinate_data[3 * shape + 1][0] * g2;
-          J20_values[0] += bcoordinate_data[3 * shape + 2][0] * g0;
-          J21_values[0] += bcoordinate_data[3 * shape + 2][0] * g1;
-          J22_values[0] += bcoordinate_data[3 * shape + 2][0] * g2;
+          J00_values += bcoordinate_data[3 * shape] * g0;
+          J01_values += bcoordinate_data[3 * shape] * g1;
+          J02_values += bcoordinate_data[3 * shape] * g2;
+          J10_values += bcoordinate_data[3 * shape + 1] * g0;
+          J11_values += bcoordinate_data[3 * shape + 1] * g1;
+          J12_values += bcoordinate_data[3 * shape + 1] * g2;
+          J20_values += bcoordinate_data[3 * shape + 2] * g0;
+          J21_values += bcoordinate_data[3 * shape + 2] * g1;
+          J22_values += bcoordinate_data[3 * shape + 2] * g2;
         }
       }
       {
-        const s_t J00 = J00_values[0];
-        const s_t J01 = J01_values[0];
-        const s_t J02 = J02_values[0];
-        const s_t J10 = J10_values[0];
-        const s_t J11 = J11_values[0];
-        const s_t J12 = J12_values[0];
-        const s_t J20 = J20_values[0];
-        const s_t J21 = J21_values[0];
-        const s_t J22 = J22_values[0];
+        const s_t J00 = J00_values;
+        const s_t J01 = J01_values;
+        const s_t J02 = J02_values;
+        const s_t J10 = J10_values;
+        const s_t J11 = J11_values;
+        const s_t J12 = J12_values;
+        const s_t J20 = J20_values;
+        const s_t J21 = J21_values;
+        const s_t J22 = J22_values;
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badj_streams, bdet0, q * 1 + 0);
+            badj_streams, bdet0, q);
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_apply_block<s_t, NQ, NS, 1>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_apply_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -1339,13 +1339,13 @@ extern "C" int cu_modified_mooney_rivlin_tet10_apply_i_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_apply_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::modified_mooney_rivlin_tet10_apply_i_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_apply_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::modified_mooney_rivlin_tet10_apply_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::modified_mooney_rivlin_tet10_apply_i_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, c1, c2, kappa, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("modified_mooney_rivlin_tet10_apply_i_msoa_impl");
     }
     default:

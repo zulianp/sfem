@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_residual_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -62,53 +62,53 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_re
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_old_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_old_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
+    s_t p_w_values;
+    s_t p_w_old_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_old_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
     {
-      p_w_values[0] = s_t(0);
+      p_w_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
+        p_w_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_w_old_values[0] = s_t(0);
+      p_w_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = previous[trial * NC][0];
-        p_w_old_values[0] += coeff * shape[q * NS + trial];
+        p_w_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
       }
     }
     {
-      p_c_old_values[0] = s_t(0);
+      p_c_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = previous[trial * NC + 1][0];
-        p_c_old_values[0] += coeff * shape[q * NS + trial];
+        p_c_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
@@ -118,14 +118,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_re
       const s_t adj1 = adjugate[1][goff];
       const s_t adj2 = adjugate[2][goff];
       const s_t adj3 = adjugate[3][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_old = p_w_old_values[0];
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_old = p_w_old_values;
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj2) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj3) / det;
-      const s_t p_c_old = p_c_old_values[0];
+      const s_t p_c_old = p_c_old_values;
       const s_t residual_tmp0 = S_res + s_t(-1);
       const s_t residual_tmp1 = pow_m1(P_r);
       const s_t residual_tmp2 = (s_t(1) - m)/m;
@@ -136,9 +136,9 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_re
       const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
       const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1);
       const s_t grad_coeff1_1 = residual_tmp6*(-K_2*p_c_grad_0 - K_3*p_c_grad_1);
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -151,13 +151,13 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_re
         const s_t test_value = shape[q * NS + test];
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1);
+        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_residual_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -167,8 +167,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_re
     const s_t *const RSTR grad_ref_x,
     const s_t *const RSTR grad_ref_y,
     const s_t *const RSTR q_weight,
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
     const s_t C_ka1,
     const s_t C_ka2,
     const s_t K_0,
@@ -185,57 +185,57 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_re
     const s_t m,
     const s_t mu_c,
     const s_t porosity,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_old_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_old_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
+    s_t p_w_values;
+    s_t p_w_old_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_old_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
     {
-      p_w_values[0] = s_t(0);
+      p_w_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = current[trial * NC];
+        p_w_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_w_old_values[0] = s_t(0);
+      p_w_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = previous[trial * NC][0];
-        p_w_old_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = previous[trial * NC];
+        p_w_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        const s_t coeff = current[trial * NC + 1];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
       }
     }
     {
-      p_c_old_values[0] = s_t(0);
+      p_c_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = previous[trial * NC + 1][0];
-        p_c_old_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = previous[trial * NC + 1];
+        p_c_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
@@ -245,14 +245,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_re
       const s_t adj1 = adjugate[1][goff];
       const s_t adj2 = adjugate[2][goff];
       const s_t adj3 = adjugate[3][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_old = p_w_old_values[0];
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_old = p_w_old_values;
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj2) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj3) / det;
-      const s_t p_c_old = p_c_old_values[0];
+      const s_t p_c_old = p_c_old_values;
       const s_t residual_tmp0 = S_res + s_t(-1);
       const s_t residual_tmp1 = pow_m1(P_r);
       const s_t residual_tmp2 = (s_t(1) - m)/m;
@@ -263,9 +263,9 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_re
       const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
       const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1);
       const s_t grad_coeff1_1 = residual_tmp6*(-K_2*p_c_grad_0 - K_3*p_c_grad_1);
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -278,13 +278,13 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_re
         const s_t test_value = shape[q * NS + test];
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1);
+        output[test * NC + 1] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tri3_residual_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -316,53 +316,53 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tr
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_old_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_old_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
+    s_t p_w_values;
+    s_t p_w_old_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_old_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
     {
-      p_w_values[0] = s_t(0);
+      p_w_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
+        p_w_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_w_old_values[0] = s_t(0);
+      p_w_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = previous[trial * NC][0];
-        p_w_old_values[0] += coeff * shape[q * NS + trial];
+        p_w_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
       }
     }
     {
-      p_c_old_values[0] = s_t(0);
+      p_c_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
         const s_t coeff = previous[trial * NC + 1][0];
-        p_c_old_values[0] += coeff * shape[q * NS + trial];
+        p_c_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
@@ -372,14 +372,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tr
       const s_t adj1 = adjugate[1][goff];
       const s_t adj2 = adjugate[2][goff];
       const s_t adj3 = adjugate[3][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_old = p_w_old_values[0];
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_old = p_w_old_values;
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj2) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj3) / det;
-      const s_t p_c_old = p_c_old_values[0];
+      const s_t p_c_old = p_c_old_values;
       const s_t residual_tmp0 = S_res + s_t(-1);
       const s_t residual_tmp1 = pow_m1(P_r);
       const s_t residual_tmp2 = (s_t(1) - m)/m;
@@ -390,9 +390,9 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tr
       const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
       const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1);
       const s_t grad_coeff1_1 = residual_tmp6*(-K_2*p_c_grad_0 - K_3*p_c_grad_1);
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -405,13 +405,13 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tr
         const s_t test_value = shape[q * NS + test];
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1);
+        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
       }
     }
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tri3_residual_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -421,8 +421,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tr
     const s_t *const RSTR grad_ref_x,
     const s_t *const RSTR grad_ref_y,
     const s_t *const RSTR q_weight,
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
     const s_t C_ka1,
     const s_t C_ka2,
     const s_t K_0,
@@ -439,57 +439,57 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tr
     const s_t m,
     const s_t mu_c,
     const s_t porosity,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int NC = 2;
   for (int q = 0; q < NQ; ++q) {
-    s_t p_w_values[VS];
-    s_t p_w_old_values[VS];
-    s_t p_c_values[VS];
-    s_t p_c_grad_0_ref_values[VS];
-    s_t p_c_grad_1_ref_values[VS];
-    s_t p_c_old_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t grad_coeff1_0_values[VS];
-    s_t grad_coeff1_1_values[VS];
+    s_t p_w_values;
+    s_t p_w_old_values;
+    s_t p_c_values;
+    s_t p_c_grad_0_ref_values;
+    s_t p_c_grad_1_ref_values;
+    s_t p_c_old_values;
+    s_t value_coeff1_values;
+    s_t grad_coeff1_0_values;
+    s_t grad_coeff1_1_values;
     {
-      p_w_values[0] = s_t(0);
+      p_w_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC][0];
-        p_w_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = current[trial * NC];
+        p_w_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_w_old_values[0] = s_t(0);
+      p_w_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = previous[trial * NC][0];
-        p_w_old_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = previous[trial * NC];
+        p_w_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
-      p_c_values[0] = s_t(0);
-      p_c_grad_0_ref_values[0] = s_t(0);
-      p_c_grad_1_ref_values[0] = s_t(0);
+      p_c_values = s_t(0);
+      p_c_grad_0_ref_values = s_t(0);
+      p_c_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = current[trial * NC + 1][0];
-        p_c_values[0] += coeff * shape[q * NS + trial];
-        p_c_grad_0_ref_values[0] += coeff * grad_ref_x[q * NS + trial];
-        p_c_grad_1_ref_values[0] += coeff * grad_ref_y[q * NS + trial];
+        const s_t coeff = current[trial * NC + 1];
+        p_c_values += coeff * shape[q * NS + trial];
+        p_c_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
+        p_c_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
       }
     }
     {
-      p_c_old_values[0] = s_t(0);
+      p_c_old_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
       {
-        const s_t coeff = previous[trial * NC + 1][0];
-        p_c_old_values[0] += coeff * shape[q * NS + trial];
+        const s_t coeff = previous[trial * NC + 1];
+        p_c_old_values += coeff * shape[q * NS + trial];
       }
     }
     {
@@ -499,14 +499,14 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tr
       const s_t adj1 = adjugate[1][goff];
       const s_t adj2 = adjugate[2][goff];
       const s_t adj3 = adjugate[3][goff];
-      const s_t p_w = p_w_values[0];
-      const s_t p_w_old = p_w_old_values[0];
-      const s_t p_c = p_c_values[0];
-      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values[0];
-      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values[0];
+      const s_t p_w = p_w_values;
+      const s_t p_w_old = p_w_old_values;
+      const s_t p_c = p_c_values;
+      const s_t p_c_grad_0_ref = p_c_grad_0_ref_values;
+      const s_t p_c_grad_1_ref = p_c_grad_1_ref_values;
       const s_t p_c_grad_0 = (p_c_grad_0_ref * adj0 + p_c_grad_1_ref * adj2) / det;
       const s_t p_c_grad_1 = (p_c_grad_0_ref * adj1 + p_c_grad_1_ref * adj3) / det;
-      const s_t p_c_old = p_c_old_values[0];
+      const s_t p_c_old = p_c_old_values;
       const s_t residual_tmp0 = S_res + s_t(-1);
       const s_t residual_tmp1 = pow_m1(P_r);
       const s_t residual_tmp2 = (s_t(1) - m)/m;
@@ -517,9 +517,9 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tr
       const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
       const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1);
       const s_t grad_coeff1_1 = residual_tmp6*(-K_2*p_c_grad_0 - K_3*p_c_grad_1);
-      value_coeff1_values[0] = value_coeff1;
-      grad_coeff1_0_values[0] = grad_coeff1_0;
-      grad_coeff1_1_values[0] = grad_coeff1_1;
+      value_coeff1_values = value_coeff1;
+      grad_coeff1_0_values = grad_coeff1_0;
+      grad_coeff1_1_values = grad_coeff1_1;
     }
     for (int test = 0; test < NS; ++test) {
       {
@@ -532,7 +532,7 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d2_simplex_tr
         const s_t test_value = shape[q * NS + test];
         const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
         const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values[0] * test_value + grad_coeff1_0_values[0] * test_grad0 + grad_coeff1_1_values[0] * test_grad1);
+        output[test * NC + 1] += q_weight[q] * det * (value_coeff1_values * test_value + grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
       }
     }
   }

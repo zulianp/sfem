@@ -755,7 +755,7 @@ static int linear_elasticity_tri3_hessian_a_msoa_assemble_impl(
     badj3[0] = s_t(g_adj3[element]);
     bdet0[0] = s_t(g_det0[element]);
 
-    linear_elasticity_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS, VS>(badj0, badj1, badj2, badj3, bdet0, lmbda, mu, element_matrix);
+    linear_elasticity_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, lmbda, mu, element_matrix);
 
     if constexpr (FORMAT == 1) {
       linear_elasticity_tri3_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

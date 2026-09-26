@@ -28,7 +28,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -37,15 +37,13 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
-  {
-    converted[0] = s_t(source[0]);
-  }
+  converted[0] = s_t(source[0]);
   return converted;
 }
 
@@ -199,24 +197,23 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_affin
   static constexpr int CELL_NS = 27;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 89;
-  static constexpr int VS = 16;
   const s_t *const field_shape_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()};
   const s_t *const field_grad_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::grad_1d(), sfem::codegen::ref_line_p1_q4<s_t>::grad_1d()};
   const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[2], elements[6], elements[8], elements[18], elements[20], elements[24], elements[26]};
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    s_t bcurrent[N_FIELD_STREAMS][VS];
-    s_t bprevious[N_FIELD_STREAMS][VS];
-    s_t boutput[N_FIELD_STREAMS][VS];
+    s_t bcurrent[N_FIELD_STREAMS];
+    s_t bprevious[N_FIELD_STREAMS];
+    s_t boutput[N_FIELD_STREAMS];
 
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
       const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 0 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[0][node * current_stride];
-        bprevious[stream][0] = u_old_data[0][node * previous_stride];
+        bcurrent[stream] = u_data[0][node * current_stride];
+        bprevious[stream] = u_old_data[0][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
@@ -224,8 +221,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_affin
       const int stream = 27 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[1][node * current_stride];
-        bprevious[stream][0] = u_old_data[1][node * previous_stride];
+        bcurrent[stream] = u_data[1][node * current_stride];
+        bprevious[stream] = u_old_data[1][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
@@ -233,8 +230,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_affin
       const int stream = 54 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[2][node * current_stride];
-        bprevious[stream][0] = u_old_data[2][node * previous_stride];
+        bcurrent[stream] = u_data[2][node * current_stride];
+        bprevious[stream] = u_old_data[2][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 8; ++local_shape) {
@@ -242,37 +239,37 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_affin
       const int stream = 81 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = p_data[node * current_stride];
-        bprevious[stream][0] = p_old_data[node * previous_stride];
+        bcurrent[stream] = p_data[node * current_stride];
+        bprevious[stream] = p_old_data[node * previous_stride];
       }
     }
 
     for (int stream = 0; stream < 89; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
     const g_t *const affine_geometry_sources[10] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_adj4 + evb, g_adj5 + evb, g_adj6 + evb, g_adj7 + evb, g_adj8 + evb, g_det0 + evb};
-    s_t baffine_geometry_data[10][VS];
+    s_t baffine_geometry_data[10];
     const s_t *bageom_streams[10];
     for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t>(
+          ne, affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
     }
     const s_t *badjugate[ND * ND];
     for (int component = 0; component < ND * ND; ++component) {
       badjugate[component] = bageom_streams[component];
     }
 
-    navier_stokes_form_1_u_d3_tensor_product_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[9], badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bcurrent, bprevious, convection_scale, dt, f0, f1, f2, nu, rho, boutput);
+    navier_stokes_form_1_u_d3_tensor_product_mixed_residual_block_contiguous<s_t, NQ, CELL_NS>(ne, 0, bageom_streams[9], badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bcurrent, bprevious, convection_scale, dt, f0, f1, f2, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -281,8 +278,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_affin
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 27 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -291,8 +288,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_affin
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 54 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -301,8 +298,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_affin
       for (int local_shape = 0; local_shape < 8; ++local_shape) {
         const idx_t *const RSTR element_shape = field_3_elements[local_shape];
         const int stream = 81 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -396,18 +393,17 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_isopa
   static constexpr int NS = CELL_NS;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 89;
-  static constexpr int VS = 16;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p2_q4<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
   const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[2], elements[6], elements[8], elements[18], elements[20], elements[24], elements[26]};
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    s_t bcoordinates[ND * CELL_NS][VS];
-    s_t badjugate_data[ND * ND][NQ * VS];
-    s_t bdeterminant[NQ * VS];
-    s_t bcurrent[N_FIELD_STREAMS][VS];
-    s_t bprevious[N_FIELD_STREAMS][VS];
-    s_t boutput[N_FIELD_STREAMS][VS];
+    s_t bcoordinates[ND * CELL_NS];
+    s_t badjugate_data[ND * ND][NQ];
+    s_t bdeterminant[NQ];
+    s_t bcurrent[N_FIELD_STREAMS];
+    s_t bprevious[N_FIELD_STREAMS];
+    s_t boutput[N_FIELD_STREAMS];
 
     const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
     for (int shape = 0; shape < NS; ++shape) {
@@ -415,7 +411,7 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_isopa
       for (int d = 0; d < ND; ++d) {
         {
           const idx_t node = element_shape[evb];
-          bcoordinates[shape * ND + d][0] = coordinate_components[d][node];
+          bcoordinates[shape * ND + d] = coordinate_components[d][node];
         }
       }
     }
@@ -425,8 +421,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_isopa
       const int stream = 0 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[0][node * current_stride];
-        bprevious[stream][0] = u_old_data[0][node * previous_stride];
+        bcurrent[stream] = u_data[0][node * current_stride];
+        bprevious[stream] = u_old_data[0][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
@@ -434,8 +430,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_isopa
       const int stream = 27 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[1][node * current_stride];
-        bprevious[stream][0] = u_old_data[1][node * previous_stride];
+        bcurrent[stream] = u_data[1][node * current_stride];
+        bprevious[stream] = u_old_data[1][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 27; ++local_shape) {
@@ -443,8 +439,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_isopa
       const int stream = 54 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[2][node * current_stride];
-        bprevious[stream][0] = u_old_data[2][node * previous_stride];
+        bcurrent[stream] = u_data[2][node * current_stride];
+        bprevious[stream] = u_old_data[2][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 8; ++local_shape) {
@@ -452,45 +448,45 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_isopa
       const int stream = 81 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = p_data[node * current_stride];
-        bprevious[stream][0] = p_old_data[node * previous_stride];
+        bcurrent[stream] = p_data[node * current_stride];
+        bprevious[stream] = p_old_data[node * previous_stride];
       }
     }
 
     for (int stream = 0; stream < 89; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
         coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
-        coordinate_grad_ref + NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
-        coordinate_grad_ref + 2 * NQ * ND * VS);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
+        coordinate_grad_ref + NQ * ND);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
+        coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
 
     const s_t *const field_shape_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()};
     const s_t *const field_grad_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::grad_1d(), sfem::codegen::ref_line_p1_q4<s_t>::grad_1d()};
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    navier_stokes_form_1_u_d3_tensor_product_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bcurrent, bprevious, convection_scale, dt, f0, f1, f2, nu, rho, boutput);
+    navier_stokes_form_1_u_d3_tensor_product_mixed_residual_block_contiguous<s_t, NQ, CELL_NS>(ne, 1, bdeterminant, badjugate, field_shape_1d, field_grad_1d, sfem::codegen::quad_line_q4<s_t>::q_weight_1d(), bcurrent, bprevious, convection_scale, dt, f0, f1, f2, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -499,8 +495,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_isopa
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 27 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -509,8 +505,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_isopa
       for (int local_shape = 0; local_shape < 27; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 54 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -519,8 +515,8 @@ __global__ void navier_stokes_form_1_u_proteus_hex27_proteus_hex8_residual_isopa
       for (int local_shape = 0; local_shape < 8; ++local_shape) {
         const idx_t *const RSTR element_shape = field_3_elements[local_shape];
         const int stream = 81 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }

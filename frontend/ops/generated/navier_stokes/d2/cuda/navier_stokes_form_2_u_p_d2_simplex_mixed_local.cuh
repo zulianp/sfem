@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int CELL_NS, int VS>
+template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_form_2_u_p_d2_simplex_mixed_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -90,7 +90,7 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_u_p_d2_simplex_mix
   }
 }
 
-template <typename s_t, int NQ, int CELL_NS, int VS>
+template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_form_2_u_p_d2_simplex_mixed_jacobian_action_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -99,8 +99,8 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_u_p_d2_simplex_mix
     const s_t *const RSTR field_shape[2],
     const s_t *const RSTR fgref[4],
     const s_t *const RSTR q_weight,
-    const s_t direction[15][VS],
-    s_t output[15][VS]
+    const s_t direction[15],
+    s_t output[15]
 ) {
   static constexpr int U_NS = 6;
   static constexpr int P_NS = 3;
@@ -113,39 +113,39 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_u_p_d2_simplex_mix
       const s_t adj2 = adjugate[2][goff];
       const s_t adj3 = adjugate[3][goff];
       s_t p_direction = s_t(0);
-      const s_t coeff_direction_p_0 = direction[12][0];
+      const s_t coeff_direction_p_0 = direction[12];
       p_direction += coeff_direction_p_0 * field_shape[1][q * P_NS];
-      const s_t coeff_direction_p_1 = direction[13][0];
+      const s_t coeff_direction_p_1 = direction[13];
       p_direction += coeff_direction_p_1 * field_shape[1][q * P_NS + 1];
-      const s_t coeff_direction_p_2 = direction[14][0];
+      const s_t coeff_direction_p_2 = direction[14];
       p_direction += coeff_direction_p_2 * field_shape[1][q * P_NS + 2];
       const s_t residual_tmp0 = -p_direction;
       const s_t grad_coeff0_0 = residual_tmp0;
       const s_t grad_coeff1_1 = residual_tmp0;
       const s_t test_grad0_u0_0 = (fgref[0][q * U_NS] * adj0 + fgref[1][q * U_NS] * adj2) / det;
-      output[0][0] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_0);
+      output[0] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_0);
       const s_t test_grad0_u0_1 = (fgref[0][q * U_NS + 1] * adj0 + fgref[1][q * U_NS + 1] * adj2) / det;
-      output[1][0] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_1);
+      output[1] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_1);
       const s_t test_grad0_u0_2 = (fgref[0][q * U_NS + 2] * adj0 + fgref[1][q * U_NS + 2] * adj2) / det;
-      output[2][0] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_2);
+      output[2] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_2);
       const s_t test_grad0_u0_3 = (fgref[0][q * U_NS + 3] * adj0 + fgref[1][q * U_NS + 3] * adj2) / det;
-      output[3][0] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_3);
+      output[3] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_3);
       const s_t test_grad0_u0_4 = (fgref[0][q * U_NS + 4] * adj0 + fgref[1][q * U_NS + 4] * adj2) / det;
-      output[4][0] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_4);
+      output[4] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_4);
       const s_t test_grad0_u0_5 = (fgref[0][q * U_NS + 5] * adj0 + fgref[1][q * U_NS + 5] * adj2) / det;
-      output[5][0] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_5);
+      output[5] += q_weight[q] * det * (grad_coeff0_0 * test_grad0_u0_5);
       const s_t test_grad1_u1_0 = (fgref[0][q * U_NS] * adj1 + fgref[1][q * U_NS] * adj3) / det;
-      output[6][0] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_0);
+      output[6] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_0);
       const s_t test_grad1_u1_1 = (fgref[0][q * U_NS + 1] * adj1 + fgref[1][q * U_NS + 1] * adj3) / det;
-      output[7][0] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_1);
+      output[7] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_1);
       const s_t test_grad1_u1_2 = (fgref[0][q * U_NS + 2] * adj1 + fgref[1][q * U_NS + 2] * adj3) / det;
-      output[8][0] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_2);
+      output[8] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_2);
       const s_t test_grad1_u1_3 = (fgref[0][q * U_NS + 3] * adj1 + fgref[1][q * U_NS + 3] * adj3) / det;
-      output[9][0] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_3);
+      output[9] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_3);
       const s_t test_grad1_u1_4 = (fgref[0][q * U_NS + 4] * adj1 + fgref[1][q * U_NS + 4] * adj3) / det;
-      output[10][0] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_4);
+      output[10] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_4);
       const s_t test_grad1_u1_5 = (fgref[0][q * U_NS + 5] * adj1 + fgref[1][q * U_NS + 5] * adj3) / det;
-      output[11][0] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_5);
+      output[11] += q_weight[q] * det * (grad_coeff1_1 * test_grad1_u1_5);
     }
   }
 }

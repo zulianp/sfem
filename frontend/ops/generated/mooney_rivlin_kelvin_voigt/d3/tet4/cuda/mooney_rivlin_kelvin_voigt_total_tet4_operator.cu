@@ -21,7 +21,7 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -30,15 +30,13 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
-  {
-    converted[0] = s_t(source[0]);
-  }
+  converted[0] = s_t(source[0]);
   return converted;
 }
 
@@ -656,11 +654,11 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block<double, 1, 4, 1>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block<double, 1, 4>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block<float, 1, 4, 1>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block<float, 1, 4>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -708,7 +706,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa_impl(
   static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int NC = 3;
-  static constexpr int VS = 1;
   const s_t *const affine_shape = sfem::codegen::ref_tet4_q1<s_t>::shape();
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
@@ -717,9 +714,9 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    s_t bcurrent[NC * NS][VS];
-    s_t bprevious[NC * NS][VS];
-    s_t boutput[NC * NS][VS];
+    s_t bcurrent[NC * NS];
+    s_t bprevious[NC * NS];
+    s_t boutput[NC * NS];
     const s_t *const current_components[NC] = {u0, u1, u2};
     const s_t *const previous_components[NC] = {u0_old, u1_old, u2_old};
 
@@ -729,31 +726,31 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa_impl(
         const int stream = shape * NC + field;
         {
           const idx_t node = element_shape[evb];
-          bcurrent[stream][0] = current_components[field][node * current_stride];
-          bprevious[stream][0] = previous_components[field][node * previous_stride];
+          bcurrent[stream] = current_components[field][node * current_stride];
+          bprevious[stream] = previous_components[field][node * previous_stride];
         }
       }
     }
 
     for (int stream = 0; stream < 12; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
     const g_t *const affine_geometry_sources[10] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_adj4 + evb, g_adj5 + evb, g_adj6 + evb, g_adj7 + evb, g_adj8 + evb, g_det0 + evb};
-    s_t baffine_geometry_data[10][VS];
+    s_t baffine_geometry_data[10];
     const s_t *bageom_streams[10];
     for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t>(
+          ne, affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
     }
     const s_t *badjugate[9];
     for (int component = 0; component < 9; ++component) {
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[9], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block_contiguous<s_t, NQ, NS>(ne, 0, bageom_streams[9], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -761,8 +758,8 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa_impl(
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -845,11 +842,11 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block<double, 1, 4, 1>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block<double, 1, 4>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block<float, 1, 4, 1>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block<float, 1, 4>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -901,7 +898,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_msoa_imp
   static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int NC = 3;
-  static constexpr int VS = 1;
   const s_t *const affine_shape = sfem::codegen::ref_tet4_q1<s_t>::shape();
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
@@ -910,10 +906,10 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_msoa_imp
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    s_t bcurrent[NC * NS][VS];
-    s_t bprevious[NC * NS][VS];
-    s_t bdirection[NC * NS][VS];
-    s_t boutput[NC * NS][VS];
+    s_t bcurrent[NC * NS];
+    s_t bprevious[NC * NS];
+    s_t bdirection[NC * NS];
+    s_t boutput[NC * NS];
     const s_t *const current_components[NC] = {u0, u1, u2};
     const s_t *const previous_components[NC] = {u0_old, u1_old, u2_old};
     const s_t *const direction_components[NC] = {u0_direction, u1_direction, u2_direction};
@@ -924,32 +920,32 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_msoa_imp
         const int stream = shape * NC + field;
         {
           const idx_t node = element_shape[evb];
-          bcurrent[stream][0] = current_components[field][node * current_stride];
-          bprevious[stream][0] = previous_components[field][node * previous_stride];
-          bdirection[stream][0] = direction_components[field][node * direction_stride];
+          bcurrent[stream] = current_components[field][node * current_stride];
+          bprevious[stream] = previous_components[field][node * previous_stride];
+          bdirection[stream] = direction_components[field][node * direction_stride];
         }
       }
     }
 
     for (int stream = 0; stream < 12; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
     const g_t *const affine_geometry_sources[10] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_adj4 + evb, g_adj5 + evb, g_adj6 + evb, g_adj7 + evb, g_adj8 + evb, g_det0 + evb};
-    s_t baffine_geometry_data[10][VS];
+    s_t baffine_geometry_data[10];
     const s_t *bageom_streams[10];
     for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t>(
+          ne, affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
     }
     const s_t *badjugate[9];
     for (int component = 0; component < 9; ++component) {
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[9], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS>(ne, 0, bageom_streams[9], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -957,8 +953,8 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_msoa_imp
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -1117,7 +1113,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl(
   static constexpr int NS = 4;
   static constexpr int NC = 3;
   static constexpr int N_STREAMS = NC * NS;
-  static constexpr int VS = 1;
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
   const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
@@ -1127,20 +1122,20 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl(
     const int ne = 1;
     idx_t ev[NS];
     s_t element_matrix[144];
-    s_t badjugate_data[ND * ND][NQ * VS];
-    s_t bdeterminant[NQ * VS];
-    s_t bcurrent[N_STREAMS][VS];
-    s_t bprevious[N_STREAMS][VS];
+    s_t badjugate_data[ND * ND][NQ];
+    s_t bdeterminant[NQ];
+    s_t bcurrent[N_STREAMS];
+    s_t bprevious[N_STREAMS];
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];
       ev[shape] = node;
-      bcurrent[shape * NC + 0][0] = u0[node * current_stride];
-      bcurrent[shape * NC + 1][0] = u1[node * current_stride];
-      bcurrent[shape * NC + 2][0] = u2[node * current_stride];
-      bprevious[shape * NC + 0][0] = u0_old[node * previous_stride];
-      bprevious[shape * NC + 1][0] = u1_old[node * previous_stride];
-      bprevious[shape * NC + 2][0] = u2_old[node * previous_stride];
+      bcurrent[shape * NC + 0] = u0[node * current_stride];
+      bcurrent[shape * NC + 1] = u1[node * current_stride];
+      bcurrent[shape * NC + 2] = u2[node * current_stride];
+      bprevious[shape * NC + 0] = u0_old[node * previous_stride];
+      bprevious[shape * NC + 1] = u1_old[node * previous_stride];
+      bprevious[shape * NC + 2] = u2_old[node * previous_stride];
     }
 
 
@@ -1156,7 +1151,7 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_impl(
     bdeterminant[0] = s_t(g_det0[element]);
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian_block<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
+    mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian_block<s_t, NQ, NS>(1, 1, bdeterminant, badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
 
     mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
   }

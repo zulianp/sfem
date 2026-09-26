@@ -37,21 +37,21 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_e
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t badj0[NQ * 1];
-    s_t badj1[NQ * 1];
-    s_t badj2[NQ * 1];
-    s_t badj3[NQ * 1];
-    s_t bdet0[NQ * 1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * 1];
+      s_t *const RSTR badj0_q = &badj0[q];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * 1];
+      s_t *const RSTR badj1_q = &badj1[q];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * 1];
+      s_t *const RSTR badj2_q = &badj2[q];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * 1];
+      s_t *const RSTR badj3_q = &badj3[q];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * 1];
+      s_t *const RSTR bdet0_q = &bdet0[q];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -61,7 +61,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_e
         bdet0_q[0] = det_q[0];
       }
     }
-    linear_elasticity_d2_tensor_product_objective_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    linear_elasticity_d2_tensor_product_objective_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -92,23 +92,23 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_e
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * 1];
-    s_t badj1[NQ * 1];
-    s_t badj2[NQ * 1];
-    s_t badj3[NQ * 1];
-    s_t bdet0[NQ * 1];
-    s_t coordinate_grad_ref[ND * NQ * ND * 1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, 1>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    linear_elasticity_d2_tensor_product_objective_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    linear_elasticity_d2_tensor_product_objective_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -139,23 +139,23 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_e
       bvalue[0] = s_t(0);
     }
     const s_t objective_step = s_t(0);
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * 1];
-    s_t badj1[NQ * 1];
-    s_t badj2[NQ * 1];
-    s_t badj3[NQ * 1];
-    s_t bdet0[NQ * 1];
-    s_t coordinate_grad_ref[ND * NQ * ND * 1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, 1>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    linear_elasticity_d2_tensor_product_objective_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    linear_elasticity_d2_tensor_product_objective_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -189,21 +189,21 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_g
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t badj0[NQ * 1];
-    s_t badj1[NQ * 1];
-    s_t badj2[NQ * 1];
-    s_t badj3[NQ * 1];
-    s_t bdet0[NQ * 1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * 1];
+      s_t *const RSTR badj0_q = &badj0[q];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * 1];
+      s_t *const RSTR badj1_q = &badj1[q];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * 1];
+      s_t *const RSTR badj2_q = &badj2[q];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * 1];
+      s_t *const RSTR badj3_q = &badj3[q];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * 1];
+      s_t *const RSTR bdet0_q = &bdet0[q];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -213,7 +213,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_g
         bdet0_q[0] = det_q[0];
       }
     }
-    linear_elasticity_d2_tensor_product_gradient_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
+    linear_elasticity_d2_tensor_product_gradient_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -246,23 +246,23 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_g
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * 1];
-    s_t badj1[NQ * 1];
-    s_t badj2[NQ * 1];
-    s_t badj3[NQ * 1];
-    s_t bdet0[NQ * 1];
-    s_t coordinate_grad_ref[ND * NQ * ND * 1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, 1>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    linear_elasticity_d2_tensor_product_gradient_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    linear_elasticity_d2_tensor_product_gradient_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -295,23 +295,23 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_g
         bout_streams[stream][0] = s_t(0);
       }
     }
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * 1];
-    s_t badj1[NQ * 1];
-    s_t badj2[NQ * 1];
-    s_t badj3[NQ * 1];
-    s_t bdet0[NQ * 1];
-    s_t coordinate_grad_ref[ND * NQ * ND * 1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, 1>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    linear_elasticity_d2_tensor_product_gradient_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    linear_elasticity_d2_tensor_product_gradient_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -333,21 +333,21 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_h
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const int ne = 1;
-    s_t badj0[NQ * 1];
-    s_t badj1[NQ * 1];
-    s_t badj2[NQ * 1];
-    s_t badj3[NQ * 1];
-    s_t bdet0[NQ * 1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
     for (int q = 0; q < NQ; ++q) {
-      s_t *const RSTR badj0_q = &badj0[q * 1];
+      s_t *const RSTR badj0_q = &badj0[q];
       const s_t *const RSTR adj0_q = adj[0] + q * nelements + evb;
-      s_t *const RSTR badj1_q = &badj1[q * 1];
+      s_t *const RSTR badj1_q = &badj1[q];
       const s_t *const RSTR adj1_q = adj[1] + q * nelements + evb;
-      s_t *const RSTR badj2_q = &badj2[q * 1];
+      s_t *const RSTR badj2_q = &badj2[q];
       const s_t *const RSTR adj2_q = adj[2] + q * nelements + evb;
-      s_t *const RSTR badj3_q = &badj3[q * 1];
+      s_t *const RSTR badj3_q = &badj3[q];
       const s_t *const RSTR adj3_q = adj[3] + q * nelements + evb;
-      s_t *const RSTR bdet0_q = &bdet0[q * 1];
+      s_t *const RSTR bdet0_q = &bdet0[q];
       const s_t *const RSTR det_q = det + q * nelements + evb;
       {
         badj0_q[0] = adj0_q[0];
@@ -357,26 +357,26 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_h
         bdet0_q[0] = det_q[0];
       }
     }
-    s_t bh_data[NDOFS][1];
-    s_t bout_data[NDOFS][1];
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      linear_elasticity_d2_tensor_product_apply_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bh_streams, bout_streams);
+      linear_elasticity_d2_tensor_product_apply_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }
@@ -400,42 +400,42 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_h
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const int ne = 1;
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * 1];
-    s_t badj1[NQ * 1];
-    s_t badj2[NQ * 1];
-    s_t badj3[NQ * 1];
-    s_t bdet0[NQ * 1];
-    s_t coordinate_grad_ref[ND * NQ * ND * 1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, 1>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    s_t bh_data[NDOFS][1];
-    s_t bout_data[NDOFS][1];
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      linear_elasticity_d2_tensor_product_apply_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bh_streams, bout_streams);
+      linear_elasticity_d2_tensor_product_apply_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }
@@ -459,42 +459,42 @@ static __host__ __device__ __forceinline__ int linear_elasticity_proteus_quad4_h
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
     const int ne = 1;
-    s_t bcoordinate_data[NDOFS][1];
+    s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
-        bcoordinate_data[stream][0] = coords[stream][evb + 0];
+        bcoordinate_data[stream] = coords[stream][evb + 0];
       }
     }
-    s_t badj0[NQ * 1];
-    s_t badj1[NQ * 1];
-    s_t badj2[NQ * 1];
-    s_t badj3[NQ * 1];
-    s_t bdet0[NQ * 1];
-    s_t coordinate_grad_ref[ND * NQ * ND * 1];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
+    s_t coordinate_grad_ref[ND * NQ * ND];
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 0, coordinate_grad_ref + 0);
     tensor_gradient_contiguous_scalar<s_t, NQ, NS, 2>(sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), bcoordinate_data, 1, coordinate_grad_ref + NQ * ND);
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, 1>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
-    s_t bh_data[NDOFS][1];
-    s_t bout_data[NDOFS][1];
+    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    s_t bh_data[NDOFS];
+    s_t bout_data[NDOFS];
     const s_t *bh_streams[NDOFS];
     s_t *bout_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
-      bh_streams[stream] = bh_data[stream];
-      bout_streams[stream] = bout_data[stream];
+      bh_streams[stream] = &bh_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
     for (int col = 0; col < NDOFS; ++col) {
       for (int stream = 0; stream < NDOFS; ++stream) {
         {
-          bh_data[stream][0] = stream == col ? s_t(1) : s_t(0);
-          bout_data[stream][0] = s_t(0);
+          bh_data[stream] = stream == col ? s_t(1) : s_t(0);
+          bout_data[stream] = s_t(0);
         }
       }
-      linear_elasticity_d2_tensor_product_apply_block<s_t, NQ, NS, 1>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bh_streams, bout_streams);
+      linear_elasticity_d2_tensor_product_apply_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, sfem::codegen::ref_line_p1_q2<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q2<s_t>::grad_1d(), sfem::codegen::quad_line_q2<s_t>::q_weight_1d(), lmbda, mu, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
-          matrix_stream[0] = bout_data[row][0];
+          matrix_stream[0] = bout_data[row];
         }
       }
     }

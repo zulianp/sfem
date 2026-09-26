@@ -739,7 +739,7 @@ static int modified_mooney_rivlin_tri3_hessian_a_msoa_assemble_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC];
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
     s_t badj2[NQ * VS];
@@ -750,7 +750,7 @@ static int modified_mooney_rivlin_tri3_hessian_a_msoa_assemble_impl(
       const idx_t node = elements[shape][element];
       ev[shape] = node;
       for (int d = 0; d < ND; ++d) {
-        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+        bu_data[shape * NC + d] = u_components[d][node * u_stride];
       }
     }
 
@@ -761,7 +761,7 @@ static int modified_mooney_rivlin_tri3_hessian_a_msoa_assemble_impl(
     badj3[0] = s_t(g_adj3[element]);
     bdet0[0] = s_t(g_det0[element]);
 
-    modified_mooney_rivlin_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS, VS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_data, element_matrix);
+    modified_mooney_rivlin_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_data, element_matrix);
 
     if constexpr (FORMAT == 1) {
       modified_mooney_rivlin_tri3_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

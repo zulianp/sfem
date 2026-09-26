@@ -801,7 +801,7 @@ static int linear_elasticity_proteus_quad4_hessian_i_msoa_assemble_impl(
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    linear_elasticity_d2_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, element_matrix);
+    linear_elasticity_d2_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS>(badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, element_matrix);
 
     if constexpr (FORMAT == 1) {
       linear_elasticity_proteus_quad4_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

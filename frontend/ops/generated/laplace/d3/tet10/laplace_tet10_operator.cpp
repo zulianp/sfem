@@ -3818,7 +3818,7 @@ static int laplace_tet10_hessian_i_msoa_assemble_impl(
       }
     }
 
-    laplace_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, element_matrix);
+    laplace_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, kappa, element_matrix);
 
     if constexpr (FORMAT == 1) {
       laplace_tet10_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

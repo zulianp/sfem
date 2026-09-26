@@ -33,6 +33,8 @@ from codegen.framework.emitters.tensor_product_kernels import (
     micro_kernel as _micro_kernel,
     micro_kernel_count as _micro_kernel_count,
     micro_kernel_template as _micro_kernel_template,
+    width_factors as _width_factors,
+    work_item_block_stride as _work_item_block_stride,
 )
 from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
@@ -225,6 +227,7 @@ from codegen.framework.emitters.patch_merit_codegen import (
     patch_orientation_table_lines,
 )
 from codegen.framework.emitters.energy_codegen import (
+    affine_geometry_stream_helper_lines,
     _sfem_soa_diagnostics_header,
     _sfem_packed_thread_scratch_header_source,
 )
@@ -477,9 +480,109 @@ def _wi():
     return _target().work_item_subscript()
 
 
+#: How a block's contributions are scattered, keyed on whether the staged output
+#: has a slot per work item.  A block is walked by a scatter loop of its own --
+#: separate from the SIMD lane loop, because the writes collide -- and where a
+#: work item *is* the element there is no block to walk: one contribution,
+#: written where it is.
+_SCATTER_SCOPE = {
+    True: lambda indent: (
+        "%sfor (int scatter = 0; scatter < ne; ++scatter) {" % indent,
+    ),
+    False: lambda indent: ("%s{" % indent,),
+}
+
+_SCATTER_ELEMENT = {True: "evb + scatter", False: "evb"}
+
+_SCATTER_SLOT = {True: "[scatter]", False: ""}
+
+
+def _scatter_element():
+    """The element a scatter writes for: `evb + scatter`, or `evb` itself."""
+    return _SCATTER_ELEMENT[bool(_wi_extent())]
+
+
+def _scatter_slot():
+    """That element's slot in the staged output: `[scatter]`, or nothing."""
+    return _SCATTER_SLOT[bool(_wi_extent())]
+
+
+#: How a stream container is read at this work item, keyed on the layout the
+#: caller laid the streams out in.  Both spellings are `[lane]` where a work item
+#: is a lane of a block, which is why one spelling served for both; where a work
+#: item *is* the element they part company, because a pointer array is still an
+#: array of pointers and a contiguous tile has lost its second dimension.
+_STREAM_SUBSCRIPT = {
+    "pointer": lambda: _ptr(),
+    "contiguous": lambda: _wi(),
+}
+
+
+def _stream_slot(stream_layout="pointer"):
+    return _STREAM_SUBSCRIPT[stream_layout]()
+
+
+def _ptr():
+    """The subscript for a *pointer* at this work item: `[lane]`, or `[0]`.
+
+    The twin of `_wi()`, and the distinction matters: `_wi()` indexes a staged
+    buffer, which on a target whose work item is one element has no slot at all,
+    while a pointer alias -- a `_q` slice into a per-point buffer, or an entry of
+    a stream array -- is still a pointer there and is read at zero.
+    """
+    return "[%s]" % _work_item_index()
+
+
 def _elem(block="evb"):
     """The element this work item holds: `evb + lane`, or `evb` itself."""
     return _target().element_index(block)
+
+
+#: The one slot a kernel that holds a single element writes: `[0]` where the
+#: target's buffers have a slot at all, and nothing where a work item *is* the
+#: element and the staged buffer is the value.
+_FIRST_SLOT = {True: "[0]", False: ""}
+
+
+def _first_slot():
+    return _FIRST_SLOT[bool(_target().work_item_extent())]
+
+
+def _wi_extent():
+    """The trailing extent of a staged buffer: `[VS]`, or nothing at all."""
+    return _target().work_item_extent()
+
+
+def _wi_parameters():
+    """The work-item width, spelled as template parameters -- none where there is none."""
+    return tuple("int %s" % name for name in _width_factors())
+
+
+def _width_product(*factors):
+    """A staged extent, with the work-item width as its last factor where there is one."""
+    return c_product(*(factors + _width_factors()))
+
+
+def _block_offset(outer):
+    """`q * VS + lane`, or `q` alone where a work item is the element."""
+    return _target().work_item_block_offset(outer)
+
+
+#: The work-item count a micro-kernel call passes, where the micro-kernel takes
+#: one.  The scalar rendering has no block of work items to count.
+_MICRO_KERNEL_COUNT_ARGUMENT = {True: ("ne",), False: ()}
+
+
+def _micro_kernel_arguments(arguments):
+    """A micro-kernel's arguments, without the work-item count where it has none."""
+    return _MICRO_KERNEL_COUNT_ARGUMENT[bool(_width_factors())] + tuple(arguments[1:])
+
+
+def _width_constant_lines(vector_size, indent="  "):
+    """The kernel's own width constant, where it has a width to declare."""
+    return tuple(
+        kernel_constant(name, vector_size, indent=indent) for name in _width_factors()
+    )
 
 
 def _offset(outer, stride):
@@ -530,8 +633,8 @@ def _affine_geometry_stream_conversion_lines(streams, indent):
             n_streams,
             ", ".join(abi_geometry_name(stream) + " + evb" for stream in streams),
         ),
-        "%ss_t baffine_geometry_data[%d][VS];"
-        % (indent, n_streams),
+        "%ss_t baffine_geometry_data[%d]%s;"
+        % (indent, n_streams, _wi_extent()),
         "%sconst s_t *bageom_streams[%d];"
         % (indent, n_streams),
     ] + _affine_geometry_stream_assignment_lines(indent, n_streams)
@@ -546,10 +649,15 @@ def _affine_geometry_stream_assignment_lines(indent, n_streams):
     """
     def convert(index, extra):
         return [
-            "%s%sbageom_streams[%s] = ageom_stream<s_t, g_t, VS>("
-            % (indent, extra, index),
-            "%s%s    ne, affine_geometry_sources[%s], baffine_geometry_data[%s], std::is_same<g_t, s_t>());"
-            % (indent, extra, index, index),
+            "%s%sbageom_streams[%s] = ageom_stream<%s>("
+            % (indent, extra, index, ", ".join(("s_t", "g_t") + _width_factors())),
+            "%s%s    ne, affine_geometry_sources[%s], %s, std::is_same<g_t, s_t>());"
+            % (
+                indent,
+                extra,
+                index,
+                _target().staged_buffer_address("baffine_geometry_data[%s]" % index),
+            ),
         ]
 
     if n_streams == 1:
@@ -562,42 +670,6 @@ def _affine_geometry_stream_assignment_lines(indent, n_streams):
         + convert("geometry_stream", "  ")
         + ["%s}" % indent]
     )
-
-
-def _affine_geometry_stream_helper_lines():
-    lines = [
-        "namespace sfem {",
-        "namespace codegen {",
-        "",
-        "template <typename s_t, typename g_t, int VS>",
-        "%s const s_t *ageom_stream(" % _inline_qualifier(),
-        "    const int,",
-        "    const g_t *const RSTR source,",
-        "    s_t *const RSTR,",
-        "    std::true_type) {",
-        "  return source;",
-        "}",
-        "",
-        "template <typename s_t, typename g_t, int VS>",
-        "%s const s_t *ageom_stream(" % _inline_qualifier(),
-        "    const int ne,",
-        "    const g_t *const RSTR source,",
-        "    s_t *const RSTR converted,",
-        "    std::false_type) {",
-    ]
-    lines.extend(work_item_scope_header_lines("  "))
-    lines.extend(
-        [
-            "    converted%s = s_t(source%s);" % (_wi(), _wi()),
-            "  }",
-            "  return converted;",
-            "}",
-            "",
-            "} // namespace codegen",
-            "} // namespace sfem",
-        ]
-    )
-    return lines
 
 
 def _uses_cached_affine_metric(gradient_metric):
@@ -1184,8 +1256,7 @@ def _mesh_block_scatter_loop_lines(indent, loop, accumulation):
     lines.extend(loop.setup_lines)
     lines.extend(
         [
-            "%sfor (int scatter = 0; scatter < ne; ++scatter) {"
-            % loop.scatter_indent,
+            *_SCATTER_SCOPE[bool(_wi_extent())](loop.scatter_indent),
             *_scatter_add_lines(
                 accumulation[0], accumulation[1], "%s  " % loop.scatter_indent
             ),
@@ -1289,7 +1360,10 @@ def _field_atomic_scatter_lines(system, indent, element_array="elements"):
                 close_lines=("%s  }" % indent,),
                 scatter_indent="%s    " % indent,
             ),
-            ("out[element_shape[evb + scatter] * out_stride]", "boutput[stream][scatter]"),
+            (
+                "out[element_shape[%s] * out_stride]" % _scatter_element(),
+                "boutput[stream]%s" % _scatter_slot(),
+            ),
         ),
     ]
 
@@ -1829,7 +1903,10 @@ def _mixed_field_atomic_scatter_lines(system, layout, indent, field_element_arra
                         ),
                         scatter_indent="%s    " % indent,
                     ),
-                    ("out[element_shape[evb + scatter] * out_stride]", "boutput[stream][scatter]"),
+                    (
+                "out[element_shape[%s] * out_stride]" % _scatter_element(),
+                "boutput[stream]%s" % _scatter_slot(),
+            ),
                 ),
                 "%s}" % indent,
             ]
@@ -2648,7 +2725,7 @@ def _mixed_local_function(
         "typename s_t",
         "int NQ",
         "int CELL_NS",
-        "int VS",
+        *_wi_parameters(),
     ]
     lines = [
         "template <%s>" % ", ".join(template_params),
@@ -2679,12 +2756,21 @@ def _mixed_local_function(
             )
         )
     else:
-        lines.extend(_mixed_simplex_local_body(system, layout, coefficients, dependencies))
+        lines.extend(
+            _mixed_simplex_local_body(
+                system,
+                layout,
+                coefficients,
+                dependencies,
+                stream_layout=stream_layout,
+            )
+        )
     lines.append("}")
     return lines
 
 
-def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
+def _mixed_simplex_local_body(system, layout, coefficients, dependencies,
+                              stream_layout="pointer"):
     dim = system.dim
     lines = [
         "  for (int q = 0; q < NQ; ++q) {",
@@ -2703,6 +2789,7 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
             dependencies,
             "      ",
             unroll=True,
+            stream_layout=stream_layout,
         )
     )
     lines.extend(
@@ -2737,7 +2824,8 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
             ]
             if terms:
                 lines.append(
-                    ('      output[%d]' + _wi() + ' += q_weight[q] * det * (%s);')
+                    ('      output[%d]' + _stream_slot(stream_layout)
+                     + ' += q_weight[q] * det * (%s);')
                     % (offset + test, " + ".join(terms))
                 )
     lines.extend(["    }", "  }"])
@@ -2792,13 +2880,13 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 continue
             if read.uses_value or read.uses_gradient:
                 lines.append(
-                    "  s_t %s_%s_value[NQ * VS];"
-                    % (group.name, field.name)
+                    "  s_t %s_%s_value[%s];"
+                    % (group.name, field.name, _width_product("NQ"))
                 )
             if read.uses_gradient:
                 lines.append(
-                    "  s_t %s_%s_grad_ref[NQ * ND * VS];"
-                    % (group.name, field.name)
+                    "  s_t %s_%s_grad_ref[%s];"
+                    % (group.name, field.name, _width_product("NQ", "ND"))
                 )
             stream_arg, declaration = _FIELD_STREAM_ARGUMENT[
                 field_stream_layout(stream_layout)
@@ -2847,7 +2935,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     for row, field in enumerate(system.fields):
         for quantity in staged_test_quantities(dependencies):
             suffix, extent = _STAGED_COEFFICIENT_BUFFER[quantity]
-            lines.append("  s_t %s_%s[%s];" % (field.name, suffix, extent))
+            lines.append("  s_t %s_%s[%s];" % (field.name, suffix, extent()))
 
     lines.extend(["  for (int q = 0; q < NQ; ++q) {"])
     if dim == 2:
@@ -2881,9 +2969,9 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         for i in _adjugate_components(dependencies, dim)
     )
     if uses_determinant:
-        body.append('      const s_t det = det_q' + _wi() + ';')
+        body.append('      const s_t det = det_q' + _ptr() + ';')
     body.extend(
-        ('      const s_t adj%d = adj_q%d' + _wi() + ';') % (i, i)
+        ('      const s_t adj%d = adj_q%d' + _ptr() + ';') % (i, i)
         for i in _adjugate_components(dependencies, dim)
     )
     for field_index, field in enumerate(system.fields):
@@ -2891,21 +2979,34 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             read = field_stream_usage(dependencies, field, group.name)
             if read.uses_value:
                 hoisted.append(
-                    "    const s_t *const RSTR %s_%s_value_q = &%s_%s_value[q * VS];"
-                    % (group.name, field.name, group.name, field.name)
+                    "    const s_t *const RSTR %s_%s_value_q = &%s_%s_value[%s];"
+                    % (
+                        group.name,
+                        field.name,
+                        group.name,
+                        field.name,
+                        _width_product("q"),
+                    )
                 )
                 body.append(
-                    ('      const s_t %s%s = %s_%s_value_q' + _wi() + ';')
+                    ('      const s_t %s%s = %s_%s_value_q' + _ptr() + ';')
                     % (field.name, group.symbol_suffix, group.name, field.name)
                 )
             if read.uses_gradient:
                 for k in range(dim):
                     hoisted.append(
-                        "    const s_t *const RSTR %s_%s_grad_ref_q%d = &%s_%s_grad_ref[(q * ND + %d) * VS];"
-                        % (group.name, field.name, k, group.name, field.name, k)
+                        "    const s_t *const RSTR %s_%s_grad_ref_q%d = &%s_%s_grad_ref[%s];"
+                        % (
+                            group.name,
+                            field.name,
+                            k,
+                            group.name,
+                            field.name,
+                            _width_product(c_group(c_sum(c_product("q", "ND"), k))),
+                        )
                     )
                     body.append(
-                        ('      const s_t %s%s_grad_%d_ref = %s_%s_grad_ref_q%d' + _wi() + ';')
+                        ('      const s_t %s%s_grad_%d_ref = %s_%s_grad_ref_q%d' + _ptr() + ';')
                         % (field.name, group.symbol_suffix, k, group.name, field.name, k)
                     )
                 body.extend(
@@ -2913,12 +3014,17 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 )
     for row, field in enumerate(system.fields):
         hoisted.append(
-            "    s_t *const RSTR %s_value_coeff_q = &%s_value_coeff[q * VS];"
-            % (field.name, field.name)
+            "    s_t *const RSTR %s_value_coeff_q = &%s_value_coeff[%s];"
+            % (field.name, field.name, _width_product("q"))
         )
         hoisted.extend(
-            "    s_t *const RSTR %s_grad_coeff_ref_q%d = &%s_grad_coeff_ref[(q * ND + %d) * VS];"
-            % (field.name, k, field.name, k)
+            "    s_t *const RSTR %s_grad_coeff_ref_q%d = &%s_grad_coeff_ref[%s];"
+            % (
+                field.name,
+                k,
+                field.name,
+                _width_product(c_group(c_sum(c_product("q", "ND"), k))),
+            )
             for k in contracted_gradient_components(dependencies, dim)
         )
     lines.extend(hoisted)
@@ -2942,7 +3048,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             bool(dependencies.value_coefficients[row])
         ](row)
         lines.append(
-            ('      %s_value_coeff_q' + _wi() + ' = %s;') % (field.name, value)
+            ('      %s_value_coeff_q' + _ptr() + ' = %s;') % (field.name, value)
         )
         for k in contracted_gradient_components(dependencies, dim):
             terms = [
@@ -2952,7 +3058,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             ]
             value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
             lines.append(
-                ('      %s_grad_coeff_ref_q%d' + _wi() + ' = %s;') % (field.name, k, value)
+                ('      %s_grad_coeff_ref_q%d' + _ptr() + ' = %s;') % (field.name, k, value)
             )
     lines.extend(["    }", "  }"])
     for row, field in enumerate(system.fields):
@@ -2992,6 +3098,7 @@ def _mixed_local_field_evaluation_lines(
     indent,
     *,
     unroll=False,
+    stream_layout="pointer",
 ):
     dim = system.dim
     lines = []
@@ -3017,7 +3124,8 @@ def _mixed_local_field_evaluation_lines(
                 for trial in range(layout.n_shape(field_index)):
                     coeff_name = "coeff_%s_%s_%d" % (group.name, field.name, trial)
                     lines.append(
-                        ('%sconst s_t %s = %s[%d]' + _wi() + ';')
+                        ('%sconst s_t %s = %s[%d]'
+                         + _stream_slot(stream_layout) + ';')
                         % (indent, coeff_name, group.name, offset + trial)
                     )
                     if read.uses_value:
@@ -3049,7 +3157,8 @@ def _mixed_local_field_evaluation_lines(
             else:
                 lines.append("%sfor (int trial = 0; trial < %s; ++trial) {" % (indent, n_shape_name))
                 lines.append(
-                    ('%s  const s_t coeff = %s[%d + trial]' + _wi() + ';')
+                    ('%s  const s_t coeff = %s[%d + trial]'
+                     + _stream_slot(stream_layout) + ';')
                     % (indent, group.name, offset)
                 )
                 if read.uses_value:
@@ -3241,8 +3350,8 @@ def _stream_call_arguments(streams, spell):
 #:   DENSE  one flat array the kernel addresses itself, with nothing per degree
 #:          of freedom at the boundary to describe
 _LAYOUT_DECLARATIONS = {
-    DataStreamLayout.AOS: lambda qualifier, stream: "%s %s[%d * NS][VS]"
-    % (qualifier, stream.name, stream.components),
+    DataStreamLayout.AOS: lambda qualifier, stream: "%s %s[%d * NS]%s"
+    % (qualifier, stream.name, stream.components, _wi_extent()),
     DataStreamLayout.DENSE: lambda qualifier, stream: "%s *const RSTR %s"
     % (qualifier, stream.name),
 }
@@ -3332,7 +3441,7 @@ def _local_function(
         "typename s_t",
         "int NQ",
         "int NS",
-        "int VS",
+        *_wi_parameters(),
     ]
     body = [
         BufferDeclNode("static constexpr int", "ND", (), expr_ref(str(dim))),
@@ -3360,6 +3469,7 @@ def _local_function(
                 gradient_metric,
                 allow_gradient_metric=allow_simplex_gradient_metric,
                 constant_p1_gradient_expansion=constant_p1_gradient_expansion,
+                stream_layout=stream_layout,
             )
         )
 
@@ -3607,7 +3717,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
     dim = system.dim
     n_fields = len(system.fields)
     assembled = assembled_matrix_dependencies(dependencies)
-    templates = ("s_t", "NQ", "NS", "VS", "ND", "NC")
+    templates = ("s_t", "NQ", "NS") + _width_factors() + ("ND", "NC")
     quantities = contracted_test_quantities(dependencies)
     uses_determinant = uses_geometry_values(dependencies)
 
@@ -3624,19 +3734,21 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
     for group in _dependency_stream_groups(assembled):
         uses_gradient = getattr(assembled, "%s_gradient" % group.name)
         nodes.append(
-            BufferDeclNode("s_t", "%s_value" % group.name, ("NC * NQ * VS",))
+            BufferDeclNode("s_t", "%s_value" % group.name, (_width_product("NC", "NQ"),))
         )
         if uses_gradient:
             nodes.append(
                 BufferDeclNode(
-                    "s_t", "%s_grad_ref" % group.name, ("NC * NQ * ND * VS",)
+                    "s_t", "%s_grad_ref" % group.name, (_width_product("NC", "NQ", "ND"),)
                 )
             )
             nodes.append(
                 CallNode(
-                    "tensor_evaluate_contiguous",
-                    ("ne", "shape_1d", "grad_1d", group.name,
-                     "%s_value" % group.name, "%s_grad_ref" % group.name),
+                    _micro_kernel("tensor_evaluate_contiguous"),
+                    _micro_kernel_arguments(
+                        ("ne", "shape_1d", "grad_1d", group.name,
+                         "%s_value" % group.name, "%s_grad_ref" % group.name)
+                    ),
                     templates,
                     wrap_arguments=True,
                 )
@@ -3644,16 +3756,18 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         else:
             nodes.append(
                 CallNode(
-                    "tensor_evaluate_value_contiguous",
-                    ("ne", "shape_1d", group.name, "%s_value" % group.name),
+                    _micro_kernel("tensor_evaluate_value_contiguous"),
+                    _micro_kernel_arguments(
+                        ("ne", "shape_1d", group.name, "%s_value" % group.name)
+                    ),
                     templates,
                     wrap_arguments=True,
                 )
             )
 
-    nodes.append(BufferDeclNode("s_t", "value_coeff", ("NC * NQ * VS",)))
+    nodes.append(BufferDeclNode("s_t", "value_coeff", (_width_product("NC", "NQ"),)))
     nodes.extend(
-        BufferDeclNode("s_t", "grad_coeff_ref", ("NC * NQ * ND * VS",))
+        BufferDeclNode("s_t", "grad_coeff_ref", (_width_product("NC", "NQ", "ND"),))
         for quantity in quantities
         if quantity == "gradient"
     )
@@ -3674,6 +3788,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
     )
 
     entry_point, arguments = _TENSOR_INTEGRATE_BY_QUANTITIES[quantities]
+    arguments = _micro_kernel_arguments(arguments)
     # The trial function's value, where the flux contracts it: on this element
     # it is the product of the one-dimensional factors, as its gradient is.
     trial_value_nodes = [
@@ -3709,7 +3824,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                     (),
                     expr_ref("%d" % len(tangent_targets)),
                 ),
-                BufferDeclNode("s_t", "tangent", ("N_TANGENT * NQ * VS",)),
+                BufferDeclNode("s_t", "tangent", (_width_product("N_TANGENT", "NQ"),)),
             ]
         )
         staging_quadrature_body = []
@@ -3722,7 +3837,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                 )
             )
             staging_lane_body.append(
-                BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _wi()))
+                BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
             )
         for i in _adjugate_components(dependencies, dim):
             staging_quadrature_body.append(
@@ -3733,7 +3848,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
             )
             staging_lane_body.append(
                 BufferDeclNode(
-                    "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _wi()) % i)
+                    "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
                 )
             )
         staging_hoists, staging_aliases = _tensor_field_alias_nodes(system, assembled)
@@ -3745,14 +3860,16 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                 BufferDeclNode(
                     "s_t *const RSTR", "%s_q" % target, (),
                     expr_ref(
-                        "&tangent[%s * VS]"
-                        % c_group(c_sum(c_product("%d" % index, "NQ"), "q"))
+                        "&tangent[%s]"
+                        % _width_product(
+                            c_group(c_sum(c_product("%d" % index, "NQ"), "q"))
+                        )
                     ),
                 )
             )
             staging_lane_body.append(
                 AssignmentNode(
-                    expr_ref(('%s_q' % target) + _wi()), expr_ref(target)
+                    expr_ref(('%s_q' % target) + _ptr()), expr_ref(target)
                 )
             )
         staging_quadrature_body.append(_work_item_loop_node(staging_lane_body))
@@ -3792,7 +3909,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                 )
             )
             lane_body.append(
-                BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _wi()))
+                BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
             )
         for i in _adjugate_components(dependencies, dim):
             quadrature_body.append(
@@ -3803,7 +3920,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
             )
             lane_body.append(
                 BufferDeclNode(
-                    "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _wi()) % i)
+                    "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
                 )
             )
         # No state here any more: this loop contracts the staged tangent with
@@ -3832,14 +3949,18 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                     BufferDeclNode(
                         "const s_t *const RSTR", "%s_q" % name, (),
                         expr_ref(
-                            "&tangent[%s * VS]"
-                            % c_group(
-                                c_sum(c_product("%d" % tangent_index[name], "NQ"), "q")
+                            "&tangent[%s]"
+                            % _width_product(
+                                c_group(
+                                    c_sum(
+                                        c_product("%d" % tangent_index[name], "NQ"), "q"
+                                    )
+                                )
                             )
                         ),
                     )
                 )
-                terms.append("%s * %s" % (quantity, ('%s_q' % name) + _wi()))
+                terms.append("%s * %s" % (quantity, ('%s_q' % name) + _ptr()))
             lane_body.append(
                 BufferDeclNode(
                     "const s_t",
@@ -3856,14 +3977,14 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                 BufferDeclNode(
                     "s_t *const RSTR", "value_coeff_q%d" % row, (),
                     expr_ref(
-                        "&value_coeff[%s * VS]"
-                        % c_group(c_sum(c_product(row, "NQ"), "q"))
+                        "&value_coeff[%s]"
+                        % _width_product(c_group(c_sum(c_product(row, "NQ"), "q")))
                     ),
                 )
             )
             lane_body.append(
                 AssignmentNode(
-                    expr_ref(('value_coeff_q%d' + _wi()) % row), expr_ref(value)
+                    expr_ref(('value_coeff_q%d' + _ptr()) % row), expr_ref(value)
                 )
             )
             for k in contracted_gradient_components(dependencies, dim):
@@ -3877,13 +3998,16 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                     BufferDeclNode(
                         "s_t *const RSTR", "grad_coeff_ref_q%d_%d" % (row, k), (),
                         expr_ref(
-                            "&grad_coeff_ref[%s * VS]"
-                            % c_group(
-                                c_sum(
-                                    c_product(
-                                        c_group(c_sum(c_product(row, "NQ"), "q")), "ND"
-                                    ),
-                                    k,
+                            "&grad_coeff_ref[%s]"
+                            % _width_product(
+                                c_group(
+                                    c_sum(
+                                        c_product(
+                                            c_group(c_sum(c_product(row, "NQ"), "q")),
+                                            "ND",
+                                        ),
+                                        k,
+                                    )
                                 )
                             )
                         ),
@@ -3891,7 +4015,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                 )
                 lane_body.append(
                     AssignmentNode(
-                        expr_ref(('grad_coeff_ref_q%d_%d' + _wi()) % (row, k)),
+                        expr_ref(('grad_coeff_ref_q%d_%d' + _ptr()) % (row, k)),
                         expr_ref(value),
                     )
                 )
@@ -3925,7 +4049,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         )
         trial_body.append(
             CallNode(
-                entry_point % "",
+                _micro_kernel(entry_point % ""),
                 tuple(
                     "column" if argument == "output" else argument
                     for argument in arguments
@@ -3984,7 +4108,7 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
     ]
     body.extend(_simplex_state_staging_nodes(system, assembled, usage))
     body.extend(
-        BufferDeclNode("s_t", "%s_values" % name, ("VS",))
+        BufferDeclNode("s_t", "%s_values" % name, _width_factors())
         for row in range(n_fields)
         for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
     )
@@ -4013,7 +4137,7 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
     tangent_staging = []
     if tangent_targets:
         body.append(
-            BufferDeclNode("s_t", "tangent", ("%d" % len(tangent_targets), "VS"))
+            BufferDeclNode("s_t", "tangent", ("%d" % len(tangent_targets),) + _width_factors())
         )
         staging_lane_body = list(_simplex_state_transform_nodes(system, assembled, usage))
         staging_lane_body.extend(tangent_nodes)
@@ -4088,7 +4212,9 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
             _shape_loop_node("test", [_work_item_loop_node(test_body)])
         )
 
-    quadrature_body = list(_simplex_state_gather_nodes(system, assembled, usage))
+    quadrature_body = list(
+        _simplex_state_gather_nodes(system, assembled, usage, "contiguous")
+    )
     quadrature_body.extend(tangent_staging)
     quadrature_body.append(_shape_loop_node("trial", trial_body))
     quadrature = iterator("q", "int")
@@ -4143,7 +4269,9 @@ def _closed_form_element_matrix_nodes(
 
     body = list(_geometry_value_nodes(assembled, dim))
     body.extend(
-        _constant_p1_state_gradient_nodes(system, assembled, reference_gradients)
+        _constant_p1_state_gradient_nodes(
+            system, assembled, reference_gradients, "contiguous"
+        )
     )
     # Test and trial run over the same space, so one gradient per shape serves
     # both -- the hand-written kernel does the same.
@@ -4325,7 +4453,7 @@ def _element_matrix_function(system, kernel, coefficients, dependencies):
             params=tuple(params),
             body=tuple(body),
             qualifier=_function_qualifier(),
-            template_params=("typename s_t", "int NQ", "int NS", "int VS"),
+            template_params=("typename s_t", "int NQ", "int NS") + _wi_parameters(),
         )
     )
 
@@ -4368,19 +4496,20 @@ def _simplex_state_staging_nodes(system, dependencies, usage):
             read = usage[(field.name, group.name)]
             if read.uses_value:
                 nodes.append(
-                    BufferDeclNode("s_t", "%s_values" % stem, ("VS",))
+                    BufferDeclNode("s_t", "%s_values" % stem, _width_factors())
                 )
             if read.uses_gradient:
                 nodes.extend(
                     BufferDeclNode(
-                        "s_t", "%s_grad_%d_ref_values" % (stem, d), ("VS",)
+                        "s_t", "%s_grad_%d_ref_values" % (stem, d), _width_factors()
                     )
                     for d in range(dim)
                 )
     return nodes
 
 
-def _simplex_state_gather_nodes(system, dependencies, usage):
+def _simplex_state_gather_nodes(system, dependencies, usage,
+                                stream_layout="pointer"):
     """Zero the staging buffers, then accumulate over trial functions."""
     dim = system.dim
     nodes = []
@@ -4415,7 +4544,7 @@ def _simplex_state_gather_nodes(system, dependencies, usage):
                     "coeff",
                     (),
                     expr_ref(
-                        ('%s[%s]' + _wi())
+                        ('%s[%s]' + _stream_slot(stream_layout))
                         % (group.name, c_sum(c_product("trial", "NC"), field_index))
                     ),
                 )
@@ -4554,11 +4683,16 @@ def _simplex_local_body(
     allow_gradient_metric=True,
     constant_p1_gradient_expansion=True,
     stepped=False,
+    stream_layout="pointer",
 ):
     if gradient_metric is None and allow_gradient_metric:
         gradient_metric = simplex_gradient_metric_transformation(system.fields, rule, coefficients, dependencies)
     if gradient_metric is not None:
-        return (_simplex_gradient_metric_body(system, rule, dependencies, gradient_metric),)
+        return (
+            _simplex_gradient_metric_body(
+                system, rule, dependencies, gradient_metric, stream_layout
+            ),
+        )
     reference_gradients = constant_p1_simplex_reference_gradients(rule)
     if constant_p1_gradient_expansion and _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
         return (
@@ -4567,6 +4701,7 @@ def _simplex_local_body(
                 coefficients,
                 dependencies,
                 reference_gradients,
+                stream_layout,
             ),
         )
 
@@ -4575,11 +4710,11 @@ def _simplex_local_body(
 
     staging = list(_simplex_state_staging_nodes(system, dependencies, usage))
     staging.extend(
-        BufferDeclNode("s_t", "%s_values" % name, ("VS",))
+        BufferDeclNode("s_t", "%s_values" % name, _width_factors())
         for row in range(len(system.fields))
         for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
     )
-    gather = _simplex_state_gather_nodes(system, dependencies, usage)
+    gather = _simplex_state_gather_nodes(system, dependencies, usage, stream_layout)
     transform = _simplex_state_transform_nodes(system, dependencies, usage, stepped)
 
     # EVALUATE_MATERIAL: the constitutive evaluation, staged for the contraction.
@@ -4628,7 +4763,7 @@ def _simplex_local_body(
                 stream = c_sum(c_product("step", "NC * NS"), stream)
             test_body.append(
                 ScatterNode(
-                    expr_ref(('output[%s]' + _wi()) % stream),
+                    expr_ref(('output[%s]' + _stream_slot(stream_layout)) % stream),
                     expr_ref("q_weight[q] * det * (%s)" % " + ".join(terms)),
                     "+=",
                 )
@@ -4808,7 +4943,8 @@ def _constant_reference_gradient_sum(reference_gradients, n_shape, dim, expr_for
     return _sum_cpp_terms(terms)
 
 
-def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients):
+def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients,
+                                      stream_layout="pointer"):
     """The element's state gradients, on an element whose basis is constant.
 
     Every live role of every field, contracted against the constant reference
@@ -4847,7 +4983,9 @@ def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients)
                     reference_gradients,
                     dim + 1,
                     d,
-                    lambda shape, group=group, field_index=field_index: ('%s[%d]' + _wi())
+                    lambda shape, group=group, field_index=field_index: (
+                        '%s[%d]' + _stream_slot(stream_layout)
+                    )
                     % (group.name, shape * n_fields + field_index),
                 )
                 nodes.append(
@@ -4862,7 +5000,9 @@ def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients)
     return nodes
 
 
-def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, reference_gradients):
+def _constant_p1_gradient_expanded_body(system, coefficients, dependencies,
+                                        reference_gradients,
+                                        stream_layout="pointer"):
     """The expanded constant-P1 gradient kernel, built as IR.
 
     The second kernel whose body is a tree rather than a list of strings, and
@@ -4877,7 +5017,9 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
 
     body = list(_geometry_value_nodes(dependencies, dim))
     body.extend(
-        _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients)
+        _constant_p1_state_gradient_nodes(
+            system, dependencies, reference_gradients, stream_layout
+        )
     )
     body.extend(_coefficient_evaluation_nodes(system, coefficients, dependencies))
 
@@ -4920,7 +5062,10 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
             if terms:
                 body.append(
                     ScatterNode(
-                        expr_ref(('output[%d]' + _wi()) % (test * n_fields + row)),
+                        expr_ref(
+                            ('output[%d]' + _stream_slot(stream_layout))
+                            % (test * n_fields + row)
+                        ),
                         expr_ref("q_weight[q] * det * (%s)" % _sum_cpp_terms(terms)),
                         "+=",
                     )
@@ -5174,7 +5319,8 @@ def _quadrature_lane_kernel_lines(lane_body, indent="  ", name="quadrature_lane_
     return ["%s%s" % (indent, line) for line in ast_lines]
 
 
-def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
+def _simplex_gradient_metric_body(system, rule, dependencies, specialization,
+                                  stream_layout="pointer"):
     """The constant-P1 simplex gradient-metric kernel body, built as a KernelAST.
 
     This is the first kernel whose structure is expressed in the IR rather than
@@ -5201,7 +5347,8 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
         body.append(
             declare(
                 "coeff_%s_%s_%d" % (group.name, field.name, trial),
-                ('%s[%d]' + _wi()) % (group.name, trial * len(system.fields) + field_index),
+                ('%s[%d]' + _stream_slot(stream_layout))
+                % (group.name, trial * len(system.fields) + field_index),
             )
         )
     for d in range(dim):
@@ -5278,7 +5425,8 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
             body.append(
                 ScatterNode(
                     expr_ref(
-                        ('output[%d]' + _wi()) % (test * len(system.fields) + field_index),
+                        ('output[%d]' + _stream_slot(stream_layout))
+                        % (test * len(system.fields) + field_index),
                         "scatter_target",
                     ),
                     expr_ref(_sum_cpp_terms(terms), "scatter_value"),
@@ -5331,7 +5479,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
 
     contiguous = stream_layout == "contiguous"
     suffix = "_contiguous" if contiguous else ""
-    templates = ("s_t", "NQ", "NS", "VS", "ND", "NC")
+    templates = ("s_t", "NQ", "NS") + _width_factors() + ("ND", "NC")
 
     nodes = []
     for group, enabled in (
@@ -5344,7 +5492,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         uses_gradient = getattr(dependencies, "%s_gradient" % group)
         nodes.append(
             BufferDeclNode(
-                "s_t", "%s_value" % group, ("NC * NQ * VS",)
+                "s_t", "%s_value" % group, (_width_product("NC", "NQ"),)
             )
         )
         if uses_gradient:
@@ -5352,14 +5500,16 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
                 BufferDeclNode(
                     "s_t",
                     "%s_grad_ref" % group,
-                    ("NC * NQ * ND * VS",),
+                    (_width_product("NC", "NQ", "ND"),),
                 )
             )
             nodes.append(
                 CallNode(
-                    "tensor_evaluate%s" % suffix,
-                    ("ne", "shape_1d", "grad_1d", group,
-                     "%s_value" % group, "%s_grad_ref" % group),
+                    _micro_kernel("tensor_evaluate%s" % suffix),
+                    _micro_kernel_arguments(
+                        ("ne", "shape_1d", "grad_1d", group,
+                         "%s_value" % group, "%s_grad_ref" % group)
+                    ),
                     templates,
                     wrap_arguments=True,
                 )
@@ -5367,22 +5517,24 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         else:
             nodes.append(
                 CallNode(
-                    "tensor_evaluate_value%s" % suffix,
-                    ("ne", "shape_1d", group, "%s_value" % group),
+                    _micro_kernel("tensor_evaluate_value%s" % suffix),
+                    _micro_kernel_arguments(
+                        ("ne", "shape_1d", group, "%s_value" % group)
+                    ),
                     templates,
                     wrap_arguments=True,
                 )
             )
 
     nodes.append(
-        BufferDeclNode("s_t", "value_coeff", ("NC * NQ * VS",))
+        BufferDeclNode("s_t", "value_coeff", (_width_product("NC", "NQ"),))
     )
     # One buffer per contracted quantity beyond the value, which is always
     # staged.  `contracted_test_quantities` is the plan's list; a form that
     # contracts no test gradient names no reference-gradient buffer because the
     # sequence does not contain one.
     nodes.extend(
-        BufferDeclNode("s_t", "grad_coeff_ref", ("NC * NQ * ND * VS",))
+        BufferDeclNode("s_t", "grad_coeff_ref", (_width_product("NC", "NQ", "ND"),))
         for quantity in contracted_test_quantities(dependencies)
         if quantity == "gradient"
     )
@@ -5426,7 +5578,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             )
         )
         lane_body.append(
-            BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _wi()))
+            BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
         )
     for i in _adjugate_components(dependencies, dim):
         quadrature_body.append(
@@ -5437,7 +5589,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         )
         lane_body.append(
             BufferDeclNode(
-                "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _wi()) % i)
+                "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
             )
         )
     field_hoists, field_aliases = _tensor_field_alias_nodes(system, dependencies)
@@ -5454,14 +5606,14 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             BufferDeclNode(
                 "s_t *const RSTR", "value_coeff_q%d" % row, (),
                 expr_ref(
-                    "&value_coeff[%s * VS]"
-                    % c_group(c_sum(c_product(row, "NQ"), "q"))
+                    "&value_coeff[%s]"
+                    % _width_product(c_group(c_sum(c_product(row, "NQ"), "q")))
                 ),
             )
         )
         lane_body.append(
             AssignmentNode(
-                expr_ref(('value_coeff_q%d' + _wi()) % row), expr_ref(value)
+                expr_ref(('value_coeff_q%d' + _ptr()) % row), expr_ref(value)
             )
         )
         # `contracted_gradient_components` is this question phrased as a range,
@@ -5478,11 +5630,15 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
                 BufferDeclNode(
                     "s_t *const RSTR", "grad_coeff_ref_q%d_%d" % (row, k), (),
                     expr_ref(
-                        "&grad_coeff_ref[%s * VS]"
-                        % c_group(
-                            c_sum(
-                                c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"),
-                                k,
+                        "&grad_coeff_ref[%s]"
+                        % _width_product(
+                            c_group(
+                                c_sum(
+                                    c_product(
+                                        c_group(c_sum(c_product(row, "NQ"), "q")), "ND"
+                                    ),
+                                    k,
+                                )
                             )
                         )
                     ),
@@ -5490,7 +5646,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             )
             lane_body.append(
                 AssignmentNode(
-                    expr_ref(('grad_coeff_ref_q%d_%d' + _wi()) % (row, k)),
+                    expr_ref(('grad_coeff_ref_q%d_%d' + _ptr()) % (row, k)),
                     expr_ref(value),
                 )
             )
@@ -5511,7 +5667,12 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         contracted_test_quantities(dependencies)
     ]
     nodes.append(
-        CallNode(entry_point % suffix, arguments, templates, wrap_arguments=True)
+        CallNode(
+            _micro_kernel(entry_point % suffix),
+            _micro_kernel_arguments(arguments),
+            templates,
+            wrap_arguments=True,
+        )
     )
     return tuple(nodes)
 
@@ -5647,10 +5808,12 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "%s_value_q%d" % (group.name, field_index),
                         (),
                         expr_ref(
-                            "&%s_value[%s * VS]"
+                            "&%s_value[%s]"
                             % (
                                 group.name,
-                                c_group(c_sum(c_product(field_index, "NQ"), "q")),
+                                _width_product(
+                                    c_group(c_sum(c_product(field_index, "NQ"), "q"))
+                                ),
                             )
                         ),
                     )
@@ -5660,7 +5823,7 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "const s_t",
                         stem,
                         (),
-                        expr_ref(('%s_value_q%d' + _wi()) % (group.name, field_index)),
+                        expr_ref(('%s_value_q%d' + _ptr()) % (group.name, field_index)),
                     )
                 )
             if read.uses_gradient:
@@ -5670,16 +5833,22 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "%s_grad_ref_q%d_%d" % (group.name, field_index, k),
                         (),
                         expr_ref(
-                            "&%s_grad_ref[%s * VS]"
+                            "&%s_grad_ref[%s]"
                             % (
                                 group.name,
-                                c_group(
-                                    c_sum(
-                                        c_product(
-                                            c_group(c_sum(c_product(field_index, "NQ"), "q")),
-                                            "ND",
-                                        ),
-                                        k,
+                                _width_product(
+                                    c_group(
+                                        c_sum(
+                                            c_product(
+                                                c_group(
+                                                    c_sum(
+                                                        c_product(field_index, "NQ"), "q"
+                                                    )
+                                                ),
+                                                "ND",
+                                            ),
+                                            k,
+                                        )
                                     )
                                 ),
                             )
@@ -5693,7 +5862,7 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "%s_grad_%d_ref" % (stem, k),
                         (),
                         expr_ref(
-                            ('%s_grad_ref_q%d_%d' + _wi()) % (group.name, field_index, k)
+                            ('%s_grad_ref_q%d_%d' + _ptr()) % (group.name, field_index, k)
                         ),
                     )
                     for k in range(dim)
@@ -5926,7 +6095,7 @@ def _operator_source(
         "#include <cstdio>",
         "",
     ]
-    lines.extend(_affine_geometry_stream_helper_lines())
+    lines.extend(affine_geometry_stream_helper_lines())
     # Built before the diagnostics rather than after, because the diagnostics
     # describe the kernels below and have to be told which of them exist.
     form_dependencies = {
@@ -5991,9 +6160,13 @@ def _operator_source(
                 pre_call_lines.extend(
                     [
                         kernel_constant("NQ", n_qp, indent="  "),
-                        kernel_constant("VS", vector_size, indent="  "),
-                        "  %s geom_metric_data[%d][NQ * VS];"
-                        % (scalar_type, gradient_metric.metric_components),
+                        *_width_constant_lines(vector_size),
+                        "  %s geom_metric_data[%d][%s];"
+                        % (
+                            scalar_type,
+                            gradient_metric.metric_components,
+                            _width_product("NQ"),
+                        ),
                         "  const %s *const geom_metric[%d] = %s;"
                         % (
                             scalar_type,
@@ -6013,7 +6186,7 @@ def _operator_source(
                         dim,
                         "determinant[goff]",
                         lambda component: "adjugate[%d][goff]" % component,
-                        lambda component: "geom_metric_data[%d][" + _offset("q", "VS") + "]"
+                        lambda component: "geom_metric_data[%d][" + _block_offset("q") + "]"
                         % component,
                         "      ",
                         "metric",
@@ -6068,13 +6241,13 @@ def _operator_source(
                 return list(
                     line.replace("s_t", concrete) for line in _pre
                 ) + [
-                    "  sfem::codegen::%s<%s, %d, %d, %d>(%s);"
+                    "  sfem::codegen::%s<%s>(%s);"
                     % (
                         block,
-                        concrete,
-                        n_qp,
-                        n_shape,
-                        vector_size,
+                        ", ".join(
+                            (concrete, str(n_qp), str(n_shape))
+                            + tuple(str(vector_size) for _ in _width_factors())
+                        ),
                         ", ".join(spelled),
                     ),
                     "  return SFEM_SUCCESS;",
@@ -6234,7 +6407,7 @@ def _mixed_operator_source(
         "#endif",
         "",
     ]
-    lines.extend(_affine_geometry_stream_helper_lines())
+    lines.extend(affine_geometry_stream_helper_lines())
     lines.extend(
         _mixed_residual_diagnostics_lines(
             system,
@@ -6277,7 +6450,15 @@ def _mixed_operator_source(
                 element,
                 rule,
                 AFFINE_MODE,
-                cell_specialization.vector_size,
+                # Through the target, as every other mesh operator's width
+                # is.  Passed raw, a device mixed kernel declared `VS = 16`
+                # and blocked its staging over sixteen elements while the
+                # micro-kernels it calls hold one, so it handed a scalar entry
+                # point a lane-blocked tile -- which nvcc rejects, and which
+                # would have computed the wrong numbers had it compiled.
+                current_target().effective_vector_size(
+                    cell_specialization.vector_size
+                ),
                 field_element_types,
                 form,
                 dependencies,
@@ -6292,7 +6473,15 @@ def _mixed_operator_source(
                 element,
                 rule,
                 ISOPARAMETRIC_MODE,
-                cell_specialization.vector_size,
+                # Through the target, as every other mesh operator's width
+                # is.  Passed raw, a device mixed kernel declared `VS = 16`
+                # and blocked its staging over sixteen elements while the
+                # micro-kernels it calls hold one, so it handed a scalar entry
+                # point a lane-blocked tile -- which nvcc rejects, and which
+                # would have computed the wrong numbers had it compiled.
+                current_target().effective_vector_size(
+                    cell_specialization.vector_size
+                ),
                 field_element_types,
                 form,
                 coefficients,
@@ -6457,7 +6646,7 @@ def _mixed_affine_function(
             kernel_constant("NS", "CELL_NS", indent="  "),
             kernel_constant("NC", layout.n_reference_fields, indent="  "),
             kernel_constant("N_FIELD_STREAMS", layout.total_streams, indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -6489,11 +6678,11 @@ def _mixed_affine_function(
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "    s_t b%s[N_FIELD_STREAMS][VS];" % role.name
+            "    s_t b%s[N_FIELD_STREAMS]%s;" % (role.name, _wi_extent())
         )
     lines.extend(
         [
-            "    s_t boutput[N_FIELD_STREAMS][VS];",
+            "    s_t boutput[N_FIELD_STREAMS]%s;" % _wi_extent(),
         ]
     )
     field_gather = _mixed_field_gather_lines(system, layout, dependencies, "    ", field_element_arrays)
@@ -6550,8 +6739,12 @@ def _mixed_affine_function(
     lines.extend(
         [
             "",
-            "    %s<s_t, NQ, CELL_NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "    %s%s(%s);"
+            % (
+                block_function,
+                _micro_kernel_template(shape="CELL_NS"),
+                ", ".join(call_args),
+            ),
             "",
         ]
     )
@@ -6642,7 +6835,7 @@ def _mixed_isoparametric_function(
             kernel_constant("NS", "CELL_NS", indent="  "),
             kernel_constant("NC", layout.n_reference_fields, indent="  "),
             kernel_constant("N_FIELD_STREAMS", layout.total_streams, indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -6676,18 +6869,18 @@ def _mixed_isoparametric_function(
     lines.extend(
         [
             *_mesh_loop_lines(),
-            "    s_t bcoordinates[ND * CELL_NS][VS];",
-            "    s_t badjugate_data[ND * ND][NQ * VS];",
-            "    s_t bdeterminant[NQ * VS];",
+            "    s_t bcoordinates[ND * CELL_NS]%s;" % _wi_extent(),
+            "    s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+            "    s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "    s_t b%s[N_FIELD_STREAMS][VS];" % role.name
+            "    s_t b%s[N_FIELD_STREAMS]%s;" % (role.name, _wi_extent())
         )
     lines.extend(
         [
-            "    s_t boutput[N_FIELD_STREAMS][VS];",
+            "    s_t boutput[N_FIELD_STREAMS]%s;" % _wi_extent(),
         ]
     )
     lines.extend(["", *_coordinate_gather_lines(dim, "    ", coordinate_element_array)])
@@ -6779,7 +6972,7 @@ def _mixed_isoparametric_function(
     block_function = "%s_contiguous" % block if not block_stream_lines else block
     call_args = [
         "ne",
-        "VS",
+        _work_item_block_stride(),
         "bdeterminant",
     ]
     call_args.extend(
@@ -6795,8 +6988,12 @@ def _mixed_isoparametric_function(
     lines.extend(
         [
             "",
-            "    %s<s_t, NQ, CELL_NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "    %s%s(%s);"
+            % (
+                block_function,
+                _micro_kernel_template(shape="CELL_NS"),
+                ", ".join(call_args),
+            ),
             "",
         ]
     )
@@ -7106,7 +7303,8 @@ _STREAM_HELPER_SUFFIX = {
 
 _STREAM_PARAMETER = {
     DataStreamLayout.AOS: (
-        lambda qualifier, name, total: "%s %s[%d][VS]" % (qualifier, name, total)
+        lambda qualifier, name, total: "%s %s[%d]%s"
+        % (qualifier, name, total, _wi_extent())
     ),
     DataStreamLayout.SOA: (
         lambda qualifier, name, total: "%s *const RSTR %s[%d]"
@@ -7165,8 +7363,8 @@ _OUTPUT_STREAM_ARGUMENT = {
 #: Which of them exist is `plans.dependencies.staged_test_quantities`; how many
 #: elements each holds is emission's, because `NQ` and `ND` are this text's.
 _STAGED_COEFFICIENT_BUFFER = {
-    "value": ("value_coeff", "NQ * VS"),
-    "gradient": ("grad_coeff_ref", "NQ * ND * VS"),
+    "value": ("value_coeff", lambda: _width_product("NQ")),
+    "gradient": ("grad_coeff_ref", lambda: _width_product("NQ", "ND")),
 }
 
 
@@ -7372,7 +7570,7 @@ def _mesh_operator_source(
             kernel_constant("NQ", n_qp, indent="  "),
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -7484,16 +7682,16 @@ def _mesh_operator_source(
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "    s_t b%s[NC * NS][VS];" % role.name
+            "    s_t b%s[NC * NS]%s;" % (role.name, _wi_extent())
         )
     if gradient_metric is not None and not uses_cached_affine_metric:
         lines.append(
-            "    s_t bgeom_metric_data[%d][VS];"
-            % gradient_metric.metric_components
+            "    s_t bgeom_metric_data[%d]%s;"
+            % (gradient_metric.metric_components, _wi_extent())
         )
     lines.extend(
         [
-            "    s_t boutput[NC * NS][VS];",
+            "    s_t boutput[NC * NS]%s;" % _wi_extent(),
         ]
     )
     # The element loop runs four phases.  MeshPhasePlan states which and in
@@ -7552,9 +7750,9 @@ def _mesh_operator_source(
         geometry.extend(
             _geometry_metric_grouping_lines(
                 dim,
-                ('bageom_streams[%d]' + _wi())
+                ('bageom_streams[%d]' + _ptr())
                 % affine_geometry_stream_indices["det0"],
-                lambda component: ('bageom_streams[%d]' + _wi())
+                lambda component: ('bageom_streams[%d]' + _ptr())
                 % affine_geometry_stream_indices["adj%d" % component],
                 lambda component: ('bgeom_metric_data[%d]' + _wi()) % component,
                 "      ",
@@ -7590,8 +7788,8 @@ def _mesh_operator_source(
     local_call.extend(
         [
             "",
-            "    %s<s_t, NQ, NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "    %s%s(%s);"
+            % (block_function, _micro_kernel_template(), ", ".join(call_args)),
             "",
         ]
     )
@@ -8315,8 +8513,8 @@ def _nested_element_matrix_fill_lines(
             "%s      boutput[stream][0] = s_t(0);" % indent,
             "%s    }" % indent,
             "%s    bdirection[trial][0] = s_t(1);" % indent,
-            "%s    %s<s_t, NQ, NS, VS>(%s);"
-            % (indent, block_function, ", ".join(call_args)),
+            "%s    %s%s(%s);"
+            % (indent, block_function, _micro_kernel_template(), ", ".join(call_args)),
             "%s    for (int test_component = 0; test_component < %d; ++test_component) {"
             % (indent, n_fields),
             "%s      for (int test_node = 0; test_node < %d; ++test_node) {"
@@ -8365,8 +8563,13 @@ def _element_matrix_fill_lines(
     """
     if element_matrix_kernel is not None:
         return [
-            "%s%s<s_t, NQ, NS, VS>(%s);"
-            % (indent, element_matrix_kernel, ", ".join(element_matrix_args))
+            "%s%s%s(%s);"
+            % (
+                indent,
+                element_matrix_kernel,
+                _micro_kernel_template(),
+                ", ".join(element_matrix_args),
+            )
         ]
     # Nested where the mapping decomposes, tabulated where it does not.
     # `component_major_index_decomposition` is the question, so this site walks
@@ -8685,22 +8888,22 @@ def _scalar_crs_matrix_assembly_source(
             "    const int ne = 1;",
             "    idx_t ev[NS];",
             "    s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
-            *([] if is_affine_assembly else ["    s_t bcoordinates[ND * NS][VS];"]),
-            "    s_t badjugate_data[ND * ND][NQ * VS];",
-            "    s_t bdeterminant[NQ * VS];",
+            *([] if is_affine_assembly else ["    s_t bcoordinates[ND * NS]%s;" % _wi_extent()]),
+            "    s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+            "    s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
     for role in live_field_roles(state_dependencies):
         lines.append(
-            "    s_t b%s[N_STREAMS][VS];" % role.name
+            "    s_t b%s[N_STREAMS]%s;" % (role.name, _wi_extent())
         )
     if not serves_this_matrix:
         # The direction and the answer to applying the operator to it exist
         # only for probing.  A closed-form element applies nothing.
         lines.extend(
             [
-                "    s_t bdirection[N_STREAMS][VS];",
-                "    s_t boutput[N_STREAMS][VS];",
+                "    s_t bdirection[N_STREAMS]%s;" % _wi_extent(),
+                "    s_t boutput[N_STREAMS]%s;" % _wi_extent(),
             ]
         )
     lines.extend(
@@ -8730,7 +8933,7 @@ def _scalar_crs_matrix_assembly_source(
                 if is_affine_assembly
                 else [
                     "      for (int d = 0; d < ND; ++d) {",
-                    "        bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);",
+                    "        bcoordinates[shape * ND + d]%s = s_t(coordinate_components[d][coordinate_node]);" % _first_slot(),
                     "      }",
                 ]
             ),
@@ -8744,14 +8947,26 @@ def _scalar_crs_matrix_assembly_source(
                 lines.append("      const idx_t field_node = %s[shape][element];" % field_element_array)
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "      b%s[shape * NC + %d][0] = %s[field_node * %s];"
-                    % (role.name, field_index, role.field_pointer(field.name), role.stride)
+                    "      b%s[shape * NC + %d]%s = %s[field_node * %s];"
+                    % (
+                        role.name,
+                        field_index,
+                        _first_slot(),
+                        role.field_pointer(field.name),
+                        role.stride,
+                    )
                 )
         else:
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "      b%s[shape * NC + %d][0] = %s[node * %s];"
-                    % (role.name, field_index, role.field_pointer(field.name), role.stride)
+                    "      b%s[shape * NC + %d]%s = %s[node * %s];"
+                    % (
+                        role.name,
+                        field_index,
+                        _first_slot(),
+                        role.field_pointer(field.name),
+                        role.stride,
+                    )
                 )
     lines.extend(
         [
@@ -9087,21 +9302,20 @@ def _scalar_crs_matrix_assembly_source(
                 "      for (ptrdiff_t element = e_start; element < e_end; ++element) {",
                 "        const int ne = 1;",
                 "        s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
-                "        s_t bcoordinates[ND * NS][VS];",
-                "        s_t badjugate_data[ND * ND][NQ * VS];",
-                "        s_t bdeterminant[NQ * VS];",
+                "        s_t bcoordinates[ND * NS]%s;" % _wi_extent(),
+                "        s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+                "        s_t bdeterminant[%s];" % _width_product("NQ"),
             ]
         )
         for role in live_field_roles(state_dependencies):
             lines.append(
-                "        s_t b%s[N_STREAMS][VS];"
-                % role.name
+                "        s_t b%s[N_STREAMS]%s;" % (role.name, _wi_extent())
             )
         if not serves_this_matrix:
             lines.extend(
                 [
-                    "        s_t bdirection[N_STREAMS][VS];",
-                    "        s_t boutput[N_STREAMS][VS];",
+                    "        s_t bdirection[N_STREAMS]%s;" % _wi_extent(),
+                    "        s_t boutput[N_STREAMS]%s;" % _wi_extent(),
                 ]
             )
         lines.extend(
@@ -9111,7 +9325,7 @@ def _scalar_crs_matrix_assembly_source(
                 "          const uint16_t packed_node = elements[shape][element];",
                 "          const uint16_t coordinate_packed_node = %s[shape][element];" % packed_coordinate_element_array,
                 "          for (int d = 0; d < ND; ++d) {",
-                "            bcoordinates[shape * ND + d][0] = pk_coordinates[d * max_nodes_per_pack + coordinate_packed_node];",
+                "            bcoordinates[shape * ND + d]%s = pk_coordinates[d * max_nodes_per_pack + coordinate_packed_node];" % _first_slot(),
                 "        }",
             ]
         )
@@ -9121,13 +9335,13 @@ def _scalar_crs_matrix_assembly_source(
                     lines.append("          const uint16_t field_packed_node = %s[shape][element];" % packed_field_element_array)
                 for field_index in range(len(system.fields)):
                     lines.append(
-                        "          b%s[shape * NC + %d][0] = pk_%s[%d * max_nodes_per_pack + field_packed_node];"
+                        "          b%s[shape * NC + %d]" + _first_slot() + " = pk_%s[%d * max_nodes_per_pack + field_packed_node];"
                         % (role.name, field_index, role.name, field_index)
                     )
             else:
                 for field_index in range(len(system.fields)):
                     lines.append(
-                        "          b%s[shape * NC + %d][0] = pk_%s[%d * max_nodes_per_pack + packed_node];"
+                        "          b%s[shape * NC + %d]" + _first_slot() + " = pk_%s[%d * max_nodes_per_pack + packed_node];"
                         % (role.name, field_index, role.name, field_index)
                     )
         lines.extend(["        }", ""])
@@ -9341,7 +9555,7 @@ def _isoparametric_mesh_operator_source(
             kernel_constant("NQ", n_qp, indent="  "),
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -9368,25 +9582,24 @@ def _isoparametric_mesh_operator_source(
         [
             "",
             *_mesh_loop_lines(),
-            "    s_t bcoordinates[%d * NS][VS];"
-            % dim,
-            "    s_t badjugate_data[%d][NQ * VS];"
-            % (dim * dim),
-            "    s_t bdeterminant[NQ * VS];",
+            "    s_t bcoordinates[%d * NS]%s;" % (dim, _wi_extent()),
+            "    s_t badjugate_data[%d][%s];"
+            % (dim * dim, _width_product("NQ")),
+            "    s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "    s_t b%s[NC * NS][VS];" % role.name
+            "    s_t b%s[NC * NS]%s;" % (role.name, _wi_extent())
         )
     if gradient_metric is not None:
         lines.append(
-            "    s_t bgeom_metric_data[%d][NQ * VS];"
-            % gradient_metric.metric_components
+            "    s_t bgeom_metric_data[%d][%s];"
+            % (gradient_metric.metric_components, _width_product("NQ"))
         )
     lines.extend(
         [
-            "    s_t boutput[NC * NS][VS];",
+            "    s_t boutput[NC * NS]%s;" % _wi_extent(),
         ]
     )
     lines.extend(["", *_coordinate_gather_lines(dim, "    ", coordinate_element_array)])
@@ -9445,7 +9658,7 @@ def _isoparametric_mesh_operator_source(
                 "",
                 *quadrature_scope_lines(rule.element_type, "    "),
                 *_work_item_loop_lines("      "),
-                "        const ptrdiff_t goff = %s;" % _offset("q", "VS"),
+                "        const ptrdiff_t goff = %s;" % _block_offset("q"),
             ]
         )
         lines.extend(
@@ -9483,7 +9696,7 @@ def _isoparametric_mesh_operator_source(
                 ),
             )
         )
-    call_args = ["ne", "VS"]
+    call_args = ["ne", _work_item_block_stride()]
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
@@ -9497,8 +9710,8 @@ def _isoparametric_mesh_operator_source(
     lines.extend(
         [
             "",
-            "    %s<s_t, NQ, NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "    %s%s(%s);"
+            % (block_function, _micro_kernel_template(), ", ".join(call_args)),
             "",
         ]
     )
@@ -9615,7 +9828,7 @@ def _scalar_packed_jacobian_action_source(
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
             kernel_constant("N_STREAMS", "NC * NS", indent="  "),
-            kernel_constant("VS", current_target().effective_vector_size(specialization.vector_size), indent="  "),
+            *_width_constant_lines(current_target().effective_vector_size(specialization.vector_size)),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -9697,19 +9910,19 @@ def _scalar_packed_jacobian_action_source(
             "",
             "      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
             "        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
-            "        s_t bcoordinates[ND * NS][VS];",
-            "        s_t badjugate_data[ND * ND][NQ * VS];",
-            "        s_t bdeterminant[NQ * VS];",
+            "        s_t bcoordinates[ND * NS]%s;" % _wi_extent(),
+            "        s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+            "        s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.append(
-            "        s_t b%s[N_STREAMS][VS];" % role.name
+            "        s_t b%s[N_STREAMS]%s;" % (role.name, _wi_extent())
         )
     lines.extend(
         [
-            "        s_t bdirection[N_STREAMS][VS];",
-            "        s_t boutput[N_STREAMS][VS];",
+            "        s_t bdirection[N_STREAMS]%s;" % _wi_extent(),
+            "        s_t boutput[N_STREAMS]%s;" % _wi_extent(),
             "",
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR coordinate_shape = %s[shape];" % coordinate_element_array,
@@ -9787,7 +10000,7 @@ def _scalar_packed_jacobian_action_source(
     lines.extend(
         _blocked_adjugate_array_lines(dependencies, dim, "ND * ND", "        ")
     )
-    call_args = ["ne", "VS"]
+    call_args = ["ne", _work_item_block_stride()]
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
@@ -9801,8 +10014,8 @@ def _scalar_packed_jacobian_action_source(
     lines.extend(
         [
             "",
-            "        %s<s_t, NQ, NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "        %s%s(%s);"
+            % (block_function, _micro_kernel_template(), ", ".join(call_args)),
             "",
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR field_shape = %s[shape];"
@@ -10035,7 +10248,7 @@ def _scalar_packed_affine_jacobian_action_source(
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
             kernel_constant("N_STREAMS", "NC * NS", indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
             discard_unused("max_nodes_per_pack", indent="  "),
         ]
@@ -10114,12 +10327,12 @@ def _scalar_packed_affine_jacobian_action_source(
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.append(
-            "        s_t b%s[N_STREAMS][VS];" % role.name
+            "        s_t b%s[N_STREAMS]%s;" % (role.name, _wi_extent())
         )
     lines.extend(
         [
-            "        s_t bdirection[N_STREAMS][VS];",
-            "        s_t boutput[N_STREAMS][VS];",
+            "        s_t bdirection[N_STREAMS]%s;" % _wi_extent(),
+            "        s_t boutput[N_STREAMS]%s;" % _wi_extent(),
             "",
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
@@ -10166,16 +10379,16 @@ def _scalar_packed_affine_jacobian_action_source(
         )
     elif gradient_metric is not None:
         lines.append(
-            "        s_t bgeom_metric_data[%d][VS];"
-            % gradient_metric.metric_components
+            "        s_t bgeom_metric_data[%d]%s;"
+            % (gradient_metric.metric_components, _wi_extent())
         )
         lines.extend(["", *_work_item_loop_lines("        ")])
         lines.extend(
             _geometry_metric_grouping_lines(
                 dim,
-                ('bageom_streams[%d]' + _wi())
+                ('bageom_streams[%d]' + _ptr())
                 % affine_geometry_stream_indices["det0"],
-                lambda component: ('bageom_streams[%d]' + _wi())
+                lambda component: ('bageom_streams[%d]' + _ptr())
                 % affine_geometry_stream_indices["adj%d" % component],
                 lambda component: ('bgeom_metric_data[%d]' + _wi()) % component,
                 "          ",
@@ -10211,8 +10424,8 @@ def _scalar_packed_affine_jacobian_action_source(
     lines.extend(
         [
             "",
-            "        %s<s_t, NQ, NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "        %s%s(%s);"
+            % (block_function, _micro_kernel_template(), ", ".join(call_args)),
             "",
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
@@ -10351,7 +10564,7 @@ def _isoparametric_jacobian_terms(rule, dim, n_shape, row, col):
 #: stride with either.
 _ISOPARAMETRIC_GEOMETRY_INDEX = {
     True: lambda: _wi().strip("[]"),
-    False: lambda: _offset("q", "VS"),
+    False: lambda: _block_offset("q"),
 }
 
 

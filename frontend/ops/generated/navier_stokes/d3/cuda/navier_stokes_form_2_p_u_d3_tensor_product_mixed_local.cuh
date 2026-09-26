@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int CELL_NS, int VS>
+template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -51,25 +51,25 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_p_u_d3_tensor_prod
   static_assert(ipow(U_NS1, ND) == U_NS, "U_NS must be tensor-product compatible");
   static constexpr int P_NS1 = integer_root(P_NS, ND);
   static_assert(ipow(P_NS1, ND) == P_NS, "P_NS must be tensor-product compatible");
-  s_t direction_u0_value[NQ * VS];
-  s_t direction_u0_grad_ref[NQ * ND * VS];
+  s_t direction_u0_value[NQ];
+  s_t direction_u0_grad_ref[NQ * ND];
   const s_t *const direction_u0_streams[U_NS] = {direction[0], direction[1], direction[2], direction[3], direction[4], direction[5], direction[6], direction[7], direction[8], direction[9], direction[10], direction[11], direction[12], direction[13], direction[14], direction[15], direction[16], direction[17], direction[18], direction[19], direction[20], direction[21], direction[22], direction[23], direction[24], direction[25], direction[26]};
   tensor_evaluate_scalar<s_t, NQ, U_NS, ND, 1>(
       field_shape_1d[0], field_grad_1d[0], direction_u0_streams, direction_u0_value, direction_u0_grad_ref);
-  s_t direction_u1_value[NQ * VS];
-  s_t direction_u1_grad_ref[NQ * ND * VS];
+  s_t direction_u1_value[NQ];
+  s_t direction_u1_grad_ref[NQ * ND];
   const s_t *const direction_u1_streams[U_NS] = {direction[27], direction[28], direction[29], direction[30], direction[31], direction[32], direction[33], direction[34], direction[35], direction[36], direction[37], direction[38], direction[39], direction[40], direction[41], direction[42], direction[43], direction[44], direction[45], direction[46], direction[47], direction[48], direction[49], direction[50], direction[51], direction[52], direction[53]};
   tensor_evaluate_scalar<s_t, NQ, U_NS, ND, 1>(
       field_shape_1d[0], field_grad_1d[0], direction_u1_streams, direction_u1_value, direction_u1_grad_ref);
-  s_t direction_u2_value[NQ * VS];
-  s_t direction_u2_grad_ref[NQ * ND * VS];
+  s_t direction_u2_value[NQ];
+  s_t direction_u2_grad_ref[NQ * ND];
   const s_t *const direction_u2_streams[U_NS] = {direction[54], direction[55], direction[56], direction[57], direction[58], direction[59], direction[60], direction[61], direction[62], direction[63], direction[64], direction[65], direction[66], direction[67], direction[68], direction[69], direction[70], direction[71], direction[72], direction[73], direction[74], direction[75], direction[76], direction[77], direction[78], direction[79], direction[80]};
   tensor_evaluate_scalar<s_t, NQ, U_NS, ND, 1>(
       field_shape_1d[0], field_grad_1d[0], direction_u2_streams, direction_u2_value, direction_u2_grad_ref);
-  s_t u0_value_coeff[NQ * VS];
-  s_t u1_value_coeff[NQ * VS];
-  s_t u2_value_coeff[NQ * VS];
-  s_t p_value_coeff[NQ * VS];
+  s_t u0_value_coeff[NQ];
+  s_t u1_value_coeff[NQ];
+  s_t u2_value_coeff[NQ];
+  s_t p_value_coeff[NQ];
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -85,19 +85,19 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_p_u_d3_tensor_prod
     const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
     const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
     const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
-    const s_t *const RSTR direction_u0_grad_ref_q0 = &direction_u0_grad_ref[(q * ND + 0) * VS];
-    const s_t *const RSTR direction_u0_grad_ref_q1 = &direction_u0_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_u0_grad_ref_q2 = &direction_u0_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR direction_u1_grad_ref_q0 = &direction_u1_grad_ref[(q * ND + 0) * VS];
-    const s_t *const RSTR direction_u1_grad_ref_q1 = &direction_u1_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_u1_grad_ref_q2 = &direction_u1_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR direction_u2_grad_ref_q0 = &direction_u2_grad_ref[(q * ND + 0) * VS];
-    const s_t *const RSTR direction_u2_grad_ref_q1 = &direction_u2_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_u2_grad_ref_q2 = &direction_u2_grad_ref[(q * ND + 2) * VS];
-    s_t *const RSTR u0_value_coeff_q = &u0_value_coeff[q * VS];
-    s_t *const RSTR u1_value_coeff_q = &u1_value_coeff[q * VS];
-    s_t *const RSTR u2_value_coeff_q = &u2_value_coeff[q * VS];
-    s_t *const RSTR p_value_coeff_q = &p_value_coeff[q * VS];
+    const s_t *const RSTR direction_u0_grad_ref_q0 = &direction_u0_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_u0_grad_ref_q1 = &direction_u0_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_u0_grad_ref_q2 = &direction_u0_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR direction_u1_grad_ref_q0 = &direction_u1_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_u1_grad_ref_q1 = &direction_u1_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_u1_grad_ref_q2 = &direction_u1_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR direction_u2_grad_ref_q0 = &direction_u2_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_u2_grad_ref_q1 = &direction_u2_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_u2_grad_ref_q2 = &direction_u2_grad_ref[(q * ND + 2)];
+    s_t *const RSTR u0_value_coeff_q = &u0_value_coeff[q];
+    s_t *const RSTR u1_value_coeff_q = &u1_value_coeff[q];
+    s_t *const RSTR u2_value_coeff_q = &u2_value_coeff[q];
+    s_t *const RSTR p_value_coeff_q = &p_value_coeff[q];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -142,7 +142,7 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_p_u_d3_tensor_prod
       field_shape_1d[1], p_value_coeff, p_output_streams);
 }
 
-template <typename s_t, int NQ, int CELL_NS, int VS>
+template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_form_2_p_u_d3_tensor_product_mixed_jacobian_action_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -151,8 +151,8 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_p_u_d3_tensor_prod
     const s_t *const RSTR field_shape_1d[2],
     const s_t *const RSTR field_grad_1d[2],
     const s_t *const RSTR q_weight_1d,
-    const s_t direction[89][VS],
-    s_t output[89][VS]
+    const s_t direction[89],
+    s_t output[89]
 ) {
   static constexpr int ND = 3;
   static constexpr int U_NS = 27;
@@ -163,22 +163,22 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_p_u_d3_tensor_prod
   static_assert(ipow(U_NS1, ND) == U_NS, "U_NS must be tensor-product compatible");
   static constexpr int P_NS1 = integer_root(P_NS, ND);
   static_assert(ipow(P_NS1, ND) == P_NS, "P_NS must be tensor-product compatible");
-  s_t direction_u0_value[NQ * VS];
-  s_t direction_u0_grad_ref[NQ * ND * VS];
+  s_t direction_u0_value[NQ];
+  s_t direction_u0_grad_ref[NQ * ND];
   tensor_evaluate_contiguous_scalar<s_t, NQ, U_NS, ND, 1>(
       field_shape_1d[0], field_grad_1d[0], direction + 0, direction_u0_value, direction_u0_grad_ref);
-  s_t direction_u1_value[NQ * VS];
-  s_t direction_u1_grad_ref[NQ * ND * VS];
+  s_t direction_u1_value[NQ];
+  s_t direction_u1_grad_ref[NQ * ND];
   tensor_evaluate_contiguous_scalar<s_t, NQ, U_NS, ND, 1>(
       field_shape_1d[0], field_grad_1d[0], direction + 27, direction_u1_value, direction_u1_grad_ref);
-  s_t direction_u2_value[NQ * VS];
-  s_t direction_u2_grad_ref[NQ * ND * VS];
+  s_t direction_u2_value[NQ];
+  s_t direction_u2_grad_ref[NQ * ND];
   tensor_evaluate_contiguous_scalar<s_t, NQ, U_NS, ND, 1>(
       field_shape_1d[0], field_grad_1d[0], direction + 54, direction_u2_value, direction_u2_grad_ref);
-  s_t u0_value_coeff[NQ * VS];
-  s_t u1_value_coeff[NQ * VS];
-  s_t u2_value_coeff[NQ * VS];
-  s_t p_value_coeff[NQ * VS];
+  s_t u0_value_coeff[NQ];
+  s_t u1_value_coeff[NQ];
+  s_t u2_value_coeff[NQ];
+  s_t p_value_coeff[NQ];
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
     const int qy = (q / NQ1) % NQ1;
@@ -194,19 +194,19 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_p_u_d3_tensor_prod
     const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
     const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
     const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
-    const s_t *const RSTR direction_u0_grad_ref_q0 = &direction_u0_grad_ref[(q * ND + 0) * VS];
-    const s_t *const RSTR direction_u0_grad_ref_q1 = &direction_u0_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_u0_grad_ref_q2 = &direction_u0_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR direction_u1_grad_ref_q0 = &direction_u1_grad_ref[(q * ND + 0) * VS];
-    const s_t *const RSTR direction_u1_grad_ref_q1 = &direction_u1_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_u1_grad_ref_q2 = &direction_u1_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR direction_u2_grad_ref_q0 = &direction_u2_grad_ref[(q * ND + 0) * VS];
-    const s_t *const RSTR direction_u2_grad_ref_q1 = &direction_u2_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_u2_grad_ref_q2 = &direction_u2_grad_ref[(q * ND + 2) * VS];
-    s_t *const RSTR u0_value_coeff_q = &u0_value_coeff[q * VS];
-    s_t *const RSTR u1_value_coeff_q = &u1_value_coeff[q * VS];
-    s_t *const RSTR u2_value_coeff_q = &u2_value_coeff[q * VS];
-    s_t *const RSTR p_value_coeff_q = &p_value_coeff[q * VS];
+    const s_t *const RSTR direction_u0_grad_ref_q0 = &direction_u0_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_u0_grad_ref_q1 = &direction_u0_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_u0_grad_ref_q2 = &direction_u0_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR direction_u1_grad_ref_q0 = &direction_u1_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_u1_grad_ref_q1 = &direction_u1_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_u1_grad_ref_q2 = &direction_u1_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR direction_u2_grad_ref_q0 = &direction_u2_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_u2_grad_ref_q1 = &direction_u2_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_u2_grad_ref_q2 = &direction_u2_grad_ref[(q * ND + 2)];
+    s_t *const RSTR u0_value_coeff_q = &u0_value_coeff[q];
+    s_t *const RSTR u1_value_coeff_q = &u1_value_coeff[q];
+    s_t *const RSTR u2_value_coeff_q = &u2_value_coeff[q];
+    s_t *const RSTR p_value_coeff_q = &p_value_coeff[q];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];

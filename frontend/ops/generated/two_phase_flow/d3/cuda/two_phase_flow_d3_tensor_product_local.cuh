@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_residual_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -71,15 +71,15 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_residu
 ) {
   static constexpr int ND = 3;
   static constexpr int NC = 2;
-  s_t current_value[NC * NQ * VS];
-  s_t current_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
-  s_t previous_value[NC * NQ * VS];
-  tensor_evaluate_value<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, previous, previous_value);
-  s_t value_coeff[NC * NQ * VS];
-  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  s_t current_value[NC * NQ];
+  s_t current_grad_ref[NC * NQ * ND];
+  tensor_evaluate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t previous_value[NC * NQ];
+  tensor_evaluate_value_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, previous, previous_value);
+  s_t value_coeff[NC * NQ];
+  s_t grad_coeff_ref[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -96,24 +96,24 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_residu
     const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
     const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
     const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
-    const s_t *const RSTR current_value_q0 = &current_value[q * VS];
-    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q0_2 = &current_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR previous_value_q0 = &previous_value[q * VS];
-    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q) * VS];
-    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2) * VS];
-    const s_t *const RSTR previous_value_q1 = &previous_value[(NQ + q) * VS];
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2) * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2) * VS];
+    const s_t *const RSTR current_value_q0 = &current_value[q];
+    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND)];
+    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q0_2 = &current_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR previous_value_q0 = &previous_value[q];
+    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q)];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2)];
+    const s_t *const RSTR previous_value_q1 = &previous_value[(NQ + q)];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2)];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
+    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2)];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -174,11 +174,11 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_residu
       grad_coeff_ref_q1_2[0] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
     }
   }
-  tensor_integrate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_residual_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -187,8 +187,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_residu
     const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
     const s_t *const RSTR q_weight_1d,
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
     const s_t C_ka1,
     const s_t C_ka2,
     const s_t C_kw1,
@@ -215,19 +215,19 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_residu
     const s_t p_wr,
     const s_t porosity,
     const s_t rho_w0,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int ND = 3;
   static constexpr int NC = 2;
-  s_t current_value[NC * NQ * VS];
-  s_t current_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
-  s_t previous_value[NC * NQ * VS];
-  tensor_evaluate_value_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, previous, previous_value);
-  s_t value_coeff[NC * NQ * VS];
-  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  s_t current_value[NC * NQ];
+  s_t current_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t previous_value[NC * NQ];
+  tensor_evaluate_value_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, previous, previous_value);
+  s_t value_coeff[NC * NQ];
+  s_t grad_coeff_ref[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -244,24 +244,24 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_residu
     const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
     const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
     const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
-    const s_t *const RSTR current_value_q0 = &current_value[q * VS];
-    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q0_2 = &current_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR previous_value_q0 = &previous_value[q * VS];
-    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q) * VS];
-    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2) * VS];
-    const s_t *const RSTR previous_value_q1 = &previous_value[(NQ + q) * VS];
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2) * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2) * VS];
+    const s_t *const RSTR current_value_q0 = &current_value[q];
+    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND)];
+    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q0_2 = &current_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR previous_value_q0 = &previous_value[q];
+    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q)];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2)];
+    const s_t *const RSTR previous_value_q1 = &previous_value[(NQ + q)];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2)];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
+    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2)];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -322,11 +322,11 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_residu
       grad_coeff_ref_q1_2[0] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
     }
   }
-  tensor_integrate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  tensor_integrate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_jacobian_action_block(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -367,16 +367,16 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_jacobi
 ) {
   static constexpr int ND = 3;
   static constexpr int NC = 2;
-  s_t current_value[NC * NQ * VS];
-  s_t current_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
-  s_t direction_value[NC * NQ * VS];
-  s_t direction_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, direction, direction_value, direction_grad_ref);
-  s_t value_coeff[NC * NQ * VS];
-  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  s_t current_value[NC * NQ];
+  s_t current_grad_ref[NC * NQ * ND];
+  tensor_evaluate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t direction_value[NC * NQ];
+  s_t direction_grad_ref[NC * NQ * ND];
+  tensor_evaluate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, direction, direction_value, direction_grad_ref);
+  s_t value_coeff[NC * NQ];
+  s_t grad_coeff_ref[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -393,30 +393,30 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_jacobi
     const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
     const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
     const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
-    const s_t *const RSTR current_value_q0 = &current_value[q * VS];
-    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q0_2 = &current_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR direction_value_q0 = &direction_value[q * VS];
-    const s_t *const RSTR direction_grad_ref_q0_0 = &direction_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR direction_grad_ref_q0_1 = &direction_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_grad_ref_q0_2 = &direction_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q) * VS];
-    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2) * VS];
-    const s_t *const RSTR direction_value_q1 = &direction_value[(NQ + q) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_0 = &direction_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_1 = &direction_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_2 = &direction_grad_ref[((NQ + q) * ND + 2) * VS];
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2) * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2) * VS];
+    const s_t *const RSTR current_value_q0 = &current_value[q];
+    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND)];
+    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q0_2 = &current_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR direction_value_q0 = &direction_value[q];
+    const s_t *const RSTR direction_grad_ref_q0_0 = &direction_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_grad_ref_q0_1 = &direction_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_grad_ref_q0_2 = &direction_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q)];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2)];
+    const s_t *const RSTR direction_value_q1 = &direction_value[(NQ + q)];
+    const s_t *const RSTR direction_grad_ref_q1_0 = &direction_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR direction_grad_ref_q1_1 = &direction_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR direction_grad_ref_q1_2 = &direction_grad_ref[((NQ + q) * ND + 2)];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2)];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
+    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2)];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -552,11 +552,11 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_jacobi
       grad_coeff_ref_q1_2[0] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
     }
   }
-  tensor_integrate<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_jacobian_action_block_contiguous(
     const int ne,
     const ptrdiff_t geometry_stride,
@@ -565,8 +565,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_jacobi
     const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
     const s_t *const RSTR q_weight_1d,
-    const s_t current[2 * NS][VS],
-    const s_t direction[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t direction[2 * NS],
     const s_t C_ka1,
     const s_t C_ka2,
     const s_t C_kw1,
@@ -593,20 +593,20 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_jacobi
     const s_t p_wr,
     const s_t porosity,
     const s_t rho_w0,
-    s_t output[2 * NS][VS]
+    s_t output[2 * NS]
 ) {
   static constexpr int ND = 3;
   static constexpr int NC = 2;
-  s_t current_value[NC * NQ * VS];
-  s_t current_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, current, current_value, current_grad_ref);
-  s_t direction_value[NC * NQ * VS];
-  s_t direction_grad_ref[NC * NQ * ND * VS];
-  tensor_evaluate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, direction, direction_value, direction_grad_ref);
-  s_t value_coeff[NC * NQ * VS];
-  s_t grad_coeff_ref[NC * NQ * ND * VS];
+  s_t current_value[NC * NQ];
+  s_t current_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, current, current_value, current_grad_ref);
+  s_t direction_value[NC * NQ];
+  s_t direction_grad_ref[NC * NQ * ND];
+  tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, direction, direction_value, direction_grad_ref);
+  s_t value_coeff[NC * NQ];
+  s_t grad_coeff_ref[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -623,30 +623,30 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_jacobi
     const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
     const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
     const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
-    const s_t *const RSTR current_value_q0 = &current_value[q * VS];
-    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q0_2 = &current_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR direction_value_q0 = &direction_value[q * VS];
-    const s_t *const RSTR direction_grad_ref_q0_0 = &direction_grad_ref[(q * ND) * VS];
-    const s_t *const RSTR direction_grad_ref_q0_1 = &direction_grad_ref[(q * ND + 1) * VS];
-    const s_t *const RSTR direction_grad_ref_q0_2 = &direction_grad_ref[(q * ND + 2) * VS];
-    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q) * VS];
-    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2) * VS];
-    const s_t *const RSTR direction_value_q1 = &direction_value[(NQ + q) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_0 = &direction_grad_ref[((NQ + q) * ND) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_1 = &direction_grad_ref[((NQ + q) * ND + 1) * VS];
-    const s_t *const RSTR direction_grad_ref_q1_2 = &direction_grad_ref[((NQ + q) * ND + 2) * VS];
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1) * VS];
-    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2) * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1) * VS];
-    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2) * VS];
+    const s_t *const RSTR current_value_q0 = &current_value[q];
+    const s_t *const RSTR current_grad_ref_q0_0 = &current_grad_ref[(q * ND)];
+    const s_t *const RSTR current_grad_ref_q0_1 = &current_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q0_2 = &current_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR direction_value_q0 = &direction_value[q];
+    const s_t *const RSTR direction_grad_ref_q0_0 = &direction_grad_ref[(q * ND)];
+    const s_t *const RSTR direction_grad_ref_q0_1 = &direction_grad_ref[(q * ND + 1)];
+    const s_t *const RSTR direction_grad_ref_q0_2 = &direction_grad_ref[(q * ND + 2)];
+    const s_t *const RSTR current_value_q1 = &current_value[(NQ + q)];
+    const s_t *const RSTR current_grad_ref_q1_0 = &current_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR current_grad_ref_q1_1 = &current_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR current_grad_ref_q1_2 = &current_grad_ref[((NQ + q) * ND + 2)];
+    const s_t *const RSTR direction_value_q1 = &direction_value[(NQ + q)];
+    const s_t *const RSTR direction_grad_ref_q1_0 = &direction_grad_ref[((NQ + q) * ND)];
+    const s_t *const RSTR direction_grad_ref_q1_1 = &direction_grad_ref[((NQ + q) * ND + 1)];
+    const s_t *const RSTR direction_grad_ref_q1_2 = &direction_grad_ref[((NQ + q) * ND + 2)];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
+    s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
+    s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2)];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
+    s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
+    s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2)];
     {
       const s_t det = det_q[0];
       const s_t adj0 = adj_q0[0];
@@ -782,8 +782,8 @@ __host__ __device__ __forceinline__ void two_phase_flow_d3_tensor_product_jacobi
       grad_coeff_ref_q1_2[0] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
     }
   }
-  tensor_integrate_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
+  tensor_integrate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, grad_1d, value_coeff, grad_coeff_ref, output);
 }
 
 } // namespace codegen

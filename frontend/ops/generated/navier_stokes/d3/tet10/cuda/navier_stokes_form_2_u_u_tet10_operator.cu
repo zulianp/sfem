@@ -27,7 +27,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -36,15 +36,13 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
-  {
-    converted[0] = s_t(source[0]);
-  }
+  converted[0] = s_t(source[0]);
   return converted;
 }
 
@@ -192,23 +190,22 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_mixed
   static constexpr int CELL_NS = 10;
   static constexpr int NC = 1;
   static constexpr int N_FIELD_STREAMS = 30;
-  static constexpr int VS = 16;
   const s_t *const field_shape[NC] = {sfem::codegen::ref_tet10_q11<s_t>::shape()};
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z()};
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    s_t bprevious[N_FIELD_STREAMS][VS];
-    s_t bdirection[N_FIELD_STREAMS][VS];
-    s_t boutput[N_FIELD_STREAMS][VS];
+    s_t bprevious[N_FIELD_STREAMS];
+    s_t bdirection[N_FIELD_STREAMS];
+    s_t boutput[N_FIELD_STREAMS];
 
     for (int local_shape = 0; local_shape < 10; ++local_shape) {
       const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 0 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[0][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[0][node * direction_stride];
+        bprevious[stream] = u_old_data[0][node * previous_stride];
+        bdirection[stream] = u_direction_data[0][node * direction_stride];
       }
     }
     for (int local_shape = 0; local_shape < 10; ++local_shape) {
@@ -216,8 +213,8 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_mixed
       const int stream = 10 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[1][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[1][node * direction_stride];
+        bprevious[stream] = u_old_data[1][node * previous_stride];
+        bdirection[stream] = u_direction_data[1][node * direction_stride];
       }
     }
     for (int local_shape = 0; local_shape < 10; ++local_shape) {
@@ -225,37 +222,37 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_mixed
       const int stream = 20 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[2][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[2][node * direction_stride];
+        bprevious[stream] = u_old_data[2][node * previous_stride];
+        bdirection[stream] = u_direction_data[2][node * direction_stride];
       }
     }
 
     for (int stream = 0; stream < 30; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
     const g_t *const affine_geometry_sources[10] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_adj4 + evb, g_adj5 + evb, g_adj6 + evb, g_adj7 + evb, g_adj8 + evb, g_det0 + evb};
-    s_t baffine_geometry_data[10][VS];
+    s_t baffine_geometry_data[10];
     const s_t *bageom_streams[10];
     for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t>(
+          ne, affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
     }
     const s_t *badjugate[ND * ND];
     for (int component = 0; component < ND * ND; ++component) {
       badjugate[component] = bageom_streams[component];
     }
 
-    navier_stokes_form_2_u_u_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[9], badjugate, field_shape, fgref, sfem::codegen::quad_tet_q11<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
+    navier_stokes_form_2_u_u_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS>(ne, 0, bageom_streams[9], badjugate, field_shape, fgref, sfem::codegen::quad_tet_q11<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 10; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -264,8 +261,8 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_mixed
       for (int local_shape = 0; local_shape < 10; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 10 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -274,8 +271,8 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_affine_mesh_mixed
       for (int local_shape = 0; local_shape < 10; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 20 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -357,18 +354,17 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mes
   static constexpr int NS = CELL_NS;
   static constexpr int NC = 1;
   static constexpr int N_FIELD_STREAMS = 30;
-  static constexpr int VS = 16;
   const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_cell_grad_ref_2 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    s_t bcoordinates[ND * CELL_NS][VS];
-    s_t badjugate_data[ND * ND][NQ * VS];
-    s_t bdeterminant[NQ * VS];
-    s_t bprevious[N_FIELD_STREAMS][VS];
-    s_t bdirection[N_FIELD_STREAMS][VS];
-    s_t boutput[N_FIELD_STREAMS][VS];
+    s_t bcoordinates[ND * CELL_NS];
+    s_t badjugate_data[ND * ND][NQ];
+    s_t bdeterminant[NQ];
+    s_t bprevious[N_FIELD_STREAMS];
+    s_t bdirection[N_FIELD_STREAMS];
+    s_t boutput[N_FIELD_STREAMS];
 
     const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
     for (int shape = 0; shape < NS; ++shape) {
@@ -376,7 +372,7 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mes
       for (int d = 0; d < ND; ++d) {
         {
           const idx_t node = element_shape[evb];
-          bcoordinates[shape * ND + d][0] = coordinate_components[d][node];
+          bcoordinates[shape * ND + d] = coordinate_components[d][node];
         }
       }
     }
@@ -386,8 +382,8 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mes
       const int stream = 0 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[0][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[0][node * direction_stride];
+        bprevious[stream] = u_old_data[0][node * previous_stride];
+        bdirection[stream] = u_direction_data[0][node * direction_stride];
       }
     }
     for (int local_shape = 0; local_shape < 10; ++local_shape) {
@@ -395,8 +391,8 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mes
       const int stream = 10 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[1][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[1][node * direction_stride];
+        bprevious[stream] = u_old_data[1][node * previous_stride];
+        bdirection[stream] = u_direction_data[1][node * direction_stride];
       }
     }
     for (int local_shape = 0; local_shape < 10; ++local_shape) {
@@ -404,32 +400,32 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mes
       const int stream = 20 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[2][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[2][node * direction_stride];
+        bprevious[stream] = u_old_data[2][node * previous_stride];
+        bdirection[stream] = u_direction_data[2][node * direction_stride];
       }
     }
 
     for (int stream = 0; stream < 30; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
     s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
     for (int q = 0; q < NQ; ++q) {
       {
-        const s_t J00 = bcoordinates[0][0] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[3][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[6][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[9][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[12][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[15][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5] + bcoordinates[18][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 6] + bcoordinates[21][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 7] + bcoordinates[24][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 8] + bcoordinates[27][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 9];
-        const s_t J01 = bcoordinates[0][0] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[3][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[6][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[9][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[12][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[15][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5] + bcoordinates[18][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 6] + bcoordinates[21][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 7] + bcoordinates[24][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 8] + bcoordinates[27][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 9];
-        const s_t J02 = bcoordinates[0][0] * isoparametric_cell_grad_ref_2[q * CELL_NS] + bcoordinates[3][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 1] + bcoordinates[6][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 2] + bcoordinates[9][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 3] + bcoordinates[12][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 4] + bcoordinates[15][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 5] + bcoordinates[18][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 6] + bcoordinates[21][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 7] + bcoordinates[24][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 8] + bcoordinates[27][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 9];
-        const s_t J10 = bcoordinates[1][0] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[4][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[7][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[10][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[13][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[16][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5] + bcoordinates[19][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 6] + bcoordinates[22][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 7] + bcoordinates[25][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 8] + bcoordinates[28][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 9];
-        const s_t J11 = bcoordinates[1][0] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[4][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[7][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[10][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[13][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[16][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5] + bcoordinates[19][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 6] + bcoordinates[22][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 7] + bcoordinates[25][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 8] + bcoordinates[28][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 9];
-        const s_t J12 = bcoordinates[1][0] * isoparametric_cell_grad_ref_2[q * CELL_NS] + bcoordinates[4][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 1] + bcoordinates[7][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 2] + bcoordinates[10][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 3] + bcoordinates[13][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 4] + bcoordinates[16][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 5] + bcoordinates[19][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 6] + bcoordinates[22][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 7] + bcoordinates[25][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 8] + bcoordinates[28][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 9];
-        const s_t J20 = bcoordinates[2][0] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[5][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[8][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[11][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[14][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[17][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5] + bcoordinates[20][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 6] + bcoordinates[23][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 7] + bcoordinates[26][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 8] + bcoordinates[29][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 9];
-        const s_t J21 = bcoordinates[2][0] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[5][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[8][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[11][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[14][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[17][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5] + bcoordinates[20][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 6] + bcoordinates[23][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 7] + bcoordinates[26][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 8] + bcoordinates[29][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 9];
-        const s_t J22 = bcoordinates[2][0] * isoparametric_cell_grad_ref_2[q * CELL_NS] + bcoordinates[5][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 1] + bcoordinates[8][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 2] + bcoordinates[11][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 3] + bcoordinates[14][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 4] + bcoordinates[17][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 5] + bcoordinates[20][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 6] + bcoordinates[23][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 7] + bcoordinates[26][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 8] + bcoordinates[29][0] * isoparametric_cell_grad_ref_2[q * CELL_NS + 9];
+        const s_t J00 = bcoordinates[0] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[3] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[6] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[9] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[12] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[15] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5] + bcoordinates[18] * isoparametric_cell_grad_ref_0[q * CELL_NS + 6] + bcoordinates[21] * isoparametric_cell_grad_ref_0[q * CELL_NS + 7] + bcoordinates[24] * isoparametric_cell_grad_ref_0[q * CELL_NS + 8] + bcoordinates[27] * isoparametric_cell_grad_ref_0[q * CELL_NS + 9];
+        const s_t J01 = bcoordinates[0] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[3] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[6] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[9] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[12] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[15] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5] + bcoordinates[18] * isoparametric_cell_grad_ref_1[q * CELL_NS + 6] + bcoordinates[21] * isoparametric_cell_grad_ref_1[q * CELL_NS + 7] + bcoordinates[24] * isoparametric_cell_grad_ref_1[q * CELL_NS + 8] + bcoordinates[27] * isoparametric_cell_grad_ref_1[q * CELL_NS + 9];
+        const s_t J02 = bcoordinates[0] * isoparametric_cell_grad_ref_2[q * CELL_NS] + bcoordinates[3] * isoparametric_cell_grad_ref_2[q * CELL_NS + 1] + bcoordinates[6] * isoparametric_cell_grad_ref_2[q * CELL_NS + 2] + bcoordinates[9] * isoparametric_cell_grad_ref_2[q * CELL_NS + 3] + bcoordinates[12] * isoparametric_cell_grad_ref_2[q * CELL_NS + 4] + bcoordinates[15] * isoparametric_cell_grad_ref_2[q * CELL_NS + 5] + bcoordinates[18] * isoparametric_cell_grad_ref_2[q * CELL_NS + 6] + bcoordinates[21] * isoparametric_cell_grad_ref_2[q * CELL_NS + 7] + bcoordinates[24] * isoparametric_cell_grad_ref_2[q * CELL_NS + 8] + bcoordinates[27] * isoparametric_cell_grad_ref_2[q * CELL_NS + 9];
+        const s_t J10 = bcoordinates[1] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[4] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[7] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[10] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[13] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[16] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5] + bcoordinates[19] * isoparametric_cell_grad_ref_0[q * CELL_NS + 6] + bcoordinates[22] * isoparametric_cell_grad_ref_0[q * CELL_NS + 7] + bcoordinates[25] * isoparametric_cell_grad_ref_0[q * CELL_NS + 8] + bcoordinates[28] * isoparametric_cell_grad_ref_0[q * CELL_NS + 9];
+        const s_t J11 = bcoordinates[1] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[4] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[7] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[10] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[13] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[16] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5] + bcoordinates[19] * isoparametric_cell_grad_ref_1[q * CELL_NS + 6] + bcoordinates[22] * isoparametric_cell_grad_ref_1[q * CELL_NS + 7] + bcoordinates[25] * isoparametric_cell_grad_ref_1[q * CELL_NS + 8] + bcoordinates[28] * isoparametric_cell_grad_ref_1[q * CELL_NS + 9];
+        const s_t J12 = bcoordinates[1] * isoparametric_cell_grad_ref_2[q * CELL_NS] + bcoordinates[4] * isoparametric_cell_grad_ref_2[q * CELL_NS + 1] + bcoordinates[7] * isoparametric_cell_grad_ref_2[q * CELL_NS + 2] + bcoordinates[10] * isoparametric_cell_grad_ref_2[q * CELL_NS + 3] + bcoordinates[13] * isoparametric_cell_grad_ref_2[q * CELL_NS + 4] + bcoordinates[16] * isoparametric_cell_grad_ref_2[q * CELL_NS + 5] + bcoordinates[19] * isoparametric_cell_grad_ref_2[q * CELL_NS + 6] + bcoordinates[22] * isoparametric_cell_grad_ref_2[q * CELL_NS + 7] + bcoordinates[25] * isoparametric_cell_grad_ref_2[q * CELL_NS + 8] + bcoordinates[28] * isoparametric_cell_grad_ref_2[q * CELL_NS + 9];
+        const s_t J20 = bcoordinates[2] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[5] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[8] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[11] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[14] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[17] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5] + bcoordinates[20] * isoparametric_cell_grad_ref_0[q * CELL_NS + 6] + bcoordinates[23] * isoparametric_cell_grad_ref_0[q * CELL_NS + 7] + bcoordinates[26] * isoparametric_cell_grad_ref_0[q * CELL_NS + 8] + bcoordinates[29] * isoparametric_cell_grad_ref_0[q * CELL_NS + 9];
+        const s_t J21 = bcoordinates[2] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[5] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[8] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[11] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[14] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[17] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5] + bcoordinates[20] * isoparametric_cell_grad_ref_1[q * CELL_NS + 6] + bcoordinates[23] * isoparametric_cell_grad_ref_1[q * CELL_NS + 7] + bcoordinates[26] * isoparametric_cell_grad_ref_1[q * CELL_NS + 8] + bcoordinates[29] * isoparametric_cell_grad_ref_1[q * CELL_NS + 9];
+        const s_t J22 = bcoordinates[2] * isoparametric_cell_grad_ref_2[q * CELL_NS] + bcoordinates[5] * isoparametric_cell_grad_ref_2[q * CELL_NS + 1] + bcoordinates[8] * isoparametric_cell_grad_ref_2[q * CELL_NS + 2] + bcoordinates[11] * isoparametric_cell_grad_ref_2[q * CELL_NS + 3] + bcoordinates[14] * isoparametric_cell_grad_ref_2[q * CELL_NS + 4] + bcoordinates[17] * isoparametric_cell_grad_ref_2[q * CELL_NS + 5] + bcoordinates[20] * isoparametric_cell_grad_ref_2[q * CELL_NS + 6] + bcoordinates[23] * isoparametric_cell_grad_ref_2[q * CELL_NS + 7] + bcoordinates[26] * isoparametric_cell_grad_ref_2[q * CELL_NS + 8] + bcoordinates[29] * isoparametric_cell_grad_ref_2[q * CELL_NS + 9];
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badjugate_streams, bdeterminant, q * VS);
+            badjugate_streams, bdeterminant, q);
       }
     }
 
@@ -437,15 +433,15 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mes
     const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z()};
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    navier_stokes_form_2_u_u_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tet_q11<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
+    navier_stokes_form_2_u_u_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, CELL_NS>(ne, 1, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tet_q11<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 10; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -454,8 +450,8 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mes
       for (int local_shape = 0; local_shape < 10; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 10 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -464,8 +460,8 @@ __global__ void navier_stokes_form_2_u_u_tet10_jacobian_action_isoparametric_mes
       for (int local_shape = 0; local_shape < 10; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 20 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }

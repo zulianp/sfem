@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static SFEM_INLINE void neohookean_ogden_d2_tensor_product_direct_hessian_tensor_product_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -42,12 +42,11 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_direct_hessian_tensor
     const s_t *const RSTR q_weight_1d,
     const s_t lmbda,
     const s_t mu,
-    const s_t bu_data[NS * 2][VS],
+    const s_t bu_data[NS * 2],
     s_t *const RSTR element_matrix
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(NS > 0, "NS must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NC = 2;
   static constexpr int ND = 2;
   static constexpr int NDOFS = NC * NS;
@@ -74,8 +73,7 @@ static SFEM_INLINE void neohookean_ogden_d2_tensor_product_direct_hessian_tensor
         const int qx = q % NQ1;
         const int qy = q / NQ1;
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
-        const int lane = 0;
-        const ptrdiff_t goff = q * VS + lane;
+        const ptrdiff_t goff = q;
         const s_t adj_lane0 = badj0[goff];
         const s_t adj_lane1 = badj1[goff];
         const s_t adj_lane2 = badj2[goff];

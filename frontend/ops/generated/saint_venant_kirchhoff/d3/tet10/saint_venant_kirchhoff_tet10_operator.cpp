@@ -3976,7 +3976,7 @@ static int saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl(
     s_t element_matrix[NDOFS * NDOFS];
     s_t bcoordinate_data[NS * ND][VS];
     static constexpr int ne = VS;
-    s_t bu_data[NS * NC][VS];
+    s_t bu_data[NS * NC];
     s_t badj0[NQ * VS];
     s_t badj1[NQ * VS];
     s_t badj2[NQ * VS];
@@ -3994,7 +3994,7 @@ static int saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl(
       ev[shape] = node;
       for (int d = 0; d < ND; ++d) {
         bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
-        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+        bu_data[shape * NC + d] = u_components[d][node * u_stride];
       }
     }
 
@@ -4056,7 +4056,7 @@ static int saint_venant_kirchhoff_tet10_hessian_i_msoa_assemble_impl(
       }
     }
 
-    saint_venant_kirchhoff_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bu_data, element_matrix);
+    saint_venant_kirchhoff_d3_simplex_direct_hessian_reference_element_matrix<s_t, NQ, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, lmbda, mu, bu_data, element_matrix);
 
     if constexpr (FORMAT == 1) {
       saint_venant_kirchhoff_tet10_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

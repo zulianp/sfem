@@ -83,19 +83,19 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
     const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
     const s_t *const RSTR direction_p_value_q = &direction_p_value[q * VS];
     s_t *const RSTR u0_value_coeff_q = &u0_value_coeff[q * VS];
-    s_t *const RSTR u0_grad_coeff_ref_q0 = &u0_grad_coeff_ref[(q * ND + 0) * VS];
+    s_t *const RSTR u0_grad_coeff_ref_q0 = &u0_grad_coeff_ref[(q * ND) * VS];
     s_t *const RSTR u0_grad_coeff_ref_q1 = &u0_grad_coeff_ref[(q * ND + 1) * VS];
     s_t *const RSTR u0_grad_coeff_ref_q2 = &u0_grad_coeff_ref[(q * ND + 2) * VS];
     s_t *const RSTR u1_value_coeff_q = &u1_value_coeff[q * VS];
-    s_t *const RSTR u1_grad_coeff_ref_q0 = &u1_grad_coeff_ref[(q * ND + 0) * VS];
+    s_t *const RSTR u1_grad_coeff_ref_q0 = &u1_grad_coeff_ref[(q * ND) * VS];
     s_t *const RSTR u1_grad_coeff_ref_q1 = &u1_grad_coeff_ref[(q * ND + 1) * VS];
     s_t *const RSTR u1_grad_coeff_ref_q2 = &u1_grad_coeff_ref[(q * ND + 2) * VS];
     s_t *const RSTR u2_value_coeff_q = &u2_value_coeff[q * VS];
-    s_t *const RSTR u2_grad_coeff_ref_q0 = &u2_grad_coeff_ref[(q * ND + 0) * VS];
+    s_t *const RSTR u2_grad_coeff_ref_q0 = &u2_grad_coeff_ref[(q * ND) * VS];
     s_t *const RSTR u2_grad_coeff_ref_q1 = &u2_grad_coeff_ref[(q * ND + 1) * VS];
     s_t *const RSTR u2_grad_coeff_ref_q2 = &u2_grad_coeff_ref[(q * ND + 2) * VS];
     s_t *const RSTR p_value_coeff_q = &p_value_coeff[q * VS];
-    s_t *const RSTR p_grad_coeff_ref_q0 = &p_grad_coeff_ref[(q * ND + 0) * VS];
+    s_t *const RSTR p_grad_coeff_ref_q0 = &p_grad_coeff_ref[(q * ND) * VS];
     s_t *const RSTR p_grad_coeff_ref_q1 = &p_grad_coeff_ref[(q * ND + 1) * VS];
     s_t *const RSTR p_grad_coeff_ref_q2 = &p_grad_coeff_ref[(q * ND + 2) * VS];
     #pragma omp simd
@@ -196,19 +196,19 @@ static SFEM_INLINE void navier_stokes_form_2_u_p_d3_tensor_product_mixed_jacobia
     const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
     const s_t *const RSTR direction_p_value_q = &direction_p_value[q * VS];
     s_t *const RSTR u0_value_coeff_q = &u0_value_coeff[q * VS];
-    s_t *const RSTR u0_grad_coeff_ref_q0 = &u0_grad_coeff_ref[(q * ND + 0) * VS];
+    s_t *const RSTR u0_grad_coeff_ref_q0 = &u0_grad_coeff_ref[(q * ND) * VS];
     s_t *const RSTR u0_grad_coeff_ref_q1 = &u0_grad_coeff_ref[(q * ND + 1) * VS];
     s_t *const RSTR u0_grad_coeff_ref_q2 = &u0_grad_coeff_ref[(q * ND + 2) * VS];
     s_t *const RSTR u1_value_coeff_q = &u1_value_coeff[q * VS];
-    s_t *const RSTR u1_grad_coeff_ref_q0 = &u1_grad_coeff_ref[(q * ND + 0) * VS];
+    s_t *const RSTR u1_grad_coeff_ref_q0 = &u1_grad_coeff_ref[(q * ND) * VS];
     s_t *const RSTR u1_grad_coeff_ref_q1 = &u1_grad_coeff_ref[(q * ND + 1) * VS];
     s_t *const RSTR u1_grad_coeff_ref_q2 = &u1_grad_coeff_ref[(q * ND + 2) * VS];
     s_t *const RSTR u2_value_coeff_q = &u2_value_coeff[q * VS];
-    s_t *const RSTR u2_grad_coeff_ref_q0 = &u2_grad_coeff_ref[(q * ND + 0) * VS];
+    s_t *const RSTR u2_grad_coeff_ref_q0 = &u2_grad_coeff_ref[(q * ND) * VS];
     s_t *const RSTR u2_grad_coeff_ref_q1 = &u2_grad_coeff_ref[(q * ND + 1) * VS];
     s_t *const RSTR u2_grad_coeff_ref_q2 = &u2_grad_coeff_ref[(q * ND + 2) * VS];
     s_t *const RSTR p_value_coeff_q = &p_value_coeff[q * VS];
-    s_t *const RSTR p_grad_coeff_ref_q0 = &p_grad_coeff_ref[(q * ND + 0) * VS];
+    s_t *const RSTR p_grad_coeff_ref_q0 = &p_grad_coeff_ref[(q * ND) * VS];
     s_t *const RSTR p_grad_coeff_ref_q1 = &p_grad_coeff_ref[(q * ND + 1) * VS];
     s_t *const RSTR p_grad_coeff_ref_q2 = &p_grad_coeff_ref[(q * ND + 2) * VS];
     #pragma omp simd

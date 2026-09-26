@@ -571,7 +571,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, 2> {
   static SFEM_INLINE void gradient_impl(
       const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NC * NS][1],
+      const s_t streams[NC * NS],
       const int component,
       s_t *const RSTR gradient) {
     static constexpr int NQ1 = integer_root(NQ, 2);
@@ -585,7 +585,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, 2> {
           s_t gx = s_t(0);
           for (int sx = 0; sx < NS1; ++sx) {
             const int shape = sx + NS1 * sy;
-            const s_t u = streams[shape * NC + component][0];
+            const s_t u = streams[shape * NC + component];
             v += u * shape_1d[qx * NS1 + sx];
             gx += u * grad_1d[qx * NS1 + sx];
           }
@@ -629,7 +629,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, 2> {
   static SFEM_INLINE void gradient_contiguous(
       const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NS * NC][1],
+      const s_t streams[NS * NC],
       const int component,
       s_t *const RSTR gradient) {
     gradient_impl<NC>(shape_1d, grad_1d, streams, component, gradient);
@@ -765,7 +765,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, 3> {
   static SFEM_INLINE void gradient_impl(
       const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NC * NS][1],
+      const s_t streams[NC * NS],
       const int component,
       s_t *const RSTR gradient) {
     static constexpr int NQ1 = integer_root(NQ, 3);
@@ -783,7 +783,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, 3> {
             s_t gx = s_t(0);
             for (int sx = 0; sx < NS1; ++sx) {
               const int shape = sx + NS1 * (sy + NS1 * sz);
-              const s_t u = streams[shape * NC + component][0];
+              const s_t u = streams[shape * NC + component];
               v += u * shape_1d[qx * NS1 + sx];
               gx += u * grad_1d[qx * NS1 + sx];
             }
@@ -855,7 +855,7 @@ struct TensorProductWeakOpsScalar<s_t, NQ, NS, 3> {
   static SFEM_INLINE void gradient_contiguous(
       const s_t *const RSTR shape_1d,
       const s_t *const RSTR grad_1d,
-      const s_t streams[NS * NC][1],
+      const s_t streams[NS * NC],
       const int component,
       s_t *const RSTR gradient) {
     gradient_impl<NC>(shape_1d, grad_1d, streams, component, gradient);
@@ -952,7 +952,7 @@ template <typename s_t, int NQ, int NS, int ND, int NC = ND>
 static SFEM_INLINE void tensor_gradient_contiguous_scalar(
     const s_t *const RSTR shape_1d,
     const s_t *const RSTR grad_1d,
-    const s_t streams[NS * NC][1],
+    const s_t streams[NS * NC],
     const int component,
     s_t *const RSTR gradient) {
   TensorProductWeakOpsScalar<s_t, NQ, NS, ND>::template gradient_contiguous<NC>(
@@ -1914,7 +1914,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 2> {
   static SFEM_INLINE void evaluate_contiguous(
       const s_t *const shape_1d,
       const s_t *const grad_1d,
-      const s_t streams[NC * NS][1],
+      const s_t streams[NC * NS],
       s_t *const value,
       s_t *const gradient) {
     static constexpr int NQ1 = integer_root(NQ, 2);
@@ -1927,7 +1927,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 2> {
         s_t g = s_t(0);
         for (int sx = 0; sx < NS1; ++sx) {
           const int s = sx + NS1 * sy;
-          const s_t u = streams[s * NC + f][0];
+          const s_t u = streams[s * NC + f];
           v += u * shape_1d[qx * NS1 + sx];
           g += u * grad_1d[qx * NS1 + sx];
         }
@@ -1993,7 +1993,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 2> {
   template <int NC>
   static SFEM_INLINE void evaluate_value_contiguous(
       const s_t *const shape_1d,
-      const s_t streams[NC * NS][1],
+      const s_t streams[NC * NS],
       s_t *const value) {
     static constexpr int NQ1 = integer_root(NQ, 2);
     static constexpr int NS1 = integer_root(NS, 2);
@@ -2004,7 +2004,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 2> {
         s_t v = s_t(0);
         for (int sx = 0; sx < NS1; ++sx) {
           const int s = sx + NS1 * sy;
-          v += streams[s * NC + f][0] * shape_1d[qx * NS1 + sx];
+          v += streams[s * NC + f] * shape_1d[qx * NS1 + sx];
         }
         vx_q[0] = v;
       }
@@ -2067,7 +2067,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 2> {
       const s_t *const grad_1d,
       const s_t *const value_coeff,
       const s_t *const grad_coeff,
-      s_t output[NC * NS][1]) {
+      s_t output[NC * NS]) {
     static constexpr int NQ1 = integer_root(NQ, 2);
     static constexpr int NS1 = integer_root(NS, 2);
     s_t sv[NC * NQ1 * NS1];
@@ -2095,7 +2095,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 2> {
           const int i = ((f * NQ1 + qx) * NS1 + sy) ;
           v += sv[i] * shape_1d[qx * NS1 + sx] + sg[i] * grad_1d[qx * NS1 + sx];
         }
-        output[s * NC + f][0] += v;
+        output[s * NC + f] += v;
       }
     }
   }
@@ -2135,7 +2135,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 2> {
   static SFEM_INLINE void integrate_value_contiguous(
       const s_t *const shape_1d,
       const s_t *const value_coeff,
-      s_t output[NC * NS][1]) {
+      s_t output[NC * NS]) {
     static constexpr int NQ1 = integer_root(NQ, 2);
     static constexpr int NS1 = integer_root(NS, 2);
     s_t sv[NC * NQ1 * NS1];
@@ -2157,7 +2157,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 2> {
         for (int qx = 0; qx < NQ1; ++qx) {
           v += sv[((f * NQ1 + qx) * NS1 + sy) ] * shape_1d[qx * NS1 + sx];
         }
-        output[s * NC + f][0] += v;
+        output[s * NC + f] += v;
       }
     }
   }
@@ -2241,7 +2241,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 3> {
   static SFEM_INLINE void evaluate_contiguous(
       const s_t *const shape_1d,
       const s_t *const grad_1d,
-      const s_t streams[NC * NS][1],
+      const s_t streams[NC * NS],
       s_t *const value,
       s_t *const gradient) {
     static constexpr int NQ1 = integer_root(NQ, 3);
@@ -2257,7 +2257,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 3> {
         s_t g = s_t(0);
         for (int sx = 0; sx < NS1; ++sx) {
           const int s = sx + NS1 * (sy + NS1 * sz);
-          const s_t u = streams[s * NC + f][0];
+          const s_t u = streams[s * NC + f];
           v += u * shape_1d[qx * NS1 + sx];
           g += u * grad_1d[qx * NS1 + sx];
         }
@@ -2355,7 +2355,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 3> {
   template <int NC>
   static SFEM_INLINE void evaluate_value_contiguous(
       const s_t *const shape_1d,
-      const s_t streams[NC * NS][1],
+      const s_t streams[NC * NS],
       s_t *const value) {
     static constexpr int NQ1 = integer_root(NQ, 3);
     static constexpr int NS1 = integer_root(NS, 3);
@@ -2367,7 +2367,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 3> {
         s_t v = s_t(0);
         for (int sx = 0; sx < NS1; ++sx) {
           const int s = sx + NS1 * (sy + NS1 * sz);
-          v += streams[s * NC + f][0] * shape_1d[qx * NS1 + sx];
+          v += streams[s * NC + f] * shape_1d[qx * NS1 + sx];
         }
         vx_q[0] = v;
       }
@@ -2460,7 +2460,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 3> {
       const s_t *const grad_1d,
       const s_t *const value_coeff,
       const s_t *const grad_coeff,
-      s_t output[NC * NS][1]) {
+      s_t output[NC * NS]) {
     static constexpr int NQ1 = integer_root(NQ, 3);
     static constexpr int NS1 = integer_root(NS, 3);
     s_t z0[NC * NQ1 * NQ1 * NS1];
@@ -2508,7 +2508,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 3> {
           const int j = (((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ;
           v += yz0[j] * shape_1d[qx * NS1 + sx] + yz1[j] * grad_1d[qx * NS1 + sx];
         }
-        output[s * NC + f][0] += v;
+        output[s * NC + f] += v;
       }
     }
   }
@@ -2559,7 +2559,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 3> {
   static SFEM_INLINE void integrate_value_contiguous(
       const s_t *const shape_1d,
       const s_t *const value_coeff,
-      s_t output[NC * NS][1]) {
+      s_t output[NC * NS]) {
     static constexpr int NQ1 = integer_root(NQ, 3);
     static constexpr int NS1 = integer_root(NS, 3);
     s_t z0[NC * NQ1 * NQ1 * NS1];
@@ -2592,7 +2592,7 @@ struct TensorProductResidualOpsScalar<s_t, NQ, NS, 3> {
         for (int qx = 0; qx < NQ1; ++qx) {
           v += yz0[(((f * NQ1 + qx) * NS1 + sy) * NS1 + sz) ] * shape_1d[qx * NS1 + sx];
         }
-        output[s * NC + f][0] += v;
+        output[s * NC + f] += v;
       }
     }
   }
@@ -2613,7 +2613,7 @@ template <typename s_t, int NQ, int NS, int ND, int NC>
 static SFEM_INLINE void tensor_evaluate_contiguous_scalar(
     const s_t *const shape_1d,
     const s_t *const grad_1d,
-    const s_t streams[NC * NS][1],
+    const s_t streams[NC * NS],
     s_t *const value,
     s_t *const gradient) {
   TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template evaluate_contiguous<NC>(
@@ -2632,7 +2632,7 @@ static SFEM_INLINE void tensor_evaluate_value_scalar(
 template <typename s_t, int NQ, int NS, int ND, int NC>
 static SFEM_INLINE void tensor_evaluate_value_contiguous_scalar(
     const s_t *const shape_1d,
-    const s_t streams[NC * NS][1],
+    const s_t streams[NC * NS],
     s_t *const value) {
   TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template evaluate_value_contiguous<NC>(
       shape_1d, streams, value);
@@ -2655,7 +2655,7 @@ static SFEM_INLINE void tensor_integrate_contiguous_scalar(
     const s_t *const grad_1d,
     const s_t *const value_coeff,
     const s_t *const grad_coeff,
-    s_t output[NC * NS][1]) {
+    s_t output[NC * NS]) {
   TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template integrate_contiguous<NC>(
       shape_1d, grad_1d, value_coeff, grad_coeff, output);
 }
@@ -2673,7 +2673,7 @@ template <typename s_t, int NQ, int NS, int ND, int NC>
 static SFEM_INLINE void tensor_integrate_value_contiguous_scalar(
     const s_t *const shape_1d,
     const s_t *const value_coeff,
-    s_t output[NC * NS][1]) {
+    s_t output[NC * NS]) {
   TensorProductResidualOpsScalar<s_t, NQ, NS, ND>::template integrate_value_contiguous<NC>(
       shape_1d, value_coeff, output);
 }

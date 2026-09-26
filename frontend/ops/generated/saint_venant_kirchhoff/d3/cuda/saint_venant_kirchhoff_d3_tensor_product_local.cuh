@@ -27,7 +27,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor_product_objective_block(
         const int ne,
         const ptrdiff_t geometry_stride,
@@ -54,13 +54,12 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NQ1 = integer_root(NQ, 3);
   static constexpr int NS1 = integer_root(NS, 3);
   static_assert(ipow(NQ1, 3) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
-  s_t gu_ref_q[NQ * 9 * VS];
-  s_t grad_h_ref_q[NQ * 9 * VS];
+  s_t gu_ref_q[9 * NQ];
+  s_t grad_h_ref_q[9 * NQ];
   tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
   tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
   tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ]);
@@ -72,24 +71,24 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
     const int qy = (q / NQ1) % NQ1;
     const int qz = q / (NQ1 * NQ1);
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-    const s_t *const RSTR gu_ref0 = &gu_ref_q[(3 * q) * VS];
-    const s_t *const RSTR gu_ref1 = &gu_ref_q[(3 * q + 1) * VS];
-    const s_t *const RSTR gu_ref2 = &gu_ref_q[(3 * q + 2) * VS];
-    const s_t *const RSTR gu_ref3 = &gu_ref_q[(3 * (NQ + q)) * VS];
-    const s_t *const RSTR gu_ref4 = &gu_ref_q[(3 * (NQ + q) + 1) * VS];
-    const s_t *const RSTR gu_ref5 = &gu_ref_q[(3 * (NQ + q) + 2) * VS];
-    const s_t *const RSTR gu_ref6 = &gu_ref_q[(3 * (2 * NQ + q)) * VS];
-    const s_t *const RSTR gu_ref7 = &gu_ref_q[(3 * (2 * NQ + q) + 1) * VS];
-    const s_t *const RSTR gu_ref8 = &gu_ref_q[(3 * (2 * NQ + q) + 2) * VS];
-    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(3 * q) * VS];
-    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(3 * q + 1) * VS];
-    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(3 * q + 2) * VS];
-    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(3 * (NQ + q)) * VS];
-    const s_t *const RSTR grad_h_ref4 = &grad_h_ref_q[(3 * (NQ + q) + 1) * VS];
-    const s_t *const RSTR grad_h_ref5 = &grad_h_ref_q[(3 * (NQ + q) + 2) * VS];
-    const s_t *const RSTR grad_h_ref6 = &grad_h_ref_q[(3 * (2 * NQ + q)) * VS];
-    const s_t *const RSTR grad_h_ref7 = &grad_h_ref_q[(3 * (2 * NQ + q) + 1) * VS];
-    const s_t *const RSTR grad_h_ref8 = &grad_h_ref_q[(3 * (2 * NQ + q) + 2) * VS];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(3 * q)];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(3 * q + 1)];
+    const s_t *const RSTR gu_ref2 = &gu_ref_q[(3 * q + 2)];
+    const s_t *const RSTR gu_ref3 = &gu_ref_q[(3 * (NQ + q))];
+    const s_t *const RSTR gu_ref4 = &gu_ref_q[(3 * (NQ + q) + 1)];
+    const s_t *const RSTR gu_ref5 = &gu_ref_q[(3 * (NQ + q) + 2)];
+    const s_t *const RSTR gu_ref6 = &gu_ref_q[(3 * (2 * NQ + q))];
+    const s_t *const RSTR gu_ref7 = &gu_ref_q[(3 * (2 * NQ + q) + 1)];
+    const s_t *const RSTR gu_ref8 = &gu_ref_q[(3 * (2 * NQ + q) + 2)];
+    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(3 * q)];
+    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(3 * q + 1)];
+    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(3 * q + 2)];
+    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(3 * (NQ + q))];
+    const s_t *const RSTR grad_h_ref4 = &grad_h_ref_q[(3 * (NQ + q) + 1)];
+    const s_t *const RSTR grad_h_ref5 = &grad_h_ref_q[(3 * (NQ + q) + 2)];
+    const s_t *const RSTR grad_h_ref6 = &grad_h_ref_q[(3 * (2 * NQ + q))];
+    const s_t *const RSTR grad_h_ref7 = &grad_h_ref_q[(3 * (2 * NQ + q) + 1)];
+    const s_t *const RSTR grad_h_ref8 = &grad_h_ref_q[(3 * (2 * NQ + q) + 2)];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -100,8 +99,8 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
     const s_t *const RSTR adj_q7 = adj7 + q * geometry_stride;
     const s_t *const RSTR adj_q8 = adj8 + q * geometry_stride;
     const s_t *const RSTR det_q0 = det0 + q * geometry_stride;
-    s_t gu_base_v[9 * VS];
-    s_t trial_grad_v[9 * VS];
+    s_t gu_base_v[9];
+    s_t trial_grad_v[9];
     {
       const s_t adj_value0 = adj_q0[0];
       const s_t adj_value1 = adj_q1[0];
@@ -114,39 +113,39 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
       const s_t adj_value8 = adj_q8[0];
       const s_t det_value0 = det_q0[0];
       const s_t idet = s_t(1) / det_value0;
-      gu_base_v[0 * VS + 0] = (gu_ref0[0] * adj_value0 + gu_ref1[0] * adj_value3 + gu_ref2[0] * adj_value6) * idet;
-      trial_grad_v[0 * VS + 0] = (grad_h_ref0[0] * adj_value0 + grad_h_ref1[0] * adj_value3 + grad_h_ref2[0] * adj_value6) * idet;
-      gu_base_v[1 * VS + 0] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value4 + gu_ref2[0] * adj_value7) * idet;
-      trial_grad_v[1 * VS + 0] = (grad_h_ref0[0] * adj_value1 + grad_h_ref1[0] * adj_value4 + grad_h_ref2[0] * adj_value7) * idet;
-      gu_base_v[2 * VS + 0] = (gu_ref0[0] * adj_value2 + gu_ref1[0] * adj_value5 + gu_ref2[0] * adj_value8) * idet;
-      trial_grad_v[2 * VS + 0] = (grad_h_ref0[0] * adj_value2 + grad_h_ref1[0] * adj_value5 + grad_h_ref2[0] * adj_value8) * idet;
-      gu_base_v[3 * VS + 0] = (gu_ref3[0] * adj_value0 + gu_ref4[0] * adj_value3 + gu_ref5[0] * adj_value6) * idet;
-      trial_grad_v[3 * VS + 0] = (grad_h_ref3[0] * adj_value0 + grad_h_ref4[0] * adj_value3 + grad_h_ref5[0] * adj_value6) * idet;
-      gu_base_v[4 * VS + 0] = (gu_ref3[0] * adj_value1 + gu_ref4[0] * adj_value4 + gu_ref5[0] * adj_value7) * idet;
-      trial_grad_v[4 * VS + 0] = (grad_h_ref3[0] * adj_value1 + grad_h_ref4[0] * adj_value4 + grad_h_ref5[0] * adj_value7) * idet;
-      gu_base_v[5 * VS + 0] = (gu_ref3[0] * adj_value2 + gu_ref4[0] * adj_value5 + gu_ref5[0] * adj_value8) * idet;
-      trial_grad_v[5 * VS + 0] = (grad_h_ref3[0] * adj_value2 + grad_h_ref4[0] * adj_value5 + grad_h_ref5[0] * adj_value8) * idet;
-      gu_base_v[6 * VS + 0] = (gu_ref6[0] * adj_value0 + gu_ref7[0] * adj_value3 + gu_ref8[0] * adj_value6) * idet;
-      trial_grad_v[6 * VS + 0] = (grad_h_ref6[0] * adj_value0 + grad_h_ref7[0] * adj_value3 + grad_h_ref8[0] * adj_value6) * idet;
-      gu_base_v[7 * VS + 0] = (gu_ref6[0] * adj_value1 + gu_ref7[0] * adj_value4 + gu_ref8[0] * adj_value7) * idet;
-      trial_grad_v[7 * VS + 0] = (grad_h_ref6[0] * adj_value1 + grad_h_ref7[0] * adj_value4 + grad_h_ref8[0] * adj_value7) * idet;
-      gu_base_v[8 * VS + 0] = (gu_ref6[0] * adj_value2 + gu_ref7[0] * adj_value5 + gu_ref8[0] * adj_value8) * idet;
-      trial_grad_v[8 * VS + 0] = (grad_h_ref6[0] * adj_value2 + grad_h_ref7[0] * adj_value5 + grad_h_ref8[0] * adj_value8) * idet;
+      gu_base_v[0] = (gu_ref0[0] * adj_value0 + gu_ref1[0] * adj_value3 + gu_ref2[0] * adj_value6) * idet;
+      trial_grad_v[0] = (grad_h_ref0[0] * adj_value0 + grad_h_ref1[0] * adj_value3 + grad_h_ref2[0] * adj_value6) * idet;
+      gu_base_v[1] = (gu_ref0[0] * adj_value1 + gu_ref1[0] * adj_value4 + gu_ref2[0] * adj_value7) * idet;
+      trial_grad_v[1] = (grad_h_ref0[0] * adj_value1 + grad_h_ref1[0] * adj_value4 + grad_h_ref2[0] * adj_value7) * idet;
+      gu_base_v[2] = (gu_ref0[0] * adj_value2 + gu_ref1[0] * adj_value5 + gu_ref2[0] * adj_value8) * idet;
+      trial_grad_v[2] = (grad_h_ref0[0] * adj_value2 + grad_h_ref1[0] * adj_value5 + grad_h_ref2[0] * adj_value8) * idet;
+      gu_base_v[3] = (gu_ref3[0] * adj_value0 + gu_ref4[0] * adj_value3 + gu_ref5[0] * adj_value6) * idet;
+      trial_grad_v[3] = (grad_h_ref3[0] * adj_value0 + grad_h_ref4[0] * adj_value3 + grad_h_ref5[0] * adj_value6) * idet;
+      gu_base_v[4] = (gu_ref3[0] * adj_value1 + gu_ref4[0] * adj_value4 + gu_ref5[0] * adj_value7) * idet;
+      trial_grad_v[4] = (grad_h_ref3[0] * adj_value1 + grad_h_ref4[0] * adj_value4 + grad_h_ref5[0] * adj_value7) * idet;
+      gu_base_v[5] = (gu_ref3[0] * adj_value2 + gu_ref4[0] * adj_value5 + gu_ref5[0] * adj_value8) * idet;
+      trial_grad_v[5] = (grad_h_ref3[0] * adj_value2 + grad_h_ref4[0] * adj_value5 + grad_h_ref5[0] * adj_value8) * idet;
+      gu_base_v[6] = (gu_ref6[0] * adj_value0 + gu_ref7[0] * adj_value3 + gu_ref8[0] * adj_value6) * idet;
+      trial_grad_v[6] = (grad_h_ref6[0] * adj_value0 + grad_h_ref7[0] * adj_value3 + grad_h_ref8[0] * adj_value6) * idet;
+      gu_base_v[7] = (gu_ref6[0] * adj_value1 + gu_ref7[0] * adj_value4 + gu_ref8[0] * adj_value7) * idet;
+      trial_grad_v[7] = (grad_h_ref6[0] * adj_value1 + grad_h_ref7[0] * adj_value4 + grad_h_ref8[0] * adj_value7) * idet;
+      gu_base_v[8] = (gu_ref6[0] * adj_value2 + gu_ref7[0] * adj_value5 + gu_ref8[0] * adj_value8) * idet;
+      trial_grad_v[8] = (grad_h_ref6[0] * adj_value2 + grad_h_ref7[0] * adj_value5 + grad_h_ref8[0] * adj_value8) * idet;
     }
     for (int step = 0; step < nsteps; ++step) {
       const s_t alpha = steps[step];
       {
         const s_t det_value0 = det_q0[0];
         s_t gu[9];
-        gu[0] = gu_base_v[0 * VS + 0] + alpha * trial_grad_v[0 * VS + 0];
-        gu[1] = gu_base_v[1 * VS + 0] + alpha * trial_grad_v[1 * VS + 0];
-        gu[2] = gu_base_v[2 * VS + 0] + alpha * trial_grad_v[2 * VS + 0];
-        gu[3] = gu_base_v[3 * VS + 0] + alpha * trial_grad_v[3 * VS + 0];
-        gu[4] = gu_base_v[4 * VS + 0] + alpha * trial_grad_v[4 * VS + 0];
-        gu[5] = gu_base_v[5 * VS + 0] + alpha * trial_grad_v[5 * VS + 0];
-        gu[6] = gu_base_v[6 * VS + 0] + alpha * trial_grad_v[6 * VS + 0];
-        gu[7] = gu_base_v[7 * VS + 0] + alpha * trial_grad_v[7 * VS + 0];
-        gu[8] = gu_base_v[8 * VS + 0] + alpha * trial_grad_v[8 * VS + 0];
+        gu[0] = gu_base_v[0] + alpha * trial_grad_v[0];
+        gu[1] = gu_base_v[1] + alpha * trial_grad_v[1];
+        gu[2] = gu_base_v[2] + alpha * trial_grad_v[2];
+        gu[3] = gu_base_v[3] + alpha * trial_grad_v[3];
+        gu[4] = gu_base_v[4] + alpha * trial_grad_v[4];
+        gu[5] = gu_base_v[5] + alpha * trial_grad_v[5];
+        gu[6] = gu_base_v[6] + alpha * trial_grad_v[6];
+        gu[7] = gu_base_v[7] + alpha * trial_grad_v[7];
+        gu[8] = gu_base_v[8] + alpha * trial_grad_v[8];
     const s_t weak_obj_tmp0 = ((s_t(1) / s_t(2)))*pow_2(gu[0]) + gu[0] + ((s_t(1) / s_t(2)))*pow_2(gu[3]) + ((s_t(1) / s_t(2)))*pow_2(gu[6]);
     const s_t weak_obj_tmp1 = ((s_t(1) / s_t(2)))*pow_2(gu[1]) + ((s_t(1) / s_t(2)))*pow_2(gu[4]) + gu[4] + ((s_t(1) / s_t(2)))*pow_2(gu[7]);
     const s_t weak_obj_tmp2 = ((s_t(1) / s_t(2)))*pow_2(gu[2]) + ((s_t(1) / s_t(2)))*pow_2(gu[5]) + ((s_t(1) / s_t(2)))*pow_2(gu[8]) + gu[8];
@@ -161,7 +160,7 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor_product_gradient_block(
         const int ne,
         const ptrdiff_t geometry_stride,
@@ -184,13 +183,12 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
         s_t *const RSTR out_streams[NS * 3]
 ) {
   static_assert(NQ > 0, "NQ must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NQ1 = integer_root(NQ, 3);
   static constexpr int NS1 = integer_root(NS, 3);
   static_assert(ipow(NQ1, 3) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
-  s_t gu_ref_q[NQ * 9 * VS];
-  s_t loperand_q[NQ * 9 * VS];
+  s_t gu_ref_q[9 * NQ];
+  s_t loperand_q[9 * NQ];
   tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
   tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ]);
   tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 2, &gu_ref_q[6 * NQ]);
@@ -199,24 +197,24 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
     const int qy = (q / NQ1) % NQ1;
     const int qz = q / (NQ1 * NQ1);
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-    const s_t *const RSTR gu_ref0 = &gu_ref_q[(3 * q) * VS];
-    const s_t *const RSTR gu_ref1 = &gu_ref_q[(3 * q + 1) * VS];
-    const s_t *const RSTR gu_ref2 = &gu_ref_q[(3 * q + 2) * VS];
-    const s_t *const RSTR gu_ref3 = &gu_ref_q[(3 * (NQ + q)) * VS];
-    const s_t *const RSTR gu_ref4 = &gu_ref_q[(3 * (NQ + q) + 1) * VS];
-    const s_t *const RSTR gu_ref5 = &gu_ref_q[(3 * (NQ + q) + 2) * VS];
-    const s_t *const RSTR gu_ref6 = &gu_ref_q[(3 * (2 * NQ + q)) * VS];
-    const s_t *const RSTR gu_ref7 = &gu_ref_q[(3 * (2 * NQ + q) + 1) * VS];
-    const s_t *const RSTR gu_ref8 = &gu_ref_q[(3 * (2 * NQ + q) + 2) * VS];
-    s_t *const RSTR loperand0 = &loperand_q[(3 * q) * VS];
-    s_t *const RSTR loperand1 = &loperand_q[(3 * q + 1) * VS];
-    s_t *const RSTR loperand2 = &loperand_q[(3 * q + 2) * VS];
-    s_t *const RSTR loperand3 = &loperand_q[(3 * (NQ + q)) * VS];
-    s_t *const RSTR loperand4 = &loperand_q[(3 * (NQ + q) + 1) * VS];
-    s_t *const RSTR loperand5 = &loperand_q[(3 * (NQ + q) + 2) * VS];
-    s_t *const RSTR loperand6 = &loperand_q[(3 * (2 * NQ + q)) * VS];
-    s_t *const RSTR loperand7 = &loperand_q[(3 * (2 * NQ + q) + 1) * VS];
-    s_t *const RSTR loperand8 = &loperand_q[(3 * (2 * NQ + q) + 2) * VS];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(3 * q)];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(3 * q + 1)];
+    const s_t *const RSTR gu_ref2 = &gu_ref_q[(3 * q + 2)];
+    const s_t *const RSTR gu_ref3 = &gu_ref_q[(3 * (NQ + q))];
+    const s_t *const RSTR gu_ref4 = &gu_ref_q[(3 * (NQ + q) + 1)];
+    const s_t *const RSTR gu_ref5 = &gu_ref_q[(3 * (NQ + q) + 2)];
+    const s_t *const RSTR gu_ref6 = &gu_ref_q[(3 * (2 * NQ + q))];
+    const s_t *const RSTR gu_ref7 = &gu_ref_q[(3 * (2 * NQ + q) + 1)];
+    const s_t *const RSTR gu_ref8 = &gu_ref_q[(3 * (2 * NQ + q) + 2)];
+    s_t *const RSTR loperand0 = &loperand_q[(3 * q)];
+    s_t *const RSTR loperand1 = &loperand_q[(3 * q + 1)];
+    s_t *const RSTR loperand2 = &loperand_q[(3 * q + 2)];
+    s_t *const RSTR loperand3 = &loperand_q[(3 * (NQ + q))];
+    s_t *const RSTR loperand4 = &loperand_q[(3 * (NQ + q) + 1)];
+    s_t *const RSTR loperand5 = &loperand_q[(3 * (NQ + q) + 2)];
+    s_t *const RSTR loperand6 = &loperand_q[(3 * (2 * NQ + q))];
+    s_t *const RSTR loperand7 = &loperand_q[(3 * (2 * NQ + q) + 1)];
+    s_t *const RSTR loperand8 = &loperand_q[(3 * (2 * NQ + q) + 2)];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;
@@ -296,7 +294,7 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
   tensor_test_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, &loperand_q[6 * NQ], out_streams, 2);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor_product_apply_block(
         const int ne,
         const ptrdiff_t geometry_stride,
@@ -320,14 +318,13 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
         s_t *const RSTR out_streams[NS * 3]
 ) {
   static_assert(NQ > 0, "NQ must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NQ1 = integer_root(NQ, 3);
   static constexpr int NS1 = integer_root(NS, 3);
   static_assert(ipow(NQ1, 3) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
-  s_t gu_ref_q[NQ * 9 * VS];
-  s_t grad_h_ref_q[NQ * 9 * VS];
-  s_t loperand_q[NQ * 9 * VS];
+  s_t gu_ref_q[9 * NQ];
+  s_t grad_h_ref_q[9 * NQ];
+  s_t loperand_q[9 * NQ];
   tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
   tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
   tensor_gradient_scalar<s_t, NQ, NS, 3, 3>(shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ]);
@@ -339,33 +336,33 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d3_tensor
     const int qy = (q / NQ1) % NQ1;
     const int qz = q / (NQ1 * NQ1);
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
-    const s_t *const RSTR gu_ref0 = &gu_ref_q[(3 * q) * VS];
-    const s_t *const RSTR gu_ref1 = &gu_ref_q[(3 * q + 1) * VS];
-    const s_t *const RSTR gu_ref2 = &gu_ref_q[(3 * q + 2) * VS];
-    const s_t *const RSTR gu_ref3 = &gu_ref_q[(3 * (NQ + q)) * VS];
-    const s_t *const RSTR gu_ref4 = &gu_ref_q[(3 * (NQ + q) + 1) * VS];
-    const s_t *const RSTR gu_ref5 = &gu_ref_q[(3 * (NQ + q) + 2) * VS];
-    const s_t *const RSTR gu_ref6 = &gu_ref_q[(3 * (2 * NQ + q)) * VS];
-    const s_t *const RSTR gu_ref7 = &gu_ref_q[(3 * (2 * NQ + q) + 1) * VS];
-    const s_t *const RSTR gu_ref8 = &gu_ref_q[(3 * (2 * NQ + q) + 2) * VS];
-    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(3 * q) * VS];
-    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(3 * q + 1) * VS];
-    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(3 * q + 2) * VS];
-    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(3 * (NQ + q)) * VS];
-    const s_t *const RSTR grad_h_ref4 = &grad_h_ref_q[(3 * (NQ + q) + 1) * VS];
-    const s_t *const RSTR grad_h_ref5 = &grad_h_ref_q[(3 * (NQ + q) + 2) * VS];
-    const s_t *const RSTR grad_h_ref6 = &grad_h_ref_q[(3 * (2 * NQ + q)) * VS];
-    const s_t *const RSTR grad_h_ref7 = &grad_h_ref_q[(3 * (2 * NQ + q) + 1) * VS];
-    const s_t *const RSTR grad_h_ref8 = &grad_h_ref_q[(3 * (2 * NQ + q) + 2) * VS];
-    s_t *const RSTR loperand0 = &loperand_q[(3 * q) * VS];
-    s_t *const RSTR loperand1 = &loperand_q[(3 * q + 1) * VS];
-    s_t *const RSTR loperand2 = &loperand_q[(3 * q + 2) * VS];
-    s_t *const RSTR loperand3 = &loperand_q[(3 * (NQ + q)) * VS];
-    s_t *const RSTR loperand4 = &loperand_q[(3 * (NQ + q) + 1) * VS];
-    s_t *const RSTR loperand5 = &loperand_q[(3 * (NQ + q) + 2) * VS];
-    s_t *const RSTR loperand6 = &loperand_q[(3 * (2 * NQ + q)) * VS];
-    s_t *const RSTR loperand7 = &loperand_q[(3 * (2 * NQ + q) + 1) * VS];
-    s_t *const RSTR loperand8 = &loperand_q[(3 * (2 * NQ + q) + 2) * VS];
+    const s_t *const RSTR gu_ref0 = &gu_ref_q[(3 * q)];
+    const s_t *const RSTR gu_ref1 = &gu_ref_q[(3 * q + 1)];
+    const s_t *const RSTR gu_ref2 = &gu_ref_q[(3 * q + 2)];
+    const s_t *const RSTR gu_ref3 = &gu_ref_q[(3 * (NQ + q))];
+    const s_t *const RSTR gu_ref4 = &gu_ref_q[(3 * (NQ + q) + 1)];
+    const s_t *const RSTR gu_ref5 = &gu_ref_q[(3 * (NQ + q) + 2)];
+    const s_t *const RSTR gu_ref6 = &gu_ref_q[(3 * (2 * NQ + q))];
+    const s_t *const RSTR gu_ref7 = &gu_ref_q[(3 * (2 * NQ + q) + 1)];
+    const s_t *const RSTR gu_ref8 = &gu_ref_q[(3 * (2 * NQ + q) + 2)];
+    const s_t *const RSTR grad_h_ref0 = &grad_h_ref_q[(3 * q)];
+    const s_t *const RSTR grad_h_ref1 = &grad_h_ref_q[(3 * q + 1)];
+    const s_t *const RSTR grad_h_ref2 = &grad_h_ref_q[(3 * q + 2)];
+    const s_t *const RSTR grad_h_ref3 = &grad_h_ref_q[(3 * (NQ + q))];
+    const s_t *const RSTR grad_h_ref4 = &grad_h_ref_q[(3 * (NQ + q) + 1)];
+    const s_t *const RSTR grad_h_ref5 = &grad_h_ref_q[(3 * (NQ + q) + 2)];
+    const s_t *const RSTR grad_h_ref6 = &grad_h_ref_q[(3 * (2 * NQ + q))];
+    const s_t *const RSTR grad_h_ref7 = &grad_h_ref_q[(3 * (2 * NQ + q) + 1)];
+    const s_t *const RSTR grad_h_ref8 = &grad_h_ref_q[(3 * (2 * NQ + q) + 2)];
+    s_t *const RSTR loperand0 = &loperand_q[(3 * q)];
+    s_t *const RSTR loperand1 = &loperand_q[(3 * q + 1)];
+    s_t *const RSTR loperand2 = &loperand_q[(3 * q + 2)];
+    s_t *const RSTR loperand3 = &loperand_q[(3 * (NQ + q))];
+    s_t *const RSTR loperand4 = &loperand_q[(3 * (NQ + q) + 1)];
+    s_t *const RSTR loperand5 = &loperand_q[(3 * (NQ + q) + 2)];
+    s_t *const RSTR loperand6 = &loperand_q[(3 * (2 * NQ + q))];
+    s_t *const RSTR loperand7 = &loperand_q[(3 * (2 * NQ + q) + 1)];
+    s_t *const RSTR loperand8 = &loperand_q[(3 * (2 * NQ + q) + 2)];
     const s_t *const RSTR adj_q0 = adj0 + q * geometry_stride;
     const s_t *const RSTR adj_q1 = adj1 + q * geometry_stride;
     const s_t *const RSTR adj_q2 = adj2 + q * geometry_stride;

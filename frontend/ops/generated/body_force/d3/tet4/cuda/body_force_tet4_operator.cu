@@ -21,7 +21,7 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -30,15 +30,13 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int ne,
+    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
-  {
-    converted[0] = s_t(source[0]);
-  }
+  converted[0] = s_t(source[0]);
   return converted;
 }
 
@@ -166,11 +164,11 @@ extern "C" int cu_body_force_tet4_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::body_force_d3_simplex_residual_block<double, 1, 4, 1>(ne, geometry_stride, (const double *)determinant, sfem::codegen::ref_tet4_q1<double>::shape(), sfem::codegen::quad_tet_q1<double>::q_weight(), density, g0, g1, g2, (double *const *)output);
+        sfem::codegen::body_force_d3_simplex_residual_block<double, 1, 4>(ne, geometry_stride, (const double *)determinant, sfem::codegen::ref_tet4_q1<double>::shape(), sfem::codegen::quad_tet_q1<double>::q_weight(), density, g0, g1, g2, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::body_force_d3_simplex_residual_block<float, 1, 4, 1>(ne, geometry_stride, (const float *)determinant, sfem::codegen::ref_tet4_q1<float>::shape(), sfem::codegen::quad_tet_q1<float>::q_weight(), density, g0, g1, g2, (float *const *)output);
+        sfem::codegen::body_force_d3_simplex_residual_block<float, 1, 4>(ne, geometry_stride, (const float *)determinant, sfem::codegen::ref_tet4_q1<float>::shape(), sfem::codegen::quad_tet_q1<float>::q_weight(), density, g0, g1, g2, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -200,7 +198,6 @@ __global__ void body_force_tet4_residual_a_msoa_impl(
   static constexpr int NQ = 1;
   static constexpr int NS = 4;
   static constexpr int NC = 3;
-  static constexpr int VS = 1;
   const s_t *const affine_shape = sfem::codegen::ref_tet4_q1<s_t>::shape();
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
@@ -209,21 +206,21 @@ __global__ void body_force_tet4_residual_a_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    s_t boutput[NC * NS][VS];
+    s_t boutput[NC * NS];
 
     for (int stream = 0; stream < 12; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
     const g_t *const affine_geometry_sources[1] = {g_det0 + evb};
-    s_t baffine_geometry_data[1][VS];
+    s_t baffine_geometry_data[1];
     const s_t *bageom_streams[1];
-    bageom_streams[0] = ageom_stream<s_t, g_t, VS>(
-        ne, affine_geometry_sources[0], baffine_geometry_data[0], std::is_same<g_t, s_t>());
+    bageom_streams[0] = ageom_stream<s_t, g_t>(
+        ne, affine_geometry_sources[0], &baffine_geometry_data[0], std::is_same<g_t, s_t>());
 
-    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[0], affine_shape, affine_q_weight, density, g0, g1, g2, boutput);
+    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS>(ne, 0, bageom_streams[0], affine_shape, affine_q_weight, density, g0, g1, g2, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -231,8 +228,8 @@ __global__ void body_force_tet4_residual_a_msoa_impl(
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }

@@ -3415,7 +3415,7 @@ static int laplace_proteus_hex8_hessian_i_msoa_assemble_impl(
     geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
         ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    laplace_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, element_matrix);
+    laplace_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, kappa, element_matrix);
 
     if constexpr (FORMAT == 1) {
       laplace_proteus_hex8_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);

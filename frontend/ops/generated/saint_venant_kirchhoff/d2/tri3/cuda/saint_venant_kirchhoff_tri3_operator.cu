@@ -11,7 +11,7 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -20,7 +20,7 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
     const int,
     const g_t *const RSTR source,
@@ -91,7 +91,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_saint_venant_kirchhoff_tri
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -119,13 +119,13 @@ __global__ void saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][1];
-    s_t bh_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -135,38 +135,38 @@ __global__ void saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy};
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
-    s_t badj0_data[1];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[1];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[1];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[1];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[1];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        ne, g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        ne, g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        ne, g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        ne, g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
     for (int step = 0; step < nsteps; ++step) {
       {
@@ -174,7 +174,7 @@ __global__ void saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl(
       }
     }
 
-    saint_venant_kirchhoff_d2_simplex_tri3_objective_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    saint_venant_kirchhoff_d2_simplex_tri3_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -209,13 +209,13 @@ extern "C" int cu_saint_venant_kirchhoff_tri3_objective_steps_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
+        sfem::codegen::saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
+        sfem::codegen::saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, nsteps, (const float *)steps, (float *)value);
         return sfem::codegen::launch_status("saint_venant_kirchhoff_tri3_objective_steps_a_msoa_impl");
     }
     default:
@@ -283,7 +283,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_saint_venant_kirchhoff_tri
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void saint_venant_kirchhoff_tri3_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -308,13 +308,13 @@ __global__ void saint_venant_kirchhoff_tri3_gradient_a_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][1];
-    s_t bout_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bout_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -322,52 +322,52 @@ __global__ void saint_venant_kirchhoff_tri3_gradient_a_msoa_impl(
     const s_t *const u_components[NC] = {ux, uy};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
-    s_t badj0_data[1];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[1];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[1];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[1];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[1];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        ne, g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        ne, g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        ne, g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        ne, g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    saint_venant_kirchhoff_d2_simplex_tri3_gradient_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d2_simplex_tri3_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -401,13 +401,13 @@ extern "C" int cu_saint_venant_kirchhoff_tri3_gradient_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::saint_venant_kirchhoff_tri3_gradient_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
+        sfem::codegen::saint_venant_kirchhoff_tri3_gradient_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, out_stride, (double *)outx, (double *)outy);
         return sfem::codegen::launch_status("saint_venant_kirchhoff_tri3_gradient_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::saint_venant_kirchhoff_tri3_gradient_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
+        sfem::codegen::saint_venant_kirchhoff_tri3_gradient_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, out_stride, (float *)outx, (float *)outy);
         return sfem::codegen::launch_status("saint_venant_kirchhoff_tri3_gradient_a_msoa_impl");
     }
     default:
@@ -475,7 +475,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_saint_venant_kirchhoff_tri
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void saint_venant_kirchhoff_tri3_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -503,14 +503,14 @@ __global__ void saint_venant_kirchhoff_tri3_apply_a_msoa_impl(
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][1];
-    s_t bh_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
+    s_t bout_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -519,57 +519,57 @@ __global__ void saint_venant_kirchhoff_tri3_apply_a_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
-    s_t badj0_data[1];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[1];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[1];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[1];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[1];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        ne, g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        ne, g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        ne, g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        ne, g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    saint_venant_kirchhoff_d2_simplex_tri3_apply_block<s_t, NS, 1>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
+    saint_venant_kirchhoff_d2_simplex_tri3_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -606,13 +606,13 @@ extern "C" int cu_saint_venant_kirchhoff_tri3_apply_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::saint_venant_kirchhoff_tri3_apply_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
+        sfem::codegen::saint_venant_kirchhoff_tri3_apply_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, h_stride, (const double *)hx, (const double *)hy, out_stride, (double *)outx, (double *)outy);
         return sfem::codegen::launch_status("saint_venant_kirchhoff_tri3_apply_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::saint_venant_kirchhoff_tri3_apply_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
+        sfem::codegen::saint_venant_kirchhoff_tri3_apply_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, h_stride, (const float *)hx, (const float *)hy, out_stride, (float *)outx, (float *)outy);
         return sfem::codegen::launch_status("saint_venant_kirchhoff_tri3_apply_a_msoa_impl");
     }
     default:

@@ -26,7 +26,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_objective_block(
         const int ne,
         const ptrdiff_t geometry_stride,
@@ -47,18 +47,17 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_objective_blo
         s_t *const RSTR value
 ) {
   static_assert(NQ > 0, "NQ must be positive");
-  static_assert(VS > 0, "VS must be positive");
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
-      s_t gu_ref0_values[1];
-      s_t grad_h_ref0_values[1];
-      s_t gu_ref1_values[1];
-      s_t grad_h_ref1_values[1];
+      s_t gu_ref0_values;
+      s_t grad_h_ref0_values;
+      s_t gu_ref1_values;
+      s_t grad_h_ref1_values;
       {
-        gu_ref0_values[0] = s_t(0);
-        grad_h_ref0_values[0] = s_t(0);
-        gu_ref1_values[0] = s_t(0);
-        grad_h_ref1_values[0] = s_t(0);
+        gu_ref0_values = s_t(0);
+        grad_h_ref0_values = s_t(0);
+        gu_ref1_values = s_t(0);
+        grad_h_ref1_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t gref0 = grad_ref_x[q * NS + shape];
@@ -66,14 +65,14 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_objective_blo
         const s_t *const RSTR u_shape0 = u_streams[shape];
         const s_t *const RSTR h_shape0 = h_streams[shape];
         {
-          gu_ref0_values[0] += u_shape0[0] * gref0;
-          grad_h_ref0_values[0] += h_shape0[0] * gref0;
-          gu_ref1_values[0] += u_shape0[0] * gref1;
-          grad_h_ref1_values[0] += h_shape0[0] * gref1;
+          gu_ref0_values += u_shape0[0] * gref0;
+          grad_h_ref0_values += h_shape0[0] * gref0;
+          gu_ref1_values += u_shape0[0] * gref1;
+          grad_h_ref1_values += h_shape0[0] * gref1;
         }
       }
-      s_t gu_base_v[2 * VS];
-      s_t trial_grad_v[2 * VS];
+      s_t gu_base_v[2];
+      s_t trial_grad_v[2];
       {
       const ptrdiff_t goff = q * geometry_stride + 0;
       const s_t adj_value0 = adj0[goff];
@@ -81,30 +80,30 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_objective_blo
       const s_t adj_value2 = adj2[goff];
       const s_t adj_value3 = adj3[goff];
       const s_t det_value0 = det0[goff];
-      const s_t gu_ref0 = gu_ref0_values[0];
-      const s_t grad_h_ref0 = grad_h_ref0_values[0];
-      const s_t gu_ref1 = gu_ref1_values[0];
-      const s_t grad_h_ref1 = grad_h_ref1_values[0];
+      const s_t gu_ref0 = gu_ref0_values;
+      const s_t grad_h_ref0 = grad_h_ref0_values;
+      const s_t gu_ref1 = gu_ref1_values;
+      const s_t grad_h_ref1 = grad_h_ref1_values;
     const s_t idet = s_t(1) / det_value0;
-    gu_base_v[0 * VS + 0] = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
-    trial_grad_v[0 * VS + 0] = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
-    gu_base_v[1 * VS + 0] = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
-    trial_grad_v[1 * VS + 0] = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
+    gu_base_v[0] = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+    trial_grad_v[0] = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
+    gu_base_v[1] = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+    trial_grad_v[1] = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
       }
       for (int step = 0; step < nsteps; ++step) {
         const s_t alpha = steps[step];
         {
           const ptrdiff_t goff = q * geometry_stride + 0;
           const s_t det_value0 = det0[goff];
-          const s_t gu0 = gu_base_v[0 * VS + 0] + alpha * trial_grad_v[0 * VS + 0];
-          const s_t gu1 = gu_base_v[1 * VS + 0] + alpha * trial_grad_v[1 * VS + 0];
+          const s_t gu0 = gu_base_v[0] + alpha * trial_grad_v[0];
+          const s_t gu1 = gu_base_v[1] + alpha * trial_grad_v[1];
     value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1)));
         }
       }
     }
 }
 
-template <typename s_t, int NS, int VS>
+template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_objective_block(
         const int ne,
         const s_t *const RSTR adj0,
@@ -120,11 +119,10 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_objectiv
         const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
-  static_assert(VS > 0, "VS must be positive");
     {
       const s_t qw = (s_t(1) / s_t(2));
-      s_t gu_base_v[2 * VS];
-      s_t trial_grad_v[2 * VS];
+      s_t gu_base_v[2];
+      s_t trial_grad_v[2];
       {
       const ptrdiff_t goff = 0;
       const s_t adj_value0 = adj0[goff];
@@ -137,25 +135,25 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_objectiv
       const s_t gu_ref1 = -(u_streams[0][0]) + u_streams[2][0];
       const s_t grad_h_ref1 = -(h_streams[0][0]) + h_streams[2][0];
       const s_t idet = s_t(1) / det_value0;
-      gu_base_v[0 * VS + 0] = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
-      trial_grad_v[0 * VS + 0] = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
-      gu_base_v[1 * VS + 0] = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
-      trial_grad_v[1 * VS + 0] = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
+      gu_base_v[0] = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
+      trial_grad_v[0] = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
+      gu_base_v[1] = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
+      trial_grad_v[1] = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
       }
       for (int step = 0; step < nsteps; ++step) {
         const s_t alpha = steps[step];
         {
           const ptrdiff_t goff = 0;
           const s_t det_value0 = det0[goff];
-          const s_t gu0 = gu_base_v[0 * VS + 0] + alpha * trial_grad_v[0 * VS + 0];
-          const s_t gu1 = gu_base_v[1 * VS + 0] + alpha * trial_grad_v[1 * VS + 0];
+          const s_t gu0 = gu_base_v[0] + alpha * trial_grad_v[0];
+          const s_t gu1 = gu_base_v[1] + alpha * trial_grad_v[1];
     value[step * value_stride + 0] += qw * det_value0 * (((s_t(1) / s_t(2)))*kappa*(pow_2(gu0) + pow_2(gu1)));
         }
       }
     }
 }
 
-template <typename s_t, int NS, int VS>
+template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_objective_block(
         const int ne,
         const s_t *const RSTR geom_metric0,
@@ -169,7 +167,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_o
         const ptrdiff_t value_stride,
         s_t *const RSTR value
 ) {
-  static_assert(VS > 0, "VS must be positive");
     for (int step = 0; step < nsteps; ++step) {
       const s_t alpha = steps[step];
       {
@@ -189,7 +186,7 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_o
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_gradient_block(
         const int ne,
         const ptrdiff_t geometry_stride,
@@ -206,24 +203,23 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_gradient_bloc
         s_t *const RSTR out_streams[NS * 1]
 ) {
   static_assert(NQ > 0, "NQ must be positive");
-  static_assert(VS > 0, "VS must be positive");
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
-      s_t gu_ref0_values[1];
-      s_t gu_ref1_values[1];
-      s_t loperand0_values[1];
-      s_t loperand1_values[1];
+      s_t gu_ref0_values;
+      s_t gu_ref1_values;
+      s_t loperand0_values;
+      s_t loperand1_values;
       {
-        gu_ref0_values[0] = s_t(0);
-        gu_ref1_values[0] = s_t(0);
+        gu_ref0_values = s_t(0);
+        gu_ref1_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t gref0 = grad_ref_x[q * NS + shape];
         const s_t gref1 = grad_ref_y[q * NS + shape];
         const s_t *const RSTR u_shape0 = u_streams[shape];
         {
-          gu_ref0_values[0] += u_shape0[0] * gref0;
-          gu_ref1_values[0] += u_shape0[0] * gref1;
+          gu_ref0_values += u_shape0[0] * gref0;
+          gu_ref1_values += u_shape0[0] * gref1;
         }
       }
       {
@@ -233,8 +229,8 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_gradient_bloc
       const s_t adj_value2 = adj2[goff];
       const s_t adj_value3 = adj3[goff];
       const s_t det_value0 = det0[goff];
-      const s_t gu_ref0 = gu_ref0_values[0];
-      const s_t gu_ref1 = gu_ref1_values[0];
+      const s_t gu_ref0 = gu_ref0_values;
+      const s_t gu_ref1 = gu_ref1_values;
     const s_t idet = s_t(1) / det_value0;
     const s_t gu0 = (gu_ref0 * adj_value0 + gu_ref1 * adj_value2) * idet;
     const s_t gu1 = (gu_ref0 * adj_value1 + gu_ref1 * adj_value3) * idet;
@@ -242,21 +238,21 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_gradient_bloc
     const s_t material1 = gu1*kappa;
     const s_t loperand0 = qw * (material0 * adj_value0 + material1 * adj_value1);
     const s_t loperand1 = qw * (material0 * adj_value2 + material1 * adj_value3);
-      loperand0_values[0] = loperand0;
-      loperand1_values[0] = loperand1;
+      loperand0_values = loperand0;
+      loperand1_values = loperand1;
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];
         const s_t tref1 = grad_ref_y[q * NS + shape];
         s_t *const RSTR out_shape0 = out_streams[shape];
         {
-          out_shape0[0] += loperand0_values[0] * tref0 + loperand1_values[0] * tref1;
+          out_shape0[0] += loperand0_values * tref0 + loperand1_values * tref1;
         }
       }
     }
 }
 
-template <typename s_t, int NS, int VS>
+template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_gradient_block(
         const int ne,
         const s_t *const RSTR adj0,
@@ -268,7 +264,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_gradient
         const s_t *const RSTR u_streams[NS * 1],
         s_t *const RSTR out_streams[NS * 1]
 ) {
-  static_assert(VS > 0, "VS must be positive");
     {
       const s_t qw = (s_t(1) / s_t(2));
       {
@@ -294,7 +289,7 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_gradient
     }
 }
 
-template <typename s_t, int NS, int VS>
+template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_gradient_block(
         const int ne,
         const s_t *const RSTR geom_metric0,
@@ -304,7 +299,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_g
         const s_t *const RSTR u_streams[NS * 1],
         s_t *const RSTR out_streams[NS * 1]
 ) {
-  static_assert(VS > 0, "VS must be positive");
     {
       const ptrdiff_t goff = 0;
       const s_t geom_metric_value0 = geom_metric0[goff];
@@ -320,7 +314,7 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_g
     }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_apply_block(
         const int ne,
         const ptrdiff_t geometry_stride,
@@ -337,24 +331,23 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_apply_block(
         s_t *const RSTR out_streams[NS * 1]
 ) {
   static_assert(NQ > 0, "NQ must be positive");
-  static_assert(VS > 0, "VS must be positive");
     for (int q = 0; q < NQ; ++q) {
       const s_t qw = q_weight[q];
-      s_t grad_h_ref0_values[1];
-      s_t grad_h_ref1_values[1];
-      s_t loperand0_values[1];
-      s_t loperand1_values[1];
+      s_t grad_h_ref0_values;
+      s_t grad_h_ref1_values;
+      s_t loperand0_values;
+      s_t loperand1_values;
       {
-        grad_h_ref0_values[0] = s_t(0);
-        grad_h_ref1_values[0] = s_t(0);
+        grad_h_ref0_values = s_t(0);
+        grad_h_ref1_values = s_t(0);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t gref0 = grad_ref_x[q * NS + shape];
         const s_t gref1 = grad_ref_y[q * NS + shape];
         const s_t *const RSTR h_shape0 = h_streams[shape];
         {
-          grad_h_ref0_values[0] += h_shape0[0] * gref0;
-          grad_h_ref1_values[0] += h_shape0[0] * gref1;
+          grad_h_ref0_values += h_shape0[0] * gref0;
+          grad_h_ref1_values += h_shape0[0] * gref1;
         }
       }
       {
@@ -364,8 +357,8 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_apply_block(
       const s_t adj_value2 = adj2[goff];
       const s_t adj_value3 = adj3[goff];
       const s_t det_value0 = det0[goff];
-      const s_t grad_h_ref0 = grad_h_ref0_values[0];
-      const s_t grad_h_ref1 = grad_h_ref1_values[0];
+      const s_t grad_h_ref0 = grad_h_ref0_values;
+      const s_t grad_h_ref1 = grad_h_ref1_values;
     const s_t idet = s_t(1) / det_value0;
     const s_t trial_grad0 = (grad_h_ref0 * adj_value0 + grad_h_ref1 * adj_value2) * idet;
     const s_t trial_grad1 = (grad_h_ref0 * adj_value1 + grad_h_ref1 * adj_value3) * idet;
@@ -373,21 +366,21 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_apply_block(
     const s_t material1 = kappa*trial_grad1;
     const s_t loperand0 = qw * (material0 * adj_value0 + material1 * adj_value1);
     const s_t loperand1 = qw * (material0 * adj_value2 + material1 * adj_value3);
-      loperand0_values[0] = loperand0;
-      loperand1_values[0] = loperand1;
+      loperand0_values = loperand0;
+      loperand1_values = loperand1;
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];
         const s_t tref1 = grad_ref_y[q * NS + shape];
         s_t *const RSTR out_shape0 = out_streams[shape];
         {
-          out_shape0[0] += loperand0_values[0] * tref0 + loperand1_values[0] * tref1;
+          out_shape0[0] += loperand0_values * tref0 + loperand1_values * tref1;
         }
       }
     }
 }
 
-template <typename s_t, int NS, int VS>
+template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_apply_block(
         const int ne,
         const s_t *const RSTR adj0,
@@ -399,7 +392,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_apply_bl
         const s_t *const RSTR h_streams[NS * 1],
         s_t *const RSTR out_streams[NS * 1]
 ) {
-  static_assert(VS > 0, "VS must be positive");
     {
       const s_t qw = (s_t(1) / s_t(2));
       {
@@ -425,7 +417,7 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_apply_bl
     }
 }
 
-template <typename s_t, int NS, int VS>
+template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_apply_block(
         const int ne,
         const s_t *const RSTR geom_metric0,
@@ -435,7 +427,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_a
         const s_t *const RSTR h_streams[NS * 1],
         s_t *const RSTR out_streams[NS * 1]
 ) {
-  static_assert(VS > 0, "VS must be positive");
     {
       const ptrdiff_t goff = 0;
       const s_t geom_metric_value0 = geom_metric0[goff];

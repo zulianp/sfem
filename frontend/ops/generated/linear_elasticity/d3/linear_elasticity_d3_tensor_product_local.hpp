@@ -62,8 +62,8 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_objective_block(
   static constexpr int NS1 = integer_root(NS, 3);
   static_assert(ipow(NQ1, 3) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
-  s_t gu_ref_q[NQ * 9 * VS];
-  s_t grad_h_ref_q[NQ * 9 * VS];
+  s_t gu_ref_q[9 * NQ * VS];
+  s_t grad_h_ref_q[9 * NQ * VS];
   tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
   tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
   tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ * VS]);
@@ -186,8 +186,8 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_gradient_block(
   static constexpr int NS1 = integer_root(NS, 3);
   static_assert(ipow(NQ1, 3) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
-  s_t gu_ref_q[NQ * 9 * VS];
-  s_t loperand_q[NQ * 9 * VS];
+  s_t gu_ref_q[9 * NQ * VS];
+  s_t loperand_q[9 * NQ * VS];
   tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 0, &gu_ref_q[0]);
   tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 1, &gu_ref_q[3 * NQ * VS]);
   tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, u_streams, 2, &gu_ref_q[6 * NQ * VS]);
@@ -307,8 +307,8 @@ static SFEM_INLINE void linear_elasticity_d3_tensor_product_apply_block(
   static constexpr int NS1 = integer_root(NS, 3);
   static_assert(ipow(NQ1, 3) == NQ, "NQ must be tensor-product compatible");
   static_assert(ipow(NS1, 3) == NS, "NS must be tensor-product compatible");
-  s_t grad_h_ref_q[NQ * 9 * VS];
-  s_t loperand_q[NQ * 9 * VS];
+  s_t grad_h_ref_q[9 * NQ * VS];
+  s_t loperand_q[9 * NQ * VS];
   tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 0, &grad_h_ref_q[0]);
   tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 1, &grad_h_ref_q[3 * NQ * VS]);
   tensor_gradient<s_t, NQ, NS, VS, 3, 3>(ne, shape_1d, grad_1d, h_streams, 2, &grad_h_ref_q[6 * NQ * VS]);
