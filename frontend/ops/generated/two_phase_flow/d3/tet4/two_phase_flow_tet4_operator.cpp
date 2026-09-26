@@ -408,11 +408,11 @@ extern "C" int two_phase_flow_tet4_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_d3_simplex_residual_block<double, 11, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q11<double>::shape(), sfem::codegen::ref_tet4_q11<double>::grad_ref_x(), sfem::codegen::ref_tet4_q11<double>::grad_ref_y(), sfem::codegen::ref_tet4_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), (const double *const *)current, (const double *const *)previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
+        sfem::codegen::two_phase_flow_d3_simplex_tet4_residual_block<double, 11, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q11<double>::shape(), sfem::codegen::ref_tet4_q11<double>::grad_ref_x(), sfem::codegen::ref_tet4_q11<double>::grad_ref_y(), sfem::codegen::ref_tet4_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), (const double *const *)current, (const double *const *)previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_d3_simplex_residual_block<float, 11, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q11<float>::shape(), sfem::codegen::ref_tet4_q11<float>::grad_ref_x(), sfem::codegen::ref_tet4_q11<float>::grad_ref_y(), sfem::codegen::ref_tet4_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), (const float *const *)current, (const float *const *)previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
+        sfem::codegen::two_phase_flow_d3_simplex_tet4_residual_block<float, 11, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q11<float>::shape(), sfem::codegen::ref_tet4_q11<float>::grad_ref_x(), sfem::codegen::ref_tet4_q11<float>::grad_ref_y(), sfem::codegen::ref_tet4_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), (const float *const *)current, (const float *const *)previous, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -526,7 +526,7 @@ static SFEM_INLINE int two_phase_flow_tet4_residual_a_msoa_impl(
       badjugate[component] = bageom_streams[component];
     }
 
-    two_phase_flow_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[9], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, boutput);
+    two_phase_flow_d3_simplex_tet4_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[9], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, boutput);
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -650,11 +650,11 @@ extern "C" int two_phase_flow_tet4_jacobian_action_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_d3_simplex_jacobian_action_block<double, 11, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q11<double>::shape(), sfem::codegen::ref_tet4_q11<double>::grad_ref_x(), sfem::codegen::ref_tet4_q11<double>::grad_ref_y(), sfem::codegen::ref_tet4_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), (const double *const *)current, (const double *const *)direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
+        sfem::codegen::two_phase_flow_d3_simplex_tet4_jacobian_action_block<double, 11, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q11<double>::shape(), sfem::codegen::ref_tet4_q11<double>::grad_ref_x(), sfem::codegen::ref_tet4_q11<double>::grad_ref_y(), sfem::codegen::ref_tet4_q11<double>::grad_ref_z(), sfem::codegen::quad_tet_q11<double>::q_weight(), (const double *const *)current, (const double *const *)direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_d3_simplex_jacobian_action_block<float, 11, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q11<float>::shape(), sfem::codegen::ref_tet4_q11<float>::grad_ref_x(), sfem::codegen::ref_tet4_q11<float>::grad_ref_y(), sfem::codegen::ref_tet4_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), (const float *const *)current, (const float *const *)direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
+        sfem::codegen::two_phase_flow_d3_simplex_tet4_jacobian_action_block<float, 11, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q11<float>::shape(), sfem::codegen::ref_tet4_q11<float>::grad_ref_x(), sfem::codegen::ref_tet4_q11<float>::grad_ref_y(), sfem::codegen::ref_tet4_q11<float>::grad_ref_z(), sfem::codegen::quad_tet_q11<float>::q_weight(), (const float *const *)current, (const float *const *)direction, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -768,7 +768,7 @@ static SFEM_INLINE int two_phase_flow_tet4_jacobian_action_a_msoa_impl(
       badjugate[component] = bageom_streams[component];
     }
 
-    two_phase_flow_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[9], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bdirection, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, boutput);
+    two_phase_flow_d3_simplex_tet4_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[9], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bdirection, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, boutput);
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {

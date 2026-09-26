@@ -101,68 +101,46 @@ __host__ __device__ __forceinline__ void body_force_d2_simplex_residual_block_co
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void body_force_d2_simplex_tri3_residual_block(
     const int ne,
-    const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
-    const s_t *const RSTR shape,
-    const s_t *const RSTR q_weight,
     const s_t density,
     const s_t g0,
     const s_t g1,
     s_t *const RSTR output[2 * NS]
 ) {
-  static constexpr int NC = 2;
-  for (int q = 0; q < NQ; ++q) {
-    s_t value_coeff0_values;
-    s_t value_coeff1_values;
-    {
-      const s_t value_coeff0 = -density*g0;
-      const s_t value_coeff1 = -density*g1;
-      value_coeff0_values = value_coeff0;
-      value_coeff1_values = value_coeff1;
-    }
-    for (int test = 0; test < NS; ++test) {
-      {
-        const ptrdiff_t goff = q * geometry_stride;
-        const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values * test_value);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values * test_value);
-      }
-    }
+  {
+    const ptrdiff_t goff = 0;
+    const s_t det = determinant[goff];
+    const s_t value_coeff0 = -density*g0;
+    const s_t value_coeff1 = -density*g1;
+    output[0][0] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff0));
+    output[1][0] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff1));
+    output[2][0] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff0));
+    output[3][0] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff1));
+    output[4][0] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff0));
+    output[5][0] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff1));
   }
 }
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void body_force_d2_simplex_tri3_residual_block_contiguous(
     const int ne,
-    const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
-    const s_t *const RSTR shape,
-    const s_t *const RSTR q_weight,
     const s_t density,
     const s_t g0,
     const s_t g1,
     s_t output[2 * NS]
 ) {
-  static constexpr int NC = 2;
-  for (int q = 0; q < NQ; ++q) {
-    s_t value_coeff0_values;
-    s_t value_coeff1_values;
-    {
-      const s_t value_coeff0 = -density*g0;
-      const s_t value_coeff1 = -density*g1;
-      value_coeff0_values = value_coeff0;
-      value_coeff1_values = value_coeff1;
-    }
-    for (int test = 0; test < NS; ++test) {
-      {
-        const ptrdiff_t goff = q * geometry_stride;
-        const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
-        output[test * NC] += q_weight[q] * det * (value_coeff0_values * test_value);
-        output[test * NC + 1] += q_weight[q] * det * (value_coeff1_values * test_value);
-      }
-    }
+  {
+    const ptrdiff_t goff = 0;
+    const s_t det = determinant[goff];
+    const s_t value_coeff0 = -density*g0;
+    const s_t value_coeff1 = -density*g1;
+    output[0] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff0));
+    output[1] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff1));
+    output[2] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff0));
+    output[3] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff1));
+    output[4] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff0));
+    output[5] += ((s_t(1) / s_t(2))) * (det) * (((s_t(1) / s_t(3))) * (value_coeff1));
   }
 }
 

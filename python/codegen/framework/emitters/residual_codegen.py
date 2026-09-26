@@ -199,6 +199,8 @@ from codegen.framework.plans.affine_element_kernel import (
 from codegen.framework.plans.geometry_variants import geometry_variant_plan
 from codegen.framework.plans.form_transformations import (
     constant_p1_simplex_reference_gradients,
+    constant_p1_simplex_shape_values,
+    constant_p1_simplex_weight,
     simplex_gradient_metric_transformation,
     symmetric_metric_component_count,
     symmetric_metric_component_index,
@@ -3213,7 +3215,8 @@ def _mesh_stream_arguments(dependencies, fields, output=True):
 
 
 def _block_stream_plans(
-    dependencies, dim, n_fields, tensor_product, gradient_metric=None
+    dependencies, dim, n_fields, tensor_product, gradient_metric=None,
+    needs_reference_basis=True,
 ):
     """The streams a block call site hands its local kernel, in the plan's order.
 
@@ -3222,9 +3225,14 @@ def _block_stream_plans(
     metric or determinant, adjugate when the form needs one, one-dimensional or
     simplex reference basis -- in four near-identical copies that nothing held
     to the signature they were calling.
+
+    ``needs_reference_basis`` is the one answer that has to travel: a closed-form
+    kernel declares none of the reference streams, so a call site left at the
+    default would hand it three arguments the signature no longer has.
     """
     return local_kernel_stream_plans(
         dependencies,
+        needs_reference_basis=needs_reference_basis,
         dim=dim,
         n_fields=n_fields,
         tensor_product=tensor_product,
@@ -3422,7 +3430,18 @@ def _local_function(
         gradient_metric,
         constant_p1_gradient_expansion,
     )
-    params = ["const int ne", "const ptrdiff_t geometry_stride"]
+    # The whole reference basis, not the gradients alone: a closed-form body
+    # folds the shape values and the weight too, so `shape`, `grad_ref` and
+    # `q_weight` are three dead parameters at every call site.  Distinct from
+    # `folds_gradients` because the gradient-metric kernel folds only the
+    # gradients -- the basis is contracted into the metric before it is called,
+    # and the weight still crosses the boundary.
+    folds_basis = (
+        not tensor_product
+        and constant_p1_gradient_expansion
+        and _uses_constant_p1_expansion(rule)
+    )
+    params = list(_LOCAL_KERNEL_COUNT_PARAMS[bool(folds_basis)])
     params.extend(
         _declare_stream(stream)
         for stream in local_kernel_stream_plans(
@@ -3434,6 +3453,7 @@ def _local_function(
             metric_components=symmetric_metric_component_count(dim),
             stream_layout=stream_layout,
             grad_ref_name=lambda d: sfem_simplex_grad_ref_name("grad_ref", d),
+            needs_reference_basis=not folds_basis,
             needs_reference_gradients=not folds_gradients,
         )
     )
@@ -4651,6 +4671,22 @@ def _simplex_state_transform_nodes(system, dependencies, usage, stepped=False):
     )
 
 
+#: What a local kernel takes before its streams, keyed on whether it evaluates in
+#: closed form.  A stride *between quadrature points* is meaningless where there
+#: is one point: every caller passed either a literal zero or a stride that
+#: multiplied an index of zero, and the folded body reads the work item alone.
+_LOCAL_KERNEL_COUNT_PARAMS = {
+    True: ("const int ne",),
+    False: ("const int ne", "const ptrdiff_t geometry_stride"),
+}
+
+#: The arguments that match it, for a call site that names its own.
+_LOCAL_KERNEL_COUNT_ARGS = {
+    True: lambda count, stride: [count],
+    False: lambda count, stride: [count, stride],
+}
+
+
 def _folds_reference_gradients(system, rule, coefficients, dependencies,
                                gradient_metric, constant_p1_gradient_expansion):
     """Whether the body about to be built reads no reference gradient tables.
@@ -4669,9 +4705,7 @@ def _folds_reference_gradients(system, rule, coefficients, dependencies,
         return True
     if not constant_p1_gradient_expansion:
         return False
-    return _uses_constant_p1_gradient_expansion(
-        system, dependencies, constant_p1_simplex_reference_gradients(rule)
-    )
+    return _uses_constant_p1_expansion(rule)
 
 
 def _simplex_local_body(
@@ -4693,15 +4727,15 @@ def _simplex_local_body(
                 system, rule, dependencies, gradient_metric, stream_layout
             ),
         )
-    reference_gradients = constant_p1_simplex_reference_gradients(rule)
-    if constant_p1_gradient_expansion and _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
+    if constant_p1_gradient_expansion and _uses_constant_p1_expansion(rule):
         return (
-            _constant_p1_gradient_expanded_body(
+            _constant_p1_expanded_body(
                 system,
+                rule,
                 coefficients,
                 dependencies,
-                reference_gradients,
                 stream_layout,
+                stepped,
             ),
         )
 
@@ -4915,18 +4949,23 @@ def _basis_gradient_nodes(
     return nodes
 
 
-def _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
-    if reference_gradients is None:
-        return False
-    if any(dependencies.value_coefficients):
-        return False
-    if not dependencies.uses_test_gradients:
-        return False
-    if dependencies.current_value or dependencies.previous_value or dependencies.direction_value:
-        return False
-    if not dependencies.uses_trial_gradients:
-        return False
-    return len(reference_gradients) == system.dim + 1
+def _uses_constant_p1_expansion(rule):
+    """Whether this rule's element evaluates in closed form.
+
+    One question, about the element: `plans.evaluation_strategy` says a
+    lowest-order simplex is EXPANDED, and `constant_p1_simplex_shape_values`
+    answers whether this particular rule is the one-point rule that makes the
+    basis constant.
+
+    It used to ask five more, all about the *form* -- no value coefficients, no
+    field values, test gradients present, trial gradients present -- because the
+    body could only fold the reference gradients and a form reading anything else
+    had to fall back.  The body folds the shape values and the weight as well
+    now, so the strategy is the element's alone, which is what the plan says it
+    is.  Those five refusals were why every TET4 kernel of a material that reads
+    a field value carried the quadrature body and its tables.
+    """
+    return constant_p1_simplex_shape_values(rule) is not None
 
 
 def _reference_gradient_expr(reference_gradients, shape, component):
@@ -5000,22 +5039,87 @@ def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients,
     return nodes
 
 
-def _constant_p1_gradient_expanded_body(system, coefficients, dependencies,
-                                        reference_gradients,
-                                        stream_layout="pointer"):
-    """The expanded constant-P1 gradient kernel, built as IR.
+def _constant_p1_state_value_nodes(system, dependencies, shape_values,
+                                   stream_layout="pointer"):
+    """The element's state *values*, on an element whose basis is constant.
 
-    The second kernel whose body is a tree rather than a list of strings, and
-    the one that shows the first generalises.  It is the same quadrature-over-
-    lane nest, but fed by five statement sources instead of two -- the geometry
-    loads, the reference-gradient contraction, the chain rule, the CSE'd
-    coefficients and the test-function gradients -- each of which now hands
-    back nodes.
+    The twin of `_constant_p1_state_gradient_nodes`, and the piece that was
+    missing: a form reading a field's value -- a viscoelastic material reads the
+    current and the previous state, a body force contracts a test value against
+    a source -- went to the general body, which accumulates over trial functions
+    with `shape[q * NS + trial]` out of a table.  On a one-point rule over a
+    constant basis those shape values are constants, so the accumulation is a
+    folded sum and there is no table and no trial loop.
+
+    The symbol is the stem itself, which is what the lowered form's coefficient
+    expressions are printed against -- the same naming
+    `_simplex_state_transform_nodes` gives the staged version.
+    """
+    n_fields = len(system.fields)
+    groups = _dependency_stream_groups(dependencies)
+    nodes = []
+    for field_index, field in enumerate(system.fields):
+        for group in groups:
+            read = field_stream_usage(dependencies, field, group.name)
+            if not read.uses_value:
+                continue
+            stem = field.name + group.symbol_suffix
+            terms = [
+                _scaled_cpp_term(
+                    shape_values[shape],
+                    ('%s[%d]' + _stream_slot(stream_layout))
+                    % (group.name, shape * n_fields + field_index),
+                )
+                for shape in range(len(shape_values))
+                if shape_values[shape] != 0
+            ]
+            nodes.append(
+                BufferDeclNode(
+                    "const s_t", stem, (), expr_ref(_sum_cpp_terms(terms))
+                )
+            )
+    return nodes
+
+
+def _constant_p1_expanded_body(system, rule, coefficients, dependencies,
+                               stream_layout="pointer", stepped=False):
+    """The constant-P1 kernel, with every constant of its rule folded in.
+
+    `plans.evaluation_strategy` calls this element's strategy EXPANDED: *no
+    quadrature loop and no per-point data at all*.  Three constants stand behind
+    that, and this body now folds all three rather than the gradients alone --
+    the reference gradients, the shape values and the single quadrature weight,
+    from `constant_p1_simplex_reference_gradients`,
+    `constant_p1_simplex_shape_values` and `constant_p1_simplex_weight`.  What it
+    used to leave behind was `q_weight[q]` in the measure and, for any form that
+    reads a field's value or contracts a test value, the whole general body with
+    its `shape[q * NS + trial]` table and its trial loop.
+
+    So the reach widened with the folding.  The body was taken only by a form
+    that contracts test gradients and nothing else; every other form on a TET4
+    fell back to the quadrature body, which is why a `_tet4_` kernel was a
+    verbatim copy of the generic one under a different name.
+
+    The test functions are unrolled, because that is what lets their values and
+    gradients be constants at all, and the scatter is written per test.
     """
     dim = system.dim
     n_fields = len(system.fields)
+    reference_gradients = constant_p1_simplex_reference_gradients(rule)
+    shape_values = constant_p1_simplex_shape_values(rule)
+    weight = constant_p1_simplex_weight(rule)
+    n_shape = len(shape_values)
 
-    body = list(_geometry_value_nodes(dependencies, dim))
+    # The offset is the work item's alone: one point, so there is no point to
+    # stride by, and `q` is not in scope because there is no loop to open it.
+    body = list(
+        _geometry_value_nodes(dependencies, dim, offset=_work_item_index())
+    )
+    body.extend(
+        _constant_p1_state_value_nodes(
+            system, dependencies, shape_values, stream_layout
+        )
+    )
     body.extend(
         _constant_p1_state_gradient_nodes(
             system, dependencies, reference_gradients, stream_layout
@@ -5023,25 +5127,13 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies,
     )
     body.extend(_coefficient_evaluation_nodes(system, coefficients, dependencies))
 
-    for row in range(n_fields):
-        for d in range(dim):
-            if dependencies.gradient_coefficients[row][d]:
-                body.append(
-                    BufferDeclNode(
-                        "const s_t",
-                        "grad_coeff%d_%d_value" % (row, d),
-                        (),
-                        expr_ref("grad_coeff%d_%d" % (row, d)),
-                    )
-                )
-
+    # No staging between the coefficients and the contraction.  The quadrature
+    # body stages them because the two stand in different loops; here everything
+    # is in one work-item scope, so each test function multiplies the coefficient
+    # `_coefficient_evaluation_nodes` already named and a `%s_value = %s` alias
+    # would be a name for a name.
     directions = tuple(live_gradient_directions(dependencies, dim))
-    test_grad_names = {
-        (test, d): "test%d_grad%d" % (test, d)
-        for test in range(dim + 1)
-        for d in directions
-    }
-    for test in range(dim + 1):
+    for test in range(n_shape):
         body.extend(
             _basis_gradient_nodes(
                 "test%d_grad" % test,
@@ -5052,28 +5144,54 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies,
             )
         )
 
-    for test in range(dim + 1):
+    # `det` times the rule's one weight, folded: the measure is a constant of
+    # the element up to the determinant it cannot know.
+    measure = _scaled_cpp_term(weight, "det")
+    for test in range(n_shape):
         for row in range(n_fields):
             terms = [
-                "grad_coeff%d_%d_value * %s" % (row, d, test_grad_names[(test, d)])
-                for d in range(dim)
-                if dependencies.gradient_coefficients[row][d]
+                _CONSTANT_P1_TEST_FACTOR[kind](name, axis, test, shape_values)
+                for kind, axis, name in live_test_coefficients(dependencies, row, dim)
             ]
             if terms:
+                stream = test * n_fields + row
                 body.append(
                     ScatterNode(
                         expr_ref(
-                            ('output[%d]' + _stream_slot(stream_layout))
-                            % (test * n_fields + row)
+                            ('output[%d]' + _stream_slot(stream_layout)) % stream
                         ),
-                        expr_ref("q_weight[q] * det * (%s)" % _sum_cpp_terms(terms)),
+                        expr_ref(
+                            "%s * (%s)" % (measure, _sum_cpp_terms(terms))
+                        ),
                         "+=",
                     )
                 )
 
-    return _quadrature_lane_kernel_node(
-        body, name="constant_p1_gradient_expanded_body"
-    )
+    return _expanded_lane_kernel_node(body)
+
+
+def _expanded_lane_kernel_node(lane_body, name="constant_p1_expanded_body"):
+    """The closed-form body's scope: the work items, and no quadrature loop.
+
+    The sibling of `_quadrature_lane_kernel_node`, and the shape
+    `plans.evaluation_strategy` asks for -- one point, folded, so there is
+    nothing to loop over.  A named node rather than a bare call so the body is
+    still one slice that `tests/test_kernel_ast_slice.py` can reach and hold to
+    being nodes.
+    """
+    return _work_item_loop_node(lane_body)
+
+
+#: What a coefficient of each kind multiplies in the expanded body: the test
+#: function's gradient, which is a folded constant pushed through the geometry,
+#: or its value, which is a constant of the rule and needs no name at all.
+_CONSTANT_P1_TEST_FACTOR = {
+    "value": lambda coefficient, axis, test, shape_values: _scaled_cpp_term(
+        shape_values[test], coefficient
+    ),
+    "gradient": lambda coefficient, axis, test, shape_values: "%s * test%d_grad%d"
+    % (coefficient, test, axis),
+}
 
 
 #: Where a local phase's statements sit.  A phase is either emitted at
@@ -5141,7 +5259,7 @@ def _published_forms(form_dependencies, unit_name="", mixes_energy_and_residual=
     )
 
 
-def _geometry_value_nodes(dependencies, dim):
+def _geometry_value_nodes(dependencies, dim, offset=None):
     """The per-point geometry a body reads, from the plan that decides it.
 
     `plans.geometry_quantities.local_geometry_quantities` already says which of
@@ -5160,7 +5278,9 @@ def _geometry_value_nodes(dependencies, dim):
                     "const ptrdiff_t",
                     "goff",
                     (),
-                    expr_ref(_offset("q", "geometry_stride")),
+                    expr_ref(
+                        _offset("q", "geometry_stride") if offset is None else offset
+                    ),
                 )
             )
         elif quantity.name == "determinant":
@@ -6008,9 +6128,17 @@ def _reference_header_files(rules, references_for):
 
 
 def _reference_includes(rules, references_for):
-    """The shared reference headers a source forwards into, once each."""
+    """The shared reference headers a source forwards into, once each.
+
+    A rule whose element evaluates in closed form contributes none: its kernels
+    name no table, so the header held the accessors for declarations that are
+    gone, and the `#include` outlived the last use of what it brings in.  The
+    test is the strategy's -- one point -- and not "is this a P1 element", whose
+    gradients are constant under a rule of any size while its shape values are
+    not.
+    """
     seen = []
-    for rule in rules:
+    for rule in (rule for rule in rules if not _uses_constant_p1_expansion(rule)):
         for line in reference_include_lines(rule, references_for(rule)):
             if line not in seen:
                 seen.append(line)
@@ -6127,7 +6255,19 @@ def _operator_source(
         coefficients = residual_coeffs if form == "residual" else action_coeffs
         gradient_metric = None
         function = "%s_%s_esoa" % (prefix, form)
-        block = "%s_%s_block" % (local_prefix, form)
+        # The element-SoA entry point reaches the same kernel the mesh operator
+        # does.  Where this element evaluates in closed form that is the
+        # specialisation, which takes no reference data -- so the plan is asked
+        # for the streams with the same answer the signature was built with,
+        # and the entry point stops fetching three tables to pass them on.
+        specialized_block_prefix = _constant_p1_affine_specialized_local_prefix(
+            local_prefix, rule
+        )
+        block_needs_reference_basis = not _uses_constant_p1_expansion(rule)
+        block = "%s_%s_block" % (
+            specialized_block_prefix or local_prefix,
+            form,
+        )
         if True:
             scalar_type = "s_t"
             params = [
@@ -6154,7 +6294,9 @@ def _operator_source(
                 "%s *const RSTR output[%d]"
                 % (scalar_type, n_fields * n_shape)
             )
-            call_args = ["ne", "geometry_stride"]
+            call_args = _LOCAL_KERNEL_COUNT_ARGS[
+                _uses_constant_p1_expansion(rule)
+            ]("ne", "geometry_stride")
             pre_call_lines = []
             if gradient_metric is not None:
                 pre_call_lines.extend(
@@ -6223,6 +6365,7 @@ def _operator_source(
                         grad_ref_name=lambda d: sfem_simplex_grad_ref_name(
                             "grad_ref", d
                         ),
+                        needs_reference_basis=block_needs_reference_basis,
                     ),
                     spell,
                 )
@@ -7526,7 +7669,15 @@ def _mesh_operator_source(
         )
     )
     uses_cached_affine_metric = _uses_cached_affine_metric(gradient_metric)
-    omit_simplex_reference_basis_inputs = gradient_metric is not None
+    # The aliases go when nothing reads them: a gradient-metric loop has the
+    # basis contracted into the metric before the call, and a closed-form one has
+    # the whole reference basis folded into the kernel.  A specialisation exists
+    # for any P1 rule -- its gradients are constant however many points it
+    # carries -- but it folds only under the one-point rule, so the question is
+    # the strategy's and not the specialisation's.
+    omit_simplex_reference_basis_inputs = (
+        gradient_metric is not None or _uses_constant_p1_expansion(rule)
+    )
     shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
         tuple(range(n_fields * n_shape)),
@@ -7534,7 +7685,12 @@ def _mesh_operator_source(
         shape_order,
     )
     impl = "%s_%s_a_msoa_impl" % (prefix, form)
-    block_prefix = specialized_prefix if gradient_metric is not None else local_prefix
+    # Wherever a specialisation exists, which is wherever this element evaluates
+    # in closed form.  It used to be routed to only when a gradient metric had
+    # been isolated, so on every other form the specialised kernel was emitted,
+    # never called, and -- having nothing to specialise before the shape values
+    # and the weight were folded -- byte-identical to the generic one.
+    block_prefix = specialized_prefix if specialized_prefix is not None else local_prefix
     block = "%s_%s_block" % (block_prefix, form)
     lines = [
         "namespace sfem {",
@@ -7770,11 +7926,18 @@ def _mesh_operator_source(
                 ),
             )
         )
-    call_args = ["ne", "0"]
+    call_args = _LOCAL_KERNEL_COUNT_ARGS[_uses_constant_p1_expansion(rule)](
+        "ne", "0"
+    )
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
-                dependencies, dim, n_fields, tensor_product, gradient_metric
+                dependencies,
+                dim,
+                n_fields,
+                tensor_product,
+                gradient_metric,
+                needs_reference_basis=not _uses_constant_p1_expansion(rule),
             ),
             lambda stream: _block_call_argument(
                 stream,
@@ -8726,13 +8889,20 @@ def _scalar_crs_matrix_assembly_source(
         else None
     )
     serves_this_matrix = element_matrix_kernel is not None
+    # Whether this mesh loop maps the element itself or reads a cached adjugate.
+    # Asked here because `kept_reference_tables` below needs it: an affine loop
+    # builds no Jacobian, so it reads no reference gradient either.
+    builds_its_own_jacobian = geometry_mode != AFFINE_MODE
     element_matrix_call = (
         element_matrix_kernel.name if serves_this_matrix else None
     )
-    # The mesh loop still builds its Jacobian from the reference gradients.
-    # Which of the other tables survive is the kernel's: a closed-form one reads
-    # none of them, so the shape values and the quadrature weights would be two
-    # aliases with no reader, while a quadrature one is handed all of them.
+    # A mesh loop that maps the element builds its Jacobian from the reference
+    # gradients.  Which of the other tables survive is the kernel's: a
+    # closed-form one reads none of them, so the shape values and the quadrature
+    # weights would be two aliases with no reader, while a quadrature one is
+    # handed all of them.  An *affine* loop maps nothing -- it reads the cached
+    # adjugate -- so even the gradients had no reader there, which is three dead
+    # aliases per assembly on every constant-P1 element.
     kernel_shape = (
         _ELEMENT_MATRIX_SHAPES[element_matrix_kernel.strategy]
         if serves_this_matrix
@@ -8743,7 +8913,8 @@ def _scalar_crs_matrix_assembly_source(
         if kernel_shape is not None
         and not kernel_shape.needs_reference_basis
         and not tensor_product_geometry
-        else None
+        and builds_its_own_jacobian
+        else _EMPTY_REFERENCE_TABLES[bool(builds_its_own_jacobian)]
     )
     element_matrix_call_args = (
         ["1", "1"]
@@ -9700,7 +9871,11 @@ def _isoparametric_mesh_operator_source(
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
-                dependencies, dim, n_fields, tensor_product, gradient_metric
+                dependencies,
+                dim,
+                n_fields,
+                tensor_product,
+                gradient_metric,
             ),
             lambda stream: _block_call_argument(
                 stream, ISOPARAMETRIC_MODE, block_stream_args
@@ -10181,7 +10356,15 @@ def _scalar_packed_affine_jacobian_action_source(
         )
     )
     uses_cached_affine_metric = _uses_cached_affine_metric(gradient_metric)
-    omit_simplex_reference_basis_inputs = gradient_metric is not None
+    # The aliases go when nothing reads them: a gradient-metric loop has the
+    # basis contracted into the metric before the call, and a closed-form one has
+    # the whole reference basis folded into the kernel.  A specialisation exists
+    # for any P1 rule -- its gradients are constant however many points it
+    # carries -- but it folds only under the one-point rule, so the question is
+    # the strategy's and not the specialisation's.
+    omit_simplex_reference_basis_inputs = (
+        gradient_metric is not None or _uses_constant_p1_expansion(rule)
+    )
     shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
         tuple(range(n_fields * n_shape)),
@@ -10191,7 +10374,12 @@ def _scalar_packed_affine_jacobian_action_source(
     packed_token = "jacobian_action_packed_two_pass_a_msoa" if two_pass else "jacobian_action_packed_a_msoa"
     function = "%s_%s" % (prefix, packed_token)
     impl = "%s_impl" % function
-    block_prefix = specialized_prefix if gradient_metric is not None else local_prefix
+    # Wherever a specialisation exists, which is wherever this element evaluates
+    # in closed form.  It used to be routed to only when a gradient metric had
+    # been isolated, so on every other form the specialised kernel was emitted,
+    # never called, and -- having nothing to specialise before the shape values
+    # and the weight were folded -- byte-identical to the generic one.
+    block_prefix = specialized_prefix if specialized_prefix is not None else local_prefix
     block = "%s_jacobian_action_block" % block_prefix
     block_function = "%s_contiguous" % block
     # Which geometry streams an affine kernel carries, and in what order, is
@@ -10406,11 +10594,18 @@ def _scalar_packed_affine_jacobian_action_source(
                 ),
             )
         )
-    call_args = ["ne", "0"]
+    call_args = _LOCAL_KERNEL_COUNT_ARGS[_uses_constant_p1_expansion(rule)](
+        "ne", "0"
+    )
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
-                jacobian_action_dependencies(dependencies), dim, n_fields, tensor_product, gradient_metric
+                jacobian_action_dependencies(dependencies),
+                dim,
+                n_fields,
+                tensor_product,
+                gradient_metric,
+                needs_reference_basis=not _uses_constant_p1_expansion(rule),
             ),
             lambda stream: _block_call_argument(
                 stream,
@@ -10580,6 +10775,11 @@ def _isoparametric_geometry_assignment_lines(dim, indent, rule=None):
     )
 
 
+#: What survives when the kernel takes no reference basis: nothing at all where
+#: the loop maps no element either, and "whatever the rule carries" where it does.
+_EMPTY_REFERENCE_TABLES = {True: None, False: ()}
+
+
 def _mesh_reference_alias_lines(
     prefix, rule, geometry_mode, emit_reference_basis=True, keep=None
 ):
@@ -10593,9 +10793,11 @@ def _mesh_reference_alias_lines(
     """
     references = tuple(sfem_mesh_reference_data(rule))
     if not emit_reference_basis:
-        references = tuple(
-            reference for reference in references if reference.name.startswith("q_weight")
-        )
+        # Nothing, not "the weights only": a kernel that takes no reference
+        # basis takes no weight either -- a closed-form one has it folded, and a
+        # cached-metric one reads the `cached_affine_metric_q_weight` this file
+        # declares beside the call.  The alias was dead in both.
+        references = ()
     if keep is not None:
         wanted = set(keep)
         references = tuple(

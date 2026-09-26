@@ -6,8 +6,6 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
-#include "../../../reference/quad_tet_q1.hpp"
-#include "../../../reference/tet4_q1.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -657,11 +655,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block<double, 1, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_residual_block<double, 1, 4, 16>(ne, (const double *)determinant, (const double *const *)adjugate, (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block<float, 1, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_residual_block<float, 1, 4, 16>(ne, (const float *)determinant, (const float *const *)adjugate, (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -710,11 +708,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa_imp
   static constexpr int NS = 4;
   static constexpr int NC = 3;
   static constexpr int VS = 16;
-  const s_t *const affine_shape = sfem::codegen::ref_tet4_q1<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -757,7 +750,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_residual_a_msoa_imp
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_total_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[9], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_residual_block_contiguous<s_t, NQ, NS, VS>(ne, bageom_streams[9], badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -843,11 +836,11 @@ extern "C" int mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block<double, 1, 4, 16>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tet4_q1<double>::grad_ref_x(), sfem::codegen::ref_tet4_q1<double>::grad_ref_y(), sfem::codegen::ref_tet4_q1<double>::grad_ref_z(), sfem::codegen::quad_tet_q1<double>::q_weight(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobian_action_block<double, 1, 4, 16>(ne, (const double *)determinant, (const double *const *)adjugate, (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block<float, 1, 4, 16>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tet4_q1<float>::grad_ref_x(), sfem::codegen::ref_tet4_q1<float>::grad_ref_y(), sfem::codegen::ref_tet4_q1<float>::grad_ref_z(), sfem::codegen::quad_tet_q1<float>::q_weight(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobian_action_block<float, 1, 4, 16>(ne, (const float *)determinant, (const float *const *)adjugate, (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -900,11 +893,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_m
   static constexpr int NS = 4;
   static constexpr int NC = 3;
   static constexpr int VS = 16;
-  const s_t *const affine_shape = sfem::codegen::ref_tet4_q1<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -950,7 +938,7 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_jacobian_action_a_m
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_total_d3_simplex_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[9], badjugate, affine_grad_ref_x, affine_grad_ref_y, affine_grad_ref_z, affine_q_weight, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, bageom_streams[9], badjugate, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -1115,9 +1103,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet4_hessian_crs_a_msoa_
   static constexpr int NC = 3;
   static constexpr int N_STREAMS = NC * NS;
   static constexpr int VS = 1;
-  const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const isoparametric_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {

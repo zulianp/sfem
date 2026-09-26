@@ -1,8 +1,6 @@
 #include <type_traits>
 #include <cuda_runtime.h>
 #include "../../cuda/laplace_d3_simplex_local.cuh"
-#include "../../../../reference/cuda/quad_tet_q1.hpp"
-#include "../../../../reference/cuda/tet4_q1.hpp"
 #include "../../../../cuda/geometry_kernels.cuh"
 #include "../../../../cuda/kernel_diagnostics.cuh"
 #include <cstdint>

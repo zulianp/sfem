@@ -5,8 +5,6 @@
 #include "../../cuda/body_force_d2_simplex_local.cuh"
 #include "../../../../cuda/geometry_kernels.cuh"
 #include "../../../../cuda/kernel_diagnostics.cuh"
-#include "../../../../reference/cuda/quad_tri_q1.hpp"
-#include "../../../../reference/cuda/tri3_q1.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -163,11 +161,11 @@ extern "C" int cu_body_force_tri3_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::body_force_d2_simplex_residual_block<double, 1, 3>(ne, geometry_stride, (const double *)determinant, sfem::codegen::ref_tri3_q1<double>::shape(), sfem::codegen::quad_tri_q1<double>::q_weight(), density, g0, g1, (double *const *)output);
+        sfem::codegen::body_force_d2_simplex_tri3_residual_block<double, 1, 3>(ne, (const double *)determinant, density, g0, g1, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::body_force_d2_simplex_residual_block<float, 1, 3>(ne, geometry_stride, (const float *)determinant, sfem::codegen::ref_tri3_q1<float>::shape(), sfem::codegen::quad_tri_q1<float>::q_weight(), density, g0, g1, (float *const *)output);
+        sfem::codegen::body_force_d2_simplex_tri3_residual_block<float, 1, 3>(ne, (const float *)determinant, density, g0, g1, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -195,10 +193,6 @@ __global__ void body_force_tri3_residual_a_msoa_impl(
   static constexpr int NQ = 1;
   static constexpr int NS = 3;
   static constexpr int NC = 2;
-  const s_t *const affine_shape = sfem::codegen::ref_tri3_q1<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
@@ -216,7 +210,7 @@ __global__ void body_force_tri3_residual_a_msoa_impl(
     bageom_streams[0] = ageom_stream<s_t, g_t>(
         ne, affine_geometry_sources[0], &baffine_geometry_data[0], std::is_same<g_t, s_t>());
 
-    body_force_d2_simplex_residual_block_contiguous<s_t, NQ, NS>(ne, 0, bageom_streams[0], affine_shape, affine_q_weight, density, g0, g1, boutput);
+    body_force_d2_simplex_tri3_residual_block_contiguous<s_t, NQ, NS>(ne, bageom_streams[0], density, g0, g1, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {

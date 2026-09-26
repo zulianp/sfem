@@ -1,8 +1,6 @@
 #include <type_traits>
 #include <cuda_runtime.h>
 #include "../../cuda/neohookean_ogden_d3_simplex_local.cuh"
-#include "../../../../reference/cuda/quad_tet_q1.hpp"
-#include "../../../../reference/cuda/tet4_q1.hpp"
 #include "../../../../cuda/geometry_kernels.cuh"
 #include "../../../../cuda/kernel_diagnostics.cuh"
 #include <cstdint>
@@ -122,7 +120,6 @@ __global__ void neohookean_ogden_tet4_objective_steps_a_msoa_impl(
 ) {
   static constexpr int NC = 3;
   static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
@@ -340,7 +337,6 @@ __global__ void neohookean_ogden_tet4_gradient_a_msoa_impl(
 ) {
   static constexpr int NC = 3;
   static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;
@@ -565,7 +561,6 @@ __global__ void neohookean_ogden_tet4_apply_a_msoa_impl(
 ) {
   static constexpr int NC = 3;
   static constexpr int NS = 4;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
     const int ne = 1;

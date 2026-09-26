@@ -2,8 +2,6 @@
 #include <type_traits>
 #include "../neohookean_ogden_d2_simplex_local.hpp"
 #include "../neohookean_ogden_d2_simplex_hessian.hpp"
-#include "../../../reference/quad_tri_q1.hpp"
-#include "../../../reference/tri3_q1.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
@@ -123,7 +121,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_objective_steps_a_msoa_impl(
 ) {
   static constexpr int NC = 2;
   static constexpr int NS = 3;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -310,7 +307,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_gradient_a_msoa_impl(
 ) {
   static constexpr int NC = 2;
   static constexpr int NS = 3;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -508,7 +504,6 @@ static SFEM_INLINE int neohookean_ogden_tri3_apply_a_msoa_impl(
 ) {
   static constexpr int NC = 2;
   static constexpr int NS = 3;
-  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -722,9 +717,6 @@ static int neohookean_ogden_tri3_hessian_a_msoa_assemble_impl(
   static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
   const s_t *const u_components[NC] = {ux, uy};
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
   static_assert(FORMAT == 1,
                 "this kernel has no scatter for the requested matrix format");

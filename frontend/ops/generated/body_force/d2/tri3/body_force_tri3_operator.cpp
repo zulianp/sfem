@@ -6,8 +6,6 @@
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #include "../../../packed_thread_scratch.hpp"
-#include "../../../reference/quad_tri_q1.hpp"
-#include "../../../reference/tri3_q1.hpp"
 #if defined(__has_include)
 #if __has_include("smesh_types.hpp")
 #include "smesh_types.hpp"
@@ -166,11 +164,11 @@ extern "C" int body_force_tri3_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::body_force_d2_simplex_residual_block<double, 1, 3, 16>(ne, geometry_stride, (const double *)determinant, sfem::codegen::ref_tri3_q1<double>::shape(), sfem::codegen::quad_tri_q1<double>::q_weight(), density, g0, g1, (double *const *)output);
+        sfem::codegen::body_force_d2_simplex_tri3_residual_block<double, 1, 3, 16>(ne, (const double *)determinant, density, g0, g1, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::body_force_d2_simplex_residual_block<float, 1, 3, 16>(ne, geometry_stride, (const float *)determinant, sfem::codegen::ref_tri3_q1<float>::shape(), sfem::codegen::quad_tri_q1<float>::q_weight(), density, g0, g1, (float *const *)output);
+        sfem::codegen::body_force_d2_simplex_tri3_residual_block<float, 1, 3, 16>(ne, (const float *)determinant, density, g0, g1, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -199,10 +197,6 @@ static SFEM_INLINE int body_force_tri3_residual_a_msoa_impl(
   static constexpr int NS = 3;
   static constexpr int NC = 2;
   static constexpr int VS = 16;
-  const s_t *const affine_shape = sfem::codegen::ref_tri3_q1<s_t>::shape();
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t evb = 0; evb < nelements; evb += VS) {
@@ -222,7 +216,7 @@ static SFEM_INLINE int body_force_tri3_residual_a_msoa_impl(
     bageom_streams[0] = ageom_stream<s_t, g_t, VS>(
         ne, affine_geometry_sources[0], baffine_geometry_data[0], std::is_same<g_t, s_t>());
 
-    body_force_d2_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[0], affine_shape, affine_q_weight, density, g0, g1, boutput);
+    body_force_d2_simplex_tri3_residual_block_contiguous<s_t, NQ, NS, VS>(ne, bageom_streams[0], density, g0, g1, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {

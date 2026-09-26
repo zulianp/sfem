@@ -118,82 +118,64 @@ static SFEM_INLINE void body_force_d3_simplex_residual_block_contiguous(
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void body_force_d3_simplex_tet4_residual_block(
     const int ne,
-    const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
-    const s_t *const RSTR shape,
-    const s_t *const RSTR q_weight,
     const s_t density,
     const s_t g0,
     const s_t g1,
     const s_t g2,
     s_t *const RSTR output[3 * NS]
 ) {
-  static constexpr int NC = 3;
-  for (int q = 0; q < NQ; ++q) {
-    s_t value_coeff0_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t value_coeff2_values[VS];
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const s_t value_coeff0 = -density*g0;
-      const s_t value_coeff1 = -density*g1;
-      const s_t value_coeff2 = -density*g2;
-      value_coeff0_values[lane] = value_coeff0;
-      value_coeff1_values[lane] = value_coeff1;
-      value_coeff2_values[lane] = value_coeff2;
-    }
-    for (int test = 0; test < NS; ++test) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
-        const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
-        output[test * NC][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value);
-        output[test * NC + 1][lane] += q_weight[q] * det * (value_coeff1_values[lane] * test_value);
-        output[test * NC + 2][lane] += q_weight[q] * det * (value_coeff2_values[lane] * test_value);
-      }
-    }
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    const ptrdiff_t goff = lane;
+    const s_t det = determinant[goff];
+    const s_t value_coeff0 = -density*g0;
+    const s_t value_coeff1 = -density*g1;
+    const s_t value_coeff2 = -density*g2;
+    output[0][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff0));
+    output[1][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff1));
+    output[2][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff2));
+    output[3][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff0));
+    output[4][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff1));
+    output[5][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff2));
+    output[6][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff0));
+    output[7][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff1));
+    output[8][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff2));
+    output[9][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff0));
+    output[10][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff1));
+    output[11][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff2));
   }
 }
 
 template <typename s_t, int NQ, int NS, int VS>
 static SFEM_INLINE void body_force_d3_simplex_tet4_residual_block_contiguous(
     const int ne,
-    const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
-    const s_t *const RSTR shape,
-    const s_t *const RSTR q_weight,
     const s_t density,
     const s_t g0,
     const s_t g1,
     const s_t g2,
     s_t output[3 * NS][VS]
 ) {
-  static constexpr int NC = 3;
-  for (int q = 0; q < NQ; ++q) {
-    s_t value_coeff0_values[VS];
-    s_t value_coeff1_values[VS];
-    s_t value_coeff2_values[VS];
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const s_t value_coeff0 = -density*g0;
-      const s_t value_coeff1 = -density*g1;
-      const s_t value_coeff2 = -density*g2;
-      value_coeff0_values[lane] = value_coeff0;
-      value_coeff1_values[lane] = value_coeff1;
-      value_coeff2_values[lane] = value_coeff2;
-    }
-    for (int test = 0; test < NS; ++test) {
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
-        const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
-        output[test * NC][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value);
-        output[test * NC + 1][lane] += q_weight[q] * det * (value_coeff1_values[lane] * test_value);
-        output[test * NC + 2][lane] += q_weight[q] * det * (value_coeff2_values[lane] * test_value);
-      }
-    }
+  #pragma omp simd
+  for (int lane = 0; lane < ne; ++lane) {
+    const ptrdiff_t goff = lane;
+    const s_t det = determinant[goff];
+    const s_t value_coeff0 = -density*g0;
+    const s_t value_coeff1 = -density*g1;
+    const s_t value_coeff2 = -density*g2;
+    output[0][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff0));
+    output[1][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff1));
+    output[2][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff2));
+    output[3][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff0));
+    output[4][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff1));
+    output[5][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff2));
+    output[6][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff0));
+    output[7][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff1));
+    output[8][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff2));
+    output[9][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff0));
+    output[10][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff1));
+    output[11][lane] += ((s_t(1) / s_t(6))) * (det) * (((s_t(1) / s_t(4))) * (value_coeff2));
   }
 }
 

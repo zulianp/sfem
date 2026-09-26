@@ -2,8 +2,6 @@
 #include <type_traits>
 #include "../laplace_d3_simplex_local.hpp"
 #include "../laplace_d3_simplex_hessian.hpp"
-#include "../../../reference/quad_tet_q1.hpp"
-#include "../../../reference/tet4_q1.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
@@ -224,7 +222,6 @@ static SFEM_INLINE int laplace_tet4_objective_steps_packed_a_msoa_impl(
 ) {
   static constexpr int NC = 1;
 
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -515,7 +512,6 @@ static SFEM_INLINE int laplace_tet4_gradient_packed_a_msoa_impl(
 ) {
   static constexpr int NC = 1;
 
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -674,7 +670,6 @@ static SFEM_INLINE int laplace_tet4_gradient_packed_two_pass_a_msoa_impl(
 ) {
   static constexpr int NC = 1;
 
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -998,7 +993,6 @@ static SFEM_INLINE int laplace_tet4_apply_packed_a_msoa_impl(
 ) {
   static constexpr int NC = 1;
 
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -1157,7 +1151,6 @@ static SFEM_INLINE int laplace_tet4_apply_packed_two_pass_a_msoa_impl(
 ) {
   static constexpr int NC = 1;
 
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
 #pragma omp parallel
   {
@@ -1431,10 +1424,6 @@ static int laplace_tet4_hessian_a_msoa_assemble_impl(
   static constexpr int NS = 4;
   static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
-  const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_x();
-  const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_y();
-  const s_t *const affine_grad_ref_z = sfem::codegen::ref_tet4_q1<s_t>::grad_ref_z();
-  const s_t *const affine_q_weight = sfem::codegen::quad_tet_q1<s_t>::q_weight();
 
   static_assert(FORMAT == 0 || FORMAT == 1,
                 "this kernel has no scatter for the requested matrix format");

@@ -8,6 +8,7 @@ from codegen.framework.plans.loperand import (
     loperand_matrix,
 )
 from codegen.framework.forms.weak_forms import flux_form_from_energy
+from codegen.framework.fem.reference import sfem_mesh_reference_data
 
 
 @dataclass(frozen=True)
@@ -153,6 +154,55 @@ def constant_p1_simplex_reference_gradients(rule):
     if rule is None:
         return None
     return _constant_reference_gradients(rule) if _is_constant_p1_simplex_rule(rule) else None
+
+
+def constant_p1_simplex_shape_values(rule):
+    """The constant shape values of a lowest-order simplex rule, or None.
+
+    The twin of `constant_p1_simplex_reference_gradients`, for the other half of
+    the reference basis.  A one-point rule on a constant-basis simplex evaluates
+    its shape functions at one point, so their values are as much a constant of
+    the element as their gradients are -- `(1/4, 1/4, 1/4, 1/4)` on a TET4 -- and
+    a kernel that reads them out of a table is reading a table of constants.
+
+    `None` in, `None` out, and `None` for any other element, so a caller asks
+    once and reads the answer instead of deciding twice.
+    """
+    if not _evaluates_at_one_point(rule):
+        return None
+    for entry in sfem_mesh_reference_data(rule):
+        if entry.name == "shape":
+            return tuple(sp.nsimplify(value) for value in entry.values)
+    return None
+
+
+def constant_p1_simplex_weight(rule):
+    """That rule's one quadrature weight, or None.
+
+    The third constant, and the one a kernel kept reading after the other two
+    were folded: `q_weight[q]` with a single point is `1/6` on a TET4 and `1/2`
+    on a TRI3.
+    """
+    if not _evaluates_at_one_point(rule):
+        return None
+    return sp.nsimplify(rule.weights[0])
+
+
+def _evaluates_at_one_point(rule):
+    """Whether this rule is the single point that makes the whole basis constant.
+
+    `_is_constant_p1_simplex_rule` is about the *gradients*, which are the same
+    number at every point of a P1 element however many points the rule carries.
+    The shape values and the weight are constants only when there is one point:
+    a TET4 under an eleven-point rule -- which a form whose integrand is not
+    constant over the cell asks for -- has eleven distinct sets of shape values,
+    and folding the first of them would keep a fraction of the integral.
+    """
+    return (
+        rule is not None
+        and int(rule.n_qp) == 1
+        and _is_constant_p1_simplex_rule(rule)
+    )
 
 
 def symmetric_metric_component_count(dim):
