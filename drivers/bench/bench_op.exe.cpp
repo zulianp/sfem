@@ -156,6 +156,38 @@ void add_matrix_based_vector_ops(const int                       dim,
     }
 }
 
+//: One operator named at run time, so an assembly this list does not carry can
+//: still be timed here rather than in a benchmark of its own.  `setup` is the
+//: assembly: `create_linear_operator` builds the matrix, and for a matrix type
+//: that is the element kernel plus the scatter.  The viscoelastic operator is
+//: the case this exists for -- its tangent kernel is generated for the combined
+//: residual unit, which no entry above names.
+void add_named_op(const int dim, std::vector<OpDesc_t> &ops) {
+    const std::string name = smesh::Env::read("SFEM_EXTRA_OP", std::string(""));
+    if (name.empty()) return;
+    ops.push_back({.name       = name,
+                   .type       = smesh::Env::read("SFEM_EXTRA_OP_TYPE", std::string(sfem::op_type::BSR)),
+                   .block_size = smesh::Env::read("SFEM_EXTRA_OP_BLOCK_SIZE", dim)});
+}
+
+//: The fields to hand every operator before it is measured, as a comma
+//: separated list -- `SFEM_EXTRA_OP_FIELDS=previous` for the viscoelastic one.
+std::vector<std::string> named_fields() {
+    const std::string spec = smesh::Env::read("SFEM_EXTRA_OP_FIELDS", std::string(""));
+    std::vector<std::string> names;
+    std::string              name;
+    for (const char c : spec) {
+        if (c == ',') {
+            if (!name.empty()) names.push_back(name);
+            name.clear();
+            continue;
+        }
+        name.push_back(c);
+    }
+    if (!name.empty()) names.push_back(name);
+    return names;
+}
+
 int main(int argc, char *argv[]) {
     sfem::Context context(argc, argv);
     {
@@ -245,6 +277,8 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "[Warning] Skipping BSR ops for large meshes #nodes %ld #dim %d\n", (long)nnodes, dim);
         }
 
+        add_named_op(dim, ops);
+
         for (auto &op_desc : ops) {
             std::shared_ptr<sfem::FunctionSpace> fs;
             if (ssmesh) {
@@ -271,6 +305,18 @@ int main(int argc, char *argv[]) {
                 SFEM_ERROR("Failed to initialize op %s\n", op_desc.name.c_str());
                 return err;
             }
+
+            // The fields an operator needs before it can be asked for anything.
+            // A history-carrying operator -- the viscoelastic one -- refuses to
+            // assemble without a previous state, and the names come from the
+            // caller rather than from a test on the operator's own name, which
+            // would be this benchmark deciding what an operator is.
+            std::vector<std::shared_ptr<sfem::Buffer<real_t>>> extra_fields;
+            for (const auto &field : named_fields()) {
+                extra_fields.push_back(sfem::create_buffer<real_t>(op->n_dofs_domain(), es));
+                op->set_field(field.c_str(), extra_fields.back(), 0);
+            }
+
             f->add_operator(op);
 
             auto x      = sfem::create_buffer<real_t>(op->n_dofs_domain(), es);
