@@ -17,9 +17,22 @@ TensorProductWeakOps (`tensor_test`), the residual path evaluates and integrates
 with TensorProductResidualOps (`tensor_evaluate` / `tensor_integrate`).  So rule
 one is largely met already, by two separate implementations of it.
 
-Rule two is met in the volume kernels, where it is stated: every lowest-order
-simplex opens `{ const int q = 0; }` instead of a one-trip loop, and the count
-below is zero.  `tests/test_evaluation_strategy_conformance.py` holds it there.
+Rule two is met in the volume kernels for the loop, where it is stated: every
+lowest-order simplex opens `{ const int q = 0; }` instead of a one-trip loop, and
+the `qp loops` count below is zero.
+`tests/test_evaluation_strategy_conformance.py` holds it there.
+
+Rule two also says *no quadrature-point information generated at all*, and the
+loop count does not see that half.  A lowest-order simplex still asks the mesh
+for `ref_tet4_q1::grad_ref_x()`, `ref_tet4_q1::shape()` and
+`quad_tet_q1::q_weight()` and hands them to its kernel, which reads
+`q_weight[q]` and `shape[q * NS + test]` at run time -- all of them constants of
+a one-point rule on a constant-basis element.  The `ref data` column counts those
+references, per element, in the element's own operator, and a lowest-order
+simplex should carry none.  The loop count missed it because a shared local
+header is templated on `NQ` and serves TET4 and TET10 from one file, so the loop
+sits one directory above the element it belongs to and is attributable to
+neither; what the element's own operator names is attributable.
 
 Rule two says nothing about a facet.  What makes a lowest-order simplex
 loop-free is that its volume integrand is built from basis gradients that are
@@ -82,6 +95,7 @@ def survey(generated):
         )
         by_element = {}
         volume = {}
+        reference_data = {}
         for path in glob.glob(os.path.join(material_dir, "d*", "*", "*")):
             if os.path.isdir(path):
                 continue
@@ -108,9 +122,21 @@ def survey(generated):
             # So loops are counted where the rules apply: in volume kernels.
             volume.setdefault(element, False)
             by_element.setdefault(element, 0)
+            reference_data.setdefault(element, 0)
             if "_boundary_operator" not in os.path.basename(path):
                 volume[element] = True
                 by_element[element] += len(re.findall(r"for \(int q = 0", source))
+                # The one-point rule's own tables, named by this element's
+                # operator.  Only the `_q1` families: a P1 element carrying a
+                # higher rule -- `ref_tet4_q11`, for a form whose integrand is
+                # not constant over the cell -- is integrating, not spelling
+                # constants, and is not what rule two is about.
+                reference_data[element] += len(
+                    re.findall(
+                        r"sfem::codegen::(?:ref_(?:tet4|tri3)|quad_(?:tet|tri))_q1<",
+                        source,
+                    )
+                )
         for element, quadrature_loops in sorted(by_element.items()):
             rows.append(
                 {
@@ -119,6 +145,7 @@ def survey(generated):
                     "family": element_family(element),
                     "sum_factorised": factorised,
                     "quadrature_loops": quadrature_loops,
+                    "reference_data": reference_data.get(element, 0),
                     "has_volume_kernels": volume.get(element, False),
                 }
             )
@@ -148,6 +175,14 @@ def violations(rows):
                     % (row["material"], row["element"], row["quadrature_loops"]),
                 )
             )
+        if row["family"] == "simplex-lowest" and row.get("reference_data"):
+            found.append(
+                (
+                    "lowest-order simplex reading reference tables",
+                    "%s/%s (%d references)"
+                    % (row["material"], row["element"], row["reference_data"]),
+                )
+            )
     return found
 
 
@@ -164,18 +199,22 @@ def main(argv=None):
         print("no generated materials under %s" % root)
         return 2
 
-    print("%-24s %-16s %-16s %10s %10s" % ("material", "element", "family", "sum-fact", "qp loops"))
+    print(
+        "%-24s %-16s %-16s %10s %10s %10s"
+        % ("material", "element", "family", "sum-fact", "qp loops", "ref data")
+    )
     for row in rows:
         if row["family"] == "mixed":
             continue
         print(
-            "%-24s %-16s %-16s %10s %10d"
+            "%-24s %-16s %-16s %10s %10d %10d"
             % (
                 row["material"],
                 row["element"],
                 row["family"],
                 "yes" if row["sum_factorised"] else "NO",
                 row["quadrature_loops"],
+                row["reference_data"],
             )
         )
 

@@ -3883,7 +3883,16 @@ def _sfem_soa_reference_header_paths(rules):
     exists instead of adding a second one.
     """
     seen = []
-    for rule in rules:
+    # A rule whose element evaluates in closed form contributes nothing: its
+    # kernel names no table, so the header held the accessors for a declaration
+    # that is gone with `_sfem_soa_mesh_reference_alias_lines`.  Iterated rather
+    # than tested, so emission walks the rules that carry data instead of asking
+    # about each one.
+    for rule in (
+        rule
+        for rule in rules
+        if constant_p1_simplex_reference_gradients(rule) is None
+    ):
         for line in reference_include_lines(rule, sfem_mesh_reference_data(rule)):
             path = line.split('"')[1]
             if path not in seen:
@@ -11724,7 +11733,26 @@ def _sfem_soa_element_api_hessian_lines(
     return lines
 
 
-def _sfem_soa_mesh_reference_alias_lines(
+def _sfem_soa_mesh_reference_alias_lines(*arguments, **keywords):
+    """What a mesh operator names of the reference tables, per evaluation strategy.
+
+    A constant-P1 simplex evaluates in closed form: its kernel has the basis
+    gradients and the quadrature weight folded in as constants and takes no
+    table at all, so the operator that calls it has nothing to name.  It was
+    naming them anyway -- `affine_grad_ref_x`, `affine_grad_ref_y`,
+    `affine_grad_ref_z` and `affine_q_weight`, declared and never read, in every
+    TET4 and TRI3 operator of every energy material, with the reference header
+    included for them.  `plans.evaluation_strategy` already says this element
+    needs no reference-basis data; this is the mesh operator consuming that
+    answer, as the kernel signature does.
+    """
+    rule = arguments[1] if len(arguments) > 1 else keywords["quadrature_rule"]
+    return _MESH_REFERENCE_ALIASES[
+        constant_p1_simplex_reference_gradients(rule) is not None
+    ](*arguments, **keywords)
+
+
+def _quadrature_mesh_reference_alias_lines(
     prefix,
     quadrature_rule,
     reference_inputs,
@@ -11792,6 +11820,13 @@ def _sfem_soa_mesh_reference_alias_lines(
         )
     )
     return lines
+
+
+#: The two answers, keyed on whether this element evaluates in closed form.
+_MESH_REFERENCE_ALIASES = {
+    True: lambda *arguments, **keywords: [],
+    False: _quadrature_mesh_reference_alias_lines,
+}
 
 
 def _sfem_soa_public_function_name(prefix, form_name, quadrature_rule):

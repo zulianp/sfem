@@ -229,13 +229,23 @@ class BothKernelBodiesReachThePrinterAsNodesTest(unittest.TestCase):
 
     def _capture_material(self, material, element):
         captured = {}
+        # Two scopes, because there are two shapes: a quadrature body loops over
+        # points, and a closed-form one has a single folded point and opens only
+        # the work items.  Both hand their statements to the printer as nodes,
+        # which is what this test is about, so both are captured.
         original = residual_codegen._quadrature_lane_kernel_node
+        original_expanded = residual_codegen._expanded_lane_kernel_node
 
         def capture(lane_body, name="quadrature_lane_body"):
             captured.setdefault(name, []).extend(lane_body)
             return original(lane_body, name=name)
 
+        def capture_expanded(lane_body, name="constant_p1_expanded_body"):
+            captured.setdefault(name, []).extend(lane_body)
+            return original_expanded(lane_body, name=name)
+
         residual_codegen._quadrature_lane_kernel_node = capture
+        residual_codegen._expanded_lane_kernel_node = capture_expanded
         try:
             from sfem import gen
 
@@ -245,6 +255,7 @@ class BothKernelBodiesReachThePrinterAsNodesTest(unittest.TestCase):
             gen.CodeGenerationStage(user_input, plan).run()
         finally:
             residual_codegen._quadrature_lane_kernel_node = original
+            residual_codegen._expanded_lane_kernel_node = original_expanded
         return captured
 
     def _assert_all_nodes(self, statements):
@@ -268,10 +279,10 @@ class BothKernelBodiesReachThePrinterAsNodesTest(unittest.TestCase):
     def test_constant_p1_expanded_body_is_nodes(self):
         captured = self._capture(EXPANDED_MATERIAL, EXPANDED_ELEMENT)
         self.assertIn(
-            "constant_p1_gradient_expanded_body",
+            "constant_p1_expanded_body",
             captured,
             "%s/%s no longer exercises the expanded constant-P1 kernel; pick a "
             "material that does, or this test silently stops proving anything"
             % (EXPANDED_MATERIAL, EXPANDED_ELEMENT),
         )
-        self._assert_all_nodes(captured["constant_p1_gradient_expanded_body"])
+        self._assert_all_nodes(captured["constant_p1_expanded_body"])
