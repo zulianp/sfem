@@ -109,8 +109,13 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             "neohookean_ogden_d3_tensor_product_apply_block<s_t, NQ, NS, VS>",
             hessian_source,
         )
+        # The element-matrix kernel holds one element, on every target, so it
+        # carries no work-item width: `plans` says assembly has one element in
+        # hand and the scatter that reads the matrix has no lane index to give
+        # it.  The apply beside it still takes the width, and that is the
+        # distinction this pair of assertions holds.
         self.assertIn(
-            "neohookean_ogden_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS, VS>",
+            "neohookean_ogden_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS>",
             hessian_source,
         )
         self.assertIn(

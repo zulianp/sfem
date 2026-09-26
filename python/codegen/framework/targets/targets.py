@@ -234,9 +234,68 @@ class TargetPlatform:
         """
         return "VS"
 
+    def work_item_extent(self):
+        """The trailing extent of a staged buffer: `[VS]`, or nothing.
+
+        A buffer holds one slot per work item, and where a work item *is* one
+        element there is no slot to hold -- the buffer is the value.  Spelling
+        that as `[1]` type-checks and is the width surviving under another name,
+        which is what `kernel_vector_width` says a target without a width does
+        not have.
+        """
+        width = self.kernel_vector_width()
+        return "[%s]" % width if width is not None else ""
+
     def work_item_subscript(self):
-        """How a staged buffer is indexed at this work item: `[lane]`, or `[0]`."""
+        """How a staged buffer is indexed at this work item: `[lane]`, or nothing.
+
+        Paired with `work_item_extent`: a buffer with no trailing extent has no
+        trailing subscript either, and the two have to move together or the
+        kernel indexes a scalar.
+        """
+        if self.kernel_vector_width() is None:
+            return ""
         return "[%s]" % self.work_item_index()
+
+    def staged_buffer_address(self, name):
+        """The pointer to a staged buffer: the array, or the scalar's address.
+
+        A buffer with a slot per work item is an array and decays to a pointer
+        on its own.  Where a work item *is* one element the buffer is the value,
+        so the pointer is its address -- which is the whole difference between
+        the two spellings at a call boundary that takes `s_t *`.
+        """
+        if self.kernel_vector_width() is None:
+            return "&%s" % name
+        return name
+
+    def work_item_block_offset_at(self, outer, index):
+        """Where `outer`'s slot of the work item at `index` sits in a staged block.
+
+        `outer * VS + index` where a work item is a lane of a block of `VS`
+        elements, and `outer` alone where a work item *is* the element: the
+        array holds one entry per `outer` and there is no lane to add.  The
+        index is a parameter because the loop that supplies it is not always the
+        work-item loop -- a scatter walks the same block by its own name.
+        """
+        width = self.kernel_vector_width()
+        if width is None:
+            return str(outer)
+        return "%s * %s + %s" % (outer, width, index)
+
+    def work_item_block_offset(self, outer):
+        """A flat offset into a per-point block of work items.
+
+        `q * VS + lane` where a work item is one lane of a block of `VS`
+        elements, and `q` alone where a work item *is* the element: there is no
+        block to stride over and no lane to add, so neither term is spelled.
+        Distinct from `work_item_offset`, whose stride is usually a runtime mesh
+        parameter that survives however wide a work item is.
+        """
+        width = self.kernel_vector_width()
+        if width is None:
+            return outer
+        return self.work_item_offset(outer, width)
 
     def work_item_offset(self, outer, stride):
         """A flat offset into a per-point, per-work-item stream.

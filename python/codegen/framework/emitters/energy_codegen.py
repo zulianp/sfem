@@ -99,7 +99,7 @@ from codegen.framework.emitters.ast_printer import (
     render_kernel_ast_lines,
 )
 from codegen.framework.emitters.tensor_product_kernels import (
-    kernel_width as _kernel_width,
+    work_item_block_stride as _work_item_block_stride,
     micro_kernel as _micro_kernel,
     micro_kernel_count as _micro_kernel_count,
     micro_kernel_template as _micro_kernel_template,
@@ -283,18 +283,21 @@ def _reference_gradient_offset_lines(
     out nine times.
     """
     return tuple(
-        "%s%s %s%d = &%s_q[%s * VS];"
+        "%s%s %s%d = &%s_q[%s];"
         % (
             indent,
             pointer,
             name,
             row * dim + col,
             name,
-            c_group(
-                c_sum(
-                    c_product(c_group(c_sum(c_product(row, "NQ"), "q")), dim),
-                    col,
-                )
+            c_product(
+                c_group(
+                    c_sum(
+                        c_product(c_group(c_sum(c_product(row, "NQ"), "q")), dim),
+                        col,
+                    )
+                ),
+                *_width_factors()
             ),
         )
         for row in range(n_field_components)
@@ -381,23 +384,41 @@ def _sfem_soa_affine_geometry_stream_lines(
         for stream in _soa_array_stream_names(array_input):
             lines.extend(
                 [
-                    "%ss_t b%s_data[%s];" % (indent, stream, _kernel_width()),
-                    "%sconst s_t *const b%s = ageom_stream<s_t, %s, VS>("
-                    % (indent, stream, geometry_scalar_type),
-                    "%s    ne, %s + evb, b%s_data, std::is_same<%s, s_t>());"
-                    % (indent, abi_geometry_name(stream), stream, geometry_scalar_type),
+                    "%ss_t b%s_data%s;"
+                    % (indent, stream, current_target().work_item_extent()),
+                    "%sconst s_t *const b%s = ageom_stream<%s>("
+                    % (
+                        indent,
+                        stream,
+                        ", ".join(("s_t", geometry_scalar_type) + _width_factors()),
+                    ),
+                    "%s    ne, %s + evb, %s, std::is_same<%s, s_t>());"
+                    % (
+                        indent,
+                        abi_geometry_name(stream),
+                        current_target().staged_buffer_address("b%s_data" % stream),
+                        geometry_scalar_type,
+                    ),
                 ]
             )
     return lines
 
 
-def _affine_geometry_stream_helper_lines(source_builder):
-    inline_qualifier = source_builder.inline_qualifier()
+def affine_geometry_stream_helper_lines(source_builder=None):
+    """The `ageom_stream` conversion helper, once, for whichever family needs it.
+
+    The residual family kept its own copy of this, and the copy's device
+    rendering wrote `converted = s_t(source)` -- an `s_t` into an `s_t *` -- while
+    this one indexes the work item.  There is one conversion, so there is one
+    emission of it; the two staging shapes above it differ because the callees do,
+    but this does not.
+    """
+    inline_qualifier = _inline_qualifier(source_builder)
     lines = [
         "namespace sfem {",
         "namespace codegen {",
         "",
-        "template <typename s_t, typename g_t, int VS>",
+        _block_template_head("typename s_t", "typename g_t"),
         "%s const s_t *ageom_stream(" % inline_qualifier,
         "    const int,",
         "    const g_t *const RSTR source,",
@@ -406,15 +427,15 @@ def _affine_geometry_stream_helper_lines(source_builder):
         "  return source;",
         "}",
         "",
-        "template <typename s_t, typename g_t, int VS>",
+        _block_template_head("typename s_t", "typename g_t"),
         "%s const s_t *ageom_stream(" % inline_qualifier,
         "    const int ne,",
         "    const g_t *const RSTR source,",
         "    s_t *const RSTR converted,",
         "    std::false_type) {",
     ]
-    if _emits_vector_lane_loop(source_builder):
-        slot = _work_item_slot(source_builder)
+    if _emits_lane_loop():
+        slot = _wi_slot()
         lines.extend(work_item_scope_header_lines("  "))
         lines.extend(
             [
@@ -423,7 +444,7 @@ def _affine_geometry_stream_helper_lines(source_builder):
             ]
         )
     else:
-        index = _work_item_index(source_builder)
+        index = current_target().work_item_index()
         lines.extend(
             [
                 discard_unused("ne", indent="  "),
@@ -442,6 +463,54 @@ def _affine_geometry_stream_helper_lines(source_builder):
     return lines
 
 
+#: The stride a block call passes between quadrature points of one work item's
+#: geometry.  An affine element has one point of cached geometry per element, so
+#: the stride is zero; otherwise it is how many elements a work item holds.
+_AFFINE_GEOMETRY_STRIDE = {
+    True: lambda: "0",
+    False: _work_item_block_stride,
+}
+
+
+def _emits_lane_loop():
+    """Whether the bound target's work item is a lane of a vectorized block."""
+    policy = current_target().loop_lowering_policy()
+    return bool(policy.emits_lane_loop and policy.vectorize_lane_loop)
+
+
+#: The one slot a kernel that holds a single element writes, keyed on whether the
+#: target's buffers have a slot at all.  `[0]` where they do -- these kernels
+#: declare no lane loop, so the first slot is the only one -- and nothing where a
+#: work item *is* the element and the buffer is the value.
+_FIRST_SLOT = {True: "[0]", False: ""}
+
+
+def _first_slot():
+    return _FIRST_SLOT[bool(current_target().work_item_extent())]
+
+
+def _wi_slot():
+    """How a staged buffer is indexed at this work item: `[lane]`, or nothing."""
+    return current_target().work_item_subscript()
+
+
+def _ev_slot(shape):
+    """Where this work item's node for shape function `shape` sits in `ev`."""
+    return current_target().work_item_block_offset(shape)
+
+
+def _ev_node(shape):
+    """Where a shape function's node sits in the staged connectivity, by index.
+
+    A function of the index rather than a format: the block is `VS` wide where a
+    work item is a lane of one, and holds a single node per shape function where
+    a work item *is* the element, in which case the index does not appear.
+    """
+    return lambda index: "ev[%s] * out_stride" % current_target().work_item_block_offset_at(
+        shape, index
+    )
+
+
 def _emits_vector_lane_loop(source_builder):
     target = getattr(source_builder, "target", None)
     if target is not None and hasattr(target, "loop_lowering_policy"):
@@ -450,12 +519,23 @@ def _emits_vector_lane_loop(source_builder):
     return True
 
 
-def _scatter_add_lines(source_builder, pointer, node_expr, value_expr, indent):
+def _scatter_add_lines(source_builder, pointer, node_node, value_expr, indent):
+    """One accumulation per work item, through the connectivity.
+
+    `node_node` is a function of the index rather than a format, because the
+    index the block is walked by is not always the work item's -- a scatter loop
+    walks it by its own name -- and because on a target whose work item is one
+    element the block has no second dimension, so the index does not appear in
+    the node expression at all.
+    """
     work_item = _work_item_index(source_builder)
     if not _emits_vector_lane_loop(source_builder):
+        # `value_expr` names a staged buffer and takes the whole subscript, brackets
+        # included, because a target whose work item is one element stages a scalar
+        # and there is no slot to write -- the subscript is empty, not `[0]`.
         return source_builder.scatter_add_lines(
-            "%s[%s]" % (pointer, node_expr % work_item),
-            value_expr % work_item,
+            "%s[%s]" % (pointer, node_node(work_item)),
+            value_expr % current_target().work_item_subscript(),
             indent,
         )
 
@@ -491,8 +571,8 @@ def _scatter_add_lines(source_builder, pointer, node_expr, value_expr, indent):
                 "scatter_add",
                 (
                     ScatterNode(
-                        expr_ref("%s[%s]" % (pointer, node_expr % "scatter"), "scatter_target"),
-                        expr_ref(value_expr % "scatter", "scatter_value"),
+                        expr_ref("%s[%s]" % (pointer, node_node("scatter")), "scatter_target"),
+                        expr_ref(value_expr % "[scatter]", "scatter_value"),
                         "+=",
                         atomic=True,
                     ),
@@ -503,8 +583,8 @@ def _scatter_add_lines(source_builder, pointer, node_expr, value_expr, indent):
     else:
         lines.extend(
             source_builder.scatter_add_lines(
-                "%s[%s]" % (pointer, node_expr % "scatter"),
-                value_expr % "scatter",
+                "%s[%s]" % (pointer, node_node("scatter")),
+                value_expr % "[scatter]",
                 "%s    " % indent,
             )
         )
@@ -538,9 +618,16 @@ def _diagnostic_work_item(source_builder):
 
 
 def _inline_qualifier(source_builder):
+    """The bound target's inline spelling, or the builder's where one is in hand.
+
+    The fallback is the target rather than a literal `SFEM_INLINE`, because a
+    device source may not carry that macro at all -- `backends/cuda` refuses one
+    that does -- and a helper called without a builder must still print for the
+    target it is being emitted into.
+    """
     if hasattr(source_builder, "inline_qualifier"):
         return source_builder.inline_qualifier()
-    return "SFEM_INLINE"
+    return current_target().inline_qualifier()
 
 
 def _defines_sfem_inline(source_builder):
@@ -1147,7 +1234,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     # The component count is settled by the form, and the signature is written
     # before the body declares `NC`, so it goes in as a number.
     params.extend(
-        "const s_t b%s_data[NS * %d][VS]" % (stream_prefix, n_field_components)
+        "const s_t b%s_data[NS * %d]" % (stream_prefix, n_field_components)
         for _role, stream_prefix in element_api_field_roles(form)
         if stream_prefix == "u"
     )
@@ -1156,7 +1243,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     lines = [
         # Same rule as every other block: a kernel whose single quadrature point
         # is folded into its arithmetic is not parameterised by a point count.
-        _BLOCK_TEMPLATE_HEADER[constant_p1 is not None],
+        _block_template_header(constant_p1 is not None, ()),
         "static %s void %s(" % (_inline_qualifier(source_builder), name),
     ]
     lines.extend(parameter_list_lines(params))
@@ -1165,7 +1252,6 @@ def _sfem_soa_direct_hessian_element_matrix_function(
     lines.extend(
         [
             "  static_assert(NS > 0, \"NS must be positive\");",
-            "  static_assert(VS > 0, \"VS must be positive\");",
             kernel_constant("NC", n_field_components, indent="  "),
                 kernel_constant("ND", dim, indent="  "),
             kernel_constant("NDOFS", "NC * NS", indent="  "),
@@ -1243,7 +1329,7 @@ def _sfem_soa_direct_hessian_element_matrix_function(
             # The header the IR actually prints; the `lines` built above
             # only supply the body slice, which is why changing the literal
             # there left the emitted `int NQ` in place.
-            template_params=_BLOCK_TEMPLATE_PARAMS[constant_p1 is not None],
+            template_params=_block_template_params(constant_p1 is not None, ()),
         )
     )
 
@@ -1273,27 +1359,75 @@ class _BlockKernelInputs:
             setattr(self, field, fields[field])
 
 
-#: The template header a block opens with, and the assert that goes with it,
-#: keyed on whether the kernel has a quadrature point to be parameterised by.
-#: An expanded kernel has its single point folded into its body, so `NQ` would
-#: be a template argument nothing mentions and an assert about a number that
-#: cannot vary.
-_BLOCK_TEMPLATE_HEADER = {
-    True: "template <typename s_t, int NS, int VS>",
-    False: "template <typename s_t, int NQ, int NS, int VS>",
+#: The shape parameters a block opens with, keyed on whether the kernel has a
+#: quadrature point to be parameterised by.  An expanded kernel has its single
+#: point folded into its body, so `NQ` would be a template argument nothing
+#: mentions and an assert about a number that cannot vary.
+#:
+#: The work-item width is not in the table.  It is appended by the three builders
+#: below from the factors the caller has, which is none on a target whose work
+#: item is one element and none for the element-matrix kernel, which holds one
+#: element on every target -- `plans` says so and the scatter that reads the
+#: matrix has no lane index to give it.  Spelling that kernel's tile `[NS * NC][1]`
+#: and handing it `VS = 1` was the width surviving under another name, and the
+#: two families had a table each saying the same thing for it.
+_BLOCK_SHAPE_PARAMS = {
+    True: ("typename s_t", "int NS"),
+    False: ("typename s_t", "int NQ", "int NS"),
 }
 
-#: The same header as a tuple, for the IR path that prints its own.
-_BLOCK_TEMPLATE_PARAMS = {
-    True: ("typename s_t", "int NS", "int VS"),
-    False: ("typename s_t", "int NQ", "int NS", "int VS"),
-}
 
-#: The template arguments a call passes, matching the header above.
-_BLOCK_TEMPLATE_ARGUMENTS = {
-    True: lambda width: "<s_t, NS, %s>" % width,
-    False: lambda width: "<s_t, NQ, NS, %s>" % width,
-}
+def _width_parameters():
+    """The work-item width, spelled as template parameters -- none where there is none."""
+    return tuple("int %s" % name for name in _width_factors())
+
+
+def _mesh_template_arguments(effective_vector_size):
+    """A mesh kernel's template arguments: the geometry type, and the width if any.
+
+    A device kernel is not templated on a width, so there is no argument to
+    spell for it -- handing it the `1` its work item happens to hold is the
+    width surviving as a template argument to a parameter that is gone.
+    """
+    return "".join(
+        [", geom_t"] + [", %d" % effective_vector_size for _ in _width_factors()]
+    )
+
+
+def _wi_extent():
+    """The trailing extent of a staged buffer: `[VS]`, or nothing at all."""
+    return current_target().work_item_extent()
+
+
+def _block_template_head(*parameters):
+    """`template <...>` for a helper whose shape parameters are its own.
+
+    The work-item width is appended where the target has one, so the affine
+    geometry helper is templated on it only in the kernels that stage a block.
+    """
+    return "template <%s>" % ", ".join(
+        parameters + tuple("int %s" % name for name in _width_factors())
+    )
+
+
+def _block_template_params(expanded, factors):
+    """The template parameter list, as a tuple, for the IR path that prints its own."""
+    return _BLOCK_SHAPE_PARAMS[bool(expanded)] + tuple(
+        "int %s" % name for name in factors
+    )
+
+
+def _block_template_header(expanded, factors):
+    """The same list, spelled as the `template <...>` a kernel opens with."""
+    return "template <%s>" % ", ".join(_block_template_params(expanded, factors))
+
+
+def _block_template_arguments(expanded, factors):
+    """The template arguments a call passes, matching the header above."""
+    names = tuple(
+        parameter.split()[-1] for parameter in _BLOCK_SHAPE_PARAMS[bool(expanded)]
+    )
+    return "<%s>" % ", ".join(names + tuple(factors))
 
 _BLOCK_TEMPLATE_ASSERTS = {
     True: (),
@@ -1304,13 +1438,16 @@ _BLOCK_TEMPLATE_ASSERTS = {
 def _sfem_soa_block_signature_lines(name, params, source_builder, expanded=False):
     """The template header, parameter list and asserts both kernels open with."""
     lines = [
-        _BLOCK_TEMPLATE_HEADER[bool(expanded)],
+        _block_template_header(expanded, _width_factors()),
         "static %s void %s(" % (_inline_qualifier(source_builder), name),
     ]
     lines.extend(parameter_list_lines(params))
     lines.append(") {")
     lines.extend(_BLOCK_TEMPLATE_ASSERTS[bool(expanded)])
-    lines.append('  static_assert(VS > 0, "VS must be positive");')
+    lines.extend(
+        '  static_assert(%s > 0, "%s must be positive");' % (name, name)
+        for name in _width_factors()
+    )
     return lines
 
 
@@ -1500,15 +1637,24 @@ class ObjectiveStepLoop:
     def buffer_lines(self):
         """Lane-indexed room for the two gradients, outside the first loop."""
         return [
-            "%ss_t %s[%d * VS];" % (self.indent, name, self.components)
+            "%ss_t %s[%s];"
+            % (self.indent, name, c_product(self.components, *_width_factors()))
             for name in ("gu_base_v", "trial_grad_v")
         ]
 
     def base(self, index):
-        return "gu_base_v[%d * VS + %s]" % (index, self.work_item)
+        return "gu_base_v[%s]" % self._slot(index)
 
     def direction(self, index):
-        return "trial_grad_v[%d * VS + %s]" % (index, self.work_item)
+        return "trial_grad_v[%s]" % self._slot(index)
+
+    def _slot(self, index):
+        """Where this component of this work item lives in the two buffers.
+
+        `index * VS + lane` where a work item is a lane of a block, and `index`
+        alone where a work item *is* the element: there is no block to stride.
+        """
+        return current_target().work_item_block_offset(index)
 
     def open_lines(self):
         """Close the first work-item loop, open the step loop and the second."""
@@ -1941,12 +2087,7 @@ def _sfem_soa_pointwise_block_function(
                 ),
             ),
             qualifier="static %s" % _inline_qualifier(source_builder),
-            template_params=(
-                "typename s_t",
-                "int NQ",
-                "int NS",
-                "int VS",
-            ),
+            template_params=_block_template_params(False, _width_factors()),
         )
     )
 
@@ -2095,7 +2236,7 @@ def _append_sfem_soa_tensor_weak_form_lines(
     u_streams = "u_streams" if use_stream_arrays else "weak_u_streams"
     h_streams = "h_streams" if use_stream_arrays else "weak_h_streams"
     out_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
-    block_extent = "NQ * %d * VS" % (dim * dim)
+    block_extent = c_product("NQ", dim * dim, *_width_factors())
 
     if uses_current:
         lines.append("  s_t gu_ref_q[%s];" % block_extent)
@@ -2739,7 +2880,7 @@ def _simplex_weak_per_shape_tail(
         scalar_temporaries=True,
     )
     for component in range(n_field_components * dim):
-        lines.append("      loperand%d_values[%s] = loperand%d;" % (component, work_item, component))
+        lines.append("      loperand%d_values%s = loperand%d;" % (component, _wi_slot(), component))
     lines.append("      }")
     op = output_assignment(form)
     output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"
@@ -2764,7 +2905,7 @@ def _simplex_weak_per_shape_tail(
     lines.extend(_work_item_loop_lines(source_builder, "        "))
     for row in range(n_field_components):
         terms = [
-            "loperand%d_values[%s] * tref%d" % (row * dim + col, work_item, col)
+            "loperand%d_values%s * tref%d" % (row * dim + col, _wi_slot(), col)
             for col in range(dim)
         ]
         lines.append(
@@ -2880,11 +3021,11 @@ def _append_sfem_soa_weak_form_lines(
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
-                lines.append("      s_t gu_ref%d_values[%s];" % (idx, _kernel_width()))
+                lines.append("      s_t gu_ref%d_values%s;" % (idx, _wi_extent()))
             if uses_direction:
-                lines.append("      s_t grad_h_ref%d_values[%s];" % (idx, _kernel_width()))
+                lines.append("      s_t grad_h_ref%d_values%s;" % (idx, _wi_extent()))
     lines.extend(
-        "      s_t loperand%d_values[%s];" % (component, _kernel_width())
+        "      s_t loperand%d_values%s;" % (component, _wi_extent())
         for component in _LOPERAND_COMPONENTS[form_accumulation(form)](
             n_field_components, dim
         )
@@ -2925,13 +3066,13 @@ def _append_sfem_soa_weak_form_lines(
             idx = row * dim + col
             if uses_current:
                 lines.append(
-                    "          gu_ref%d_values[%s] += u_shape%d[%s] * gref%d;"
-                    % (idx, work_item, row, work_item, col)
+                    "          gu_ref%d_values%s += u_shape%d[%s] * gref%d;"
+                    % (idx, _wi_slot(), row, work_item, col)
                 )
             if uses_direction:
                 lines.append(
-                    "          grad_h_ref%d_values[%s] += h_shape%d[%s] * gref%d;"
-                    % (idx, work_item, row, work_item, col)
+                    "          grad_h_ref%d_values%s += h_shape%d[%s] * gref%d;"
+                    % (idx, _wi_slot(), row, work_item, col)
                 )
     lines.append("        }")
     lines.append("      }")
@@ -2967,9 +3108,9 @@ def _append_sfem_soa_weak_form_lines(
         for col in range(dim):
             idx = row * dim + col
             if uses_current:
-                lines.append("      const s_t gu_ref%d = gu_ref%d_values[%s];" % (idx, idx, work_item))
+                lines.append("      const s_t gu_ref%d = gu_ref%d_values%s;" % (idx, idx, _wi_slot()))
             if uses_direction:
-                lines.append("      const s_t grad_h_ref%d = grad_h_ref%d_values[%s];" % (idx, idx, work_item))
+                lines.append("      const s_t grad_h_ref%d = grad_h_ref%d_values%s;" % (idx, idx, _wi_slot()))
     base_target = (
         (lambda index: "const s_t %s%d" % (gradient_name, index))
         if step_loop is None
@@ -3485,7 +3626,7 @@ def _general_jacobian_staging_lines(
     lines = []
     for row in range(dim):
         for col in range(dim):
-            lines.append("      s_t J%d%d_values[%s];" % (row, col, _kernel_width()))
+            lines.append("      s_t J%d%d_values%s;" % (row, col, _wi_extent()))
     lines.extend(
         _zero_lane_block_lines(
             source_builder,
@@ -3522,14 +3663,14 @@ def _general_jacobian_staging_lines(
     # nine accumulations that belong together.  Same stores, one region.
     lines.extend(_work_item_loop_lines(source_builder, "        "))
     lines.extend(
-        "          J%d%d_values[%s] += %s[%s][%s] * g%d;"
+        "          J%d%d_values%s += %s[%s]%s * g%d;"
         % (
             row,
             col,
-            work_item,
+            _wi_slot(),
             coordinate_streams,
             c_sum(c_product("shape", dim), row),
-            work_item,
+            _wi_slot(),
             col,
         )
         for row in range(dim)
@@ -3547,7 +3688,7 @@ def _constant_p1_jacobian_staging_lines(*_arguments):
 
 def _general_jacobian_value_lines(dim, work_item, coordinate_streams, gradients):
     return [
-        "        const s_t J%d%d = J%d%d_values[%s];" % (row, col, row, col, work_item)
+        "        const s_t J%d%d = J%d%d_values%s;" % (row, col, row, col, _wi_slot())
         for row in range(dim)
         for col in range(dim)
     ]
@@ -3569,11 +3710,11 @@ def _constant_p1_jacobian_value_lines(dim, work_item, coordinate_streams, gradie
                 (
                     sp.sympify(gradients[shape][col])
                     * sp.Symbol(
-                        "%s[%s][%s]"
+                        "%s[%s]%s"
                         % (
                             coordinate_streams,
                             c_sum(c_product(shape, dim), row),
-                            work_item,
+                            _wi_slot(),
                         )
                     )
                     for shape in range(len(gradients))
@@ -3600,14 +3741,20 @@ _JACOBIAN_VALUE_LINES = {
     False: _general_jacobian_value_lines,
 }
 
+#: Whether the point strides the block, for the general case below: `q * VS + lane`
+#: where a work item is a lane of a block, `q` where a work item is the element,
+#: and the work item alone where the write is not q-major.
+_Q_MAJOR_GEOMETRY_INDEX = {
+    True: lambda work_item: current_target().work_item_block_offset("q"),
+    False: lambda work_item: work_item,
+}
+
 #: Where the adjugate is written.  A element with one quadrature point has no
 #: `q` to stride by, and after the fold above there is no `q` in scope either.
 _GEOMETRY_OUTPUT_INDEX = {
     True: lambda q_major, work_item: work_item,
     False: (
-        lambda q_major, work_item: "q * %s + %s" % (_kernel_width(), work_item)
-        if q_major
-        else work_item
+        lambda q_major, work_item: _Q_MAJOR_GEOMETRY_INDEX[bool(q_major)](work_item)
     ),
 }
 
@@ -3796,7 +3943,7 @@ def _sfem_soa_operator_source(
     lines = [line for line in lines if line != ""]
     lines.append("")
     lines.extend(
-        _affine_geometry_stream_helper_lines(
+        affine_geometry_stream_helper_lines(
             source_builder,
         )
     )
@@ -4428,17 +4575,17 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             [
                 "      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
                 "        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
-                "        s_t bu_data[NS * NC][VS];",
-                "        s_t bh_data[NS * NC][VS];",
+                "        s_t bu_data[NS * NC]%s;" % _wi_extent(),
+                "        s_t bh_data[NS * NC]%s;" % _wi_extent(),
             ]
         )
         if not is_affine:
-            lines.append("        s_t bcoordinate_data[NS * ND][VS];")
+            lines.append("        s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
             for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                lines.append("        s_t b%s[NQ * VS];" % stream)
+                lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
             lines.extend(
                 [
-                    "        s_t bdet0[NQ * VS];",
+                    "        s_t bdet0[%s];" % c_product("NQ", *_width_factors()),
                     "        s_t *badj_streams[ND * ND] = {%s};"
                     % ", ".join("badj%d" % i for i in range(dim * dim)),
                 ]
@@ -4559,7 +4706,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
         # neither the stride between points nor the weight below.
         call_args.extend(
             argument
-            for argument in ("0" if is_affine else "VS",)
+            for argument in (_AFFINE_GEOMETRY_STRIDE[bool(is_affine)](),)
             if not omit_reference_basis_inputs
         )
         if is_affine:
@@ -4613,7 +4760,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                 "        %s%s(%s);"
                 % (
                     block_name,
-                    _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)](_kernel_width()),
+                    _block_template_arguments(omit_reference_basis_inputs, _width_factors()),
                     ", ".join(call_args),
                 ),
                 "      }",
@@ -4891,13 +5038,13 @@ def _per_shape_output_scatter(lines, form, dim, n_nodes, n_field_components,
             [
                 "",
                 "    for (int shape = 0; shape < NS; ++shape) {",
-                "      const idx_t *const RSTR ev_shape = &ev[shape * VS];",
+                "      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors()),
                 "      for (int d = 0; d < NC; ++d) {",
                 *_scatter_add_lines(
                     source_builder,
                     "out_components[d]",
-                    "ev_shape[%s] * out_stride",
-                    "bout_data[shape * NC + d][%s]",
+                    lambda index: "ev_shape[%s] * out_stride" % index,
+                    "bout_data[shape * NC + d]%s",
                     "        ",
                 ),
                 "      }",
@@ -4913,8 +5060,8 @@ def _per_shape_output_scatter(lines, form, dim, n_nodes, n_field_components,
                         _scatter_add_lines(
                             source_builder,
                             "out%s" % component,
-                            "ev[%d * VS + %%s] * out_stride" % shape,
-                            "bout%s%d[%%s]" % (component, shape),
+                            _ev_node(shape),
+                            "bout%s%d%%s" % (component, shape),
                             "    ",
                         )
                     )
@@ -4972,21 +5119,25 @@ def _append_mesh_operator_compact_buffers(
     """
     if compact_stream_buffers:
         if uses_current:
-            lines.append("    s_t bu_data[NS * NC][%s];" % _kernel_width())
+            lines.append("    s_t bu_data[NS * NC]%s;" % current_target().work_item_extent())
         if uses_direction:
-            lines.append("    s_t bh_data[NS * NC][VS];")
+            lines.append("    s_t bh_data[NS * NC]%s;" % current_target().work_item_extent())
         output = mesh_output_shape(form)
         lines.append(
-            "    s_t %s%s[VS];"
-            % (output.block, "".join("[%s]" % extent for extent in output.extents))
+            "    s_t %s%s%s;"
+            % (
+                output.block,
+                "".join("[%s]" % extent for extent in output.extents),
+                current_target().work_item_extent(),
+            )
         )
         if compact_coordinate_buffers:
-            lines.append("    s_t bcoordinate_data[NS * ND][VS];")
+            lines.append("    s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
     elif compact_coordinate_buffers:
-        lines.append("    s_t bcoordinate_data[NS * ND][VS];")
+        lines.append("    s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
     elif geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
-            lines.append("    s_t b%s[VS];" % stream)
+            lines.append("    s_t b%s%s;" % (stream, _wi_extent()))
 
 
 def _append_mesh_operator_isoparametric_flux(
@@ -5148,16 +5299,16 @@ def _append_mesh_operator_stream_buffer_views(
         lines.extend(
             [
                 "    for (int shape = 0; shape < NS; ++shape) {",
-                "      const idx_t *const RSTR ev_shape = &ev[shape * VS];",
+                "      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors()),
                 "      for (int d = 0; d < NC; ++d) {",
                 *_work_item_loop_lines(source_builder, "        "),
                 "          const idx_t node = ev_shape[%s];" % work_item,
             ]
         )
         if uses_current:
-            lines.append("          bu_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item)
+            lines.append("          bu_data[shape * NC + d]%s = u_components[d][node * u_stride];" % current_target().work_item_subscript())
         if uses_direction:
-            lines.append("          bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item)
+            lines.append("          bh_data[shape * NC + d]%s = h_components[d][node * h_stride];" % current_target().work_item_subscript())
         lines.extend(["        }", "      }", "    }"])
         # One loop per extent the plan states, innermost the lane loop.  A
         # scalar output has no extents and gets the lane loop alone, which is
@@ -5173,16 +5324,16 @@ def _append_mesh_operator_stream_buffer_views(
                 component = _component_name(d)
                 if uses_current:
                     lines.append(
-                        "      bu%s%d[%s] = u%s[ev[%d * VS + %s] * u_stride];"
-                        % (component, shape, work_item, component, shape, work_item)
+                        "      bu%s%d%s = u%s[ev[%s] * u_stride];"
+                        % (component, shape, _wi_slot(), component, _ev_slot(shape))
                     )
                 if uses_direction:
                     lines.append(
-                        "      bh%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
-                        % (component, shape, work_item, component, shape, work_item)
+                        "      bh%s%d%s = h%s[ev[%s] * h_stride];"
+                        % (component, shape, _wi_slot(), component, _ev_slot(shape))
                     )
         for stream in _output_stream_names(form, n_field_components, n_nodes):
-            lines.append("      b%s[%s] = s_t(0);" % (stream, work_item))
+            lines.append("      b%s%s = s_t(0);" % (stream, _wi_slot()))
         lines.append("    }")
 
 
@@ -5200,7 +5351,7 @@ def _zero_lane_block_lines(source_builder, indent, targets, work_item):
         return []
     lines = list(_work_item_loop_lines(source_builder, indent))
     lines.extend(
-        "%s  %s[%s] = s_t(0);" % (indent, target, work_item) for target in targets
+        "%s  %s%s = s_t(0);" % (indent, target, _wi_slot()) for target in targets
     )
     lines.append("%s}" % indent)
     return lines
@@ -5227,12 +5378,12 @@ def _append_mesh_operator_isoparametric_jacobian(
                 [
                     "",
                     "    for (int shape = 0; shape < NS; ++shape) {",
-                    *(["      const idx_t *const RSTR ev_shape = &ev[shape * VS];"] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
+                    *(["      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors())] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
                     "      for (int d = 0; d < ND; ++d) {",
                     *_work_item_loop_lines(source_builder, "        "),
-                    "          bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
+                    "          bcoordinate_data[shape * ND + d]%s = coordinate_components[d][%s];"
                     % (
-                        work_item,
+                        _wi_slot(),
                         "ev_shape[%s]" % work_item
                         if identity_stream_shape_order
                         else "coordinate_element_shape[evb + %s]" % work_item,
@@ -5249,8 +5400,8 @@ def _append_mesh_operator_isoparametric_jacobian(
                 for d in range(dim):
                     stream = "%s%d" % (_component_name(d), shape)
                     lines.append(
-                        "      b%s[%s] = %s[ev[%d * VS + %s]];"
-                        % (stream, work_item, _component_name(d), shape, work_item)
+                        "      b%s%s = %s[ev[%s]];"
+                        % (stream, _wi_slot(), _component_name(d), _ev_slot(shape))
                     )
             lines.append("    }")
 
@@ -5526,7 +5677,7 @@ def _sfem_soa_mesh_operator_function(
         "namespace sfem {",
         "namespace codegen {",
         "",
-        source_builder.mesh_template_line(geometry_mode, ("int VS",)),
+        source_builder.mesh_template_line(geometry_mode, _width_parameters()),
         source_builder.mesh_function_line(implementation_name),
     ]
     lines.extend(parameter_list_lines(impl_params))
@@ -5582,7 +5733,7 @@ def _sfem_soa_mesh_operator_function(
     lines.append("")
     lines.extend(source_builder.parallel_for_lines())
     lines.extend(source_builder.mesh_loop_lines())
-    lines.append("    idx_t ev[VS * NS];")
+    lines.append("    idx_t ev[%s];" % c_product(*(_width_factors() + ("NS",))))
 
     compact_stream_buffers = use_stream_arrays
     _append_mesh_operator_compact_buffers(
@@ -5599,24 +5750,24 @@ def _sfem_soa_mesh_operator_function(
     if geometry_mode == "isoparametric":
         for array_input in element_inputs:
             for stream in _soa_array_stream_names(array_input):
-                extent = _BLOCK_BUFFER_EXTENT[form_contraction(form)]
-                lines.append("    s_t b%s[%s];" % (stream, extent))
+                extent = _BLOCK_BUFFER_EXTENT[form_contraction(form)]()
+                lines.append("    s_t b%s%s;" % (stream, extent))
     if not compact_stream_buffers:
         if uses_current:
             for stream in _field_stream_names("u", n_field_components, n_nodes):
-                lines.append("    s_t b%s[VS];" % stream)
+                lines.append("    s_t b%s%s;" % (stream, _wi_extent()))
         if uses_direction:
             for stream in _field_stream_names("h", n_field_components, n_nodes):
-                lines.append("    s_t b%s[VS];" % stream)
+                lines.append("    s_t b%s%s;" % (stream, _wi_extent()))
         for stream in _output_stream_names(form, n_field_components, n_nodes):
-            lines.append("    s_t b%s[VS];" % stream)
+            lines.append("    s_t b%s%s;" % (stream, _wi_extent()))
 
     lines.extend(
         [
             "",
             "    for (int element_node = 0; element_node < NS; ++element_node) {",
             "      const idx_t *const RSTR element_shape = elements[element_node] + evb;",
-            "      idx_t *const RSTR ev_node = &ev[element_node * VS];",
+            "      idx_t *const RSTR ev_node = &ev[%s];" % c_product("element_node", *_width_factors()),
             *_work_item_loop_lines(source_builder, "      "),
             "        ev_node[%s] = element_shape[%s];" % (work_item, work_item),
             "      }",
@@ -5754,7 +5905,7 @@ def _sfem_soa_mesh_operator_function(
             % (
                 call_indent,
                 block_name,
-                _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)](_kernel_width()),
+                _block_template_arguments(omit_reference_basis_inputs, _width_factors()),
                 ", ".join(call_args),
             ),
         ]
@@ -5815,7 +5966,7 @@ def _sfem_soa_mesh_operator_function(
             lambda scalar_type, _positional: source_builder.wrapper_call_lines(
                 implementation_name,
                 scalar_type,
-                ", geom_t, %d" % effective_vector_size,
+                _mesh_template_arguments(effective_vector_size),
                 cast_arguments(wrapper_params, wrapper_args, scalar_type),
             ),
             parameter_lines=parameter_list_lines,
@@ -6273,21 +6424,21 @@ def _sfem_soa_packed_apply_public_wrappers(
                 ]
             )
             if uses_current:
-                lines.append("        s_t bu_data[NS * NC][VS];")
+                lines.append("        s_t bu_data[NS * NC]%s;" % _wi_extent())
             if uses_direction:
-                lines.append("        s_t bh_data[NS * NC][VS];")
+                lines.append("        s_t bh_data[NS * NC]%s;" % _wi_extent())
             lines.extend(
                 [
-                    "        s_t bout_data[NS * NC][VS];",
+                    "        s_t bout_data[NS * NC]%s;" % _wi_extent(),
                 ]
             )
             if not is_affine:
-                lines.append("        s_t bcoordinate_data[NS * ND][VS];")
+                lines.append("        s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
                 for stream in _soa_array_stream_names(_adjugate_input(dim)):
-                    lines.append("        s_t b%s[NQ * VS];" % stream)
+                    lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
                 lines.extend(
                     [
-                        "        s_t bdet0[NQ * VS];",
+                        "        s_t bdet0[%s];" % c_product("NQ", *_width_factors()),
                         "        s_t *badj_streams[ND * ND] = {%s};"
                         % ", ".join("badj%d" % i for i in range(dim * dim)),
                     ]
@@ -6441,7 +6592,7 @@ def _sfem_soa_packed_apply_public_wrappers(
             # neither the stride between points nor the weight below.
             call_args.extend(
                 argument
-                for argument in ("0" if is_affine else "VS",)
+                for argument in (_AFFINE_GEOMETRY_STRIDE[bool(is_affine)](),)
                 if not omit_reference_basis_inputs
             )
             if is_affine:
@@ -6488,7 +6639,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "        %s%s(%s);"
                     % (
                         block_name,
-                        _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)](_kernel_width()),
+                        _block_template_arguments(omit_reference_basis_inputs, _width_factors()),
                         ", ".join(call_args),
                     ),
                     "",
@@ -6896,7 +7047,7 @@ def _objective_steps_lines(
         "namespace sfem {",
         "namespace codegen {",
         "",
-        source_builder.mesh_template_line(geometry_mode, ("int VS",)),
+        source_builder.mesh_template_line(geometry_mode, _width_parameters()),
         source_builder.mesh_function_line(implementation_name),
     ]
     lines.extend(parameter_list_lines(impl_params))
@@ -6953,38 +7104,38 @@ def _objective_steps_lines(
             "",
             *source_builder.parallel_for_lines(),
             *source_builder.mesh_loop_lines(),
-            "    idx_t ev[VS * NS];",
+            "    idx_t ev[%s];" % c_product(*(_width_factors() + ("NS",))),
         ]
     )
 
     compact_stream_buffers = use_stream_arrays
     if compact_stream_buffers:
-        lines.append("    s_t bu_data[NS * NC][%s];" % _kernel_width())
-        lines.append("    s_t bh_data[NS * NC][VS];")
+        lines.append("    s_t bu_data[NS * NC]%s;" % current_target().work_item_extent())
+        lines.append("    s_t bh_data[NS * NC]%s;" % current_target().work_item_extent())
         if compact_coordinate_buffers:
-            lines.append("    s_t bcoordinate_data[NS * ND][VS];")
+            lines.append("    s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
     elif compact_coordinate_buffers:
-        lines.append("    s_t bcoordinate_data[NS * ND][VS];")
+        lines.append("    s_t bcoordinate_data[NS * ND]%s;" % _wi_extent())
     elif geometry_mode == "isoparametric":
         for stream in _coordinate_stream_names(dim, n_nodes):
-            lines.append("    s_t b%s[VS];" % stream)
+            lines.append("    s_t b%s%s;" % (stream, _wi_extent()))
     if geometry_mode == "isoparametric":
         for array_input in element_inputs:
             for stream in _soa_array_stream_names(array_input):
-                extent = "NQ * VS"
+                extent = c_product("NQ", *_width_factors())
                 lines.append("    s_t b%s[%s];" % (stream, extent))
     if not compact_stream_buffers:
         for stream in _field_stream_names("u", n_field_components, n_nodes):
-            lines.append("    s_t b%s[VS];" % stream)
+            lines.append("    s_t b%s%s;" % (stream, _wi_extent()))
         for stream in _field_stream_names("h", n_field_components, n_nodes):
-            lines.append("    s_t b%s[VS];" % stream)
+            lines.append("    s_t b%s%s;" % (stream, _wi_extent()))
 
     lines.extend(
         [
             "",
             "    for (int element_node = 0; element_node < NS; ++element_node) {",
             "      const idx_t *const RSTR element_shape = elements[element_node] + evb;",
-            "      idx_t *const RSTR ev_node = &ev[element_node * VS];",
+            "      idx_t *const RSTR ev_node = &ev[%s];" % c_product("element_node", *_width_factors()),
             *_work_item_loop_lines(source_builder, "      "),
             "        ev_node[%s] = element_shape[%s];"
             % (work_item, work_item),
@@ -7000,12 +7151,12 @@ def _objective_steps_lines(
                 [
                     "",
                     "    for (int shape = 0; shape < NS; ++shape) {",
-                    *(["      const idx_t *const RSTR ev_shape = &ev[shape * VS];"] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
+                    *(["      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors())] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
                     "      for (int d = 0; d < ND; ++d) {",
                     *_work_item_loop_lines(source_builder, "        "),
-                    "          bcoordinate_data[shape * ND + d][%s] = coordinate_components[d][%s];"
+                    "          bcoordinate_data[shape * ND + d]%s = coordinate_components[d][%s];"
                     % (
-                        work_item,
+                        _wi_slot(),
                         "ev_shape[%s]" % work_item
                         if identity_stream_shape_order
                         else "coordinate_element_shape[evb + %s]" % work_item,
@@ -7021,8 +7172,8 @@ def _objective_steps_lines(
                 for d in range(dim):
                     stream = "%s%d" % (_component_name(d), shape)
                     lines.append(
-                        "      b%s[%s] = %s[ev[%d * VS + %s]];"
-                        % (stream, work_item, _component_name(d), shape, work_item)
+                        "      b%s%s = %s[ev[%s]];"
+                        % (stream, _wi_slot(), _component_name(d), _ev_slot(shape))
                     )
             lines.append("    }")
 
@@ -7054,12 +7205,12 @@ def _objective_steps_lines(
             [
                 "",
                 "    for (int shape = 0; shape < NS; ++shape) {",
-                "      const idx_t *const RSTR ev_shape = &ev[shape * VS];",
+                "      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors()),
                 "      for (int d = 0; d < NC; ++d) {",
                 *_work_item_loop_lines(source_builder, "        "),
                 "          const idx_t node = ev_shape[%s];" % work_item,
-                "          bu_data[shape * NC + d][%s] = u_components[d][node * u_stride];" % work_item,
-                "          bh_data[shape * NC + d][%s] = h_components[d][node * h_stride];" % work_item,
+                "          bu_data[shape * NC + d]%s = u_components[d][node * u_stride];" % current_target().work_item_subscript(),
+                "          bh_data[shape * NC + d]%s = h_components[d][node * h_stride];" % current_target().work_item_subscript(),
                 "        }",
                 "      }",
                 "    }",
@@ -7087,12 +7238,12 @@ def _objective_steps_lines(
             for d in range(dim):
                 component = _component_name(d)
                 lines.append(
-                    "      bu%s%d[%s] = u%s[ev[%d * VS + %s] * u_stride];"
-                    % (component, shape, work_item, component, shape, work_item)
+                    "      bu%s%d%s = u%s[ev[%s] * u_stride];"
+                    % (component, shape, _wi_slot(), component, _ev_slot(shape))
                 )
                 lines.append(
-                    "      bh%s%d[%s] = h%s[ev[%d * VS + %s] * h_stride];"
-                    % (component, shape, work_item, component, shape, work_item)
+                    "      bh%s%d%s = h%s[ev[%s] * h_stride];"
+                    % (component, shape, _wi_slot(), component, _ev_slot(shape))
                 )
         lines.append("    }")
 
@@ -7156,7 +7307,7 @@ def _objective_steps_lines(
     # table below, and both are gated on the flag that gated its signature.
     call_args.extend(
         argument
-        for argument in (_MESH_GEOMETRY_STRIDE_ARGUMENT[geometry_mode],)
+        for argument in (_MESH_GEOMETRY_STRIDE_ARGUMENT[geometry_mode](),)
         if not omit_reference_basis_inputs
     )
     if geometry_mode == "affine":
@@ -7221,7 +7372,7 @@ def _objective_steps_lines(
             "    %s%s(%s);"
             % (
                 block_name,
-                _BLOCK_TEMPLATE_ARGUMENTS[bool(omit_reference_basis_inputs)](_kernel_width()),
+                _block_template_arguments(omit_reference_basis_inputs, _width_factors()),
                 ", ".join(call_args),
             ),
             "  }",
@@ -7262,7 +7413,7 @@ def _objective_steps_lines(
             lambda scalar_type, _positional: source_builder.wrapper_call_lines(
                 implementation_name,
                 scalar_type,
-                ", geom_t, %d" % effective_vector_size,
+                _mesh_template_arguments(effective_vector_size),
                 cast_arguments(wrapper_params, wrapper_args, scalar_type),
             ),
             parameter_lines=parameter_list_lines,
@@ -7483,13 +7634,9 @@ def _sfem_soa_direct_hessian_current_gradient_lines(
         )
     for row in range(n_field_components):
         lines.append(
-            "%s  const s_t state_u%d = bu_data[%s]%s;"
-            % (
-                indent,
-                row,
-                c_sum(c_product("shape", "NC"), row),
-                current_target().work_item_subscript(),
-            )
+            # No subscript: the element-matrix kernel's state tile is flat.
+            "%s  const s_t state_u%d = bu_data[%s];"
+            % (indent, row, c_sum(c_product("shape", "NC"), row))
         )
         for col in range(dim):
             lines.append(
@@ -7506,10 +7653,12 @@ def _sfem_soa_direct_hessian_point_geometry_lines(dim, indent):
     Shared by the two assembly shapes: they disagree about which loop is
     outermost, not about what the geometry at a point is.
     """
+    # One element, so the point *is* the offset: this kernel assembles a single
+    # element matrix and carries no width, and its caller's geometry buffers are
+    # strided by the point alone.  It used to open a work item and offset by a
+    # width of one, which is the lane surviving where there are no lanes.
     lines = [
-        *("%s%s" % (indent, line) for line in current_target().work_item_prologue_lines()),
-        "%sconst ptrdiff_t goff = %s;"
-        % (indent, current_target().work_item_offset("q", "VS")),
+        "%sconst ptrdiff_t goff = q;" % indent,
     ]
     lines.extend(
         "%sconst s_t %s = badj%d[goff];"
@@ -7639,11 +7788,10 @@ def _sfem_soa_direct_hessian_closed_form_assembly_lines(
     idet = sp.Symbol("idet")
     weight = sp.nsimplify(quadrature_rule.weights[0])
 
-    lines = list(current_target().work_item_prologue_lines(indent))
-    lines.append(
-        "%sconst ptrdiff_t goff = %s;"
-        % (indent, current_target().work_item_offset(0, "VS"))
-    )
+    # One element and one quadrature point, so the offset is zero: this is the
+    # closed-form element matrix, which carries no width for the same reason the
+    # quadrature body above does not.
+    lines = ["%sconst ptrdiff_t goff = 0;" % indent]
     lines.extend(
         "%sconst s_t %s = badj%d[goff];" % (indent, adj[component], component)
         for component in range(dim * dim)
@@ -7666,11 +7814,10 @@ def _sfem_soa_direct_hessian_closed_form_assembly_lines(
                     (
                         sp.sympify(reference_gradients[shape][k])
                         * sp.Symbol(
-                            "bu_data[%d]%s"
-                            % (
-                                shape * n_field_components + row,
-                                current_target().work_item_subscript(),
-                            )
+                            # No subscript: the element-matrix kernel's state
+                            # tile is flat, because it holds one element.
+                            "bu_data[%d]"
+                            % (shape * n_field_components + row,)
                         )
                         for shape in range(n_shape)
                     ),
@@ -7972,16 +8119,8 @@ def _sfem_soa_direct_hessian_matrix_assembly_lines(
         )
     else:
         lines.append("%s  const s_t qw = %sq_weight[q];" % (indent, reference_prefix))
-    lines.extend(
-        [
-            *(
-                "%s  %s" % (indent, line)
-                for line in current_target().work_item_prologue_lines()
-            ),
-            "%s  const ptrdiff_t goff = %s;"
-            % (indent, current_target().work_item_offset("q", "VS")),
-        ]
-    )
+    # No work item opened: see `_sfem_soa_direct_hessian_point_geometry_lines`.
+    lines.append("%s  const ptrdiff_t goff = q;" % indent)
     for component in range(dim * dim):
         lines.append(
             "%s  const s_t %s = badj%d[goff];"
@@ -8193,7 +8332,7 @@ def _sfem_soa_direct_hessian_element_matrix_call_lines(
         % (
             indent,
             function_name,
-            _BLOCK_TEMPLATE_ARGUMENTS[bool(constant_p1)](_kernel_width()),
+            _block_template_arguments(constant_p1, ()),
             ", ".join(args),
         ),
     )
@@ -8430,10 +8569,10 @@ def _sfem_soa_hessian_packed_crs_passes(
             ]
         )
         if uses_current:
-            lines.append("        s_t bu_data[NS * NC][VS];")
+            lines.append("        s_t bu_data[NS * NC]%s;" % _wi_extent())
         for stream in _soa_array_stream_names(_adjugate_input(dim)):
-            lines.append("        s_t b%s[NQ * VS];" % stream)
-        lines.append("        s_t bdet0[NQ * VS];")
+            lines.append("        s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
+        lines.append("        s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
         lines.append(
             "        s_t *badj_streams[ND * ND] = {%s};"
             % ", ".join("badj%d" % i for i in range(dim * dim))
@@ -8445,11 +8584,11 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "          const uint16_t packed_node = elements[shape][element];",
                 *([] if identity_stream_shape_order else ["          const uint16_t coordinate_packed_node = coordinate_elements[shape][element];"]),
                 "          for (int d = 0; d < ND; ++d) {",
-                "            bcoordinate_data[shape * ND + d][0] = pk_coordinates[d * max_nodes_per_pack + %s];" % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node"),
+                "            bcoordinate_data[shape * ND + d]" + _first_slot() + " = pk_coordinates[d * max_nodes_per_pack + %s];" % ("packed_node" if identity_stream_shape_order else "coordinate_packed_node"),
             ]
         )
         if uses_current:
-            lines.append("            bu_data[shape * NC + d][0] = pk_u[d * max_nodes_per_pack + packed_node];")
+            lines.append("            bu_data[shape * NC + d]%s = pk_u[d * max_nodes_per_pack + packed_node];" % _first_slot())
         lines.extend(
             [
                 "          }",
@@ -8761,10 +8900,12 @@ def _sfem_soa_hessian_matrix_assembly_function(
         ]
     )
     if uses_current:
-        lines.append("    s_t bu_data[NS * NC][%s];" % _kernel_width())
+        # No width: this kernel assembles one element, and the element-matrix
+        # kernel it hands the tile to takes it flat.
+        lines.append("    s_t bu_data[NS * NC];")
     for stream in _soa_array_stream_names(_adjugate_input(dim)):
-        lines.append("    s_t b%s[NQ * VS];" % stream)
-    lines.append("    s_t bdet0[NQ * VS];")
+        lines.append("    s_t b%s[%s];" % (stream, c_product("NQ", *_width_factors())))
+    lines.append("    s_t bdet0[%s];" % c_product("NQ", *_width_factors()))
     if not is_affine_assembly:
         lines.append(
             "    s_t *badj_streams[ND * ND] = {%s};"
@@ -8788,12 +8929,15 @@ def _sfem_soa_hessian_matrix_assembly_function(
             []
             if is_affine_assembly
             else [
-                "        bcoordinate_data[shape * ND + d][0] = s_t(points[d][%s]);"
-                % ("node" if identity_stream_shape_order else "coordinate_node")
+                "        bcoordinate_data[shape * ND + d]%s = s_t(points[d][%s]);"
+                % (
+                    _first_slot(),
+                    "node" if identity_stream_shape_order else "coordinate_node",
+                )
             ]
         ),
         *(
-            ["        bu_data[shape * NC + d][0] = u_components[d][node * u_stride];"]
+            ["        bu_data[shape * NC + d] = u_components[d][node * u_stride];"]
             if uses_current
             else []
         ),
@@ -9068,7 +9212,16 @@ def _ordered_stream_pointer_array_lines(pointer_type, array_name, storage_name, 
         lines.extend(
             [
                 "%sfor (int stream = 0; stream < NS * NC; ++stream) {" % indent,
-                "%s  %s[stream] = %s[stream];" % (indent, array_name, storage_name),
+                # `&` where the tile has no work-item extent: its element is
+                # then the value rather than the row, and a pointer array wants
+                # the address of it.
+                "%s  %s[stream] = %s%s[stream];"
+                % (
+                    indent,
+                    array_name,
+                    "" if current_target().work_item_extent() else "&",
+                    storage_name,
+                ),
                 "%s}" % indent,
             ]
         )
@@ -11027,7 +11180,10 @@ def _sfem_soa_element_api_reference_args(prefix, quadrature_rule, use_tensor_pro
 
 #: The stride a mesh call passes between quadrature points, per geometry mode.
 #: `affine` has one point of cached geometry per element, so the stride is zero.
-_MESH_GEOMETRY_STRIDE_ARGUMENT = {"affine": "0", "isoparametric": "VS"}
+_MESH_GEOMETRY_STRIDE_ARGUMENT = {
+    "affine": lambda: "0",
+    "isoparametric": _work_item_block_stride,
+}
 
 
 #: Which weight name a call passes, per reference family.
@@ -11125,7 +11281,7 @@ def _sfem_soa_element_api_block_call(
         # It is the width where there is one, and one element otherwise.
         *(
             name
-            for name in (_kernel_width(),)
+            for name in (_work_item_block_stride(),)
             if not specialized
         ),
         *_sfem_soa_element_api_geometry_args(dim),
@@ -11140,7 +11296,7 @@ def _sfem_soa_element_api_block_call(
     args.append(output_arg)
     return "%s%s(%s);" % (
         block_name,
-        _BLOCK_TEMPLATE_ARGUMENTS[bool(specialized)](_kernel_width()),
+        _block_template_arguments(specialized, _width_factors()),
         ", ".join(args),
     )
 
@@ -11196,37 +11352,52 @@ def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind, sour
 
 #: How a tile sizes and slices its geometry buffers, keyed on whether the
 #: element carries a single quadrature point.  With one point the extent is the
-#: vector width, both strides vanish, and there is no `q` to stride with -- the
-#: reference gradients having been folded, nothing declares one any more.
-#: How wide a tile's geometry buffers are, with the width coming from the
-#: target so a scalar work item sizes them `1` and `NQ`.
-_GEOMETRY_TILE_EXTENT = {
+#: work item's own, both strides vanish, and there is no `q` to stride with --
+#: the reference gradients having been folded, nothing declares one any more.
+#:
+#: A tile holds one slot per work item per point, so its extent is the target's:
+#: `[VS]` and `[NQ * VS]` where a work item is a lane of a block, and nothing and
+#: `[NQ]` where a work item *is* the element.  With one point and no width the
+#: buffer is a scalar, so the slice that used to be the array's own name is its
+#: address instead.
+#: A single-point element's tile, keyed on whether the target has a width to
+#: fold the point dimension into.  With one, the extent is that width.  With
+#: none there is nothing to fold it into, so the tile keeps the quadrature
+#: extent every other element carries -- `NQ`, which is one for this element --
+#: and stays an array, which is what the pointer arrays above it take.
+_SINGLE_POINT_TILE_EXTENT = {
     True: lambda width: width,
-    False: lambda width: "NQ * %s" % width,
+    False: lambda width: "[NQ]",
+}
+
+_GEOMETRY_TILE_EXTENT = {
+    True: lambda: _SINGLE_POINT_TILE_EXTENT[bool(current_target().work_item_extent())](
+        current_target().work_item_extent()
+    ),
+    False: lambda: "[%s]" % c_product("NQ", *_width_factors()),
 }
 
 _GEOMETRY_TILE_LOCAL_SLICE = {
-    True: lambda name, width: name,
-    False: lambda name, width: "&%s[q * %s]" % (name, width),
+    True: lambda name: name,
+    False: lambda name: "&%s[%s]" % (name, c_product("q", *_width_factors())),
 }
 
 _GEOMETRY_TILE_MESH_SLICE = {
-    True: lambda source, width: "%s + evb" % source,
-    False: lambda source, width: "%s + q * nelements + evb" % source,
+    True: lambda source: "%s + evb" % source,
+    False: lambda source: "%s + q * nelements + evb" % source,
 }
 
 
 def _sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule, source_builder):
     item = _work_item_index(source_builder)
     single_point = constant_p1_simplex_reference_gradients(quadrature_rule) is not None
-    extent = _GEOMETRY_TILE_EXTENT[single_point](_kernel_width())
-    width = _kernel_width()
-    local_slice = lambda name: _GEOMETRY_TILE_LOCAL_SLICE[single_point](name, width)
-    mesh_slice = lambda source: _GEOMETRY_TILE_MESH_SLICE[single_point](source, width)
+    extent = _GEOMETRY_TILE_EXTENT[single_point]()
+    local_slice = _GEOMETRY_TILE_LOCAL_SLICE[single_point]
+    mesh_slice = _GEOMETRY_TILE_MESH_SLICE[single_point]
     lines = []
     for component in range(dim * dim):
-        lines.append("    s_t badj%d[%s];" % (component, extent))
-    lines.append("    s_t bdet0[%s];" % extent)
+        lines.append("    s_t badj%d%s;" % (component, extent))
+    lines.append("    s_t bdet0%s;" % extent)
     # The element API tiles are per element, so the scope the
     # element calls for can be printed here without the shared
     # local header disagreeing with itself about it.
@@ -11268,24 +11439,25 @@ def _sfem_soa_element_api_coords_tile_lines(
     source_builder,
 ):
     lines = [
-        "    s_t bcoordinate_data[NDOFS][%s];" % _kernel_width(),
+        "    s_t bcoordinate_data[NDOFS]%s;" % _wi_extent(),
         "    for (int stream = 0; stream < NDOFS; ++stream) {",
         *_element_api_lane_loop(source_builder, "      "),
-        "        bcoordinate_data[stream][%s] = coords[stream][evb + %s];"
-        % (_work_item_index(source_builder), _work_item_index(source_builder)),
+        "        bcoordinate_data[stream]%s = coords[stream][evb + %s];"
+        % (_wi_slot(), _work_item_index(source_builder)),
         "      }",
         "    }",
     ]
     extent = _GEOMETRY_TILE_EXTENT[
         constant_p1_simplex_reference_gradients(quadrature_rule) is not None
-    ](_kernel_width())
+    ]()
     for component in range(dim * dim):
-        lines.append("    s_t badj%d[%s];" % (component, extent))
-    lines.append("    s_t bdet0[%s];" % extent)
+        lines.append("    s_t badj%d%s;" % (component, extent))
+    lines.append("    s_t bdet0%s;" % extent)
     if use_tensor_product_reference:
         lines.extend(
             [
-                "    s_t coordinate_grad_ref[ND * NQ * ND * %s];" % _kernel_width(),
+                "    s_t coordinate_grad_ref[%s];"
+                % c_product("ND", "NQ", "ND", *_width_factors()),
             ]
         )
         for d in range(dim):
@@ -11306,8 +11478,8 @@ def _sfem_soa_element_api_coords_tile_lines(
             % ", ".join("badj%d" % component for component in range(dim * dim))
         )
         lines.append(
-            "    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, %s>(%scoordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
-            % (_kernel_width(), "ne, " if _has_width() else "ne, ")
+            "    geometry_jacobian_adjugate_and_determinant<%s>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
+            % ", ".join(("s_t", "ND", "NQ") + _width_factors())
         )
         return lines
     reference_declarations = []
@@ -11505,20 +11677,22 @@ def _sfem_soa_element_api_hessian_lines(
             lines.extend(_sfem_soa_element_api_geometry_tile_lines(dim, quadrature_rule, source_builder))
         lines.extend(
             [
-                "    s_t bh_data[NDOFS][%s];" % _kernel_width(),
-                "    s_t bout_data[NDOFS][%s];" % _kernel_width(),
+                "    s_t bh_data[NDOFS]%s;" % _wi_extent(),
+                "    s_t bout_data[NDOFS]%s;" % _wi_extent(),
                 "    const s_t *bh_streams[NDOFS];",
                 "    s_t *bout_streams[NDOFS];",
                 "    for (int stream = 0; stream < NDOFS; ++stream) {",
-                "      bh_streams[stream] = bh_data[stream];",
-                "      bout_streams[stream] = bout_data[stream];",
+                "      bh_streams[stream] = %s;"
+                % current_target().staged_buffer_address("bh_data[stream]"),
+                "      bout_streams[stream] = %s;"
+                % current_target().staged_buffer_address("bout_data[stream]"),
                 "    }",
                 "    for (int col = 0; col < NDOFS; ++col) {",
                 "      for (int stream = 0; stream < NDOFS; ++stream) {",
                 *_element_api_lane_loop(source_builder, "        "),
-                "          bh_data[stream][%s] = stream == col ? s_t(1) : s_t(0);"
-                % _work_item_index(source_builder),
-                "          bout_data[stream][%s] = s_t(0);" % _work_item_index(source_builder),
+                "          bh_data[stream]%s = stream == col ? s_t(1) : s_t(0);"
+                % _wi_slot(),
+                "          bout_data[stream]%s = s_t(0);" % _wi_slot(),
                 "        }",
                 "      }",
                 "      %s" % _sfem_soa_element_api_block_call(
@@ -11536,8 +11710,8 @@ def _sfem_soa_element_api_hessian_lines(
                 "      for (int row = 0; row < NDOFS; ++row) {",
                 "        s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;",
                 *_element_api_lane_loop(source_builder, "        "),
-                "          matrix_stream[%s] = bout_data[row][%s];"
-                % (_work_item_index(source_builder), _work_item_index(source_builder)),
+                "          matrix_stream[%s] = bout_data[row]%s;"
+                % (_work_item_index(source_builder), _wi_slot()),
                 "        }",
                 "      }",
                 "    }",
@@ -11747,7 +11921,7 @@ def _zero_fill_lines(output, source_builder, work_item, indent="    "):
     inner = indent + "  " * len(output.extents)
     lines.extend(_work_item_loop_lines(source_builder, inner))
     lines.append(
-        "%s  %s%s[%s] = s_t(0);" % (inner, output.block, subscripts, work_item)
+        "%s  %s%s%s = s_t(0);" % (inner, output.block, subscripts, _wi_slot())
     )
     lines.append("%s}" % inner)
     lines.extend(
@@ -11768,8 +11942,8 @@ def _zero_fill_lines(output, source_builder, work_item, indent="    "):
 #: weight, the indent and the closing brace.  `form_contraction`'s own docstring
 #: named this function as where eight of its twenty-three copies lived.
 _BLOCK_BUFFER_EXTENT = {
-    FormContraction.DEFERRED_FLUX: "NQ * VS",
-    FormContraction.POINTWISE: "VS",
+    FormContraction.DEFERRED_FLUX: lambda: "[%s]" % c_product("NQ", *_width_factors()),
+    FormContraction.POINTWISE: _wi_extent,
 }
 
 _MESH_BLOCK_CALL_INDENT = {
@@ -11804,7 +11978,7 @@ _MESH_QUADRATURE_SCOPE = {
 
 _MESH_GEOMETRY_CALL_ARGUMENT = {
     FormContraction.DEFERRED_FLUX: (
-        lambda geometry_mode: "0" if geometry_mode == "affine" else "VS"
+        lambda geometry_mode: _MESH_GEOMETRY_STRIDE_ARGUMENT[geometry_mode]()
     ),
     FormContraction.POINTWISE: lambda geometry_mode: "q",
 }

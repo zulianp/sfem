@@ -1,3 +1,5 @@
+import re
+
 from codegen.framework.plans.conventions import restrict_prelude
 from codegen.framework.targets import current_target
 
@@ -29,9 +31,10 @@ def _residual_stream_method_end(text, start):
 
 
 #: The contiguous stream layout, per rendering.  The lane-blocked family takes
-#: a slot per work item; the scalar family has one element in hand and says so
-#: with a literal, rather than with a width it is no longer parameterised by.
-_CONTIGUOUS_STREAM_EXTENT = {True: "[VS]", False: "[1]"}
+#: a slot per work item; the scalar family has one element in hand and so takes
+#: no slot at all.  It said `[1]` for a while, which type-checks and is the lane
+#: dimension surviving under another name -- an extent of one is not an extent.
+_CONTIGUOUS_STREAM_EXTENT = {True: "[VS]", False: ""}
 
 
 def _expand_residual_stream_method(method, lane_blocked=True):
@@ -87,6 +90,19 @@ def _expand_residual_stream_method(method, lane_blocked=True):
         "s_t output[NC * NS]%s)" % extent,
         1,
     )
+    if not extent:
+        # With no work-item extent the contiguous tile is a flat array, so the
+        # slot the shared body reads no longer exists.  The two layouts are
+        # uniform while both are two-dimensional -- `streams[i][lane]` indexes
+        # a pointer and a row alike -- and diverge exactly here: a pointer
+        # array still has `[0]` to dereference, a flat tile has the value.
+        # `out_streams` is a pointer array in both layouts and keeps its slot;
+        # `\b` does not match inside it, because `_` is a word character.
+        contiguous_method = re.sub(
+            r"\b(streams|output)\[([^\]]*)\]\[0\]",
+            r"\1[\2]",
+            contiguous_method,
+        )
     return "%s\n\n%s" % (pointer_method, contiguous_method)
 
 
@@ -146,7 +162,9 @@ def _weak_form_ops_source(
         "scalar_suffix": "" if lane_blocked else "_scalar",
         "width_param": ", int VS" if lane_blocked else "",
         "width_arg": ", VS" if lane_blocked else "",
-        "stream_extent": "[VS]" if lane_blocked else "[1]",
+        "stream_extent": "[VS]" if lane_blocked else "",
+        # The slot a stream is read at, which exists only where the extent does.
+        "stream_slot": ("[%s]" % work_item_index) if lane_blocked else "",
         "lane_stride": " * VS" if lane_blocked else "",
         "lane_offset": (" * VS + %s" % work_item_index) if lane_blocked else "",
         "work_item_count_6": "      const int ne,\n" if lane_blocked else "",
@@ -185,7 +203,9 @@ def _residual_ops_source(inline_qualifier, work_item_index, simd_lines,
         "scalar_suffix": "" if lane_blocked else "_scalar",
         "width_param": ", int VS" if lane_blocked else "",
         "width_arg": ", VS" if lane_blocked else "",
-        "stream_extent": "[VS]" if lane_blocked else "[1]",
+        "stream_extent": "[VS]" if lane_blocked else "",
+        # The slot a stream is read at, which exists only where the extent does.
+        "stream_slot": ("[%s]" % work_item_index) if lane_blocked else "",
         "lane_stride": " * VS" if lane_blocked else "",
         "lane_offset": (" * VS + %s" % work_item_index) if lane_blocked else "",
         "work_item_count_6": "      const int ne,\n" if lane_blocked else "",
@@ -202,8 +222,26 @@ def _residual_ops_source(inline_qualifier, work_item_index, simd_lines,
     return _RESIDUAL_OPS_TEMPLATE % values
 
 
-def kernel_width():
-    """`VS`, or `1` where the target's work item is a single element."""
+#: Which spellings of the micro-kernels a target's header carries, keyed on
+#: whether that target has a work-item width at all.
+#:
+#: A host target needs both: its mesh kernels walk a block of elements and call
+#: the lane-blocked spelling, while its element-matrix kernels hold one element
+#: and call the scalar one.  A device target's work item *is* one element, so the
+#: blocked spelling is a template nothing instantiates -- and it is written
+#: throughout in terms of a width that target does not have, which is 228 lines
+#: of `VS` in a header whose kernels carry none.
+_RENDERED_SPELLINGS = {True: (False,), False: (True, False)}
+
+
+def work_item_block_stride():
+    """How many elements one work item's geometry strides by, as a runtime value.
+
+    `VS` where a work item is a lane of a block of that many, and `1` where a
+    work item *is* the element.  This is a stride an argument carries, not an
+    array extent -- a buffer with one slot per work item asks the target for
+    `work_item_extent`, which has no slot at all rather than a slot of one.
+    """
     return current_target().kernel_vector_width() or "1"
 
 
@@ -326,7 +364,7 @@ def sfem_tensor_product_kernels_header_source(
             ),
             lane_blocked,
         )
-        for lane_blocked in (True, False)
+        for lane_blocked in _RENDERED_SPELLINGS[target.kernel_vector_width() is None]
     )
     values["residual_form_ops"] = "\n\n".join(
         _expand_residual_stream_layouts(
@@ -339,7 +377,7 @@ def sfem_tensor_product_kernels_header_source(
             ),
             lane_blocked,
         )
-        for lane_blocked in (True, False)
+        for lane_blocked in _RENDERED_SPELLINGS[target.kernel_vector_width() is None]
     )
     return _expand_residual_stream_layouts(_TENSOR_PRODUCT_KERNELS_TEMPLATE % values)
 

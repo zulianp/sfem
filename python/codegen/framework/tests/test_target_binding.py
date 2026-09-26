@@ -471,15 +471,24 @@ class WorkItemAccessorTest(unittest.TestCase):
         for target in (CUDATarget(), HIPTarget()):
             with self.subTest(target=target.name):
                 self.assertEqual(target.work_item_index(), "0")
-                self.assertEqual(target.work_item_subscript(), "[0]")
+                # A staged buffer has no slot per work item here, because the
+                # work item *is* the element -- so there is no subscript to
+                # write.  `[0]` would be the lane dimension surviving under
+                # another name, and the buffer it indexes is a scalar.
+                self.assertEqual(target.work_item_subscript(), "")
+                self.assertEqual(target.work_item_extent(), "")
+                self.assertEqual(target.staged_buffer_address("bdet0"), "&bdet0")
                 # The stride survives; only the `+ lane` term goes.  Four of the
                 # seven offset sites stride by `geometry_stride`, a runtime mesh
                 # parameter, so dropping the stride would be wrong arithmetic.
-                self.assertEqual(target.work_item_offset("q", "VS"), "q * VS")
                 self.assertEqual(
                     target.work_item_offset("q", "geometry_stride"),
                     "q * geometry_stride",
                 )
+                # The block offset is the other case: its stride *is* the width,
+                # and with no width there is no block to stride over either.
+                self.assertEqual(target.work_item_block_offset("q"), "q")
+                self.assertEqual(target.work_item_block_offset_at(3, "scatter"), "3")
                 self.assertEqual(target.element_index(), "evb")
                 self.assertEqual(target.work_item_prologue_lines("  "), ())
 
