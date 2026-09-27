@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     const int         reps      = smesh::Env::read<int>("SFEM_BENCH_REPS", 20);
     const int         warmup    = smesh::Env::read<int>("SFEM_BENCH_WARMUP", 3);
     const std::string geom_name = smesh::Env::read_string("SFEM_GEOM", "affine");
-    const int         pack_size = smesh::Env::read<int>("SFEM_PACK_SIZE", 2048);
+    const int         pack_size = smesh::Env::read<int>("SFEM_PACK_SIZE", 1024);
     const real_t      Lx = 4, Ly = 1, Lz = 1;
     const real_t      rho = 1, mu = 0.01, U = 1;
 

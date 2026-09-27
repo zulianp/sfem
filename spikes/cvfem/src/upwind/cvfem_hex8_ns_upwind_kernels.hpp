@@ -76,6 +76,21 @@ struct Hex8RcTau {
     scalar_t u2_scale{1};
 };
 
+// The nodal velocity gradient for the deferred correction, lane-major like every other pack:
+// nine components per node (du_c/dx_k, c and k both fastest-to-slowest as the scalar kernel
+// packs them), one column per element in the SIMD batch.
+struct Hex8UGradPack {
+    alignas(ALIGN_BYTES) scalar_t g[CVFEM_HEX8_N_NODES][9][CVFEM_HEX8_VEC_SIZE];
+    // Element node coordinates. The reconstruction works in physical space and needs them even
+    // when Rhie-Chow is off, which is exactly the case that made the first packed higher-order
+    // sweep read uninitialised memory.
+    alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t z[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    int      limiter{0};
+    scalar_t venkat_c{0};
+};
+
 struct Hex8RhieChowPack {
     alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
@@ -329,6 +344,61 @@ static SFEM_INLINE SFEM_HOST_DEVICE const double (&cvfem_hex8_scs_xi_tbl())[CVFE
 #else
 static constexpr double CVFEM_HEX8_SCS_XI[CVFEM_HEX8_N_SCS][3] = CVFEM_HEX8_SCS_XI_INIT;
 #endif
+
+// The trilinear shape function of every node at every sub-control-surface centroid, N[s][a].
+//
+// DERIVED from the two tables above rather than written out. The deferred correction needs the
+// centroid in physical space, which is sum_a N[s][a] * x[a]; evaluating N there costs eight
+// iterations of three compares and two multiplies, per lane and per face, for a quantity that
+// depends on nothing but these two compile-time tables. Hoisting it into a table is therefore
+// free arithmetic -- and deriving it from CVFEM_HEX8_{REF,SCS}_XI_INIT rather than typing the
+// 96 values means it cannot drift from them, which a third hand-written copy would.
+//
+// It is also bit-exact, not an approximation: the centroids are 1/4, 1/2 and 3/4 and the node
+// references are 0 and 1, so every weight is a product of exact binary fractions and the table
+// holds precisely what the run-time expression produced.
+struct Hex8ScsShape {
+    double n[CVFEM_HEX8_N_SCS][CVFEM_HEX8_N_NODES];
+};
+static constexpr Hex8ScsShape cvfem_hex8_scs_shape_build() {
+    const double ref[CVFEM_HEX8_N_NODES][3] = CVFEM_HEX8_REF_XI_INIT;
+    const double scs[CVFEM_HEX8_N_SCS][3]   = CVFEM_HEX8_SCS_XI_INIT;
+    Hex8ScsShape t{};
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            t.n[s][a] = (ref[a][0] > 0.5 ? scs[s][0] : 1.0 - scs[s][0]) *
+                        (ref[a][1] > 0.5 ? scs[s][1] : 1.0 - scs[s][1]) *
+                        (ref[a][2] > 0.5 ? scs[s][2] : 1.0 - scs[s][2]);
+        }
+    }
+    return t;
+}
+#if defined(__CUDACC__)
+static SFEM_INLINE SFEM_HOST_DEVICE
+        const double (&cvfem_hex8_scs_n_tbl())[CVFEM_HEX8_N_SCS][CVFEM_HEX8_N_NODES] {
+    static constexpr Hex8ScsShape t = cvfem_hex8_scs_shape_build();
+    return t.n;
+}
+#define CVFEM_HEX8_SCS_N cvfem_hex8_scs_n_tbl()
+#else
+static constexpr Hex8ScsShape cvfem_hex8_scs_shape_tbl = cvfem_hex8_scs_shape_build();
+#define CVFEM_HEX8_SCS_N cvfem_hex8_scs_shape_tbl.n
+#endif
+
+// Partition of unity, per surface. A transposed read of either source table would still sum to
+// one, so this does not catch everything -- but a weight indexed off the end, or a table built
+// from the wrong extent, shows up here at compile time and nowhere else until a residual is
+// quietly wrong by a smooth field.
+static_assert(cvfem_hex8_scs_shape_build().n[0][0] +
+                      cvfem_hex8_scs_shape_build().n[0][1] +
+                      cvfem_hex8_scs_shape_build().n[0][2] +
+                      cvfem_hex8_scs_shape_build().n[0][3] +
+                      cvfem_hex8_scs_shape_build().n[0][4] +
+                      cvfem_hex8_scs_shape_build().n[0][5] +
+                      cvfem_hex8_scs_shape_build().n[0][6] +
+                      cvfem_hex8_scs_shape_build().n[0][7] ==
+              1.0,
+              "HEX8 sub-control-surface shape functions must sum to one");
 
 // Face-diff grad + 3-dir traction + 12-SCS convection (see kernel).
 static constexpr double CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT = 754.0;
@@ -1035,7 +1105,66 @@ static SFEM_INLINE __attribute__((always_inline)) SFEM_HOST_DEVICE void cvfem_up
 // `g` is the element's eight nodal velocity gradients, [a*9 + r*3 + c] = du_r/dx_c, the same
 // layout CVFEMNavierStokes::nodal_velocity_gradient produces. Passing null disables the
 // correction with no arithmetic, which is what every caller that has not asked for it does.
-template <typename scalar_t>
+// All twelve sub-control-surface centroids in physical space, once per element.
+//
+// HOISTED out of the reconstruction, and the reason is register pressure rather than arithmetic.
+// This sum is the only part of the correction that needs all eight nodes' coordinates live at
+// once -- 24 vector values in the lane-major layout -- and it was being recomputed inside each of
+// the twelve per-face lane loops, so those 24 were live in every one of them on top of the flux's
+// own working set, against 32 architectural registers. The counters said exactly that: with the
+// reconstruction inlined the SIMD sweep executed 17% FEWER instructions and 36% fewer loads than
+// the scalar one and still stalled 32% more in the backend, with only a fifth of those stalls
+// memory-related and last-level misses identical (job 4813956). Roughly 580 stores per element
+// against the 32 the kernel writes is spill traffic, not work.
+//
+// Computing them once and letting each face read its own three drops the per-face live set by
+// about 21 vectors. The accumulation order is unchanged, so this is bit-identical to computing
+// them in place -- the equivalence oracles check that rather than it being asserted here.
+//
+// The output shares the input's (STRIDE, off): flat gives cen[s], lane-major gives cen[s][lane].
+template <int STRIDE, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_centroids(
+        const scalar_t *const SFEM_RESTRICT xe,
+        const scalar_t *const SFEM_RESTRICT ye,
+        const scalar_t *const SFEM_RESTRICT ze,
+        const int                           off,
+        scalar_t *const SFEM_RESTRICT       sx,
+        scalar_t *const SFEM_RESTRICT       sy,
+        scalar_t *const SFEM_RESTRICT       sz) {
+    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+        scalar_t cx = 0, cy = 0, cz = 0;
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const scalar_t N = (scalar_t)CVFEM_HEX8_SCS_N[s][a];
+            cx += N * xe[a * STRIDE + off];
+            cy += N * ye[a * STRIDE + off];
+            cz += N * ze[a * STRIDE + off];
+        }
+        sx[s * STRIDE + off] = cx;
+        sy[s * STRIDE + off] = cy;
+        sz[s * STRIDE + off] = cz;
+    }
+}
+
+// STRIDE and `off` are the LAYOUT, and they are the only difference between the two callers.
+//
+// The flat element arrays a scalar sweep holds are (STRIDE=1, off=0): g[a*9+c], xe[a]. The
+// lane-major packs a 16-wide sweep holds are (STRIDE=CVFEM_HEX8_VEC_SIZE, off=lane):
+// g[a][c][lane] is g[(a*9+c)*VEC + lane], and x[a][lane] is x[a*VEC + lane]. Every array this
+// body reads -- the nodal velocity gradients, the coordinates and the three velocity components
+// -- shares that one stride, so a single compile-time parameter serves both.
+//
+// This exists because the SIMD caller used to GATHER a lane's 96 inputs out of the packs into
+// flat locals and call the (1, 0) form. That gather sat inside the per-face lane loop, so it ran
+// twelve times per element against the scalar sweep's once, and it expanded seven private arrays
+// per lane inside a loop the compiler was being asked to vectorise. Reading the packs in place
+// removes it outright rather than hoisting it, and keeps ONE implementation of the reconstruction
+// and its limiters: a second, hand-vectorised copy of this arithmetic is the redundant path that
+// would be certain to drift.
+//
+// `off` stays a runtime argument rather than being folded into the base pointers: an invariant
+// base plus a lane-varying index is the form a vectoriser recognises as unit-stride, where a
+// lane-varying pointer invites it to emit a gather.
+template <int STRIDE, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *const SFEM_RESTRICT g,
                                                                const scalar_t *const SFEM_RESTRICT xe,
                                                                const scalar_t *const SFEM_RESTRICT ye,
@@ -1048,28 +1177,28 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
                                                                const scalar_t mdot, const scalar_t ueps,
                                                                const scalar_t venkat_c,
                                                                Hex8LimiterStats *const stats,
+                                                               const int off,
+                                                               // This surface's centroid, from
+                                                               // cvfem_hex8_scs_centroids.
+                                                               const scalar_t sx,
+                                                               const scalar_t sy,
+                                                               const scalar_t sz,
                                                                scalar_t &dfx, scalar_t &dfy, scalar_t &dfz) {
     dfx = dfy = dfz = scalar_t(0);
     if (!g) return;
+    // Node `a`'s slot, and gradient component `c` of node `a`'s slot, in whichever layout the
+    // caller holds. One place decides the addressing so no reader has to spell it again.
+    const auto at = [off](const scalar_t *const SFEM_RESTRICT v, const int a) -> scalar_t {
+        return v[a * STRIDE + off];
+    };
+    const auto gat = [g, off](const int a, const int c) -> scalar_t {
+        return g[(a * 9 + c) * STRIDE + off];
+    };
 
-    // The sub-control surface's centroid in physical space, by trilinear interpolation at its
-    // parametric position. Computed rather than cached: it is eight fused multiply-adds and
-    // the alternative is a per-element array that has to be kept in step with the geometry.
-    const scalar_t xi = (scalar_t)CVFEM_HEX8_SCS_XI[s][0];
-    const scalar_t et = (scalar_t)CVFEM_HEX8_SCS_XI[s][1];
-    const scalar_t ze_ = (scalar_t)CVFEM_HEX8_SCS_XI[s][2];
-    scalar_t sx = 0, sy = 0, sz = 0;
-    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const scalar_t rx = (scalar_t)CVFEM_HEX8_REF_XI[a][0];
-        const scalar_t ry = (scalar_t)CVFEM_HEX8_REF_XI[a][1];
-        const scalar_t rz = (scalar_t)CVFEM_HEX8_REF_XI[a][2];
-        const scalar_t N  = (rx > scalar_t(0.5) ? xi : scalar_t(1) - xi) *
-                            (ry > scalar_t(0.5) ? et : scalar_t(1) - et) *
-                            (rz > scalar_t(0.5) ? ze_ : scalar_t(1) - ze_);
-        sx += N * xe[a];
-        sy += N * ye[a];
-        sz += N * ze[a];
-    }
+    // The centroid arrives already built, by cvfem_hex8_scs_centroids, for the register-pressure
+    // reason written up there. `s` is still needed for nothing else here, so it stays only as the
+    // surface's identity for the caller's benefit.
+    (void)s;
 
     // The same upwind split the flux used, recovered from the mass flux it returned -- which
     // already carries the Rhie-Chow term, so the correction is weighted by the flux actually
@@ -1079,10 +1208,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     const scalar_t mpos = scalar_t(0.5) * (mdot + amdot);
     const scalar_t mneg = scalar_t(0.5) * (mdot - amdot);
 
-    const scalar_t dix = sx - xe[i], diy = sy - ye[i], diz = sz - ze[i];
-    const scalar_t djx = sx - xe[j], djy = sy - ye[j], djz = sz - ze[j];
-    const scalar_t *const Gi = g + i * 9;
-    const scalar_t *const Gj = g + j * 9;
+    const scalar_t dix = sx - at(xe, i), diy = sy - at(ye, i), diz = sz - at(ze, i);
+    const scalar_t djx = sx - at(xe, j), djy = sy - at(ye, j), djz = sz - at(ze, j);
 
     // Venkatakrishnan's eps^2 = coeff * h^3, with h the edge this sub-control surface cuts.
     // d_i and d_j both run from a node to the same centroid, so their difference is the edge
@@ -1209,7 +1336,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
                    scalar_t &oi, scalar_t &oj) {
         oi = inc_i;
         oj = inc_j;
-        const scalar_t a  = u[i], b = u[j];
+        const scalar_t a  = at(u, i), b = at(u, j);
         const scalar_t lo = a < b ? a : b;
         const scalar_t hi = a < b ? b : a;
         if (limiter >= 1 && limiter <= 3) {
@@ -1232,14 +1359,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     };
 
     scalar_t ii, jj;
-    lim(ux, Gi[0] * dix + Gi[1] * diy + Gi[2] * diz,
-            Gj[0] * djx + Gj[1] * djy + Gj[2] * djz, ii, jj);
+    lim(ux, gat(i, 0) * dix + gat(i, 1) * diy + gat(i, 2) * diz,
+            gat(j, 0) * djx + gat(j, 1) * djy + gat(j, 2) * djz, ii, jj);
     dfx = mpos * ii + mneg * jj;
-    lim(uy, Gi[3] * dix + Gi[4] * diy + Gi[5] * diz,
-            Gj[3] * djx + Gj[4] * djy + Gj[5] * djz, ii, jj);
+    lim(uy, gat(i, 3) * dix + gat(i, 4) * diy + gat(i, 5) * diz,
+            gat(j, 3) * djx + gat(j, 4) * djy + gat(j, 5) * djz, ii, jj);
     dfy = mpos * ii + mneg * jj;
-    lim(uz, Gi[6] * dix + Gi[7] * diy + Gi[8] * diz,
-            Gj[6] * djx + Gj[7] * djy + Gj[8] * djz, ii, jj);
+    lim(uz, gat(i, 6) * dix + gat(i, 7) * diy + gat(i, 8) * diz,
+            gat(j, 6) * djx + gat(j, 7) * djy + gat(j, 8) * djz, ii, jj);
     dfz = mpos * ii + mneg * jj;
 }
 
@@ -1372,6 +1499,11 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                                               const Hex8PecletConfig<scalar_t> &pcfg = {}) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
 
+    // The twelve centroids, once for the element, only when the correction is on. Twelve triples
+    // of doubles on the stack against reloading all eight node coordinates twelve times.
+    scalar_t cenx[CVFEM_HEX8_N_SCS], ceny[CVFEM_HEX8_N_SCS], cenz[CVFEM_HEX8_N_SCS];
+    if (ugrad8) cvfem_hex8_scs_centroids<1>(xe, ye, ze, /*off=*/0, cenx, ceny, cenz);
+
     scalar_t grad[9];
     cvfem_hex8_grad_sumfact(adj, det, ux, uy, uz, grad);
 
@@ -1448,8 +1580,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
         // Jacobian below is untouched by design; see cvfem_hex8_scs_defcor.
         if (ugrad8) {
             scalar_t dfx, dfy, dfz;
-            cvfem_hex8_scs_defcor(ugrad8, xe, ye, ze, ux, uy, uz, limiter, s, i, j, mdot, ueps, venkat_c, stats,
-                                  dfx, dfy, dfz);
+            // (STRIDE=1, off=0): the flat per-element arrays this scalar sweep holds.
+            cvfem_hex8_scs_defcor<1>(ugrad8, xe, ye, ze, ux, uy, uz, limiter, s, i, j, mdot, ueps,
+                                     venkat_c, stats, /*off=*/0, cenx[s], ceny[s], cenz[s],
+                                     dfx, dfy, dfz);
             fx += dfx;
             fy += dfy;
             fz += dfz;
@@ -2109,8 +2243,15 @@ static SFEM_INLINE void cvfem_hex8_visc_dir_simd(const scalar_t                 
     }
 }
 
-template <int I, int J, bool RC = false, bool EPS = false>
-static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                      rho,
+// FLATTEN, and it is load-bearing rather than decoration. The higher-order reconstruction is
+// marked always_inline, and both compilers ignore it here: clang emits an out-of-line
+// cvfem_hex8_scs_defcor<16> and gcc a .constprop clone, and both then CALL it from inside this
+// function's `#pragma omp simd` loop. A loop containing a call does not vectorise, so the whole
+// lane loop -- the flux as well as the correction -- was running scalar. That is why removing
+// the per-lane gather bought only 7.5%: the gather was real, but it was not what was stopping
+// the vectorisation. flatten forces the call site open so the loop body is straight-line again.
+template <int I, int J, int S, bool RC = false, bool EPS = false, bool HO = false>
+static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_simd(const scalar_t rho,
                                                   const scalar_t                      mu,
                                                   const scalar_t                      rc_scale,
                                                   const scalar_t                      half,
@@ -2120,11 +2261,23 @@ static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                
                                                   const Hex8InputPack                &in,
                                                   const Hex8RhieChowPack             *rc,
                                                   Hex8ResidualPack                   &out,
-                                               const scalar_t ueps = scalar_t(0)) {
+                                               const scalar_t ueps = scalar_t(0),
+                                               const Hex8UGradPack *const ho = nullptr,
+                                               // The twelve centroids, cen?[s * VEC + lane], built
+                                               // once per element batch by the sweep. This kernel
+                                               // reads three of the thirty-six.
+                                               const scalar_t *const SFEM_RESTRICT cenx = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT ceny = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT cenz = nullptr) {
     if constexpr (!RC) {
         (void)mu;
         (void)rc_scale;
         (void)rc;
+    }
+    if constexpr (!HO) {
+        (void)cenx;
+        (void)ceny;
+        (void)cenz;
     }
 #pragma omp simd
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
@@ -2162,13 +2315,37 @@ static SFEM_INLINE void cvfem_hex8_conv_face_simd(const scalar_t                
         const scalar_t fx   = mpos * in.ux[I][lane] + mneg * in.ux[J][lane] + pmid * ax;
         const scalar_t fy   = mpos * in.uy[I][lane] + mneg * in.uy[J][lane] + pmid * ay;
         const scalar_t fz   = mpos * in.uz[I][lane] + mneg * in.uz[J][lane] + pmid * az;
-        out.rx[I][lane] += fx;
-        out.ry[I][lane] += fy;
-        out.rz[I][lane] += fz;
+        // DEFERRED CORRECTION, in the SIMD path. Only the momentum flux is corrected; the
+        // continuity row and mdot are untouched, which is what keeps the Jacobian first-order.
+        //
+        // The reconstruction is the SAME cvfem_hex8_scs_defcor the scalar sweep calls -- one
+        // implementation of the arithmetic and the limiters, so they cannot drift -- reading the
+        // lane-major packs IN PLACE through its (STRIDE=VEC_SIZE, off=lane) instantiation. There
+        // is no gather: g[a][c][lane] over varying lane is contiguous, so each read is a
+        // unit-stride vector load. The earlier version gathered this lane's 96 inputs into flat
+        // locals here, inside the loop and therefore once per FACE rather than once per element,
+        // and it measured slower than not vectorising at all -- 500 against 659 MDOF/s.
+        //
+        // HO is a template flag rather than the `if (ho)` this used to be, for the reason the
+        // band above is one: a sweep-uniform pointer test inside the vectorised body is the
+        // shape of guard that cost 1.83x here once already.
+        scalar_t hx = scalar_t(0), hy = scalar_t(0), hz = scalar_t(0);
+        if constexpr (HO) {
+            cvfem_hex8_scs_defcor<CVFEM_HEX8_VEC_SIZE>(
+                    &ho->g[0][0][0], &ho->x[0][0], &ho->y[0][0], &ho->z[0][0],
+                    &in.ux[0][0], &in.uy[0][0], &in.uz[0][0],
+                    ho->limiter, S, I, J, mdot, EPS ? ueps : scalar_t(0), ho->venkat_c,
+                    (Hex8LimiterStats *)nullptr, /*off=*/lane,
+                    cenx[S * CVFEM_HEX8_VEC_SIZE + lane], ceny[S * CVFEM_HEX8_VEC_SIZE + lane],
+                    cenz[S * CVFEM_HEX8_VEC_SIZE + lane], hx, hy, hz);
+        }
+        out.rx[I][lane] += fx + hx;
+        out.ry[I][lane] += fy + hy;
+        out.rz[I][lane] += fz + hz;
         out.rc[I][lane] += mdot;
-        out.rx[J][lane] -= fx;
-        out.ry[J][lane] -= fy;
-        out.rz[J][lane] -= fz;
+        out.rx[J][lane] -= fx + hx;
+        out.ry[J][lane] -= fy + hy;
+        out.rz[J][lane] -= fz + hz;
         out.rc[J][lane] -= mdot;
     }
 }
@@ -2262,7 +2439,7 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t             
     }
 }
 
-template <bool RC = false, bool EPS = false>
+template <bool RC = false, bool EPS = false, bool HO = false>
 static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                      rho,
                                                  const scalar_t                      mu,
                                                  const scalar_t                      rc_scale,
@@ -2279,19 +2456,23 @@ static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                 
                                                  const Hex8InputPack                &in,
                                                  const Hex8RhieChowPack             *rc,
                                                  Hex8ResidualPack                   &out,
-                                                 const scalar_t                      ueps = scalar_t(0)) {
-    cvfem_hex8_conv_face_simd<0, 1, RC, EPS>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<3, 2, RC, EPS>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<4, 5, RC, EPS>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<7, 6, RC, EPS>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<0, 3, RC, EPS>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<1, 2, RC, EPS>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<4, 7, RC, EPS>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<5, 6, RC, EPS>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<0, 4, RC, EPS>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<1, 5, RC, EPS>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<2, 6, RC, EPS>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps);
-    cvfem_hex8_conv_face_simd<3, 7, RC, EPS>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps);
+                                                 const scalar_t                      ueps = scalar_t(0),
+                                                 const Hex8UGradPack *const          ho = nullptr,
+                                                 const scalar_t *const SFEM_RESTRICT cenx = nullptr,
+                                                 const scalar_t *const SFEM_RESTRICT ceny = nullptr,
+                                                 const scalar_t *const SFEM_RESTRICT cenz = nullptr) {
+    cvfem_hex8_conv_face_simd<0, 1, 0, RC, EPS, HO>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<3, 2, 1, RC, EPS, HO>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<4, 5, 2, RC, EPS, HO>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<7, 6, 3, RC, EPS, HO>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<0, 3, 4, RC, EPS, HO>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<1, 2, 5, RC, EPS, HO>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<4, 7, 6, RC, EPS, HO>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<5, 6, 7, RC, EPS, HO>(rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<0, 4, 8, RC, EPS, HO>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<1, 5, 9, RC, EPS, HO>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<2, 6, 10, RC, EPS, HO>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps, ho, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_simd<3, 7, 11, RC, EPS, HO>(rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, out, ueps, ho, cenx, ceny, cenz);
 }
 
 static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                      rho,
@@ -2610,7 +2791,10 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_sumfact_simd(
         const scalar_t                        rc_scale = scalar_t(0),
         // The Harten band. Absent here until now, which is why the solver's flat packed
         // path silently ran the hard switch while SFEM_UPWIND_EPS reached every other one.
-        const scalar_t                        ueps     = scalar_t(0)) {
+        const scalar_t                        ueps     = scalar_t(0),
+        // The deferred-correction inputs, or null for first-order upwinding. Defaulted so
+        // every existing call site keeps the first-order kernel it had, bit for bit.
+        const Hex8UGradPack *const            ho       = nullptr) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
@@ -2689,22 +2873,54 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_sumfact_simd(
     // every run, including the overwhelming majority that use the hard switch. So the
     // band is a template flag: EPS=false passes a literal zero, the branch folds, and the
     // default path emits what it emitted before this parameter existed.
+    //
+    // The deferred correction is dispatched the same way and for the same reason. It used to be
+    // an `if (ho)` inside the lane loop, on a pointer that cannot change across the sweep; as a
+    // template flag the whole reconstruction leaves the body of every first-order run instead of
+    // sitting behind a compare in it.
+    //
+    // Eight leaves, written out because each has to name its template arguments as constants.
+    // The macro keeps the argument list in one place -- it is eight copies of thirteen arguments
+    // otherwise, which is where a transposed pack would hide -- and is undefined immediately.
     const bool eps_on = ueps > scalar_t(0);
-    if (rc && rc_scale != scalar_t(0)) {
-        if (eps_on)
-            cvfem_hex8_conv_all_simd<true, true>(
-                    rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out, ueps);
-        else
-            cvfem_hex8_conv_all_simd<true, false>(
-                    rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out);
-    } else {
-        if (eps_on)
-            cvfem_hex8_conv_all_simd<false, true>(
-                    rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out, ueps);
-        else
-            cvfem_hex8_conv_all_simd<false, false>(
-                    rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, in, rc, out);
+    const bool rc_on  = rc && rc_scale != scalar_t(0);
+    const bool ho_on  = ho != nullptr;
+
+    // The twelve centroids for this batch of elements, lane-parallel, once. 4.6 KB of stack
+    // against reloading twenty-four coordinate vectors inside each of the twelve face loops --
+    // see cvfem_hex8_scs_centroids for the measurement that motivated it.
+    alignas(ALIGN_BYTES) scalar_t cenx[CVFEM_HEX8_N_SCS * CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t ceny[CVFEM_HEX8_N_SCS * CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t cenz[CVFEM_HEX8_N_SCS * CVFEM_HEX8_VEC_SIZE];
+    if (ho_on) {
+#pragma omp simd
+        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+            cvfem_hex8_scs_centroids<CVFEM_HEX8_VEC_SIZE>(&ho->x[0][0], &ho->y[0][0], &ho->z[0][0],
+                                                          lane, cenx, ceny, cenz);
+        }
     }
+#define CVFEM_HEX8_CONV_ALL(RC_, EPS_, HO_)                                                     \
+    cvfem_hex8_conv_all_simd<RC_, EPS_, HO_>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1,  \
+                                             Az1, Ax2, Ay2, Az2, in, rc, out, ueps, ho, cenx,   \
+                                             ceny, cenz)
+    if (rc_on) {
+        if (eps_on) {
+            if (ho_on) CVFEM_HEX8_CONV_ALL(true, true, true);
+            else       CVFEM_HEX8_CONV_ALL(true, true, false);
+        } else {
+            if (ho_on) CVFEM_HEX8_CONV_ALL(true, false, true);
+            else       CVFEM_HEX8_CONV_ALL(true, false, false);
+        }
+    } else {
+        if (eps_on) {
+            if (ho_on) CVFEM_HEX8_CONV_ALL(false, true, true);
+            else       CVFEM_HEX8_CONV_ALL(false, true, false);
+        } else {
+            if (ho_on) CVFEM_HEX8_CONV_ALL(false, false, true);
+            else       CVFEM_HEX8_CONV_ALL(false, false, false);
+        }
+    }
+#undef CVFEM_HEX8_CONV_ALL
 }
 
 #define CVFEM_HEX8_ACTION_GEOM_ARGS                                                                          \

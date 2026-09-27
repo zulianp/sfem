@@ -124,6 +124,338 @@ static void build_pack_local_crs(PackedData               &p,
     }
 }
 
+// The DEFERRED-CORRECTION higher-order convective flux, on the packed layout.
+//
+// Same two-pass shape as apply_residual_packed: stage the pack's fields, accumulate into a
+// pack-private buffer with plain `+=`, write the owned rows straight out, stage the ghosts and
+// close them with the reduction graph. No atomic anywhere, and the same fixed summation order,
+// so the higher-order operator inherits the format's reproducibility rather than giving it up.
+//
+// It runs the SCALAR sum-factored kernel, not the 16-wide SIMD one, because the scalar kernel
+// is the FASTER of the two for this operator -- 659 against 500 MDOF/s on Grace at 8,586,756
+// dof (job 4812910). Both accept the correction; the SIMD one re-gathers each lane's 96 inputs
+// inside every one of the twelve face loops, and that costs more than vectorising the flux
+// around it returns. That is also the honest basis for the comparison this enables: the atomic
+// higher-order sweep runs the same scalar kernel, so packed against atomic here isolates the
+// LAYOUT with the kernel held fixed. It also means a packed higher-order number is not
+// comparable with a packed first-order one, which is SIMD -- the paper says so rather than
+// letting the two sit in one column.
+//
+// `ugrad` is nine interleaved components per node and is hoisted, as the solver lags the
+// correction one Newton step. The reconstruction also needs the element's node coordinates, so
+// the pack stages its coordinates whenever the correction is on, exactly as Rhie-Chow does.
+static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
+                                                       PackedData     &p,
+                                                       const scalar_t  rho,
+                                                       const scalar_t  mu,
+                                                       const scalar_t *const SFEM_RESTRICT ugrad,
+                                                       const int       limiter,
+                                                       const scalar_t  venkat_c) {
+    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
+    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
+    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
+    scalar_t *const SFEM_RESTRICT rc = d.rc.data();
+    const size_t                  scratch_n = packed_scratch_n(p);
+    const Hex8Extras              opt(d);
+    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
+        // Coordinates always, and the pressure gradient when Rhie-Chow is on: the same
+        // six-array slot the first-order SIMD path uses, so no new scratch shape appears.
+        scalar_t *const SFEM_RESTRICT pack_xyz =
+                thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p));
+        const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+        scalar_t *const SFEM_RESTRICT pack_x   = pack_xyz;
+        scalar_t *const SFEM_RESTRICT pack_y   = pack_xyz + xyz_n;
+        scalar_t *const SFEM_RESTRICT pack_z   = pack_xyz + 2 * xyz_n;
+        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+            const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
+            const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+            const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
+            const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+            const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
+            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
+
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+            fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            if (with_rc)
+                cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x,
+                                               pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz);
+            else
+                fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+
+            // THE SIMD HIGHER-ORDER PATH IS CORRECT AND SLOWER, which is why this sweep runs
+            // the scalar kernel. The 2.5e-05 discrepancy this comment used to record was real
+            // but was not the reconstruction's geometry: the two EPS=false branches of
+            // cvfem_hex8_ns_upwind_residual_sumfact_simd did not forward `ho` to
+            // cvfem_hex8_conv_all_simd, so the correction was silently never applied on the
+            // path the benchmark took. Found by observing that disabling the correction left
+            // the discrepancy bit-identical. With `ho` forwarded the two layouts agree to
+            // 1.3e-18, and the remaining reason to prefer the scalar kernel is throughput --
+            // see the note on this function above.
+            for (ptrdiff_t e = e_start; e < e_end; ++e) {
+                scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8], r[CVFEM_HEX8_N_DOF], g8[72];
+                // Fields come from the PACK -- read once per pack node, contiguously for the
+                // owned majority, which is the layout's advantage.
+                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)p.elems[a][e] * N_FIELDS;
+                    ux_e[a] = u[0]; uy_e[a] = u[1]; uz_e[a] = u[2]; p_e[a] = u[3];
+                }
+                // The Rhie-Chow inputs come through the shared scratch, exactly as the atomic
+                // sweep takes them, so the kernel sees identical inputs in both layouts.
+                Hex8ExtraScratch ex;
+                ex.load(d, opt, e);
+                // Coordinates are gathered here rather than taken from `ex`, and that is not
+                // redundant: Hex8ExtraScratch::load returns EARLY when neither Rhie-Chow nor
+                // the boundary closure is on, leaving its x/y/z untouched. The reconstruction
+                // works in physical space and needs them whether or not those terms are on, so
+                // reading ex.x there gave an uninitialised buffer -- caught by the packed-vs-
+                // atomic check at 2.9e-03, which is what that check is for.
+                scalar_t xe[8], ye[8], ze[8];
+                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                    const smesh::idx_t g = d.elems[a][e];
+                    xe[a] = scalar_t(d.points[0][g]);
+                    ye[a] = scalar_t(d.points[1][g]);
+                    ze[a] = scalar_t(d.points[2][g]);
+                    for (int c = 0; c < 9; ++c) g8[a * 9 + c] = ugrad[(ptrdiff_t)g * 9 + c];
+                }
+                scalar_t adj[9], det;
+                load_hex8_adj(d, e, adj, &det);
+                cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r,
+                                                      ex.rc, /*ueps=*/scalar_t(0),
+                                                      g8, xe, ye, ze,
+                                                      limiter, venkat_c, nullptr);
+
+                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                    scalar_t *const SFEM_RESTRICT out = pack_out + (ptrdiff_t)p.elems[a][e] * N_FIELDS;
+                    out[0] += r[a * 4 + 0];
+                    out[1] += r[a * 4 + 1];
+                    out[2] += r[a * 4 + 2];
+                    out[3] += r[a * 4 + 3];
+                }
+            }
+
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                const scalar_t *const SFEM_RESTRICT out = pack_out + k * N_FIELDS;
+                const ptrdiff_t                     g   = owned + k;
+                rx[g] = out[0]; ry[g] = out[1]; rz[g] = out[2]; rc[g] = out[3];
+            }
+            scalar_t *const SFEM_RESTRICT gx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gy = p.ghost_buf.data() + 1 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gc = p.ghost_buf.data() + 3 * p.n_ghost_entries;
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * N_FIELDS;
+                gx[ghost_off + k] = out[0]; gy[ghost_off + k] = out[1];
+                gz[ghost_off + k] = out[2]; gc[ghost_off + k] = out[3];
+            }
+        }
+    }
+
+    scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        for (int f = 0; f < N_FIELDS; ++f) {
+            const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + (ptrdiff_t)f * p.n_ghost_entries;
+            scalar_t                            sum   = 0;
+            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
+            fields[f][dest] += sum;
+        }
+    }
+}
+
+static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
+                                                       PackedData     &p,
+                                                       const scalar_t  rho,
+                                                       const scalar_t  mu,
+                                                       const scalar_t *const SFEM_RESTRICT ugrad,
+                                                       const int       limiter,
+                                                       const scalar_t  venkat_c,
+                                                       // Run the GENERATED lane-blocked kernel
+                                                       // instead of the hand-written one. Same
+                                                       // sweep, same staging, same scatter -- only
+                                                       // the kernel differs, which is what makes
+                                                       // the comparison a kernel comparison.
+                                                       const bool      sympy = false) {
+    // Every limiter arm is generated now, with and without Rhie-Chow -- eight kernels. What is NOT
+    // generated is Venkatakrishnan's eps^2 term: it is venkat_c * h^3, so carrying it would put a
+    // square root at every sub-control surface, and every caller in the tree passes zero. Refused
+    // rather than silently dropped, because a row that names a term it did not compute is worse
+    // than a row that does not exist.
+    if (sympy && venkat_c != scalar_t(0)) {
+        std::fprintf(stderr,
+                     "the generated higher-order kernels carry eps^2 = 0; a non-zero venkat_c "
+                     "needs the hand-written kernel (--ho-scalar)\n");
+        std::abort();
+    }
+    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
+    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
+    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
+    scalar_t *const SFEM_RESTRICT rc = d.rc.data();
+    const size_t                  scratch_n = packed_scratch_n(p);
+    const Hex8Extras              opt(d);
+    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+
+    // The generated Rhie-Chow kernel reads the coefficient out of the staged table instead of
+    // rebuilding it per surface, so the table has to exist. It is cached on the state stamp, so
+    // this is a no-op after the first call for a given state. The hand-written kernel computes the
+    // coefficient inline and needs none of it, which is why this is conditional.
+    if (sympy && with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+
+#pragma omp parallel
+    {
+        scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
+        // Coordinates always, and the pressure gradient when Rhie-Chow is on: the same
+        // six-array slot the first-order SIMD path uses, so no new scratch shape appears.
+        scalar_t *const SFEM_RESTRICT pack_xyz =
+                thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p));
+        const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+        scalar_t *const SFEM_RESTRICT pack_x   = pack_xyz;
+        scalar_t *const SFEM_RESTRICT pack_y   = pack_xyz + xyz_n;
+        scalar_t *const SFEM_RESTRICT pack_z   = pack_xyz + 2 * xyz_n;
+        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
+#pragma omp for schedule(static)
+        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+            const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
+            const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
+            const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
+            const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+            const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
+            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
+
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+            fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            if (with_rc)
+                cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x,
+                                               pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz);
+            else
+                fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+
+            alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
+                    cof2[CVFEM_HEX8_VEC_SIZE], cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
+                    cof5[CVFEM_HEX8_VEC_SIZE], cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE],
+                    cof8[CVFEM_HEX8_VEC_SIZE], detv[CVFEM_HEX8_VEC_SIZE];
+            Hex8InputPack    in;
+            Hex8ResidualPack outp;
+            Hex8RhieChowPack rcp;
+            Hex8UGradPack    hop;
+            hop.limiter  = limiter;
+            hop.venkat_c = venkat_c;
+            for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
+                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
+                gather_hex8_simd_from_pack(p.elems, pack_u, d, begin, nlanes, in,
+                                           cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+                if (with_rc) {
+                    cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx,
+                                                   pack_pgy, pack_pgz, begin, nlanes, rcp);
+                    if (sympy) cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
+                }
+                for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                    const ptrdiff_t e = begin + lane;
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        if (lane >= nlanes) {
+                            hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
+                            for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
+                            continue;
+                        }
+                        const smesh::idx_t g = d.elems[a][e];
+                        hop.x[a][lane] = scalar_t(d.points[0][g]);
+                        hop.y[a][lane] = scalar_t(d.points[1][g]);
+                        hop.z[a][lane] = scalar_t(d.points[2][g]);
+                        for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = ugrad[(ptrdiff_t)g * 9 + c];
+                    }
+                }
+                if (sympy) {
+                    // Assigns rather than accumulates: the generated body is the complete element
+                    // residual, so there is no zero-fill for it to add onto.
+                    //
+                    // Eight kernels, selected here rather than by a parameter inside them: the
+                    // limiter is uniform across the sweep, and a four-way select inside the vector
+                    // body at every surface is the shape of guard measured at 1.83x in this file.
+                    // The macro keeps one copy of the fourteen common arguments; a transposed pack
+                    // would hide in eight hand-written copies of it.
+#define CVFEM_HEX8_SYMPY_HO_ARGS \
+    rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in, hop
+                    if (with_rc) {
+                        switch (limiter) {
+                            case 1: cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim1_simd(
+                                            CVFEM_HEX8_SYMPY_HO_ARGS, rcp, outp); break;
+                            case 2: cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim2_simd(
+                                            CVFEM_HEX8_SYMPY_HO_ARGS, rcp, outp); break;
+                            case 3: cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim3_simd(
+                                            CVFEM_HEX8_SYMPY_HO_ARGS, rcp, outp); break;
+                            default: cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim0_simd(
+                                             CVFEM_HEX8_SYMPY_HO_ARGS, rcp, outp); break;
+                        }
+                    } else {
+                        switch (limiter) {
+                            case 1: cvfem_hex8_ns_upwind_sympy_residual_defcor_lim1_simd(
+                                            CVFEM_HEX8_SYMPY_HO_ARGS, outp); break;
+                            case 2: cvfem_hex8_ns_upwind_sympy_residual_defcor_lim2_simd(
+                                            CVFEM_HEX8_SYMPY_HO_ARGS, outp); break;
+                            case 3: cvfem_hex8_ns_upwind_sympy_residual_defcor_lim3_simd(
+                                            CVFEM_HEX8_SYMPY_HO_ARGS, outp); break;
+                            default: cvfem_hex8_ns_upwind_sympy_residual_defcor_lim0_simd(
+                                             CVFEM_HEX8_SYMPY_HO_ARGS, outp); break;
+                        }
+                    }
+#undef CVFEM_HEX8_SYMPY_HO_ARGS
+                } else {
+                    cvfem_hex8_ns_upwind_residual_sumfact_simd(
+                            rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in,
+                            outp, with_rc ? &rcp : nullptr, d.rhie_chow_scale, scalar_t(0), &hop);
+                }
+                scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
+            }
+            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+                const scalar_t *const SFEM_RESTRICT out = pack_out + k * N_FIELDS;
+                const ptrdiff_t                     g   = owned + k;
+                rx[g] = out[0]; ry[g] = out[1]; rz[g] = out[2]; rc[g] = out[3];
+            }
+            scalar_t *const SFEM_RESTRICT gx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gy = p.ghost_buf.data() + 1 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT gc = p.ghost_buf.data() + 3 * p.n_ghost_entries;
+            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * N_FIELDS;
+                gx[ghost_off + k] = out[0]; gy[ghost_off + k] = out[1];
+                gz[ghost_off + k] = out[2]; gc[ghost_off + k] = out[3];
+            }
+        }
+    }
+
+    scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        for (int f = 0; f < N_FIELDS; ++f) {
+            const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + (ptrdiff_t)f * p.n_ghost_entries;
+            scalar_t                            sum   = 0;
+            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
+            fields[f][dest] += sum;
+        }
+    }
+}
+
 static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                                                 PackedData      &p,
                                                 const scalar_t   rho,

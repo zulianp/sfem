@@ -246,6 +246,58 @@ int main(int argc, char **argv) {
         check(w <= scalar_t(0.05) * scale, "the isoparametric rule tracks the affine one", (double)(w / scale));
     }
 
+    // ---- the FUSED nine-component sweeps equal three single-component ones -----------
+    //
+    // assemble_nodal_u_grad used to call the one-field sweep three times and transpose. It now
+    // does one sweep for all nine, in both the packed and the flat path, which is a claim of
+    // EXACT equivalence: the per-component arithmetic is unchanged and only the geometry,
+    // indirection and reduction are shared. Three single sweeps are therefore the independent
+    // witness, and the comparison is exact rather than toleranced -- the same operations in
+    // the same order must give the same bits. A tolerance here would hide precisely the kind
+    // of reassociation that fusing invites.
+    {
+        std::vector<scalar_t> u[3];
+        for (int r = 0; r < 3; ++r) {
+            u[r].resize((size_t)d.nnodes);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                const scalar_t x = d.points[0][i], y = d.points[1][i], z = d.points[2][i];
+                u[r][(size_t)i] = std::sin(scalar_t(1.3 + r) * x) + scalar_t(0.7) * y * z
+                                  + scalar_t(0.2 + 0.1 * r) * x * y;
+            }
+        }
+        // the witness: three separate single-field sweeps, transposed as the old code did
+        std::vector<scalar_t> ref((size_t)d.nnodes * 9, scalar_t(0));
+        for (int r = 0; r < 3; ++r) {
+            cvfem_hex8_assemble_nodal_grad_packed(d, packed, 0, u[r].data(), 1, ogx, ogy, ogz);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+                ref[(size_t)i * 9 + (size_t)r * 3 + 0] = ogx[(size_t)i];
+                ref[(size_t)i * 9 + (size_t)r * 3 + 1] = ogy[(size_t)i];
+                ref[(size_t)i * 9 + (size_t)r * 3 + 2] = ogz[(size_t)i];
+            }
+        }
+
+        const scalar_t *const srcs[3] = {u[0].data(), u[1].data(), u[2].data()};
+        std::vector<scalar_t> got, gbuf;
+        cvfem_hex8_assemble_nodal_grads_packed(d, packed, 0, srcs, 3, got, gbuf);
+        ptrdiff_t bad = 0;
+        for (size_t k = 0; k < ref.size(); ++k)
+            if (got[k] != ref[k]) ++bad;
+        check(bad == 0, "packed: the fused nine-component sweep is bit-for-bit three sweeps", (double)bad);
+
+        // The flat sweep uses atomics, so its summation order is not reproducible and an exact
+        // comparison would be testing the scheduler. It is held to round-off instead, against
+        // the same witness.
+        std::vector<scalar_t> flat;
+        cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, 3, flat);
+        scalar_t worst = 0, scale = 0;
+        for (size_t k = 0; k < ref.size(); ++k) {
+            worst = std::max(worst, std::fabs(flat[k] - ref[k]));
+            scale = std::max(scale, std::fabs(ref[k]));
+        }
+        check(worst <= scalar_t(1e-12) * std::max(scale, scalar_t(1)),
+              "flat: the fused sweep matches to round-off", (double)(worst / std::max(scale, scalar_t(1))));
+    }
+
     if (g_failures) {
         std::fprintf(stderr, "cvfem_nodal_grad_test: %d check(s) failed\n", g_failures);
         return 1;

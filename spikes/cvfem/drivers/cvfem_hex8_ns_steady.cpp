@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
     int         check_jv    = smesh::Env::read<int>("SFEM_CHECK_JV", 0);
     int         rhie_chow   = smesh::Env::read<int>("SFEM_RHIE_CHOW", 1);
     scalar_t    rc_scale    = smesh::Env::read<scalar_t>("SFEM_RHIE_CHOW_SCALE", 1);
-    int         pack_size   = smesh::Env::read<int>("SFEM_PACK_SIZE", 2048);
+    int         pack_size   = smesh::Env::read<int>("SFEM_PACK_SIZE", 1024);
     // Schur scaling of the pressure block in the block-Jacobi preconditioner.
     // 0 = the original identity-on-pressure behaviour, which is the control.
     scalar_t    pscale      = smesh::Env::read<scalar_t>("SFEM_PC_PSCALE", 0);

@@ -31,13 +31,14 @@ cd "$SLURM_SUBMIT_DIR" || exit 1
 source scripts/alps_env.sh || exit 1
 
 echo "### host $(hostname)  $(date '+%F %T')"
-echo "### sizes 64  reps 2"
+echo "### sizes 128  reps 3"
 
 srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
   bash -lc "cd $PWD && BIN=build/cvfem_hex8_ns_upwind_bench THREADS=72 \
-            SIZES='128' REPS=3 RUN_TIMEOUT=900 OUT='perf/campaign_sat3' \
+            SIZES='128' REPS=3 RUN_TIMEOUT=900 OUT=perf/campaign_sat_${SLURM_JOB_ID:-manual} \
             ./scripts/layout_campaign.sh"
 
 echo
 echo "### report:"
-python3 python/cvfem_kernel_report.py perf/campaign_sat3/campaign.csv -o perf/campaign_sat3/CVFEM_Kernels.md 2>&1 | tail -2
+OUT=perf/campaign_sat_${SLURM_JOB_ID:-manual}
+python3 python/cvfem_kernel_report.py $OUT/campaign.csv -o $OUT/CVFEM_Kernels.md 2>&1 | tail -2
