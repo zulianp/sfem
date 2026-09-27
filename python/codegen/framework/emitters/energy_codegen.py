@@ -4,6 +4,7 @@ import sympy as sp
 from codegen.framework.emitters.kernel_prologue import (
     discard_unused,
     kernel_constant,
+    kernel_local,
     resolve_dead_parameters,
     resolve_kernel_constants,
 )
@@ -105,7 +106,8 @@ from codegen.framework.emitters.tensor_product_kernels import (
     micro_kernel_template as _micro_kernel_template,
     width_factors as _width_factors,
 )
-from codegen.framework.targets import current_target
+from dataclasses import replace as dataclass_replace
+from codegen.framework.targets import current_target, use_target
 from codegen.framework.plans.diagnostics import energy_reference_data_traffic
 from codegen.framework.plans.kernel_signature import (
     PACKED_MESH_CORE_ARGUMENTS,
@@ -1406,6 +1408,19 @@ _BLOCK_SHAPE_PARAMS = {
 }
 
 
+def _width_constant_lines(vector_size, indent="  "):
+    """The kernel's own width constant, where it has a width to declare.
+
+    A kernel that holds one element has none: the constant was `VS = 1`, which
+    is the block surviving at a size of one, and every extent spelled in terms
+    of it was an array of extent one.
+    """
+    return tuple(
+        kernel_constant(name, vector_size, indent=indent)
+        for name in _width_factors()
+    )
+
+
 def _width_parameters():
     """The work-item width, spelled as template parameters -- none where there is none."""
     return tuple("int %s" % name for name in _width_factors())
@@ -1800,7 +1815,7 @@ def _sfem_soa_weak_form_block_function(
         constant_p1_gradient_expansion and not shared.use_tensor_product_reference
     )
 
-    params = ["const int ne"]
+    params = list(_count_params())
     # The expanded kernel indexes no quadrature point, so it needs neither the
     # stride between points nor the weight table.  The weight is a constant of
     # the element and is folded into the body; the stride multiplied an index
@@ -1988,7 +2003,7 @@ def _sfem_soa_pointwise_block_function(
     source_builder = shared.source_builder
     work_item = shared.work_item
 
-    params = ["const int ne", "const int q"]
+    params = list(_count_params()) + ["const int q"]
     params.extend(_sfem_soa_element_stream_params(shared))
     params.extend(
         _sfem_soa_reference_basis_params(
@@ -4760,7 +4775,7 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             )
             lines.extend("  %s" % line if line else line for line in geometry_lines)
             lines.append("        }")
-        call_args = ["ne"]
+        call_args = _count_args()
         # An expanded kernel indexes no quadrature point, so it takes
         # neither the stride between points nor the weight below.
         call_args.extend(
@@ -5934,7 +5949,7 @@ def _sfem_soa_mesh_operator_function(
         use_tensor_product_geometry,
     )
 
-    call_args = ["ne"]
+    call_args = _count_args()
     # The expanded kernel reads no quadrature point, so it is handed neither
     # the stride between points nor, below, the weight table -- the same two
     # arguments its signature stopped naming.  Both are gated on the one flag,
@@ -6701,7 +6716,7 @@ def _sfem_soa_packed_apply_public_wrappers(
                 lines.extend("  %s" % line if line else line for line in geometry_lines)
                 lines.append("        }")
 
-            call_args = ["ne"]
+            call_args = _count_args()
             # An expanded kernel indexes no quadrature point, so it takes
             # neither the stride between points nor the weight below.
             call_args.extend(
@@ -7450,7 +7465,7 @@ def _objective_steps_lines(
             )
         )
 
-    call_args = ["ne"]
+    call_args = _count_args()
     # Same as the operator call: an expanded kernel indexes no quadrature
     # point, so it takes neither the stride between points nor the weight
     # table below, and both are gated on the flag that gated its signature.
@@ -8611,7 +8626,7 @@ def _sfem_soa_hessian_packed_crs_passes(
                 kernel_constant("ND", dim, indent="  "),
                 kernel_constant("NQ", n_qp, indent="  "),
                 kernel_constant("NS", n_nodes, indent="  "),
-                kernel_constant("VS", "1", indent="  "),
+                *_width_constant_lines("1", indent="  "),
                 kernel_constant("NDOFS", "NC * NS", indent="  "),
                 discard_unused("nnodes", indent="  "),
                 discard_unused("n_shared_nodes", indent="  "),
@@ -8713,8 +8728,8 @@ def _sfem_soa_hessian_packed_crs_passes(
                 "",
                 "      for (ptrdiff_t element = e_start; element < e_end; ++element) {",
                 "        s_t element_matrix[NDOFS * NDOFS];",
-                "        s_t bcoordinate_data[NS * ND][VS];",
-                kernel_constant("ne", "VS", indent="        "),
+                "        s_t bcoordinate_data[NS * ND]%s;" % _wi_extent(),
+                kernel_constant("ne", _work_item_block_stride(), indent="        "),
             ]
         )
         if uses_current:
@@ -8820,7 +8835,39 @@ def _sfem_soa_hessian_packed_crs_passes(
         )
 
 
-def _sfem_soa_hessian_matrix_assembly_function(
+def _sfem_soa_hessian_matrix_assembly_function(*arguments, **keywords):
+    """The assembly, emitted for a target whose work item is one element.
+
+    Assembly holds one element: `plans` says so, and the scatter that reads the
+    element matrix has no lane index to give it.  It was emitted for the block
+    target anyway and then instantiated at a width of one -- `static constexpr
+    int VS = 1;`, `const int ne = VS;`, tiles sized `[VS]`, and a lane loop that
+    runs once.  All of that is the width surviving at one, which is what item 9
+    asks to be gone and what "arrays with size one are not acceptable" rules out.
+
+    Binding `holding_one_element` is the whole of the change: every answer that
+    depends on having a width already reads `kernel_vector_width`, so the width
+    constant, the extents, the loop, the slot and the choice between the blocked
+    and the scalar micro-kernels all follow from it -- the same machinery the
+    device kernels use, asked of a kernel rather than of a machine.
+    """
+    one_element = current_target().holding_one_element()
+    # The source builder carries its own target, so it has to be rebound with the
+    # ambient one or the mesh loop keeps asking the block target for its lane loop
+    # while the kernel it calls no longer has one.
+    builder = keywords.get("source_builder")
+    if builder is not None:
+        keywords = dict(
+            keywords,
+            source_builder=dataclass_replace(builder, target=one_element),
+        )
+    with use_target(one_element):
+        return _holding_one_element_hessian_matrix_assembly_function(
+            *arguments, **keywords
+        )
+
+
+def _holding_one_element_hessian_matrix_assembly_function(
     form,
     prefix,
     dim,
@@ -8982,7 +9029,7 @@ def _sfem_soa_hessian_matrix_assembly_function(
                 kernel_constant("ND", dim, indent="  "),
             kernel_constant("NQ", n_qp, indent="  "),
             kernel_constant("NS", n_nodes, indent="  "),
-            kernel_constant("VS", "1", indent="  "),
+            *_width_constant_lines("1", indent="  "),
             kernel_constant("NDOFS", "NC * NS", indent="  "),
             discard_unused("nnodes", indent="  "),
             # One signature carries every sparse format's arrays so that the
@@ -9044,8 +9091,12 @@ def _sfem_soa_hessian_matrix_assembly_function(
             *source_builder.element_loop_lines(),
             "    idx_t ev[NS];",
             "    s_t element_matrix[NDOFS * NDOFS];",
-            *([] if is_affine_assembly else ["    s_t bcoordinate_data[NS * ND][VS];"]),
-            kernel_constant("ne", "VS", indent="    "),
+            *(
+                []
+                if is_affine_assembly
+                else ["    s_t bcoordinate_data[NS * ND]%s;" % _wi_extent()]
+            ),
+            kernel_constant("ne", _work_item_block_stride(), indent="    "),
         ]
     )
     if uses_current:
@@ -11362,13 +11413,35 @@ _ELEMENT_API_TEMPLATE_HEAD = {
 _ELEMENT_API_TILE_STEP = {True: "evb += VS", False: "++evb"}
 
 _ELEMENT_API_TILE_COUNT = {
-    True: "    const int ne = (int)MIN((ptrdiff_t)VS, nelements - evb);",
-    False: "    const int ne = 1;",
+    True: lambda: kernel_local(
+        "ne", "(int)MIN((ptrdiff_t)VS, nelements - evb)", "const int", indent="    "
+    ),
+    # A work item that is one element counts one, and every kernel it hands the
+    # tile to has stopped taking a count -- so this is a `kernel_local`, dropped
+    # by the same liveness pass as the constants above it wherever the body that
+    # follows never mentions it.
+    False: lambda: kernel_local("ne", "1", "const int", indent="    "),
 }
 
 
 def _has_width():
     return current_target().kernel_vector_width() is not None
+
+
+#: A local kernel's work-item count, as a parameter and as a call argument.
+#: There is nothing to count where a work item *is* the element: the count was
+#: read only by the lane loop that spelling does not open, and naming it anyway
+#: left 138 device kernels with a parameter their bodies never mention.  One
+#: table serves both ends so a signature and its call cannot disagree.
+_COUNT = {True: ("ne",), False: ()}
+
+
+def _count_params():
+    return tuple("const int %s" % name for name in _COUNT[_has_width()])
+
+
+def _count_args():
+    return list(_COUNT[_has_width()])
 
 
 def _sfem_soa_element_api_geometry_args(dim):
@@ -11425,7 +11498,7 @@ def _sfem_soa_element_api_block_call(
     # stride it used to multiply is gone with the index.
     specialized_reference_args = [() for _ in specialized]
     args = [
-        "ne",
+        *_count_args(),
         # The stride between quadrature points of one work item's geometry.
         # It is the width where there is one, and one element otherwise.
         *(
@@ -11470,7 +11543,7 @@ def _element_api_lane_loop(source_builder, indent):
 def _sfem_soa_element_api_tile_setup_lines(form, dim, n_nodes, output_kind, source_builder):
     item = _work_item_index(source_builder)
     lines = [
-        _ELEMENT_API_TILE_COUNT[_has_width()],
+        _ELEMENT_API_TILE_COUNT[_has_width()](),
     ]
     for _role, stream_prefix in element_api_field_roles(form):
         if stream_prefix != "u":
@@ -11627,8 +11700,12 @@ def _sfem_soa_element_api_coords_tile_lines(
             % ", ".join("badj%d" % component for component in range(dim * dim))
         )
         lines.append(
-            "    geometry_jacobian_adjugate_and_determinant<%s>(ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
-            % ", ".join(("s_t", "ND", "NQ") + _width_factors())
+            "    %s<%s>(%scoordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);"
+            % (
+                _micro_kernel("geometry_jacobian_adjugate_and_determinant"),
+                ", ".join(("s_t", "ND", "NQ") + _width_factors()),
+                _micro_kernel_count(),
+            )
         )
         return lines
     reference_declarations = []
@@ -11797,7 +11874,7 @@ def _sfem_soa_element_api_hessian_lines(
                 "  if (nelements <= 0) return SFEM_SUCCESS;",
                 "  for (ptrdiff_t evb = 0; evb < nelements; %s) {"
                 % _ELEMENT_API_TILE_STEP[_has_width()],
-                _ELEMENT_API_TILE_COUNT[_has_width()],
+                _ELEMENT_API_TILE_COUNT[_has_width()](),
             ]
         )
         for _role, stream_prefix in element_api_field_roles(form):

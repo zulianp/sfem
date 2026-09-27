@@ -336,11 +336,12 @@ class MeshLoweringAccessorTest(unittest.TestCase):
 
     def test_cuda_walks_the_mesh_with_a_grid_of_threads(self):
         target = CUDATarget()
-        loop, extent = mesh_loop_lines(target)
+        (loop,) = mesh_loop_lines(target)
         self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", loop)
         self.assertIn("evb += (ptrdiff_t)blockDim.x * gridDim.x", loop)
-        # one element per thread, so the block's tail count is not a count
-        self.assertEqual(extent, "    const int ne = 1;")
+        # and no count beside the loop: one element per thread, so there is no
+        # block to count and every kernel this pass calls takes no count.
+        self.assertEqual(len(mesh_loop_lines(target)), 1)
         self.assertEqual(target.mesh_function_line("k"), "__global__ void k(")
         # a `__global__` kernel returns void, so there is no status to give
         self.assertEqual(target.success_return_lines(), ())

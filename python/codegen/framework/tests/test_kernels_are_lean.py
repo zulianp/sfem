@@ -75,11 +75,15 @@ def _generated_tree():
 #: deletions and no insertions, and `reproducibility --all` returned all 53
 #: digests and 28 parity pairs unchanged.
 #:
-#: The 10 left are a different defect: 8 are `const ptrdiff_t evb = element;`
-#: and `const int ne = 1;` in the MRKV viscous operators, a single-element path
-#: declaring the block-loop variables it does not use, and 2 are stragglers in
-#: one tensor-product body.
-DEAD_ASSIGNMENT_BUDGET = 10
+#: 10 -> 2.  The 8 were `const ptrdiff_t evb = element;` and `const int ne = 1;`
+#: in the MRKV viscous operators, a single-element path declaring the block-loop
+#: variables it does not use -- and the count became dead in two more of them
+#: once the assembly kernels stopped taking a work-item count, which is how a
+#: tolerated defect turned into one that had to be fixed.  Both now go through
+#: `kernel_local`, so the existing liveness pass over deferred declarations
+#: drops them wherever the scope never mentions them, rather than a predicate
+#: per declaration shape.  The 2 left are stragglers in one tensor-product body.
+DEAD_ASSIGNMENT_BUDGET = 2
 
 #: Runs of back-to-back single-statement `#pragma omp simd` lane loops.  A run
 #: longer than one is N loops and N pragmas where one loop with N statements
@@ -175,13 +179,15 @@ UNUSED_PARAMETER_BUDGET = 0
 #: and was Patrick's `q * NS + should be done outside`.
 #:
 #: There were 4923, in 112 files.  What is left has a shape rather than a site:
-#: thirteen writes into `element_matrix` from the element-matrix kernels, whose
-#: work-item loop runs exactly once because assembly holds one element -- the
-#: loop itself is what should go, not the address inside it -- and ten in the
-#: shared micro-kernel templates, whose scalar rendering is produced by a textual
-#: expansion that rewrites `streams[..][0]` and would have to rewrite a hoisted
-#: pointer with it.
-LANE_LOOP_INVARIANT_BUDGET = 23
+#: ten in the shared micro-kernel templates, whose scalar rendering is produced
+#: by a textual expansion that rewrites `streams[..][0]` and would have to
+#: rewrite a hoisted pointer with it.
+#: 23 -> 10 when the thirteen writes into `element_matrix` went away with the
+#: loop around them.  They were the shape this comment said should be fixed by
+#: removing the loop rather than the address: an assembly kernel holds one
+#: element, so it is emitted for a target that holds one element and opens no
+#: work-item loop at all.
+LANE_LOOP_INVARIANT_BUDGET = 10
 
 #: Node-ordering permutations built inside a kernel.
 #:
@@ -212,9 +218,42 @@ KERNEL_PERMUTATION_BUDGET = 0
 WRAPPED_HELPER_BUDGET = 0
 
 
+#: The device sources held their own copy of every measurement here, unmeasured,
+#: because the survey read only `.cpp` and `.hpp`.  278 device kernels named a
+#: work-item count nothing read and 88 declared `ne = 1` for a block that is one
+#: thread, all while the host budgets stood at zero -- so the budget was not
+#: being met, it was being applied to half the tree.  Both are now the same
+#: numbers as the host: the `ne` the lane loop read is gone wherever there is no
+#: lane loop, and what remains is the two `det` stragglers in one Navier-Stokes
+#: body, which the host survey counts too.
+DEVICE_DEAD_ASSIGNMENT_BUDGET = 2
+DEVICE_UNUSED_PARAMETER_BUDGET = 0
+
+
 class KernelsAreLeanTest(unittest.TestCase):
     def setUp(self):
         self.survey = survey(_generated_tree())
+        self.device_survey = survey(_generated_tree(), device=True)
+
+    def test_no_device_kernel_computes_a_value_nothing_reads(self):
+        dead = self.device_survey["dead"]
+        self.assertLessEqual(
+            len(dead),
+            DEVICE_DEAD_ASSIGNMENT_BUDGET,
+            "these device assignments are never read:\n%s"
+            % "\n".join(
+                "  %s: %s: %s" % (row[0], row[1], row[3][:100]) for row in dead[:20]
+            ),
+        )
+
+    def test_no_device_kernel_names_a_parameter_it_ignores(self):
+        parameters = self.device_survey["unused_parameters"]
+        self.assertLessEqual(
+            len(parameters),
+            DEVICE_UNUSED_PARAMETER_BUDGET,
+            "these device parameters are named and never read:\n%s"
+            % "\n".join("  %s: %s" % row for row in parameters[:20]),
+        )
 
     def test_no_kernel_computes_a_value_nothing_reads(self):
         dead = self.survey["dead"]

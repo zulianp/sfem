@@ -25,14 +25,20 @@ import re
 
 
 class KernelConstant(str):
-    """A `static constexpr int` declaration that survives only if it is read.
+    """A declaration that survives only if it is read.
 
     A `str` subclass so that the line behaves exactly like the literal it
     replaces everywhere between here and `resolve_kernel_constants`.
+
+    `declaration` is what precedes the name.  Most callers want the default,
+    a kernel's `static constexpr int`; a mesh loop's local aliases -- the block
+    base and the work-item count it hands to a local kernel -- are the same kind
+    of line under a different type, and go through `kernel_local` so that one
+    liveness pass covers both rather than each shape carrying its own predicate.
     """
 
-    def __new__(cls, name, value, indent="  "):
-        line = "%sstatic constexpr int %s = %s;" % (indent, name, value)
+    def __new__(cls, name, value, indent="  ", declaration="static constexpr int"):
+        line = "%s%s %s = %s;" % (indent, declaration, name, value)
         constant = super(KernelConstant, cls).__new__(cls, line)
         constant.constant_name = name
         constant.constant_value = str(value)
@@ -41,6 +47,11 @@ class KernelConstant(str):
 
 def kernel_constant(name, value, indent="  "):
     return KernelConstant(name, value, indent)
+
+
+def kernel_local(name, value, declaration, indent="  "):
+    """A local alias, dropped where its own scope never mentions it."""
+    return KernelConstant(name, value, indent, declaration)
 
 
 class KernelDiscard(str):

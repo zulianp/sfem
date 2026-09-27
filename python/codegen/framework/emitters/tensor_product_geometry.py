@@ -5,7 +5,7 @@ from codegen.framework.emitters.tensor_product_kernels import (
     micro_kernel_template,
 )
 from codegen.framework.plans.conventions import restrict_prelude
-from codegen.framework.targets import current_target
+from codegen.framework.targets import current_target, use_target
 from codegen.framework.fem.tensor_product import (
     streams_in_shape_order,
     tensor_product_cartesian_shape_order,
@@ -45,6 +45,21 @@ def _width_suffix():
 def _block_offset(outer):
     """`q * VS + lane`, or `q` alone where a work item is the element."""
     return _default_target().work_item_block_offset(outer)
+
+
+#: The work-item count, as a parameter line and as a call argument.  A kernel that
+#: holds one element counts nothing: `ne` was read only by the work-item loop that
+#: spelling does not open, so carrying it would leave an unused parameter behind.
+_COUNT_PARAMETER = {True: lambda indent: ("%sconst int ne," % indent,), False: lambda indent: ()}
+_COUNT_ARGUMENT = {True: ("ne",), False: ()}
+
+
+def _count_parameter_lines(indent):
+    return _COUNT_PARAMETER[bool(_width_factors())](indent)
+
+
+def _count_arguments():
+    return _COUNT_ARGUMENT[bool(_width_factors())]
 
 
 def _target_simd_lines(simd_lines=None):
@@ -182,9 +197,62 @@ def sfem_geometry_kernels_header_source(
             "namespace sfem {",
             "namespace codegen {",
             "",
-            "template <%s>" % ", ".join(("typename s_t", "int ND", "int NQ") + _width_parameters()),
-            "struct GeometryJacobianAdjugateDeterminant;",
+            *_geometry_kernel_spellings(inline_qualifier, simd_lines, single_work_item),
             "",
+            "} // namespace codegen",
+            "} // namespace sfem",
+            "",
+            "#endif",
+            "",
+        ]
+    )
+
+
+#: Which spellings of the geometry kernels a header carries, keyed on whether the
+#: target has a work-item width.  A host header needs both: its mesh kernels walk
+#: a block and call the blocked spelling, while its assembly kernels hold one
+#: element and call the scalar one.  A device header needs only the scalar, which
+#: is all its kernels can call.
+_GEOMETRY_SPELLINGS = {
+    True: lambda target: (target,),
+    False: lambda target: (target, target.holding_one_element()),
+}
+
+
+def _geometry_struct_name():
+    """The Jacobian struct's name for the spelling being rendered."""
+    return micro_kernel("GeometryJacobianAdjugateDeterminant")
+
+
+def _geometry_dispatcher_name():
+    """And the free function in front of it."""
+    return micro_kernel("geometry_jacobian_adjugate_and_determinant")
+
+
+def _geometry_kernel_spellings(inline_qualifier, simd_lines, single_work_item):
+    """The geometry kernels, once per spelling this target needs.
+
+    The two renderings are this one body under two targets, so the scalar one
+    cannot drift from the blocked one -- the same reason
+    `tensor_product_kernels` renders its micro-kernels twice.  The two free
+    adjugate helpers take an offset and no width, so they are emitted once.
+    """
+    target = _default_target()
+    lines = list(_geometry_free_helper_lines(inline_qualifier))
+    for spelling in _GEOMETRY_SPELLINGS[
+        target.kernel_vector_width() is None
+    ](target):
+        with use_target(spelling):
+            lines.extend(
+                _geometry_jacobian_lines(
+                    inline_qualifier, simd_lines, single_work_item
+                )
+            )
+    return lines
+
+
+def _geometry_free_helper_lines(inline_qualifier):
+    return [
             "template <typename s_t>",
             "static %s void geometry_jacobian_adjugate_and_determinant_2(" % inline_qualifier,
             "    const s_t J00,",
@@ -229,10 +297,26 @@ def sfem_geometry_kernels_header_source(
             "      + J02 * (J10 * J21 - J11 * J20);",
             "}",
             "",
+    ]
+
+
+def _geometry_jacobian_lines(inline_qualifier, simd_lines, single_work_item):
+    work_item = _target_work_item_index()
+    work_loop = _work_item_loop_lines(
+        "      ",
+        work_item_index=work_item,
+        simd_lines=simd_lines,
+        single_work_item=single_work_item or not _width_factors(),
+    )
+    return [
+            "template <%s>" % ", ".join(("typename s_t", "int ND", "int NQ") + _width_parameters()),
+            "struct %s;" % _geometry_struct_name(),
+            "",
             "template <%s>" % ", ".join(("typename s_t", "int NQ") + _width_parameters()),
-            "struct GeometryJacobianAdjugateDeterminant<%s> {" % ", ".join(("s_t", "2", "NQ") + _width_factors()),
+            "struct %s<%s> {"
+            % (_geometry_struct_name(), ", ".join(("s_t", "2", "NQ") + _width_factors())),
             "  static %s void eval(" % inline_qualifier,
-            "      const int ne,",
+            *_count_parameter_lines("      "),
             "      const s_t *const RSTR coordinate_grad_ref,",
             "      s_t *const *const RSTR adjugate,",
             "      s_t *const RSTR determinant) {",
@@ -259,9 +343,10 @@ def sfem_geometry_kernels_header_source(
             "};",
             "",
             "template <%s>" % ", ".join(("typename s_t", "int NQ") + _width_parameters()),
-            "struct GeometryJacobianAdjugateDeterminant<%s> {" % ", ".join(("s_t", "3", "NQ") + _width_factors()),
+            "struct %s<%s> {"
+            % (_geometry_struct_name(), ", ".join(("s_t", "3", "NQ") + _width_factors())),
             "  static %s void eval(" % inline_qualifier,
-            "      const int ne,",
+            *_count_parameter_lines("      "),
             "      const s_t *const RSTR coordinate_grad_ref,",
             "      s_t *const *const RSTR adjugate,",
             "      s_t *const RSTR determinant) {",
@@ -304,22 +389,19 @@ def sfem_geometry_kernels_header_source(
             "};",
             "",
             "template <%s>" % ", ".join(("typename s_t", "int ND", "int NQ") + _width_parameters()),
-            "static %s void geometry_jacobian_adjugate_and_determinant(" % inline_qualifier,
-            "    const int ne,",
+            "static %s void %s(" % (inline_qualifier, _geometry_dispatcher_name()),
+            *_count_parameter_lines("    "),
             "    const s_t *const RSTR coordinate_grad_ref,",
             "    s_t *const *const RSTR adjugate,",
             "    s_t *const RSTR determinant) {",
-            "  GeometryJacobianAdjugateDeterminant<%s>::eval(" % ", ".join(("s_t", "ND", "NQ") + _width_factors()),
-            "      ne, coordinate_grad_ref, adjugate, determinant);",
+            "  %s<%s>::eval(" % (_geometry_struct_name(), ", ".join(("s_t", "ND", "NQ") + _width_factors())),
+            "      %s);" % ", ".join(
+                _count_arguments()
+                + ("coordinate_grad_ref", "adjugate", "determinant")
+            ),
             "}",
             "",
-            "} // namespace codegen",
-            "} // namespace sfem",
-            "",
-            "#endif",
-            "",
-        ]
-    )
+    ]
 
 
 def isoparametric_adjugate_stream_array_lines(
@@ -744,10 +826,20 @@ def tensor_product_adjugate_determinant_lines(
             "",
             "%ss_t *%s_adjugate_streams[%s * %s] = {%s};"
             % (indent, gradient_name, dim_name, dim_name, ", ".join(adjugate_streams)),
-            "%sgeometry_jacobian_adjugate_and_determinant<%s>("
-            % (indent, ", ".join(("s_t", dim_name, "NQ") + _width_factors())),
-            "%s    ne, %s, %s_adjugate_streams, %s);"
-            % (indent, gradient_name, gradient_name, determinant_stream),
+            "%s%s<%s>("
+            % (
+                indent,
+                micro_kernel("geometry_jacobian_adjugate_and_determinant"),
+                ", ".join(("s_t", dim_name, "NQ") + _width_factors()),
+            ),
+            "%s    %s%s, %s_adjugate_streams, %s);"
+            % (
+                indent,
+                micro_kernel_count(),
+                gradient_name,
+                gradient_name,
+                determinant_stream,
+            ),
         ]
 
     lines = ["", "%sfor (int q = 0; q < NQ; ++q) {" % indent]
