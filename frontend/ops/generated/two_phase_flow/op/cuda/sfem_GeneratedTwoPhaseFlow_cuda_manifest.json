@@ -320,6 +320,7 @@
     "d3/cuda",
     "d3/hex8/cuda",
     "d3/proteus_hex8/cuda",
+    "d3/tet10/cuda",
     "d3/tet4/cuda",
     "op/cuda",
     "reference/cuda"

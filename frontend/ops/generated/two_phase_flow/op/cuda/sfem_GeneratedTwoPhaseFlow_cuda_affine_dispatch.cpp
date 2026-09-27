@@ -214,6 +214,53 @@ extern "C" int cu_two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa(
     void *const RSTR p_c_out,
     void *const stream
 );
+extern "C" int cu_two_phase_flow_form_1_p_c_tet10_residual_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t m,
+    const real_t mu_c,
+    const real_t porosity,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR p_w_old,
+    const void *const RSTR p_c_old,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out,
+    void *const stream
+);
 extern "C" int cu_two_phase_flow_form_1_p_c_tet4_residual_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -412,6 +459,51 @@ extern "C" int cu_two_phase_flow_form_1_p_w_hex8_residual_a_msoa(
     void *const stream
 );
 extern "C" int cu_two_phase_flow_form_1_p_w_proteus_hex8_residual_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C_kw1,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t P_r,
+    const real_t S_res,
+    const real_t dt,
+    const real_t kappa_T,
+    const real_t m,
+    const real_t mu_w,
+    const real_t p_wr,
+    const real_t porosity,
+    const real_t rho_w0,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR p_w_old,
+    const void *const RSTR p_c_old,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out,
+    void *const stream
+);
+extern "C" int cu_two_phase_flow_form_1_p_w_tet10_residual_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -660,6 +752,53 @@ extern "C" int cu_two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_a_msoa(
     void *const stream
 );
 extern "C" int cu_two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t m,
+    const real_t mu_c,
+    const real_t porosity,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR p_w_direction,
+    const void *const RSTR p_c_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out,
+    void *const stream
+);
+extern "C" int cu_two_phase_flow_form_2_p_c_p_c_tet10_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -958,6 +1097,53 @@ extern "C" int cu_two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_a_m
     void *const RSTR p_c_out,
     void *const stream
 );
+extern "C" int cu_two_phase_flow_form_2_p_c_p_w_tet10_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t m,
+    const real_t mu_c,
+    const real_t porosity,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR p_w_direction,
+    const void *const RSTR p_c_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out,
+    void *const stream
+);
 extern "C" int cu_two_phase_flow_form_2_p_c_p_w_tet4_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -1156,6 +1342,51 @@ extern "C" int cu_two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_a_msoa(
     void *const stream
 );
 extern "C" int cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C_kw1,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t P_r,
+    const real_t S_res,
+    const real_t dt,
+    const real_t kappa_T,
+    const real_t m,
+    const real_t mu_w,
+    const real_t p_wr,
+    const real_t porosity,
+    const real_t rho_w0,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR p_w_direction,
+    const void *const RSTR p_c_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out,
+    void *const stream
+);
+extern "C" int cu_two_phase_flow_form_2_p_w_p_c_tet10_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -1440,6 +1671,51 @@ extern "C" int cu_two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_a_m
     void *const RSTR p_c_out,
     void *const stream
 );
+extern "C" int cu_two_phase_flow_form_2_p_w_p_w_tet10_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C_kw1,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t P_r,
+    const real_t S_res,
+    const real_t dt,
+    const real_t kappa_T,
+    const real_t m,
+    const real_t mu_w,
+    const real_t p_wr,
+    const real_t porosity,
+    const real_t rho_w0,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR p_w_direction,
+    const void *const RSTR p_c_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out,
+    void *const stream
+);
 extern "C" int cu_two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -1664,6 +1940,58 @@ extern "C" int cu_two_phase_flow_hex8_jacobian_action_a_msoa(
     void *const stream
 );
 extern "C" int cu_two_phase_flow_proteus_hex8_jacobian_action_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t C_kw1,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t kappa_T,
+    const real_t m,
+    const real_t mu_c,
+    const real_t mu_w,
+    const real_t p_wr,
+    const real_t porosity,
+    const real_t rho_w0,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t direction_stride,
+    const void *const RSTR p_w_direction,
+    const void *const RSTR p_c_direction,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out,
+    void *const stream
+);
+extern "C" int cu_two_phase_flow_tet10_jacobian_action_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
     const ptrdiff_t nnodes,
@@ -1997,6 +2325,58 @@ extern "C" int cu_two_phase_flow_proteus_hex8_residual_a_msoa(
     void *const RSTR p_c_out,
     void *const stream
 );
+extern "C" int cu_two_phase_flow_tet10_residual_a_msoa(
+    const int scalar_bytes,
+    const ptrdiff_t nelements,
+    const ptrdiff_t nnodes,
+    idx_t **const RSTR elements,
+    const geom_t *const RSTR g_adj0,
+    const geom_t *const RSTR g_adj1,
+    const geom_t *const RSTR g_adj2,
+    const geom_t *const RSTR g_adj3,
+    const geom_t *const RSTR g_adj4,
+    const geom_t *const RSTR g_adj5,
+    const geom_t *const RSTR g_adj6,
+    const geom_t *const RSTR g_adj7,
+    const geom_t *const RSTR g_adj8,
+    const geom_t *const RSTR g_det0,
+    const real_t C_ka1,
+    const real_t C_ka2,
+    const real_t C_kw1,
+    const real_t K_0,
+    const real_t K_1,
+    const real_t K_2,
+    const real_t K_3,
+    const real_t K_4,
+    const real_t K_5,
+    const real_t K_6,
+    const real_t K_7,
+    const real_t K_8,
+    const real_t M_c,
+    const real_t P_r,
+    const real_t R,
+    const real_t S_res,
+    const real_t T,
+    const real_t Z,
+    const real_t dt,
+    const real_t kappa_T,
+    const real_t m,
+    const real_t mu_c,
+    const real_t mu_w,
+    const real_t p_wr,
+    const real_t porosity,
+    const real_t rho_w0,
+    const ptrdiff_t current_stride,
+    const void *const RSTR p_w,
+    const void *const RSTR p_c,
+    const ptrdiff_t previous_stride,
+    const void *const RSTR p_w_old,
+    const void *const RSTR p_c_old,
+    const ptrdiff_t out_stride,
+    void *const RSTR p_w_out,
+    void *const RSTR p_c_out,
+    void *const stream
+);
 extern "C" int cu_two_phase_flow_tet4_residual_a_msoa(
     const int scalar_bytes,
     const ptrdiff_t nelements,
@@ -2163,6 +2543,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_two_phase_flow_form_1_p_c_residual_3
       return cu_two_phase_flow_form_1_p_c_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
     case smesh::PROTEUS_HEX8:
       return cu_two_phase_flow_form_1_p_c_proteus_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
+    case smesh::TET10:
+      return cu_two_phase_flow_form_1_p_c_tet10_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
     case smesh::TET4:
       return cu_two_phase_flow_form_1_p_c_tet4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
     default:
@@ -2281,6 +2663,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_two_phase_flow_form_1_p_w_residual_3
       return cu_two_phase_flow_form_1_p_w_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
     case smesh::PROTEUS_HEX8:
       return cu_two_phase_flow_form_1_p_w_proteus_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
+    case smesh::TET10:
+      return cu_two_phase_flow_form_1_p_w_tet10_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
     case smesh::TET4:
       return cu_two_phase_flow_form_1_p_w_tet4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
     default:
@@ -2403,6 +2787,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_two_phase_flow_form_2_p_c_p_c_jacobi
       return cu_two_phase_flow_form_2_p_c_p_c_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::PROTEUS_HEX8:
       return cu_two_phase_flow_form_2_p_c_p_c_proteus_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+    case smesh::TET10:
+      return cu_two_phase_flow_form_2_p_c_p_c_tet10_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::TET4:
       return cu_two_phase_flow_form_2_p_c_p_c_tet4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     default:
@@ -2525,6 +2911,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_two_phase_flow_form_2_p_c_p_w_jacobi
       return cu_two_phase_flow_form_2_p_c_p_w_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::PROTEUS_HEX8:
       return cu_two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+    case smesh::TET10:
+      return cu_two_phase_flow_form_2_p_c_p_w_tet10_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::TET4:
       return cu_two_phase_flow_form_2_p_c_p_w_tet4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     default:
@@ -2643,6 +3031,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_two_phase_flow_form_2_p_w_p_c_jacobi
       return cu_two_phase_flow_form_2_p_w_p_c_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::PROTEUS_HEX8:
       return cu_two_phase_flow_form_2_p_w_p_c_proteus_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+    case smesh::TET10:
+      return cu_two_phase_flow_form_2_p_w_p_c_tet10_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::TET4:
       return cu_two_phase_flow_form_2_p_w_p_c_tet4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     default:
@@ -2761,6 +3151,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_two_phase_flow_form_2_p_w_p_w_jacobi
       return cu_two_phase_flow_form_2_p_w_p_w_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::PROTEUS_HEX8:
       return cu_two_phase_flow_form_2_p_w_p_w_proteus_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+    case smesh::TET10:
+      return cu_two_phase_flow_form_2_p_w_p_w_tet10_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::TET4:
       return cu_two_phase_flow_form_2_p_w_p_w_tet4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     default:
@@ -2893,6 +3285,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_two_phase_flow_jacobian_action_3d_a_
       return cu_two_phase_flow_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::PROTEUS_HEX8:
       return cu_two_phase_flow_proteus_hex8_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
+    case smesh::TET10:
+      return cu_two_phase_flow_tet10_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     case smesh::TET4:
       return cu_two_phase_flow_tet4_jacobian_action_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, direction_stride, p_w_direction, p_c_direction, out_stride, p_w_out, p_c_out, stream);
     default:
@@ -3025,6 +3419,8 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int cu_two_phase_flow_residual_3d_a_msoa(
       return cu_two_phase_flow_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
     case smesh::PROTEUS_HEX8:
       return cu_two_phase_flow_proteus_hex8_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
+    case smesh::TET10:
+      return cu_two_phase_flow_tet10_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
     case smesh::TET4:
       return cu_two_phase_flow_tet4_residual_a_msoa((int)resolved_real_type, nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, C_ka1, C_ka2, C_kw1, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, kappa_T, m, mu_c, mu_w, p_wr, porosity, rho_w0, current_stride, p_w, p_c, previous_stride, p_w_old, p_c_old, out_stride, p_w_out, p_c_out, stream);
     default:
