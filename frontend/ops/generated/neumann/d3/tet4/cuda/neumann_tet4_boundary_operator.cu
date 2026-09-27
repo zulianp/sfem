@@ -36,59 +36,18 @@ template <typename s_t>
 struct neumann_tet4_trishell3_boundary_residual_soa_reference_data {
   static constexpr int NS = 3;
 
-  static __host__ __device__ __forceinline__ const s_t *grad() {
-    static const s_t data[18] = {
-      s_t(-1),
-      s_t(-1),
-      s_t(1),
-      s_t(0),
-      s_t(0),
-      s_t(1),
-      s_t(-1),
-      s_t(-1),
-      s_t(1),
-      s_t(0),
-      s_t(0),
-      s_t(1),
-      s_t(-1),
-      s_t(-1),
-      s_t(1),
-      s_t(0),
-      s_t(0),
-      s_t(1)
-    };
-    return data;
-  }
-
 };
 
 template <typename s_t>
 __host__ __device__ __forceinline__ s_t neumann_tet4_trishell3_boundary_residual_soa_measure(
-    const int q,
     const idx_t *const RSTR ev,
     const geom_t *const *const RSTR points) {
-  const s_t *const grad = neumann_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::grad();
-  const int n_shape = neumann_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NS;
-    s_t dxdr0 = s_t(0);
-  s_t dxdr1 = s_t(0);
-  s_t dxdr2 = s_t(0);
-  s_t dxds0 = s_t(0);
-  s_t dxds1 = s_t(0);
-  s_t dxds2 = s_t(0);
-  for (int i = 0; i < n_shape; ++i) {
-    const s_t gr = grad[(q * n_shape + i) * 2 + 0];
-    const s_t gs = grad[(q * n_shape + i) * 2 + 1];
-    const idx_t node = ev[i];
-    const s_t x = s_t(points[0][node]);
-    const s_t y = s_t(points[1][node]);
-    const s_t z = s_t(points[2][node]);
-    dxdr0 += x * gr;
-    dxdr1 += y * gr;
-    dxdr2 += z * gr;
-    dxds0 += x * gs;
-    dxds1 += y * gs;
-    dxds2 += z * gs;
-  }
+  const s_t dxdr0 = s_t(points[0][ev[1]]) - s_t(points[0][ev[0]]);
+  const s_t dxdr1 = s_t(points[1][ev[1]]) - s_t(points[1][ev[0]]);
+  const s_t dxdr2 = s_t(points[2][ev[1]]) - s_t(points[2][ev[0]]);
+  const s_t dxds0 = s_t(points[0][ev[2]]) - s_t(points[0][ev[0]]);
+  const s_t dxds1 = s_t(points[1][ev[2]]) - s_t(points[1][ev[0]]);
+  const s_t dxds2 = s_t(points[2][ev[2]]) - s_t(points[2][ev[0]]);
   const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
   const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
   const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
@@ -137,7 +96,7 @@ __host__ __device__ __forceinline__ void neumann_tet4_trishell3_boundary_residua
     const s_t coeff2 = -t2;
 
   {
-    const s_t test = (s_t(1) / s_t(6)) * neumann_tet4_trishell3_boundary_residual_soa_measure<s_t>(0, ev, points);
+    const s_t test = (s_t(1) / s_t(6)) * neumann_tet4_trishell3_boundary_residual_soa_measure<s_t>(ev, points);
 
     for (int i = 0; i < n_shape; ++i) {
         element_vector[0][i] += coeff0 * test;

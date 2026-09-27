@@ -35,33 +35,14 @@ template <typename s_t>
 struct neumann_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data {
   static constexpr int NS = 2;
 
-  static const s_t *grad() {
-    static const s_t data[4] = {
-      s_t(-1),
-      s_t(1),
-      s_t(-1),
-      s_t(1)
-    };
-    return data;
-  }
-
 };
 
 template <typename s_t>
 static SFEM_INLINE s_t neumann_proteus_quad4_edgeshell2_boundary_residual_soa_measure(
-    const int q,
     const idx_t *const RSTR ev,
     const geom_t *const *const RSTR points) {
-  const s_t *const grad = neumann_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::grad();
-  const int n_shape = neumann_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
-    s_t dx0 = s_t(0);
-  s_t dx1 = s_t(0);
-  for (int i = 0; i < n_shape; ++i) {
-    const s_t gi = grad[q * n_shape + i];
-    const idx_t node = ev[i];
-    dx0 += s_t(points[0][node]) * gi;
-    dx1 += s_t(points[1][node]) * gi;
-  }
+  const s_t dx0 = s_t(points[0][ev[1]]) - s_t(points[0][ev[0]]);
+  const s_t dx1 = s_t(points[1][ev[1]]) - s_t(points[1][ev[0]]);
   return sqrt(dx0 * dx0 + dx1 * dx1);
 }
 
@@ -102,7 +83,7 @@ static SFEM_INLINE void neumann_proteus_quad4_edgeshell2_boundary_residual_soa_e
     const s_t coeff1 = -t1;
 
   {
-    const s_t test = (s_t(1) / s_t(2)) * neumann_proteus_quad4_edgeshell2_boundary_residual_soa_measure<s_t>(0, ev, points);
+    const s_t test = (s_t(1) / s_t(2)) * neumann_proteus_quad4_edgeshell2_boundary_residual_soa_measure<s_t>(ev, points);
 #pragma omp simd
     for (int i = 0; i < n_shape; ++i) {
         element_vector[0][i] += coeff0 * test;
