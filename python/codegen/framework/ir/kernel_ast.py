@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass, field, fields, is_dataclass, replace
 from enum import Enum
 
 
@@ -764,3 +765,109 @@ def _entity_to_dict(value):
     if hasattr(value, "to_dict"):
         return value.to_dict()
     return {"kind": "unknown", "value": str(value)}
+
+
+#: A temporary whose only reader copies it verbatim into a buffer is a name for
+#: a value that already had a home.  ISSUES.md item 5 quotes the shape: nine
+#: `loperand[i] = qw * (...)` lines followed by nine `loperandI[lane] =
+#: loperand[i]` lines, where the store could have carried the expression.  It
+#: outlived the `loperand` array and reappeared as the staged coefficient of
+#: every quadrature value -- `const s_t value_coeff0 = -density*g0;` and then
+#: `value_coeff0_values[lane] = value_coeff0;`.
+#:
+#: The fusion is done on the AST rather than on emitted text, because what makes
+#: it safe is structural: the declaration has no extents, its name is read once
+#: in the whole body, and that read is the entire right-hand side of a plain
+#: assignment.
+#: `+=` counts too: `out[i] += t` with `t = a + b` accumulates the same sum in
+#: the same order as `out[i] += a + b`, so the fusion is still the identity it
+#: has to be for the digests to hold.
+_COPY_OPERATORS = frozenset(("=", "+="))
+
+
+def _expression_text(value):
+    """Every expression string inside a node, concatenated, for a read count."""
+    if value is None:
+        return ""
+    if isinstance(value, ExpressionRef):
+        return value.expression
+    if isinstance(value, (SymbolRef, TypeRef)):
+        return value.name
+    if isinstance(value, Literal):
+        return str(value.value)
+    if isinstance(value, (tuple, list)):
+        return " ".join(_expression_text(item) for item in value)
+    if is_dataclass(value):
+        return " ".join(
+            _expression_text(getattr(value, item.name)) for item in fields(value)
+        )
+    return str(value)
+
+
+def _copied_name(node):
+    """The name a node copies verbatim into a buffer, if that is all it does."""
+    if not isinstance(node, AssignmentNode) or node.operator not in _COPY_OPERATORS:
+        return None
+    if isinstance(node.rhs, SymbolRef):
+        return node.rhs.name
+    if isinstance(node.rhs, ExpressionRef):
+        text = node.rhs.expression.strip()
+        return text if re.fullmatch(r"\w+", text) else None
+    return None
+
+
+def fuse_single_use_copies(body):
+    """Give a copied-once temporary's expression straight to the store.
+
+    A declaration stays when its name is read anywhere else, when it declares an
+    array, or when anything between it and the store writes a name its
+    expression reads -- the expression moves later, so a reassignment in between
+    would change what it means.
+    """
+    nodes = [
+        replace(node, body=fuse_single_use_copies(node.body))
+        if getattr(node, "body", None)
+        else node
+        for node in body
+    ]
+    reads = [_expression_text(node) for node in nodes]
+    written = [
+        node.lhs.name if isinstance(getattr(node, "lhs", None), SymbolRef) else
+        (node.lhs.expression if isinstance(getattr(node, "lhs", None), ExpressionRef) else "")
+        for node in nodes
+    ]
+    fused = {}
+    for index, node in enumerate(nodes):
+        if not isinstance(node, BufferDeclNode) or node.extents or node.initializer is None:
+            continue
+        name = node.name.name
+        word = re.compile(r"\b%s\b" % re.escape(name))
+        readers = [
+            other
+            for other in range(len(nodes))
+            if other != index and word.search(reads[other])
+        ]
+        if len(readers) != 1:
+            continue
+        store = readers[0]
+        if store < index or _copied_name(nodes[store]) != name:
+            continue
+        initializer = _expression_text(node.initializer)
+        if any(
+            written[between] and re.search(
+                r"\b%s\b" % re.escape(written[between]), initializer
+            )
+            for between in range(index + 1, store)
+        ):
+            continue
+        fused[store] = node.initializer
+        fused[index] = None
+    if not fused:
+        return tuple(nodes)
+    return tuple(
+        AssignmentNode(nodes[index].lhs, fused[index], nodes[index].operator)
+        if index in fused and fused[index] is not None
+        else nodes[index]
+        for index in range(len(nodes))
+        if not (index in fused and fused[index] is None)
+    )

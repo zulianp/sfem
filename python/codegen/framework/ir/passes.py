@@ -17,7 +17,7 @@ contract asserted where it is actually true, and it runs during emission
 rather than after it, so a kernel that violates it never reaches a file.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from codegen.framework.ir.kernel_ast import (
     BlockNode,
@@ -28,6 +28,7 @@ from codegen.framework.ir.kernel_ast import (
     LoopHeaderNode,
     LoopNode,
     ScatterNode,
+    fuse_single_use_copies,
 )
 
 
@@ -86,3 +87,36 @@ class VectorizationContractPass(KernelASTPass):
                         "%s: an atomic update inside vectorised lane loop '%s' "
                         "serialises it" % (ast.name, index)
                     )
+
+
+@dataclass(frozen=True)
+class SingleUseCopyPass(KernelASTPass):
+    """A temporary copied once into a buffer gives its expression to the store.
+
+    ISSUES.md item 5, whose example is nine `loperand[i] = qw * (...)` lines
+    followed by nine `loperandI[lane] = loperand[i]` lines.  The name exists
+    only to be spelled again one line later, and the store could have carried
+    the expression.
+
+    The transform is `fuse_single_use_copies`, which is structural: it fuses a
+    declaration with no extents whose name is read exactly once in the whole
+    body, where that read is the entire right-hand side of a plain or
+    accumulating assignment, and where nothing in between writes a name the
+    expression reads.  It is therefore an identity on the arithmetic -- the same
+    expression in the same association, one name fewer -- which is what lets the
+    reproducibility digests hold across it.
+
+    It runs here rather than at the places these bodies are built because the
+    shape occurs in bodies no work-item loop wraps: the inexact-apply path
+    stages `element_out0_0` into `bout0_0[lane]`, and the closed-form simplex
+    gradient accumulates `e0` into `outx[ev0 * out_stride]`.  One pass at the
+    one place every AST is rendered covers all of them.
+    """
+
+    name: str = "single-use-copy"
+    parity_preserving: bool = True
+    performance_changing: bool = False
+
+    def apply(self, ast):
+        after = replace(ast, nodes=fuse_single_use_copies(ast.nodes))
+        return KernelASTPassResult(self, ast, after, ())
