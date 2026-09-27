@@ -23,7 +23,6 @@ namespace codegen {
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -32,7 +31,6 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
@@ -211,7 +209,7 @@ __global__ void body_force_proteus_quad4_residual_a_msoa_impl(
     s_t baffine_geometry_data[1];
     const s_t *bageom_streams[1];
     bageom_streams[0] = ageom_stream<s_t, g_t>(
-        ne, affine_geometry_sources[0], &baffine_geometry_data[0], std::is_same<g_t, s_t>());
+        affine_geometry_sources[0], &baffine_geometry_data[0], std::is_same<g_t, s_t>());
 
     body_force_d2_tensor_product_residual_block_contiguous<s_t, NQ, NS>(0, bageom_streams[0], affine_shape_1d, affine_q_weight_1d, density, g0, g1, boutput);
 

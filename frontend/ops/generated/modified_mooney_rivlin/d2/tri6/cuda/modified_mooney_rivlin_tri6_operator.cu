@@ -15,7 +15,6 @@ namespace codegen {
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -24,7 +23,6 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {

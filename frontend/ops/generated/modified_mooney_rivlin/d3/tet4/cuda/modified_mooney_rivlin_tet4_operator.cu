@@ -11,7 +11,6 @@ namespace codegen {
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -20,7 +19,6 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
@@ -158,34 +156,34 @@ __global__ void modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
     }
     s_t badj0_data;
     const s_t *const badj0 = ageom_stream<s_t, g_t>(
-        ne, g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
     s_t badj1_data;
     const s_t *const badj1 = ageom_stream<s_t, g_t>(
-        ne, g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
     s_t badj2_data;
     const s_t *const badj2 = ageom_stream<s_t, g_t>(
-        ne, g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
     s_t badj3_data;
     const s_t *const badj3 = ageom_stream<s_t, g_t>(
-        ne, g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
     s_t badj4_data;
     const s_t *const badj4 = ageom_stream<s_t, g_t>(
-        ne, g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+        g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
     s_t badj5_data;
     const s_t *const badj5 = ageom_stream<s_t, g_t>(
-        ne, g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+        g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
     s_t badj6_data;
     const s_t *const badj6 = ageom_stream<s_t, g_t>(
-        ne, g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+        g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
     s_t badj7_data;
     const s_t *const badj7 = ageom_stream<s_t, g_t>(
-        ne, g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+        g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
     s_t badj8_data;
     const s_t *const badj8 = ageom_stream<s_t, g_t>(
-        ne, g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+        g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
     s_t bdet0_data;
     const s_t *const bdet0 = ageom_stream<s_t, g_t>(
-        ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
     for (int step = 0; step < nsteps; ++step) {
       {
@@ -379,34 +377,34 @@ __global__ void modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
     }
     s_t badj0_data;
     const s_t *const badj0 = ageom_stream<s_t, g_t>(
-        ne, g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
     s_t badj1_data;
     const s_t *const badj1 = ageom_stream<s_t, g_t>(
-        ne, g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
     s_t badj2_data;
     const s_t *const badj2 = ageom_stream<s_t, g_t>(
-        ne, g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
     s_t badj3_data;
     const s_t *const badj3 = ageom_stream<s_t, g_t>(
-        ne, g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
     s_t badj4_data;
     const s_t *const badj4 = ageom_stream<s_t, g_t>(
-        ne, g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+        g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
     s_t badj5_data;
     const s_t *const badj5 = ageom_stream<s_t, g_t>(
-        ne, g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+        g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
     s_t badj6_data;
     const s_t *const badj6 = ageom_stream<s_t, g_t>(
-        ne, g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+        g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
     s_t badj7_data;
     const s_t *const badj7 = ageom_stream<s_t, g_t>(
-        ne, g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+        g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
     s_t badj8_data;
     const s_t *const badj8 = ageom_stream<s_t, g_t>(
-        ne, g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+        g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
     s_t bdet0_data;
     const s_t *const bdet0 = ageom_stream<s_t, g_t>(
-        ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
     modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
@@ -611,34 +609,34 @@ __global__ void modified_mooney_rivlin_tet4_apply_a_msoa_impl(
     }
     s_t badj0_data;
     const s_t *const badj0 = ageom_stream<s_t, g_t>(
-        ne, g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
     s_t badj1_data;
     const s_t *const badj1 = ageom_stream<s_t, g_t>(
-        ne, g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
     s_t badj2_data;
     const s_t *const badj2 = ageom_stream<s_t, g_t>(
-        ne, g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
     s_t badj3_data;
     const s_t *const badj3 = ageom_stream<s_t, g_t>(
-        ne, g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
     s_t badj4_data;
     const s_t *const badj4 = ageom_stream<s_t, g_t>(
-        ne, g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+        g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
     s_t badj5_data;
     const s_t *const badj5 = ageom_stream<s_t, g_t>(
-        ne, g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+        g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
     s_t badj6_data;
     const s_t *const badj6 = ageom_stream<s_t, g_t>(
-        ne, g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+        g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
     s_t badj7_data;
     const s_t *const badj7 = ageom_stream<s_t, g_t>(
-        ne, g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+        g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
     s_t badj8_data;
     const s_t *const badj8 = ageom_stream<s_t, g_t>(
-        ne, g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+        g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
     s_t bdet0_data;
     const s_t *const bdet0 = ageom_stream<s_t, g_t>(
-        ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
     modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 

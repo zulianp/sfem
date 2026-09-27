@@ -708,10 +708,11 @@ def _affine_geometry_stream_assignment_lines(indent, n_streams):
         return [
             "%s%sbageom_streams[%s] = ageom_stream<%s>("
             % (indent, extra, index, ", ".join(("s_t", "g_t") + _width_factors())),
-            "%s%s    ne, affine_geometry_sources[%s], %s, std::is_same<g_t, s_t>());"
+            "%s%s    %saffine_geometry_sources[%s], %s, std::is_same<g_t, s_t>());"
             % (
                 indent,
                 extra,
+                _micro_kernel_count(),
                 index,
                 _target().staged_buffer_address("baffine_geometry_data[%s]" % index),
             ),
@@ -7111,9 +7112,7 @@ def _mixed_affine_function(
     )
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
-    call_args = [
-        "ne",
-        "0",
+    call_args = list(_local_kernel_count_args(False, "ne", "0")) + [
         "bageom_streams[%d]"
         % affine_geometry_stream_indices["det0"],
     ]
@@ -7387,11 +7386,9 @@ def _mixed_isoparametric_function(
     )
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
-    call_args = [
-        "ne",
-        _work_item_block_stride(),
-        "bdeterminant",
-    ]
+    call_args = list(
+        _local_kernel_count_args(False, "ne", _work_item_block_stride())
+    ) + ["bdeterminant"]
     call_args.extend(
         _geometry_buffer_arguments(dependencies, dim, {"adjugate": "badjugate"})
     )

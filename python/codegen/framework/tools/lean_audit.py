@@ -199,6 +199,55 @@ def unused_parameters(source):
                 yield name
 
 
+#: The names an emitter spells by hand for the loop structure around a kernel,
+#: rather than deriving from a stream or a field.  A body that reads one of them
+#: without declaring it or taking it as a parameter does not compile, and no
+#: measurement here saw that: `unused_parameters` is its mirror and catches only
+#: the declared-and-unread direction.
+#:
+#: The list is closed rather than a free-variable analysis, which would have to
+#: know every type, global and helper name in scope.  These five are the ones
+#: the loop lowering owns, so they are the ones a change to the loop lowering
+#: can leave dangling -- as removing the work-item count did: `ageom_stream`
+#: kept taking `ne` after the SIMT mesh loop stopped declaring it, and 11 device
+#: translation units failed on `identifier "ne" is undefined` while every host
+#: gate was green, because the host mesh loop still declares it.
+#: `VS` is deliberately absent: it is a template parameter, and a member
+#: function of a class template reads the enclosing struct's parameter list,
+#: which a signature-local search cannot see -- 14 false positives in the two
+#: shared micro-kernel headers.  The names here are locals the loop lowering
+#: declares in the body itself.
+_WORK_ITEM_NAMES = ("ne", "evb", "lane", "q")
+
+
+def undeclared_work_item_names(source):
+    """Loop-structure names a body reads but neither declares nor is given."""
+    for match in _SIGNATURE.finditer(source):
+        open_brace = source.index("{", match.start())
+        depth, index = 0, open_brace
+        while index < len(source):
+            if source[index] == "{":
+                depth += 1
+            elif source[index] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            index += 1
+        body = source[open_brace : index + 1]
+        given = match.group("params") + match.group(0)
+        for name in _WORK_ITEM_NAMES:
+            word = r"\b%s\b" % name
+            if not re.search(word, body):
+                continue
+            if re.search(word, given):
+                continue
+            # A declaration, a `for (int name = ...)` head or a template
+            # parameter all introduce it; only a bare read is the defect.
+            if re.search(r"(?:\w+|>)\s+\**%s\b\s*(?:=|;|\)|\[)" % name, body):
+                continue
+            yield name
+
+
 _DISCARD = re.compile(r"^\s*\(void\)(\w+);\s*$", re.M)
 
 
@@ -456,6 +505,7 @@ def survey(generated, device=False):
     wrappers = []
     constants = []
     parameters = []
+    undeclared = []
     discards = []
     permutations = []
     invariants = []
@@ -474,6 +524,9 @@ def survey(generated, device=False):
             (relative, name, line) for name, line in unused_constants(source)
         )
         parameters.extend((relative, name) for name in unused_parameters(source))
+        undeclared.extend(
+            (relative, name) for name in undeclared_work_item_names(source)
+        )
         discards.extend((relative, name) for name in void_discards(source))
         permutations.extend(
             (relative, name, extent) for name, extent in kernel_permutations(source)
@@ -487,6 +540,7 @@ def survey(generated, device=False):
         "wrapped_helpers": wrappers,
         "unused_constants": constants,
         "unused_parameters": parameters,
+        "undeclared_work_item_names": undeclared,
         "void_discards": discards,
         "kernel_permutations": permutations,
         "lane_loop_invariants": invariants,
@@ -516,6 +570,9 @@ def main(argv=None):
         print("    %s:%d: %s" % (row[0], row[2], row[1]))
     print("unused parameters:           %d" % len(result["unused_parameters"]))
     for row in result["unused_parameters"][: args.limit]:
+        print("    %s: %s" % row)
+    print("undeclared loop names:       %d" % len(result["undeclared_work_item_names"]))
+    for row in result["undeclared_work_item_names"][: args.limit]:
         print("    %s: %s" % row)
     print("dead assignments:            %d" % len(result["dead"]))
     for row in result["dead"][: args.limit]:

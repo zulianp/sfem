@@ -30,7 +30,6 @@ namespace codegen {
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -39,7 +38,6 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
@@ -224,14 +222,14 @@ __global__ void navier_stokes_form_1_p_tri6_tri3_residual_affine_mesh_mixed_impl
     const s_t *bageom_streams[5];
     for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
       bageom_streams[geometry_stream] = ageom_stream<s_t, g_t>(
-          ne, affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+          affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
     }
     const s_t *badjugate[ND * ND];
     for (int component = 0; component < ND * ND; ++component) {
       badjugate[component] = bageom_streams[component];
     }
 
-    navier_stokes_form_1_p_d2_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS>(ne, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bcurrent, boutput);
+    navier_stokes_form_1_p_d2_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS>(0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bcurrent, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
@@ -407,7 +405,7 @@ __global__ void navier_stokes_form_1_p_tri6_tri3_residual_isoparametric_mesh_mix
     const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y()};
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-    navier_stokes_form_1_p_d2_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS>(ne, 1, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bcurrent, boutput);
+    navier_stokes_form_1_p_d2_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS>(1, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bcurrent, boutput);
 
     {
       s_t *const RSTR out = u_out[0];

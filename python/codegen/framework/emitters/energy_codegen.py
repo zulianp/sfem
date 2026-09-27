@@ -394,9 +394,10 @@ def _sfem_soa_affine_geometry_stream_lines(
                         stream,
                         ", ".join(("s_t", geometry_scalar_type) + _width_factors()),
                     ),
-                    "%s    ne, %s + evb, %s, std::is_same<%s, s_t>());"
+                    "%s    %s%s + evb, %s, std::is_same<%s, s_t>());"
                     % (
                         indent,
+                        _micro_kernel_count(),
                         abi_geometry_name(stream),
                         current_target().staged_buffer_address("b%s_data" % stream),
                         geometry_scalar_type,
@@ -422,7 +423,7 @@ def affine_geometry_stream_helper_lines(source_builder=None):
         "",
         _block_template_head("typename s_t", "typename g_t"),
         "%s const s_t *ageom_stream(" % inline_qualifier,
-        "    const int,",
+        *("    %s," % parameter for parameter in _count_params()),
         "    const g_t *const RSTR source,",
         "    s_t *const RSTR,",
         "    std::true_type) {",
@@ -431,7 +432,7 @@ def affine_geometry_stream_helper_lines(source_builder=None):
         "",
         _block_template_head("typename s_t", "typename g_t"),
         "%s const s_t *ageom_stream(" % inline_qualifier,
-        "    const int ne,",
+        *("    %s," % parameter for parameter in _count_params()),
         "    const g_t *const RSTR source,",
         "    s_t *const RSTR converted,",
         "    std::false_type) {",
@@ -447,12 +448,7 @@ def affine_geometry_stream_helper_lines(source_builder=None):
         )
     else:
         index = current_target().work_item_index()
-        lines.extend(
-            [
-                discard_unused("ne", indent="  "),
-                "  converted[%s] = s_t(source[%s]);" % (index, index),
-            ]
-        )
+        lines.append("  converted[%s] = s_t(source[%s]);" % (index, index))
     lines.extend(
         [
             "  return converted;",

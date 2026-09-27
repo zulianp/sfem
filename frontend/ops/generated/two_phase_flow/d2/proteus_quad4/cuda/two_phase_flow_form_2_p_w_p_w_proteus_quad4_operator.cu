@@ -23,7 +23,6 @@ namespace codegen {
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -32,7 +31,6 @@ __host__ __device__ __forceinline__ const s_t *ageom_stream(
 
 template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
@@ -479,7 +477,7 @@ __global__ void two_phase_flow_form_2_p_w_p_w_proteus_quad4_jacobian_action_a_ms
     const s_t *bageom_streams[5];
     for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
       bageom_streams[geometry_stream] = ageom_stream<s_t, g_t>(
-          ne, affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+          affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
     }
     const s_t *badjugate[4];
     for (int component = 0; component < 4; ++component) {
