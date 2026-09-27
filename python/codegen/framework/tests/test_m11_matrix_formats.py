@@ -485,11 +485,21 @@ class M11MatrixFormatAssemblyTest(unittest.TestCase):
             ).read_text()
             wrapper = (Path(out_dir) / "op/sfem_GeneratedTwoPhaseFlow.cpp").read_text()
             self.assertIn("static constexpr int NC = 2;", source)
-            self.assertIn("static constexpr int N_ROW_STREAMS = 3;", source)
+            # The column extent is the row stride and is read; the row extent is
+            # not, because a row is reached as `bi * NS + row_shape` and never
+            # as a count, so the prologue drops it.
+            self.assertNotIn("N_ROW_STREAMS", source)
             self.assertIn("static constexpr int N_COL_STREAMS = 3;", source)
-            self.assertIn("bcurrent[0 * NS + shape][0] = p_w[node * current_stride];", source)
-            self.assertIn("bcurrent[1 * NS + shape][0] = p_c[node * current_stride];", source)
-            self.assertIn("block[bi * NC + bj] += element_matrix[row_stream * N_COL_STREAMS + col_stream];", source)
+            # Flat staging and no lane slot: this assembly holds one element.
+            self.assertIn("bcurrent[shape * NC + 0] = p_w[node * current_stride];", source)
+            self.assertIn("bcurrent[shape * NC + 1] = p_c[node * current_stride];", source)
+            # And the row address is named once above the column loop rather
+            # than recomputed per entry.
+            self.assertIn(
+                "const s_t *const RSTR row = &element_matrix[(bi * NS + row_shape) * N_COL_STREAMS];",
+                source,
+            )
+            self.assertIn("block[bi * NC + bj] += row[bj * NS + col_shape];", source)
             self.assertNotIn("ROW_STREAMS[", source)
             self.assertNotIn("COL_STREAMS[", source)
             self.assertNotIn("ROW_TENSOR_STREAMS[", source)

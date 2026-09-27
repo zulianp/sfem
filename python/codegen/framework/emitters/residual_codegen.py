@@ -9202,7 +9202,12 @@ def _holding_one_element_crs_matrix_assembly_source(
         and not kernel_shape.needs_reference_basis
         and not tensor_product_geometry
         and builds_its_own_jacobian
-        else _EMPTY_REFERENCE_TABLES[bool(builds_its_own_jacobian)]
+        else _KEPT_REFERENCE_TABLES[
+            (
+                kernel_shape is not None and kernel_shape.needs_reference_basis,
+                bool(builds_its_own_jacobian),
+            )
+        ]
     )
     element_matrix_call_args = (
         list(_local_kernel_count_args(False, "1", "1"))
@@ -11151,7 +11156,23 @@ def _isoparametric_geometry_assignment_lines(dim, indent, rule=None):
 
 #: What survives when the kernel takes no reference basis: nothing at all where
 #: the loop maps no element either, and "whatever the rule carries" where it does.
-_EMPTY_REFERENCE_TABLES = {True: None, False: ()}
+#: What a mesh loop keeps when the gradient-only case below does not apply:
+#: every table the rule publishes (`None`), or none of them.
+#:
+#: Two things read these aliases -- the element-matrix kernel the loop calls,
+#: and the loop's own Jacobian -- so the key is both.  Keying on the Jacobian
+#: alone was wrong for an *affine* assembly, which maps nothing and therefore
+#: reads no gradient itself: a 6-point TRI3 was handed `shape`, `grad_ref_x`,
+#: `grad_ref_y` and `q_weight` that nothing in the function had declared, and
+#: the configuration that shows it -- `two_phase_flow` with the crs and bsr
+#: formats -- is not in the shipped tree, so no gate compiled it.
+_KEPT_REFERENCE_TABLES = {
+    # (the kernel reads the reference basis, the loop builds its own Jacobian)
+    (True, True): None,
+    (True, False): None,
+    (False, True): None,
+    (False, False): (),
+}
 
 
 def _mesh_reference_alias_lines(
