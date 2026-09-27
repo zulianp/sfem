@@ -2911,6 +2911,10 @@ def _simplex_weak_per_shape_tail(
         ),
     )
 
+    # Straight into the per-lane buffers.  This used to take delivery in
+    # `const s_t loperandN` and copy each one out a line later, which is the
+    # shape ISSUES.md item 5 quotes: a name that exists to be spelled again.
+    # The `destination` hook is what the other caller already uses for this.
     _append_transformed_loperand_lines(
         lines,
         material,
@@ -2918,9 +2922,9 @@ def _simplex_weak_per_shape_tail(
         "weak_mat_tmp",
         geometry_value,
         scalar_temporaries=True,
+        destination=lambda index: "loperand%d_values%s =" % (index, _wi_slot()),
+        indent="      ",
     )
-    for component in range(n_field_components * dim):
-        lines.append("      loperand%d_values%s = loperand%d;" % (component, _wi_slot(), component))
     lines.append("      }")
     op = output_assignment(form)
     output_streams = "out_streams" if use_stream_arrays else "weak_out_streams"

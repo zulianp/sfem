@@ -266,14 +266,10 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
     const s_t material1 = gu1*weak_mat_tmp3 + mu*(weak_mat_tmp2*weak_mat_tmp6 + weak_mat_tmp5*weak_mat_tmp7);
     const s_t material2 = gu2*weak_mat_tmp3 + mu*(weak_mat_tmp1*weak_mat_tmp8 + weak_mat_tmp5*weak_mat_tmp9);
     const s_t material3 = mu*(weak_mat_tmp2*weak_mat_tmp9 + weak_mat_tmp5*weak_mat_tmp8) + weak_mat_tmp3*weak_mat_tmp4;
-    const s_t loperand0 = qw * (material0 * adj_value0 + material1 * adj_value1);
-    const s_t loperand1 = qw * (material0 * adj_value2 + material1 * adj_value3);
-    const s_t loperand2 = qw * (material2 * adj_value0 + material3 * adj_value1);
-    const s_t loperand3 = qw * (material2 * adj_value2 + material3 * adj_value3);
-      loperand0_values = loperand0;
-      loperand1_values = loperand1;
-      loperand2_values = loperand2;
-      loperand3_values = loperand3;
+      loperand0_values = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1_values = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2_values = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3_values = qw * (material2 * adj_value2 + material3 * adj_value3);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];
@@ -455,14 +451,10 @@ static __host__ __device__ __forceinline__ void saint_venant_kirchhoff_d2_simple
     const s_t material1 = trial_grad0*weak_mat_tmp7 + trial_grad1*(lmbda*weak_mat_tmp12 + mu*(s_t(3)*weak_mat_tmp12 + weak_mat_tmp19) + weak_mat_tmp15) + trial_grad2*weak_mat_tmp16 + trial_grad3*weak_mat_tmp17;
     const s_t material2 = trial_grad0*weak_mat_tmp10 + trial_grad1*weak_mat_tmp16 + trial_grad2*(lmbda*weak_mat_tmp13 + mu*(s_t(3)*weak_mat_tmp13 + weak_mat_tmp19) + weak_mat_tmp15) + trial_grad3*weak_mat_tmp20;
     const s_t material3 = trial_grad0*weak_mat_tmp4 + trial_grad1*weak_mat_tmp17 + trial_grad2*weak_mat_tmp20 + trial_grad3*(lmbda*weak_mat_tmp18 + mu*(weak_mat_tmp14 + s_t(3)*weak_mat_tmp18) + weak_mat_tmp15);
-    const s_t loperand0 = qw * (material0 * adj_value0 + material1 * adj_value1);
-    const s_t loperand1 = qw * (material0 * adj_value2 + material1 * adj_value3);
-    const s_t loperand2 = qw * (material2 * adj_value0 + material3 * adj_value1);
-    const s_t loperand3 = qw * (material2 * adj_value2 + material3 * adj_value3);
-      loperand0_values = loperand0;
-      loperand1_values = loperand1;
-      loperand2_values = loperand2;
-      loperand3_values = loperand3;
+      loperand0_values = qw * (material0 * adj_value0 + material1 * adj_value1);
+      loperand1_values = qw * (material0 * adj_value2 + material1 * adj_value3);
+      loperand2_values = qw * (material2 * adj_value0 + material3 * adj_value1);
+      loperand3_values = qw * (material2 * adj_value2 + material3 * adj_value3);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];

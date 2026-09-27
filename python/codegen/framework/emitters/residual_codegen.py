@@ -5631,6 +5631,11 @@ def _work_item_loop_node(body):
     The body of this used to live here, and it was the only one of six
     re-spellings of the work-item loop that read the policy and returned a
     node.  It now lives on `TargetPlatform`, where the other five can reach it.
+
+    A temporary this body declares and copies once into a staged buffer is
+    fused by `SingleUseCopyPass`, not here: that shape occurs in bodies no
+    work-item loop wraps, so the pass sits at the one place every AST is
+    rendered rather than at each place one is built.
     """
     return _target().work_item_scope_node(body)
 

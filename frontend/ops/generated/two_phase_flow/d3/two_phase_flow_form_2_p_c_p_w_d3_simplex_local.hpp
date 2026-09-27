@@ -166,14 +166,10 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_jacobian_action
       const s_t residual_tmp15 = residual_tmp11*residual_tmp8;
       const s_t residual_tmp16 = residual_tmp12*residual_tmp8;
       const s_t residual_tmp17 = -K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2;
-      const s_t value_coeff1 = -porosity*residual_tmp4*residual_tmp5*residual_tmp6*(S_res + s_t(-1));
-      const s_t grad_coeff1_0 = residual_tmp13*(-residual_tmp11*residual_tmp9 + residual_tmp12*residual_tmp9);
-      const s_t grad_coeff1_1 = residual_tmp13*(-residual_tmp14*residual_tmp15 + residual_tmp14*residual_tmp16);
-      const s_t grad_coeff1_2 = residual_tmp13*(-residual_tmp15*residual_tmp17 + residual_tmp16*residual_tmp17);
-      value_coeff1_values[lane] = value_coeff1;
-      grad_coeff1_0_values[lane] = grad_coeff1_0;
-      grad_coeff1_1_values[lane] = grad_coeff1_1;
-      grad_coeff1_2_values[lane] = grad_coeff1_2;
+      value_coeff1_values[lane] = -porosity*residual_tmp4*residual_tmp5*residual_tmp6*(S_res + s_t(-1));
+      grad_coeff1_0_values[lane] = residual_tmp13*(-residual_tmp11*residual_tmp9 + residual_tmp12*residual_tmp9);
+      grad_coeff1_1_values[lane] = residual_tmp13*(-residual_tmp14*residual_tmp15 + residual_tmp14*residual_tmp16);
+      grad_coeff1_2_values[lane] = residual_tmp13*(-residual_tmp15*residual_tmp17 + residual_tmp16*residual_tmp17);
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
@@ -336,14 +332,10 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_jacobian_action
       const s_t residual_tmp15 = residual_tmp11*residual_tmp8;
       const s_t residual_tmp16 = residual_tmp12*residual_tmp8;
       const s_t residual_tmp17 = -K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2;
-      const s_t value_coeff1 = -porosity*residual_tmp4*residual_tmp5*residual_tmp6*(S_res + s_t(-1));
-      const s_t grad_coeff1_0 = residual_tmp13*(-residual_tmp11*residual_tmp9 + residual_tmp12*residual_tmp9);
-      const s_t grad_coeff1_1 = residual_tmp13*(-residual_tmp14*residual_tmp15 + residual_tmp14*residual_tmp16);
-      const s_t grad_coeff1_2 = residual_tmp13*(-residual_tmp15*residual_tmp17 + residual_tmp16*residual_tmp17);
-      value_coeff1_values[lane] = value_coeff1;
-      grad_coeff1_0_values[lane] = grad_coeff1_0;
-      grad_coeff1_1_values[lane] = grad_coeff1_1;
-      grad_coeff1_2_values[lane] = grad_coeff1_2;
+      value_coeff1_values[lane] = -porosity*residual_tmp4*residual_tmp5*residual_tmp6*(S_res + s_t(-1));
+      grad_coeff1_0_values[lane] = residual_tmp13*(-residual_tmp11*residual_tmp9 + residual_tmp12*residual_tmp9);
+      grad_coeff1_1_values[lane] = residual_tmp13*(-residual_tmp14*residual_tmp15 + residual_tmp14*residual_tmp16);
+      grad_coeff1_2_values[lane] = residual_tmp13*(-residual_tmp15*residual_tmp17 + residual_tmp16*residual_tmp17);
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
@@ -506,14 +498,10 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_tet4_jacobian_a
       const s_t residual_tmp15 = residual_tmp11*residual_tmp8;
       const s_t residual_tmp16 = residual_tmp12*residual_tmp8;
       const s_t residual_tmp17 = -K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2;
-      const s_t value_coeff1 = -porosity*residual_tmp4*residual_tmp5*residual_tmp6*(S_res + s_t(-1));
-      const s_t grad_coeff1_0 = residual_tmp13*(-residual_tmp11*residual_tmp9 + residual_tmp12*residual_tmp9);
-      const s_t grad_coeff1_1 = residual_tmp13*(-residual_tmp14*residual_tmp15 + residual_tmp14*residual_tmp16);
-      const s_t grad_coeff1_2 = residual_tmp13*(-residual_tmp15*residual_tmp17 + residual_tmp16*residual_tmp17);
-      value_coeff1_values[lane] = value_coeff1;
-      grad_coeff1_0_values[lane] = grad_coeff1_0;
-      grad_coeff1_1_values[lane] = grad_coeff1_1;
-      grad_coeff1_2_values[lane] = grad_coeff1_2;
+      value_coeff1_values[lane] = -porosity*residual_tmp4*residual_tmp5*residual_tmp6*(S_res + s_t(-1));
+      grad_coeff1_0_values[lane] = residual_tmp13*(-residual_tmp11*residual_tmp9 + residual_tmp12*residual_tmp9);
+      grad_coeff1_1_values[lane] = residual_tmp13*(-residual_tmp14*residual_tmp15 + residual_tmp14*residual_tmp16);
+      grad_coeff1_2_values[lane] = residual_tmp13*(-residual_tmp15*residual_tmp17 + residual_tmp16*residual_tmp17);
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
@@ -676,14 +664,10 @@ static SFEM_INLINE void two_phase_flow_form_2_p_c_p_w_d3_simplex_tet4_jacobian_a
       const s_t residual_tmp15 = residual_tmp11*residual_tmp8;
       const s_t residual_tmp16 = residual_tmp12*residual_tmp8;
       const s_t residual_tmp17 = -K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2;
-      const s_t value_coeff1 = -porosity*residual_tmp4*residual_tmp5*residual_tmp6*(S_res + s_t(-1));
-      const s_t grad_coeff1_0 = residual_tmp13*(-residual_tmp11*residual_tmp9 + residual_tmp12*residual_tmp9);
-      const s_t grad_coeff1_1 = residual_tmp13*(-residual_tmp14*residual_tmp15 + residual_tmp14*residual_tmp16);
-      const s_t grad_coeff1_2 = residual_tmp13*(-residual_tmp15*residual_tmp17 + residual_tmp16*residual_tmp17);
-      value_coeff1_values[lane] = value_coeff1;
-      grad_coeff1_0_values[lane] = grad_coeff1_0;
-      grad_coeff1_1_values[lane] = grad_coeff1_1;
-      grad_coeff1_2_values[lane] = grad_coeff1_2;
+      value_coeff1_values[lane] = -porosity*residual_tmp4*residual_tmp5*residual_tmp6*(S_res + s_t(-1));
+      grad_coeff1_0_values[lane] = residual_tmp13*(-residual_tmp11*residual_tmp9 + residual_tmp12*residual_tmp9);
+      grad_coeff1_1_values[lane] = residual_tmp13*(-residual_tmp14*residual_tmp15 + residual_tmp14*residual_tmp16);
+      grad_coeff1_2_values[lane] = residual_tmp13*(-residual_tmp15*residual_tmp17 + residual_tmp16*residual_tmp17);
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_grad_ref0 = grad_ref_x[q * NS + test];

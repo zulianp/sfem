@@ -282,14 +282,10 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_gradient_block(
     const s_t material1 = -gu2*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp8 + weak_mat_tmp7;
     const s_t material2 = -gu1*weak_mat_tmp6 + weak_mat_tmp4*weak_mat_tmp7 + weak_mat_tmp8;
     const s_t material3 = weak_mat_tmp0*weak_mat_tmp6 - weak_mat_tmp1*weak_mat_tmp4 + weak_mat_tmp5;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
-    const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-    const s_t loperand2 = qw * (material2 * adj_lane0 + material3 * adj_lane1);
-    const s_t loperand3 = qw * (material2 * adj_lane2 + material3 * adj_lane3);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
-      loperand2_values[lane] = loperand2;
-      loperand3_values[lane] = loperand3;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1);
+      loperand1_values[lane] = qw * (material0 * adj_lane2 + material1 * adj_lane3);
+      loperand2_values[lane] = qw * (material2 * adj_lane0 + material3 * adj_lane1);
+      loperand3_values[lane] = qw * (material2 * adj_lane2 + material3 * adj_lane3);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];
@@ -487,14 +483,10 @@ static SFEM_INLINE void neohookean_ogden_d2_simplex_apply_block(
     const s_t material1 = trial_grad0*weak_mat_tmp8 + trial_grad1*(lmbda*weak_mat_tmp19 + mu*weak_mat_tmp19 + mu - weak_mat_tmp16*weak_mat_tmp19) + trial_grad2*weak_mat_tmp24 + trial_grad3*weak_mat_tmp22;
     const s_t material2 = trial_grad0*weak_mat_tmp10 + trial_grad1*weak_mat_tmp24 + trial_grad2*(lmbda*weak_mat_tmp25 + mu*weak_mat_tmp25 + mu - weak_mat_tmp16*weak_mat_tmp25) + trial_grad3*weak_mat_tmp27;
     const s_t material3 = trial_grad0*weak_mat_tmp18 + trial_grad1*weak_mat_tmp22 + trial_grad2*weak_mat_tmp27 + trial_grad3*(lmbda*weak_mat_tmp28 + mu*weak_mat_tmp28 + mu - weak_mat_tmp16*weak_mat_tmp28);
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
-    const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-    const s_t loperand2 = qw * (material2 * adj_lane0 + material3 * adj_lane1);
-    const s_t loperand3 = qw * (material2 * adj_lane2 + material3 * adj_lane3);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
-      loperand2_values[lane] = loperand2;
-      loperand3_values[lane] = loperand3;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1);
+      loperand1_values[lane] = qw * (material0 * adj_lane2 + material1 * adj_lane3);
+      loperand2_values[lane] = qw * (material2 * adj_lane0 + material3 * adj_lane1);
+      loperand3_values[lane] = qw * (material2 * adj_lane2 + material3 * adj_lane3);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];

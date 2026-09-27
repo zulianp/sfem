@@ -156,14 +156,10 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d3_simplex_re
       const s_t residual_tmp4 = s_t(1) - S_res;
       const s_t residual_tmp5 = M_c/(R*T*Z);
       const s_t residual_tmp6 = p_c*residual_tmp5*pow(s_t(1) - residual_tmp3, C_ka1)*(pow(residual_tmp3, C_ka2) + s_t(-1))/mu_c;
-      const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
-      const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
-      const s_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
-      const s_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff1_values = value_coeff1;
-      grad_coeff1_0_values = grad_coeff1_0;
-      grad_coeff1_1_values = grad_coeff1_1;
-      grad_coeff1_2_values = grad_coeff1_2;
+      value_coeff1_values = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
+      grad_coeff1_0_values = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
+      grad_coeff1_1_values = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
+      grad_coeff1_2_values = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
@@ -314,14 +310,10 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d3_simplex_re
       const s_t residual_tmp4 = s_t(1) - S_res;
       const s_t residual_tmp5 = M_c/(R*T*Z);
       const s_t residual_tmp6 = p_c*residual_tmp5*pow(s_t(1) - residual_tmp3, C_ka1)*(pow(residual_tmp3, C_ka2) + s_t(-1))/mu_c;
-      const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
-      const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
-      const s_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
-      const s_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff1_values = value_coeff1;
-      grad_coeff1_0_values = grad_coeff1_0;
-      grad_coeff1_1_values = grad_coeff1_1;
-      grad_coeff1_2_values = grad_coeff1_2;
+      value_coeff1_values = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
+      grad_coeff1_0_values = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
+      grad_coeff1_1_values = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
+      grad_coeff1_2_values = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
@@ -475,14 +467,10 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d3_simplex_te
       const s_t residual_tmp4 = s_t(1) - S_res;
       const s_t residual_tmp5 = M_c/(R*T*Z);
       const s_t residual_tmp6 = p_c*residual_tmp5*pow(s_t(1) - residual_tmp3, C_ka1)*(pow(residual_tmp3, C_ka2) + s_t(-1))/mu_c;
-      const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
-      const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
-      const s_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
-      const s_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff1_values = value_coeff1;
-      grad_coeff1_0_values = grad_coeff1_0;
-      grad_coeff1_1_values = grad_coeff1_1;
-      grad_coeff1_2_values = grad_coeff1_2;
+      value_coeff1_values = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
+      grad_coeff1_0_values = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
+      grad_coeff1_1_values = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
+      grad_coeff1_2_values = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
@@ -633,14 +621,10 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_1_p_c_d3_simplex_te
       const s_t residual_tmp4 = s_t(1) - S_res;
       const s_t residual_tmp5 = M_c/(R*T*Z);
       const s_t residual_tmp6 = p_c*residual_tmp5*pow(s_t(1) - residual_tmp3, C_ka1)*(pow(residual_tmp3, C_ka2) + s_t(-1))/mu_c;
-      const s_t value_coeff1 = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
-      const s_t grad_coeff1_0 = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
-      const s_t grad_coeff1_1 = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
-      const s_t grad_coeff1_2 = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
-      value_coeff1_values = value_coeff1;
-      grad_coeff1_0_values = grad_coeff1_0;
-      grad_coeff1_1_values = grad_coeff1_1;
-      grad_coeff1_2_values = grad_coeff1_2;
+      value_coeff1_values = -porosity*residual_tmp5*(-p_c*(residual_tmp0*residual_tmp3 + residual_tmp4) + p_c_old*(residual_tmp0*pow(pow(residual_tmp1*(p_c_old - p_w_old), m) + s_t(1), residual_tmp2) + residual_tmp4))/dt;
+      grad_coeff1_0_values = residual_tmp6*(-K_0*p_c_grad_0 - K_1*p_c_grad_1 - K_2*p_c_grad_2);
+      grad_coeff1_1_values = residual_tmp6*(-K_3*p_c_grad_0 - K_4*p_c_grad_1 - K_5*p_c_grad_2);
+      grad_coeff1_2_values = residual_tmp6*(-K_6*p_c_grad_0 - K_7*p_c_grad_1 - K_8*p_c_grad_2);
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_grad_ref0 = grad_ref_x[q * NS + test];

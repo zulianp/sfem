@@ -53,12 +53,9 @@ static SFEM_INLINE void body_force_d3_simplex_residual_block(
     s_t value_coeff2_values[VS];
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
-      const s_t value_coeff0 = -density*g0;
-      const s_t value_coeff1 = -density*g1;
-      const s_t value_coeff2 = -density*g2;
-      value_coeff0_values[lane] = value_coeff0;
-      value_coeff1_values[lane] = value_coeff1;
-      value_coeff2_values[lane] = value_coeff2;
+      value_coeff0_values[lane] = -density*g0;
+      value_coeff1_values[lane] = -density*g1;
+      value_coeff2_values[lane] = -density*g2;
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_value = shape[q * NS + test];
@@ -97,12 +94,9 @@ static SFEM_INLINE void body_force_d3_simplex_residual_block_contiguous(
     s_t value_coeff2_values[VS];
     #pragma omp simd
     for (int lane = 0; lane < ne; ++lane) {
-      const s_t value_coeff0 = -density*g0;
-      const s_t value_coeff1 = -density*g1;
-      const s_t value_coeff2 = -density*g2;
-      value_coeff0_values[lane] = value_coeff0;
-      value_coeff1_values[lane] = value_coeff1;
-      value_coeff2_values[lane] = value_coeff2;
+      value_coeff0_values[lane] = -density*g0;
+      value_coeff1_values[lane] = -density*g1;
+      value_coeff2_values[lane] = -density*g2;
     }
     for (int test = 0; test < NS; ++test) {
       const s_t test_value = shape[q * NS + test];

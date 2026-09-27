@@ -305,14 +305,10 @@ static SFEM_INLINE void modified_mooney_rivlin_d2_simplex_gradient_block(
     const s_t material1 = c1*(gu2*weak_mat_tmp10 + weak_mat_tmp13*weak_mat_tmp5) + c2*(gu2*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu1*weak_mat_tmp9 + s_t(2)*gu1 - weak_mat_tmp12*weak_mat_tmp6 - weak_mat_tmp13*weak_mat_tmp8)) - gu2*weak_mat_tmp4;
     const s_t material2 = c1*(gu1*weak_mat_tmp10 + weak_mat_tmp15*weak_mat_tmp5) + c2*(gu1*weak_mat_tmp14 + weak_mat_tmp11*(s_t(2)*gu2*weak_mat_tmp9 + s_t(2)*gu2 - weak_mat_tmp12*weak_mat_tmp16 - weak_mat_tmp15*weak_mat_tmp7)) - gu1*weak_mat_tmp4;
     const s_t material3 = c1*(s_t(2)*weak_mat_tmp0*weak_mat_tmp5 - weak_mat_tmp10*weak_mat_tmp2) + c2*(weak_mat_tmp11*(s_t(2)*gu3 - weak_mat_tmp12*weak_mat_tmp15 - weak_mat_tmp16*weak_mat_tmp8 + weak_mat_tmp16*weak_mat_tmp9 + s_t(2)) - weak_mat_tmp14*weak_mat_tmp2) + weak_mat_tmp2*weak_mat_tmp4;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
-    const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-    const s_t loperand2 = qw * (material2 * adj_lane0 + material3 * adj_lane1);
-    const s_t loperand3 = qw * (material2 * adj_lane2 + material3 * adj_lane3);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
-      loperand2_values[lane] = loperand2;
-      loperand3_values[lane] = loperand3;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1);
+      loperand1_values[lane] = qw * (material0 * adj_lane2 + material1 * adj_lane3);
+      loperand2_values[lane] = qw * (material2 * adj_lane0 + material3 * adj_lane1);
+      loperand3_values[lane] = qw * (material2 * adj_lane2 + material3 * adj_lane3);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];
@@ -560,14 +556,10 @@ static SFEM_INLINE void modified_mooney_rivlin_d2_simplex_apply_block(
     const s_t material1 = trial_grad0*weak_mat_tmp44 + trial_grad1*(c1*(weak_mat_tmp16*weak_mat_tmp8 + weak_mat_tmp59) + c2*(gu2*weak_mat_tmp30*weak_mat_tmp41 + weak_mat_tmp22*(s_t(2)*weak_mat_tmp8 + s_t(2)) + weak_mat_tmp33*weak_mat_tmp8) - weak_mat_tmp58*weak_mat_tmp7 + weak_mat_tmp58) + trial_grad2*weak_mat_tmp64 + trial_grad3*weak_mat_tmp62;
     const s_t material2 = trial_grad0*weak_mat_tmp51 + trial_grad1*weak_mat_tmp64 + trial_grad2*(c1*(weak_mat_tmp11*weak_mat_tmp16 + weak_mat_tmp59) + c2*(gu1*weak_mat_tmp30*weak_mat_tmp50 + weak_mat_tmp11*weak_mat_tmp33 + weak_mat_tmp22*(s_t(2)*weak_mat_tmp11 + s_t(2))) - weak_mat_tmp65*weak_mat_tmp7 + weak_mat_tmp65) + trial_grad3*weak_mat_tmp67;
     const s_t material3 = trial_grad0*weak_mat_tmp57 + trial_grad1*weak_mat_tmp62 + trial_grad2*weak_mat_tmp67 + trial_grad3*(c1*(weak_mat_tmp16*weak_mat_tmp9 + weak_mat_tmp21) + c2*(weak_mat_tmp22*(s_t(2)*weak_mat_tmp9 + s_t(2)) - weak_mat_tmp3*weak_mat_tmp30*weak_mat_tmp55 + weak_mat_tmp33*weak_mat_tmp9) - weak_mat_tmp68*weak_mat_tmp7 + weak_mat_tmp68);
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
-    const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-    const s_t loperand2 = qw * (material2 * adj_lane0 + material3 * adj_lane1);
-    const s_t loperand3 = qw * (material2 * adj_lane2 + material3 * adj_lane3);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
-      loperand2_values[lane] = loperand2;
-      loperand3_values[lane] = loperand3;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1);
+      loperand1_values[lane] = qw * (material0 * adj_lane2 + material1 * adj_lane3);
+      loperand2_values[lane] = qw * (material2 * adj_lane0 + material3 * adj_lane1);
+      loperand3_values[lane] = qw * (material2 * adj_lane2 + material3 * adj_lane3);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];

@@ -254,10 +254,8 @@ static SFEM_INLINE void laplace_d2_simplex_gradient_block(
     const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane3) * idet;
     const s_t material0 = gu0*kappa;
     const s_t material1 = gu1*kappa;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
-    const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1);
+      loperand1_values[lane] = qw * (material0 * adj_lane2 + material1 * adj_lane3);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];
@@ -391,10 +389,8 @@ static SFEM_INLINE void laplace_d2_simplex_apply_block(
     const s_t trial_grad1 = (grad_h_ref0 * adj_lane1 + grad_h_ref1 * adj_lane3) * idet;
     const s_t material0 = kappa*trial_grad0;
     const s_t material1 = kappa*trial_grad1;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1);
-    const s_t loperand1 = qw * (material0 * adj_lane2 + material1 * adj_lane3);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1);
+      loperand1_values[lane] = qw * (material0 * adj_lane2 + material1 * adj_lane3);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];

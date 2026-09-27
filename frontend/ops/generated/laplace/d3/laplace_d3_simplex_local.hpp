@@ -320,12 +320,9 @@ static SFEM_INLINE void laplace_d3_simplex_gradient_block(
     const s_t material0 = gu0*kappa;
     const s_t material1 = gu1*kappa;
     const s_t material2 = gu2*kappa;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
-    const s_t loperand1 = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
-    const s_t loperand2 = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
-      loperand2_values[lane] = loperand2;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
+      loperand1_values[lane] = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
+      loperand2_values[lane] = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];
@@ -503,12 +500,9 @@ static SFEM_INLINE void laplace_d3_simplex_apply_block(
     const s_t material0 = kappa*trial_grad0;
     const s_t material1 = kappa*trial_grad1;
     const s_t material2 = kappa*trial_grad2;
-    const s_t loperand0 = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
-    const s_t loperand1 = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
-    const s_t loperand2 = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
-      loperand0_values[lane] = loperand0;
-      loperand1_values[lane] = loperand1;
-      loperand2_values[lane] = loperand2;
+      loperand0_values[lane] = qw * (material0 * adj_lane0 + material1 * adj_lane1 + material2 * adj_lane2);
+      loperand1_values[lane] = qw * (material0 * adj_lane3 + material1 * adj_lane4 + material2 * adj_lane5);
+      loperand2_values[lane] = qw * (material0 * adj_lane6 + material1 * adj_lane7 + material2 * adj_lane8);
       }
       for (int shape = 0; shape < NS; ++shape) {
         const s_t tref0 = grad_ref_x[q * NS + shape];
