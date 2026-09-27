@@ -3153,7 +3153,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     for row, field in enumerate(system.fields):
         value = _VALUE_COEFFICIENT_TERM[
             bool(dependencies.value_coefficients[row])
-        ](row)
+        ](row, None)
         lines.append(
             ('      %s_value_coeff_q' + _ptr() + ' = %s;') % (field.name, value)
         )
@@ -3890,9 +3890,24 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
                 )
             )
 
-    nodes.append(BufferDeclNode("s_t", "value_coeff", (_width_product("NC", "NQ"),)))
+    # One set per column pass.  The three passes used to take turns through one
+    # buffer, which is what forced a quadrature loop each; sharing the loop means
+    # all of them are written before any is integrated.
     nodes.extend(
-        BufferDeclNode("s_t", "grad_coeff_ref", (_width_product("NC", "NQ", "ND"),))
+        BufferDeclNode(
+            "s_t",
+            column_coefficient("value_coeff", column),
+            (_width_product("NC", "NQ"),),
+        )
+        for column in range(len(block.column_fields))
+    )
+    nodes.extend(
+        BufferDeclNode(
+            "s_t",
+            column_coefficient("grad_coeff_ref", column),
+            (_width_product("NC", "NQ", "ND"),),
+        )
+        for column in range(len(block.column_fields))
         for quantity in quantities
         if quantity == "gradient"
     )
@@ -4010,61 +4025,72 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         )
     tangent_index = {target: index for index, target in enumerate(tangent_targets)}
 
-    for trial_component in block.column_fields:
-        quadrature_body = list(_tensor_index_nodes("q", "NQ", dim))
+    # One trial loop for all the column fields, not one loop each.  The preamble
+    # -- the tensor indices, the quadrature weight, the adjugate offsets, the
+    # trial function's reference gradient and its physical gradient with three
+    # divisions by the determinant -- does not depend on which column is being
+    # built, and a loop per column recomputed every bit of it.  That is
+    # ISSUES.md item 7: "a big chunk of the block is also not depending on the
+    # trial function".
+    #
+    # What has to stay per column is the coefficient each pass contracts into,
+    # because all of them are now written during one quadrature loop and read by
+    # the integrations after it; `column_coefficient` carries that.
+    quadrature_body = list(_tensor_index_nodes("q", "NQ", dim))
+    quadrature_body.append(
+        BufferDeclNode(
+            "const s_t",
+            "qw",
+            (),
+            expr_ref(
+                " * ".join(
+                    "q_weight_1d[q_%s]" % letter
+                    for letter in _TENSOR_AXES[:dim]
+                )
+            ),
+        )
+    )
+    lane_body = []
+    if uses_determinant:
         quadrature_body.append(
             BufferDeclNode(
-                "const s_t",
-                "qw",
-                (),
-                expr_ref(
-                    " * ".join(
-                        "q_weight_1d[q_%s]" % letter
-                        for letter in _TENSOR_AXES[:dim]
-                    )
-                ),
+                "const s_t *const RSTR", "det_q", (),
+                expr_ref("determinant + q * geometry_stride"),
             )
         )
-        lane_body = []
-        if uses_determinant:
-            quadrature_body.append(
-                BufferDeclNode(
-                    "const s_t *const RSTR", "det_q", (),
-                    expr_ref("determinant + q * geometry_stride"),
-                )
-            )
-            lane_body.append(
-                BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
-            )
-        for i in _adjugate_components(dependencies, dim):
-            quadrature_body.append(
-                BufferDeclNode(
-                    "const s_t *const RSTR", "adj_q%d" % i, (),
-                    expr_ref("adjugate[%d] + q * geometry_stride" % i),
-                )
-            )
-            lane_body.append(
-                BufferDeclNode(
-                    "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
-                )
-            )
-        # No state here any more: this loop contracts the staged tangent with
-        # the trial function, and the tangent is all the state it needs.
-        #
-        # The reference half is the product of one-dimensional factors at this
-        # point and this trial function -- both outer -- so it is named at
-        # quadrature scope and the vectorised loop only pushes it forward.
-        trial_reference, trial_physical = _basis_gradient_split_nodes(
-            "trial_grad",
-            "trial",
-            dim,
-            directions=tuple(live_gradient_directions(dependencies, dim)),
-            tensor_product=True,
+        lane_body.append(
+            BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
         )
-        quadrature_body.extend(trial_reference)
-        lane_body.extend(trial_physical)
-        lane_body.extend(trial_value_nodes)
-        directions = _trial_directions(dependencies, dim, bool(trial_value_nodes))
+    for i in _adjugate_components(dependencies, dim):
+        quadrature_body.append(
+            BufferDeclNode(
+                "const s_t *const RSTR", "adj_q%d" % i, (),
+                expr_ref("adjugate[%d] + q * geometry_stride" % i),
+            )
+        )
+        lane_body.append(
+            BufferDeclNode(
+                "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
+            )
+        )
+    # No state here any more: this loop contracts the staged tangent with
+    # the trial function, and the tangent is all the state it needs.
+    #
+    # The reference half is the product of one-dimensional factors at this
+    # point and this trial function -- both outer -- so it is named at
+    # quadrature scope and the vectorised loop only pushes it forward.
+    trial_reference, trial_physical = _basis_gradient_split_nodes(
+        "trial_grad",
+        "trial",
+        dim,
+        directions=tuple(live_gradient_directions(dependencies, dim)),
+        tensor_product=True,
+    )
+    quadrature_body.extend(trial_reference)
+    lane_body.extend(trial_physical)
+    lane_body.extend(trial_value_nodes)
+    directions = _trial_directions(dependencies, dim, bool(trial_value_nodes))
+    for column, trial_component in enumerate(block.column_fields):
         for target_suffix, wanted in _tangent_targets_for_column(
             block, dependencies, dim
         ):
@@ -4093,7 +4119,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
             lane_body.append(
                 BufferDeclNode(
                     "const s_t",
-                    wanted,
+                    column_coefficient(wanted, column),
                     (),
                     expr_ref(" + ".join(terms) if terms else "s_t(0)"),
                 )
@@ -4101,66 +4127,82 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         for row in block.row_fields:
             value = _VALUE_COEFFICIENT_TERM[
                 bool(dependencies.value_coefficients[row])
-            ](row)
+            ](row, column)
+            value_pointer = column_coefficient("value_coeff_q%d" % row, column)
             quadrature_body.append(
                 BufferDeclNode(
-                    "s_t *const RSTR", "value_coeff_q%d" % row, (),
+                    "s_t *const RSTR", value_pointer, (),
                     expr_ref(
-                        "&value_coeff[%s]"
-                        % _width_product(c_group(c_sum(c_product(row, "NQ"), "q")))
+                        "&%s[%s]"
+                        % (
+                            column_coefficient("value_coeff", column),
+                            _width_product(
+                                c_group(c_sum(c_product(row, "NQ"), "q"))
+                            ),
+                        )
                     ),
                 )
             )
             lane_body.append(
-                AssignmentNode(
-                    expr_ref(('value_coeff_q%d' + _ptr()) % row), expr_ref(value)
-                )
+                AssignmentNode(expr_ref(value_pointer + _ptr()), expr_ref(value))
             )
             for k in contracted_gradient_components(dependencies, dim):
                 terms = [
-                    "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
+                    "adj%d * %s"
+                    % (
+                        k * dim + d,
+                        column_coefficient("grad_coeff%d_%d" % (row, d), column),
+                    )
                     for d in range(dim)
                     if dependencies.gradient_coefficients[row][d]
                 ]
                 value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
+                gradient_pointer = column_coefficient(
+                    "grad_coeff_ref_q%d_%d" % (row, k), column
+                )
                 quadrature_body.append(
                     BufferDeclNode(
-                        "s_t *const RSTR", "grad_coeff_ref_q%d_%d" % (row, k), (),
+                        "s_t *const RSTR", gradient_pointer, (),
                         expr_ref(
-                            "&grad_coeff_ref[%s]"
-                            % _width_product(
-                                c_group(
-                                    c_sum(
-                                        c_product(
-                                            c_group(c_sum(c_product(row, "NQ"), "q")),
-                                            "ND",
-                                        ),
-                                        k,
+                            "&%s[%s]"
+                            % (
+                                column_coefficient("grad_coeff_ref", column),
+                                _width_product(
+                                    c_group(
+                                        c_sum(
+                                            c_product(
+                                                c_group(
+                                                    c_sum(c_product(row, "NQ"), "q")
+                                                ),
+                                                "ND",
+                                            ),
+                                            k,
+                                        )
                                     )
-                                )
+                                ),
                             )
                         ),
                     )
                 )
                 lane_body.append(
                     AssignmentNode(
-                        expr_ref(('grad_coeff_ref_q%d_%d' + _ptr()) % (row, k)),
-                        expr_ref(value),
+                        expr_ref(gradient_pointer + _ptr()), expr_ref(value)
                     )
                 )
-        quadrature_body.append(_work_item_loop_node(lane_body))
+    quadrature_body.append(_work_item_loop_node(lane_body))
 
-        trial_body = list(_tensor_index_nodes("trial", "NS", dim))
-        quadrature = iterator("q", "int")
-        trial_body.append(
-            LoopNode(
-                LoopKind.QUADRATURE,
-                quadrature,
-                iteration_range(0, expr_ref("NQ", "quadrature_count")),
-                pre_increment(quadrature),
-                body=tuple(quadrature_body),
-            )
+    trial_body = list(_tensor_index_nodes("trial", "NS", dim))
+    quadrature = iterator("q", "int")
+    trial_body.append(
+        LoopNode(
+            LoopKind.QUADRATURE,
+            quadrature,
+            iteration_range(0, expr_ref("NQ", "quadrature_count")),
+            pre_increment(quadrature),
+            body=tuple(quadrature_body),
         )
+    )
+    for column, trial_component in enumerate(block.column_fields):
         trial_body.append(
             _shape_loop_node(
                 "out_shape",
@@ -4180,14 +4222,13 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
             CallNode(
                 _micro_kernel(entry_point % ""),
                 tuple(
-                    "column" if argument == "output" else argument
-                    for argument in arguments
+                    _integrate_argument(argument, column) for argument in arguments
                 ),
                 templates,
                 wrap_arguments=True,
             )
         )
-        nodes.append(_shape_loop_node("trial", trial_body))
+    nodes.append(_shape_loop_node("trial", trial_body))
     return tuple(nodes)
 
 
@@ -5998,7 +6039,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
     for row in range(n_fields):
         value = _VALUE_COEFFICIENT_TERM[
             bool(dependencies.value_coefficients[row])
-        ](row)
+        ](row, None)
         quadrature_body.append(
             BufferDeclNode(
                 "s_t *const RSTR", "value_coeff_q%d" % row, (),
@@ -7890,8 +7931,53 @@ _MIXED_TEST_FACTOR = {
 #: needs, so unlike the staging above this cannot be an absent entry -- a row
 #: with no value coefficient writes a zero rather than writing nothing.
 _VALUE_COEFFICIENT_TERM = {
-    True: lambda row: "qw * det * value_coeff%d" % row,
-    False: lambda row: "s_t(0)",
+    True: lambda row, column: "qw * det * %s" % column_coefficient(
+        "value_coeff%d" % row, column
+    ),
+    False: lambda row, column: "s_t(0)",
+}
+
+
+def column_coefficient(coefficient, column):
+    """One column pass's copy of a tangent coefficient.
+
+    The tensor-product element matrix used to open one trial loop per column
+    field, and each of them recomputed the whole trial-independent preamble: the
+    tensor indices, the quadrature weight, nine adjugate offsets, the trial
+    function's reference gradient, and its physical gradient with three
+    divisions by the determinant.  None of that depends on the column, so the
+    three loops are now one and share it.
+
+    What does depend on the column is the coefficient each pass contracts into,
+    so the name carries it.  `None` means there is only one pass and the name
+    stays as it was, which is what every other caller wants.
+    """
+    return _COLUMN_COEFFICIENT[column is None](coefficient, column)
+
+
+_COLUMN_COEFFICIENT = {
+    True: lambda coefficient, column: coefficient,
+    False: lambda coefficient, column: "%s_c%d" % (coefficient, column),
+}
+
+#: Which of a tensor integration's arguments belong to one column pass.  The
+#: output is the matrix column this pass fills; the two coefficient buffers are
+#: what it filled during the shared quadrature loop.  Everything else -- the
+#: work-item count and the one-dimensional tables -- is the element's.
+_INTEGRATE_COLUMN_ARGUMENTS = frozenset(("value_coeff", "grad_coeff_ref"))
+
+
+def _integrate_argument(argument, column):
+    return _INTEGRATE_ARGUMENT[argument in _INTEGRATE_COLUMN_ARGUMENTS](
+        argument, column
+    )
+
+
+_INTEGRATE_ARGUMENT = {
+    True: lambda argument, column: column_coefficient(argument, column),
+    False: lambda argument, column: (
+        "column" if argument == "output" else argument
+    ),
 }
 
 
