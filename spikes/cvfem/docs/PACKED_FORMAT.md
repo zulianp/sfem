@@ -134,6 +134,57 @@ Using the 65,536 constant to size shared memory would ask for 16 MB per block.
 `pack_idx_t` also caps how large a pack may be: a pack may never reach more than
 `max()+1` distinct nodes, which is what bounds `elements_per_pack`.
 
+## 6b. What the format costs in memory — measured
+
+`cvfem_hex8_ns_upwind_bench --mesh-footprint` prints every array's own `nbytes()` and exits.
+Nothing in its output is `n_elements * nodes_per_element * sizeof(index)` worked out by hand,
+which matters because the two quantities that decide the answer have no closed form: the ghost
+list length and the number of reduction-graph rows depend on how the pack boundaries happen to
+cut the mesh. An arithmetic model that guessed both from the mean node count per pack was about
+20% out.
+
+Grace, HEX8 cube at n=128 (2,146,689 nodes, 2,097,152 elements, 8,586,756 dof), pack size 1024,
+bytes per dof:
+
+| array | B/dof |
+|---|---:|
+| `standard.elements` (8 x `idx_t`) | 7.82 |
+| `packed.elements` (8 x `pack_idx_t`) | 3.91 |
+| `packed.ghost_idx` | 0.31 |
+| `packed.ghost_reduce_ptr` | 0.52 |
+| `packed.ghost_reduce_idx` | 0.63 |
+| `packed.ghost_reduce_dest` | 0.26 |
+| `packed.node_map` | 1.00 |
+| `owned_nodes_ptr`, `n_shared`, `ghost_ptr` | 0.01 |
+| **packed total** | **6.64** |
+
+So the packed topology is **85%** of the standard one. The 16-bit index halves the connectivity
+exactly, as it must, and the ownership and ghost arrays spend part of that back. Coordinates are
+byte-for-byte identical in both and are excluded; including them gives 9.64 against 10.82, or
+89%.
+
+Two items in the packed total are avoidable, and together they are most of the distance to the
+~60% the format costs in principle:
+
+- `node_map`, 1.00 B/dof, is the permutation between packed and unpacked numbering. The apply
+  never reads it, and neither does a solver whose fields live in packed numbering throughout.
+  Excluding it gives 72%.
+- `ghost_reduce_ptr` and `ghost_reduce_idx` are `ptrdiff_t` while indexing fewer than a million
+  entries — eight bytes per index with three orders of magnitude to spare. Narrowing them to a
+  32-bit count saves a further 0.58 B/dof and gives **65%**, or **58%** at 4096 elements per
+  pack, where there are proportionally fewer ghosts.
+
+The narrowing has **not** been done. Both arrays are public smesh API consumed by several
+hundred generated operator files across the codegen framework as well as the CUDA paths, so
+changing their width is a submodule API change and belongs with that work, not here. It would
+also cut the reduction pass's read traffic, so it is a throughput item as well as a footprint
+one.
+
+The ghost count, and therefore the whole overhead, falls as the pack size rises: 839,295 ghost
+entries at 512 elements per pack against 294,783 at 8192. The footprint and the throughput
+sweep of `docs/CVFEM_Performance.md` therefore do not want the same pack size, and the
+footprint figures above are quoted at the shipped default rather than at the smallest total.
+
 ## 7. Element connectivity
 
 `elements(block)` is SoA: `pack_idx_t **`, extent `[nodes_per_element][n_elements]`,

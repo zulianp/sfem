@@ -309,7 +309,39 @@ namespace sfem {
 
         // Affine packing width, mirroring SFEM_PACK_SIZE in the driver. 0 selects the
         // atomic path. Ignored for isoparametric geometry, which has no packed kernel.
-        int pack_size{2048};
+        // DEFAULT 1024, NOT 2048, AND THE CHOICE IS MEASURED.
+        //
+        // A pack is one OpenMP iteration, so the pack count IS the available parallelism, and
+        // the pack size is what sets it. Swept on a Grace socket at 72 threads, best of three
+        // passes (one pass cannot separate the band -- the same configuration read 1333.6 and
+        // 842.0 MDOF/s on consecutive single passes, while best-of-three reproduces to 0.5%):
+        //
+        //   n = 128, 2,097,152 elements        n = 64, 262,144 elements
+        //   pack  packs  /thread  res   jac    pack  packs  /thread  res    jac
+        //    256   8192    113.8 1290   844     256   1024     14.2 1392   1052
+        //   1024   2048     28.4 1316   846    1024    256      3.6 1330    994
+        //   2048   1024     14.2 1267   831    2048    128      1.8 1350    981
+        //   4096    512      7.1 1189   779    4096     64      0.9 1325    922
+        //   8192    256      3.6 1135   727    8192     32      0.4  706    504
+        //
+        // 1024 is the best row at n = 128 on both operators and within 1.5% of the best at
+        // n = 64, so the larger problem decides. 2048 gave up 3.9% of the residual and 1.8% of
+        // the Jacobian action at the saturating size for nothing.
+        //
+        // THE LAST ROW IS THE REAL POINT. 8192 elements per pack is what the packer picks on
+        // its own, because pack_idx_t is uint16_t and it sizes packs against the 65536-node
+        // ceiling using the pessimistic bound n_elements * nodes_per_element, which credits no
+        // sharing. At n = 64 that leaves THIRTY-TWO packs for 72 threads -- fewer than half the
+        // cores can hold work -- and throughput halves. The ceiling is a correctness bound on
+        // the index type and it knows nothing about how many cores the machine has, so it is
+        // the wrong constraint to select a default with.
+        //
+        // What the data actually argues for is a default derived from the thread count rather
+        // than a constant: both winning rows have at least fourteen packs per thread, and every
+        // row that falls below one pack per thread collapses. That is left as a follow-up
+        // because it changes behaviour on every machine, whereas this constant is measured on
+        // the one the numbers come from.
+        int pack_size{1024};
 
     private:
         // Shared by clone() and derefine_op(): same parameters, different space.

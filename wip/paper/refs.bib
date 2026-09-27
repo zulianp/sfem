@@ -1,0 +1,193 @@
+% Bibliography for the packed-format paper.
+%
+% There was no shared .bib in the repository; this is the first one.
+%
+% PROVENANCE MATTERS HERE. Every entry below is transcribed from the inline thebibliography in
+% docs/partial_assembly.tex, which is the only vetted reference list in the tree. Nothing has
+% been written from memory: a bibliography is exactly the place where a plausible-looking
+% invented volume or page range survives review and then embarrasses the authors, so entries
+% this paper needs but the repository cannot supply are listed as TODOs at the bottom rather
+% than guessed at.
+
+% ---------------------------------------------------------------------------------- matrix-free
+@article{KronbichlerKormann2012,
+  author  = {Kronbichler, Martin and Kormann, Katharina},
+  title   = {A generic interface for parallel cell-based finite element operator application},
+  journal = {Computers \& Fluids},
+  volume  = {63},
+  pages   = {135--147},
+  year    = {2012},
+}
+
+@article{KronbichlerKormann2019,
+  author  = {Kronbichler, Martin and Kormann, Katharina},
+  title   = {Fast matrix-free evaluation of discontinuous {G}alerkin finite element operators},
+  journal = {ACM Transactions on Mathematical Software},
+  volume  = {45},
+  number  = {3},
+  pages   = {29},
+  year    = {2019},
+}
+
+@article{Brown2010,
+  author  = {Brown, Jed},
+  title   = {Efficient nonlinear solvers for nodal high-order finite elements in {3D}},
+  journal = {Journal of Scientific Computing},
+  volume  = {45},
+  number  = {1--3},
+  pages   = {48--63},
+  year    = {2010},
+}
+
+@article{Kolev2021,
+  author  = {Kolev, Tzanio and others},
+  title   = {Efficient exascale discretizations: High-order finite element methods},
+  journal = {International Journal of High Performance Computing Applications},
+  volume  = {35},
+  number  = {6},
+  pages   = {527--552},
+  year    = {2021},
+}
+
+@article{MFEM2021,
+  author  = {Anderson, Robert and others},
+  title   = {{MFEM}: A modular finite element methods library},
+  journal = {Computers \& Mathematics with Applications},
+  volume  = {81},
+  pages   = {42--74},
+  year    = {2021},
+}
+
+@article{libCEED2021,
+  author  = {Brown, Jed and others},
+  title   = {{libCEED}: Fast algebra for high-order element-based discretizations},
+  journal = {Journal of Open Source Software},
+  volume  = {6},
+  number  = {63},
+  pages   = {2945},
+  year    = {2021},
+}
+
+% ------------------------------------------------------------------------ sum factorisation
+@article{Orszag1980,
+  author  = {Orszag, Steven A.},
+  title   = {Spectral methods for problems in complex geometries},
+  journal = {Journal of Computational Physics},
+  volume  = {37},
+  number  = {1},
+  pages   = {70--92},
+  year    = {1980},
+}
+
+@book{DevilleFischerMund2002,
+  author    = {Deville, Michel O. and Fischer, Paul F. and Mund, Ernest H.},
+  title     = {High-Order Methods for Incompressible Fluid Flow},
+  publisher = {Cambridge University Press},
+  year      = {2002},
+}
+
+% ---------------------------------------------------------------------- generated assembly
+@article{Firedrake2016,
+  author  = {Rathgeber, Florian and others},
+  title   = {{Firedrake}: Automating the finite element method by composing abstractions},
+  journal = {ACM Transactions on Mathematical Software},
+  volume  = {43},
+  number  = {3},
+  pages   = {24},
+  year    = {2016},
+}
+
+@article{KirbyLogg2006,
+  author  = {Kirby, Robert C. and Logg, Anders},
+  title   = {A compiler for variational forms},
+  journal = {ACM Transactions on Mathematical Software},
+  volume  = {32},
+  number  = {3},
+  pages   = {417--444},
+  year    = {2006},
+}
+
+% ------------------------------------------------- resolving the scatter: colouring vs atomics
+% The closest prior art to this paper's contribution. Verified against the publisher record
+% rather than recalled: IJNME 85(5):640-669, 2011.
+@article{CeckaLewDarve2011,
+  author  = {Cecka, Cris and Lew, Adrian J. and Darve, Eric},
+  title   = {Assembly of finite element methods on graphics processors},
+  journal = {International Journal for Numerical Methods in Engineering},
+  volume  = {85},
+  number  = {5},
+  pages   = {640--669},
+  year    = {2011},
+}
+
+% ------------------------------------------------------ locality by spatial (re)ordering
+@book{Bader2013,
+  author    = {Bader, Michael},
+  title     = {Space-Filling Curves: An Introduction with Applications in Scientific Computing},
+  series    = {Texts in Computational Science and Engineering},
+  volume    = {9},
+  publisher = {Springer},
+  year      = {2013},
+}
+
+@article{Zumbusch2001,
+  author  = {Zumbusch, Gerhard W.},
+  title   = {On the quality of space-filling curve induced partitions},
+  journal = {Zeitschrift f\"ur Angewandte Mathematik und Mechanik},
+  volume  = {81},
+  pages   = {25--28},
+  year    = {2001},
+}
+
+% ------------------------------------------------------------------- reproducible summation
+% The contrast this paper needs: reproducibility obtained through ARITHMETIC -- compensated or
+% exact accumulation, carrying a run-time cost -- where this work obtains it by fixing an order
+% in the layout, at no run-time cost.
+@inproceedings{DemmelNguyen2013,
+  author    = {Demmel, James and Nguyen, Hong Diep},
+  title     = {Fast reproducible floating-point summation},
+  booktitle = {Proceedings of the 21st IEEE Symposium on Computer Arithmetic (ARITH)},
+  pages     = {163--172},
+  year      = {2013},
+}
+
+% --------------------------------------------------- colocated pressure--velocity coupling
+% The interpolation the example operator's Rhie--Chow term implements.
+@article{RhieChow1983,
+  author  = {Rhie, C. M. and Chow, W. L.},
+  title   = {Numerical study of the turbulent flow past an airfoil with trailing edge
+             separation},
+  journal = {AIAA Journal},
+  volume  = {21},
+  number  = {11},
+  pages   = {1525--1532},
+  year    = {1983},
+}
+
+% ------------------------------------------------------------------- the platform's own figures
+% Vendor specification, cited so the advertised numbers in Table 2 are attributable and can be
+% told apart from the ones measured here. Note the 7.1 TFLOP/s figure that circulates for Grace
+% is the dual-die CPU Superchip; a single 72-core Grace die is half of it.
+@misc{NvidiaGrace2023,
+  author       = {{NVIDIA Corporation}},
+  title        = {{NVIDIA Grace CPU Superchip Architecture Whitepaper}},
+  year         = {2023},
+  howpublished = {\url{https://www.nvidia.com/en-us/data-center/grace-cpu-superchip/}},
+  note         = {72 Arm Neoverse~V2 cores per die, $4\times$\SI{128}{\bit} SVE2 per core,
+                  LPDDR5X up to \SI{500}{\giga\byte\per\second}, \SI{3.55}{\tera\flops} FP64
+                  peak per die},
+}
+
+% ==============================================================================================
+% STILL NEEDED, AND DELIBERATELY NOT INVENTED.
+%
+% The repository cannot supply these and they must be looked up and verified before submission.
+% Listed as threads rather than as half-remembered keys so that none is quietly forgotten:
+%
+%   * Cache blocking and tiling of unstructured mesh traversals -- still open.
+%   * A second colouring-vs-atomics reference on CPUs rather than GPUs would strengthen
+%     \S\ref{sec:related}; Cecka et al. is a GPU study and the distinction should be drawn.
+%
+% spikes/cvfem/literature/ holds four PDFs that may cover part of the CVFEM thread, and
+% spikes/cvfem/docs/CVFEM_SotA.tex has prose citations for the solver side.
+% ==============================================================================================

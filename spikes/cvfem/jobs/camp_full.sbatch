@@ -35,9 +35,10 @@ echo "### sizes 64 96 128 160 192  reps 5"
 
 srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
   bash -lc "cd $PWD && BIN=build/cvfem_hex8_ns_upwind_bench THREADS=72 \
-            SIZES='64 96 128 160 192' REPS=5 RUN_TIMEOUT=900 OUT='perf/campaign_grace3' \
+            SIZES='64 96 128 160 192' REPS=5 RUN_TIMEOUT=900 OUT=perf/campaign_grace_${SLURM_JOB_ID:-manual} \
             ./scripts/layout_campaign.sh"
 
 echo
 echo "### report:"
-python3 python/cvfem_kernel_report.py perf/campaign_grace3/campaign.csv -o perf/campaign_grace3/CVFEM_Kernels.md 2>&1 | tail -2
+OUT=perf/campaign_grace_${SLURM_JOB_ID:-manual}
+python3 python/cvfem_kernel_report.py $OUT/campaign.csv -o $OUT/CVFEM_Kernels.md 2>&1 | tail -2

@@ -1,0 +1,1057 @@
+%% PASC27 submission -- packed mesh format for CPU matrix-free operators.
+%%
+%% Build:  make          (latexmk -pdf)
+%%         make figures  (regenerate every figure and table input from the measurements)
+%%
+%% NOTHING IN THIS FILE IS A TYPED-IN NUMBER. Every measured quantity arrives through
+%% \input{tables/...} or a \newcommand emitted by the generators in python/, so a
+%% re-measurement propagates and a stale number cannot survive a rebuild. See README.md for
+%% which job id produced which input.
+\documentclass[sigconf,nonacm]{acmart}
+
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\sisetup{group-separator={,},group-minimum-digits=4}
+% siunitx has no FLOP unit; declared once here so rates read as "461 GFLOP/s" everywhere.
+\DeclareSIUnit{\flop}{FLOP}
+\DeclareSIUnit{\flops}{FLOP/s}
+\DeclareSIUnit{\tflops}{TFLOP/s}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\input{figures/colors}
+\input{figures/packed_counts}
+\input{figures/determinism_macros}
+\input{figures/scaling_macros}
+\input{figures/stream_macros}
+\input{figures/campaign_macros}
+\input{figures/packsize_macros}
+\input{figures/roofline_macros}
+\IfFileExists{figures/convho_macros.tex}{\input{figures/convho_macros}}{}
+\IfFileExists{figures/meshfoot_macros.tex}{\input{figures/meshfoot_macros}}{}
+\IfFileExists{figures/jacfair_macros.tex}{\input{figures/jacfair_macros}}{}
+% Inputs a generated file if it exists, and says so loudly if it does not, so a pending
+% measurement cannot quietly vanish from the paper.
+\newcommand{\inputifready}[2]{%
+  \IfFileExists{#1.tex}{\input{#1}}%
+    {\textbf{[MEASUREMENT PENDING: #2]}}}
+%% Printed in every caption built from campaign data that did not come from one of
+%% this paper's own runs, so a placeholder figure cannot pass for a final one.
+% The convective scheme every measured float must name. Terse by design: the page
+% budget does not permit a sentence on each, and a tag always in the same place is
+% easier to scan than prose. Format figures carry no scheme and stay untagged.
+\newcommand{\fostag}{\emph{First-order upwind.}}
+\newcommand{\provwarn}{\ifnum\campProvisional=1 \textbf{[PROVISIONAL: pipeline-validation data from \campHost, not this paper's campaign]} \fi}
+
+\begin{document}
+
+\title{A Packed Mesh Format for Deterministic, Atomics-Free Matrix-Free
+       Operators on Multicore CPUs}
+
+\author{Patrick Zulian}
+\orcid{0000-0002-5822-3288}
+\affiliation{%
+  \institution{Euler Institute, Universit\`a della Svizzera italiana}
+  \streetaddress{Via Buffi 13}
+  \city{Lugano}
+  \postcode{6900}
+  \country{Switzerland}}
+\affiliation{%
+  \institution{UniDistance Suisse}
+  \city{Brig}
+  \country{Switzerland}}
+\affiliation{%
+  \institution{University of Victoria}
+  \city{Victoria}
+  \state{British Columbia}
+  \country{Canada}}
+\email{patrick.zulian@usi.ch}
+
+\begin{abstract}
+Matrix-free finite element and finite volume operators on unstructured meshes are limited less
+by arithmetic than by the scatter: every element contributes to nodes it shares with its
+neighbours, and on a multicore CPU that contention is usually resolved with atomics, with
+graph colouring, or by abandoning the matrix-free form and assembling a sparse matrix. Each
+costs something distinct. Atomics make the result depend on thread timing, so the operator is
+not reproducible even against itself. Colouring removes the atomics but pays a barrier per
+colour, which dominates when the reduced object is a vector rather than a matrix. Assembly
+trades arithmetic for bandwidth and a footprint that grows with the stencil.
+
+We present a \emph{packed} mesh format that removes the scatter conflict structurally rather
+than by synchronisation. Elements are grouped into packs; each node is owned by exactly one
+pack, and the owned ranges partition the node numbering, so a pack accumulates into a private
+buffer with plain addition and writes its owned rows out without contention. The nodes a pack
+touches but does not own are staged and closed by a gather whose graph is built by sorting, so
+each destination is visited by exactly one row in a fixed order. The consequence is an operator
+application with no atomic on any path and a summation order fixed by index arrays rather than
+by thread arrival, which makes the result bitwise identical at every thread count.
+
+We evaluate the format on the operators of a colocated CVFEM incompressible Navier--Stokes
+discretisation --- residual and Jacobian action --- on an NVIDIA Grace CPU, against a standard
+atomic sweep and against sparse matrix--vector products with the assembled block-sparse matrix
+in double and single precision. On \num{8586756} degrees of freedom the packed residual reaches
+\campResPacked{}~MDOF/s against \campResAtomic{} for the atomic sweep and \campSpmvF{} for the
+assembled product, while reading two orders of magnitude less per degree of freedom than the
+matrix does. Measured over repeats and over thread counts, the atomic sweep returns a different
+result every time and the packed one returns the same bits throughout. We also report what the
+advantage is not: most of it is present at a single thread, where no contention exists, so the
+gain comes from what the layout reads rather than from the atomics it removes; and the margin
+falls from $2.96\times$ on a bare element kernel to $2.06\times$ once the operator carries the
+terms a solver actually applies.
+\end{abstract}
+
+\begin{CCSXML}
+<ccs2012>
+<concept><concept_id>10010147.10010169.10010170</concept_id>
+<concept_desc>Computing methodologies~Parallel algorithms</concept_desc>
+<concept_significance>500</concept_significance></concept>
+<concept><concept_id>10010147.10010341.10010349</concept_id>
+<concept_desc>Computing methodologies~Massively parallel and high-performance simulations</concept_desc>
+<concept_significance>500</concept_significance></concept>
+</ccs2012>
+\end{CCSXML}
+\ccsdesc[500]{Computing methodologies~Parallel algorithms}
+\ccsdesc[500]{Computing methodologies~Massively parallel and high-performance simulations}
+
+\keywords{matrix-free operators, unstructured meshes, mesh data layout, reproducibility,
+          multicore CPUs, CVFEM, Navier--Stokes}
+
+\maketitle
+
+%================================================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Implicit solvers on unstructured meshes spend most of their time applying an operator. In a
+matrix-free formulation that application is a loop over elements: gather the nodal values an
+element needs, evaluate a small kernel, and scatter the result back to the element's nodes. The
+kernel is the part that looks like the physics, and it is not usually the difficulty. The
+difficulty is the scatter. Elements share nodes with their neighbours, so on a shared-memory
+machine several threads reach the same output location, and something has to resolve that.
+
+Three answers are in common use and each gives up something different. \emph{Atomic} updates
+are the simplest and impose no structure on the mesh, but they serialise on contended nodes and,
+more consequentially, they fix no order of summation. Floating-point addition is not
+associative, so an operator applied twice to the same input returns two different answers.
+\emph{Colouring} partitions the elements into conflict-free sets and removes the atomics, at the
+cost of a barrier per colour --- a fixed cost that is repaid when the object being reduced is a
+large matrix and is not repaid when it is a vector. \emph{Assembling} a sparse matrix removes
+the problem from the inner loop entirely, but replaces a compute-bound kernel with a
+bandwidth-bound sparse matrix--vector product and a footprint that grows with the stencil rather
+than with the solution.
+
+The loss of reproducibility is easy to treat as a theoretical concern and it is not. In the
+solver used here it surfaced as a preconditioner that was not the same preconditioner twice: the
+block-diagonal blocks being inverted were accumulated atomically, so their entries depended on
+the order in which threads arrived, and a linear solve with no multigrid and no other source of
+variation gave different iteration counts from one run to the next. Debugging anything on top of
+such an operator means separating a real effect from a different summation order, which is a
+tax on every experiment performed above it.
+
+This paper takes the position that the scatter conflict is better removed by the data layout
+than resolved by synchronisation. We describe a \emph{packed} mesh format in which elements are
+grouped into packs, every node is owned by exactly one pack, and the owned ranges partition the
+node numbering. A pack then accumulates into a private buffer with ordinary addition and writes
+its owned rows out with no possibility of conflict, because no other pack owns them; the nodes it
+touches but does not own are staged and closed by a gather whose graph is built by sorting, so
+each destination is visited by exactly one row in a fixed order. No atomic appears on any path,
+and the order in which every node's contributions are summed is fixed by index arrays rather
+than by thread arrival --- which makes the result bitwise identical at every thread count, as a
+property of the layout rather than of a reduction primitive.
+
+\noindent\textbf{Contributions.}
+\begin{itemize}
+  \item A mesh format whose ownership structure makes the matrix-free scatter
+        \emph{atomics-free by construction} rather than by synchronisation, on any number of
+        threads (\S\ref{sec:format}).
+  \item An argument from three independent properties of the layout, and a measurement, that
+        operator application in this format is \emph{bitwise reproducible} at every thread
+        count --- a consequence of the data structure rather than of a reduction primitive
+        (\S\ref{sec:apply}, \S\ref{sec:res:determinism}).
+  \item A like-for-like evaluation on a real solver's operators against an atomic sweep and
+        against assembled sparse matrix--vector products, reported along a
+        \emph{term-completeness ladder} so that the margin quoted is the one a solver sees and
+        not the one a bare element kernel flatters (\S\ref{sec:res:throughput}).
+  \item An analysis of pack sizing showing that the index-type ceiling, which is what actually
+        selects the default pack size, chooses a pack far larger than the throughput optimum and
+        leaves fewer parallel work units than the machine has cores (\S\ref{sec:res:packsize}).
+\end{itemize}
+
+%================================================================================================
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Matrix-free operator application.} Evaluating an operator from its element
+contributions rather than from an assembled matrix is long established for high-order
+discretisations, where the assembled stencil grows quickly with the polynomial degree and sum
+factorisation makes the element kernel cheap~\cite{Orszag1980,DevilleFischerMund2002,Brown2010}.
+Modern libraries build on that lineage and make the matrix-free operator the primary
+object~\cite{KronbichlerKormann2012,KronbichlerKormann2019,MFEM2021,libCEED2021,Kolev2021}, as
+do the form compilers that generate the element kernels~\cite{KirbyLogg2006,Firedrake2016}. That
+work is largely concerned with making the kernel fast. This paper is concerned with what happens
+on either side of it.
+
+\paragraph{Resolving the scatter.} The conflict between elements sharing a node is classically
+resolved either by atomic updates or by colouring the elements so that no two of a colour share
+one, and the trade between them has been studied most closely on GPUs, where Cecka et
+al.~\cite{CeckaLewDarve2011} set out the alternatives and their costs. The present work differs
+in where the resolution happens: colouring partitions the \emph{work} so that conflicting
+updates never coincide in time, while the packed format partitions the \emph{data} so that
+conflicting updates do not exist. We measure against colouring throughout, and report that it is
+also atomics-free and, on this operator, also reproducible --- what separates the two is the
+barrier it must pay and this does not.
+
+\paragraph{Locality by spatial ordering.} Reordering an unstructured mesh along a space-filling
+curve is standard practice for locality and for partitioning~\cite{Bader2013,Zumbusch2001}. The
+distinction worth drawing is that the packed format does not merely \emph{benefit} from such an
+ordering: because a pack is a contiguous range of element indices, an unordered mesh gives packs
+whose node sets are large and scattered, and the format's advantage disappears.
+\S\ref{sec:res:ordering} measures what removing the ordering costs.
+
+\paragraph{Reproducibility.} Reproducible summation obtains a result that does not depend on the
+summation order, through arithmetic --- compensated, extended or exactly-rounded accumulation~\cite{DemmelNguyen2013} ---
+and pays for it at run time. This paper takes the opposite route: it does not make the sum
+independent of its order, it fixes the order, in the index arrays the layout already stores. The
+two are complementary rather than competing, and the distinction matters for cost, because
+fixing an order is free once the layout has done it.
+
+\paragraph{What is not claimed as new.} Grouping elements into blocks with locally numbered
+nodes is not itself novel, and neither is reordering a mesh along a space-filling curve. The
+claim made here is about what follows from making ownership of every node \emph{exclusive to one
+pack} and from closing the remainder with a gather built by sorting: the scatter then needs no
+synchronisation at all, and the summation order becomes a property of the stored index arrays.
+Atomics-freedom and reproducibility are consequences of the layout rather than of a reduction
+primitive, and the narrowed index traffic that comes with pack-local numbering is what pays for
+them.
+
+%================================================================================================
+\section{The packed format}
+\label{sec:format}
+
+\subsection{Packs and the reordering precondition}
+
+A \emph{pack} is a contiguous range of element indices together with the nodes those elements
+touch. Element $e$ belongs to pack $p = \lfloor e / n_{\mathrm{epp}} \rfloor$, where
+$n_{\mathrm{epp}}$ is the number of elements per pack; the assignment is by element index and
+nothing else.
+
+That simplicity is bought by a precondition, and it is worth stating as one rather than as an
+optimisation: \textbf{the mesh must be spatially reordered before packing}. If it is not, a
+pack's elements are scattered across the domain and the set of nodes they touch is large, which
+defeats the locality the format exists to create. Production meshes are ordered by a
+space-filling curve before the packing pass.
+
+A second consequence is an ordering constraint on everything built from the mesh. Constructing
+the packed representation \emph{renumbers the nodes in place}, so coordinates, the node-to-node
+graph and any sparsity pattern must be built after packing, never before. This is a property of
+the format rather than an implementation detail, and it is also what makes verification
+awkward: a packed operator and a reference operator cannot be compared entry by entry, because
+their node numbering differs. Equivalence must be checked by matching nodes on coordinates.
+
+\begin{figure}[t]
+  \centering
+  \resizebox{\columnwidth}{!}{\input{figures/packed_decomposition}}
+  \caption{A mesh of $\figPackNx\times\figPackNy$ elements in $\figPackNPacks$ packs of
+    $\figPackElemsPerPack$, after space-filling reordering. Element tint gives the
+    pack. A filled node is owned by the pack of its colour and touched by no other pack; a
+    ringed node is owned by the pack of its colour and \emph{also touched} by at least one
+    other, which is what the ghost machinery of \S\ref{sec:format:ghost} exists to close. The
+    figure is generated by reimplementing the format's documented ownership rules, not drawn,
+    so it cannot disagree with them; two dimensions are used because a readable picture of a
+    three-dimensional pack decomposition does not exist.}
+  \label{fig:decomposition}
+\end{figure}
+
+\subsection{Node identity: one owner, three zones}
+\label{sec:format:zones}
+
+Each node has exactly one owning pack, and pack $p$ owns a contiguous, monotonically increasing
+range of global indices. The owned ranges therefore \emph{partition} $[0, n_{\mathrm{nodes}})$.
+Writing $n_c(p)$ for the size of that range, a pack-local index $\ell$ resolves to a global one
+as
+\[
+  g(p,\ell) =
+  \begin{cases}
+    \texttt{owned\_nodes\_ptr}[p] + \ell, & \ell < n_c(p),\\[2pt]
+    \texttt{ghost\_idx}\big[\texttt{ghost\_ptr}[p] + \ell - n_c(p)\big], & \ell \ge n_c(p).
+  \end{cases}
+\]
+Because the owned ranges are contiguous and monotone in $p$, the owner of a global index is
+recoverable by binary search, which is what lets a conflict graph over packs be built without
+storing one.
+
+The pack-local index is a \textbf{16-bit unsigned integer}. That is the single most consequential
+choice in the format and it cuts both ways: it halves the index traffic of the element sweep
+against the \SI{32}{\bit} global index a flat sweep must use (\S\ref{sec:cost}), and it caps a
+pack at $2^{16}$ distinct nodes, which is what bounds the pack size and, as
+\S\ref{sec:res:packsize} shows, is also what the packer wrongly uses to choose one.
+
+Within the owned range the indices are ordered \emph{non-shared first, then shared}. With
+$n_s(p)$ the number of a pack's owned nodes that some other pack also touches, the local index
+space splits into three zones (Figure~\ref{fig:idspace}):
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+range of $\ell$ & property \\
+\midrule
+$0 \le \ell < n_c - n_s$ & owned, touched by no other pack \\
+$n_c - n_s \le \ell < n_c$ & owned, also touched elsewhere \\
+$n_c \le \ell < n_{\mathrm{pack}}$ & ghost: touched, not owned \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+This split is the least obvious property of the format. On a CPU, where one thread owns a pack,
+the whole flush of the owned range is already contention-free and the distinction is not needed;
+it becomes load-bearing wherever a pack is processed by more than one thread, since the first
+zone can then be written without synchronisation and only the shared tail cannot.
+
+\begin{figure}[t]
+  \centering
+  \resizebox{\columnwidth}{!}{\input{figures/packed_id_space}}
+  \caption{The pack-local index space of one pack, and the resolution rule. A middle pack is
+    shown deliberately: ownership is first-touch in pack order, so the lowest-numbered pack
+    owns everything it touches and has no ghosts, while the highest owns nothing that is
+    shared. Either extreme would show only two zones.}
+  \label{fig:idspace}
+\end{figure}
+
+\subsection{Ghost lists and the reduction graph}
+\label{sec:format:ghost}
+
+The nodes a pack touches but does not own are listed per pack in a compressed row structure.
+Two properties matter to a reader and one of them is a trap: the list is deduplicated, and it is
+ordered \emph{by first appearance} in a node-major, element-minor sweep --- it is \textbf{not}
+sorted, so it must not be binary-searched.
+
+The contributions staged against those entries are closed by a separate gather. Its graph is
+built by sorting (destination, entry) pairs and grouping them, which gives it the two properties
+the rest of the paper rests on:
+\begin{itemize}
+  \item each destination appears in \emph{exactly one} row, so one thread owns that destination
+        and no atomic is required; and
+  \item within a row the terms are visited in a fixed index order, so the sum is the same
+        sequence of floating-point additions on every run.
+\end{itemize}
+
+\begin{figure}[t]
+  \centering
+  \resizebox{\columnwidth}{!}{\input{figures/packed_reduction}}
+  \caption{The ghost reduction as a gather. Contributions staged by different packs against the
+    same node are summed by the single row that owns that destination. There are
+    $\figPackGhostEntries$ staged entries and $\figPackReduceRows$ rows in the mesh of
+    Figure~\ref{fig:decomposition}.}
+  \label{fig:reduction}
+\end{figure}
+
+%================================================================================================
+\section{Operator application}
+\label{sec:apply}
+
+\subsection{The two-pass algorithm}
+
+\begin{algorithm}
+\caption{Packed operator application}
+\label{alg:apply}
+\begin{algorithmic}[1]
+\ForAll{packs $p$ \textbf{in parallel}}
+  \State $A \gets 0$ \Comment{pack-private accumulator, $n_{\mathrm{pack}}(p)$ rows}
+  \State gather the input fields into pack-local order
+  \ForAll{elements $e$ of $p$, in increasing index}
+    \State evaluate the element kernel
+    \State $A[\,\text{local node}\,] \mathrel{+}= \text{contribution}$
+           \Comment{plain addition, no atomic}
+  \EndFor
+  \State \textbf{write} $A[0 \ldots n_c)$ to the global array \Comment{assignment, not
+         accumulation}
+  \State \textbf{store} $A[n_c \ldots n_{\mathrm{pack}})$ into the staging buffer
+\EndFor
+\ForAll{reduction rows $r$ \textbf{in parallel}}
+  \State $\text{global}[\texttt{dest}[r]] \mathrel{+}= \sum_{j \in \text{row } r}
+         \text{staged}[j]$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Two details of Algorithm~\ref{alg:apply} are easy to read past and both are consequences of the
+ownership partition. The owned rows are \emph{assigned} rather than accumulated, because no
+other pack owns them --- which also means the global array never has to be zeroed, so a full
+pass over the output disappears. And the staged ghost values are \emph{stored} rather than
+accumulated, because the staging slot of a given pack and ghost is written by that pack alone.
+
+The format also changes how the input is read. A flat element sweep reads each node's input once
+per incident element; the packed sweep reads it once per pack node, which for a hexahedral mesh
+is roughly eight times less, and contiguously for the owned majority.
+
+\subsection{Why the result is reproducible}
+\label{sec:apply:determinism}
+
+Floating-point addition is not associative, so a reproducible result requires a fixed summation
+order, not a particular one. In this format the order is fixed by three independent properties,
+and it is worth separating them because they fail independently:
+
+\begin{enumerate}
+  \item \textbf{Within a pack}, one thread walks the pack's elements in increasing index order,
+        and pack membership is a pure function of the element index. The order in which a node
+        receives its contributions from inside the pack is therefore the same on every run and
+        at every thread count.
+  \item \textbf{Across packs, for owned nodes}, there is no summation to order at all: the owned
+        ranges partition the node numbering, so exactly one pack contributes.
+  \item \textbf{Across packs, for shared nodes}, the reduction graph fixes the order, because
+        each destination is one row and the row's terms are visited in a stored sequence.
+\end{enumerate}
+
+\noindent
+No atomic appears on any of these paths, and the absence is structural: it follows from the
+ownership partition rather than from a choice of synchronisation primitive.
+
+\paragraph{Scope of the claim.} The argument above is about a processor on which a pack is
+processed by a single thread, which is the setting of this paper. It does not transfer
+unchanged to an implementation that splits a pack across many threads and accumulates into a
+shared buffer with atomic addition: the reduction graph would still be deterministic, but the
+in-pack accumulation would not, and the result would not be reproducible. Making such an
+implementation reproducible requires ordering the in-pack accumulation as well --- for instance
+by gathering per node from a pack-local node-to-element adjacency instead of scattering per
+element. We state this because the property is easy to over-claim: it is a consequence of the
+whole execution, not of the format alone.
+
+\subsection{The alternatives, and what each fixes}
+\label{sec:apply:alternatives}
+
+
+
+The packed layout is measured against two alternatives, worth distinguishing carefully because
+they fail in different places.
+
+\paragraph{Atomic.} The flat sweep addresses nodes globally and resolves every collision with an
+atomic update. It imposes no structure on the mesh at all, which makes it the natural reference
+implementation, and it needs the output array zeroed first because it accumulates into it. Its
+weakness is not primarily the cost of the atomic instruction --- \S\ref{sec:res:scaling} shows
+it scaling perfectly respectably --- but that it fixes no summation order, so the operator is
+not a function of its input in the bitwise sense.
+
+\paragraph{Colouring.} Partitioning the packs so that no two packs of a colour share a node lets
+each colour write to the global arrays directly, with neither atomics nor a reduction, at the
+cost of a barrier between colours. It shares the packed layout's gather and its pack-local
+indexing, and differs from it only in how the result leaves the pack. That makes the pair an
+unusually clean controlled comparison, and \S\ref{sec:res:scaling} uses it as one.
+
+Colouring also fixes a summation order and is, as measured in \S\ref{sec:res:determinism},
+bitwise reproducible here. We note two qualifications rather than claim it as equivalent. The
+order it fixes is a property of the colouring, so reproducibility additionally requires the
+colouring itself to be constructed deterministically --- a property of the construction, not of
+the layout. And the cost of the barriers is paid per application and grows with the thread
+count, whereas the ghost reduction's cost is proportional to the number of shared nodes, which
+is a property of the mesh. Which is preferable therefore depends on how much reduction there is
+to remove: for the vector-valued operators measured here, the barriers cost more than the ghost
+reduction they replace, and \S\ref{sec:res:scaling} shows that gap opening with thread count.
+
+%================================================================================================
+\section{Cost model}
+\label{sec:cost}
+
+\subsection{What each representation must read}
+
+The three representations differ less in arithmetic than in what they must move to reach it, and
+the differences are structural enough to predict an ordering before any of them is run.
+
+\paragraph{Indices.} A flat element sweep addresses its nodes globally, so it reads one
+$\SI{4}{\byte}$ index per element--node incidence --- $\SI{32}{\byte}$ per hexahedron. Inside a
+pack the same connectivity is expressed in pack-local indices, and because a pack may not
+address more distinct nodes than its \SI{16}{\bit} index admits, those are $\SI{2}{\byte}$
+wide. The
+index traffic of the element sweep is therefore halved outright. This is not a compression trick
+with a decode cost: the narrower index is the one the kernel indexes with.
+
+\paragraph{Input.} As \S\ref{sec:apply} notes, the packed sweep reads a node's input once per
+\emph{pack node} rather than once per element--node incidence --- eight times less for a
+hexahedral mesh --- and contiguously over the owned majority, so a field held with a stride
+inside an interleaved solution vector is read at the cost of a contiguous one.
+
+\paragraph{Output.} Because the owned ranges partition the node numbering, a pack's owned rows
+are \emph{written} rather than accumulated, so the global output array never has to be zeroed
+and a full pass over it disappears from every application.
+
+\subsection{Against the assembled matrix}
+
+\begin{table}[t]
+  \centering
+  \caption{\fostag{} What the operator must read per degree of freedom, excluding the solution and result
+    vectors, which are identical for every representation. The assembled side carries its values
+    and its sparsity pattern; the matrix-free side carries the mesh. The two mesh rows are
+    measured, array by array; the assembled rows follow from the sparsity pattern.}
+  \label{tab:footprint}
+  \input{tables/footprint}
+\end{table}
+
+\paragraph{The packed mesh is smaller than the standard one, and by less than it should be.} The
+16-bit index halves the connectivity, \fpStd{} to \fpConn{}~B/dof, and the ownership and ghost
+arrays spend part of that back: measured at \fpPack{} elements per pack
+(Table~\ref{tab:footprint}), the packed topology is \fpImpl{} against \fpStd{}~B/dof, or
+\fpImplPct{}\%. Two items account for nearly all the gap to what the format costs in principle.
+The permutation between packed and unpacked numbering is \fpNodeMap{}~B/dof and the apply never
+reads it (\fpWorkingPct{}\% without it); and the reduction graph's two offset arrays are 64-bit
+while indexing under a million entries, so narrowing them --- which their own lengths permit
+with three orders of magnitude to spare --- saves \fpReduceSaving{} more and reaches
+\fpFloorPct{}\%, or \fpFloorBigPct{}\% at \fpPackBig{} elements per pack where ghosts are
+proportionally fewer. The table reports the implemented figure; the floor is named, not quoted.
+Coordinates are byte-identical in both and excluded; with them the ratio is \fpImplPtsPct{}\%.
+
+The sharper contrast is with assembly. A sparse matrix--vector product does little arithmetic per
+byte, so its rate is set by how much it must read, and what it reads is a stencil: $4\times4$
+blocks whose count grows with the connectivity. The matrix-free side reads the mesh itself, and
+Table~\ref{tab:footprint} puts the gap at more than two orders of magnitude, essentially
+independent of problem size.
+
+\paragraph{The two are not the same operator, and the comparison has to say so.}
+An assembled Jacobian cannot carry the Rhie--Chow pressure-gradient sensitivity: the exact
+Jacobian differentiates through the nodal gradient reconstruction, so it needs the reconstructed
+gradient of the \emph{direction}, and putting that into a matrix would couple pressures beyond
+nearest neighbours and destroy the one-ring sparsity the matrix is built on. The matrix therefore
+\emph{lags} that term, so a matrix-free action carrying it does strictly more work than the
+matrix encodes and comparing the two as one operator flatters the matrix.
+Table~\ref{tab:jacfair} reports both forms.
+
+Two consequences follow. The assembled operator is bandwidth-bound at a footprint that fits no
+level of cache, which is why halving the value precision is close to its only lever; and the
+matrix-free operator, reading a hundredfold less, has intensity enough that the element kernel's
+arithmetic is what it must hide. \S\ref{sec:res:spmv} reports whether that happens.
+
+%================================================================================================
+\section{Experimental setup}
+\label{sec:setup}
+
+\begin{table}[t]
+  \centering
+  \caption{The platform. One Grace die, not the dual-die Superchip.}
+  \label{tab:platform}
+  \small
+  \begin{tabular}{@{}lrr@{}}
+    \toprule
+    & advertised~\cite{NvidiaGrace2023} & measured here \\
+    \midrule
+    Cores & 72 Neoverse~V2 & \\
+    Vector & $4\times\SI{128}{\bit}$ SVE2 & \\
+    L1 / L2 per core & 64+\SI{64}{\kilo\byte} / \SI{1}{\mega\byte} & \\
+    L3 shared & \SI{114}{\mega\byte} & \\
+    \midrule
+    Memory bandwidth & $\le\SI{500}{\giga\byte\per\second}$
+      & \SI{\streamTriad}{\giga\byte\per\second} \\
+    FP64 rate & \SI{3.55}{\tflops} peak & \SI{\rlPeak}{\giga\flops} sustained \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Every measurement in this paper was taken on the Grace CPU die of an NVIDIA GH200 Grace Hopper
+Superchip (Table~\ref{tab:platform}), at 72 OpenMP threads with threads bound to cores, unless
+a thread count is the independent variable. The memory bandwidth quoted is a STREAM triad
+measured on the same node rather than a vendor figure, because it is the bound the roofline of
+\S\ref{sec:res:spmv} is drawn against and the two must come from the same machine.
+
+\paragraph{How the two measured figures were obtained.} The bandwidth is a STREAM triad,
+compiled with \texttt{gcc -O3 -fopenmp -mcmodel=large} over arrays of $80\times10^{6}$ doubles
+--- about \SI{1.9}{\giga\byte} in three arrays, some sixteen times the shared L3, so the triad
+genuinely streams. The FP64 rate is the best of five timed $N=8192$ double-precision \textsc{gemm}
+calls into \textbf{OpenBLAS 0.3.28}, the threaded build the same node resolves for the solver;
+at that size the operational intensity is of order $10^3$~FLOP/byte, so the kernel is
+unambiguously compute-bound and the figure is a sustained rate rather than a peak. Five
+repetitions agreed to \SI{0.2}{\percent}.
+
+\paragraph{Measured against advertised.} The triad reaches \SI{\streamTriad}{\giga\byte\per\second},
+or \SI{90}{\percent} of the $\le\SI{500}{\giga\byte\per\second}$ the vendor
+quotes~\cite{NvidiaGrace2023}; the \textsc{gemm} rate reaches \SI{\rlPeak}{\giga\flops}, or
+\SI{65}{\percent} of the \SI{3.55}{\tflops} FP64 peak of a single Grace die. Both ratios are
+ordinary --- a library \textsc{gemm} at two thirds of vector peak and a triad at nine tenths of
+nominal bandwidth are what these benchmarks usually deliver --- and we draw the roofline of
+\S\ref{sec:res:spmv} with the \emph{measured} pair, because the kernels being placed on it were
+measured on the same node under the same conditions. Using the advertised pair would move both
+roofs up and make every efficiency reported here look worse than the machine actually permits.
+
+One further detail of the bandwidth figure: it is quoted at the thread count the kernels run at,
+which is not where it peaks. The triad reaches \SI{\streamPeak}{\giga\byte\per\second} at
+\streamPeakThreads{} threads and falls to \SI{\streamTriad}{\giga\byte\per\second} at
+\streamThreads{} --- the memory system saturates before the socket does, so the last half of the
+cores add compute but no bandwidth. We use the \streamThreads{}-thread figure throughout,
+because that is the bandwidth available in the configuration being measured.
+
+\paragraph{The case.} The operators are those of a colocated control-volume finite element
+discretisation of the incompressible Navier--Stokes equations on hexahedra. Four unknowns live
+at each node --- three velocity components and pressure --- and fluxes are integrated over the
+sub-control-surfaces of the dual mesh. The discretisation itself is not the subject of this
+paper, but \emph{which} operator is being measured is, so the variants are set out explicitly.
+
+\paragraph{Convective schemes.} Two are measured. The baseline is \textbf{first-order upwinding
+with a hard donor switch}: the face value is taken from whichever side the mass flux comes from,
+with no blending band. Every measured figure and table names its scheme in the first words of
+its caption, so which one produced a number is never left to be inferred.
+
+The second is a \textbf{deferred-correction higher-order flux}. The face value is reconstructed
+from the donor node and its nodal velocity gradient,
+$u_{\mathrm{face}} = u_{\mathrm{donor}} + \nabla u_{\mathrm{donor}}\cdot
+ (x_{\mathrm{scs}} - x_{\mathrm{donor}})$,
+and only the \emph{difference} from the first-order value is added to the residual. Two
+consequences follow and both matter here. The correction is residual-only, so the Jacobian stays
+first-order and its assembled stencil stays at one ring --- a reconstructed face value reaches
+outside the element and would otherwise regrow it to two. And the correction is lagged one
+Newton step, so the nodal velocity gradient it reads is an input to the application rather than
+part of it, exactly as the Rhie--Chow state gradient is. \S\ref{sec:res:convho} reports the cost
+of the flux on that basis, for the unlimited reconstruction and for three limiter arms.
+
+\paragraph{The two operators, and why the Jacobian is the exact one.} We measure the residual
+$\mathcal{F}(u)$ and the action of its Jacobian $\mathcal{J}(u)\,v$, which are what a
+Newton--Krylov solve applies. The Jacobian action is the \emph{exact} one, and for the
+Rhie--Chow term that is a stronger statement than it sounds. The coupling depends on a
+reconstructed nodal pressure gradient, so differentiating it correctly requires the
+reconstructed gradient \emph{of the direction} $v$, not only of the state $u$. A lagged --- or
+frozen --- Jacobian treats that gradient, and the coefficient built from it, as constant in $v$
+and skips its reconstruction: cheaper per matvec, and inexact. We measure the exact form
+throughout, and the driver records which one ran, so a frozen variant cannot be reported as an
+exact one.
+
+\paragraph{One-pass and two-pass operators.} Here the operators differ structurally rather than
+in arithmetic. A node's reconstructed gradient needs contributions from every element incident on
+it, so it must be \emph{complete} before any flux may use it --- a data dependency, not a
+scheduling choice, and why the reconstruction cannot fuse into the flux sweep but is a separate
+pass ending in its own ghost reduction. \textbf{One pass}: the bare element kernel, and the
+residual with Rhie--Chow when the state gradient $\nabla p(u)$ is \emph{hoisted}, computed once
+per Newton step and reused across the Krylov solve since $u$ is fixed there. \textbf{Two
+passes}: the residual with Rhie--Chow when $\nabla p$ is rebuilt inside every application, and
+the exact Rhie--Chow Jacobian action, which must reconstruct the \emph{direction}'s gradient on
+every matvec because the direction changes every iteration; the driver times that pass
+separately at \SI{\campQgradPct}{\percent} of the exact matvec, large enough that attributing the
+whole matvec to the element kernel would misplace a sixth of it. The distinction explains two
+results below: why hoisting the state gradient is worth as much as it is, and why the layout's
+margin is widest on the per-apply gradient configuration of \S\ref{sec:res:ladder}, which spends
+more of its time in exactly the sweep the packed layout accelerates most.
+
+\begin{table}[t]
+  \centering
+  \caption{Sweeps over the mesh per operator application. Amortised sweeps run once per Newton
+    step and are reused across the Krylov solve --- the nodal gradient for the hoisted and
+    higher-order rows, the assembly itself for the matrix. They do not appear per application,
+    but they are not free.}
+  \label{tab:passes}
+  \small
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    & element & ghost & amortised \\
+    operator & sweeps & reductions & sweeps \\
+    \midrule
+    residual, bare                 & 1 & 1 & 0 \\
+    residual, $\nabla p$ hoisted   & 1 & 1 & 1 \\
+    residual, $\nabla p$ per apply & 2 & 2 & 0 \\
+    residual, higher-order flux    & 1 & 1 & 1 \\
+    Jacobian action, lagged RC     & 1 & 1 & 0 \\
+    Jacobian action, exact RC      & 2 & 2 & 0 \\
+    SpMV, assembled matrix         & 0 & 0 & 1 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:passes} collects the counts. Two rows deserve comment. The higher-order flux is a
+one-sweep operator only because its correction is lagged; the velocity gradient it reads moves
+into the amortised column rather than disappearing. And the assembled matrix performs no element
+sweep at all per application --- that is the whole point of assembling --- but it pays a full
+assembly, the most expensive sweep in the table, once per Newton step, and then streams a matrix
+two orders of magnitude larger than the mesh on every application thereafter.
+
+\paragraph{Optional terms.} The Rhie--Chow coupling~\cite{RhieChow1983}, which colocation
+requires in order to suppress the checkerboard mode, the boundary closure over boundary
+sub-control-surfaces, and the transient mass term are each switchable, and are what the
+completeness ladder of \S\ref{sec:res:ladder} adds one at a time.
+
+\paragraph{Problem sizes.} Sizes run from $n=64$ to $n=192$ on a cube, \SI{1.1e6}{} to
+\SI{2.9e7}{} degrees of freedom. The smaller sizes make the saturation knee visible rather than
+being compared across layouts; every cross-layout statement is drawn at $n\ge128$, where the
+packed residual has saturated.
+
+\paragraph{Measurement protocol.} Every comparison was measured inside a single allocation with
+the layouts interleaved, and no figure combines runs from different nodes. This is not a
+formality: node-to-node variation here is 5--11\%, larger than several differences the paper
+discusses, and a change already shown performance-neutral by a controlled comparison once read
+5.7--6.5\% slower with its two sides on different nodes. Each recorded run also carries the
+configuration that \emph{dispatched}, not the one requested, so a measurement cannot claim a
+term the code path silently dropped.
+
+%================================================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Throughput}
+\label{sec:res:throughput}
+
+\begin{figure}[t]
+  \centering
+  \input{figures/throughput_size}
+  \caption{\provwarn \fostag{} Residual throughput against problem size for the matrix-free layouts and
+    for sparse matrix--vector products with the assembled matrix at both storage precisions.
+    The smaller sizes show the saturation knee; cross-representation statements are drawn at
+    $n\ge128$.}
+  \label{fig:throughput}
+\end{figure}
+
+At the saturating size, \campDofs{} degrees of freedom, the packed residual reaches
+\campResPacked{}~MDOF/s against \campResAtomic{} for the atomic sweep, and the Jacobian action
+\campJacPacked{} against \campJacAtomic{}. Both are the bare element kernels here, carrying no
+Rhie--Chow term; the forms that do, and the exact/lagged distinction they raise, are in
+Table~\ref{tab:jacfair}. Sparse matrix--vector products with the assembled
+matrix reach \campSpmvF{}~MDOF/s at double precision and \campSpmvS{} at single. Both
+matrix-free layouts therefore exceed the assembled operator, and the packed one does so by a
+factor of several --- which is what the footprint of Table~\ref{tab:footprint} predicts, since
+the assembled product must stream two orders of magnitude more per degree of freedom.
+
+\subsection{What the margin is, and what it is not}
+\label{sec:res:ladder}
+
+A layout comparison on a bare element kernel overstates what a solver receives. The terms a real
+operator carries --- the pressure--velocity coupling, the boundary closure, the transient mass
+term --- are either separate passes over the mesh or arithmetic that vectorises less well, and
+both layouts pay for them, so Table~\ref{tab:ladder} reports a ladder rather than a single
+ratio, adding one term at a time until the operator is the solver's.
+
+\begin{table}[t]
+  \centering
+  \caption{\provwarn \fostag{} The margin as solver terms are added, residual at $n=\campN$. The bare
+    element kernel is the most favourable comparison and the bottom row is the honest one.}
+  \label{tab:ladder}
+  \input{tables/ladder}
+\end{table}
+
+The margin falls monotonically as the operator is completed. Quoting the first row alone would
+overstate what the format delivers to a solver by roughly half again.
+
+\subsection{Reproducibility}
+\label{sec:res:determinism}
+
+\begin{table}[t]
+  \centering
+  \caption{\fostag{} Distinct outputs over $\detRepeats$ repeats at $72$ threads, and over one run at
+    each of $\detThreads$ threads, at $n=\detN$. One distinct output means the operator is
+    bitwise reproducible. The atomic sweep produces a \emph{different answer on every run}.
+    Compared down a column only: packing renumbers the mesh, so fingerprints from different
+    layouts are not comparable.}
+  \label{tab:determinism}
+  \input{tables/determinism}
+\end{table}
+
+Table~\ref{tab:determinism} is unambiguous in both directions. The atomic sweep agrees with
+itself in not one of the runs measured: three repeats at a fixed thread count gave three
+different results, and four thread counts gave four. The packed layout gave a single answer
+throughout, at every thread count, for both operators.
+
+Colouring is reproducible here as well, and we report that rather than implying determinism is
+what separates the packed layout from it. Both avoid atomics and both therefore fix a summation
+order; what separates them is throughput (\S\ref{sec:res:throughput}), where the barrier per
+colour is paid against a reduction whose volume is a vector rather than a matrix. Two caveats:
+a colouring's reproducibility rests on the colouring being constructed deterministically, a
+property of the construction and not the layout, and agreement over seven runs is evidence
+rather than proof.
+
+Reproducibility is measured with a fingerprint folding every output value's bit pattern, not
+with a checksum. The distinction is not pedantic: a checksum is a running sum over millions of
+values, so a last-bit difference on a handful of nodes falls below the total's unit in the last
+place and vanishes. On this operator a checksum reported two runs identical while a per-node
+comparison of the same output showed hundreds of differing doubles. Fingerprints are also
+compared only \emph{within} a layout, as the caption says; operator equivalence across layouts
+is a separate question, established by matching nodes on coordinates.
+
+\subsection{Thread scaling, and where the advantage comes from}
+\label{sec:res:scaling}
+
+\begin{figure}[t]
+  \centering
+  \input{figures/scaling_res}
+  \caption{\fostag{} Residual throughput against thread count, $n=128$, \scalePacks{} packs. The packed
+    and coloured curves begin at the same point and separate as barriers accumulate; the atomic
+    curve begins a factor of two and a half lower and stays there.}
+  \label{fig:scaling}
+\end{figure}
+
+Figure~\ref{fig:scaling} separates two effects that a single-threaded or a fully-threaded
+measurement alone would confound, and the separation is worth more than the headline ratio.
+
+\paragraph{The layout advantage is already present at one thread.} At a single thread the
+packed and coloured sweeps reach \scalePackedResOne{} and \scaleColoredResOne{}~MDOF/s --- the
+same number to within a per cent --- against \scaleAtomicResOne{} for the atomic sweep. That is
+a factor of \num{2.5}, measured where there is no contention of any kind, and the two layouts
+that share it are exactly the two that share the pack-local gather and the narrowed index
+width. The advantage is therefore attributable to what the sweep \emph{reads}, as
+\S\ref{sec:cost} predicts, and not to what it avoids contending on.
+
+\paragraph{The atomic sweep does not scale badly.} It reaches
+$\scaleAtomicResSpeedup\times$ on 72 threads, an efficiency of \scaleAtomicResEff\%, which is
+better than the packed layout's \scalePackedResEff\%. We had expected the opposite --- that
+contention on shared nodes would worsen with thread count --- and it is not what happens at this
+problem size. The atomic sweep is slower throughout because each of its threads does more work,
+not because its threads obstruct one another. Reporting this matters, because the common
+argument for removing atomics is contention, and on this evidence contention is not what the
+removal is buying.
+
+\paragraph{What colouring costs is visible as a divergence.} The coloured sweep starts level
+with the packed one and falls away steadily, ending at \scaleColoredResTop{} against
+\scalePackedResTop{}~MDOF/s, an efficiency of \scaleColoredResEff\% against
+\scalePackedResEff\%. Its last two points differ by only a few per cent, so it has stopped
+scaling before the socket is full. This is the barrier per colour, isolated: the two layouts
+differ in nothing else, so the gap between the curves is the cost of synchronising between
+colours rather than reducing afterwards --- and it is the reason a ghost reduction is preferable
+to a colouring when the object being reduced is a vector.
+
+\paragraph{Why the packed curve is not ideal either.} Its efficiency of \scalePackedResEff\% has
+a structural explanation rather than a mysterious one. The unit of parallel work is the pack,
+and there are \scalePacks{} of them for 72 threads --- about fourteen each --- so static
+scheduling quantises the imbalance in steps of roughly seven per cent before any variation in
+per-pack cost is counted. That is a statement about the pack size, and \S\ref{sec:res:packsize}
+takes it up.
+
+\subsection{Pack size and the index-type ceiling}
+\label{sec:res:packsize}
+
+\begin{figure}[t]
+  \centering
+  \input{figures/packsize}
+  \caption{\fostag{} Throughput of the \emph{exact} Rhie--Chow Jacobian action --- the two-sweep form,
+    carrying the boundary closure --- against the number of packs per thread, at two problem
+    sizes. The pack size is the knob, but packs per thread is what explains the collapse: the
+    two sizes fail at the same place on this axis while failing at different pack sizes.}
+  \label{fig:packsize}
+\end{figure}
+
+The pack size is the one parameter of the format, and what selects its default is not what
+should. A pack may address no more distinct nodes than its index type admits, and the packer
+sizes packs against that ceiling using the pessimistic bound (elements $\times$ nodes per
+element), which credits no sharing at all. For hexahedra that yields roughly
+$\packLargeCeil{}$ elements per pack. But a pack is one unit of parallel work, so the number of
+packs \emph{is} the available parallelism, and an index-width ceiling knows nothing about how
+many cores the machine has.
+
+Figure~\ref{fig:packsize} shows what that costs. At $n=\packLargeN{}$ the ceiling-derived pack
+leaves $\packLargeCeilPacks{}$ packs for 72 threads and gives up a factor of
+$\packLargeCeilLoss\times$ against the best size. At $n=\packSmallN{}$ the same pack size leaves
+$\packSmallCeilPacks{}$ packs --- \packSmallCeilPpt{} per thread, so most cores cannot be given
+work at all --- and throughput falls by $\packSmallCeilLoss\times$. Plotted against packs per
+thread the two curves fail together, which is the evidence that parallel granularity and not
+cache residency is the mechanism.
+
+The remedy is to derive the default from the core count rather than from the index width,
+subject to the ceiling as a correctness bound: every configuration that performed well here had
+at least fourteen packs per thread, and every configuration below one pack per thread collapsed.
+
+\subsection{Spatial ordering is a precondition}
+\label{sec:res:ordering}
+
+\begin{table}[t]
+  \centering
+  \caption{\fostag{} Element order at fixed pack size, for the residual and the \emph{exact} Rhie--Chow
+    Jacobian action, both carrying the boundary closure. Without a space-filling pass a pack's
+    elements are scattered and its node set grows, and both operators pay for it.}
+  \label{tab:ordering}
+  \input{tables/ordering}
+\end{table}
+
+Because a pack is a contiguous range of element indices, the element order decides which nodes a
+pack touches. Removing the space-filling pass at fixed pack size grows the mean node set per
+pack from $\ordSfcMean{}$ to $\ordLexMean{}$ and costs $\ordSfcRes{}\to\ordLexRes{}$~MDOF/s on
+the residual and $\ordSfcJac{}\to\ordLexJac{}$ on the Jacobian action
+(Table~\ref{tab:ordering}). The ordering is part of the format, not an optimisation applied to
+it, which is why \S\ref{sec:format} states it as a precondition.
+
+\subsection{The higher-order convective flux}
+\label{sec:res:convho}
+
+\begin{table}[t]
+  \centering
+  \caption{\emph{Higher-order, deferred correction.} Cost of the flux, residual only. Each ratio
+    isolates one variable: \emph{gen/hand} is two kernels at one layout, \emph{hand/atomic} one
+    kernel at two layouts. The nodal velocity gradient is hoisted, so what is timed is the flux
+    and not the reconstruction feeding it. Every arm's checksum differs from the first-order one,
+    which is what says the correction was applied; the generator refuses the table otherwise.}
+  \label{tab:convho}
+  \inputifready{tables/convho}{convective scheme arms, jobs/conv\_ho\_bench.sbatch}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \inputifready{figures/convho}{convective scheme arms, jobs/conv\_ho\_bench.sbatch}
+  \caption{The same five variants as Table~\ref{tab:convho}. The two layouts converge from left to
+    right: each added term is arithmetic per sub-control surface that the layout does not
+    accelerate.}
+  \label{fig:convho}
+\end{figure}
+
+The correction is not free and is not meant to be: it adds a reconstruction and, where a limiter is
+selected, a limiter evaluation at every sub-control surface, against a first-order flux that is a
+branch and a multiply. Table~\ref{tab:convho} and Figure~\ref{fig:convho} put all five variants on
+one footing and ask the same question of each.
+
+\paragraph{The layout's advantage falls as arithmetic per surface rises, monotonically.} It is
+$\hoFirstLayoutRatio\times$ on first-order upwind, $\hoUnlimLayoutRatio\times$ once the unlimited
+reconstruction is added, and $\hoDmLayoutRatio\times$ to $\hoVenkLayoutRatio\times$ with a limiter.
+That ordering is the paper's own thesis read off a single table. The format accelerates what the
+sweep reads and how it writes; the higher-order flux adds arithmetic per sub-control surface without
+adding traffic, so with every term the share of the operator the layout can accelerate shrinks. It
+is the same effect the completeness ladder measures in \S\ref{sec:res:ladder}, here driven by the
+convective scheme rather than by which physical terms are switched on, and it reaches the same
+conclusion: a margin quoted from the cheapest kernel is not the margin a solver receives.
+
+\paragraph{The cost of the correction, within one layout.} Against first order in the same layout
+--- so the format is not in the comparison and what remains is the scheme's own arithmetic --- the
+unlimited reconstruction costs $\hoUnlimCostAtomic\times$ on atomic and the limiters
+$\hoClipCostAtomic\times$ to $\hoVenkCostAtomic\times$. On packed the same corrections cost
+$\hoUnlimCostPacked\times$ to $\hoVenkCostPacked\times$, more in relative terms precisely because
+the layout had removed so much of the first-order cost that the arithmetic it does not touch is
+what is left. The limiters separate by less than the limited--unlimited gap, sharing the
+reconstruction and differing only in what is applied to the increment.
+
+\paragraph{The higher-order flux carries the layout's properties.} The packed higher-order
+sweep has the same shape as the first-order one: stage the pack's fields, accumulate into a
+pack-private buffer with plain addition, write the owned rows straight out, close the ghosts
+through the reduction graph. No atomic appears, and the summation order is fixed by the same
+index arrays, so the reproducibility of \S\ref{sec:res:determinism} is a property of the
+higher-order operator too and not something the scheme gives up.
+
+\paragraph{Reading the table.} Each ratio isolates one variable. \emph{gen/hand} is one operator
+in one layout through two kernels, so it is what generating the kernel was worth; \emph{hand/atomic}
+is one kernel in two layouts, so it is what the format is worth. The first-order row carries
+neither: its packed entry is the sixteen-wide first-order sweep, which is not one of the two
+kernels being compared, so it is listed for scale and both of its ratios are withheld.
+
+All three kernels are checked against one another node by node, not by checksum, and that is not
+pedantry: the residual of this state sums to order \num{1e-14} and is almost all cancellation, so a
+term can be present at every node and invisible in the total. They agree to \num{2e-17} on every
+arm. One such check was itself defective --- it compared two sweeps where no pack had been built, so
+both wrote nothing and it reported perfect agreement --- which surfaced only on deliberately
+breaking a kernel and seeing it still pass.
+
+\subsection{Against the assembled matrix}
+\label{sec:res:spmv}
+
+\begin{figure}[t]
+  \centering
+  \input{figures/roofline}
+  \caption{\fostag{} Both roofs measured on the same node as the points: a STREAM triad at
+    \SI{\rlBw}{\giga\byte\per\second} and a large double-precision GEMM at
+    \SI{\rlPeak}{\giga\flops}. The matrix-free points are the \emph{bare} element kernels, with
+    no Rhie--Chow term, so the exact/lagged distinction does not arise; the SpMV points apply
+    the assembled, lagged matrix. Intensity uses compulsory traffic, an upper bound, so every
+    point lies at or right of its kernel's true position.}
+  \label{fig:roofline}
+\end{figure}
+
+Figure~\ref{fig:roofline} places the two representations on the same axes, and the distance
+between them along the horizontal is the point. The matrix-free kernels operate at
+$\rlResidualPackedAi{}$--$\rlJacobianPackedAi{}$~FLOP/byte; the assembled product operates at
+$\rlSpmvFSixFourAi{}$, a factor of thirty-four lower, because what it must read is a matrix
+whose size grows with the stencil while the matrix-free kernels read a mesh. That is the
+footprint of Table~\ref{tab:footprint} expressed as intensity, and it is why halving the value
+precision --- moving the SpMV from $\rlSpmvFSixFourAi{}$ to $\rlSpmvFThreeTwoAi{}$ --- is close
+to the only lever the assembled operator has.
+
+\paragraph{The matrix-free kernel wins without being the efficient one.} It would be convenient
+to report that the packed kernel is near a roof. It is not, and the assembled product is. The
+ridge lies at \rlRidge{}~FLOP/byte, so the two representations are bound by different roofs, and
+measured against the roof binding at its own intensity the SpMV attains \rlSpmvFSixFourPct\% ---
+it is very nearly as fast as its bandwidth allows --- while the packed residual attains
+\rlResidualPackedPct\% of the compute roof and the atomic sweep \rlResidualAtomicPct\%.
+
+The packed kernel is therefore ahead not because it uses the machine better but because it plays
+against a roof some twenty times higher, of which it reaches a fifth. That is the honest reading
+of the figure, and it says where the remaining work is: the layout has removed the scatter as a
+constraint without making the kernel either bandwidth- or arithmetic-bound, so what limits it is
+neither roof but the element kernel's own instruction mix and dependencies. An assembled
+operator at \rlSpmvFSixFourPct\% of its roof has almost nothing left to give; a matrix-free one
+at \rlResidualPackedPct\% has a great deal.
+
+The comparison against the atomic layout is worth reading on the same axes. Both do the same
+arithmetic at the same compulsory intensity --- $\rlResidualPackedAi{}$~FLOP/byte for the
+residual --- yet reach \SI{\rlResidualPacked}{\giga\flops} and
+\SI{\rlResidualAtomic}{\giga\flops}. Since the model gives them identical intensity by
+construction, the vertical gap is exactly what the atomic implementation adds over compulsory
+traffic: re-reading each node once per incident element rather than once per pack, the global
+zeroing pass, and the atomic updates themselves.
+
+%================================================================================================
+\begin{table}[t]
+  \centering
+  \caption{\fostag{} The Jacobian action in both forms, against sparse matrix--vector products with the
+    assembled matrix. The lagged row holds the same operator the matrix does and is the
+    like-for-like comparison; the exact row is what a Newton--Krylov solve should apply.}
+  \label{tab:jacfair}
+  \inputifready{tables/jacfair}{fair Jacobian comparison, jobs/jac\_fair.sbatch}
+\end{table}
+
+\paragraph{Against the operator the matrix can hold.} Table~\ref{tab:jacfair} separates two questions
+the figure runs together. Against the operator the matrix encodes, the packed matrix-free action is
+$\jfLaggedVsF\times$ the double-precision SpMV and $\jfLaggedVsS\times$ the single-precision one;
+the atomic sweep is $\jfLaggedAtomicVsF\times$, barely ahead of the matrix at all. So the assembled
+matrix is not far behind a \emph{poorly laid out} matrix-free operator, and the case for matrix-free
+rests on the layout rather than the method alone.
+
+Carrying the exact term costs $\jfExactCost\times$ on the packed layout, the direction-gradient
+sweep appearing as throughput. Quoting the exact action against the SpMV would report
+$\jfExactVsF\times$ rather than $\jfLaggedVsF\times$, understating the matrix-free side by a quarter
+while appearing to favour it; both are given because they answer different questions.
+
+\section{Discussion and limitations}
+\label{sec:discussion}
+
+\paragraph{Spatial ordering is required, not merely helpful.} Packs are contiguous element
+ranges, so an unordered mesh produces packs whose nodes are scattered and numerous and the
+locality the format depends on disappears. It is a precondition on the input, with a setup cost
+a single application does not repay, and it renumbers the nodes in place --- which constrains
+construction order downstream and makes verification against a reference match on coordinates
+rather than indices. For an implicit solver applying its operator thousands of times per mesh
+this is a good trade; for one evaluation it is not.
+
+\paragraph{The determinism claim is narrower than it may appear}: \S\ref{sec:apply:determinism} scopes
+it to execution in which one thread owns a pack, not to the format alone. And colouring is
+atomics-free and reproducible too --- the contribution is not that the packed layout alone fixes a
+summation order, but that it fixes one while also removing the barriers, both following from the
+ownership partition rather than a separate mechanism.
+
+\paragraph{The margin is a function of the operator, not a property of the format.}
+\S\ref{sec:res:convho} shows it falling from $\hoFirstLayoutRatio\times$ to
+$\hoVenkLayoutRatio\times$ across convective schemes, and \S\ref{sec:res:ladder} shows the same
+across physical terms. A single headline ratio is only ever a statement about one operator.
+
+\paragraph{The default pack size is chosen by the wrong constraint.} As \S\ref{sec:res:packsize}
+shows, the pack size the index type admits and the one that performs best are not the same
+number, and nothing in the construction reconciles them: a default set by an index-width ceiling
+rather than the core count mis-sizes itself on a wide socket.
+
+\paragraph{One node, one architecture.} Every measurement here is from a single Grace die. The
+mechanisms argued for --- narrower index traffic, a gather in place of repeated indexed reads,
+no zeroing pass, no atomics --- are not specific to it, but that is an argument, not a
+measurement.
+
+%================================================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+The scatter in a matrix-free operator is usually treated as a synchronisation problem. Treating
+it as a data-layout problem instead --- giving every node exactly one owning pack, so that the
+owned ranges partition the numbering, and closing the remainder with a gather built by sorting
+--- removes the synchronisation entirely rather than making it cheaper. The operator then has no
+atomic on any path and a summation order fixed by stored index arrays, so it returns the same
+bits at every thread count.
+
+Measured on the residual and Jacobian action of a colocated CVFEM Navier--Stokes discretisation on
+one Grace socket, the format is faster than a standard atomic sweep and than sparse matrix--vector
+products with the assembled matrix, while reading two orders of magnitude less. The thread sweep
+locates the advantage: most of it is present at a single thread, where no contention exists, so it
+comes from what the layout reads rather than what it avoids contending on. The margin depends on the
+operator: across convective schemes it runs from $\hoFirstLayoutRatio\times$ down to
+$\hoVenkLayoutRatio\times$ as arithmetic per sub-control surface grows, so a format is worth
+reporting against the operator a solver applies rather than the cheapest kernel available.
+
+\begin{acks}
+The author thanks the Swiss National Science Foundation (project no.~215627), the PASC Program
+(``XSES-FSI'') and USI's Fondo Istituzionale per la Ricerca; computations on Alps at CSCS.
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{refs}
+
+\end{document}

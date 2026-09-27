@@ -43,6 +43,56 @@ ok() {
     fi
 }
 
+# The higher-order deferred correction. Its two oracles live behind --verify rather than
+# --verify-jac, and until now NOTHING in ctest ran them: the checks existed only for whoever
+# remembered to pass the flag, so a change to the reconstruction or to how a layout gathers its
+# inputs could break equivalence and the suite would stay green. Both oracles abort the driver on
+# failure, so a non-zero exit here is the gate.
+#
+#   verify_packed_ho_residual_vs_atomic_abs      the two LAYOUTS agree
+#   verify_packed_ho_simd_vs_packed_ho_scalar_abs   the two hand-written KERNELS agree
+#   verify_packed_ho_sympy_vs_packed_ho_scalar_abs  the GENERATED kernel agrees (arm 0 only)
+# The first-order checksum, to prove each arm below actually applied its correction. Both
+# oracles read exactly 0.0 at n=8 -- one pack, so the layouts see the same element order and
+# the same arithmetic -- and an agreement of zero would also hold if the correction were
+# silently skipped in both. So agreement is checked AND the answer is checked to have moved.
+FO_CK=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout packed --kernel sumfact 2>&1 \
+        | sed -n 's|^  checksum: \(.*\)$|\1|p' | head -1)
+
+ok_ho() {
+    desc="$1"; shift
+    if ! out=$("$BENCH" --n 8 --repeat 1 --warmup 0 --verify-ho --layout atomic --kernel sumfact "$@" 2>&1); then
+        printf '%-62s FAIL\n' "$desc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    ck=$("$BENCH" --n 8 --repeat 1 --warmup 0 --layout packed --kernel sumfact "$@" 2>&1 \
+         | sed -n 's|^  checksum: \(.*\)$|\1|p' | head -1)
+    if [ -z "$ck" ] || [ "$ck" = "$FO_CK" ]; then
+        printf '%-62s FAIL (checksum equals first order: correction not applied)\n' "$desc"
+        FAIL=$((FAIL + 1))
+        return
+    fi
+    printf '%-62s OK   %s\n' "$desc" \
+        "$(printf '%s\n' "$out" | grep -oE 'verify_packed_ho_(residual_vs_atomic|simd_vs_packed_ho_scalar|sympy_vs_packed_ho_scalar)_abs: [0-9.e+-]*' | tr '\n' ' ')"
+}
+
+# The Rhie-Chow higher-order oracle. Its own helper because the driver reaches it by a different
+# path and prints a different line, and because the checksum-moved assertion above does not apply:
+# both sides here carry the correction, so what is being tested is that the two KERNELS agree.
+ok_ho_rc() {
+    desc="$1"; shift
+    if out=$("$BENCH" --n 8 --repeat 1 --warmup 0 --verify-ho --layout packed --kernel sumfact "$@" 2>&1); then
+        printf '%-62s OK   %s\n' "$desc" \
+            "$(printf '%s\n' "$out" | grep -oE 'verify_packed_ho_rc_sympy_vs_scalar_abs: [0-9.e+-]*')"
+    else
+        printf '%-62s FAIL\n' "$desc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 # A configuration the driver must still refuse, because no kernel behind it carries the term
 # the flags asked for. A refusal is a feature: the alternative is a row that names a term it
 # did not compute.
@@ -197,6 +247,19 @@ transient_reaches "residual, packed"           packed
 transient_reaches "residual, colored"          colored
 transient_reaches "jac-action, packed"         packed --jac-action
 transient_reaches "assemble, store"            store --assemble
+
+echo "== the higher-order deferred correction, every limiter arm"
+# All four arms, because the limiter is the part of the reconstruction with data-dependent
+# selects in it and an arm can break on its own.
+ok_ho "residual + ho, unlimited"                --conv-ho 0
+ok_ho "residual + ho, bounded-face clip"        --conv-ho 1
+ok_ho "residual + ho, Venkatakrishnan"          --conv-ho 2
+ok_ho "residual + ho, Darwish-Moukalled"        --conv-ho 3
+# Rhie-Chow, where the generated kernel has its own variant. This arm takes a different route
+# through the driver -- the main verify block is gated off when Rhie-Chow is on -- so it needs its
+# own row rather than being implied by the four above.
+ok_ho_rc "residual + ho + rc, generated vs scalar" --conv-ho 0 --rhie-chow
+echo
 
 echo "== the partially assembled Jacobian action"
 # Measured and lost -- 17-19% slower than direct evaluation, see subpar/README.md -- so the

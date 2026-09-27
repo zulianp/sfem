@@ -312,6 +312,11 @@ int main(int argc, char **argv) {
     int         bsr_single = 0;
     int         verify     = 0;
     int         verify_jac = 0;
+    // The higher-order oracles on their own. They live inside the --verify block, but that
+    // block also exercises a colored sympy residual that is quarantined in subpar/ and aborts
+    // by design in a default build, so --verify cannot be a ctest gate. This runs the two
+    // higher-order equivalence checks and stops before anything else.
+    int         verify_ho  = 0;
     int         use_sfc    = 1;
     scalar_t    rho        = 1.0;
     scalar_t    mu         = 0.01;
@@ -329,6 +334,35 @@ int main(int argc, char **argv) {
     int         rhie_chow  = 0;
     scalar_t    rc_scale   = 1;
     int         boundary   = 0;
+    // Deferred-correction higher-order convective flux, and which limiter arm. Residual only,
+    // and only on the atomic sum-factored sweep; see the --conv-ho help text.
+    int         conv_ho      = 0;
+    int         conv_limiter = 0;
+    // Lag the Rhie-Chow pressure-gradient sensitivity in the Jacobian action, matching what
+    // the assembled matrix encodes. See the --lagged-rc help text.
+    int         lagged_rc    = 0;
+    // Select the SIMD-kernel packed higher-order sweep instead of the scalar one. Both compute
+    // the same residual, agreeing to 3e-18.
+    //
+    // THE SCALAR ONE IS THE DEFAULT BECAUSE IT IS FASTER, which is the opposite of what
+    // routing the correction through the 16-wide kernel was meant to achieve. Measured on
+    // Grace at 8,586,756 dof, unlimited arm: 646.7 MDOF/s scalar against 494.3 SIMD, a 1.31x
+    // loss; the laptop said 1.43x in the same direction. The reason is structural rather than
+    // incidental -- the correction needs each lane's element coordinates and its eight nodal
+    // gradients, 96 scalars, gathered INSIDE the lane loop, and that gather costs more than
+    // vectorising the flux around it returns. Making it pay would need a lane-parallel
+    // reconstruction rather than a per-lane gather, which means the reconstruction existing in
+    // a second, vector form; that is a design decision about duplicating it, not a tweak.
+    int         ho_simd      = 0;
+    // Force the hand-written SCALAR higher-order kernel. It was the default until the generated
+    // lane-blocked kernel measured 910 against its 657 MDOF/s on Grace (job 4814365); it remains
+    // selectable because it is the reference the other two are checked against, and because it is
+    // the only one of the three that carries every limiter arm.
+    int         ho_scalar    = 0;
+    // Report what each representation of the mesh costs in memory, then exit. Its own mode
+    // rather than a column of the timing CSV: it needs the packed mesh built and nothing else
+    // run, and the numbers it prints are sizes, not rates.
+    int         mesh_footprint = 0;
     // Whether the nodal pressure gradient is rebuilt inside every apply or hoisted out of
     // the timed loop. This is the difference SFEM_PGRAD_CACHE makes in the solver, and it
     // is the other half of the cascade: the gradient is a full element sweep.
@@ -379,12 +413,16 @@ int main(int argc, char **argv) {
         }
         else if (arg == "--verify")
             verify = 1;
+        else if (arg == "--verify-ho")
+            verify_ho = 1;
         else if (arg == "--verify-jac")
             verify_jac = 1;
         else if (arg == "--no-sfc")
             use_sfc = 0;
         else if (arg == "--breakdown")
             g_breakdown = 1;
+        else if (arg == "--mesh-footprint")
+            mesh_footprint = 1;
         else if (arg == "--kernel-only")
             g_kernel_only = 1;
         else if (arg == "--dense-flush")
@@ -393,7 +431,18 @@ int main(int argc, char **argv) {
             rhie_chow = 1;
             // Optional scale, so --rhie-chow 0.5 works and a bare --rhie-chow means 1.
             if (i + 1 < argc && argv[i + 1][0] != '-') rc_scale = (scalar_t)std::atof(argv[++i]);
-        } else if (arg == "--boundary")
+        } else if (arg == "--conv-ho") {
+            conv_ho = 1;
+            // Optional limiter id, so --conv-ho 2 selects Venkatakrishnan and a bare
+            // --conv-ho means unlimited, which is the arm the solver defaults to.
+            if (i + 1 < argc && argv[i + 1][0] != '-') conv_limiter = std::atoi(argv[++i]);
+        } else if (arg == "--ho-simd")
+            ho_simd = 1;
+        else if (arg == "--ho-scalar")
+            ho_scalar = 1;
+        else if (arg == "--lagged-rc")
+            lagged_rc = 1;
+        else if (arg == "--boundary")
             boundary = 1;
         else if (arg == "--pgrad-per-apply")
             pgrad_per_apply = 1;
@@ -436,6 +485,17 @@ int main(int argc, char **argv) {
                     "                           (cvfem_hex8_best_store.hpp; residual/jac-action\n"
                     "                           fall back to packed)\n"
                     "  --breakdown    per-phase timing of the assembly (thread-summed ms/call)\n"
+                    "  --ho-scalar    packed --conv-ho through the hand-written SCALAR kernel. The\n"
+                    "                 default for the unlimited no-Rhie-Chow arm is now the\n"
+                    "                 GENERATED lane-blocked kernel, which measures 1.39x it; this\n"
+                    "                 forces the reference, and is implied by any limiter or by\n"
+                    "                 --rhie-chow, which the generated kernel does not carry.\n"
+                    "  --verify-ho    the two higher-order equivalence oracles alone, then exit:\n"
+                    "                 the layouts against each other and the SIMD kernel against\n"
+                    "                 the scalar one. Needs --conv-ho; this is the ctest gate.\n"
+                    "  --mesh-footprint  print the bytes each representation of the mesh occupies,\n"
+                    "                 array by array, and exit. Every figure is the allocation's\n"
+                    "                 own nbytes(), so nothing here is a hand computation.\n"
                     "  --kernel-only  element kernel writes to a dense stack buffer (no scatter);\n"
                     "                 measures the arithmetic floor of the element kernel\n"
                     "  --dense-flush  sumfact only: stage ke densely, then flush 64 contiguous\n"
@@ -449,6 +509,29 @@ int main(int argc, char **argv) {
                     "  --bsr-apply    assemble once, then time BSR SpMV y = J(u) v\n"
                     "  --bsr-precision double|single   SpMV value storage (default double);\n"
                     "                 single stores float and still accumulates in double\n"
+                    "  --conv-ho [L]    deferred-correction higher-order convective flux, limiter L\n"
+                    "                   (0 unlimited, 1 bounded-face clip, 2 Venkatakrishnan,\n"
+                    "                   3 Darwish-Moukalled; default 0). Residual only. Runs on\n"
+                    "                   --layout atomic and --layout packed, both through the\n"
+                    "                   SCALAR sum-factored kernel, which is the only one that\n"
+                    "                   accepts ugrad8: so packed-vs-atomic here isolates the\n"
+                    "                   layout with the kernel held fixed, and a higher-order\n"
+                    "                   packed number is NOT comparable with a first-order one,\n"
+                    "                   which is 16-wide SIMD. The nodal velocity gradient is\n"
+                    "                   hoisted, as the solver lags the correction one Newton\n"
+                    "                   step.\n"
+                    "  --ho-simd        packed --conv-ho through the SIMD kernel instead of the\n"
+                    "                   scalar one. Same residual to 3e-18, and SLOWER by 1.31x\n"
+                    "                   on Grace -- the per-lane gather the correction needs\n"
+                    "                   costs more than vectorising the flux returns.\n"
+                    "  --lagged-rc      lag the Rhie-Chow pressure-gradient sensitivity in the\n"
+                    "                   Jacobian action, giving the FROZEN Jacobian that the\n"
+                    "                   assembled matrix encodes. The exact action differentiates\n"
+                    "                   through the nodal gradient reconstruction and pays a\n"
+                    "                   second pass for the direction's gradient; the assembled\n"
+                    "                   matrix cannot carry that term without widening its\n"
+                    "                   one-ring sparsity, so it lags it. Use this for a\n"
+                    "                   like-for-like comparison against --bsr-apply.\n"
                     "  --rhie-chow [S]  include the Rhie-Chow pressure-velocity coupling at scale\n"
                     "                 S (default 1), and the nodal pressure gradient it needs.\n"
                     "                 sumfact only -- the hand-written and generated kernels carry\n"
@@ -859,8 +942,14 @@ int main(int argc, char **argv) {
     }
 
     PackedData packed;
+    // verify_ho belongs here for the same reason every other verify flag does: the higher-order
+    // oracles compare PACKED sweeps, and a packed sweep with no pack built writes nothing at all
+    // rather than failing, so the comparison would silently read whichever residual was left in
+    // place and report perfect agreement. That is exactly what it did until this was added -- a
+    // deliberately broken SIMD kernel still measured 0.0 -- and it is the same artefact
+    // docs/kernel_prose/30_layout_margin.md records for a throughput row.
     if (layout == "packed" || layout == "colored" || layout == "store" || verify || verify_jac || jac_action ||
-        bsr_apply)
+        bsr_apply || mesh_footprint || verify_ho)
         packed = make_packed(d.mesh, pack_size);
     PackColoring colors;
     if (layout == "colored" || verify || verify_jac)
@@ -870,6 +959,67 @@ int main(int argc, char **argv) {
     d.nelements = d.mesh->n_elements(0);
     d.elems     = d.mesh->elements(0)->data();
     d.points    = d.mesh->points()->data();
+
+    if (mesh_footprint) {
+        // Every figure below is an allocation's own nbytes(). Nothing is
+        // nelements * nodes_per_element * sizeof(index) worked out by hand, because the
+        // arrays that are easy to get wrong that way are exactly the ones that decide the
+        // answer: the ghost list and the reduction graph have no closed form -- their
+        // lengths depend on how the packs happen to cut the mesh -- and the packed element
+        // array is padded past n_packed_elements.
+        //
+        // Two totals are printed, with and without the coordinates, because the coordinates
+        // are byte-for-byte the same in both representations. Including them is the honest
+        // answer to "what does the mesh cost"; excluding them is the honest answer to "what
+        // does the format change", and the two ratios are very different. Reporting only one
+        // invites the reader to apply it to the other question.
+        const auto      pm    = packed.packed;
+        const long long dofs  = (long long)d.nnodes * N_FIELDS;
+        const size_t    pts   = d.mesh->points()->nbytes();
+        const size_t    st_el = d.mesh->elements(0)->nbytes();
+
+        const size_t pk_el   = pm->elements(0)->nbytes();
+        const size_t pk_own  = pm->owned_nodes_ptr(0)->nbytes();
+        const size_t pk_shr  = pm->n_shared(0)->nbytes();
+        const size_t pk_gptr = pm->ghost_ptr(0)->nbytes();
+        const size_t pk_gidx = pm->ghost_idx(0)->nbytes();
+        const size_t pk_rptr = pm->ghost_reduce_ptr(0) ? pm->ghost_reduce_ptr(0)->nbytes() : 0;
+        const size_t pk_ridx = pm->ghost_reduce_idx(0) ? pm->ghost_reduce_idx(0)->nbytes() : 0;
+        const size_t pk_rdst = pm->ghost_reduce_dest(0) ? pm->ghost_reduce_dest(0)->nbytes() : 0;
+        const size_t pk_nmap = pm->node_map() ? pm->node_map()->nbytes() : 0;
+        const size_t pk_top  = pk_el + pk_own + pk_shr + pk_gptr + pk_gidx + pk_rptr + pk_ridx +
+                              pk_rdst + pk_nmap;
+
+        std::printf("### mesh footprint  n_nodes=%td n_elements=%td dofs=%lld\n",
+                    d.nnodes, d.nelements, dofs);
+        std::printf("### n_packs=%td elements_per_pack=%td packed_elements=%td "
+                    "ghost_entries=%td ghost_reduce_rows=%td\n",
+                    packed.n_packs, packed.n_elements_per_pack, packed.n_packed_elements,
+                    packed.n_ghost_entries, packed.n_ghost_reduce_rows);
+        std::printf("\n%-28s %14s %12s\n", "array", "bytes", "B/dof");
+#define CV_FP_ROW(name, b) \
+    std::printf("%-28s %14zu %12.3f\n", name, (size_t)(b), (double)(b) / (double)dofs)
+        CV_FP_ROW("standard.elements", st_el);
+        CV_FP_ROW("standard.topology_total", st_el);
+        CV_FP_ROW("packed.elements", pk_el);
+        CV_FP_ROW("packed.owned_nodes_ptr", pk_own);
+        CV_FP_ROW("packed.n_shared", pk_shr);
+        CV_FP_ROW("packed.ghost_ptr", pk_gptr);
+        CV_FP_ROW("packed.ghost_idx", pk_gidx);
+        CV_FP_ROW("packed.ghost_reduce_ptr", pk_rptr);
+        CV_FP_ROW("packed.ghost_reduce_idx", pk_ridx);
+        CV_FP_ROW("packed.ghost_reduce_dest", pk_rdst);
+        CV_FP_ROW("packed.node_map", pk_nmap);
+        CV_FP_ROW("packed.topology_total", pk_top);
+        CV_FP_ROW("shared.points", pts);
+        CV_FP_ROW("standard.with_points", st_el + pts);
+        CV_FP_ROW("packed.with_points", pk_top + pts);
+#undef CV_FP_ROW
+        std::printf("\npacked/standard topology_only   %.4f\n", (double)pk_top / (double)st_el);
+        std::printf("packed/standard with_points     %.4f\n",
+                    (double)(pk_top + pts) / (double)(st_el + pts));
+        return 0;
+    }
 
     if (warp != scalar_t(0)) {
         const scalar_t pi = std::acos(scalar_t(-1));
@@ -1001,7 +1151,7 @@ int main(int argc, char **argv) {
             // nodal pressure gradient) and slot 4 appears only for the Jacobian action's
             // direction gradient. Touched here so the first timed call does not pay for the
             // allocation.
-            if (geom_kind == GeomKind::Isoparam || verify || rhie_chow)
+            if (geom_kind == GeomKind::Isoparam || verify || verify_ho || rhie_chow)
                 (void)thread_scratch<scalar_t>(3, rhie_chow ? packed_rc_n(packed) : packed_xyz_n(packed));
             if (rhie_chow && jac_action) (void)thread_scratch<scalar_t>(4, packed_qg_n(packed));
         }
@@ -1035,7 +1185,37 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (verify && !rhie_chow) {
+    // The higher-order kernels WITH Rhie-Chow. The block below is gated off when Rhie-Chow is on,
+    // because most of its comparisons are between kernels that do not all carry the term -- but the
+    // generated higher-order kernel does carry it, in its own variant, and shipping that unverified
+    // is exactly what these oracles exist to prevent. So this one runs here instead.
+    if (verify_ho && rhie_chow && conv_ho) {
+        std::vector<scalar_t> ug;
+        const scalar_t       *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
+        cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, 3, ug);
+
+        apply_residual_packed_defcor_scalar(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
+        std::vector<scalar_t> rc_scalar_r;
+        pack_residual(d, rc_scalar_r);
+
+        apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0),
+                                     /*sympy=*/true);
+        std::vector<scalar_t> rc_sympy_r;
+        pack_residual(d, rc_sympy_r);
+
+        const scalar_t rc_err = max_abs_diff(rc_scalar_r.data(), rc_sympy_r.data(),
+                                             (ptrdiff_t)rc_scalar_r.size());
+        std::printf("verify_packed_ho_rc_sympy_vs_scalar_abs: %.6e\n", rc_err);
+        if (rc_err > 1.0e-10) {
+            std::fprintf(stderr, "HEX8 generated higher-order Rhie-Chow kernel mismatch\n");
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
+        if (own_mpi) MPI_Finalize();
+        return 0;
+    }
+
+    if ((verify || verify_ho) && !rhie_chow) {
         apply_residual_atomic(d, rho, mu);
         std::vector<scalar_t> current_r;
         pack_residual(d, current_r);
@@ -1122,6 +1302,80 @@ int main(int argc, char **argv) {
             }
         }
 
+        // The two higher-order layouts must agree. Run in ONE process, so the pack has been
+        // built once and both see the same node numbering -- a comparison across two processes
+        // would be invalid, because packing renumbers the mesh in place and the arrays would
+        // not be index-comparable. Checksums cannot stand in for this: the residual of this
+        // state sums to roughly 1e-14, so the sum is all cancellation and two layouts differ
+        // in it by round-off whether or not they agree per node.
+        if (conv_ho) {
+            std::vector<scalar_t> ug;
+            const scalar_t       *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
+            cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, 3, ug);
+
+            apply_residual_atomic_sumfact_defcor(d, rho, mu, ug.data(), conv_limiter, scalar_t(0));
+            std::vector<scalar_t> ho_atomic_r;
+            pack_residual(d, ho_atomic_r);
+
+            apply_residual_packed_defcor_scalar(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
+            std::vector<scalar_t> ho_packed_r;
+            pack_residual(d, ho_packed_r);
+
+            // SAME LAYOUT, TWO KERNELS: isolates the kernel difference from everything the
+            // packed sweep does around it.
+            apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
+            std::vector<scalar_t> ho_packed_simd_r;
+            pack_residual(d, ho_packed_simd_r);
+            // A GATE, not a print. The two kernels agree to 1.3e-18 -- eight orders inside
+            // this bound -- and the bound is what stops a vectorisation change shipping a
+            // wrong kernel. It is deliberately 1e-10 rather than 1e-18: the two instantiations
+            // may legitimately reassociate differently, so demanding the measured value would
+            // fail on a reordering that is not a defect.
+            const scalar_t ho_kernel_err = max_abs_diff(ho_packed_r.data(), ho_packed_simd_r.data(),
+                                                        (ptrdiff_t)ho_packed_r.size());
+            std::printf("verify_packed_ho_simd_vs_packed_ho_scalar_abs: %.6e\n", ho_kernel_err);
+            if (ho_kernel_err > 1.0e-10) {
+                std::fprintf(stderr, "HEX8 packed higher-order SIMD/scalar kernel mismatch\n");
+                if (own_mpi) MPI_Finalize();
+                return 1;
+            }
+
+            // THE GENERATED KERNEL, against the same scalar reference. Every limiter arm is
+            // generated now, so this runs on all four; the checksum cannot stand in for it, as the
+            // residual of this state sums to ~1e-14 and is almost all cancellation.
+            {
+                apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0),
+                                             /*sympy=*/true);
+                std::vector<scalar_t> ho_sympy_r;
+                pack_residual(d, ho_sympy_r);
+                const scalar_t ho_sympy_err = max_abs_diff(ho_packed_r.data(), ho_sympy_r.data(),
+                                                           (ptrdiff_t)ho_packed_r.size());
+                std::printf("verify_packed_ho_sympy_vs_packed_ho_scalar_abs: %.6e\n", ho_sympy_err);
+                if (ho_sympy_err > 1.0e-10) {
+                    std::fprintf(stderr, "HEX8 generated higher-order kernel mismatch\n");
+                    if (own_mpi) MPI_Finalize();
+                    return 1;
+                }
+            }
+
+            const scalar_t ho_err =
+                    max_abs_diff(ho_atomic_r.data(), ho_packed_r.data(), (ptrdiff_t)ho_atomic_r.size());
+            std::printf("verify_packed_ho_residual_vs_atomic_abs: %.6e\n", ho_err);
+            if (ho_err > 1.0e-10) {
+                std::fprintf(stderr, "HEX8 packed higher-order residual mismatch\n");
+                if (own_mpi) MPI_Finalize();
+                return 1;
+            }
+        }
+
+        // --verify-ho stops here. What follows includes a colored sympy residual that lives in
+        // subpar/ and aborts unless built with -DCVFEM_ENABLE_SUBPAR, so continuing would make
+        // the higher-order gate fail for a reason that has nothing to do with it.
+        if (verify_ho && !verify) {
+            if (own_mpi) MPI_Finalize();
+            return 0;
+        }
+
         {
             apply_residual_colored(d, packed, colors, rho, mu, KernelKind::Sumfact, GeomKind::Affine);
             std::vector<scalar_t> colored_r;
@@ -1176,6 +1430,23 @@ int main(int argc, char **argv) {
 
     // The boundary closure is one extra element sweep after the layout's own, which is
     // how the solver arranges it too -- see apply_boundary_scs_residual_pass. Doing it
+    // Nodal velocity gradient for the deferred correction: nine interleaved components per
+    // node. Hoisted, because the solver lags the correction one Newton step -- so what the
+    // timed apply measures is the higher-order FLUX, not the reconstruction that feeds it,
+    // exactly as the Rhie-Chow state gradient is hoisted by default. The same fused
+    // multi-field sweep the solver uses, so this is not a second code path.
+    std::vector<scalar_t> ugrad;
+    if (conv_ho) {
+        const scalar_t *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
+        const int       iso     = geom_kind == GeomKind::Isoparam ? 1 : 0;
+        if (packed.n_packs > 0 && !g_qgrad_atomic) {
+            std::vector<scalar_t> gbuf;
+            cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso, srcs, 3, ugrad, gbuf);
+        } else {
+            cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, 3, ugrad);
+        }
+    }
+
     // here rather than inside each layout means --boundary works for all four.
     auto apply_fn = [&]() {
         if (pgrad_per_apply)
@@ -1191,10 +1462,24 @@ int main(int argc, char **argv) {
                 apply_residual_atomic_isoparam(d, rho, mu);
         } else if (layout == "colored")
             apply_residual_colored(d, packed, colors, rho, mu, kernel_kind, GeomKind::Affine);
+        else if ((layout == "packed" || layout == "store") && conv_ho && ho_simd)
+            apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
+        else if ((layout == "packed" || layout == "store") && conv_ho && !ho_scalar)
+            // THE DEFAULT where it applies: the generated lane-blocked kernel, 1.39x the scalar one
+            // it replaced. It covers the unlimited arm with and without Rhie-Chow -- two generated
+            // variants per limiter arm, eight in all, dispatched inside the sweep. --ho-scalar
+            // forces the hand-written reference, and is required for a non-zero Venkatakrishnan
+            // eps^2, which the generated kernels do not carry and refuse rather than drop.
+            apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0),
+                                         /*sympy=*/true);
+        else if ((layout == "packed" || layout == "store") && conv_ho)
+            apply_residual_packed_defcor_scalar(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (layout == "packed" || layout == "store")
             apply_residual_packed(d, packed, rho, mu, kernel_kind, GeomKind::Affine);
         else if (kernel_uses_sympy_residual(kernel_kind))
             apply_residual_atomic_sympy(d, rho, mu);
+        else if (kernel_kind == KernelKind::Sumfact && conv_ho)
+            apply_residual_atomic_sumfact_defcor(d, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact)
             apply_residual_atomic_sumfact(d, rho, mu);
         else
@@ -1328,7 +1613,19 @@ int main(int argc, char **argv) {
     // therefore rebuilt inside the timed lambda, unconditionally, and timed separately so
     // its share of the matvec is visible rather than folded into the element sweep.
     double qgrad_seconds = 0;
-    const bool with_qgrad = rhie_chow && jac_action;
+    // --lagged-rc: the FROZEN Rhie-Chow Jacobian, which is the operator the assembled matrix
+    // encodes. The exact action differentiates through the nodal pressure-gradient
+    // reconstruction, so it needs the direction's gradient and pays a second pass for it. The
+    // assembled Jacobian cannot carry that term at all -- including it would widen the
+    // pressure coupling past nearest neighbours and break the one-ring sparsity the matrix is
+    // built on -- so it lags it.
+    //
+    // Comparing the exact matrix-free action against an SpMV of that matrix therefore compares
+    // two different operators, and in the direction that flatters the matrix: the matrix-free
+    // side is doing strictly more. This flag makes the like-for-like comparison available by
+    // clearing the direction gradient, which is exactly what Hex8Extras keys `with_qg` on.
+    if (lagged_rc) { d.qgx.clear(); d.qgy.clear(); d.qgz.clear(); }
+    const bool with_qgrad = rhie_chow && jac_action && !lagged_rc;
     auto jac_action_fn = [&]() {
         // A Krylov iteration never sees the same direction twice, so neither does this when
         // the live set exists: the rotation is what stops the direction being resident.
@@ -1907,7 +2204,7 @@ int main(int argc, char **argv) {
                            : (assemble || bsr_apply || assemble_diag) ? "frozen"
                                                                      : "on";
         row.ran_boundary = boundary ? "on" : "off";
-        row.exact_rc     = (rhie_chow && jac_action) ? 1 : 0;
+        row.exact_rc     = (rhie_chow && jac_action && !lagged_rc) ? 1 : 0;
         row.pgrad_per_apply = pgrad_per_apply;
         row.live_vectors    = live_vectors;
         // Recorded as columns rather than left absent: this driver runs every kernel with

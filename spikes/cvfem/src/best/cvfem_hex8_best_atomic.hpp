@@ -156,6 +156,65 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
     }
 }
 
+// The DEFERRED-CORRECTION higher-order convective flux, on the atomic sum-factored sweep.
+//
+// The face value is reconstructed from the donor node and its nodal velocity gradient,
+// u_face = u_donor + grad u_donor . (x_scs - x_donor), and only the DIFFERENCE from the
+// first-order upwind value is added. That is what makes it a deferred correction: the
+// correction is residual-only and the Jacobian stays first-order, which keeps the assembled
+// stencil at one ring. A reconstructed face value reaches outside the element and would
+// otherwise regrow it to two.
+//
+// Only this sweep carries it. The packed and SIMD residual kernels take no ugrad8 argument, so
+// there is no higher-order packed kernel to compare against; that is an implementation gap and
+// the paper reports it as one rather than as a property of the format.
+//
+// `ugrad` is nine components per node, interleaved, and is NOT recomputed here: the solver lags
+// the correction one Newton step, so the gradient is a hoisted input to the apply exactly as
+// the Rhie-Chow state gradient is.
+static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d,
+                                                               const scalar_t  rho,
+                                                               const scalar_t  mu,
+                                                               const scalar_t *const SFEM_RESTRICT ugrad,
+                                                               const int       limiter,
+                                                               const scalar_t  venkat_c) {
+    reset_residual(d);
+    const Hex8Extras opt(d);
+
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+        scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
+        gather_element_fields(d, e, ux, uy, uz, p);
+        Hex8ExtraScratch ex;
+        ex.load(d, opt, e);
+        scalar_t adj[9], det;
+        load_hex8_adj(d, e, adj, &det);
+
+        // The reconstruction needs the element's node coordinates and the eight nodes' nodal
+        // velocity gradients; both are gathered per element, like the fields above.
+        scalar_t xe[8], ye[8], ze[8], g8[72];
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t g = d.elems[a][e];
+            xe[a] = scalar_t(d.points[0][g]);
+            ye[a] = scalar_t(d.points[1][g]);
+            ze[a] = scalar_t(d.points[2][g]);
+            for (int c = 0; c < 9; ++c) g8[a * 9 + c] = ugrad[(ptrdiff_t)g * 9 + c];
+        }
+
+        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, ex.rc,
+                                              /*ueps=*/scalar_t(0), g8, xe, ye, ze,
+                                              limiter, venkat_c, nullptr);
+
+        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+            const smesh::idx_t g = d.elems[a][e];
+            atomic_add(d.rx.data(), g, r[a * 4 + 0]);
+            atomic_add(d.ry.data(), g, r[a * 4 + 1]);
+            atomic_add(d.rz.data(), g, r[a * 4 + 2]);
+            atomic_add(d.rc.data(), g, r[a * 4 + 3]);
+        }
+    }
+}
+
 static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu) {
     reset_residual(d);
     const Hex8Extras opt(d);

@@ -38,7 +38,7 @@
 # Common overrides:
 #   N=64 OPS="assemble" LAYOUTS="colored" sbatch perf_hex8_alps.sbatch
 #   PERF_RECORD=1 sbatch perf_hex8_alps.sbatch        # + sampled profile per config
-#   GROUPS="basic stalls memory" sbatch perf_hex8_alps.sbatch
+#   PERF_GROUPS="basic stalls memory" sbatch perf_hex8_alps.sbatch
 #
 # Output:
 #   perf_hex8_alps_<ts>/cvfem_hex8_perf.csv    tidy: config,event,count  (+ derived metrics)
@@ -84,7 +84,11 @@ PACK_colored="${PACK_colored:-512}"
 PACK_store="${PACK_store:-384}"
 PACK_atomic=0
 
-GROUPS="${GROUPS:-basic stalls cache memory simd scf}"
+# PERF_GROUPS, not GROUPS. GROUPS is a bash special variable holding the process's group ids,
+# so bash overwrites any value passed in and `${GROUPS:-...}` expands to a numeric gid rather
+# than to the default below -- the selection silently never worked, in either direction. The
+# symptom is "error: unknown counter group '33203'".
+PERF_GROUPS="${PERF_GROUPS:-basic stalls cache memory simd scf}"
 PERF_STAT_REPEAT="${PERF_STAT_REPEAT:-2}"
 PERF_RECORD="${PERF_RECORD:-0}"
 PERF_FREQ="${PERF_FREQ:-499}"
@@ -195,6 +199,13 @@ op_flag() {
         jac-action) printf -- "--jac-action" ;;
         assemble)   printf -- "--assemble" ;;
         bsr-apply)  printf -- "--bsr-apply" ;;
+        # The higher-order deferred correction, through each of its two kernels. These are the
+        # arms the `simd` counter group exists to separate: ASE_SPEC/INST_SPEC says whether the
+        # lane loop vectorised at all, and LD_SPEC+ST_SPEC says what the reconstruction's reads
+        # cost. Both emit more than one word, which is why the expansion below is deliberately
+        # unquoted.
+        residual-ho)      printf -- "--conv-ho 0" ;;
+        residual-ho-simd) printf -- "--conv-ho 0 --ho-simd" ;;
         *) die "unknown operation '$1'" ;;
     esac
 }
@@ -216,7 +227,7 @@ echo "  n:        ${N}  repeat=${REPEAT} warmup=${WARMUP}"
 echo "  threads:  ${OMP_NUM_THREADS} (bind=${CPU_BIND})"
 echo "  ops:      ${OPS}"
 echo "  layouts:  ${LAYOUTS}"
-echo "  groups:   ${GROUPS}"
+echo "  groups:   ${PERF_GROUPS}"
 echo
 
 printf "config,operation,layout,kernel,pack_size,threads,cube_n,group,event,count,run_seconds\n" >"${CSV}"
@@ -231,7 +242,10 @@ for op in ${OPS}; do
 
         cmd=("${BENCH}" --n "${N}" --repeat "${REPEAT}" --warmup "${WARMUP}"
              --layout "${layout}" --kernel "${KERNEL}")
-        [[ -n "${flag}" ]] && cmd+=("${flag}")
+        # Unquoted on purpose: op_flag may return several words (see residual-ho above), and
+        # one quoted argument would reach the driver as a single unknown option.
+        # shellcheck disable=SC2206
+        [[ -n "${flag}" ]] && cmd+=(${flag})
         [[ "${layout}" != "atomic" ]] && cmd+=(--pack-size "${ps}")
 
         # a plain run first, so the csv carries the wall time the counters belong to
@@ -240,7 +254,7 @@ for op in ${OPS}; do
                 | awk '{print $2}')"
         secs="${secs:-nan}"
 
-        for grp in ${GROUPS}; do
+        for grp in ${PERF_GROUPS}; do
             echo "==> ${cfg} / ${grp}"
             evs="$(group_events "${grp}")"
             if [[ -z "${evs}" ]]; then

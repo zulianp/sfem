@@ -93,6 +93,11 @@ struct MeshData {
     // once per Krylov application: the correction is lagged by construction, so a gradient
     // from the current Newton iterate is exactly what it wants.
     std::vector<scalar_t> ugrad;
+    // Ghost staging for the fused nine-component sweep. PackedData::ghost_buf is N_FIELDS
+    // wide and this needs nine, and it is held here so a residual does not allocate.
+    std::vector<scalar_t> ugrad_ghost;
+    // Interleaved staging when only the pressure gradient is asked for.
+    std::vector<scalar_t> pgrad_tmp;
     int                   conv_ho{0};
     int                   conv_limiter{0};
     // The cell-Peclet blend, resolved from the environment once per residual and carried as
@@ -297,7 +302,7 @@ inline void usage(const char *argv0) {
                  "  SFEM_CHECK_JV        1: print |J_mf v - J_asm v| after first assembly\n"
                  "  SFEM_RHIE_CHOW       colocated mass-flux interpolation (default 1)\n"
                  "  SFEM_RHIE_CHOW_SCALE D_f = scale * h^2 / (2 mu) (default 1)\n"
-                 "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
+                 "  SFEM_PACK_SIZE       affine packed SIMD (default 1024; 0 = atomic)\n"
                  "  SFEM_PC_PSCALE       Schur scaling of the pressure block:\n"
                  "                       inv_pp = PSCALE / V_p (default 0 = use 1/A_pp).\n"
                  "                       Tuned, not physical: PSCALE * rc_scale ~ 0.1 over\n"
@@ -482,6 +487,18 @@ inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
     assemble_nodal_grad_strided(d, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
 }
 
+// WHICH nodal gradients a call needs, so the solver asks for what it is about to use.
+//
+// The pressure gradient is wanted on every residual and is hoisted across a Krylov solve; the
+// velocity gradient only when the deferred correction is on, and then once per Newton step
+// because the correction is lagged. Computing both unconditionally would waste a sweep in the
+// common case, and computing them separately wastes one in the higher-order case -- they are
+// the SAME reconstruction over the same elements with the same geometry, differing only in
+// which field is read.
+enum class GradSet { Pressure, Velocity, Both };
+
+// One sweep for whatever was asked for. Four fields at most: p, then u, v, w.
+//
 // The nodal velocity gradient the deferred correction extrapolates with. Three passes of the
 // same reconstruction the pressure already uses, interleaved into one array in the layout
 // CVFEMNavierStokes::nodal_velocity_gradient publishes, so the diagnostics and the scheme read
@@ -490,20 +507,82 @@ inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
 // This is not cheap -- the gradient pass is 40-52% of a matvec by the solver's own trace, and
 // this is three of them -- which is the other reason the correction is lagged per Newton step
 // rather than evaluated per Krylov application.
-inline void assemble_nodal_u_grad(MeshData &d, const GeomKind geom_kind) {
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_u_grad");
-    std::vector<scalar_t> gx, gy, gz;
-    d.ugrad.assign((size_t)d.nnodes * 9, scalar_t(0));
-    const scalar_t *const src[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
-    for (int r = 0; r < 3; ++r) {
-        assemble_nodal_grad_strided(d, geom_kind, src[r], 1, gx, gy, gz);
+//
+// ONE sweep for all nine components, not three sweeps of three.
+//
+// This ran assemble_nodal_grad_strided once per velocity component, so everything that is
+// not the field was done three times -- the adjugate load, the determinant check, the
+// element-node indirection, the pack memset, the weight pass and the ghost reduction --
+// and then three full-length temporaries were transposed into d.ugrad. Only the reference
+// gradient and the pushforward are per-component.
+//
+// The flat path is fused too. It keeps its atomics -- seventy-two per element either way --
+// but loses two thirds of the adjugate loads and element indirections, two of the three
+// zeroing and weight passes, and the transpose entirely.
+inline void assemble_nodal_grads(MeshData &d, const GeomKind geom_kind, const GradSet set) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_grads");
+    // The pressure ALONE keeps the single-field sweep it has always used. That sweep writes
+    // pgx/pgy/pgz directly, where the fused one writes interleaved and then needs a nodal pass
+    // to split three components back out -- strictly more work, on the path that pays it on
+    // every evaluation. Delegating rather than reimplementing keeps one sweep per shape.
+    //
+    // No measurement is claimed for this. The solver's conv_cost job runs the SEMI-STRUCTURED
+    // residual (CVFEMNavierStokes::gradient takes the sscvfem_residual branch whenever
+    // SFEM_ELEMENT_REFINE_LEVEL > 1), so it does not reach this file at all, and the flat path
+    // has no Grace measurement of its own yet.
+    if (set == GradSet::Pressure) {
+        assemble_nodal_p_grad(d, geom_kind);
+        return;
+    }
+
+    const int iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+    const bool want_p = set != GradSet::Velocity;
+    const bool want_u = set != GradSet::Pressure;
+
+    const scalar_t *srcs[4];
+    int             nf = 0;
+    if (want_p) srcs[nf++] = d.p.data();
+    if (want_u) {
+        srcs[nf++] = d.ux.data();
+        srcs[nf++] = d.uy.data();
+        srcs[nf++] = d.uz.data();
+    }
+    const int nc = 3 * nf;
+
+    // Velocity alone writes d.ugrad in place, which is the layout its consumers read. Any set
+    // that includes the pressure sweeps into the scratch buffer instead, because d.ugrad is
+    // nine-per-node by contract and the fused set is twelve.
+    std::vector<scalar_t> &buf = (set == GradSet::Velocity) ? d.ugrad : d.pgrad_tmp;
+    if (d.packed && !smesh::Env::read<int>("SFEM_QGRAD_ATOMIC", 0))
+        cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, nf, buf, d.ugrad_ghost);
+    else
+        cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, nf, buf);
+
+    // The pressure's three components are split out into the arrays the rest of the solver
+    // reads. One nodal pass against a saved element sweep, and it keeps every consumer of
+    // pgx/pgy/pgz untouched.
+    if (want_p) {
+        d.pgx.resize((size_t)d.nnodes);
+        d.pgy.resize((size_t)d.nnodes);
+        d.pgz.resize((size_t)d.nnodes);
+#pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-            d.ugrad[(size_t)i * 9 + (size_t)r * 3 + 0] = gx[(size_t)i];
-            d.ugrad[(size_t)i * 9 + (size_t)r * 3 + 1] = gy[(size_t)i];
-            d.ugrad[(size_t)i * 9 + (size_t)r * 3 + 2] = gz[(size_t)i];
+            d.pgx[(size_t)i] = buf[(size_t)i * nc + 0];
+            d.pgy[(size_t)i] = buf[(size_t)i * nc + 1];
+            d.pgz[(size_t)i] = buf[(size_t)i * nc + 2];
         }
     }
+    // With p in front the velocity block starts at component 3, and the deferred correction
+    // reads d.ugrad as nine-per-node, so it is copied out of the fused buffer. One nodal pass
+    // against an element sweep, and it leaves both layouts exactly as their consumers expect.
+    if (want_u && want_p) {
+        d.ugrad.resize((size_t)d.nnodes * 9);
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+            for (int c = 0; c < 9; ++c) d.ugrad[(size_t)i * 9 + c] = buf[(size_t)i * nc + 3 + c];
+    }
 }
+
 
 // Gather one element's eight nodal velocity gradients into the 72-scalar block the SCS
 // correction reads.
@@ -1139,7 +1218,6 @@ inline void apply_transient_action(MeshData &d, const scalar_t rho,
 inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
                            const int ho_override = -1) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual");
-    assemble_nodal_p_grad(d, geom);
     // SFEM_CONV_HO: deferred-correction convection. Off by default, and off is bit-for-bit the
     // scheme that every recorded number in this repository was measured with.
     //
@@ -1277,8 +1355,21 @@ inline void apply_residual(MeshData &d, const scalar_t rho, const scalar_t mu, c
         if (!d.conv_freeze && !d.conv_frozen.empty()) d.conv_frozen.clear();
     }
 
+    // ONE element sweep for whichever gradients this evaluation is about to read.
+    //
+    // The pressure gradient is read by every arm; the velocity gradient only by the deferred
+    // correction and the Peclet blend, and the two are the SAME reconstruction over the same
+    // elements with the same geometry, differing only in which field is gathered. Asking for
+    // them together takes the higher-order residual from three element passes to two, which
+    // is what first order already costs.
+    //
+    // It sits below the freeze block deliberately. A frozen residual is a first-order one
+    // plus a held vector, so it must not pay for a velocity gradient it never reads; the two
+    // inner evaluations that BUILD the held vector reach this line themselves and each ask
+    // for what they need.
+    assemble_nodal_grads(d, geom, (d.conv_ho || d.conv_peclet.form) ? GradSet::Both : GradSet::Pressure);
+
     if (d.conv_ho || d.conv_peclet.form) {
-        assemble_nodal_u_grad(d, geom);
         apply_residual_atomic_sumfact(d, rho, mu);
         apply_body_force(d);
         apply_transient(d, rho);

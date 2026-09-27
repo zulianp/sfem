@@ -122,8 +122,9 @@ static real_t smoother_omega() {
 }
 
 // SFEM_VANKA_FREEZE=N rebuilds the Vanka smoother every Nth Newton iteration and reuses the
-// previous one in between. N = 1, the default, rebuilds every iteration and is what this code
-// has always done, bit for bit.
+// previous one in between. N = 1 rebuilds every iteration and is what this code did originally,
+// bit for bit; it was the default until the measurement recorded below moved it. (That
+// measurement, and the reset point it turned on, are at vanka_freeze_every.)
 //
 // Why there is a knob at all: the rebuild is the largest single cost in a transient step and it
 // scales worse than the solve. Measured on the nozzle at one Grace socket, vanka_setup costs
@@ -146,9 +147,38 @@ static real_t smoother_omega() {
 // than the skipped rebuilds save, particularly with the Peclet blend on, where the defect
 // correction already contracts at only r ~ 0.49 at L = 8. Any report of this knob quotes
 // Newton and linear iterations beside wall time, or it is not a result.
+//
+// DEFAULT 0, WHICH IS ONE SMOOTHER PER CONTINUATION STAGE, BECAUSE IT COSTS NOTHING. The
+// paragraph above demanded Newton and linear iterations beside wall time before this knob is
+// reported on; here they are, each block measured within one allocation, sweeping only this:
+//
+//   cavity N=8 L=8, 1,098,500 dof    cavity N=16 L=4, 1,098,500 dof   step N=8 L=4, 343,876
+//   VF  newton linear n_vs vsetup    VF  newton linear n_vs vsetup    VF  newton linear vsetup
+//    1      14    130   14  2.288s    1      14    148   14  2.471s    1      14    183  0.804s
+//    2      14    130    9  1.529s    2      14    148    9  1.634s
+//    3      14    130    5  0.896s    3      14    148    5  0.990s
+//  stage    14    130    5  0.904s  stage    14    148    5  0.998s  stage    14    183  0.320s
+//
+// The Newton count and the linear count are IDENTICAL down every column of all three blocks.
+// The smoother built at a stage's opening state is as good a preconditioner for the rest of
+// that stage as one rebuilt each iteration, and rebuilding it was simply redundant work.
+//
+// THIS CONTRADICTS AN EARLIER MEASUREMENT, and the difference is the reset point, not the
+// stride. Measured before precond_freeze_stage_begin reset this counter, SFEM_VANKA_FREEZE=2
+// on the N=16 case ran past a 330 s cap WITHOUT CONVERGING against an 87 s baseline -- because
+// the stride then ran across continuation stages and reused a smoother built at Re = 1 at
+// Re = 4. Bounded by the stage, the same stride is free. A freeze policy is only as good as
+// what bounds its staleness.
+//
+// Why this matters more at N = 8 than the phase share at N = 16 suggests: with the coarse
+// level small, vanka_setup is 19.2% of the run rather than 1.9%, so the same saving is ten
+// times the fraction. See the coarse-level sizing note on SFEM_COARSE_FREEZE.
+//
+// 0 means "hold it for the stage"; a positive N rebuilds every Nth Newton iteration within a
+// stage, and N = 1 restores the original behaviour of rebuilding every time.
 static int vanka_freeze_every() {
-    static const int n = smesh::Env::read<int>("SFEM_VANKA_FREEZE", 1);
-    return n > 1 ? n : 1;
+    static const int n = smesh::Env::read<int>("SFEM_VANKA_FREEZE", 0);
+    return n == 0 ? std::numeric_limits<int>::max() : (n > 1 ? n : 1);
 }
 
 // The frozen smoother, and the rebuild index it was built at.
@@ -175,11 +205,70 @@ static long                                    g_vanka_calls = 0;
 // refresh_gmg once before the Newton loop; counting those would shift the rebuild phase on a
 // checked run, so the cycle and the check would disagree about when the smoother is fresh --
 // the same trap SFEM_VANKA_OMEGA was consolidated into one function to avoid.
-static bool vanka_rebuild_now() {
-    const bool build = !g_vanka_cached || (g_vanka_calls % vanka_freeze_every()) == 0;
-    ++g_vanka_calls;
+//
+// The stride arithmetic itself lives in one function, because the dense coarse factorisation
+// below freezes on exactly the same policy and two copies of a modulo would be two things to
+// keep in step. `have` is what makes the first call always build, whatever the stride.
+static bool precond_freeze_rebuild(const bool have, long &calls, const int every) {
+    const bool build = !have || (calls % (every > 1 ? every : 1)) == 0;
+    ++calls;
     return build;
 }
+
+static bool vanka_rebuild_now() {
+    return precond_freeze_rebuild((bool)g_vanka_cached, g_vanka_calls, vanka_freeze_every());
+}
+
+// SFEM_COARSE_FREEZE=N reuses the dense coarse factorisation for N-1 further Newton iterations,
+// the same policy the smoother has and for a much larger stake.
+//
+// The stake, measured on the cavity at 1,098,500 dof (SFEM_N=16, level 4, Re = 100, 14 Newton
+// steps over 5 continuation stages): of 130.919 s in top-level phases, coarse_factor is
+// 50.405 s (38.5%) -- 46.750 s of it inside LAPACK's getrf -- while vanka_setup is 2.466 s
+// (1.9%). A profile of the same run puts dgemm_kernel_NEOVERSEV1 at 54.5% of samples, and that
+// dgemm is getrf's blocked update and nothing else. Freezing the smoother alone therefore
+// addresses a twentieth of what freezing the factorisation addresses.
+//
+// Why it is admissible, in the same terms as the smoother: the level operators read states[0]
+// live, so this stales the PRECONDITIONER and not the operator being solved. FGMRES -- which
+// this work always uses, never BiCGStab -- is the flexible variant precisely so that the
+// preconditioner may differ from one iteration to the next, so a held factorisation is inside
+// what the Krylov method is specified for rather than an abuse of it.
+//
+// The cost is iterations and it must be measured, not assumed: an LU of an older Jacobian is a
+// worse coarse solve, and the coarse correction is what makes the cycle mesh-independent. Any
+// report of this knob quotes Newton and linear iterations beside wall time, or it is not a
+// result -- the same standard the smoother's knob is held to.
+//
+// DEFAULT 0, WHICH IS ONE FACTORISATION PER CONTINUATION STAGE, BECAUSE IT IS FREE. Measured
+// on Grace, within one allocation per case, sweeping only this knob:
+//
+//   cavity, 1,098,500 dof            step, 343,876 dof
+//   CF  newton linear  n_cf  wall    CF  newton linear  n_cf  wall
+//    1      14    148    14    85s    1      14    183    14    13s
+//    2      14    148     9    68s    2      14    183     9    13s
+//    3      14    148     5    53s    3      14    183     5    10s
+//  stage    14    148     5    53s  stage    14    183     5    11s
+//
+// The Newton count and the linear-iteration count are IDENTICAL down every column, and
+// coarse_solve does not move either (22.665 / 22.670 / 22.682 / 22.703 s on the cavity), so
+// the saved factorisations are not being paid for anywhere -- they were simply redundant. On
+// the cavity that is 38% of the wall clock.
+//
+// 0 means "hold it for the stage": the stride resets at every stage boundary, so an
+// unreachable stride is exactly one factorisation per stage without this having to know in
+// advance how many Newton iterations a stage will take. A positive N rebuilds every Nth
+// iteration within a stage, and N = 1 restores the old behaviour of factorising every time.
+static int coarse_freeze_every() {
+    static const int n = smesh::Env::read<int>("SFEM_COARSE_FREEZE", 0);
+    return n == 0 ? std::numeric_limits<int>::max() : (n > 1 ? n : 1);
+}
+
+// Counted separately from the smoother's, because the two strides are independent and because
+// the coarse site is reached on runs where the smoother site is not -- a non-Vanka smoother
+// skips that branch entirely, and a shared counter would then never advance and would freeze
+// the factorisation for the whole run.
+static long g_coarse_calls = 0;
 
 // Start a time step's freeze cycle, so the first Newton iteration after the state jumps by a
 // full dt always gets a smoother built at that state, and the stride runs within the step
@@ -193,7 +282,43 @@ static bool vanka_rebuild_now() {
 // continuation stage moves the state by a change of parameter, not by a full dt, and it
 // typically begins nearly solved -- but it does mean the guarantee is "first iteration of a
 // step", never "first iteration of a stage".
-static void vanka_freeze_step_begin() { g_vanka_calls = 0; }
+// Both strides restart here, so a step begins with a freshly built preconditioner throughout
+// rather than with a fresh smoother wrapped around a held factorisation.
+static void vanka_freeze_step_begin() {
+    g_vanka_calls  = 0;
+    g_coarse_calls = 0;
+}
+
+// The coarse stride ALSO restarts at every continuation stage, which the smoother's does not.
+//
+// The comment above vanka_freeze_step_begin argues that a stage moves the state by a change of
+// parameter rather than by a full dt and typically begins nearly solved, so one stride may run
+// across all of a step's stages. That reasoning does not survive contact with the coarse
+// factorisation. Measured on the cavity at 1,098,500 dof with the stride running across stages,
+// SFEM_COARSE_FREEZE=2 held the LU built at Re = 1 and reused it at Re = 4: stage 1 went 3, 14,
+// 39 linear iterations against the baseline's 3, 5, 9, and stage 2 hit the 1000-iteration cap
+// on its first Newton step, where the baseline needed 5. The ramp multiplies Re by four per
+// stage, which moves the Jacobian far more than a timestep does.
+//
+// Resetting here means a held factorisation is never older than the stage it is used in, which
+// is the only regime where holding one can be expected to work at all.
+//
+// THE SMOOTHER'S STRIDE RESTARTS HERE TOO, which revises the per-step-only reasoning above.
+// That reasoning was written before either knob had been measured on a steady continuation
+// ramp, and the ramp is where it fails: a stage multiplies Re by four, so "a stage moves the
+// state by a change of parameter, not by a full dt" understates the move rather than
+// overstating it. The smoother freeze was measured across stages and lost outright --
+// SFEM_VANKA_FREEZE=2 ran past a 330 s cap unconverged against an 87 s baseline at 1,098,500
+// dof -- for the same reason the factorisation freeze did.
+//
+// This is a no-op at both defaults: SFEM_VANKA_FREEZE defaults to 1, where the stride rebuilds
+// every iteration and resetting the counter changes nothing. It only affects a run that asks
+// for a stride, and for such a run it can only help, because it bounds the staleness by the
+// stage instead of by the whole steady solve.
+static void precond_freeze_stage_begin() {
+    g_vanka_calls  = 0;
+    g_coarse_calls = 0;
+}
 
 // Which Newton iteration the SFEM_GMG_CHECK gates fire on. Default 0, which is where they
 // have always fired and where they should stay for anything that depends only on geometry.
@@ -352,7 +477,7 @@ private:
                      "  SFEM_NSTEPS          time steps to take (default 1)\n"
                      "  SFEM_BDF_ORDER       1 or 2 (default 2; step 1 falls back to BDF1)\n"
                      "  SFEM_LSOLVE_RTOL SFEM_LSOLVE_ATOL SFEM_LSOLVE_MAX_IT\n"
-                     "  SFEM_PACK_SIZE       affine packed SIMD (default 2048; 0 = atomic)\n"
+                     "  SFEM_PACK_SIZE       affine packed SIMD (default 1024; 0 = atomic)\n"
                      "  SFEM_MATRIX_FREE     1: Krylov uses J(u)v (default); 0: assembled BSR\n"
                      "  SFEM_CHECK_JV        1: compare |J_mf v - J_asm v| on the first Jacobian\n"
                      "  SFEM_GMG             1: V-cycle preconditioner (needs a refine level > 1)\n"
@@ -1836,6 +1961,15 @@ private:
         /// redundant one, so a dropped count is reported against what was factored.
         virtual ptrdiff_t                     factored_order() const = 0;
     };
+
+    // The held factorisation, kept here because this is the first scope where its type exists.
+    // It owns its own factors -- DenseLU copies the matrix it is given and keeps the pivots --
+    // so a held one stays valid after the coarse matrix it came from has been reassembled.
+    std::shared_ptr<CoarseFactorization> g_coarse_cached;
+
+    static bool coarse_rebuild_now() {
+        return precond_freeze_rebuild((bool)g_coarse_cached, g_coarse_calls, coarse_freeze_every());
+    }
 
     class DenseLU final : public CoarseFactorization {
         static void getrf(const int n, double *a, int *ipiv, int *info) { dgetrf_(&n, &n, a, &n, ipiv, info); }
@@ -3595,6 +3729,33 @@ private:
                 // bites, the answer is a deeper hierarchy so the coarsest level is genuinely
                 // small, not a return to an iterative coarse solve. SFEM_GMG_DENSE_LU_BELOW
                 // caps it for the cases where that is not yet possible.
+                //
+                // WHAT "A DEEPER HIERARCHY" MEANS HERE, AND WHAT IT IS WORTH. This hierarchy
+                // bottoms out at the MACRO mesh, so the coarsest order is fixed by SFEM_N alone
+                // -- (N+1)^3 * 4 -- while the fine size is (N * LEVEL + 1)^3 * 4. Holding
+                // N * LEVEL fixed therefore trades coarse order against macro count with the
+                // fine problem IDENTICAL in size, which is a configuration choice and not a
+                // discretisation one: the arms below agree to every printed digit of the cavity
+                // centreline profile.
+                //
+                // Cavity at 1,098,500 dof, one allocation, 72 threads, both freeze defaults on:
+                //
+                //   N x LEVEL  coarse   linear  coarse_factor  coarse_solve  precond   wall
+                //    32 x  2   143748        -              -             -        -   >400 s (capped)
+                //    16 x  4    19652      148        18.27 s       22.79 s  29.51 s     52 s
+                //     8 x  8     2916      130         0.26 s        0.62 s   7.42 s     11 s
+                //     4 x 16      500      120         0.03 s        0.03 s   8.78 s     20 s
+                //
+                // The coarse space does NOT degrade as it shrinks -- linear iterations fall
+                // monotonically, 148, 130, 120 -- so the warning above about a macro mesh too
+                // coarse to approximate a convection-dominated operator did not bite down to 500
+                // dofs on this case. What bites instead is PARALLELISM: the macro element is the
+                // work unit, and N = 4 gives 64 of them for 72 threads, which inflates
+                // vanka_setup from 2.13 s to 7.62 s and takes the wall time back up.
+                //
+                // So the rule is the SMALLEST N whose N^3 comfortably exceeds the thread count --
+                // N = 8, giving 512 elements on a 72-core socket -- and not simply the smallest
+                // N. A geometry that needs macro elements to represent it sets its own floor.
                 const ptrdiff_t lu_max =
                         (ptrdiff_t)smesh::Env::read<int>("SFEM_GMG_DENSE_LU_BELOW", 1 << 30);
                 // Gated on the GLOBAL count as well: the factorisation is of the whole coarse
@@ -3603,11 +3764,18 @@ private:
                 if (nd_coarse <= lu_max && nd_coarse_global <= lu_max) {
                     // Prefer the assembled matrix when there is one; fall back to probing
                     // only for a level that has no matrix form.
-                    const double t_lu = smesh::time_seconds();
-                    auto lu = g.Amat[(size_t)i]
-                                      ? make_dense_lu_from_bsr_global(g.Amat[(size_t)i], fi->space(), nd_coarse)
-                                      : make_dense_lu(lop, nd_coarse);
-                    phase_add("coarse_factor", smesh::time_seconds() - t_lu);
+                    // Counted per REBUILD, like vanka_setup, so the phase table's call count
+                    // is the number of factorisations a run actually paid for rather than the
+                    // number of Newton steps it took.
+                    const bool rebuilt_lu = coarse_rebuild_now();
+                    if (rebuilt_lu) {
+                        const double t_lu = smesh::time_seconds();
+                        g_coarse_cached = g.Amat[(size_t)i]
+                                          ? make_dense_lu_from_bsr_global(g.Amat[(size_t)i], fi->space(), nd_coarse)
+                                          : make_dense_lu(lop, nd_coarse);
+                        phase_add("coarse_factor", smesh::time_seconds() - t_lu);
+                    }
+                    auto lu = g_coarse_cached;
                     {
                         const std::string dpath =
                                 smesh::Env::read_string("SFEM_GMG_DUMP_COARSE", std::string());
@@ -3630,7 +3798,10 @@ private:
                     // component loses rank says what is missing: pressure alone is a gauge
                     // (no Dirichlet pressure and an outflow that does not fix the level),
                     // velocity means the coarse boundary treatment itself is wrong.
-                    if (lu->n_dropped()) {
+                    // Printed only on a rebuild, like the phase count: with the factorisation
+                    // held across a stage this otherwise repeats the same line once per Newton
+                    // iteration and reads as though every one of them had factorised.
+                    if (lu->n_dropped() && rebuilt_lu) {
                         int by_comp[4] = {0, 0, 0, 0};
                         for (const ptrdiff_t d : lu->dropped()) by_comp[(int)(d % 4)]++;
                         std::printf(
@@ -4091,7 +4262,7 @@ int main(int argc, char **argv) {
     const real_t      lin_rtol   = smesh::Env::read<real_t>("SFEM_LSOLVE_RTOL", 1e-3);
     const real_t      lin_atol   = smesh::Env::read<real_t>("SFEM_LSOLVE_ATOL", 1e-14);
     const int         lin_max_it = smesh::Env::read<int>("SFEM_LSOLVE_MAX_IT", 1000);
-    const int         pack_size  = smesh::Env::read<int>("SFEM_PACK_SIZE", 2048);
+    const int         pack_size  = smesh::Env::read<int>("SFEM_PACK_SIZE", 1024);
     // Matrix-free by default. 0 assembles a BSR once per Newton step and hands the
     // Krylov method an SpMV instead; that path stays fully supported and gated, and at
     // p=1 it is still the faster of the two -- see the timing breakdown printed at the
@@ -6475,6 +6646,8 @@ int main(int argc, char **argv) {
     // was built from the previous stage's state is stale. Unconditional and free when nothing
     // is held; today only SFEM_CONV_FREEZE's deferred correction is.
     op->begin_continuation_stage();
+    // Same argument, for the held coarse factorisation. See precond_freeze_stage_begin.
+    precond_freeze_stage_begin();
     const real_t rho_use = rho_schedule[stage];
     // The stage's share of the prescribed pressure: one of the increments still owed,
     // measured from the last converged level. With none owed this is the target itself, so

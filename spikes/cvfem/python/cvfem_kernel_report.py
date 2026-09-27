@@ -534,6 +534,9 @@ def main():
     ap.add_argument("-o", "--output", default="CVFEM_Kernels.md")
     ap.add_argument("--html", action="store_true")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--allow-mixed-hosts", action="store_true",
+                    help="build the report even though rows span several nodes; its "
+                         "cross-configuration comparisons are then not valid")
     # Prose that outlives a rerun, the same mechanism cvfem_trace_report.py has: the tables
     # are regenerated from scratch every time, so analysis written into the output by hand
     # is destroyed by the next measurement.
@@ -550,6 +553,39 @@ def main():
     if not rows:
         sys.exit("no rows with coverage columns in %s -- rebuild the benchmark and re-run"
                  % ", ".join(args.csv))
+
+    # ROWS FROM MORE THAN ONE NODE ARE NOT COMPARABLE, AND THIS REPORT'S WHOLE JOB IS TO
+    # COMPARE THEM.
+    #
+    # The throughput tables keep the BEST reading per configuration. Across two nodes that
+    # silently takes each configuration from whichever node was faster for it, so a packed row
+    # and the standard row it is divided by can come from different machines -- which
+    # manufactures a layout ratio out of node-to-node variation. That variation is 5-11% here
+    # and larger than most differences worth finding.
+    #
+    # How this arises in practice, and why a warning was not enough: the campaign APPENDS to
+    # its csv and the batch jobs wrote into a fixed directory, so a rerun on a different node
+    # left both sets of rows in one file. campaign_sat3/campaign.csv reached 186 rows over
+    # nid006545 and nid006547, and campaign_grace3/campaign.csv held 665 rows from nid005669
+    # while a new job appended to it. The host column was already printed in the metadata
+    # table, which is how it was noticed -- after the mixed numbers had been read.
+    #
+    # Refused rather than warned, because a report that has already been generated gets quoted.
+    # --allow-mixed-hosts is there for looking at such a file deliberately, and says in the
+    # output that its comparisons are void.
+    hosts_seen = sorted({r.get("host", "?") for r in rows})
+    if len(hosts_seen) > 1 and not args.allow_mixed_hosts:
+        counts = {}
+        for r in rows:
+            counts[r.get("host", "?")] = counts.get(r.get("host", "?"), 0) + 1
+        sys.exit("refusing to build a comparison from %d nodes: %s\n"
+                 "  Node-to-node variation is larger than the differences this report exists to\n"
+                 "  find, and the tables keep the best reading per configuration, so rows would be\n"
+                 "  divided by rows from another machine. Split the csv by its host column:\n"
+                 "    awk -F, 'NR==1 || $2==\"<node>\"' in.csv > one_node.csv\n"
+                 "  or re-run with --allow-mixed-hosts to inspect it anyway."
+                 % (len(hosts_seen),
+                    ", ".join("%s (%d rows)" % (h, counts[h]) for h in hosts_seen)))
     out = args.output
     if os.path.dirname(os.path.abspath(out)):
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
