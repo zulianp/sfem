@@ -726,7 +726,6 @@ static int linear_elasticity_tri3_hessian_a_msoa_assemble_impl(
   static constexpr int NC = 2;
   static constexpr int NQ = 1;
   static constexpr int NS = 3;
-  static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
 
   static_assert(FORMAT == 1 || FORMAT == 6,
@@ -735,11 +734,11 @@ static int linear_elasticity_tri3_hessian_a_msoa_assemble_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];

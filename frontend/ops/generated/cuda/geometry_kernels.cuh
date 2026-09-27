@@ -25,9 +25,6 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int ND, int NQ>
-struct GeometryJacobianAdjugateDeterminant;
-
 template <typename s_t>
 static __host__ __device__ __forceinline__ void geometry_jacobian_adjugate_and_determinant_2(
     const s_t J00,
@@ -72,10 +69,12 @@ static __host__ __device__ __forceinline__ void geometry_jacobian_adjugate_and_d
       + J02 * (J10 * J21 - J11 * J20);
 }
 
+template <typename s_t, int ND, int NQ>
+struct GeometryJacobianAdjugateDeterminant_scalar;
+
 template <typename s_t, int NQ>
-struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ> {
+struct GeometryJacobianAdjugateDeterminant_scalar<s_t, 2, NQ> {
   static __host__ __device__ __forceinline__ void eval(
-      const int ne,
       const s_t *const RSTR coordinate_grad_ref,
       s_t *const *const RSTR adjugate,
       s_t *const RSTR determinant) {
@@ -98,9 +97,8 @@ struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ> {
 };
 
 template <typename s_t, int NQ>
-struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ> {
+struct GeometryJacobianAdjugateDeterminant_scalar<s_t, 3, NQ> {
   static __host__ __device__ __forceinline__ void eval(
-      const int ne,
       const s_t *const RSTR coordinate_grad_ref,
       s_t *const *const RSTR adjugate,
       s_t *const RSTR determinant) {
@@ -134,14 +132,14 @@ struct GeometryJacobianAdjugateDeterminant<s_t, 3, NQ> {
 };
 
 template <typename s_t, int ND, int NQ>
-static __host__ __device__ __forceinline__ void geometry_jacobian_adjugate_and_determinant(
-    const int ne,
+static __host__ __device__ __forceinline__ void geometry_jacobian_adjugate_and_determinant_scalar(
     const s_t *const RSTR coordinate_grad_ref,
     s_t *const *const RSTR adjugate,
     s_t *const RSTR determinant) {
-  GeometryJacobianAdjugateDeterminant<s_t, ND, NQ>::eval(
-      ne, coordinate_grad_ref, adjugate, determinant);
+  GeometryJacobianAdjugateDeterminant_scalar<s_t, ND, NQ>::eval(
+      coordinate_grad_ref, adjugate, determinant);
 }
+
 
 } // namespace codegen
 } // namespace sfem

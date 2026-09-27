@@ -29,9 +29,6 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int ND, int NQ, int VS>
-struct GeometryJacobianAdjugateDeterminant;
-
 template <typename s_t>
 static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_2(
     const s_t J00,
@@ -75,6 +72,9 @@ static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_3(
       - J01 * (J10 * J22 - J12 * J20)
       + J02 * (J10 * J21 - J11 * J20);
 }
+
+template <typename s_t, int ND, int NQ, int VS>
+struct GeometryJacobianAdjugateDeterminant;
 
 template <typename s_t, int NQ, int VS>
 struct GeometryJacobianAdjugateDeterminant<s_t, 2, NQ, VS> {
@@ -148,6 +148,78 @@ static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant(
   GeometryJacobianAdjugateDeterminant<s_t, ND, NQ, VS>::eval(
       ne, coordinate_grad_ref, adjugate, determinant);
 }
+
+template <typename s_t, int ND, int NQ>
+struct GeometryJacobianAdjugateDeterminant_scalar;
+
+template <typename s_t, int NQ>
+struct GeometryJacobianAdjugateDeterminant_scalar<s_t, 2, NQ> {
+  static SFEM_INLINE void eval(
+      const s_t *const RSTR coordinate_grad_ref,
+      s_t *const *const RSTR adjugate,
+      s_t *const RSTR determinant) {
+    for (int q = 0; q < NQ; ++q) {
+      const s_t *const RSTR J00_q = &coordinate_grad_ref[((0 * NQ + q) * 2 + 0)];
+      const s_t *const RSTR J01_q = &coordinate_grad_ref[((0 * NQ + q) * 2 + 1)];
+      const s_t *const RSTR J10_q = &coordinate_grad_ref[((1 * NQ + q) * 2 + 0)];
+      const s_t *const RSTR J11_q = &coordinate_grad_ref[((1 * NQ + q) * 2 + 1)];
+      {
+        const ptrdiff_t offset = q;
+        const s_t J00 = J00_q[0];
+        const s_t J01 = J01_q[0];
+        const s_t J10 = J10_q[0];
+        const s_t J11 = J11_q[0];
+        geometry_jacobian_adjugate_and_determinant_2<s_t>(
+            J00, J01, J10, J11, adjugate, determinant, offset);
+      }
+    }
+  }
+};
+
+template <typename s_t, int NQ>
+struct GeometryJacobianAdjugateDeterminant_scalar<s_t, 3, NQ> {
+  static SFEM_INLINE void eval(
+      const s_t *const RSTR coordinate_grad_ref,
+      s_t *const *const RSTR adjugate,
+      s_t *const RSTR determinant) {
+    for (int q = 0; q < NQ; ++q) {
+      const s_t *const RSTR J00_q = &coordinate_grad_ref[((0 * NQ + q) * 3 + 0)];
+      const s_t *const RSTR J01_q = &coordinate_grad_ref[((0 * NQ + q) * 3 + 1)];
+      const s_t *const RSTR J02_q = &coordinate_grad_ref[((0 * NQ + q) * 3 + 2)];
+      const s_t *const RSTR J10_q = &coordinate_grad_ref[((1 * NQ + q) * 3 + 0)];
+      const s_t *const RSTR J11_q = &coordinate_grad_ref[((1 * NQ + q) * 3 + 1)];
+      const s_t *const RSTR J12_q = &coordinate_grad_ref[((1 * NQ + q) * 3 + 2)];
+      const s_t *const RSTR J20_q = &coordinate_grad_ref[((2 * NQ + q) * 3 + 0)];
+      const s_t *const RSTR J21_q = &coordinate_grad_ref[((2 * NQ + q) * 3 + 1)];
+      const s_t *const RSTR J22_q = &coordinate_grad_ref[((2 * NQ + q) * 3 + 2)];
+      {
+        const ptrdiff_t offset = q;
+        const s_t J00 = J00_q[0];
+        const s_t J01 = J01_q[0];
+        const s_t J02 = J02_q[0];
+        const s_t J10 = J10_q[0];
+        const s_t J11 = J11_q[0];
+        const s_t J12 = J12_q[0];
+        const s_t J20 = J20_q[0];
+        const s_t J21 = J21_q[0];
+        const s_t J22 = J22_q[0];
+        geometry_jacobian_adjugate_and_determinant_3<s_t>(
+            J00, J01, J02, J10, J11, J12, J20, J21, J22,
+            adjugate, determinant, offset);
+      }
+    }
+  }
+};
+
+template <typename s_t, int ND, int NQ>
+static SFEM_INLINE void geometry_jacobian_adjugate_and_determinant_scalar(
+    const s_t *const RSTR coordinate_grad_ref,
+    s_t *const *const RSTR adjugate,
+    s_t *const RSTR determinant) {
+  GeometryJacobianAdjugateDeterminant_scalar<s_t, ND, NQ>::eval(
+      coordinate_grad_ref, adjugate, determinant);
+}
+
 
 } // namespace codegen
 } // namespace sfem

@@ -28,7 +28,6 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_objective_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -105,7 +104,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_objective_blo
 
 template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_objective_block(
-        const int ne,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -155,7 +153,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_objectiv
 
 template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_objective_block(
-        const int ne,
         const s_t *const RSTR geom_metric0,
         const s_t *const RSTR geom_metric1,
         const s_t *const RSTR geom_metric2,
@@ -188,7 +185,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_o
 
 template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_gradient_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -254,7 +250,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_gradient_bloc
 
 template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_gradient_block(
-        const int ne,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -291,7 +286,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_gradient
 
 template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_gradient_block(
-        const int ne,
         const s_t *const RSTR geom_metric0,
         const s_t *const RSTR geom_metric1,
         const s_t *const RSTR geom_metric2,
@@ -316,7 +310,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_g
 
 template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_apply_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -382,7 +375,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_apply_block(
 
 template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_apply_block(
-        const int ne,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -419,7 +411,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_apply_bl
 
 template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_simplex_tri3_metric_apply_block(
-        const int ne,
         const s_t *const RSTR geom_metric0,
         const s_t *const RSTR geom_metric1,
         const s_t *const RSTR geom_metric2,

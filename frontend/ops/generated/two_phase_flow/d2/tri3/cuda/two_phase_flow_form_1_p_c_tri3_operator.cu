@@ -152,7 +152,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_two_phase_flow_form_1_p_c_
 
 extern "C" int cu_two_phase_flow_form_1_p_c_tri3_residual_esoa(
     const int scalar_bytes,
-    const int ne,
     const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const void *const RSTR adjugate[4],
@@ -179,11 +178,11 @@ extern "C" int cu_two_phase_flow_form_1_p_c_tri3_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_form_1_p_c_d2_simplex_tri3_residual_block<double, 6, 3>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tri3_q6<double>::shape(), sfem::codegen::ref_tri3_q6<double>::grad_ref_x(), sfem::codegen::ref_tri3_q6<double>::grad_ref_y(), sfem::codegen::quad_tri_q6<double>::q_weight(), (const double *const *)current, (const double *const *)previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (double *const *)output);
+        sfem::codegen::two_phase_flow_form_1_p_c_d2_simplex_tri3_residual_block<double, 6, 3>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_tri3_q6<double>::shape(), sfem::codegen::ref_tri3_q6<double>::grad_ref_x(), sfem::codegen::ref_tri3_q6<double>::grad_ref_y(), sfem::codegen::quad_tri_q6<double>::q_weight(), (const double *const *)current, (const double *const *)previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_form_1_p_c_d2_simplex_tri3_residual_block<float, 6, 3>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tri3_q6<float>::shape(), sfem::codegen::ref_tri3_q6<float>::grad_ref_x(), sfem::codegen::ref_tri3_q6<float>::grad_ref_y(), sfem::codegen::quad_tri_q6<float>::q_weight(), (const float *const *)current, (const float *const *)previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (float *const *)output);
+        sfem::codegen::two_phase_flow_form_1_p_c_d2_simplex_tri3_residual_block<float, 6, 3>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_tri3_q6<float>::shape(), sfem::codegen::ref_tri3_q6<float>::grad_ref_x(), sfem::codegen::ref_tri3_q6<float>::grad_ref_y(), sfem::codegen::quad_tri_q6<float>::q_weight(), (const float *const *)current, (const float *const *)previous, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -240,7 +239,6 @@ __global__ void two_phase_flow_form_1_p_c_tri3_residual_a_msoa_impl(
   const s_t *const affine_q_weight = sfem::codegen::quad_tri_q6<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcurrent[NC * NS];
     s_t bprevious[NC * NS];
     s_t boutput[NC * NS];
@@ -277,7 +275,7 @@ __global__ void two_phase_flow_form_1_p_c_tri3_residual_a_msoa_impl(
       badjugate[component] = bageom_streams[component];
     }
 
-    two_phase_flow_form_1_p_c_d2_simplex_tri3_residual_block_contiguous<s_t, NQ, NS>(ne, 0, bageom_streams[4], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, bcurrent, bprevious, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, boutput);
+    two_phase_flow_form_1_p_c_d2_simplex_tri3_residual_block_contiguous<s_t, NQ, NS>(0, bageom_streams[4], badjugate, affine_shape, affine_grad_ref_x, affine_grad_ref_y, affine_q_weight, bcurrent, bprevious, C_ka1, C_ka2, K_0, K_1, K_2, K_3, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, boutput);
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {

@@ -27,7 +27,6 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_ener
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -81,7 +80,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_ener
         bdet0_q[0] = det_q[0];
       }
     }
-    saint_venant_kirchhoff_d3_simplex_objective_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    saint_venant_kirchhoff_d3_simplex_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -102,7 +101,6 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_ener
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -184,7 +182,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_ener
             badj_streams, bdet0, q);
       }
     }
-    saint_venant_kirchhoff_d3_simplex_objective_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    saint_venant_kirchhoff_d3_simplex_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -205,7 +203,6 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_ener
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -287,7 +284,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_ener
             badj_streams, bdet0, q);
       }
     }
-    saint_venant_kirchhoff_d3_simplex_objective_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    saint_venant_kirchhoff_d3_simplex_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -309,7 +306,6 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_grad
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -365,7 +361,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_grad
         bdet0_q[0] = det_q[0];
       }
     }
-    saint_venant_kirchhoff_d3_simplex_gradient_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d3_simplex_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -386,7 +382,6 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_grad
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -470,7 +465,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_grad
             badj_streams, bdet0, q);
       }
     }
-    saint_venant_kirchhoff_d3_simplex_gradient_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d3_simplex_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -491,7 +486,6 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_grad
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -575,7 +569,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_grad
             badj_streams, bdet0, q);
       }
     }
-    saint_venant_kirchhoff_d3_simplex_gradient_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
+    saint_venant_kirchhoff_d3_simplex_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -597,7 +591,6 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_hess
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
     s_t badj0[NQ];
@@ -659,7 +652,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_hess
           bout_data[stream] = s_t(0);
         }
       }
-      saint_venant_kirchhoff_d3_simplex_apply_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      saint_venant_kirchhoff_d3_simplex_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -687,7 +680,6 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_hess
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
     s_t bcoordinate_data[NDOFS];
@@ -777,7 +769,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_hess
           bout_data[stream] = s_t(0);
         }
       }
-      saint_venant_kirchhoff_d3_simplex_apply_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      saint_venant_kirchhoff_d3_simplex_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -805,7 +797,6 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_hess
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
     s_t bcoordinate_data[NDOFS];
@@ -895,7 +886,7 @@ static __host__ __device__ __forceinline__ int saint_venant_kirchhoff_tet10_hess
           bout_data[stream] = s_t(0);
         }
       }
-      saint_venant_kirchhoff_d3_simplex_apply_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
+      saint_venant_kirchhoff_d3_simplex_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::quad_tet_q11<s_t>::q_weight(), lmbda, mu, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {

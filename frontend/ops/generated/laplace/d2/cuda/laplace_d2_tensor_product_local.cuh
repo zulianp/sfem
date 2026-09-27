@@ -29,7 +29,6 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_tensor_product_objective_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -98,7 +97,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_tensor_product_object
 
 template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_tensor_product_gradient_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -154,7 +152,6 @@ static __host__ __device__ __forceinline__ void laplace_d2_tensor_product_gradie
 
 template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void laplace_d2_tensor_product_apply_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,

@@ -5,6 +5,7 @@ import sympy as sp
 from codegen.framework.emitters.kernel_prologue import (
     discard_unused,
     kernel_constant,
+    kernel_local,
     resolve_dead_parameters,
     resolve_kernel_constants,
     retag_constants,
@@ -170,7 +171,7 @@ from codegen.framework.emitters.tensor_product_geometry import (
 )
 from codegen.framework.emitters.tensor_product_kernels import tensor_product_kernels_header_source_for
 from codegen.framework.fem.geometry import GeometryMode
-from codegen.framework.targets import current_target
+from codegen.framework.targets import current_target, use_target
 from codegen.framework.fem.reference import (
     sfem_mesh_reference_data,
     sfem_reference_data,
@@ -2433,7 +2434,19 @@ def _element_matrix_kernels(
     return kernels
 
 
-def _element_matrix_functions(
+def _element_matrix_functions(*arguments, **keywords):
+    """The element-matrix kernels, emitted for a work item of one element.
+
+    The same binding the assembly mesh loop is emitted under, for the same
+    reason and so that the two agree by construction: a kernel declared with a
+    width and called without one does not compile, which is how the pair was
+    found.
+    """
+    with use_target(_target().holding_one_element()):
+        return _holding_one_element_matrix_functions(*arguments, **keywords)
+
+
+def _holding_one_element_matrix_functions(
     system,
     local_prefix,
     specialization,
@@ -2771,9 +2784,7 @@ def _mixed_local_function(
     rule = specialization.quadrature_rule
     dim = system.dim
     layout = MixedFieldLayout.create(system, rule, field_element_types)
-    params = [
-        "const int ne",
-        "const ptrdiff_t geometry_stride",
+    params = list(_local_kernel_count_params(False)) + [
         "const s_t *const RSTR determinant",
     ]
     params.extend(
@@ -3513,7 +3524,7 @@ def _local_function(
         and constant_p1_gradient_expansion
         and _uses_constant_p1_expansion(rule)
     )
-    params = list(_LOCAL_KERNEL_COUNT_PARAMS[bool(folds_basis)])
+    params = list(_local_kernel_count_params(folds_basis))
     params.extend(
         _declare_stream(stream)
         for stream in local_kernel_stream_plans(
@@ -4529,7 +4540,7 @@ def _element_matrix_function(system, kernel, coefficients, dependencies):
     dim = system.dim
     n_fields = len(system.fields)
     shape = _ELEMENT_MATRIX_SHAPES[kernel.strategy]
-    params = ["const int ne", "const ptrdiff_t geometry_stride"]
+    params = list(_local_kernel_count_params(False))
     params.extend(
         _declare_stream(stream)
         for stream in local_kernel_stream_plans(
@@ -4765,20 +4776,34 @@ def _simplex_state_transform_nodes(system, dependencies, usage, stepped=False):
     )
 
 
-#: What a local kernel takes before its streams, keyed on whether it evaluates in
-#: closed form.  A stride *between quadrature points* is meaningless where there
-#: is one point: every caller passed either a literal zero or a stride that
-#: multiplied an index of zero, and the folded body reads the work item alone.
-_LOCAL_KERNEL_COUNT_PARAMS = {
-    True: ("const int ne",),
-    False: ("const int ne", "const ptrdiff_t geometry_stride"),
-}
+#: What a local kernel takes before its streams, from two independent facts: how
+#: many elements it holds, and whether it evaluates in closed form.
+#:
+#: A kernel that holds one element counts nothing -- `ne` was read only by the
+#: work-item loop it no longer opens.  A stride *between quadrature points* is
+#: meaningless where there is one point: every caller passed either a literal zero
+#: or a stride that multiplied an index of zero.
+_LOCAL_KERNEL_COUNT = {True: ("const int ne",), False: ()}
+_LOCAL_KERNEL_STRIDE = {True: (), False: ("const ptrdiff_t geometry_stride",)}
+
+
+def _local_kernel_count_params(folds_basis):
+    return (
+        _LOCAL_KERNEL_COUNT[bool(_width_factors())]
+        + _LOCAL_KERNEL_STRIDE[bool(folds_basis)]
+    )
+
 
 #: The arguments that match it, for a call site that names its own.
-_LOCAL_KERNEL_COUNT_ARGS = {
-    True: lambda count, stride: [count],
-    False: lambda count, stride: [count, stride],
-}
+_LOCAL_KERNEL_COUNT_ARG = {True: lambda count: [count], False: lambda count: []}
+_LOCAL_KERNEL_STRIDE_ARG = {True: lambda stride: [], False: lambda stride: [stride]}
+
+
+def _local_kernel_count_args(folds_basis, count, stride):
+    return (
+        _LOCAL_KERNEL_COUNT_ARG[bool(_width_factors())](count)
+        + _LOCAL_KERNEL_STRIDE_ARG[bool(folds_basis)](stride)
+    )
 
 
 def _folds_reference_gradients(system, rule, coefficients, dependencies,
@@ -6495,11 +6520,9 @@ def _operator_source(
         )
         if True:
             scalar_type = "s_t"
-            params = [
-                "const int ne",
-                "const ptrdiff_t geometry_stride",
-                "const %s *const RSTR determinant" % scalar_type,
-            ]
+            params = list(
+                _local_kernel_count_params(_uses_constant_p1_expansion(rule))
+            ) + ["const %s *const RSTR determinant" % scalar_type]
             params.extend(
                 "const %s *const RSTR %s[%d]"
                 % (scalar_type, quantity.name, quantity.components)
@@ -6519,9 +6542,9 @@ def _operator_source(
                 "%s *const RSTR output[%d]"
                 % (scalar_type, n_fields * n_shape)
             )
-            call_args = _LOCAL_KERNEL_COUNT_ARGS[
-                _uses_constant_p1_expansion(rule)
-            ]("ne", "geometry_stride")
+            call_args = _local_kernel_count_args(
+                _uses_constant_p1_expansion(rule), "ne", "geometry_stride"
+            )
             pre_call_lines = []
             if gradient_metric is not None:
                 pre_call_lines.extend(
@@ -8177,8 +8200,8 @@ def _mesh_operator_source(
                 ),
             )
         )
-    call_args = _LOCAL_KERNEL_COUNT_ARGS[_uses_constant_p1_expansion(rule)](
-        "ne", "0"
+    call_args = _local_kernel_count_args(
+        _uses_constant_p1_expansion(rule), "ne", "0"
     )
     call_args.extend(
         _stream_call_arguments(
@@ -9062,7 +9085,24 @@ def _assembly_geometry_stream_names(dim):
     )
 
 
-def _scalar_crs_matrix_assembly_source(
+def _scalar_crs_matrix_assembly_source(*arguments, **keywords):
+    """The assembly, emitted for a target whose work item is one element.
+
+    Assembly holds one element -- `plans` says so, and the scatter that reads the
+    element matrix has no lane index to give it -- so it is emitted under
+    `Target.holding_one_element`.  Every answer that depends on having a width
+    already reads `kernel_vector_width`, so the width constant, the `[VS]`
+    extents, the one-trip lane loop, the slot and the choice between the blocked
+    and the scalar micro-kernels all follow: the same machinery the device
+    kernels use, asked of a kernel rather than of a machine.
+    """
+    with use_target(_target().holding_one_element()):
+        return _holding_one_element_crs_matrix_assembly_source(
+            *arguments, **keywords
+        )
+
+
+def _holding_one_element_crs_matrix_assembly_source(
     system,
     prefix,
     local_prefix,
@@ -9168,7 +9208,7 @@ def _scalar_crs_matrix_assembly_source(
         else _EMPTY_REFERENCE_TABLES[bool(builds_its_own_jacobian)]
     )
     element_matrix_call_args = (
-        ["1", "1"]
+        list(_local_kernel_count_args(False, "1", "1"))
         + _stream_call_arguments(
             local_kernel_stream_plans(
                 assembled_matrix_dependencies(dependencies),
@@ -9306,8 +9346,8 @@ def _scalar_crs_matrix_assembly_source(
         [
             "",
             *element_loop_lines(_target()),
-            "    const ptrdiff_t evb = element;",
-            "    const int ne = 1;",
+            kernel_local("evb", "element", "const ptrdiff_t", indent="    "),
+            kernel_local("ne", "1", "const int", indent="    "),
             "    idx_t ev[NS];",
             "    s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
             *([] if is_affine_assembly else ["    s_t bcoordinates[ND * NS]%s;" % _wi_extent()]),
@@ -9728,7 +9768,7 @@ def _scalar_crs_matrix_assembly_source(
             [
                 "",
                 "      for (ptrdiff_t element = e_start; element < e_end; ++element) {",
-                "        const int ne = 1;",
+                kernel_local("ne", "1", "const int", indent="        "),
                 "        s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
                 "        s_t bcoordinates[ND * NS]%s;" % _wi_extent(),
                 "        s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
@@ -10136,7 +10176,7 @@ def _isoparametric_mesh_operator_source(
                 ),
             )
         )
-    call_args = ["ne", _work_item_block_stride()]
+    call_args = _local_kernel_count_args(False, "ne", _work_item_block_stride())
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
@@ -10466,7 +10506,7 @@ def _scalar_packed_jacobian_action_source(
     lines.extend(
         _blocked_adjugate_array_lines(dependencies, dim, "ND * ND", "        ")
     )
-    call_args = ["ne", _work_item_block_stride()]
+    call_args = _local_kernel_count_args(False, "ne", _work_item_block_stride())
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
@@ -10885,8 +10925,8 @@ def _scalar_packed_affine_jacobian_action_source(
                 ),
             )
         )
-    call_args = _LOCAL_KERNEL_COUNT_ARGS[_uses_constant_p1_expansion(rule)](
-        "ne", "0"
+    call_args = _local_kernel_count_args(
+        _uses_constant_p1_expansion(rule), "ne", "0"
     )
     call_args.extend(
         _stream_call_arguments(

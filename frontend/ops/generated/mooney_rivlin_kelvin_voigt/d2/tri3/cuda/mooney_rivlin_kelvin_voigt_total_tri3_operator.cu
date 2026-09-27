@@ -366,8 +366,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt
 
 extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tri3_residual_esoa(
     const int scalar_bytes,
-    const int ne,
-    const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const void *const RSTR adjugate[4],
     const void *const RSTR current[6],
@@ -382,11 +380,11 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tri3_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_residual_block<double, 1, 3>(ne, (const double *)determinant, (const double *const *)adjugate, (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_residual_block<double, 1, 3>((const double *)determinant, (const double *const *)adjugate, (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_residual_block<float, 1, 3>(ne, (const float *)determinant, (const float *const *)adjugate, (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_residual_block<float, 1, 3>((const float *)determinant, (const float *const *)adjugate, (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -428,7 +426,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tri3_residual_a_msoa_impl(
   static constexpr int NC = 2;
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcurrent[NC * NS];
     s_t bprevious[NC * NS];
     s_t boutput[NC * NS];
@@ -465,7 +462,7 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tri3_residual_a_msoa_impl(
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_residual_block_contiguous<s_t, NQ, NS>(ne, bageom_streams[4], badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_residual_block_contiguous<s_t, NQ, NS>(bageom_streams[4], badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -532,8 +529,6 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tri3_residual_a_msoa(
 
 extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_esoa(
     const int scalar_bytes,
-    const int ne,
-    const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const void *const RSTR adjugate[4],
     const void *const RSTR current[6],
@@ -549,11 +544,11 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_jacobian_action_block<double, 1, 3>(ne, (const double *)determinant, (const double *const *)adjugate, (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_jacobian_action_block<double, 1, 3>((const double *)determinant, (const double *const *)adjugate, (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_jacobian_action_block<float, 1, 3>(ne, (const float *)determinant, (const float *const *)adjugate, (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_jacobian_action_block<float, 1, 3>((const float *)determinant, (const float *const *)adjugate, (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -598,7 +593,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_a_msoa_imp
   static constexpr int NC = 2;
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcurrent[NC * NS];
     s_t bprevious[NC * NS];
     s_t bdirection[NC * NS];
@@ -638,7 +632,7 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tri3_jacobian_action_a_msoa_imp
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_jacobian_action_block_contiguous<s_t, NQ, NS>(ne, bageom_streams[4], badjugate, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_jacobian_action_block_contiguous<s_t, NQ, NS>(bageom_streams[4], badjugate, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -792,8 +786,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tri3_hessian_crs_a_msoa_impl(
   static constexpr int N_STREAMS = NC * NS;
 
   for (ptrdiff_t element = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; element < nelements; element += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const ptrdiff_t evb = element;
-    const int ne = 1;
     idx_t ev[NS];
     s_t element_matrix[36];
     s_t badjugate_data[ND * ND][NQ];
@@ -818,7 +810,7 @@ __global__ void mooney_rivlin_kelvin_voigt_total_tri3_hessian_crs_a_msoa_impl(
     bdeterminant[0] = s_t(g_det0[element]);
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-    mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_hessian_block<s_t, NQ, NS>(1, 1, bdeterminant, badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
+    mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_hessian_block<s_t, NQ, NS>(1, bdeterminant, badjugate, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
 
     mooney_rivlin_kelvin_voigt_total_tri3_hessian_crs_a_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
   }

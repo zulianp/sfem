@@ -1613,7 +1613,6 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_hessian_crs_i_msoa
   static constexpr int NS = 10;
   static constexpr int NC = 3;
   static constexpr int N_STREAMS = NC * NS;
-  static constexpr int VS = 1;
   const s_t *const isoparametric_shape = sfem::codegen::ref_tet10_q11<s_t>::shape();
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
@@ -1622,15 +1621,13 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_hessian_crs_i_msoa
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
-    const ptrdiff_t evb = element;
-    const int ne = 1;
     idx_t ev[NS];
     s_t element_matrix[900];
-    s_t bcoordinates[ND * NS][VS];
-    s_t badjugate_data[ND * ND][NQ * VS];
-    s_t bdeterminant[NQ * VS];
-    s_t bcurrent[N_STREAMS][VS];
-    s_t bprevious[N_STREAMS][VS];
+    s_t bcoordinates[ND * NS];
+    s_t badjugate_data[ND * ND][NQ];
+    s_t bdeterminant[NQ];
+    s_t bcurrent[N_STREAMS];
+    s_t bprevious[N_STREAMS];
     const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
 
     for (int shape = 0; shape < NS; ++shape) {
@@ -1638,48 +1635,18 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_hessian_crs_i_msoa
       const idx_t coordinate_node = elements[shape][element];
       ev[shape] = node;
       for (int d = 0; d < ND; ++d) {
-        bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);
+        bcoordinates[shape * ND + d] = s_t(coordinate_components[d][coordinate_node]);
       }
-      bcurrent[shape * NC + 0][0] = u0[node * current_stride];
-      bcurrent[shape * NC + 1][0] = u1[node * current_stride];
-      bcurrent[shape * NC + 2][0] = u2[node * current_stride];
-      bprevious[shape * NC + 0][0] = u0_old[node * previous_stride];
-      bprevious[shape * NC + 1][0] = u1_old[node * previous_stride];
-      bprevious[shape * NC + 2][0] = u2_old[node * previous_stride];
+      bcurrent[shape * NC + 0] = u0[node * current_stride];
+      bcurrent[shape * NC + 1] = u1[node * current_stride];
+      bcurrent[shape * NC + 2] = u2[node * current_stride];
+      bprevious[shape * NC + 0] = u0_old[node * previous_stride];
+      bprevious[shape * NC + 1] = u1_old[node * previous_stride];
+      bprevious[shape * NC + 2] = u2_old[node * previous_stride];
     }
 
     s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
     for (int q = 0; q < NQ; ++q) {
-      const s_t *const RSTR coordinate_row0 = bcoordinates[0];
-      const s_t *const RSTR coordinate_row1 = bcoordinates[1];
-      const s_t *const RSTR coordinate_row2 = bcoordinates[2];
-      const s_t *const RSTR coordinate_row3 = bcoordinates[3];
-      const s_t *const RSTR coordinate_row4 = bcoordinates[4];
-      const s_t *const RSTR coordinate_row5 = bcoordinates[5];
-      const s_t *const RSTR coordinate_row6 = bcoordinates[6];
-      const s_t *const RSTR coordinate_row7 = bcoordinates[7];
-      const s_t *const RSTR coordinate_row8 = bcoordinates[8];
-      const s_t *const RSTR coordinate_row9 = bcoordinates[9];
-      const s_t *const RSTR coordinate_row10 = bcoordinates[10];
-      const s_t *const RSTR coordinate_row11 = bcoordinates[11];
-      const s_t *const RSTR coordinate_row12 = bcoordinates[12];
-      const s_t *const RSTR coordinate_row13 = bcoordinates[13];
-      const s_t *const RSTR coordinate_row14 = bcoordinates[14];
-      const s_t *const RSTR coordinate_row15 = bcoordinates[15];
-      const s_t *const RSTR coordinate_row16 = bcoordinates[16];
-      const s_t *const RSTR coordinate_row17 = bcoordinates[17];
-      const s_t *const RSTR coordinate_row18 = bcoordinates[18];
-      const s_t *const RSTR coordinate_row19 = bcoordinates[19];
-      const s_t *const RSTR coordinate_row20 = bcoordinates[20];
-      const s_t *const RSTR coordinate_row21 = bcoordinates[21];
-      const s_t *const RSTR coordinate_row22 = bcoordinates[22];
-      const s_t *const RSTR coordinate_row23 = bcoordinates[23];
-      const s_t *const RSTR coordinate_row24 = bcoordinates[24];
-      const s_t *const RSTR coordinate_row25 = bcoordinates[25];
-      const s_t *const RSTR coordinate_row26 = bcoordinates[26];
-      const s_t *const RSTR coordinate_row27 = bcoordinates[27];
-      const s_t *const RSTR coordinate_row28 = bcoordinates[28];
-      const s_t *const RSTR coordinate_row29 = bcoordinates[29];
       const s_t cell_grad_ref0_0 = isoparametric_grad_ref_x[q * NS + 0];
       const s_t cell_grad_ref0_1 = isoparametric_grad_ref_x[q * NS + 1];
       const s_t cell_grad_ref0_2 = isoparametric_grad_ref_x[q * NS + 2];
@@ -1710,23 +1677,22 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_tet10_hessian_crs_i_msoa
       const s_t cell_grad_ref2_7 = isoparametric_grad_ref_z[q * NS + 7];
       const s_t cell_grad_ref2_8 = isoparametric_grad_ref_z[q * NS + 8];
       const s_t cell_grad_ref2_9 = isoparametric_grad_ref_z[q * NS + 9];
-      const int lane = 0;
-      const s_t J00 = coordinate_row0[lane] * cell_grad_ref0_0 + coordinate_row3[lane] * cell_grad_ref0_1 + coordinate_row6[lane] * cell_grad_ref0_2 + coordinate_row9[lane] * cell_grad_ref0_3 + coordinate_row12[lane] * cell_grad_ref0_4 + coordinate_row15[lane] * cell_grad_ref0_5 + coordinate_row18[lane] * cell_grad_ref0_6 + coordinate_row21[lane] * cell_grad_ref0_7 + coordinate_row24[lane] * cell_grad_ref0_8 + coordinate_row27[lane] * cell_grad_ref0_9;
-      const s_t J01 = coordinate_row0[lane] * cell_grad_ref1_0 + coordinate_row3[lane] * cell_grad_ref1_1 + coordinate_row6[lane] * cell_grad_ref1_2 + coordinate_row9[lane] * cell_grad_ref1_3 + coordinate_row12[lane] * cell_grad_ref1_4 + coordinate_row15[lane] * cell_grad_ref1_5 + coordinate_row18[lane] * cell_grad_ref1_6 + coordinate_row21[lane] * cell_grad_ref1_7 + coordinate_row24[lane] * cell_grad_ref1_8 + coordinate_row27[lane] * cell_grad_ref1_9;
-      const s_t J02 = coordinate_row0[lane] * cell_grad_ref2_0 + coordinate_row3[lane] * cell_grad_ref2_1 + coordinate_row6[lane] * cell_grad_ref2_2 + coordinate_row9[lane] * cell_grad_ref2_3 + coordinate_row12[lane] * cell_grad_ref2_4 + coordinate_row15[lane] * cell_grad_ref2_5 + coordinate_row18[lane] * cell_grad_ref2_6 + coordinate_row21[lane] * cell_grad_ref2_7 + coordinate_row24[lane] * cell_grad_ref2_8 + coordinate_row27[lane] * cell_grad_ref2_9;
-      const s_t J10 = coordinate_row1[lane] * cell_grad_ref0_0 + coordinate_row4[lane] * cell_grad_ref0_1 + coordinate_row7[lane] * cell_grad_ref0_2 + coordinate_row10[lane] * cell_grad_ref0_3 + coordinate_row13[lane] * cell_grad_ref0_4 + coordinate_row16[lane] * cell_grad_ref0_5 + coordinate_row19[lane] * cell_grad_ref0_6 + coordinate_row22[lane] * cell_grad_ref0_7 + coordinate_row25[lane] * cell_grad_ref0_8 + coordinate_row28[lane] * cell_grad_ref0_9;
-      const s_t J11 = coordinate_row1[lane] * cell_grad_ref1_0 + coordinate_row4[lane] * cell_grad_ref1_1 + coordinate_row7[lane] * cell_grad_ref1_2 + coordinate_row10[lane] * cell_grad_ref1_3 + coordinate_row13[lane] * cell_grad_ref1_4 + coordinate_row16[lane] * cell_grad_ref1_5 + coordinate_row19[lane] * cell_grad_ref1_6 + coordinate_row22[lane] * cell_grad_ref1_7 + coordinate_row25[lane] * cell_grad_ref1_8 + coordinate_row28[lane] * cell_grad_ref1_9;
-      const s_t J12 = coordinate_row1[lane] * cell_grad_ref2_0 + coordinate_row4[lane] * cell_grad_ref2_1 + coordinate_row7[lane] * cell_grad_ref2_2 + coordinate_row10[lane] * cell_grad_ref2_3 + coordinate_row13[lane] * cell_grad_ref2_4 + coordinate_row16[lane] * cell_grad_ref2_5 + coordinate_row19[lane] * cell_grad_ref2_6 + coordinate_row22[lane] * cell_grad_ref2_7 + coordinate_row25[lane] * cell_grad_ref2_8 + coordinate_row28[lane] * cell_grad_ref2_9;
-      const s_t J20 = coordinate_row2[lane] * cell_grad_ref0_0 + coordinate_row5[lane] * cell_grad_ref0_1 + coordinate_row8[lane] * cell_grad_ref0_2 + coordinate_row11[lane] * cell_grad_ref0_3 + coordinate_row14[lane] * cell_grad_ref0_4 + coordinate_row17[lane] * cell_grad_ref0_5 + coordinate_row20[lane] * cell_grad_ref0_6 + coordinate_row23[lane] * cell_grad_ref0_7 + coordinate_row26[lane] * cell_grad_ref0_8 + coordinate_row29[lane] * cell_grad_ref0_9;
-      const s_t J21 = coordinate_row2[lane] * cell_grad_ref1_0 + coordinate_row5[lane] * cell_grad_ref1_1 + coordinate_row8[lane] * cell_grad_ref1_2 + coordinate_row11[lane] * cell_grad_ref1_3 + coordinate_row14[lane] * cell_grad_ref1_4 + coordinate_row17[lane] * cell_grad_ref1_5 + coordinate_row20[lane] * cell_grad_ref1_6 + coordinate_row23[lane] * cell_grad_ref1_7 + coordinate_row26[lane] * cell_grad_ref1_8 + coordinate_row29[lane] * cell_grad_ref1_9;
-      const s_t J22 = coordinate_row2[lane] * cell_grad_ref2_0 + coordinate_row5[lane] * cell_grad_ref2_1 + coordinate_row8[lane] * cell_grad_ref2_2 + coordinate_row11[lane] * cell_grad_ref2_3 + coordinate_row14[lane] * cell_grad_ref2_4 + coordinate_row17[lane] * cell_grad_ref2_5 + coordinate_row20[lane] * cell_grad_ref2_6 + coordinate_row23[lane] * cell_grad_ref2_7 + coordinate_row26[lane] * cell_grad_ref2_8 + coordinate_row29[lane] * cell_grad_ref2_9;
+      const s_t J00 = bcoordinates[0] * cell_grad_ref0_0 + bcoordinates[3] * cell_grad_ref0_1 + bcoordinates[6] * cell_grad_ref0_2 + bcoordinates[9] * cell_grad_ref0_3 + bcoordinates[12] * cell_grad_ref0_4 + bcoordinates[15] * cell_grad_ref0_5 + bcoordinates[18] * cell_grad_ref0_6 + bcoordinates[21] * cell_grad_ref0_7 + bcoordinates[24] * cell_grad_ref0_8 + bcoordinates[27] * cell_grad_ref0_9;
+      const s_t J01 = bcoordinates[0] * cell_grad_ref1_0 + bcoordinates[3] * cell_grad_ref1_1 + bcoordinates[6] * cell_grad_ref1_2 + bcoordinates[9] * cell_grad_ref1_3 + bcoordinates[12] * cell_grad_ref1_4 + bcoordinates[15] * cell_grad_ref1_5 + bcoordinates[18] * cell_grad_ref1_6 + bcoordinates[21] * cell_grad_ref1_7 + bcoordinates[24] * cell_grad_ref1_8 + bcoordinates[27] * cell_grad_ref1_9;
+      const s_t J02 = bcoordinates[0] * cell_grad_ref2_0 + bcoordinates[3] * cell_grad_ref2_1 + bcoordinates[6] * cell_grad_ref2_2 + bcoordinates[9] * cell_grad_ref2_3 + bcoordinates[12] * cell_grad_ref2_4 + bcoordinates[15] * cell_grad_ref2_5 + bcoordinates[18] * cell_grad_ref2_6 + bcoordinates[21] * cell_grad_ref2_7 + bcoordinates[24] * cell_grad_ref2_8 + bcoordinates[27] * cell_grad_ref2_9;
+      const s_t J10 = bcoordinates[1] * cell_grad_ref0_0 + bcoordinates[4] * cell_grad_ref0_1 + bcoordinates[7] * cell_grad_ref0_2 + bcoordinates[10] * cell_grad_ref0_3 + bcoordinates[13] * cell_grad_ref0_4 + bcoordinates[16] * cell_grad_ref0_5 + bcoordinates[19] * cell_grad_ref0_6 + bcoordinates[22] * cell_grad_ref0_7 + bcoordinates[25] * cell_grad_ref0_8 + bcoordinates[28] * cell_grad_ref0_9;
+      const s_t J11 = bcoordinates[1] * cell_grad_ref1_0 + bcoordinates[4] * cell_grad_ref1_1 + bcoordinates[7] * cell_grad_ref1_2 + bcoordinates[10] * cell_grad_ref1_3 + bcoordinates[13] * cell_grad_ref1_4 + bcoordinates[16] * cell_grad_ref1_5 + bcoordinates[19] * cell_grad_ref1_6 + bcoordinates[22] * cell_grad_ref1_7 + bcoordinates[25] * cell_grad_ref1_8 + bcoordinates[28] * cell_grad_ref1_9;
+      const s_t J12 = bcoordinates[1] * cell_grad_ref2_0 + bcoordinates[4] * cell_grad_ref2_1 + bcoordinates[7] * cell_grad_ref2_2 + bcoordinates[10] * cell_grad_ref2_3 + bcoordinates[13] * cell_grad_ref2_4 + bcoordinates[16] * cell_grad_ref2_5 + bcoordinates[19] * cell_grad_ref2_6 + bcoordinates[22] * cell_grad_ref2_7 + bcoordinates[25] * cell_grad_ref2_8 + bcoordinates[28] * cell_grad_ref2_9;
+      const s_t J20 = bcoordinates[2] * cell_grad_ref0_0 + bcoordinates[5] * cell_grad_ref0_1 + bcoordinates[8] * cell_grad_ref0_2 + bcoordinates[11] * cell_grad_ref0_3 + bcoordinates[14] * cell_grad_ref0_4 + bcoordinates[17] * cell_grad_ref0_5 + bcoordinates[20] * cell_grad_ref0_6 + bcoordinates[23] * cell_grad_ref0_7 + bcoordinates[26] * cell_grad_ref0_8 + bcoordinates[29] * cell_grad_ref0_9;
+      const s_t J21 = bcoordinates[2] * cell_grad_ref1_0 + bcoordinates[5] * cell_grad_ref1_1 + bcoordinates[8] * cell_grad_ref1_2 + bcoordinates[11] * cell_grad_ref1_3 + bcoordinates[14] * cell_grad_ref1_4 + bcoordinates[17] * cell_grad_ref1_5 + bcoordinates[20] * cell_grad_ref1_6 + bcoordinates[23] * cell_grad_ref1_7 + bcoordinates[26] * cell_grad_ref1_8 + bcoordinates[29] * cell_grad_ref1_9;
+      const s_t J22 = bcoordinates[2] * cell_grad_ref2_0 + bcoordinates[5] * cell_grad_ref2_1 + bcoordinates[8] * cell_grad_ref2_2 + bcoordinates[11] * cell_grad_ref2_3 + bcoordinates[14] * cell_grad_ref2_4 + bcoordinates[17] * cell_grad_ref2_5 + bcoordinates[20] * cell_grad_ref2_6 + bcoordinates[23] * cell_grad_ref2_7 + bcoordinates[26] * cell_grad_ref2_8 + bcoordinates[29] * cell_grad_ref2_9;
       geometry_jacobian_adjugate_and_determinant_3<s_t>(
           J00, J01, J02, J10, J11, J12, J20, J21, J22,
-          badjugate_streams, bdeterminant, q * VS + lane);
+          badjugate_streams, bdeterminant, q);
     }
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_block<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
+    mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_block<s_t, NQ, NS>(1, bdeterminant, badjugate, isoparametric_grad_ref_x, isoparametric_grad_ref_y, isoparametric_grad_ref_z, isoparametric_q_weight, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
 
     mooney_rivlin_kelvin_voigt_total_tet10_hessian_crs_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
   }

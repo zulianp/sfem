@@ -26,7 +26,6 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_energ
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -60,7 +59,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_energ
         bdet0_q[0] = det_q[0];
       }
     }
-    modified_mooney_rivlin_d2_simplex_tri3_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    modified_mooney_rivlin_d2_simplex_tri3_objective_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -82,7 +81,6 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_energ
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -114,7 +112,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_energ
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    modified_mooney_rivlin_d2_simplex_tri3_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    modified_mooney_rivlin_d2_simplex_tri3_objective_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -136,7 +134,6 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_energ
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -168,7 +165,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_energ
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    modified_mooney_rivlin_d2_simplex_tri3_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    modified_mooney_rivlin_d2_simplex_tri3_objective_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -191,7 +188,6 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_gradi
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -227,7 +223,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_gradi
         bdet0_q[0] = det_q[0];
       }
     }
-    modified_mooney_rivlin_d2_simplex_tri3_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d2_simplex_tri3_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -249,7 +245,6 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_gradi
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -283,7 +278,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_gradi
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    modified_mooney_rivlin_d2_simplex_tri3_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d2_simplex_tri3_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -305,7 +300,6 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_gradi
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -339,7 +333,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_gradi
             J00, J01, J10, J11, badj_streams, bdet0, 0);
       }
     }
-    modified_mooney_rivlin_d2_simplex_tri3_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d2_simplex_tri3_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -362,7 +356,6 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_hessi
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
     s_t badj0[NQ];
@@ -404,7 +397,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_hessi
           bout_data[stream] = s_t(0);
         }
       }
-      modified_mooney_rivlin_d2_simplex_tri3_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+      modified_mooney_rivlin_d2_simplex_tri3_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -433,7 +426,6 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_hessi
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
     s_t bcoordinate_data[NDOFS];
@@ -473,7 +465,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_hessi
           bout_data[stream] = s_t(0);
         }
       }
-      modified_mooney_rivlin_d2_simplex_tri3_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+      modified_mooney_rivlin_d2_simplex_tri3_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -502,7 +494,6 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_hessi
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) bu_streams[stream] = u_streams[stream] + evb;
     s_t bcoordinate_data[NDOFS];
@@ -542,7 +533,7 @@ static __host__ __device__ __forceinline__ int modified_mooney_rivlin_tri3_hessi
           bout_data[stream] = s_t(0);
         }
       }
-      modified_mooney_rivlin_d2_simplex_tri3_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+      modified_mooney_rivlin_d2_simplex_tri3_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {

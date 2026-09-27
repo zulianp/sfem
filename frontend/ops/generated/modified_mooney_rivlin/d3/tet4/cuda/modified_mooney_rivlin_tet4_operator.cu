@@ -123,7 +123,6 @@ __global__ void modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
   static constexpr int NS = 4;
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     idx_t ev[NS];
     s_t bu_data[NS * NC];
     s_t bh_data[NS * NC];
@@ -194,7 +193,7 @@ __global__ void modified_mooney_rivlin_tet4_objective_steps_a_msoa_impl(
       }
     }
 
-    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    modified_mooney_rivlin_d3_simplex_tet4_objective_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -342,7 +341,6 @@ __global__ void modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
   static constexpr int NS = 4;
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     idx_t ev[NS];
     s_t bu_data[NS * NC];
     s_t bout_data[NS * NC];
@@ -410,7 +408,7 @@ __global__ void modified_mooney_rivlin_tet4_gradient_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t>(
         ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
@@ -568,7 +566,6 @@ __global__ void modified_mooney_rivlin_tet4_apply_a_msoa_impl(
   static constexpr int NS = 4;
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     idx_t ev[NS];
     s_t bu_data[NS * NC];
     s_t bh_data[NS * NC];
@@ -643,7 +640,7 @@ __global__ void modified_mooney_rivlin_tet4_apply_a_msoa_impl(
     const s_t *const bdet0 = ageom_stream<s_t, g_t>(
         ne, g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
+    modified_mooney_rivlin_d3_simplex_tet4_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, c1, c2, kappa, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 

@@ -32,7 +32,6 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_residual_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -194,7 +193,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_residual_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -350,7 +348,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_residual_block(
-    const int ne,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
     const s_t *const RSTR current[2 * NS],
@@ -431,7 +428,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_residual_block_contiguous(
-    const int ne,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
     const s_t current[2 * NS],
@@ -512,7 +508,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_jacobian_action_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -761,7 +756,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_jacobian_action_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -1002,7 +996,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_jacobian_action_block(
-    const int ne,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
     const s_t *const RSTR current[2 * NS],
@@ -1140,7 +1133,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_jacobian_action_block_contiguous(
-    const int ne,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
     const s_t current[2 * NS],
@@ -1278,7 +1270,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_hessian_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -1477,7 +1468,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_simplex_hessian_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],

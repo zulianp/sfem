@@ -68,11 +68,39 @@ class LoopLoweringPolicy:
     matrix_unit: MatrixUnitKind = MatrixUnitKind.NONE
 
 
+#: What a work item holds, as the two answers every consumer of the width is
+#: already keyed on.  `False` is not a second kind of target: it is this target
+#: with the block taken away, which is what an element-matrix kernel runs on.
+_WORK_ITEM_WIDTH = {True: "VS", False: None}
+
+
 @dataclass(frozen=True)
 class TargetPlatform:
     name: str
     language: TargetLanguage
     default_alignment: int = 64
+    #: Whether a work item of this target holds a block of elements.
+    #:
+    #: True for a CPU target, where a work item is one lane of `VS`.  False for a
+    #: device thread -- and false for any kernel that holds a single element
+    #: whatever it runs on, which is what `holding_one_element` returns.  Every
+    #: answer that depends on having a width already reads
+    #: `kernel_vector_width`, so turning this off is the whole of it: no width
+    #: constant, no `[VS]` extent, no work-item loop, no slot to index and the
+    #: scalar rendering of the shared micro-kernels.
+    work_item_holds_a_block: bool = True
+
+    def holding_one_element(self):
+        """This target with the block taken away.
+
+        An element-matrix kernel holds one element on every target: `plans` says
+        assembly has one element in hand, and the scatter that reads the matrix
+        has no lane index to give it.  Emitting it under this target is what
+        stops it declaring `VS = 1`, sizing its tiles `[1]` and opening a lane
+        loop that runs once -- all of which is the width surviving at one, which
+        is the thing it does not have.
+        """
+        return dataclass_replace(self, work_item_holds_a_block=False)
 
     @property
     def generated_language(self):
@@ -227,12 +255,13 @@ class TargetPlatform:
 
         `VS` where a work item strides over a block of them, so the kernel is
         parameterised by how many and sizes its buffers in terms of it.  `None`
-        where a work item *is* one element -- a device thread -- and there is
-        no width to be parameterised by: no template argument, no width-sized
-        buffers, no tile loop over blocks of that width, and the scalar
-        rendering of the shared micro-kernels rather than the blocked one.
+        where a work item *is* one element -- a device thread, or any kernel
+        emitted under `holding_one_element` -- and there is no width to be
+        parameterised by: no template argument, no width-sized buffers, no tile
+        loop over blocks of that width, and the scalar rendering of the shared
+        micro-kernels rather than the blocked one.
         """
-        return "VS"
+        return _WORK_ITEM_WIDTH[self.work_item_holds_a_block]
 
     def work_item_extent(self):
         """The trailing extent of a staged buffer: `[VS]`, or nothing.
@@ -700,11 +729,15 @@ class OpenMPTarget(TargetPlatform):
         return "__builtin_assume_aligned(%s, %d)" % (str(pointer), alignment)
 
     def loop_lowering_policy(self):
+        # The lane loop is the block being walked, so a work item that holds no
+        # block opens no loop -- one element, written where it is.  The rest of
+        # the policy is unchanged: the *element* loop is still parallel, which is
+        # what an assembly kernel runs over.
         return LoopLoweringPolicy(
             execution_model=ExecutionModel.VECTOR_LANES,
-            emits_lane_loop=True,
+            emits_lane_loop=self.work_item_holds_a_block,
             maps_lane_to_thread=False,
-            vectorize_lane_loop=True,
+            vectorize_lane_loop=self.work_item_holds_a_block,
             parallel_element_loop=True,
             supports_shared_memory=False,
         )
@@ -852,12 +885,13 @@ class CUDATarget(TargetPlatform):
     def mesh_loop_nodes(self):
         """A grid-stride pass over the mesh, one element per thread.
 
-        `ne` is 1 rather than the block's tail count: here the block is one
-        thread, and the work-item scope below it opens no loop at all.
+        It declares no work-item count.  The count exists for the lane loop and
+        for the kernels that loop to it, and here the block is one thread: the
+        work-item scope below opens no loop, and every kernel this pass calls
+        has stopped taking a count.  Declaring `ne = 1` anyway left it dead in
+        88 device kernels.
         """
-        return self._grid_stride_nodes(
-            "evb", (BufferDeclNode("const int", "ne", (), "1"),)
-        )
+        return self._grid_stride_nodes("evb", ())
 
     def element_loop_nodes(self, index="element", extent="nelements"):
         return self._grid_stride_nodes(index, (), extent)

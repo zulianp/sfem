@@ -54,10 +54,19 @@ _LANE_LOOP = re.compile(
 )
 
 
-def source_files(generated):
+#: What a survey reads, keyed on the tree it is asked about.  The device sources
+#: are the same generated kernels under a different suffix, so they are the same
+#: measurement over a different file set rather than a second audit: leaving them
+#: out is why 278 device kernels named a work-item count nothing read while the
+#: host budget stood at zero.
+_SOURCE_SUFFIXES = {False: ("*.cpp", "*.hpp"), True: ("*.cu", "*.cuh")}
+
+
+def source_files(generated, device=False):
     return sorted(
-        glob.glob(os.path.join(generated, "**", "*.cpp"), recursive=True)
-        + glob.glob(os.path.join(generated, "**", "*.hpp"), recursive=True)
+        path
+        for suffix in _SOURCE_SUFFIXES[bool(device)]
+        for path in glob.glob(os.path.join(generated, "**", suffix), recursive=True)
     )
 
 
@@ -440,8 +449,8 @@ def wrapped_helper_entry_points(source):
     return names
 
 
-def survey(generated):
-    """Every measurement, over one generated tree."""
+def survey(generated, device=False):
+    """Every measurement, over one generated tree -- its host sources, or its device ones."""
     dead = []
     runs = collections.Counter()
     wrappers = []
@@ -450,7 +459,7 @@ def survey(generated):
     discards = []
     permutations = []
     invariants = []
-    for path in source_files(generated):
+    for path in source_files(generated, device=device):
         with open(path, encoding="utf-8") as stream:
             source = stream.read()
         relative = os.path.relpath(path, generated)
@@ -488,9 +497,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("generated", help="a generated tree")
     parser.add_argument("--limit", type=int, default=15)
+    parser.add_argument(
+        "--device",
+        action="store_true",
+        help="survey the .cu/.cuh sources instead of the host ones",
+    )
     args = parser.parse_args(argv)
 
-    result = survey(args.generated)
+    result = survey(args.generated, device=args.device)
     print("kernel permutations:         %d" % len(result["kernel_permutations"]))
     for row in result["kernel_permutations"][: args.limit]:
         print("    %s: %s[%d]" % row)

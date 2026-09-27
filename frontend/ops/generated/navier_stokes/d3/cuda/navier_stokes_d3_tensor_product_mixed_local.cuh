@@ -32,7 +32,6 @@ namespace codegen {
 
 template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_d3_tensor_product_mixed_residual_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
@@ -235,7 +234,6 @@ __host__ __device__ __forceinline__ void navier_stokes_d3_tensor_product_mixed_r
 
 template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_d3_tensor_product_mixed_residual_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
@@ -427,7 +425,6 @@ __host__ __device__ __forceinline__ void navier_stokes_d3_tensor_product_mixed_r
 
 template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_d3_tensor_product_mixed_jacobian_action_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
@@ -631,7 +628,6 @@ __host__ __device__ __forceinline__ void navier_stokes_d3_tensor_product_mixed_j
 
 template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_d3_tensor_product_mixed_jacobian_action_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],

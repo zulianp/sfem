@@ -32,7 +32,6 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_residual_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -204,7 +203,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_residual_bloc
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_residual_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -370,7 +368,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_residual_bloc
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_tri3_residual_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -542,7 +539,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_tri3_residual
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_tri3_residual_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -708,7 +704,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_tri3_residual
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_jacobian_action_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -956,7 +951,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_jacobian_acti
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_jacobian_action_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -1198,7 +1192,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_jacobian_acti
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_tri3_jacobian_action_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -1446,7 +1439,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_tri3_jacobian
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_d2_simplex_tri3_jacobian_action_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],

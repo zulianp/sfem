@@ -638,7 +638,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_mooney_rivlin_kelvin_voigt
 
 extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_esoa(
     const int scalar_bytes,
-    const int ne,
     const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const void *const RSTR adjugate[9],
@@ -654,11 +653,11 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_tensor_product_residual_block<double, 8, 8>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_tensor_product_residual_block<double, 8, 8>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_tensor_product_residual_block<float, 8, 8>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_tensor_product_residual_block<float, 8, 8>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -711,7 +710,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_a_msoa_im
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcurrent[NC * NS];
     s_t bprevious[NC * NS];
     s_t boutput[NC * NS];
@@ -748,7 +746,7 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_a_msoa_im
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_residual_block_contiguous<s_t, NQ, NS>(ne, 0, bageom_streams[9], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_residual_block_contiguous<s_t, NQ, NS>(0, bageom_streams[9], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -857,7 +855,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_msoa_im
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcoordinates[3 * NS];
     s_t badjugate_data[9][NQ];
     s_t bdeterminant[NQ];
@@ -908,12 +905,12 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_msoa_im
         coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
 
     const s_t *const badjugate[9] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_residual_block_contiguous<s_t, NQ, NS>(ne, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_residual_block_contiguous<s_t, NQ, NS>(1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -1004,7 +1001,6 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_residual_i_maos(
 
 extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_esoa(
     const int scalar_bytes,
-    const int ne,
     const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const void *const RSTR adjugate[9],
@@ -1021,11 +1017,11 @@ extern "C" int cu_mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block<double, 8, 8>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block<double, 8, 8>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q2<double>::shape_1d(), sfem::codegen::ref_line_p1_q2<double>::grad_1d(), sfem::codegen::quad_line_q2<double>::q_weight_1d(), (const double *const *)current, (const double *const *)previous, (const double *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block<float, 8, 8>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
+        sfem::codegen::mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block<float, 8, 8>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q2<float>::shape_1d(), sfem::codegen::ref_line_p1_q2<float>::grad_1d(), sfem::codegen::quad_line_q2<float>::q_weight_1d(), (const float *const *)current, (const float *const *)previous, (const float *const *)direction, eta_b, eta_s, lmbda, mu, u_dt_shift, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -1082,7 +1078,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_a_
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcurrent[NC * NS];
     s_t bprevious[NC * NS];
     s_t bdirection[NC * NS];
@@ -1122,7 +1117,7 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_a_
       badjugate[component] = bageom_streams[component];
     }
 
-    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(ne, 0, bageom_streams[9], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(0, bageom_streams[9], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -1239,7 +1234,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcoordinates[3 * NS];
     s_t badjugate_data[9][NQ];
     s_t bdeterminant[NQ];
@@ -1293,12 +1287,12 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_jacobian_action_i_
         coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
 
     const s_t *const badjugate[9] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(ne, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
+    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, bdirection, eta_b, eta_s, lmbda, mu, u_dt_shift, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -1479,8 +1473,6 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_hessian_crs_i_msoa
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t element = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; element < nelements; element += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const ptrdiff_t evb = element;
-    const int ne = 1;
     idx_t ev[NS];
     s_t element_matrix[576];
     s_t bcoordinates[ND * NS];
@@ -1517,11 +1509,11 @@ __global__ void mooney_rivlin_kelvin_voigt_total_proteus_hex8_hessian_crs_i_msoa
         coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessian_block<s_t, NQ, NS>(1, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
+    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessian_block<s_t, NQ, NS>(1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
 
     mooney_rivlin_kelvin_voigt_total_proteus_hex8_hessian_crs_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
   }

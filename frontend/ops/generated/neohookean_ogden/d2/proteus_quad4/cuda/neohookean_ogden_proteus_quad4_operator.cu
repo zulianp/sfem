@@ -120,7 +120,6 @@ __global__ void neohookean_ogden_proteus_quad4_objective_steps_i_msoa_impl(
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     idx_t ev[NS];
     s_t bu_data[NS * NC];
     s_t bh_data[NS * NC];
@@ -180,8 +179,8 @@ __global__ void neohookean_ogden_proteus_quad4_objective_steps_i_msoa_impl(
         coordinate_grad_ref + NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
     for (int step = 0; step < nsteps; ++step) {
       {
@@ -189,7 +188,7 @@ __global__ void neohookean_ogden_proteus_quad4_objective_steps_i_msoa_impl(
       }
     }
 
-    neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    neohookean_ogden_d2_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -320,7 +319,6 @@ __global__ void neohookean_ogden_proteus_quad4_gradient_i_msoa_impl(
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     idx_t ev[NS];
     s_t bu_data[NS * NC];
     s_t bout_data[NS * NC];
@@ -383,10 +381,10 @@ __global__ void neohookean_ogden_proteus_quad4_gradient_i_msoa_impl(
         coordinate_grad_ref + NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
+    neohookean_ogden_d2_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 
@@ -526,7 +524,6 @@ __global__ void neohookean_ogden_proteus_quad4_apply_i_msoa_impl(
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     idx_t ev[NS];
     s_t bu_data[NS * NC];
     s_t bh_data[NS * NC];
@@ -596,10 +593,10 @@ __global__ void neohookean_ogden_proteus_quad4_apply_i_msoa_impl(
         coordinate_grad_ref + NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS>(ne, 1, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
+    neohookean_ogden_d2_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy};
 

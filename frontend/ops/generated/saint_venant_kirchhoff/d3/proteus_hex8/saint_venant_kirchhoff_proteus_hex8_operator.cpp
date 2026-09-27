@@ -3652,7 +3652,6 @@ static int saint_venant_kirchhoff_proteus_hex8_hessian_i_msoa_assemble_impl(
   static constexpr int ND = 3;
   static constexpr int NQ = 8;
   static constexpr int NS = 8;
-  static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
   const s_t *const u_components[NC] = {ux, uy, uz};
   const g_t *const RSTR x = points[0];
@@ -3668,44 +3667,43 @@ static int saint_venant_kirchhoff_proteus_hex8_hessian_i_msoa_assemble_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
-    s_t bcoordinate_data[NS * ND][VS];
-    static constexpr int ne = VS;
+    s_t bcoordinate_data[NS * ND];
     s_t bu_data[NS * NC];
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
     s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];
       ev[shape] = node;
       for (int d = 0; d < ND; ++d) {
-        bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
+        bcoordinate_data[shape * ND + d] = s_t(points[d][node]);
         bu_data[shape * NC + d] = u_components[d][node * u_stride];
       }
     }
 
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
         coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
-        coordinate_grad_ref + 2 * NQ * ND * VS);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
     saint_venant_kirchhoff_d3_tensor_product_direct_hessian_tensor_product_element_matrix<s_t, NQ, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_data, element_matrix);
 

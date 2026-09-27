@@ -201,7 +201,6 @@ __global__ void navier_stokes_tet10_tet4_residual_affine_mesh_mixed_impl(
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_z()};
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcurrent[N_FIELD_STREAMS];
     s_t bprevious[N_FIELD_STREAMS];
     s_t boutput[N_FIELD_STREAMS];
@@ -396,7 +395,6 @@ __global__ void navier_stokes_tet10_tet4_residual_isoparametric_mesh_mixed_impl(
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_cell_grad_ref_2 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcoordinates[ND * CELL_NS];
     s_t badjugate_data[ND * ND][NQ];
     s_t bdeterminant[NQ];
@@ -642,7 +640,6 @@ __global__ void navier_stokes_tet10_tet4_jacobian_action_affine_mesh_mixed_impl(
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tet10_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_x(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_y(), sfem::codegen::ref_tet4_q11<s_t>::grad_ref_z()};
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bprevious[N_FIELD_STREAMS];
     s_t bdirection[N_FIELD_STREAMS];
     s_t boutput[N_FIELD_STREAMS];
@@ -831,7 +828,6 @@ __global__ void navier_stokes_tet10_tet4_jacobian_action_isoparametric_mesh_mixe
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_y();
   const s_t *const isoparametric_cell_grad_ref_2 = sfem::codegen::ref_tet10_q11<s_t>::grad_ref_z();
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcoordinates[ND * CELL_NS];
     s_t badjugate_data[ND * ND][NQ];
     s_t bdeterminant[NQ];

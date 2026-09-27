@@ -155,7 +155,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *body_force_tet4_jacobian_acti
 extern "C" int body_force_tet4_residual_esoa(
     const int scalar_bytes,
     const int ne,
-    const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const real_t density,
     const real_t g0,

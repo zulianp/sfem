@@ -150,8 +150,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_body_force_tet4_jacobian_a
 
 extern "C" int cu_body_force_tet4_residual_esoa(
     const int scalar_bytes,
-    const int ne,
-    const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const real_t density,
     const real_t g0,
@@ -162,11 +160,11 @@ extern "C" int cu_body_force_tet4_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::body_force_d3_simplex_tet4_residual_block<double, 1, 4>(ne, (const double *)determinant, density, g0, g1, g2, (double *const *)output);
+        sfem::codegen::body_force_d3_simplex_tet4_residual_block<double, 1, 4>((const double *)determinant, density, g0, g1, g2, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::body_force_d3_simplex_tet4_residual_block<float, 1, 4>(ne, (const float *)determinant, density, g0, g1, g2, (float *const *)output);
+        sfem::codegen::body_force_d3_simplex_tet4_residual_block<float, 1, 4>((const float *)determinant, density, g0, g1, g2, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -198,7 +196,6 @@ __global__ void body_force_tet4_residual_a_msoa_impl(
   static constexpr int NC = 3;
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t boutput[NC * NS];
 
     for (int stream = 0; stream < 12; ++stream) {
@@ -213,7 +210,7 @@ __global__ void body_force_tet4_residual_a_msoa_impl(
     bageom_streams[0] = ageom_stream<s_t, g_t>(
         ne, affine_geometry_sources[0], &baffine_geometry_data[0], std::is_same<g_t, s_t>());
 
-    body_force_d3_simplex_tet4_residual_block_contiguous<s_t, NQ, NS>(ne, bageom_streams[0], density, g0, g1, g2, boutput);
+    body_force_d3_simplex_tet4_residual_block_contiguous<s_t, NQ, NS>(bageom_streams[0], density, g0, g1, g2, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {

@@ -32,7 +32,6 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void body_force_d2_simplex_residual_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR shape,
@@ -68,7 +67,6 @@ __host__ __device__ __forceinline__ void body_force_d2_simplex_residual_block(
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void body_force_d2_simplex_residual_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR shape,
@@ -102,7 +100,6 @@ __host__ __device__ __forceinline__ void body_force_d2_simplex_residual_block_co
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void body_force_d2_simplex_tri3_residual_block(
-    const int ne,
     const s_t *const RSTR determinant,
     const s_t density,
     const s_t g0,
@@ -125,7 +122,6 @@ __host__ __device__ __forceinline__ void body_force_d2_simplex_tri3_residual_blo
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void body_force_d2_simplex_tri3_residual_block_contiguous(
-    const int ne,
     const s_t *const RSTR determinant,
     const s_t density,
     const s_t g0,

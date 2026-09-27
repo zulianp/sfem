@@ -368,7 +368,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_two_phase_flow_form_2_p_w_
 
 extern "C" int cu_two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_esoa(
     const int scalar_bytes,
-    const int ne,
     const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const void *const RSTR adjugate[4],
@@ -393,11 +392,11 @@ extern "C" int cu_two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_es
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_form_2_p_w_p_c_d2_tensor_product_jacobian_action_block<double, 16, 4>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q4<double>::shape_1d(), sfem::codegen::ref_line_p1_q4<double>::grad_1d(), sfem::codegen::quad_line_q4<double>::q_weight_1d(), (const double *const *)current, (const double *const *)direction, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
+        sfem::codegen::two_phase_flow_form_2_p_w_p_c_d2_tensor_product_jacobian_action_block<double, 16, 4>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q4<double>::shape_1d(), sfem::codegen::ref_line_p1_q4<double>::grad_1d(), sfem::codegen::quad_line_q4<double>::q_weight_1d(), (const double *const *)current, (const double *const *)direction, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_form_2_p_w_p_c_d2_tensor_product_jacobian_action_block<float, 16, 4>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q4<float>::shape_1d(), sfem::codegen::ref_line_p1_q4<float>::grad_1d(), sfem::codegen::quad_line_q4<float>::q_weight_1d(), (const float *const *)current, (const float *const *)direction, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
+        sfem::codegen::two_phase_flow_form_2_p_w_p_c_d2_tensor_product_jacobian_action_block<float, 16, 4>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q4<float>::shape_1d(), sfem::codegen::ref_line_p1_q4<float>::grad_1d(), sfem::codegen::quad_line_q4<float>::q_weight_1d(), (const float *const *)current, (const float *const *)direction, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -451,7 +450,6 @@ __global__ void two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_a_ms
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcurrent[NC * NS];
     s_t bdirection[NC * NS];
     s_t boutput[NC * NS];
@@ -488,7 +486,7 @@ __global__ void two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_a_ms
       badjugate[component] = bageom_streams[component];
     }
 
-    two_phase_flow_form_2_p_w_p_c_d2_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(ne, 0, bageom_streams[4], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bdirection, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, boutput);
+    two_phase_flow_form_2_p_w_p_c_d2_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(0, bageom_streams[4], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bdirection, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, boutput);
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -604,7 +602,6 @@ __global__ void two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_ms
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q4<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcoordinates[2 * NS];
     s_t badjugate_data[4][NQ];
     s_t bdeterminant[NQ];
@@ -652,12 +649,12 @@ __global__ void two_phase_flow_form_2_p_w_p_c_proteus_quad4_jacobian_action_i_ms
         coordinate_grad_ref + NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
 
     const s_t *const badjugate[4] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-    two_phase_flow_form_2_p_w_p_c_d2_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(ne, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bdirection, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, boutput);
+    two_phase_flow_form_2_p_w_p_c_d2_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bdirection, C_kw1, K_0, K_1, K_2, K_3, P_r, S_res, dt, kappa_T, m, mu_w, p_wr, porosity, rho_w0, boutput);
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {

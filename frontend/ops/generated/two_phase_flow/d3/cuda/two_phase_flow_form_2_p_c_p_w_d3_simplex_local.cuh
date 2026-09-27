@@ -32,7 +32,6 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_form_2_p_c_p_w_d3_simplex_jacobian_action_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
@@ -194,7 +193,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_2_p_c_p_w_d3_simple
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_form_2_p_c_p_w_d3_simplex_jacobian_action_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
@@ -352,7 +350,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_2_p_c_p_w_d3_simple
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_form_2_p_c_p_w_d3_simplex_tet4_jacobian_action_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
@@ -514,7 +511,6 @@ __host__ __device__ __forceinline__ void two_phase_flow_form_2_p_c_p_w_d3_simple
 
 template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void two_phase_flow_form_2_p_c_p_w_d3_simplex_tet4_jacobian_action_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],

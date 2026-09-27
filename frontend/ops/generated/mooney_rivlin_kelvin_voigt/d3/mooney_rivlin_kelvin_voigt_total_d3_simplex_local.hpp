@@ -3679,14 +3679,13 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_jacobia
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
-    const s_t current[3 * NS][VS],
-    const s_t previous[3 * NS][VS],
+    const s_t current[3 * NS],
+    const s_t previous[3 * NS],
     const s_t eta_b,
     const s_t eta_s,
     const s_t lmbda,
@@ -3695,9 +3694,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian
     s_t *const RSTR element_matrix
 ) {
   const int q = 0;
-  #pragma omp simd
-  for (int lane = 0; lane < ne; ++lane) {
-    const ptrdiff_t goff = q * geometry_stride + lane;
+  {
+    const ptrdiff_t goff = q * geometry_stride;
     const s_t det = determinant[goff];
     const s_t adj0 = adjugate[0][goff];
     const s_t adj1 = adjugate[1][goff];
@@ -3708,39 +3706,39 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian
     const s_t adj6 = adjugate[6][goff];
     const s_t adj7 = adjugate[7][goff];
     const s_t adj8 = adjugate[8][goff];
-    const s_t u0_grad_0_ref = -(current[0][lane]) + current[3][lane];
-    const s_t u0_grad_1_ref = -(current[0][lane]) + current[6][lane];
-    const s_t u0_grad_2_ref = -(current[0][lane]) + current[9][lane];
+    const s_t u0_grad_0_ref = -(current[0]) + current[3];
+    const s_t u0_grad_1_ref = -(current[0]) + current[6];
+    const s_t u0_grad_2_ref = -(current[0]) + current[9];
     const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
     const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
     const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-    const s_t u0_old_grad_0_ref = -(previous[0][lane]) + previous[3][lane];
-    const s_t u0_old_grad_1_ref = -(previous[0][lane]) + previous[6][lane];
-    const s_t u0_old_grad_2_ref = -(previous[0][lane]) + previous[9][lane];
+    const s_t u0_old_grad_0_ref = -(previous[0]) + previous[3];
+    const s_t u0_old_grad_1_ref = -(previous[0]) + previous[6];
+    const s_t u0_old_grad_2_ref = -(previous[0]) + previous[9];
     const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
     const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
     const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-    const s_t u1_grad_0_ref = -(current[1][lane]) + current[4][lane];
-    const s_t u1_grad_1_ref = -(current[1][lane]) + current[7][lane];
-    const s_t u1_grad_2_ref = -(current[1][lane]) + current[10][lane];
+    const s_t u1_grad_0_ref = -(current[1]) + current[4];
+    const s_t u1_grad_1_ref = -(current[1]) + current[7];
+    const s_t u1_grad_2_ref = -(current[1]) + current[10];
     const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
     const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
     const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-    const s_t u1_old_grad_0_ref = -(previous[1][lane]) + previous[4][lane];
-    const s_t u1_old_grad_1_ref = -(previous[1][lane]) + previous[7][lane];
-    const s_t u1_old_grad_2_ref = -(previous[1][lane]) + previous[10][lane];
+    const s_t u1_old_grad_0_ref = -(previous[1]) + previous[4];
+    const s_t u1_old_grad_1_ref = -(previous[1]) + previous[7];
+    const s_t u1_old_grad_2_ref = -(previous[1]) + previous[10];
     const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
     const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
     const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-    const s_t u2_grad_0_ref = -(current[2][lane]) + current[5][lane];
-    const s_t u2_grad_1_ref = -(current[2][lane]) + current[8][lane];
-    const s_t u2_grad_2_ref = -(current[2][lane]) + current[11][lane];
+    const s_t u2_grad_0_ref = -(current[2]) + current[5];
+    const s_t u2_grad_1_ref = -(current[2]) + current[8];
+    const s_t u2_grad_2_ref = -(current[2]) + current[11];
     const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
     const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
     const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-    const s_t u2_old_grad_0_ref = -(previous[2][lane]) + previous[5][lane];
-    const s_t u2_old_grad_1_ref = -(previous[2][lane]) + previous[8][lane];
-    const s_t u2_old_grad_2_ref = -(previous[2][lane]) + previous[11][lane];
+    const s_t u2_old_grad_0_ref = -(previous[2]) + previous[5];
+    const s_t u2_old_grad_1_ref = -(previous[2]) + previous[8];
+    const s_t u2_old_grad_2_ref = -(previous[2]) + previous[11];
     const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
     const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
     const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
@@ -4530,9 +4528,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_tet4_hessian
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[9],
@@ -4540,8 +4537,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
     const s_t *const RSTR grad_ref_y,
     const s_t *const RSTR grad_ref_z,
     const s_t *const RSTR q_weight,
-    const s_t current[3 * NS][VS],
-    const s_t previous[3 * NS][VS],
+    const s_t current[3 * NS],
+    const s_t previous[3 * NS],
     const s_t eta_b,
     const s_t eta_s,
     const s_t lmbda,
@@ -4553,146 +4550,127 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
   for (int entry = 0; entry < 3 * NS * 3 * NS; ++entry) {
     element_matrix[entry] = s_t(0);
   }
-  s_t u0_grad_0_ref_values[VS];
-  s_t u0_grad_1_ref_values[VS];
-  s_t u0_grad_2_ref_values[VS];
-  s_t u0_old_grad_0_ref_values[VS];
-  s_t u0_old_grad_1_ref_values[VS];
-  s_t u0_old_grad_2_ref_values[VS];
-  s_t u1_grad_0_ref_values[VS];
-  s_t u1_grad_1_ref_values[VS];
-  s_t u1_grad_2_ref_values[VS];
-  s_t u1_old_grad_0_ref_values[VS];
-  s_t u1_old_grad_1_ref_values[VS];
-  s_t u1_old_grad_2_ref_values[VS];
-  s_t u2_grad_0_ref_values[VS];
-  s_t u2_grad_1_ref_values[VS];
-  s_t u2_grad_2_ref_values[VS];
-  s_t u2_old_grad_0_ref_values[VS];
-  s_t u2_old_grad_1_ref_values[VS];
-  s_t u2_old_grad_2_ref_values[VS];
-  s_t grad_coeff0_0_values[VS];
-  s_t grad_coeff0_1_values[VS];
-  s_t grad_coeff0_2_values[VS];
-  s_t grad_coeff1_0_values[VS];
-  s_t grad_coeff1_1_values[VS];
-  s_t grad_coeff1_2_values[VS];
-  s_t grad_coeff2_0_values[VS];
-  s_t grad_coeff2_1_values[VS];
-  s_t grad_coeff2_2_values[VS];
-  s_t tangent[81][VS];
+  s_t u0_grad_0_ref_values;
+  s_t u0_grad_1_ref_values;
+  s_t u0_grad_2_ref_values;
+  s_t u0_old_grad_0_ref_values;
+  s_t u0_old_grad_1_ref_values;
+  s_t u0_old_grad_2_ref_values;
+  s_t u1_grad_0_ref_values;
+  s_t u1_grad_1_ref_values;
+  s_t u1_grad_2_ref_values;
+  s_t u1_old_grad_0_ref_values;
+  s_t u1_old_grad_1_ref_values;
+  s_t u1_old_grad_2_ref_values;
+  s_t u2_grad_0_ref_values;
+  s_t u2_grad_1_ref_values;
+  s_t u2_grad_2_ref_values;
+  s_t u2_old_grad_0_ref_values;
+  s_t u2_old_grad_1_ref_values;
+  s_t u2_old_grad_2_ref_values;
+  s_t grad_coeff0_0_values;
+  s_t grad_coeff0_1_values;
+  s_t grad_coeff0_2_values;
+  s_t grad_coeff1_0_values;
+  s_t grad_coeff1_1_values;
+  s_t grad_coeff1_2_values;
+  s_t grad_coeff2_0_values;
+  s_t grad_coeff2_1_values;
+  s_t grad_coeff2_2_values;
+  s_t tangent[81];
   for (int q = 0; q < NQ; ++q) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_grad_0_ref_values[lane] = s_t(0);
-      u0_grad_1_ref_values[lane] = s_t(0);
-      u0_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_grad_0_ref_values = s_t(0);
+      u0_grad_1_ref_values = s_t(0);
+      u0_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = current[trial * NC];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       const s_t trial_grad_2_ref = grad_ref_z[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u0_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u0_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
-        u0_grad_2_ref_values[lane] += coeff_stream[lane] * trial_grad_2_ref;
+      {
+        u0_grad_0_ref_values += current[trial * NC] * trial_grad_0_ref;
+        u0_grad_1_ref_values += current[trial * NC] * trial_grad_1_ref;
+        u0_grad_2_ref_values += current[trial * NC] * trial_grad_2_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_old_grad_0_ref_values[lane] = s_t(0);
-      u0_old_grad_1_ref_values[lane] = s_t(0);
-      u0_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u0_old_grad_0_ref_values = s_t(0);
+      u0_old_grad_1_ref_values = s_t(0);
+      u0_old_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = previous[trial * NC];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       const s_t trial_grad_2_ref = grad_ref_z[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u0_old_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u0_old_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
-        u0_old_grad_2_ref_values[lane] += coeff_stream[lane] * trial_grad_2_ref;
+      {
+        u0_old_grad_0_ref_values += previous[trial * NC] * trial_grad_0_ref;
+        u0_old_grad_1_ref_values += previous[trial * NC] * trial_grad_1_ref;
+        u0_old_grad_2_ref_values += previous[trial * NC] * trial_grad_2_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_grad_0_ref_values[lane] = s_t(0);
-      u1_grad_1_ref_values[lane] = s_t(0);
-      u1_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_grad_0_ref_values = s_t(0);
+      u1_grad_1_ref_values = s_t(0);
+      u1_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = current[trial * NC + 1];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       const s_t trial_grad_2_ref = grad_ref_z[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u1_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u1_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
-        u1_grad_2_ref_values[lane] += coeff_stream[lane] * trial_grad_2_ref;
+      {
+        u1_grad_0_ref_values += current[trial * NC + 1] * trial_grad_0_ref;
+        u1_grad_1_ref_values += current[trial * NC + 1] * trial_grad_1_ref;
+        u1_grad_2_ref_values += current[trial * NC + 1] * trial_grad_2_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_old_grad_0_ref_values[lane] = s_t(0);
-      u1_old_grad_1_ref_values[lane] = s_t(0);
-      u1_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u1_old_grad_0_ref_values = s_t(0);
+      u1_old_grad_1_ref_values = s_t(0);
+      u1_old_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = previous[trial * NC + 1];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       const s_t trial_grad_2_ref = grad_ref_z[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u1_old_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u1_old_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
-        u1_old_grad_2_ref_values[lane] += coeff_stream[lane] * trial_grad_2_ref;
+      {
+        u1_old_grad_0_ref_values += previous[trial * NC + 1] * trial_grad_0_ref;
+        u1_old_grad_1_ref_values += previous[trial * NC + 1] * trial_grad_1_ref;
+        u1_old_grad_2_ref_values += previous[trial * NC + 1] * trial_grad_2_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_grad_0_ref_values[lane] = s_t(0);
-      u2_grad_1_ref_values[lane] = s_t(0);
-      u2_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_grad_0_ref_values = s_t(0);
+      u2_grad_1_ref_values = s_t(0);
+      u2_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = current[trial * NC + 2];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       const s_t trial_grad_2_ref = grad_ref_z[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u2_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u2_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
-        u2_grad_2_ref_values[lane] += coeff_stream[lane] * trial_grad_2_ref;
+      {
+        u2_grad_0_ref_values += current[trial * NC + 2] * trial_grad_0_ref;
+        u2_grad_1_ref_values += current[trial * NC + 2] * trial_grad_1_ref;
+        u2_grad_2_ref_values += current[trial * NC + 2] * trial_grad_2_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u2_old_grad_0_ref_values[lane] = s_t(0);
-      u2_old_grad_1_ref_values[lane] = s_t(0);
-      u2_old_grad_2_ref_values[lane] = s_t(0);
+    {
+      u2_old_grad_0_ref_values = s_t(0);
+      u2_old_grad_1_ref_values = s_t(0);
+      u2_old_grad_2_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = previous[trial * NC + 2];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       const s_t trial_grad_2_ref = grad_ref_z[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u2_old_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u2_old_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
-        u2_old_grad_2_ref_values[lane] += coeff_stream[lane] * trial_grad_2_ref;
+      {
+        u2_old_grad_0_ref_values += previous[trial * NC + 2] * trial_grad_0_ref;
+        u2_old_grad_1_ref_values += previous[trial * NC + 2] * trial_grad_1_ref;
+        u2_old_grad_2_ref_values += previous[trial * NC + 2] * trial_grad_2_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
@@ -4703,39 +4681,39 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
       const s_t adj6 = adjugate[6][goff];
       const s_t adj7 = adjugate[7][goff];
       const s_t adj8 = adjugate[8][goff];
-      const s_t u0_grad_0_ref = u0_grad_0_ref_values[lane];
-      const s_t u0_grad_1_ref = u0_grad_1_ref_values[lane];
-      const s_t u0_grad_2_ref = u0_grad_2_ref_values[lane];
+      const s_t u0_grad_0_ref = u0_grad_0_ref_values;
+      const s_t u0_grad_1_ref = u0_grad_1_ref_values;
+      const s_t u0_grad_2_ref = u0_grad_2_ref_values;
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj3 + u0_grad_2_ref * adj6) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj4 + u0_grad_2_ref * adj7) / det;
       const s_t u0_grad_2 = (u0_grad_0_ref * adj2 + u0_grad_1_ref * adj5 + u0_grad_2_ref * adj8) / det;
-      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[lane];
-      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[lane];
-      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values[lane];
+      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values;
+      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values;
+      const s_t u0_old_grad_2_ref = u0_old_grad_2_ref_values;
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj3 + u0_old_grad_2_ref * adj6) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj4 + u0_old_grad_2_ref * adj7) / det;
       const s_t u0_old_grad_2 = (u0_old_grad_0_ref * adj2 + u0_old_grad_1_ref * adj5 + u0_old_grad_2_ref * adj8) / det;
-      const s_t u1_grad_0_ref = u1_grad_0_ref_values[lane];
-      const s_t u1_grad_1_ref = u1_grad_1_ref_values[lane];
-      const s_t u1_grad_2_ref = u1_grad_2_ref_values[lane];
+      const s_t u1_grad_0_ref = u1_grad_0_ref_values;
+      const s_t u1_grad_1_ref = u1_grad_1_ref_values;
+      const s_t u1_grad_2_ref = u1_grad_2_ref_values;
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj3 + u1_grad_2_ref * adj6) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj4 + u1_grad_2_ref * adj7) / det;
       const s_t u1_grad_2 = (u1_grad_0_ref * adj2 + u1_grad_1_ref * adj5 + u1_grad_2_ref * adj8) / det;
-      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[lane];
-      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[lane];
-      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values[lane];
+      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values;
+      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values;
+      const s_t u1_old_grad_2_ref = u1_old_grad_2_ref_values;
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj3 + u1_old_grad_2_ref * adj6) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj4 + u1_old_grad_2_ref * adj7) / det;
       const s_t u1_old_grad_2 = (u1_old_grad_0_ref * adj2 + u1_old_grad_1_ref * adj5 + u1_old_grad_2_ref * adj8) / det;
-      const s_t u2_grad_0_ref = u2_grad_0_ref_values[lane];
-      const s_t u2_grad_1_ref = u2_grad_1_ref_values[lane];
-      const s_t u2_grad_2_ref = u2_grad_2_ref_values[lane];
+      const s_t u2_grad_0_ref = u2_grad_0_ref_values;
+      const s_t u2_grad_1_ref = u2_grad_1_ref_values;
+      const s_t u2_grad_2_ref = u2_grad_2_ref_values;
       const s_t u2_grad_0 = (u2_grad_0_ref * adj0 + u2_grad_1_ref * adj3 + u2_grad_2_ref * adj6) / det;
       const s_t u2_grad_1 = (u2_grad_0_ref * adj1 + u2_grad_1_ref * adj4 + u2_grad_2_ref * adj7) / det;
       const s_t u2_grad_2 = (u2_grad_0_ref * adj2 + u2_grad_1_ref * adj5 + u2_grad_2_ref * adj8) / det;
-      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values[lane];
-      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values[lane];
-      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values[lane];
+      const s_t u2_old_grad_0_ref = u2_old_grad_0_ref_values;
+      const s_t u2_old_grad_1_ref = u2_old_grad_1_ref_values;
+      const s_t u2_old_grad_2_ref = u2_old_grad_2_ref_values;
       const s_t u2_old_grad_0 = (u2_old_grad_0_ref * adj0 + u2_old_grad_1_ref * adj3 + u2_old_grad_2_ref * adj6) / det;
       const s_t u2_old_grad_1 = (u2_old_grad_0_ref * adj1 + u2_old_grad_1_ref * adj4 + u2_old_grad_2_ref * adj7) / det;
       const s_t u2_old_grad_2 = (u2_old_grad_0_ref * adj2 + u2_old_grad_1_ref * adj5 + u2_old_grad_2_ref * adj8) / det;
@@ -5264,95 +5242,94 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
       const s_t tangent_grad_d2_2_grad2_0 = mu*(s_t(2)*tangent_tmp138*u2_grad_0 - tangent_tmp415 - tangent_tmp442*u2_grad_0) + tangent_tmp167*tangent_tmp432 + tangent_tmp170*tangent_tmp433 + tangent_tmp23*(-eta_s*(-tangent_tmp113 + tangent_tmp19*tangent_tmp438 - tangent_tmp321 - tangent_tmp33*tangent_tmp441) + ((s_t(1) / s_t(3)))*tangent_tmp24*tangent_tmp443);
       const s_t tangent_grad_d2_2_grad2_1 = mu*(s_t(2)*tangent_tmp138*u2_grad_1 - tangent_tmp431 - tangent_tmp442*u2_grad_1) + tangent_tmp175*tangent_tmp432 + tangent_tmp178*tangent_tmp433 + tangent_tmp23*(-eta_s*(-tangent_tmp226 - tangent_tmp363 - tangent_tmp438*tangent_tmp62 + tangent_tmp441*tangent_tmp70) + ((s_t(1) / s_t(3)))*tangent_tmp443*tangent_tmp59);
       const s_t tangent_grad_d2_2_grad2_2 = mu*(tangent_tmp411 + tangent_tmp430 + s_t(2)) + tangent_tmp186*tangent_tmp432 + tangent_tmp190*tangent_tmp433 + tangent_tmp23*(eta_s*(tangent_tmp438*tangent_tmp64 + tangent_tmp441*tangent_tmp69) - tangent_tmp191*tangent_tmp443);
-      tangent[0][lane] = tangent_grad_d0_0_grad0_0;
-      tangent[1][lane] = tangent_grad_d0_0_grad0_1;
-      tangent[2][lane] = tangent_grad_d0_0_grad0_2;
-      tangent[3][lane] = tangent_grad_d0_0_grad1_0;
-      tangent[4][lane] = tangent_grad_d0_0_grad1_1;
-      tangent[5][lane] = tangent_grad_d0_0_grad1_2;
-      tangent[6][lane] = tangent_grad_d0_0_grad2_0;
-      tangent[7][lane] = tangent_grad_d0_0_grad2_1;
-      tangent[8][lane] = tangent_grad_d0_0_grad2_2;
-      tangent[9][lane] = tangent_grad_d0_1_grad0_0;
-      tangent[10][lane] = tangent_grad_d0_1_grad0_1;
-      tangent[11][lane] = tangent_grad_d0_1_grad0_2;
-      tangent[12][lane] = tangent_grad_d0_1_grad1_0;
-      tangent[13][lane] = tangent_grad_d0_1_grad1_1;
-      tangent[14][lane] = tangent_grad_d0_1_grad1_2;
-      tangent[15][lane] = tangent_grad_d0_1_grad2_0;
-      tangent[16][lane] = tangent_grad_d0_1_grad2_1;
-      tangent[17][lane] = tangent_grad_d0_1_grad2_2;
-      tangent[18][lane] = tangent_grad_d0_2_grad0_0;
-      tangent[19][lane] = tangent_grad_d0_2_grad0_1;
-      tangent[20][lane] = tangent_grad_d0_2_grad0_2;
-      tangent[21][lane] = tangent_grad_d0_2_grad1_0;
-      tangent[22][lane] = tangent_grad_d0_2_grad1_1;
-      tangent[23][lane] = tangent_grad_d0_2_grad1_2;
-      tangent[24][lane] = tangent_grad_d0_2_grad2_0;
-      tangent[25][lane] = tangent_grad_d0_2_grad2_1;
-      tangent[26][lane] = tangent_grad_d0_2_grad2_2;
-      tangent[27][lane] = tangent_grad_d1_0_grad0_0;
-      tangent[28][lane] = tangent_grad_d1_0_grad0_1;
-      tangent[29][lane] = tangent_grad_d1_0_grad0_2;
-      tangent[30][lane] = tangent_grad_d1_0_grad1_0;
-      tangent[31][lane] = tangent_grad_d1_0_grad1_1;
-      tangent[32][lane] = tangent_grad_d1_0_grad1_2;
-      tangent[33][lane] = tangent_grad_d1_0_grad2_0;
-      tangent[34][lane] = tangent_grad_d1_0_grad2_1;
-      tangent[35][lane] = tangent_grad_d1_0_grad2_2;
-      tangent[36][lane] = tangent_grad_d1_1_grad0_0;
-      tangent[37][lane] = tangent_grad_d1_1_grad0_1;
-      tangent[38][lane] = tangent_grad_d1_1_grad0_2;
-      tangent[39][lane] = tangent_grad_d1_1_grad1_0;
-      tangent[40][lane] = tangent_grad_d1_1_grad1_1;
-      tangent[41][lane] = tangent_grad_d1_1_grad1_2;
-      tangent[42][lane] = tangent_grad_d1_1_grad2_0;
-      tangent[43][lane] = tangent_grad_d1_1_grad2_1;
-      tangent[44][lane] = tangent_grad_d1_1_grad2_2;
-      tangent[45][lane] = tangent_grad_d1_2_grad0_0;
-      tangent[46][lane] = tangent_grad_d1_2_grad0_1;
-      tangent[47][lane] = tangent_grad_d1_2_grad0_2;
-      tangent[48][lane] = tangent_grad_d1_2_grad1_0;
-      tangent[49][lane] = tangent_grad_d1_2_grad1_1;
-      tangent[50][lane] = tangent_grad_d1_2_grad1_2;
-      tangent[51][lane] = tangent_grad_d1_2_grad2_0;
-      tangent[52][lane] = tangent_grad_d1_2_grad2_1;
-      tangent[53][lane] = tangent_grad_d1_2_grad2_2;
-      tangent[54][lane] = tangent_grad_d2_0_grad0_0;
-      tangent[55][lane] = tangent_grad_d2_0_grad0_1;
-      tangent[56][lane] = tangent_grad_d2_0_grad0_2;
-      tangent[57][lane] = tangent_grad_d2_0_grad1_0;
-      tangent[58][lane] = tangent_grad_d2_0_grad1_1;
-      tangent[59][lane] = tangent_grad_d2_0_grad1_2;
-      tangent[60][lane] = tangent_grad_d2_0_grad2_0;
-      tangent[61][lane] = tangent_grad_d2_0_grad2_1;
-      tangent[62][lane] = tangent_grad_d2_0_grad2_2;
-      tangent[63][lane] = tangent_grad_d2_1_grad0_0;
-      tangent[64][lane] = tangent_grad_d2_1_grad0_1;
-      tangent[65][lane] = tangent_grad_d2_1_grad0_2;
-      tangent[66][lane] = tangent_grad_d2_1_grad1_0;
-      tangent[67][lane] = tangent_grad_d2_1_grad1_1;
-      tangent[68][lane] = tangent_grad_d2_1_grad1_2;
-      tangent[69][lane] = tangent_grad_d2_1_grad2_0;
-      tangent[70][lane] = tangent_grad_d2_1_grad2_1;
-      tangent[71][lane] = tangent_grad_d2_1_grad2_2;
-      tangent[72][lane] = tangent_grad_d2_2_grad0_0;
-      tangent[73][lane] = tangent_grad_d2_2_grad0_1;
-      tangent[74][lane] = tangent_grad_d2_2_grad0_2;
-      tangent[75][lane] = tangent_grad_d2_2_grad1_0;
-      tangent[76][lane] = tangent_grad_d2_2_grad1_1;
-      tangent[77][lane] = tangent_grad_d2_2_grad1_2;
-      tangent[78][lane] = tangent_grad_d2_2_grad2_0;
-      tangent[79][lane] = tangent_grad_d2_2_grad2_1;
-      tangent[80][lane] = tangent_grad_d2_2_grad2_2;
+      tangent[0] = tangent_grad_d0_0_grad0_0;
+      tangent[1] = tangent_grad_d0_0_grad0_1;
+      tangent[2] = tangent_grad_d0_0_grad0_2;
+      tangent[3] = tangent_grad_d0_0_grad1_0;
+      tangent[4] = tangent_grad_d0_0_grad1_1;
+      tangent[5] = tangent_grad_d0_0_grad1_2;
+      tangent[6] = tangent_grad_d0_0_grad2_0;
+      tangent[7] = tangent_grad_d0_0_grad2_1;
+      tangent[8] = tangent_grad_d0_0_grad2_2;
+      tangent[9] = tangent_grad_d0_1_grad0_0;
+      tangent[10] = tangent_grad_d0_1_grad0_1;
+      tangent[11] = tangent_grad_d0_1_grad0_2;
+      tangent[12] = tangent_grad_d0_1_grad1_0;
+      tangent[13] = tangent_grad_d0_1_grad1_1;
+      tangent[14] = tangent_grad_d0_1_grad1_2;
+      tangent[15] = tangent_grad_d0_1_grad2_0;
+      tangent[16] = tangent_grad_d0_1_grad2_1;
+      tangent[17] = tangent_grad_d0_1_grad2_2;
+      tangent[18] = tangent_grad_d0_2_grad0_0;
+      tangent[19] = tangent_grad_d0_2_grad0_1;
+      tangent[20] = tangent_grad_d0_2_grad0_2;
+      tangent[21] = tangent_grad_d0_2_grad1_0;
+      tangent[22] = tangent_grad_d0_2_grad1_1;
+      tangent[23] = tangent_grad_d0_2_grad1_2;
+      tangent[24] = tangent_grad_d0_2_grad2_0;
+      tangent[25] = tangent_grad_d0_2_grad2_1;
+      tangent[26] = tangent_grad_d0_2_grad2_2;
+      tangent[27] = tangent_grad_d1_0_grad0_0;
+      tangent[28] = tangent_grad_d1_0_grad0_1;
+      tangent[29] = tangent_grad_d1_0_grad0_2;
+      tangent[30] = tangent_grad_d1_0_grad1_0;
+      tangent[31] = tangent_grad_d1_0_grad1_1;
+      tangent[32] = tangent_grad_d1_0_grad1_2;
+      tangent[33] = tangent_grad_d1_0_grad2_0;
+      tangent[34] = tangent_grad_d1_0_grad2_1;
+      tangent[35] = tangent_grad_d1_0_grad2_2;
+      tangent[36] = tangent_grad_d1_1_grad0_0;
+      tangent[37] = tangent_grad_d1_1_grad0_1;
+      tangent[38] = tangent_grad_d1_1_grad0_2;
+      tangent[39] = tangent_grad_d1_1_grad1_0;
+      tangent[40] = tangent_grad_d1_1_grad1_1;
+      tangent[41] = tangent_grad_d1_1_grad1_2;
+      tangent[42] = tangent_grad_d1_1_grad2_0;
+      tangent[43] = tangent_grad_d1_1_grad2_1;
+      tangent[44] = tangent_grad_d1_1_grad2_2;
+      tangent[45] = tangent_grad_d1_2_grad0_0;
+      tangent[46] = tangent_grad_d1_2_grad0_1;
+      tangent[47] = tangent_grad_d1_2_grad0_2;
+      tangent[48] = tangent_grad_d1_2_grad1_0;
+      tangent[49] = tangent_grad_d1_2_grad1_1;
+      tangent[50] = tangent_grad_d1_2_grad1_2;
+      tangent[51] = tangent_grad_d1_2_grad2_0;
+      tangent[52] = tangent_grad_d1_2_grad2_1;
+      tangent[53] = tangent_grad_d1_2_grad2_2;
+      tangent[54] = tangent_grad_d2_0_grad0_0;
+      tangent[55] = tangent_grad_d2_0_grad0_1;
+      tangent[56] = tangent_grad_d2_0_grad0_2;
+      tangent[57] = tangent_grad_d2_0_grad1_0;
+      tangent[58] = tangent_grad_d2_0_grad1_1;
+      tangent[59] = tangent_grad_d2_0_grad1_2;
+      tangent[60] = tangent_grad_d2_0_grad2_0;
+      tangent[61] = tangent_grad_d2_0_grad2_1;
+      tangent[62] = tangent_grad_d2_0_grad2_2;
+      tangent[63] = tangent_grad_d2_1_grad0_0;
+      tangent[64] = tangent_grad_d2_1_grad0_1;
+      tangent[65] = tangent_grad_d2_1_grad0_2;
+      tangent[66] = tangent_grad_d2_1_grad1_0;
+      tangent[67] = tangent_grad_d2_1_grad1_1;
+      tangent[68] = tangent_grad_d2_1_grad1_2;
+      tangent[69] = tangent_grad_d2_1_grad2_0;
+      tangent[70] = tangent_grad_d2_1_grad2_1;
+      tangent[71] = tangent_grad_d2_1_grad2_2;
+      tangent[72] = tangent_grad_d2_2_grad0_0;
+      tangent[73] = tangent_grad_d2_2_grad0_1;
+      tangent[74] = tangent_grad_d2_2_grad0_2;
+      tangent[75] = tangent_grad_d2_2_grad1_0;
+      tangent[76] = tangent_grad_d2_2_grad1_1;
+      tangent[77] = tangent_grad_d2_2_grad1_2;
+      tangent[78] = tangent_grad_d2_2_grad2_0;
+      tangent[79] = tangent_grad_d2_2_grad2_1;
+      tangent[80] = tangent_grad_d2_2_grad2_2;
     }
     for (int trial = 0; trial < NS; ++trial) {
       const s_t trial_grad_ref0 = grad_ref_x[q * NS + trial];
       const s_t trial_grad_ref1 = grad_ref_y[q * NS + trial];
       const s_t trial_grad_ref2 = grad_ref_z[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
+      {
+        const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
@@ -5366,32 +5343,31 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj3 + trial_grad_ref2 * adj6) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj4 + trial_grad_ref2 * adj7) / det;
         const s_t trial_grad2 = (trial_grad_ref0 * adj2 + trial_grad_ref1 * adj5 + trial_grad_ref2 * adj8) / det;
-        const s_t grad_coeff0_0 = trial_grad0 * tangent[0][lane] + trial_grad1 * tangent[9][lane] + trial_grad2 * tangent[18][lane];
-        const s_t grad_coeff0_1 = trial_grad0 * tangent[1][lane] + trial_grad1 * tangent[10][lane] + trial_grad2 * tangent[19][lane];
-        const s_t grad_coeff0_2 = trial_grad0 * tangent[2][lane] + trial_grad1 * tangent[11][lane] + trial_grad2 * tangent[20][lane];
-        const s_t grad_coeff1_0 = trial_grad0 * tangent[3][lane] + trial_grad1 * tangent[12][lane] + trial_grad2 * tangent[21][lane];
-        const s_t grad_coeff1_1 = trial_grad0 * tangent[4][lane] + trial_grad1 * tangent[13][lane] + trial_grad2 * tangent[22][lane];
-        const s_t grad_coeff1_2 = trial_grad0 * tangent[5][lane] + trial_grad1 * tangent[14][lane] + trial_grad2 * tangent[23][lane];
-        const s_t grad_coeff2_0 = trial_grad0 * tangent[6][lane] + trial_grad1 * tangent[15][lane] + trial_grad2 * tangent[24][lane];
-        const s_t grad_coeff2_1 = trial_grad0 * tangent[7][lane] + trial_grad1 * tangent[16][lane] + trial_grad2 * tangent[25][lane];
-        const s_t grad_coeff2_2 = trial_grad0 * tangent[8][lane] + trial_grad1 * tangent[17][lane] + trial_grad2 * tangent[26][lane];
-        grad_coeff0_0_values[lane] = grad_coeff0_0;
-        grad_coeff0_1_values[lane] = grad_coeff0_1;
-        grad_coeff0_2_values[lane] = grad_coeff0_2;
-        grad_coeff1_0_values[lane] = grad_coeff1_0;
-        grad_coeff1_1_values[lane] = grad_coeff1_1;
-        grad_coeff1_2_values[lane] = grad_coeff1_2;
-        grad_coeff2_0_values[lane] = grad_coeff2_0;
-        grad_coeff2_1_values[lane] = grad_coeff2_1;
-        grad_coeff2_2_values[lane] = grad_coeff2_2;
+        const s_t grad_coeff0_0 = trial_grad0 * tangent[0] + trial_grad1 * tangent[9] + trial_grad2 * tangent[18];
+        const s_t grad_coeff0_1 = trial_grad0 * tangent[1] + trial_grad1 * tangent[10] + trial_grad2 * tangent[19];
+        const s_t grad_coeff0_2 = trial_grad0 * tangent[2] + trial_grad1 * tangent[11] + trial_grad2 * tangent[20];
+        const s_t grad_coeff1_0 = trial_grad0 * tangent[3] + trial_grad1 * tangent[12] + trial_grad2 * tangent[21];
+        const s_t grad_coeff1_1 = trial_grad0 * tangent[4] + trial_grad1 * tangent[13] + trial_grad2 * tangent[22];
+        const s_t grad_coeff1_2 = trial_grad0 * tangent[5] + trial_grad1 * tangent[14] + trial_grad2 * tangent[23];
+        const s_t grad_coeff2_0 = trial_grad0 * tangent[6] + trial_grad1 * tangent[15] + trial_grad2 * tangent[24];
+        const s_t grad_coeff2_1 = trial_grad0 * tangent[7] + trial_grad1 * tangent[16] + trial_grad2 * tangent[25];
+        const s_t grad_coeff2_2 = trial_grad0 * tangent[8] + trial_grad1 * tangent[17] + trial_grad2 * tangent[26];
+        grad_coeff0_0_values = grad_coeff0_0;
+        grad_coeff0_1_values = grad_coeff0_1;
+        grad_coeff0_2_values = grad_coeff0_2;
+        grad_coeff1_0_values = grad_coeff1_0;
+        grad_coeff1_1_values = grad_coeff1_1;
+        grad_coeff1_2_values = grad_coeff1_2;
+        grad_coeff2_0_values = grad_coeff2_0;
+        grad_coeff2_1_values = grad_coeff2_1;
+        grad_coeff2_2_values = grad_coeff2_2;
       }
       for (int test = 0; test < NS; ++test) {
         const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
         const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
         const s_t test_grad_ref2 = grad_ref_z[q * NS + test];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          const ptrdiff_t goff = q * geometry_stride + lane;
+        {
+          const ptrdiff_t goff = q * geometry_stride;
           const s_t det = determinant[goff];
           const s_t adj0 = adjugate[0][goff];
           const s_t adj1 = adjugate[1][goff];
@@ -5405,14 +5381,13 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
           const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj3 + test_grad_ref2 * adj6) / det;
           const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj4 + test_grad_ref2 * adj7) / det;
           const s_t test_grad2 = (test_grad_ref0 * adj2 + test_grad_ref1 * adj5 + test_grad_ref2 * adj8) / det;
-          element_matrix[(0 * NS + test) * 3 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
-          element_matrix[(1 * NS + test) * 3 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
-          element_matrix[(2 * NS + test) * 3 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+          element_matrix[(0 * NS + test) * 3 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+          element_matrix[(1 * NS + test) * 3 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
+          element_matrix[(2 * NS + test) * 3 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff2_0_values * test_grad0 + grad_coeff2_1_values * test_grad1 + grad_coeff2_2_values * test_grad2);
         }
       }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
+      {
+        const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
@@ -5426,32 +5401,31 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj3 + trial_grad_ref2 * adj6) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj4 + trial_grad_ref2 * adj7) / det;
         const s_t trial_grad2 = (trial_grad_ref0 * adj2 + trial_grad_ref1 * adj5 + trial_grad_ref2 * adj8) / det;
-        const s_t grad_coeff0_0 = trial_grad0 * tangent[27][lane] + trial_grad1 * tangent[36][lane] + trial_grad2 * tangent[45][lane];
-        const s_t grad_coeff0_1 = trial_grad0 * tangent[28][lane] + trial_grad1 * tangent[37][lane] + trial_grad2 * tangent[46][lane];
-        const s_t grad_coeff0_2 = trial_grad0 * tangent[29][lane] + trial_grad1 * tangent[38][lane] + trial_grad2 * tangent[47][lane];
-        const s_t grad_coeff1_0 = trial_grad0 * tangent[30][lane] + trial_grad1 * tangent[39][lane] + trial_grad2 * tangent[48][lane];
-        const s_t grad_coeff1_1 = trial_grad0 * tangent[31][lane] + trial_grad1 * tangent[40][lane] + trial_grad2 * tangent[49][lane];
-        const s_t grad_coeff1_2 = trial_grad0 * tangent[32][lane] + trial_grad1 * tangent[41][lane] + trial_grad2 * tangent[50][lane];
-        const s_t grad_coeff2_0 = trial_grad0 * tangent[33][lane] + trial_grad1 * tangent[42][lane] + trial_grad2 * tangent[51][lane];
-        const s_t grad_coeff2_1 = trial_grad0 * tangent[34][lane] + trial_grad1 * tangent[43][lane] + trial_grad2 * tangent[52][lane];
-        const s_t grad_coeff2_2 = trial_grad0 * tangent[35][lane] + trial_grad1 * tangent[44][lane] + trial_grad2 * tangent[53][lane];
-        grad_coeff0_0_values[lane] = grad_coeff0_0;
-        grad_coeff0_1_values[lane] = grad_coeff0_1;
-        grad_coeff0_2_values[lane] = grad_coeff0_2;
-        grad_coeff1_0_values[lane] = grad_coeff1_0;
-        grad_coeff1_1_values[lane] = grad_coeff1_1;
-        grad_coeff1_2_values[lane] = grad_coeff1_2;
-        grad_coeff2_0_values[lane] = grad_coeff2_0;
-        grad_coeff2_1_values[lane] = grad_coeff2_1;
-        grad_coeff2_2_values[lane] = grad_coeff2_2;
+        const s_t grad_coeff0_0 = trial_grad0 * tangent[27] + trial_grad1 * tangent[36] + trial_grad2 * tangent[45];
+        const s_t grad_coeff0_1 = trial_grad0 * tangent[28] + trial_grad1 * tangent[37] + trial_grad2 * tangent[46];
+        const s_t grad_coeff0_2 = trial_grad0 * tangent[29] + trial_grad1 * tangent[38] + trial_grad2 * tangent[47];
+        const s_t grad_coeff1_0 = trial_grad0 * tangent[30] + trial_grad1 * tangent[39] + trial_grad2 * tangent[48];
+        const s_t grad_coeff1_1 = trial_grad0 * tangent[31] + trial_grad1 * tangent[40] + trial_grad2 * tangent[49];
+        const s_t grad_coeff1_2 = trial_grad0 * tangent[32] + trial_grad1 * tangent[41] + trial_grad2 * tangent[50];
+        const s_t grad_coeff2_0 = trial_grad0 * tangent[33] + trial_grad1 * tangent[42] + trial_grad2 * tangent[51];
+        const s_t grad_coeff2_1 = trial_grad0 * tangent[34] + trial_grad1 * tangent[43] + trial_grad2 * tangent[52];
+        const s_t grad_coeff2_2 = trial_grad0 * tangent[35] + trial_grad1 * tangent[44] + trial_grad2 * tangent[53];
+        grad_coeff0_0_values = grad_coeff0_0;
+        grad_coeff0_1_values = grad_coeff0_1;
+        grad_coeff0_2_values = grad_coeff0_2;
+        grad_coeff1_0_values = grad_coeff1_0;
+        grad_coeff1_1_values = grad_coeff1_1;
+        grad_coeff1_2_values = grad_coeff1_2;
+        grad_coeff2_0_values = grad_coeff2_0;
+        grad_coeff2_1_values = grad_coeff2_1;
+        grad_coeff2_2_values = grad_coeff2_2;
       }
       for (int test = 0; test < NS; ++test) {
         const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
         const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
         const s_t test_grad_ref2 = grad_ref_z[q * NS + test];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          const ptrdiff_t goff = q * geometry_stride + lane;
+        {
+          const ptrdiff_t goff = q * geometry_stride;
           const s_t det = determinant[goff];
           const s_t adj0 = adjugate[0][goff];
           const s_t adj1 = adjugate[1][goff];
@@ -5465,14 +5439,13 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
           const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj3 + test_grad_ref2 * adj6) / det;
           const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj4 + test_grad_ref2 * adj7) / det;
           const s_t test_grad2 = (test_grad_ref0 * adj2 + test_grad_ref1 * adj5 + test_grad_ref2 * adj8) / det;
-          element_matrix[(0 * NS + test) * 3 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
-          element_matrix[(1 * NS + test) * 3 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
-          element_matrix[(2 * NS + test) * 3 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+          element_matrix[(0 * NS + test) * 3 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+          element_matrix[(1 * NS + test) * 3 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
+          element_matrix[(2 * NS + test) * 3 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff2_0_values * test_grad0 + grad_coeff2_1_values * test_grad1 + grad_coeff2_2_values * test_grad2);
         }
       }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
+      {
+        const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
@@ -5486,32 +5459,31 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj3 + trial_grad_ref2 * adj6) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj4 + trial_grad_ref2 * adj7) / det;
         const s_t trial_grad2 = (trial_grad_ref0 * adj2 + trial_grad_ref1 * adj5 + trial_grad_ref2 * adj8) / det;
-        const s_t grad_coeff0_0 = trial_grad0 * tangent[54][lane] + trial_grad1 * tangent[63][lane] + trial_grad2 * tangent[72][lane];
-        const s_t grad_coeff0_1 = trial_grad0 * tangent[55][lane] + trial_grad1 * tangent[64][lane] + trial_grad2 * tangent[73][lane];
-        const s_t grad_coeff0_2 = trial_grad0 * tangent[56][lane] + trial_grad1 * tangent[65][lane] + trial_grad2 * tangent[74][lane];
-        const s_t grad_coeff1_0 = trial_grad0 * tangent[57][lane] + trial_grad1 * tangent[66][lane] + trial_grad2 * tangent[75][lane];
-        const s_t grad_coeff1_1 = trial_grad0 * tangent[58][lane] + trial_grad1 * tangent[67][lane] + trial_grad2 * tangent[76][lane];
-        const s_t grad_coeff1_2 = trial_grad0 * tangent[59][lane] + trial_grad1 * tangent[68][lane] + trial_grad2 * tangent[77][lane];
-        const s_t grad_coeff2_0 = trial_grad0 * tangent[60][lane] + trial_grad1 * tangent[69][lane] + trial_grad2 * tangent[78][lane];
-        const s_t grad_coeff2_1 = trial_grad0 * tangent[61][lane] + trial_grad1 * tangent[70][lane] + trial_grad2 * tangent[79][lane];
-        const s_t grad_coeff2_2 = trial_grad0 * tangent[62][lane] + trial_grad1 * tangent[71][lane] + trial_grad2 * tangent[80][lane];
-        grad_coeff0_0_values[lane] = grad_coeff0_0;
-        grad_coeff0_1_values[lane] = grad_coeff0_1;
-        grad_coeff0_2_values[lane] = grad_coeff0_2;
-        grad_coeff1_0_values[lane] = grad_coeff1_0;
-        grad_coeff1_1_values[lane] = grad_coeff1_1;
-        grad_coeff1_2_values[lane] = grad_coeff1_2;
-        grad_coeff2_0_values[lane] = grad_coeff2_0;
-        grad_coeff2_1_values[lane] = grad_coeff2_1;
-        grad_coeff2_2_values[lane] = grad_coeff2_2;
+        const s_t grad_coeff0_0 = trial_grad0 * tangent[54] + trial_grad1 * tangent[63] + trial_grad2 * tangent[72];
+        const s_t grad_coeff0_1 = trial_grad0 * tangent[55] + trial_grad1 * tangent[64] + trial_grad2 * tangent[73];
+        const s_t grad_coeff0_2 = trial_grad0 * tangent[56] + trial_grad1 * tangent[65] + trial_grad2 * tangent[74];
+        const s_t grad_coeff1_0 = trial_grad0 * tangent[57] + trial_grad1 * tangent[66] + trial_grad2 * tangent[75];
+        const s_t grad_coeff1_1 = trial_grad0 * tangent[58] + trial_grad1 * tangent[67] + trial_grad2 * tangent[76];
+        const s_t grad_coeff1_2 = trial_grad0 * tangent[59] + trial_grad1 * tangent[68] + trial_grad2 * tangent[77];
+        const s_t grad_coeff2_0 = trial_grad0 * tangent[60] + trial_grad1 * tangent[69] + trial_grad2 * tangent[78];
+        const s_t grad_coeff2_1 = trial_grad0 * tangent[61] + trial_grad1 * tangent[70] + trial_grad2 * tangent[79];
+        const s_t grad_coeff2_2 = trial_grad0 * tangent[62] + trial_grad1 * tangent[71] + trial_grad2 * tangent[80];
+        grad_coeff0_0_values = grad_coeff0_0;
+        grad_coeff0_1_values = grad_coeff0_1;
+        grad_coeff0_2_values = grad_coeff0_2;
+        grad_coeff1_0_values = grad_coeff1_0;
+        grad_coeff1_1_values = grad_coeff1_1;
+        grad_coeff1_2_values = grad_coeff1_2;
+        grad_coeff2_0_values = grad_coeff2_0;
+        grad_coeff2_1_values = grad_coeff2_1;
+        grad_coeff2_2_values = grad_coeff2_2;
       }
       for (int test = 0; test < NS; ++test) {
         const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
         const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
         const s_t test_grad_ref2 = grad_ref_z[q * NS + test];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          const ptrdiff_t goff = q * geometry_stride + lane;
+        {
+          const ptrdiff_t goff = q * geometry_stride;
           const s_t det = determinant[goff];
           const s_t adj0 = adjugate[0][goff];
           const s_t adj1 = adjugate[1][goff];
@@ -5525,9 +5497,9 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_simplex_hessian_bloc
           const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj3 + test_grad_ref2 * adj6) / det;
           const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj4 + test_grad_ref2 * adj7) / det;
           const s_t test_grad2 = (test_grad_ref0 * adj2 + test_grad_ref1 * adj5 + test_grad_ref2 * adj8) / det;
-          element_matrix[(0 * NS + test) * 3 * NS + 2 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1 + grad_coeff0_2_values[lane] * test_grad2);
-          element_matrix[(1 * NS + test) * 3 * NS + 2 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1 + grad_coeff1_2_values[lane] * test_grad2);
-          element_matrix[(2 * NS + test) * 3 * NS + 2 * NS + trial] += q_weight[q] * det * (grad_coeff2_0_values[lane] * test_grad0 + grad_coeff2_1_values[lane] * test_grad1 + grad_coeff2_2_values[lane] * test_grad2);
+          element_matrix[(0 * NS + test) * 3 * NS + 2 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1 + grad_coeff0_2_values * test_grad2);
+          element_matrix[(1 * NS + test) * 3 * NS + 2 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1 + grad_coeff1_2_values * test_grad2);
+          element_matrix[(2 * NS + test) * 3 * NS + 2 * NS + trial] += q_weight[q] * det * (grad_coeff2_0_values * test_grad0 + grad_coeff2_1_values * test_grad1 + grad_coeff2_2_values * test_grad2);
         }
       }
     }

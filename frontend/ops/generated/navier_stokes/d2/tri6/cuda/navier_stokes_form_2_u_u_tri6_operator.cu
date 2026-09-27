@@ -189,7 +189,6 @@ __global__ void navier_stokes_form_2_u_u_tri6_jacobian_action_affine_mesh_mixed_
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y()};
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bprevious[N_FIELD_STREAMS];
     s_t bdirection[N_FIELD_STREAMS];
     s_t boutput[N_FIELD_STREAMS];
@@ -328,7 +327,6 @@ __global__ void navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh
   const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcoordinates[ND * CELL_NS];
     s_t badjugate_data[ND * ND][NQ];
     s_t bdeterminant[NQ];

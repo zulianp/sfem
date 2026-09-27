@@ -152,7 +152,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_body_force_tet10_jacobian_
 
 extern "C" int cu_body_force_tet10_residual_esoa(
     const int scalar_bytes,
-    const int ne,
     const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const real_t density,
@@ -164,11 +163,11 @@ extern "C" int cu_body_force_tet10_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::body_force_d3_simplex_residual_block<double, 4, 10>(ne, geometry_stride, (const double *)determinant, sfem::codegen::ref_tet10_q4<double>::shape(), sfem::codegen::quad_tet_q4<double>::q_weight(), density, g0, g1, g2, (double *const *)output);
+        sfem::codegen::body_force_d3_simplex_residual_block<double, 4, 10>(geometry_stride, (const double *)determinant, sfem::codegen::ref_tet10_q4<double>::shape(), sfem::codegen::quad_tet_q4<double>::q_weight(), density, g0, g1, g2, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::body_force_d3_simplex_residual_block<float, 4, 10>(ne, geometry_stride, (const float *)determinant, sfem::codegen::ref_tet10_q4<float>::shape(), sfem::codegen::quad_tet_q4<float>::q_weight(), density, g0, g1, g2, (float *const *)output);
+        sfem::codegen::body_force_d3_simplex_residual_block<float, 4, 10>(geometry_stride, (const float *)determinant, sfem::codegen::ref_tet10_q4<float>::shape(), sfem::codegen::quad_tet_q4<float>::q_weight(), density, g0, g1, g2, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -205,7 +204,6 @@ __global__ void body_force_tet10_residual_a_msoa_impl(
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q4<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t boutput[NC * NS];
 
     for (int stream = 0; stream < 30; ++stream) {
@@ -220,7 +218,7 @@ __global__ void body_force_tet10_residual_a_msoa_impl(
     bageom_streams[0] = ageom_stream<s_t, g_t>(
         ne, affine_geometry_sources[0], &baffine_geometry_data[0], std::is_same<g_t, s_t>());
 
-    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS>(ne, 0, bageom_streams[0], affine_shape, affine_q_weight, density, g0, g1, g2, boutput);
+    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS>(0, bageom_streams[0], affine_shape, affine_q_weight, density, g0, g1, g2, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -304,7 +302,6 @@ __global__ void body_force_tet10_residual_i_msoa_impl(
   const s_t *const isoparametric_q_weight = sfem::codegen::quad_tet_q4<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcoordinates[3 * NS];
     s_t badjugate_data[9][NQ];
     s_t bdeterminant[NQ];
@@ -376,7 +373,7 @@ __global__ void body_force_tet10_residual_i_msoa_impl(
     }
 
 
-    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS>(ne, 1, bdeterminant, isoparametric_shape, isoparametric_q_weight, density, g0, g1, g2, boutput);
+    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS>(1, bdeterminant, isoparametric_shape, isoparametric_q_weight, density, g0, g1, g2, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {

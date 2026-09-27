@@ -1475,22 +1475,19 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_proteus_hex8_hessian_crs
   static constexpr int NS = 8;
   static constexpr int NC = 3;
   static constexpr int N_STREAMS = NC * NS;
-  static constexpr int VS = 1;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q2<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q2<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
 #pragma omp parallel for schedule(static)
   for (ptrdiff_t element = 0; element < nelements; ++element) {
-    const ptrdiff_t evb = element;
-    const int ne = 1;
     idx_t ev[NS];
     s_t element_matrix[576];
-    s_t bcoordinates[ND * NS][VS];
-    s_t badjugate_data[ND * ND][NQ * VS];
-    s_t bdeterminant[NQ * VS];
-    s_t bcurrent[N_STREAMS][VS];
-    s_t bprevious[N_STREAMS][VS];
+    s_t bcoordinates[ND * NS];
+    s_t badjugate_data[ND * ND][NQ];
+    s_t bdeterminant[NQ];
+    s_t bcurrent[N_STREAMS];
+    s_t bprevious[N_STREAMS];
     const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
 
     for (int shape = 0; shape < NS; ++shape) {
@@ -1498,33 +1495,33 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_proteus_hex8_hessian_crs
       const idx_t coordinate_node = elements[shape][element];
       ev[shape] = node;
       for (int d = 0; d < ND; ++d) {
-        bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);
+        bcoordinates[shape * ND + d] = s_t(coordinate_components[d][coordinate_node]);
       }
-      bcurrent[shape * NC + 0][0] = u0[node * current_stride];
-      bcurrent[shape * NC + 1][0] = u1[node * current_stride];
-      bcurrent[shape * NC + 2][0] = u2[node * current_stride];
-      bprevious[shape * NC + 0][0] = u0_old[node * previous_stride];
-      bprevious[shape * NC + 1][0] = u1_old[node * previous_stride];
-      bprevious[shape * NC + 2][0] = u2_old[node * previous_stride];
+      bcurrent[shape * NC + 0] = u0[node * current_stride];
+      bcurrent[shape * NC + 1] = u1[node * current_stride];
+      bcurrent[shape * NC + 2] = u2[node * current_stride];
+      bprevious[shape * NC + 0] = u0_old[node * previous_stride];
+      bprevious[shape * NC + 1] = u1_old[node * previous_stride];
+      bprevious[shape * NC + 2] = u2_old[node * previous_stride];
     }
 
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
         coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
-        coordinate_grad_ref + NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
-        coordinate_grad_ref + 2 * NQ * ND * VS);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
+        coordinate_grad_ref + NQ * ND);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
+        coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessian_block<s_t, NQ, NS, VS>(1, 1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
+    mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessian_block<s_t, NQ, NS>(1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bprevious, eta_b, eta_s, lmbda, mu, u_dt_shift, element_matrix);
 
     mooney_rivlin_kelvin_voigt_total_proteus_hex8_hessian_crs_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
   }

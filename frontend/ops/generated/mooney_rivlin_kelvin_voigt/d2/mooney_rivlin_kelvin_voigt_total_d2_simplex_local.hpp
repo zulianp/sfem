@@ -1345,14 +1345,13 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_jacobia
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_hessian_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
     const s_t eta_b,
     const s_t eta_s,
     const s_t lmbda,
@@ -1361,28 +1360,27 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_hessian
     s_t *const RSTR element_matrix
 ) {
   const int q = 0;
-  #pragma omp simd
-  for (int lane = 0; lane < ne; ++lane) {
-    const ptrdiff_t goff = q * geometry_stride + lane;
+  {
+    const ptrdiff_t goff = q * geometry_stride;
     const s_t det = determinant[goff];
     const s_t adj0 = adjugate[0][goff];
     const s_t adj1 = adjugate[1][goff];
     const s_t adj2 = adjugate[2][goff];
     const s_t adj3 = adjugate[3][goff];
-    const s_t u0_grad_0_ref = -(current[0][lane]) + current[2][lane];
-    const s_t u0_grad_1_ref = -(current[0][lane]) + current[4][lane];
+    const s_t u0_grad_0_ref = -(current[0]) + current[2];
+    const s_t u0_grad_1_ref = -(current[0]) + current[4];
     const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj2) / det;
     const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj3) / det;
-    const s_t u0_old_grad_0_ref = -(previous[0][lane]) + previous[2][lane];
-    const s_t u0_old_grad_1_ref = -(previous[0][lane]) + previous[4][lane];
+    const s_t u0_old_grad_0_ref = -(previous[0]) + previous[2];
+    const s_t u0_old_grad_1_ref = -(previous[0]) + previous[4];
     const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj2) / det;
     const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj3) / det;
-    const s_t u1_grad_0_ref = -(current[1][lane]) + current[3][lane];
-    const s_t u1_grad_1_ref = -(current[1][lane]) + current[5][lane];
+    const s_t u1_grad_0_ref = -(current[1]) + current[3];
+    const s_t u1_grad_1_ref = -(current[1]) + current[5];
     const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj2) / det;
     const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj3) / det;
-    const s_t u1_old_grad_0_ref = -(previous[1][lane]) + previous[3][lane];
-    const s_t u1_old_grad_1_ref = -(previous[1][lane]) + previous[5][lane];
+    const s_t u1_old_grad_0_ref = -(previous[1]) + previous[3];
+    const s_t u1_old_grad_1_ref = -(previous[1]) + previous[5];
     const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj2) / det;
     const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj3) / det;
     const s_t basis0_grad0 = (-(adj0) - adj2) / det;
@@ -1545,17 +1543,16 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_tri3_hessian
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_hessian_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
     const s_t *const RSTR grad_ref_x,
     const s_t *const RSTR grad_ref_y,
     const s_t *const RSTR q_weight,
-    const s_t current[2 * NS][VS],
-    const s_t previous[2 * NS][VS],
+    const s_t current[2 * NS],
+    const s_t previous[2 * NS],
     const s_t eta_b,
     const s_t eta_s,
     const s_t lmbda,
@@ -1567,102 +1564,89 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_hessian_bloc
   for (int entry = 0; entry < 2 * NS * 2 * NS; ++entry) {
     element_matrix[entry] = s_t(0);
   }
-  s_t u0_grad_0_ref_values[VS];
-  s_t u0_grad_1_ref_values[VS];
-  s_t u0_old_grad_0_ref_values[VS];
-  s_t u0_old_grad_1_ref_values[VS];
-  s_t u1_grad_0_ref_values[VS];
-  s_t u1_grad_1_ref_values[VS];
-  s_t u1_old_grad_0_ref_values[VS];
-  s_t u1_old_grad_1_ref_values[VS];
-  s_t grad_coeff0_0_values[VS];
-  s_t grad_coeff0_1_values[VS];
-  s_t grad_coeff1_0_values[VS];
-  s_t grad_coeff1_1_values[VS];
-  s_t tangent[16][VS];
+  s_t u0_grad_0_ref_values;
+  s_t u0_grad_1_ref_values;
+  s_t u0_old_grad_0_ref_values;
+  s_t u0_old_grad_1_ref_values;
+  s_t u1_grad_0_ref_values;
+  s_t u1_grad_1_ref_values;
+  s_t u1_old_grad_0_ref_values;
+  s_t u1_old_grad_1_ref_values;
+  s_t grad_coeff0_0_values;
+  s_t grad_coeff0_1_values;
+  s_t grad_coeff1_0_values;
+  s_t grad_coeff1_1_values;
+  s_t tangent[16];
   for (int q = 0; q < NQ; ++q) {
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_grad_0_ref_values[lane] = s_t(0);
-      u0_grad_1_ref_values[lane] = s_t(0);
+    {
+      u0_grad_0_ref_values = s_t(0);
+      u0_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = current[trial * NC];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u0_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u0_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
+      {
+        u0_grad_0_ref_values += current[trial * NC] * trial_grad_0_ref;
+        u0_grad_1_ref_values += current[trial * NC] * trial_grad_1_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u0_old_grad_0_ref_values[lane] = s_t(0);
-      u0_old_grad_1_ref_values[lane] = s_t(0);
+    {
+      u0_old_grad_0_ref_values = s_t(0);
+      u0_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = previous[trial * NC];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u0_old_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u0_old_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
+      {
+        u0_old_grad_0_ref_values += previous[trial * NC] * trial_grad_0_ref;
+        u0_old_grad_1_ref_values += previous[trial * NC] * trial_grad_1_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_grad_0_ref_values[lane] = s_t(0);
-      u1_grad_1_ref_values[lane] = s_t(0);
+    {
+      u1_grad_0_ref_values = s_t(0);
+      u1_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = current[trial * NC + 1];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u1_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u1_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
+      {
+        u1_grad_0_ref_values += current[trial * NC + 1] * trial_grad_0_ref;
+        u1_grad_1_ref_values += current[trial * NC + 1] * trial_grad_1_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      u1_old_grad_0_ref_values[lane] = s_t(0);
-      u1_old_grad_1_ref_values[lane] = s_t(0);
+    {
+      u1_old_grad_0_ref_values = s_t(0);
+      u1_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
-      const s_t *const RSTR coeff_stream = previous[trial * NC + 1];
       const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
       const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        u1_old_grad_0_ref_values[lane] += coeff_stream[lane] * trial_grad_0_ref;
-        u1_old_grad_1_ref_values[lane] += coeff_stream[lane] * trial_grad_1_ref;
+      {
+        u1_old_grad_0_ref_values += previous[trial * NC + 1] * trial_grad_0_ref;
+        u1_old_grad_1_ref_values += previous[trial * NC + 1] * trial_grad_1_ref;
       }
     }
-    #pragma omp simd
-    for (int lane = 0; lane < ne; ++lane) {
-      const ptrdiff_t goff = q * geometry_stride + lane;
+    {
+      const ptrdiff_t goff = q * geometry_stride;
       const s_t det = determinant[goff];
       const s_t adj0 = adjugate[0][goff];
       const s_t adj1 = adjugate[1][goff];
       const s_t adj2 = adjugate[2][goff];
       const s_t adj3 = adjugate[3][goff];
-      const s_t u0_grad_0_ref = u0_grad_0_ref_values[lane];
-      const s_t u0_grad_1_ref = u0_grad_1_ref_values[lane];
+      const s_t u0_grad_0_ref = u0_grad_0_ref_values;
+      const s_t u0_grad_1_ref = u0_grad_1_ref_values;
       const s_t u0_grad_0 = (u0_grad_0_ref * adj0 + u0_grad_1_ref * adj2) / det;
       const s_t u0_grad_1 = (u0_grad_0_ref * adj1 + u0_grad_1_ref * adj3) / det;
-      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values[lane];
-      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values[lane];
+      const s_t u0_old_grad_0_ref = u0_old_grad_0_ref_values;
+      const s_t u0_old_grad_1_ref = u0_old_grad_1_ref_values;
       const s_t u0_old_grad_0 = (u0_old_grad_0_ref * adj0 + u0_old_grad_1_ref * adj2) / det;
       const s_t u0_old_grad_1 = (u0_old_grad_0_ref * adj1 + u0_old_grad_1_ref * adj3) / det;
-      const s_t u1_grad_0_ref = u1_grad_0_ref_values[lane];
-      const s_t u1_grad_1_ref = u1_grad_1_ref_values[lane];
+      const s_t u1_grad_0_ref = u1_grad_0_ref_values;
+      const s_t u1_grad_1_ref = u1_grad_1_ref_values;
       const s_t u1_grad_0 = (u1_grad_0_ref * adj0 + u1_grad_1_ref * adj2) / det;
       const s_t u1_grad_1 = (u1_grad_0_ref * adj1 + u1_grad_1_ref * adj3) / det;
-      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values[lane];
-      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values[lane];
+      const s_t u1_old_grad_0_ref = u1_old_grad_0_ref_values;
+      const s_t u1_old_grad_1_ref = u1_old_grad_1_ref_values;
       const s_t u1_old_grad_0 = (u1_old_grad_0_ref * adj0 + u1_old_grad_1_ref * adj2) / det;
       const s_t u1_old_grad_1 = (u1_old_grad_0_ref * adj1 + u1_old_grad_1_ref * adj3) / det;
       const s_t tangent_tmp0 = u1_grad_1 + s_t(1);
@@ -1755,29 +1739,28 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_hessian_bloc
       const s_t tangent_grad_d1_1_grad0_1 = tangent_tmp26*tangent_tmp35*tangent_tmp70 + tangent_tmp4*(tangent_tmp13*tangent_tmp54 + tangent_tmp69*u1_grad_0) - tangent_tmp58;
       const s_t tangent_grad_d1_1_grad1_0 = mu*(-s_t(4)*tangent_tmp29 - tangent_tmp66 + s_t(2)*tangent_tmp67*u1_grad_0) + tangent_tmp38*tangent_tmp71 + tangent_tmp4*(tangent_tmp0*tangent_tmp54 + tangent_tmp34 + tangent_tmp72*u0_grad_1) - tangent_tmp65;
       const s_t tangent_grad_d1_1_grad1_1 = lmbda*tangent_tmp73 + mu*(s_t(2)*tangent_tmp73 + s_t(4)) + tangent_tmp4*(-tangent_tmp13*tangent_tmp72 - tangent_tmp54*u1_grad_0) + tangent_tmp43*tangent_tmp71;
-      tangent[0][lane] = tangent_grad_d0_0_grad0_0;
-      tangent[1][lane] = tangent_grad_d0_0_grad0_1;
-      tangent[2][lane] = tangent_grad_d0_0_grad1_0;
-      tangent[3][lane] = tangent_grad_d0_0_grad1_1;
-      tangent[4][lane] = tangent_grad_d0_1_grad0_0;
-      tangent[5][lane] = tangent_grad_d0_1_grad0_1;
-      tangent[6][lane] = tangent_grad_d0_1_grad1_0;
-      tangent[7][lane] = tangent_grad_d0_1_grad1_1;
-      tangent[8][lane] = tangent_grad_d1_0_grad0_0;
-      tangent[9][lane] = tangent_grad_d1_0_grad0_1;
-      tangent[10][lane] = tangent_grad_d1_0_grad1_0;
-      tangent[11][lane] = tangent_grad_d1_0_grad1_1;
-      tangent[12][lane] = tangent_grad_d1_1_grad0_0;
-      tangent[13][lane] = tangent_grad_d1_1_grad0_1;
-      tangent[14][lane] = tangent_grad_d1_1_grad1_0;
-      tangent[15][lane] = tangent_grad_d1_1_grad1_1;
+      tangent[0] = tangent_grad_d0_0_grad0_0;
+      tangent[1] = tangent_grad_d0_0_grad0_1;
+      tangent[2] = tangent_grad_d0_0_grad1_0;
+      tangent[3] = tangent_grad_d0_0_grad1_1;
+      tangent[4] = tangent_grad_d0_1_grad0_0;
+      tangent[5] = tangent_grad_d0_1_grad0_1;
+      tangent[6] = tangent_grad_d0_1_grad1_0;
+      tangent[7] = tangent_grad_d0_1_grad1_1;
+      tangent[8] = tangent_grad_d1_0_grad0_0;
+      tangent[9] = tangent_grad_d1_0_grad0_1;
+      tangent[10] = tangent_grad_d1_0_grad1_0;
+      tangent[11] = tangent_grad_d1_0_grad1_1;
+      tangent[12] = tangent_grad_d1_1_grad0_0;
+      tangent[13] = tangent_grad_d1_1_grad0_1;
+      tangent[14] = tangent_grad_d1_1_grad1_0;
+      tangent[15] = tangent_grad_d1_1_grad1_1;
     }
     for (int trial = 0; trial < NS; ++trial) {
       const s_t trial_grad_ref0 = grad_ref_x[q * NS + trial];
       const s_t trial_grad_ref1 = grad_ref_y[q * NS + trial];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
+      {
+        const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
@@ -1785,21 +1768,20 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_hessian_bloc
         const s_t adj3 = adjugate[3][goff];
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj2) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj3) / det;
-        const s_t grad_coeff0_0 = trial_grad0 * tangent[0][lane] + trial_grad1 * tangent[4][lane];
-        const s_t grad_coeff0_1 = trial_grad0 * tangent[1][lane] + trial_grad1 * tangent[5][lane];
-        const s_t grad_coeff1_0 = trial_grad0 * tangent[2][lane] + trial_grad1 * tangent[6][lane];
-        const s_t grad_coeff1_1 = trial_grad0 * tangent[3][lane] + trial_grad1 * tangent[7][lane];
-        grad_coeff0_0_values[lane] = grad_coeff0_0;
-        grad_coeff0_1_values[lane] = grad_coeff0_1;
-        grad_coeff1_0_values[lane] = grad_coeff1_0;
-        grad_coeff1_1_values[lane] = grad_coeff1_1;
+        const s_t grad_coeff0_0 = trial_grad0 * tangent[0] + trial_grad1 * tangent[4];
+        const s_t grad_coeff0_1 = trial_grad0 * tangent[1] + trial_grad1 * tangent[5];
+        const s_t grad_coeff1_0 = trial_grad0 * tangent[2] + trial_grad1 * tangent[6];
+        const s_t grad_coeff1_1 = trial_grad0 * tangent[3] + trial_grad1 * tangent[7];
+        grad_coeff0_0_values = grad_coeff0_0;
+        grad_coeff0_1_values = grad_coeff0_1;
+        grad_coeff1_0_values = grad_coeff1_0;
+        grad_coeff1_1_values = grad_coeff1_1;
       }
       for (int test = 0; test < NS; ++test) {
         const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
         const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          const ptrdiff_t goff = q * geometry_stride + lane;
+        {
+          const ptrdiff_t goff = q * geometry_stride;
           const s_t det = determinant[goff];
           const s_t adj0 = adjugate[0][goff];
           const s_t adj1 = adjugate[1][goff];
@@ -1807,13 +1789,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_hessian_bloc
           const s_t adj3 = adjugate[3][goff];
           const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj2) / det;
           const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj3) / det;
-          element_matrix[(0 * NS + test) * 2 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
-          element_matrix[(1 * NS + test) * 2 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1);
+          element_matrix[(0 * NS + test) * 2 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
+          element_matrix[(1 * NS + test) * 2 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
         }
       }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const ptrdiff_t goff = q * geometry_stride + lane;
+      {
+        const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
         const s_t adj0 = adjugate[0][goff];
         const s_t adj1 = adjugate[1][goff];
@@ -1821,21 +1802,20 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_hessian_bloc
         const s_t adj3 = adjugate[3][goff];
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj2) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj3) / det;
-        const s_t grad_coeff0_0 = trial_grad0 * tangent[8][lane] + trial_grad1 * tangent[12][lane];
-        const s_t grad_coeff0_1 = trial_grad0 * tangent[9][lane] + trial_grad1 * tangent[13][lane];
-        const s_t grad_coeff1_0 = trial_grad0 * tangent[10][lane] + trial_grad1 * tangent[14][lane];
-        const s_t grad_coeff1_1 = trial_grad0 * tangent[11][lane] + trial_grad1 * tangent[15][lane];
-        grad_coeff0_0_values[lane] = grad_coeff0_0;
-        grad_coeff0_1_values[lane] = grad_coeff0_1;
-        grad_coeff1_0_values[lane] = grad_coeff1_0;
-        grad_coeff1_1_values[lane] = grad_coeff1_1;
+        const s_t grad_coeff0_0 = trial_grad0 * tangent[8] + trial_grad1 * tangent[12];
+        const s_t grad_coeff0_1 = trial_grad0 * tangent[9] + trial_grad1 * tangent[13];
+        const s_t grad_coeff1_0 = trial_grad0 * tangent[10] + trial_grad1 * tangent[14];
+        const s_t grad_coeff1_1 = trial_grad0 * tangent[11] + trial_grad1 * tangent[15];
+        grad_coeff0_0_values = grad_coeff0_0;
+        grad_coeff0_1_values = grad_coeff0_1;
+        grad_coeff1_0_values = grad_coeff1_0;
+        grad_coeff1_1_values = grad_coeff1_1;
       }
       for (int test = 0; test < NS; ++test) {
         const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
         const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          const ptrdiff_t goff = q * geometry_stride + lane;
+        {
+          const ptrdiff_t goff = q * geometry_stride;
           const s_t det = determinant[goff];
           const s_t adj0 = adjugate[0][goff];
           const s_t adj1 = adjugate[1][goff];
@@ -1843,8 +1823,8 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d2_simplex_hessian_bloc
           const s_t adj3 = adjugate[3][goff];
           const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj2) / det;
           const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj3) / det;
-          element_matrix[(0 * NS + test) * 2 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values[lane] * test_grad0 + grad_coeff0_1_values[lane] * test_grad1);
-          element_matrix[(1 * NS + test) * 2 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values[lane] * test_grad0 + grad_coeff1_1_values[lane] * test_grad1);
+          element_matrix[(0 * NS + test) * 2 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
+          element_matrix[(1 * NS + test) * 2 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
         }
       }
     }

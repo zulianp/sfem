@@ -28,7 +28,6 @@ namespace codegen {
 
 template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_objective_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -131,7 +130,6 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_obje
 
 template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_tri3_objective_block(
-        const int ne,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -193,7 +191,6 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_tri3
 
 template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_gradient_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -290,7 +287,6 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_grad
 
 template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_tri3_gradient_block(
-        const int ne,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,
@@ -348,7 +344,6 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_tri3
 
 template <typename s_t, int NQ, int NS>
 static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_apply_block(
-        const int ne,
         const ptrdiff_t geometry_stride,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
@@ -488,7 +483,6 @@ static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_appl
 
 template <typename s_t, int NS>
 static __host__ __device__ __forceinline__ void neohookean_ogden_d2_simplex_tri3_apply_block(
-        const int ne,
         const s_t *const RSTR adj0,
         const s_t *const RSTR adj1,
         const s_t *const RSTR adj2,

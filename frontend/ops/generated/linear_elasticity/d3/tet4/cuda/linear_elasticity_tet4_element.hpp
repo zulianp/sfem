@@ -25,7 +25,6 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_energy_ege
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -79,7 +78,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_energy_ege
         bdet0_q[0] = det_q[0];
       }
     }
-    linear_elasticity_d3_simplex_tet4_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    linear_elasticity_d3_simplex_tet4_objective_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -100,7 +99,6 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_energy_eco
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -143,7 +141,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_energy_eco
             badj_streams, bdet0, 0);
       }
     }
-    linear_elasticity_d3_simplex_tet4_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    linear_elasticity_d3_simplex_tet4_objective_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -164,7 +162,6 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_energy_eso
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -207,7 +204,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_energy_eso
             badj_streams, bdet0, 0);
       }
     }
-    linear_elasticity_d3_simplex_tet4_objective_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
+    linear_elasticity_d3_simplex_tet4_objective_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bu_streams, 1, &objective_step, 0, bvalue);
   }
   return SFEM_SUCCESS;
 }
@@ -229,7 +226,6 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_gradient_e
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -285,7 +281,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_gradient_e
         bdet0_q[0] = det_q[0];
       }
     }
-    linear_elasticity_d3_simplex_tet4_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+    linear_elasticity_d3_simplex_tet4_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -306,7 +302,6 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_gradient_e
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -351,7 +346,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_gradient_e
             badj_streams, bdet0, 0);
       }
     }
-    linear_elasticity_d3_simplex_tet4_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+    linear_elasticity_d3_simplex_tet4_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -372,7 +367,6 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_gradient_e
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     const s_t *bu_streams[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       bu_streams[stream] = u_streams[stream] + evb;
@@ -417,7 +411,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_gradient_e
             badj_streams, bdet0, 0);
       }
     }
-    linear_elasticity_d3_simplex_tet4_gradient_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
+    linear_elasticity_d3_simplex_tet4_gradient_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bu_streams, bout_streams);
   }
   return SFEM_SUCCESS;
 }
@@ -438,7 +432,6 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_hessian_eg
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     s_t badj0[NQ];
     s_t badj1[NQ];
     s_t badj2[NQ];
@@ -498,7 +491,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_hessian_eg
           bout_data[stream] = s_t(0);
         }
       }
-      linear_elasticity_d3_simplex_tet4_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bh_streams, bout_streams);
+      linear_elasticity_d3_simplex_tet4_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -525,7 +518,6 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_hessian_ec
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
@@ -574,7 +566,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_hessian_ec
           bout_data[stream] = s_t(0);
         }
       }
-      linear_elasticity_d3_simplex_tet4_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bh_streams, bout_streams);
+      linear_elasticity_d3_simplex_tet4_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {
@@ -601,7 +593,6 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_hessian_es
   static constexpr int NDOFS = NC * NS;
   if (nelements <= 0) return SFEM_SUCCESS;
   for (ptrdiff_t evb = 0; evb < nelements; ++evb) {
-    const int ne = 1;
     s_t bcoordinate_data[NDOFS];
     for (int stream = 0; stream < NDOFS; ++stream) {
       {
@@ -650,7 +641,7 @@ static __host__ __device__ __forceinline__ int linear_elasticity_tet4_hessian_es
           bout_data[stream] = s_t(0);
         }
       }
-      linear_elasticity_d3_simplex_tet4_apply_block<s_t, NS>(ne, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bh_streams, bout_streams);
+      linear_elasticity_d3_simplex_tet4_apply_block<s_t, NS>(badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, lmbda, mu, bh_streams, bout_streams);
       for (int row = 0; row < NDOFS; ++row) {
         s_t *const matrix_stream = matrix_streams[row * NDOFS + col] + evb;
         {

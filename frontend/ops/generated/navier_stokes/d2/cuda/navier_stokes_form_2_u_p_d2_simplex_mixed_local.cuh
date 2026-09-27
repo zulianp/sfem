@@ -32,7 +32,6 @@ namespace codegen {
 
 template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_form_2_u_p_d2_simplex_mixed_jacobian_action_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],
@@ -92,7 +91,6 @@ __host__ __device__ __forceinline__ void navier_stokes_form_2_u_p_d2_simplex_mix
 
 template <typename s_t, int NQ, int CELL_NS>
 __host__ __device__ __forceinline__ void navier_stokes_form_2_u_p_d2_simplex_mixed_jacobian_action_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR adjugate[4],

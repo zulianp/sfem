@@ -202,7 +202,6 @@ __global__ void navier_stokes_proteus_hex27_proteus_hex8_residual_affine_mesh_mi
   const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[2], elements[6], elements[8], elements[18], elements[20], elements[24], elements[26]};
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcurrent[N_FIELD_STREAMS];
     s_t bprevious[N_FIELD_STREAMS];
     s_t boutput[N_FIELD_STREAMS];
@@ -397,7 +396,6 @@ __global__ void navier_stokes_proteus_hex27_proteus_hex8_residual_isoparametric_
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
   const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[2], elements[6], elements[8], elements[18], elements[20], elements[24], elements[26]};
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcoordinates[ND * CELL_NS];
     s_t badjugate_data[ND * ND][NQ];
     s_t bdeterminant[NQ];
@@ -471,8 +469,8 @@ __global__ void navier_stokes_proteus_hex27_proteus_hex8_residual_isoparametric_
         coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
 
     const s_t *const field_shape_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()};
     const s_t *const field_grad_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::grad_1d(), sfem::codegen::ref_line_p1_q4<s_t>::grad_1d()};
@@ -611,7 +609,6 @@ __global__ void navier_stokes_proteus_hex27_proteus_hex8_jacobian_action_affine_
   const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[2], elements[6], elements[8], elements[18], elements[20], elements[24], elements[26]};
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bprevious[N_FIELD_STREAMS];
     s_t bdirection[N_FIELD_STREAMS];
     s_t boutput[N_FIELD_STREAMS];
@@ -800,7 +797,6 @@ __global__ void navier_stokes_proteus_hex27_proteus_hex8_jacobian_action_isopara
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p2_q4<s_t>::grad_1d();
   const idx_t *const RSTR field_3_elements[8] = {elements[0], elements[2], elements[6], elements[8], elements[18], elements[20], elements[24], elements[26]};
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
     s_t bcoordinates[ND * CELL_NS];
     s_t badjugate_data[ND * ND][NQ];
     s_t bdeterminant[NQ];
@@ -874,8 +870,8 @@ __global__ void navier_stokes_proteus_hex27_proteus_hex8_jacobian_action_isopara
         coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
 
     const s_t *const field_shape_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::shape_1d(), sfem::codegen::ref_line_p1_q4<s_t>::shape_1d()};
     const s_t *const field_grad_1d[NC] = {sfem::codegen::ref_line_p2_q4<s_t>::grad_1d(), sfem::codegen::ref_line_p1_q4<s_t>::grad_1d()};
