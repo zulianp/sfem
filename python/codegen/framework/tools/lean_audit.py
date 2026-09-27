@@ -340,6 +340,88 @@ def lane_loop_runs(source):
     return runs
 
 
+_WORK_ITEM_LOOP_OPEN = re.compile(
+    r"for \(int (lane|scatter) = 0; \1 < ne; \+\+\1\) \{"
+)
+_INNER_LOOP_OPEN = re.compile(r"for \(\w[\w ]* (\w+) = ")
+_INNER_DECLARATION = re.compile(
+    r"(?:const )?(?:[\w:]+ )*?\**(?:const )?(?:RSTR )?(\w+)\s*(?:\[[^\]]*\])?\s*="
+)
+_SUBSCRIPT = re.compile(r"([A-Za-z_]\w*)\[([^\[\]]+)\]")
+
+
+_DECLARED_TYPES = (
+    "s_t double float int idx_t ptrdiff_t count_t real_t geom_t uint16_t"
+    " compressed_t g_t"
+).split()
+
+
+def _declares_extent(line, name):
+    """Whether this line declares `name` with an extent rather than reading it."""
+    return re.search(
+        r"\b(?:%s)\s+(?:\*\s*)?(?:const\s+)?(?:RSTR\s+)?%s\s*\["
+        % ("|".join(_DECLARED_TYPES), re.escape(name)),
+        line,
+    ) is not None
+
+
+def lane_loop_invariants(body):
+    """Index arithmetic inside a work-item loop that does not depend on it.
+
+    The lane loop is the vectorised inner loop, so everything in it is paid once
+    per element.  A subscript the lane does not enter is the same address every
+    iteration: `grad_ref_x[q * NS + test]` is one value and
+    `bout_data[shape * NC + d]` is one row, and both belong above the loop --
+    named once, leaving `gx` and `bout_row[lane]` inside.  The compiler will
+    usually hoist them, but the generated text is what is read and reviewed, and
+    the standing shape rule for this tree is that the offsets are hoisted.
+
+    An expression that mentions a name introduced *inside* the work-item loop is
+    not invariant and is not counted -- a loop opened there, or a value read
+    there.  A packed gather's `pk_u[d * max_nodes_per_pack + packed_node]` looks
+    invariant until one notices that `packed_node` is the element's own node,
+    read from the connectivity a line above.
+    """
+    found = []
+    lines = body.split("\n")
+    depth = None
+    index = None
+    inner = set()
+    for line in lines:
+        opening = _WORK_ITEM_LOOP_OPEN.search(line)
+        if opening is not None and depth is None:
+            index = opening.group(1)
+            depth = line.count("{") - line.count("}")
+            inner = set()
+            continue
+        if depth is None:
+            continue
+        for match in _INNER_LOOP_OPEN.finditer(line):
+            inner.add(match.group(1))
+        for name, expression in _SUBSCRIPT.findall(line):
+            # `s_t jac[ND * ND];` is a declaration: the brackets are the extent,
+            # not an address computed per element, and there is nothing to hoist.
+            if _declares_extent(line, name):
+                continue
+            symbols = set(_IDENTIFIER.findall(expression))
+            if index in symbols or symbols & inner:
+                continue
+            # A bare constant or a bare name is already one address.
+            if re.fullmatch(r"\s*\d+\s*", expression):
+                continue
+            if re.fullmatch(r"\s*[A-Za-z_]\w*\s*", expression):
+                continue
+            found.append("%s[%s]" % (name, expression.strip()))
+        declaration = _INNER_DECLARATION.search(line)
+        if declaration is not None:
+            inner.add(declaration.group(1))
+        depth += line.count("{") - line.count("}")
+        if depth <= 0:
+            depth = None
+            index = None
+    return found
+
+
 #: Wrappers that took a `KernelDiagnostics` record and called a free function
 #: on it, once per kernel per precision.  Nothing referenced them.
 WRAPPED_HELPER_SUFFIXES = ("_print_rate", "_arithmetic_intensity")
@@ -367,6 +449,7 @@ def survey(generated):
     parameters = []
     discards = []
     permutations = []
+    invariants = []
     for path in source_files(generated):
         with open(path, encoding="utf-8") as stream:
             source = stream.read()
@@ -374,6 +457,10 @@ def survey(generated):
         for name, body in function_bodies(source):
             for symbol, statement in dead_assignments(body):
                 dead.append((relative, name, symbol, statement))
+            invariants.extend(
+                (relative, name, subscript)
+                for subscript in lane_loop_invariants(body)
+            )
         constants.extend(
             (relative, name, line) for name, line in unused_constants(source)
         )
@@ -393,6 +480,7 @@ def survey(generated):
         "unused_parameters": parameters,
         "void_discards": discards,
         "kernel_permutations": permutations,
+        "lane_loop_invariants": invariants,
     }
 
 

@@ -524,6 +524,60 @@ def _stream_slot(stream_layout="pointer"):
     return _STREAM_SUBSCRIPT[stream_layout]()
 
 
+#: How a work-item-invariant row is reached, keyed on whether the row still has a
+#: slot per work item.  Where it does -- a lane of a block, or a pointer array on
+#: a device -- the row is an address, so it is named above the work-item loop and
+#: the loop indexes the name.  Where the slot is gone the row has collapsed to the
+#: value itself and there is nothing to name.
+_HOISTED_ROW = {
+    True: lambda qualifier, alias, expression, slot: (
+        [BufferDeclNode(qualifier, alias, (), expr_ref(expression))],
+        alias + slot,
+    ),
+    False: lambda qualifier, alias, expression, slot: ([], expression),
+}
+
+
+def _hoisted_row(alias, expression, slot, qualifier="const s_t *const RSTR"):
+    """Name a row above the work-item loop, and say how to read it inside.
+
+    The work-item loop is the vectorised inner loop, so an address that does not
+    depend on the work item is the same address every iteration.  Returns the
+    declarations to place above the loop and the expression to read inside it,
+    so the caller has one body rather than one per target.
+    """
+    return _HOISTED_ROW[bool(slot)](qualifier, alias, expression, slot)
+
+
+#: The line-based twin of `_HOISTED_ROW`, for the bodies that are still lines.
+_HOISTED_ROW_LINES = {
+    True: lambda qualifier, alias, expression, indent: (
+        ["%s%s %s = %s;" % (indent, qualifier, alias, expression)],
+        alias,
+    ),
+    False: lambda qualifier, alias, expression, indent: ([], expression),
+}
+
+
+def _hoisted_row_lines(qualifier, alias, expression, indent):
+    """`_hoisted_row`, as lines, returning the base the loop reads."""
+    return _HOISTED_ROW_LINES[bool(_wi())](qualifier, alias, expression, indent)
+
+
+def _hoisted_value(alias, expression):
+    """Name a work-item-invariant value above the work-item loop.
+
+    Unconditional, unlike `_hoisted_row`: a value is a value on every target, so
+    there is no shape to key on.  This is `grad_ref_x[q * NS + test]` and its
+    kind -- one entry of a reference table, read once per test function rather
+    than once per element of the block.
+    """
+    return (
+        [BufferDeclNode("const s_t", alias, (), expr_ref(expression))],
+        alias,
+    )
+
+
 def _ptr():
     """The subscript for a *pointer* at this work item: `[lane]`, or `[0]`.
 
@@ -1332,13 +1386,31 @@ def _coordinate_gather_lines(dim, indent, element_array="elements", pointer_type
                 shape_count="NS",
                 element_array=element_array,
                 element_pointer_type=pointer_type,
-                setup_lines=("%s  for (int d = 0; d < ND; ++d) {" % indent,),
+                setup_lines=(
+                    "%s  for (int d = 0; d < ND; ++d) {" % indent,
+                )
+                + tuple(
+                    _hoisted_row_lines(
+                        "s_t *const RSTR",
+                        "bcoordinate_row",
+                        "bcoordinates[shape * ND + d]",
+                        "%s    " % indent,
+                    )[0]
+                ),
                 close_lines=("%s  }" % indent,),
                 lane_indent="%s    " % indent,
             ),
             [
-                ('%s      bcoordinates[shape * ND + d]' + _wi() + ' = coordinate_components[d][node];')
-                % indent
+                ('%s      %s' + _wi() + ' = coordinate_components[d][node];')
+                % (
+                    indent,
+                    _hoisted_row_lines(
+                        "s_t *const RSTR",
+                        "bcoordinate_row",
+                        "bcoordinates[shape * ND + d]",
+                        "%s    " % indent,
+                    )[1],
+                )
             ],
         ),
     ]
@@ -3945,15 +4017,19 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
             )
         # No state here any more: this loop contracts the staged tangent with
         # the trial function, and the tangent is all the state it needs.
-        lane_body.extend(
-            _basis_gradient_nodes(
-                "trial_grad",
-                "trial",
-                dim,
-                directions=tuple(live_gradient_directions(dependencies, dim)),
-                tensor_product=True,
-            )
+        #
+        # The reference half is the product of one-dimensional factors at this
+        # point and this trial function -- both outer -- so it is named at
+        # quadrature scope and the vectorised loop only pushes it forward.
+        trial_reference, trial_physical = _basis_gradient_split_nodes(
+            "trial_grad",
+            "trial",
+            dim,
+            directions=tuple(live_gradient_directions(dependencies, dim)),
+            tensor_product=True,
         )
+        quadrature_body.extend(trial_reference)
+        lane_body.extend(trial_physical)
         lane_body.extend(trial_value_nodes)
         directions = _trial_directions(dependencies, dim, bool(trial_value_nodes))
         for target_suffix, wanted in _tangent_targets_for_column(
@@ -4169,15 +4245,20 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
         )
         tangent_staging.append(_work_item_loop_node(staging_lane_body))
 
-    trial_body = []
+    # The trial function's reference gradient, named once for the whole trial
+    # loop: it depends on the point and the trial function, not on which column
+    # field is being built, so one declaration serves every component -- and a
+    # declaration per component would be a redefinition in the same scope.
+    trial_reference, trial_physical = _basis_gradient_split_nodes(
+        "trial_grad", "trial", dim, directions=directions
+    )
+    trial_body = list(trial_reference)
     for trial_component in block.column_fields:
         # The geometry, because the trial function's gradient is pushed forward
         # here.  It used to arrive with the state transform, which has moved
         # out to the staging pass above.
         material = list(_geometry_value_nodes(dependencies, dim))
-        material.extend(
-            _basis_gradient_nodes("trial_grad", "trial", dim, directions=directions)
-        )
+        material.extend(trial_physical)
         material.extend(trial_value_nodes)
         for target_suffix, wanted in _tangent_targets_for_column(
             block, dependencies, dim
@@ -4209,11 +4290,12 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
         )
         trial_body.append(_work_item_loop_node(material))
 
+        test_reference, test_physical = _basis_gradient_split_nodes(
+            "test_grad", "test", dim, directions=directions
+        )
         test_body = list(_geometry_value_nodes(dependencies, dim))
         test_body.extend(_test_value_nodes(dependencies))
-        test_body.extend(
-            _basis_gradient_nodes("test_grad", "test", dim, directions=directions)
-        )
+        test_body.extend(test_physical)
         for row in block.row_fields:
             terms = [
                 ('%s_values' + _wi() + ' * %s') % (name, _LOCAL_TEST_FACTOR[kind](axis))
@@ -4229,7 +4311,9 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
                 )
             )
         trial_body.append(
-            _shape_loop_node("test", [_work_item_loop_node(test_body)])
+            _shape_loop_node(
+                "test", test_reference + [_work_item_loop_node(test_body)]
+            )
         )
 
     quadrature_body = list(
@@ -4558,39 +4642,49 @@ def _simplex_state_gather_nodes(system, dependencies, usage,
                     ]
                 )
             )
-            trial_body = [
-                BufferDeclNode(
-                    "const s_t",
-                    "coeff",
-                    (),
-                    expr_ref(
-                        ('%s[%s]' + _stream_slot(stream_layout))
-                        % (group.name, c_sum(c_product("trial", "NC"), field_index))
-                    ),
-                )
-            ]
+            # The trial function's coefficients are a row of the stream and its
+            # basis is an entry of a table: one address and one value per trial
+            # function, both of them the same for every element of the block.
+            # They are named between the trial loop and the work-item loop, so
+            # the vectorised loop holds the accumulation and nothing else.
+            hoisted, coeff = _hoisted_row(
+                "coeff_stream",
+                ('%s[%s]')
+                % (group.name, c_sum(c_product("trial", "NC"), field_index)),
+                _stream_slot(stream_layout),
+            )
+            trial_body = []
             if read.uses_value:
+                shape_nodes, trial_shape = _hoisted_value(
+                    "trial_shape", "shape[q * NS + trial]"
+                )
+                hoisted.extend(shape_nodes)
                 trial_body.append(
                     ScatterNode(
                         expr_ref(('%s_values' + _wi()) % stem),
-                        expr_ref("coeff * shape[q * NS + trial]"),
+                        expr_ref("%s * %s" % (coeff, trial_shape)),
                         "+=",
                     )
                 )
             if read.uses_gradient:
-                trial_body.extend(
-                    ScatterNode(
-                        expr_ref(('%s_grad_%d_ref_values' + _wi()) % (stem, d)),
-                        expr_ref(
-                            "coeff * %s[q * NS + trial]"
-                            % sfem_simplex_grad_ref_name("grad_ref", d)
-                        ),
-                        "+=",
+                for d in range(dim):
+                    gradient_nodes, trial_gradient = _hoisted_value(
+                        "trial_grad_%d_ref" % d,
+                        "%s[q * NS + trial]"
+                        % sfem_simplex_grad_ref_name("grad_ref", d),
                     )
-                    for d in range(dim)
-                )
+                    hoisted.extend(gradient_nodes)
+                    trial_body.append(
+                        ScatterNode(
+                            expr_ref(('%s_grad_%d_ref_values' + _wi()) % (stem, d)),
+                            expr_ref("%s * %s" % (coeff, trial_gradient)),
+                            "+=",
+                        )
+                    )
             nodes.append(
-                _shape_loop_node("trial", [_work_item_loop_node(trial_body)])
+                _shape_loop_node(
+                    "trial", hoisted + [_work_item_loop_node(trial_body)]
+                )
             )
     return nodes
 
@@ -4765,23 +4859,27 @@ def _simplex_local_body(
         for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
     )
 
-    # Contract the staged coefficients against each test function.
+    # Contract the staged coefficients against each test function.  The test
+    # function's own basis is a table entry per test function -- the same value
+    # for every element of the block -- so it is named between the test loop and
+    # the work-item loop, and the vectorised loop reads a scalar instead of
+    # computing `q * NS + test` again per element.
+    # `_basis_gradient_split_nodes` owns the push-forward and the three reference
+    # spellings, so this reads the one answer instead of naming the table itself:
+    # the reference half is hoisted, the contraction with the adjugate stays in
+    # the loop.
+    test_reference, test_physical = _basis_gradient_split_nodes(
+        "test_grad",
+        "test",
+        dim,
+        directions=tuple(live_gradient_directions(dependencies, dim)),
+    )
+    hoisted_test = list(test_reference)
     test_body = list(_geometry_value_nodes(dependencies, dim))
-    test_body.extend(_test_value_nodes(dependencies))
-    for d in live_gradient_directions(dependencies, dim):
-        terms = " + ".join(
-            "%s[q * NS + test] * adj%d"
-            % (sfem_simplex_grad_ref_name("grad_ref", k), k * dim + d)
-            for k in range(dim)
-        )
-        test_body.append(
-            BufferDeclNode(
-                "const s_t",
-                "test_grad%d" % d,
-                (),
-                expr_ref("(%s) / det" % terms),
-            )
-        )
+    value_nodes, test_value_nodes = _hoisted_test_value_nodes(dependencies)
+    hoisted_test.extend(value_nodes)
+    test_body.extend(test_value_nodes)
+    test_body.extend(test_physical)
     for row in range(len(system.fields)):
         terms = [
             ('%s_values' + _wi() + ' * %s') % (name, _LOCAL_TEST_FACTOR[kind](axis))
@@ -4795,9 +4893,19 @@ def _simplex_local_body(
             stream = c_sum(c_product("test", "NC"), row)
             if stepped:
                 stream = c_sum(c_product("step", "NC * NS"), stream)
+            # The row this test function accumulates into, named above the lane
+            # loop: `test` and `step` are both outer, so the address is the same
+            # for every element of the block.
+            output_rows, output_row = _hoisted_row(
+                "output_row%d" % row,
+                "output[%s]" % stream,
+                _stream_slot(stream_layout),
+                qualifier="s_t *const RSTR",
+            )
+            hoisted_test.extend(output_rows)
             test_body.append(
                 ScatterNode(
-                    expr_ref(('output[%s]' + _stream_slot(stream_layout)) % stream),
+                    expr_ref(output_row),
                     expr_ref("q_weight[q] * det * (%s)" % " + ".join(terms)),
                     "+=",
                 )
@@ -4812,7 +4920,11 @@ def _simplex_local_body(
         LocalPhase.EVALUATE_MATERIAL: (_LANE_SCOPE, tuple(material)),
         LocalPhase.CONTRACT_TEST: (
             _QUADRATURE_SCOPE,
-            (_shape_loop_node("test", [_work_item_loop_node(test_body)]),),
+            (
+                _shape_loop_node(
+                    "test", hoisted_test + [_work_item_loop_node(test_body)]
+                ),
+            ),
         ),
     }
     quadrature = iterator("q", "int")
@@ -4873,6 +4985,100 @@ def _trial_substituted_coefficients(
 _TENSOR_AXES = ("x", "y", "z")
 
 
+#: Which of the three reference spellings a basis function has, from the two
+#: facts that decide it: whether the element is a tensor product, and whether its
+#: reference gradients are constants this emitter already holds.  A table rather
+#: than a chain of tests, because `plans.evaluation_strategy` is what names the
+#: three and emission only spells the one it is handed.
+_BASIS_GRADIENT_SPELLING = {
+    (True, True): "sum_factorized",
+    (True, False): "sum_factorized",
+    (False, True): "quadrature",
+    (False, False): "expanded",
+}
+
+
+def _sum_factorized_reference_nodes(name, shape_index, dim):
+    """A tensor-product basis function's reference gradient needs no contraction.
+
+    Differentiating a product of one-dimensional factors replaces exactly one of
+    them by its derivative.
+    """
+    return [
+        BufferDeclNode(
+            "const s_t",
+            "%s_ref%d" % (name, k),
+            (),
+            expr_ref(
+                " * ".join(
+                    "%s_1d[q_%s * NS1 + %s_%s]"
+                    % ("grad" if axis == k else "shape", letter, shape_index, letter)
+                    for axis, letter in enumerate(_TENSOR_AXES[:dim])
+                )
+            ),
+        )
+        for k in range(dim)
+    ]
+
+
+def _quadrature_reference_nodes(name, shape_index, dim):
+    """The table entry for this shape function at this point.
+
+    A value, and not the work item's, so it is named once and the contraction
+    reads the name.
+    """
+    return [
+        BufferDeclNode(
+            "const s_t",
+            "%s_ref%d" % (name, k),
+            (),
+            expr_ref(
+                "%s[q * NS + %s]"
+                % (sfem_simplex_grad_ref_name("grad_ref", k), shape_index)
+            ),
+        )
+        for k in range(dim)
+    ]
+
+
+#: How many components the reference half declares: all of them where a gradient
+#: is pushed forward, and none where none is.
+_BASIS_REFERENCE_EXTENT = {True: lambda dim: dim, False: lambda dim: 0}
+
+
+_BASIS_REFERENCE_NODES = {
+    "sum_factorized": _sum_factorized_reference_nodes,
+    "quadrature": _quadrature_reference_nodes,
+    #: Constants folded into the arithmetic: no table, so nothing to name.
+    "expanded": lambda name, shape_index, dim: [],
+}
+
+
+def _named_reference_gradient(name, shape_index, dim, d, reference_gradients):
+    """The push-forward of a reference gradient this emitter has named."""
+    return " + ".join(
+        "%s_ref%d * adj%d" % (name, k, k * dim + d) for k in range(dim)
+    )
+
+
+def _folded_reference_gradient(name, shape_index, dim, d, reference_gradients):
+    """The same push-forward with the reference gradients folded in as rationals."""
+    terms = []
+    for k in range(dim):
+        factor = _reference_gradient_expr(reference_gradients, shape_index, k)
+        if factor == 0:
+            continue
+        terms.append(_scaled_cpp_term(factor, "adj%d" % (k * dim + d)))
+    return _sum_cpp_terms(terms)
+
+
+_BASIS_PHYSICAL_GRADIENT = {
+    "sum_factorized": _named_reference_gradient,
+    "quadrature": _named_reference_gradient,
+    "expanded": _folded_reference_gradient,
+}
+
+
 def _basis_gradient_nodes(
     name,
     shape_index,
@@ -4901,52 +5107,56 @@ def _basis_gradient_nodes(
     One owner for all three.  The constant spelling used to be written out again
     inside `_constant_p1_gradient_expanded_body`, where nothing held the two to
     the same chain rule.
+
+    Returned in one list for the callers that place the whole thing at one depth.
+    `_basis_gradient_split_nodes` is the same computation with the reference half
+    handed back separately, for a caller that hoists it above the work-item loop.
     """
-    nodes = []
-    if tensor_product:
-        # A tensor-product basis function's reference gradient needs no
-        # contraction: differentiating a product of one-dimensional factors
-        # replaces exactly one of them by its derivative.
-        nodes.extend(
-            BufferDeclNode(
-                "const s_t",
-                "%s_ref%d" % (name, k),
-                (),
-                expr_ref(
-                    " * ".join(
-                        "%s_1d[q_%s * NS1 + %s_%s]"
-                        % ("grad" if axis == k else "shape", letter, shape_index, letter)
-                        for axis, letter in enumerate(_TENSOR_AXES[:dim])
-                    )
-                ),
-            )
-            for k in range(dim)
+    reference, physical = _basis_gradient_split_nodes(
+        name, shape_index, dim, reference_gradients, directions, tensor_product
+    )
+    return reference + physical
+
+
+def _basis_gradient_split_nodes(
+    name,
+    shape_index,
+    dim,
+    reference_gradients=None,
+    directions=None,
+    tensor_product=False,
+):
+    """The same nodes, split into the reference half and the physical half.
+
+    The reference half depends on the quadrature point and the shape function and
+    not on the work item, so it belongs above the vectorised loop; the physical
+    half contracts it with the adjugate, which is the work item's.  Splitting
+    them is what lets a caller standing in a shape loop hoist the first and keep
+    the second inside.
+    """
+    spelling = _BASIS_GRADIENT_SPELLING[
+        (bool(tensor_product), reference_gradients is None)
+    ]
+    pushed = tuple(range(dim)) if directions is None else tuple(directions)
+    # A form that pushes no gradient forward names no reference gradient either:
+    # `body_force` contracts a test *value*, so its kernel is handed no table and
+    # declaring a read of one would name a parameter it does not have.
+    reference = list(
+        _BASIS_REFERENCE_NODES[spelling](
+            name, shape_index, _BASIS_REFERENCE_EXTENT[bool(pushed)](dim)
         )
-    for d in range(dim) if directions is None else directions:
-        if tensor_product:
-            gradient = " + ".join(
-                "%s_ref%d * adj%d" % (name, k, k * dim + d) for k in range(dim)
-            )
-        elif reference_gradients is None:
-            gradient = " + ".join(
-                "%s[q * NS + %s] * adj%d"
-                % (sfem_simplex_grad_ref_name("grad_ref", k), shape_index, k * dim + d)
-                for k in range(dim)
-            )
-        else:
-            terms = []
-            for k in range(dim):
-                factor = _reference_gradient_expr(reference_gradients, shape_index, k)
-                if factor == 0:
-                    continue
-                terms.append(_scaled_cpp_term(factor, "adj%d" % (k * dim + d)))
-            gradient = _sum_cpp_terms(terms)
+    )
+    nodes = []
+    for d in pushed:
+        gradient = _BASIS_PHYSICAL_GRADIENT[spelling](
+            name, shape_index, dim, d, reference_gradients
+        )
         nodes.append(
             BufferDeclNode(
                 "const s_t", "%s%d" % (name, d), (), expr_ref("(%s) / det" % gradient)
             )
         )
-    return nodes
+    return reference, nodes
 
 
 def _uses_constant_p1_expansion(rule):
@@ -5219,6 +5429,21 @@ def _assemble_mesh_phases(sections):
     for phase_plan in residual_mesh_phase_plans(()):
         ordered.extend(sections.get(phase_plan.phase, ()))
     return ordered
+
+
+def _hoisted_test_value_nodes(dependencies):
+    """The test function's value, named above the lane loop where it is read.
+
+    The twin of `_test_value_nodes`, which declared `test_value` inside the
+    work-item loop; the shape table does not depend on the work item, so the
+    declaration moves out and the loop keeps the name.
+    """
+    nodes = []
+    for quantity in contracted_test_quantities(dependencies):
+        if quantity == "value":
+            declarations, _ = _hoisted_value("test_value", "shape[q * NS + test]")
+            nodes.extend(declarations)
+    return nodes, []
 
 
 def _test_value_nodes(dependencies):
@@ -7066,18 +7291,44 @@ def _mixed_isoparametric_function(
                     for component in range(dim * dim)
                 ),
                 "    for (int q = 0; q < NQ; ++q) {",
-                *_work_item_loop_lines("      "),
             ]
         )
-        for i in range(dim):
-            for j in range(dim):
-                terms = [
-                    ('bcoordinates[%d]' + _wi() + ' * %s_cell_grad_ref_%d[%s]')
+        # The cell's coordinates and its reference gradients, named above the
+        # work-item loop: `dim * dim` Jacobian entries each read the same
+        # `n_shape * dim` rows and table entries, and every one of them is the
+        # same for every element of the block.
+        coordinate_row = {}
+        reference_name = {}
+        for shape in range(cell_rule.n_shape):
+            for i in range(dim):
+                declarations, coordinate_row[(shape, i)] = _hoisted_row_lines(
+                    "const s_t *const RSTR",
+                    "coordinate_row%d" % (shape * dim + i),
+                    "bcoordinates[%d]" % (shape * dim + i),
+                    "      ",
+                )
+                lines.extend(declarations)
+        for j in range(dim):
+            for shape in range(cell_rule.n_shape):
+                reference_name[(j, shape)] = "cell_grad_ref%d_%d" % (j, shape)
+                lines.append(
+                    "      const s_t %s = %s_cell_grad_ref_%d[%s];"
                     % (
-                        shape * dim + i,
+                        reference_name[(j, shape)],
                         reference_stage,
                         j,
                         c_sum(c_product("q", "CELL_NS"), shape),
+                    )
+                )
+        lines.extend(_work_item_loop_lines("      "))
+        for i in range(dim):
+            for j in range(dim):
+                terms = [
+                    "%s%s * %s"
+                    % (
+                        coordinate_row[(shape, i)],
+                        _wi(),
+                        reference_name[(j, shape)],
                     )
                     for shape in range(cell_rule.n_shape)
                 ]
@@ -9191,12 +9442,18 @@ def _scalar_crs_matrix_assembly_source(
                     for component in range(dim * dim)
                 ),
                 *quadrature_scope_lines(rule.element_type, "    "),
-                *_target().work_item_prologue_lines("      "),
             ]
         )
+        hoists, coordinate, reference = _isoparametric_jacobian_hoists(
+            rule, dim, n_shape, "      "
+        )
+        lines.extend(hoists)
+        lines.extend(_target().work_item_prologue_lines("      "))
         for i in range(dim):
             for j in range(dim):
-                terms = _isoparametric_jacobian_terms(rule, dim, n_shape, i, j)
+                terms = _isoparametric_jacobian_terms(
+                    rule, dim, n_shape, i, j, coordinate, reference
+                )
                 lines.append(
                     "      const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
@@ -9549,12 +9806,18 @@ def _scalar_crs_matrix_assembly_source(
                         for component in range(dim * dim)
                     ),
                     *quadrature_scope_lines(rule.element_type, "      "),
-                    *_target().work_item_prologue_lines("        "),
                 ]
             )
+            hoists, coordinate, reference = _isoparametric_jacobian_hoists(
+                rule, dim, n_shape, "        "
+            )
+            lines.extend(hoists)
+            lines.extend(_target().work_item_prologue_lines("        "))
             for i in range(dim):
                 for j in range(dim):
-                    terms = _isoparametric_jacobian_terms(rule, dim, n_shape, i, j)
+                    terms = _isoparametric_jacobian_terms(
+                        rule, dim, n_shape, i, j, coordinate, reference
+                    )
                     lines.append(
                         "        const s_t J%d%d = %s;"
                         % (i, j, " + ".join(terms))
@@ -9811,12 +10074,18 @@ def _isoparametric_mesh_operator_source(
                     for component in range(dim * dim)
                 ),
                 *quadrature_scope_lines(rule.element_type, "    "),
-                *_work_item_loop_lines("      "),
             ]
         )
+        hoists, coordinate, reference = _isoparametric_jacobian_hoists(
+            rule, dim, n_shape, "      "
+        )
+        lines.extend(hoists)
+        lines.extend(_work_item_loop_lines("      "))
         for i in range(dim):
             for j in range(dim):
-                terms = _isoparametric_jacobian_terms(rule, dim, n_shape, i, j)
+                terms = _isoparametric_jacobian_terms(
+                    rule, dim, n_shape, i, j, coordinate, reference
+                )
                 lines.append(
                     "        const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
@@ -10103,8 +10372,24 @@ def _scalar_packed_jacobian_action_source(
             "          const uint16_t *const RSTR coordinate_shape = %s[shape];" % coordinate_element_array,
             "          const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
             "          for (int d = 0; d < ND; ++d) {",
+            *_hoisted_row_lines(
+                "s_t *const RSTR",
+                "bcoordinate_row",
+                "bcoordinates[shape * ND + d]",
+                "            ",
+            )[0],
             *work_item_scope_header_lines("            "),
-            '              bcoordinates[shape * ND + d]' + _wi() + ' = pk_coordinates[d * max_nodes_per_pack + coordinate_shape[' + _elem() + ']];',
+            "              %s%s = pk_coordinates[d * max_nodes_per_pack + coordinate_shape[%s]];"
+            % (
+                _hoisted_row_lines(
+                    "s_t *const RSTR",
+                    "bcoordinate_row",
+                    "bcoordinates[shape * ND + d]",
+                    "            ",
+                )[1],
+                _wi(),
+                _elem(),
+            ),
             "            }",
             "          }",
         ]
@@ -10160,12 +10445,18 @@ def _scalar_packed_jacobian_action_source(
                     for component in range(dim * dim)
                 ),
                 *quadrature_scope_lines(rule.element_type, "        "),
-                *_work_item_loop_lines("          "),
             ]
         )
+        hoists, coordinate, reference = _isoparametric_jacobian_hoists(
+            rule, dim, n_shape, "          "
+        )
+        lines.extend(hoists)
+        lines.extend(_work_item_loop_lines("          "))
         for i in range(dim):
             for j in range(dim):
-                terms = _isoparametric_jacobian_terms(rule, dim, n_shape, i, j)
+                terms = _isoparametric_jacobian_terms(
+                    rule, dim, n_shape, i, j, coordinate, reference
+                )
                 lines.append(
                     "            const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
@@ -10705,7 +10996,58 @@ def _scalar_packed_affine_jacobian_action_source(
     return lines
 
 
-def _isoparametric_jacobian_terms(rule, dim, n_shape, row, col):
+def _isoparametric_jacobian_hoists(rule, dim, n_shape, indent):
+    """Everything the isoparametric Jacobian reads that the work item does not.
+
+    The Jacobian is a sum over the shape functions, unrolled, and every one of
+    its `dim * dim` entries reads the same two things: a row of the coordinate
+    tile, whose offset is a compile-time constant, and an entry of the reference
+    gradient table, which is a constant of the quadrature point.  Written inline
+    that is `n_shape * dim` address computations and `n_shape * dim` table reads
+    *per entry*, all of them inside the vectorised loop -- ninety reads of thirty
+    values for a TET10.
+
+    Returns the lines to place above the work-item loop and two lookups the terms
+    are then spelled with.  A constant-P1 element folds its gradients, so it has
+    no table to read and the reference lookup is empty.
+    """
+    lines = []
+    coordinate = {}
+    for shape in range(n_shape):
+        for row in range(dim):
+            declarations, base = _hoisted_row_lines(
+                "const s_t *const RSTR",
+                "coordinate_row%d" % (shape * dim + row),
+                "bcoordinates[%d]" % (shape * dim + row),
+                indent,
+            )
+            lines.extend(declarations)
+            coordinate[(shape, row)] = base
+    reference = {}
+    for _ in (constant_p1_simplex_reference_gradients(rule),):
+        if _ is not None:
+            continue
+        for col in range(dim):
+            for shape in range(n_shape):
+                name = "cell_grad_ref%d_%d" % (col, shape)
+                lines.append(
+                    "%sconst s_t %s = %s[q * NS + %d];"
+                    % (
+                        indent,
+                        name,
+                        _mesh_reference_name(
+                            ISOPARAMETRIC_MODE,
+                            sfem_simplex_grad_ref_name("grad_ref", col),
+                        ),
+                        shape,
+                    )
+                )
+                reference[(col, shape)] = name
+    return lines, coordinate, reference
+
+
+def _isoparametric_jacobian_terms(rule, dim, n_shape, row, col,
+                                  coordinate=None, reference=None):
     """One Jacobian entry's terms: a sum over the shape functions, or its fold.
 
     An affine simplex has constant reference gradients, so the sum collapses to
@@ -10724,7 +11066,9 @@ def _isoparametric_jacobian_terms(rule, dim, n_shape, row, col):
                 sum(
                     (
                         sp.sympify(gradients[shape][col])
-                        * sp.Symbol("bcoordinates[%d]%s" % (shape * dim + row, _wi()))
+                        * sp.Symbol(
+                            "%s%s" % (coordinate[(shape, row)], _wi())
+                        )
                         for shape in range(n_shape)
                     ),
                     sp.S.Zero,
@@ -10736,15 +11080,8 @@ def _isoparametric_jacobian_terms(rule, dim, n_shape, row, col):
     ]
     general = [
         [
-            ("bcoordinates[%d]" + _wi() + " * %s[q * NS + %d]")
-            % (
-                shape * dim + row,
-                _mesh_reference_name(
-                    ISOPARAMETRIC_MODE,
-                    sfem_simplex_grad_ref_name("grad_ref", col),
-                ),
-                shape,
-            )
+            "%s%s * %s"
+            % (coordinate[(shape, row)], _wi(), reference[(col, shape)])
             for shape in range(n_shape)
         ]
         for _ in (gradients,)

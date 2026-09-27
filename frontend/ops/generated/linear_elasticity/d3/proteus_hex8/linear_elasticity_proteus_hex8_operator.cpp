@@ -165,11 +165,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_objective_steps_a_msoa_imp
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
+          bh_row[lane] = h_components[d][node * h_stride];
         }
       }
     }
@@ -352,11 +354,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_objective_steps_packed_a_m
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
-              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bu_row[lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
             }
           }
         }
@@ -524,9 +528,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_objective_steps_i_msoa_imp
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
+          bcoordinate_row[lane] = coordinate_components[d][ev_shape[lane]];
         }
       }
     }
@@ -545,11 +550,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_objective_steps_i_msoa_imp
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
+          bh_row[lane] = h_components[d][node * h_stride];
         }
       }
     }
@@ -729,18 +736,21 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_objective_steps_packed_i_m
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
+            s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
+              bcoordinate_row[lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
-              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bu_row[lane] = pk_u_base[d * max_nodes_per_pack + packed_node];
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
             }
           }
         }
@@ -929,10 +939,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_a_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
         }
       }
     }
@@ -989,10 +1000,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_a_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
           }
         }
       }
@@ -1139,11 +1151,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_a_msoa_imp
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -1185,8 +1199,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_a_msoa_imp
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -1358,11 +1373,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_two_pass_a
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -1404,8 +1421,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_two_pass_a
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -1563,9 +1581,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
+          bcoordinate_row[lane] = coordinate_components[d][ev_shape[lane]];
         }
       }
     }
@@ -1574,10 +1593,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
         }
       }
     }
@@ -1619,10 +1639,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
           }
         }
       }
@@ -1773,18 +1794,21 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_i_msoa_imp
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
+            s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
+              bcoordinate_row[lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -1810,8 +1834,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_i_msoa_imp
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -1987,18 +2012,21 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_two_pass_i
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
+            s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
+              bcoordinate_row[lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bu_row = bu_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bu_data[shape * NC + d][lane] = pk_u[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bu_row[lane] = pk_u[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -2024,8 +2052,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_gradient_packed_two_pass_i
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -2223,10 +2252,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_a_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+          bh_row[lane] = h_components[d][node * h_stride];
         }
       }
     }
@@ -2283,10 +2313,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_a_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
           }
         }
       }
@@ -2433,11 +2464,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_a_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -2479,8 +2512,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_a_msoa_impl(
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -2652,11 +2686,13 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_two_pass_a_ms
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -2698,8 +2734,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_two_pass_a_ms
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -2857,9 +2894,10 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
+          bcoordinate_row[lane] = coordinate_components[d][ev_shape[lane]];
         }
       }
     }
@@ -2868,10 +2906,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+          bh_row[lane] = h_components[d][node * h_stride];
         }
       }
     }
@@ -2913,10 +2952,11 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
           }
         }
       }
@@ -3067,18 +3107,21 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_i_msoa_impl(
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
+            s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
+              bcoordinate_row[lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -3104,8 +3147,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_i_msoa_impl(
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }
@@ -3281,18 +3325,21 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_two_pass_i_ms
         for (int shape = 0; shape < NS; ++shape) {
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < ND; ++d) {
+            s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bcoordinate_data[shape * ND + d][lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
+              bcoordinate_row[lane] = pk_coordinates[d * max_nodes_per_pack + packed_node];
             }
           }
           for (int d = 0; d < NC; ++d) {
+            s_t *const RSTR bh_row = bh_data[shape * NC + d];
+            s_t *const RSTR bout_row = bout_data[shape * NC + d];
             #pragma omp simd
             for (int lane = 0; lane < ne; ++lane) {
               const uint16_t packed_node = element_shape[evb + lane];
-              bh_data[shape * NC + d][lane] = pk_h[d * max_nodes_per_pack + packed_node];
-              bout_data[shape * NC + d][lane] = s_t(0);
+              bh_row[lane] = pk_h[d * max_nodes_per_pack + packed_node];
+              bout_row[lane] = s_t(0);
             }
           }
         }
@@ -3318,8 +3365,9 @@ static SFEM_INLINE int linear_elasticity_proteus_hex8_apply_packed_two_pass_i_ms
           const uint16_t *const RSTR element_shape = elements[shape];
           for (int d = 0; d < NC; ++d) {
             s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;
+            const s_t *const RSTR bout_row = bout_data[shape * NC + d];
             for (int lane = 0; lane < ne; ++lane) {
-              pk_component_out[element_shape[evb + lane]] += bout_data[shape * NC + d][lane];
+              pk_component_out[element_shape[evb + lane]] += bout_row[lane];
             }
           }
         }

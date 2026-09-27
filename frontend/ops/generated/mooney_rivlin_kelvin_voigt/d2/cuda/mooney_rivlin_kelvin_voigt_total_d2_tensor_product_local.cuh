@@ -838,6 +838,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
       const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
       const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
+      const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y];
+      const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y];
       const s_t *const RSTR tangent_grad_d0_0_grad0_0_q = &tangent[q];
       const s_t *const RSTR tangent_grad_d0_1_grad0_0_q = &tangent[(4 * NQ + q)];
       const s_t *const RSTR tangent_grad_d0_0_grad0_1_q = &tangent[(NQ + q)];
@@ -858,8 +860,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
         const s_t adj1 = adj_q1[0];
         const s_t adj2 = adj_q2[0];
         const s_t adj3 = adj_q3[0];
-        const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y];
-        const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y];
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj2) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj3) / det;
         const s_t grad_coeff0_0 = trial_grad0 * tangent_grad_d0_0_grad0_0_q[0] + trial_grad1 * tangent_grad_d0_1_grad0_0_q[0];
@@ -893,6 +893,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
       const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
       const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
       const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
+      const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y];
+      const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y];
       const s_t *const RSTR tangent_grad_d1_0_grad0_0_q = &tangent[(8 * NQ + q)];
       const s_t *const RSTR tangent_grad_d1_1_grad0_0_q = &tangent[(12 * NQ + q)];
       const s_t *const RSTR tangent_grad_d1_0_grad0_1_q = &tangent[(9 * NQ + q)];
@@ -913,8 +915,6 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_ten
         const s_t adj1 = adj_q1[0];
         const s_t adj2 = adj_q2[0];
         const s_t adj3 = adj_q3[0];
-        const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y];
-        const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y];
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj2) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj3) / det;
         const s_t grad_coeff0_0 = trial_grad0 * tangent_grad_d1_0_grad0_0_q[0] + trial_grad1 * tangent_grad_d1_1_grad0_0_q[0];

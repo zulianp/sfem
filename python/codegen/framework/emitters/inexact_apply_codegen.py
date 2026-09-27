@@ -798,11 +798,15 @@ def _explicit_gradient_source(
         "      const s_t %s = b%s%s;" % (value, value, _work_item())
         for value, _s, _n, _r in gathered
     ]
-    lane_lines.extend(basis_reads)
+    # The basis reads go at quadrature scope, not in the lane loop: they are one
+    # entry of the reference struct per node per point, the same number for every
+    # element of the block, and reading them per element is the address
+    # arithmetic the vectorised loop should not be paying for.
     return _GradientSource(
         tables=tuple(tables),
         scratch=tuple(scratch),
         gathers=tuple(_STAGED_GATHERS_BY_USE[bool(gathered)](gathered)),
+        q_prologue=tuple(basis_reads),
         lane_lines=tuple(lane_lines),
         weight=weight,
     )

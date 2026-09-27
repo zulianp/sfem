@@ -489,6 +489,35 @@ def _first_slot():
     return _FIRST_SLOT[bool(current_target().work_item_extent())]
 
 
+#: How a work-item-invariant row is reached, keyed on whether the row still has a
+#: slot per work item.  Where it does the row is an address, so it is named above
+#: the work-item loop and the loop indexes the name; where the slot is gone the row
+#: has collapsed to the value itself and there is nothing to name.
+_HOISTED_ROW = {
+    True: lambda qualifier, alias, expression, indent: (
+        ["%s%s %s = %s;" % (indent, qualifier, alias, expression)],
+        alias,
+    ),
+    False: lambda qualifier, alias, expression, indent: ([], expression),
+}
+
+
+def _hoisted_row(qualifier, alias, expression, indent):
+    """Name a staged row above the work-item loop, and say what to call it inside.
+
+    The work-item loop is the vectorised inner loop, so an address the work item
+    does not enter is the same address every iteration: `bu_data[shape * NC + d]`
+    is one row of the tile, and recomputing its offset per element is arithmetic
+    the loop pays for nothing.  Returns the lines to place above the loop and the
+    *base* the loop reads -- the caller appends the slot, because some callers
+    want it as a format -- so there is one body rather than one per target.
+
+    Where the slot is gone the row has collapsed to the value itself, there is no
+    address to name, and the base is the original expression.
+    """
+    return _HOISTED_ROW[bool(_wi_slot())](qualifier, alias, expression, indent)
+
+
 def _wi_slot():
     """How a staged buffer is indexed at this work item: `[lane]`, or nothing."""
     return current_target().work_item_subscript()
@@ -3657,22 +3686,28 @@ def _general_jacobian_staging_lines(
                 ),
             )
         )
+    # One row of the coordinate tile per spatial direction, named above the lane
+    # loop beside the reference gradients: this shape function's coordinates sit
+    # at the same offset for every element of the block.
+    coordinate_rows = []
+    coordinate_row = {}
+    for row in range(dim):
+        declarations, coordinate_row[row] = _hoisted_row(
+            "const s_t *const RSTR",
+            "coordinate_row%d" % row,
+            "%s[%s]" % (coordinate_streams, c_sum(c_product("shape", dim), row)),
+            "        ",
+        )
+        coordinate_rows.extend(declarations)
+    lines.extend(coordinate_rows)
     # One lane loop for the whole Jacobian, not one per component: the loop
     # bound and the pragma are the same for all of them, and a three-
     # dimensional element opened nine `#pragma omp simd` regions in a row for
     # nine accumulations that belong together.  Same stores, one region.
     lines.extend(_work_item_loop_lines(source_builder, "        "))
     lines.extend(
-        "          J%d%d_values%s += %s[%s]%s * g%d;"
-        % (
-            row,
-            col,
-            _wi_slot(),
-            coordinate_streams,
-            c_sum(c_product("shape", dim), row),
-            _wi_slot(),
-            col,
-        )
+        "          J%d%d_values%s += %s%s * g%d;"
+        % (row, col, _wi_slot(), coordinate_row[row], _wi_slot(), col)
         for row in range(dim)
         for col in range(dim)
     )
@@ -4635,9 +4670,16 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
             coordinate_node = (
                 "packed_node" if identity_stream_shape_order else "coordinate_packed_node"
             )
+            coordinate_rows, coordinate_row = _hoisted_row(
+                "s_t *const RSTR",
+                "bcoordinate_row",
+                "bcoordinate_data[shape * ND + d]",
+                "            ",
+            )
             lines.extend(
                 [
                     "          for (int d = 0; d < ND; ++d) {",
+                    *coordinate_rows,
                     *_lane_loop_header_lines(source_builder, "            "),
                     "              const uint16_t %s = %s[%s];"
                     % (
@@ -4645,22 +4687,30 @@ def _sfem_soa_packed_objective_steps_public_wrappers(
                         "element_shape" if identity_stream_shape_order else "coordinate_shape",
                         _element_index(source_builder),
                     ),
-                    "              bcoordinate_data[shape * ND + d]%s = pk_coordinates[d * max_nodes_per_pack + %s];"
-                    % (_work_item_slot(source_builder), coordinate_node),
+                    "              %s%s = pk_coordinates[d * max_nodes_per_pack + %s];"
+                    % (coordinate_row, _wi_slot(), coordinate_node),
                     "            }",
                     "          }",
                 ]
             )
+        current_rows, current_row = _hoisted_row(
+            "s_t *const RSTR", "bu_row", "bu_data[shape * NC + d]", "            "
+        )
+        direction_rows, direction_row = _hoisted_row(
+            "s_t *const RSTR", "bh_row", "bh_data[shape * NC + d]", "            "
+        )
         lines.extend(
             [
                 "          for (int d = 0; d < NC; ++d) {",
+                *current_rows,
+                *direction_rows,
                 *_lane_loop_header_lines(source_builder, "            "),
                 "              const uint16_t packed_node = element_shape[%s];"
                 % _element_index(source_builder),
-                "              bu_data[shape * NC + d]%s = pk_u_base[d * max_nodes_per_pack + packed_node];"
-                % _work_item_slot(source_builder),
-                "              bh_data[shape * NC + d]%s = pk_h[d * max_nodes_per_pack + packed_node];"
-                % _work_item_slot(source_builder),
+                "              %s%s = pk_u_base[d * max_nodes_per_pack + packed_node];"
+                % (current_row, _wi_slot()),
+                "              %s%s = pk_h[d * max_nodes_per_pack + packed_node];"
+                % (direction_row, _wi_slot()),
                 "            }",
                 "          }",
                 "        }",
@@ -5043,17 +5093,27 @@ def _per_shape_output_scatter(lines, form, dim, n_nodes, n_field_components,
     """One contribution per shape function, scattered through the connectivity."""
     if compact_stream_buffers:
         lines.append("    s_t *const out_components[NC] = {%s};" % ", ".join("out%s" % _component_name(d) for d in range(n_field_components)))
+        # The row of the output tile this (shape, component) accumulates, named
+        # above the scatter loop: the offset into the tile is the same for every
+        # element of the block.
+        output_rows, output_row = _hoisted_row(
+            "const s_t *const RSTR",
+            "bout_row",
+            "bout_data[shape * NC + d]",
+            "        ",
+        )
         lines.extend(
             [
                 "",
                 "    for (int shape = 0; shape < NS; ++shape) {",
                 "      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors()),
                 "      for (int d = 0; d < NC; ++d) {",
+                *output_rows,
                 *_scatter_add_lines(
                     source_builder,
                     "out_components[d]",
                     lambda index: "ev_shape[%s] * out_stride" % index,
-                    "bout_data[shape * NC + d]%s",
+                    output_row + "%s",
                     "        ",
                 ),
                 "      }",
@@ -5305,19 +5365,34 @@ def _append_mesh_operator_stream_buffer_views(
                 "",
             ]
         )
+        # One row of each tile per (shape, component), named above the lane loop:
+        # the offset into the tile does not depend on the element, so computing it
+        # per element is arithmetic the vectorised loop pays for nothing.
+        current_rows, current_row = _hoisted_row(
+            "s_t *const RSTR", "bu_row", "bu_data[shape * NC + d]", "        "
+        )
+        direction_rows, direction_row = _hoisted_row(
+            "s_t *const RSTR", "bh_row", "bh_data[shape * NC + d]", "        "
+        )
         lines.extend(
             [
                 "    for (int shape = 0; shape < NS; ++shape) {",
                 "      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors()),
                 "      for (int d = 0; d < NC; ++d) {",
+            ]
+        )
+        lines.extend(current_rows if uses_current else [])
+        lines.extend(direction_rows if uses_direction else [])
+        lines.extend(
+            [
                 *_work_item_loop_lines(source_builder, "        "),
                 "          const idx_t node = ev_shape[%s];" % work_item,
             ]
         )
         if uses_current:
-            lines.append("          bu_data[shape * NC + d]%s = u_components[d][node * u_stride];" % current_target().work_item_subscript())
+            lines.append("          %s%s = u_components[d][node * u_stride];" % (current_row, _wi_slot()))
         if uses_direction:
-            lines.append("          bh_data[shape * NC + d]%s = h_components[d][node * h_stride];" % current_target().work_item_subscript())
+            lines.append("          %s%s = h_components[d][node * h_stride];" % (direction_row, _wi_slot()))
         lines.extend(["        }", "      }", "    }"])
         # One loop per extent the plan states, innermost the lane loop.  A
         # scalar output has no extents and gets the lane loop alone, which is
@@ -5389,9 +5464,21 @@ def _append_mesh_operator_isoparametric_jacobian(
                     "    for (int shape = 0; shape < NS; ++shape) {",
                     *(["      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors())] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
                     "      for (int d = 0; d < ND; ++d) {",
+                    *_hoisted_row(
+                        "s_t *const RSTR",
+                        "bcoordinate_row",
+                        "bcoordinate_data[shape * ND + d]",
+                        "        ",
+                    )[0],
                     *_work_item_loop_lines(source_builder, "        "),
-                    "          bcoordinate_data[shape * ND + d]%s = coordinate_components[d][%s];"
+                    "          %s%s = coordinate_components[d][%s];"
                     % (
+                        _hoisted_row(
+                            "s_t *const RSTR",
+                            "bcoordinate_row",
+                            "bcoordinate_data[shape * ND + d]",
+                            "        ",
+                        )[1],
                         _wi_slot(),
                         "ev_shape[%s]" % work_item
                         if identity_stream_shape_order
@@ -6499,9 +6586,16 @@ def _sfem_soa_packed_apply_public_wrappers(
                     if identity_stream_shape_order
                     else "coordinate_packed_node"
                 )
+                coordinate_rows, coordinate_row = _hoisted_row(
+                    "s_t *const RSTR",
+                    "bcoordinate_row",
+                    "bcoordinate_data[shape * ND + d]",
+                    "            ",
+                )
                 lines.extend(
                     [
                         "          for (int d = 0; d < ND; ++d) {",
+                        *coordinate_rows,
                         *_lane_loop_header_lines(source_builder, "            "),
                         "              const uint16_t %s = %s[%s];"
                         % (
@@ -6511,15 +6605,27 @@ def _sfem_soa_packed_apply_public_wrappers(
                             else "coordinate_shape",
                             _element_index(source_builder),
                         ),
-                        "              bcoordinate_data[shape * ND + d]%s = pk_coordinates[d * max_nodes_per_pack + %s];"
-                        % (_work_item_slot(source_builder), coordinate_node),
+                        "              %s%s = pk_coordinates[d * max_nodes_per_pack + %s];"
+                        % (coordinate_row, _wi_slot(), coordinate_node),
                         "            }",
                         "          }",
                     ]
                 )
+            current_rows, current_row = _hoisted_row(
+                "s_t *const RSTR", "bu_row", "bu_data[shape * NC + d]", "            "
+            )
+            direction_rows, direction_row = _hoisted_row(
+                "s_t *const RSTR", "bh_row", "bh_data[shape * NC + d]", "            "
+            )
+            output_rows, output_row = _hoisted_row(
+                "s_t *const RSTR", "bout_row", "bout_data[shape * NC + d]", "            "
+            )
             lines.extend(
                 [
                     "          for (int d = 0; d < NC; ++d) {",
+                    *(current_rows if uses_current else []),
+                    *(direction_rows if uses_direction else []),
+                    *output_rows,
                     *_lane_loop_header_lines(source_builder, "            "),
                     "              const uint16_t packed_node = element_shape[%s];"
                     % _element_index(source_builder),
@@ -6527,18 +6633,17 @@ def _sfem_soa_packed_apply_public_wrappers(
             )
             if uses_current:
                 lines.append(
-                    "              bu_data[shape * NC + d]%s = pk_u[d * max_nodes_per_pack + packed_node];"
-                    % _work_item_slot(source_builder)
+                    "              %s%s = pk_u[d * max_nodes_per_pack + packed_node];"
+                    % (current_row, _wi_slot())
                 )
             if uses_direction:
                 lines.append(
-                    "              bh_data[shape * NC + d]%s = pk_h[d * max_nodes_per_pack + packed_node];"
-                    % _work_item_slot(source_builder)
+                    "              %s%s = pk_h[d * max_nodes_per_pack + packed_node];"
+                    % (direction_row, _wi_slot())
                 )
             lines.extend(
                 [
-                    "              bout_data[shape * NC + d]%s = s_t(0);"
-                    % _work_item_slot(source_builder),
+                    "              %s%s = s_t(0);" % (output_row, _wi_slot()),
                     "            }",
                     "          }",
                     "        }",
@@ -6656,11 +6761,26 @@ def _sfem_soa_packed_apply_public_wrappers(
                     "          const uint16_t *const RSTR element_shape = elements[shape];",
                     "          for (int d = 0; d < NC; ++d) {",
                     "            s_t *const RSTR pk_component_out = pk_out + d * max_nodes_per_pack;",
+                    *_hoisted_row(
+                        "const s_t *const RSTR",
+                        "bout_row",
+                        "bout_data[shape * NC + d]",
+                        "            ",
+                    )[0],
                     # Serial on purpose: two work items of one block can land
                     # on the same packed node, so this scope must not vectorize.
                     *work_item_scope_header_lines("            ", serial=True),
-                    "              pk_component_out[element_shape[%s]] += bout_data[shape * NC + d]%s;"
-                    % (_element_index(source_builder), _work_item_slot(source_builder)),
+                    "              pk_component_out[element_shape[%s]] += %s%s;"
+                    % (
+                        _element_index(source_builder),
+                        _hoisted_row(
+                            "const s_t *const RSTR",
+                            "bout_row",
+                            "bout_data[shape * NC + d]",
+                            "            ",
+                        )[1],
+                        _wi_slot(),
+                    ),
                     "            }",
                     "          }",
                     "        }",
@@ -7162,9 +7282,21 @@ def _objective_steps_lines(
                     "    for (int shape = 0; shape < NS; ++shape) {",
                     *(["      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors())] if identity_stream_shape_order else ["      const idx_t *const RSTR coordinate_element_shape = coordinate_elements[shape];"]),
                     "      for (int d = 0; d < ND; ++d) {",
+                    *_hoisted_row(
+                        "s_t *const RSTR",
+                        "bcoordinate_row",
+                        "bcoordinate_data[shape * ND + d]",
+                        "        ",
+                    )[0],
                     *_work_item_loop_lines(source_builder, "        "),
-                    "          bcoordinate_data[shape * ND + d]%s = coordinate_components[d][%s];"
+                    "          %s%s = coordinate_components[d][%s];"
                     % (
+                        _hoisted_row(
+                            "s_t *const RSTR",
+                            "bcoordinate_row",
+                            "bcoordinate_data[shape * ND + d]",
+                            "        ",
+                        )[1],
                         _wi_slot(),
                         "ev_shape[%s]" % work_item
                         if identity_stream_shape_order
@@ -7210,16 +7342,24 @@ def _objective_steps_lines(
                 ),
             ]
         )
+        current_rows, current_row = _hoisted_row(
+            "s_t *const RSTR", "bu_row", "bu_data[shape * NC + d]", "        "
+        )
+        direction_rows, direction_row = _hoisted_row(
+            "s_t *const RSTR", "bh_row", "bh_data[shape * NC + d]", "        "
+        )
         lines.extend(
             [
                 "",
                 "    for (int shape = 0; shape < NS; ++shape) {",
                 "      const idx_t *const RSTR ev_shape = &ev[%s];" % c_product("shape", *_width_factors()),
                 "      for (int d = 0; d < NC; ++d) {",
+                *current_rows,
+                *direction_rows,
                 *_work_item_loop_lines(source_builder, "        "),
                 "          const idx_t node = ev_shape[%s];" % work_item,
-                "          bu_data[shape * NC + d]%s = u_components[d][node * u_stride];" % current_target().work_item_subscript(),
-                "          bh_data[shape * NC + d]%s = h_components[d][node * h_stride];" % current_target().work_item_subscript(),
+                "          %s%s = u_components[d][node * u_stride];" % (current_row, _wi_slot()),
+                "          %s%s = h_components[d][node * h_stride];" % (direction_row, _wi_slot()),
                 "        }",
                 "      }",
                 "    }",

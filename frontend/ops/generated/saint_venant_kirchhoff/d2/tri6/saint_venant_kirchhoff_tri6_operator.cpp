@@ -155,9 +155,10 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_objective_steps_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
+          bcoordinate_row[lane] = coordinate_components[d][ev_shape[lane]];
         }
       }
     }
@@ -176,11 +177,13 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_objective_steps_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
+          bh_row[lane] = h_components[d][node * h_stride];
         }
       }
     }
@@ -201,12 +204,14 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_objective_steps_i_msoa_impl(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
         const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd
@@ -377,9 +382,10 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_gradient_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
+          bcoordinate_row[lane] = coordinate_components[d][ev_shape[lane]];
         }
       }
     }
@@ -388,10 +394,11 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_gradient_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
         }
       }
     }
@@ -427,12 +434,14 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_gradient_i_msoa_impl(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
         const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd
@@ -453,10 +462,11 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_gradient_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
           }
         }
       }
@@ -611,9 +621,10 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_apply_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinate_data[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          bcoordinate_data[shape * ND + d][lane] = coordinate_components[d][ev_shape[lane]];
+          bcoordinate_row[lane] = coordinate_components[d][ev_shape[lane]];
         }
       }
     }
@@ -623,11 +634,13 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_apply_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        s_t *const RSTR bu_row = bu_data[shape * NC + d];
+        s_t *const RSTR bh_row = bh_data[shape * NC + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = ev_shape[lane];
-          bu_data[shape * NC + d][lane] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][lane] = h_components[d][node * h_stride];
+          bu_row[lane] = u_components[d][node * u_stride];
+          bh_row[lane] = h_components[d][node * h_stride];
         }
       }
     }
@@ -667,12 +680,14 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_apply_i_msoa_impl(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
         const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd
@@ -693,10 +708,11 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_apply_i_msoa_impl(
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR ev_shape = &ev[shape * VS];
       for (int d = 0; d < NC; ++d) {
+        const s_t *const RSTR bout_row = bout_data[shape * NC + d];
         {
           for (int scatter = 0; scatter < ne; ++scatter) {
             #pragma omp atomic update
-            out_components[d][ev_shape[scatter] * out_stride] += bout_data[shape * NC + d][scatter];
+            out_components[d][ev_shape[scatter] * out_stride] += bout_row[scatter];
           }
         }
       }
@@ -873,12 +889,14 @@ static int saint_venant_kirchhoff_tri6_hessian_i_msoa_assemble_impl(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
         const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd

@@ -67,10 +67,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = current[trial * NC];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC][0];
-        u0_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u0_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -78,10 +80,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = previous[trial * NC];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC][0];
-        u0_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u0_old_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -89,10 +93,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = current[trial * NC + 1];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC + 1][0];
-        u1_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u1_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -100,10 +106,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = previous[trial * NC + 1];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC + 1][0];
-        u1_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u1_old_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -164,6 +172,10 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       grad_coeff1_1_values = grad_coeff1_1;
     }
     for (int test = 0; test < NS; ++test) {
+      const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
+      const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
+      s_t *const RSTR output_row0 = output[test * NC];
+      s_t *const RSTR output_row1 = output[test * NC + 1];
       {
         const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
@@ -171,10 +183,10 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
         const s_t adj3 = adjugate[3][goff];
-        const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
-        const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC][0] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
-        output[test * NC + 1][0] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
+        const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj2) / det;
+        const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj3) / det;
+        output_row0[0] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
+        output_row1[0] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
       }
     }
   }
@@ -217,10 +229,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC];
-        u0_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_0_ref_values += current[trial * NC] * trial_grad_0_ref;
+        u0_grad_1_ref_values += current[trial * NC] * trial_grad_1_ref;
       }
     }
     {
@@ -228,10 +241,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC];
-        u0_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_0_ref_values += previous[trial * NC] * trial_grad_0_ref;
+        u0_old_grad_1_ref_values += previous[trial * NC] * trial_grad_1_ref;
       }
     }
     {
@@ -239,10 +253,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC + 1];
-        u1_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_0_ref_values += current[trial * NC + 1] * trial_grad_0_ref;
+        u1_grad_1_ref_values += current[trial * NC + 1] * trial_grad_1_ref;
       }
     }
     {
@@ -250,10 +265,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC + 1];
-        u1_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_0_ref_values += previous[trial * NC + 1] * trial_grad_0_ref;
+        u1_old_grad_1_ref_values += previous[trial * NC + 1] * trial_grad_1_ref;
       }
     }
     {
@@ -314,6 +330,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       grad_coeff1_1_values = grad_coeff1_1;
     }
     for (int test = 0; test < NS; ++test) {
+      const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
+      const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
       {
         const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
@@ -321,8 +339,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
         const s_t adj3 = adjugate[3][goff];
-        const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
-        const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
+        const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj2) / det;
+        const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj3) / det;
         output[test * NC] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
         output[test * NC + 1] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
       }
@@ -534,10 +552,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = current[trial * NC];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC][0];
-        u0_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u0_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -545,10 +565,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = previous[trial * NC];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC][0];
-        u0_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u0_old_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -556,10 +578,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_direction_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = direction[trial * NC];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = direction[trial * NC][0];
-        u0_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_direction_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u0_direction_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -567,10 +591,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = current[trial * NC + 1];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC + 1][0];
-        u1_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u1_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -578,10 +604,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = previous[trial * NC + 1];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC + 1][0];
-        u1_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u1_old_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -589,10 +617,12 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_direction_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t *const RSTR coeff_stream = direction[trial * NC + 1];
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = direction[trial * NC + 1][0];
-        u1_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_direction_grad_0_ref_values += coeff_stream[0] * trial_grad_0_ref;
+        u1_direction_grad_1_ref_values += coeff_stream[0] * trial_grad_1_ref;
       }
     }
     {
@@ -709,6 +739,10 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       grad_coeff1_1_values = grad_coeff1_1;
     }
     for (int test = 0; test < NS; ++test) {
+      const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
+      const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
+      s_t *const RSTR output_row0 = output[test * NC];
+      s_t *const RSTR output_row1 = output[test * NC + 1];
       {
         const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
@@ -716,10 +750,10 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
         const s_t adj3 = adjugate[3][goff];
-        const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
-        const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
-        output[test * NC][0] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
-        output[test * NC + 1][0] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
+        const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj2) / det;
+        const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj3) / det;
+        output_row0[0] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
+        output_row1[0] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
       }
     }
   }
@@ -767,10 +801,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC];
-        u0_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_0_ref_values += current[trial * NC] * trial_grad_0_ref;
+        u0_grad_1_ref_values += current[trial * NC] * trial_grad_1_ref;
       }
     }
     {
@@ -778,10 +813,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC];
-        u0_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_0_ref_values += previous[trial * NC] * trial_grad_0_ref;
+        u0_old_grad_1_ref_values += previous[trial * NC] * trial_grad_1_ref;
       }
     }
     {
@@ -789,10 +825,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_direction_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = direction[trial * NC];
-        u0_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_direction_grad_0_ref_values += direction[trial * NC] * trial_grad_0_ref;
+        u0_direction_grad_1_ref_values += direction[trial * NC] * trial_grad_1_ref;
       }
     }
     {
@@ -800,10 +837,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC + 1];
-        u1_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_0_ref_values += current[trial * NC + 1] * trial_grad_0_ref;
+        u1_grad_1_ref_values += current[trial * NC + 1] * trial_grad_1_ref;
       }
     }
     {
@@ -811,10 +849,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC + 1];
-        u1_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_0_ref_values += previous[trial * NC + 1] * trial_grad_0_ref;
+        u1_old_grad_1_ref_values += previous[trial * NC + 1] * trial_grad_1_ref;
       }
     }
     {
@@ -822,10 +861,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_direction_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = direction[trial * NC + 1];
-        u1_direction_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_direction_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_direction_grad_0_ref_values += direction[trial * NC + 1] * trial_grad_0_ref;
+        u1_direction_grad_1_ref_values += direction[trial * NC + 1] * trial_grad_1_ref;
       }
     }
     {
@@ -942,6 +982,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       grad_coeff1_1_values = grad_coeff1_1;
     }
     for (int test = 0; test < NS; ++test) {
+      const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
+      const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
       {
         const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
@@ -949,8 +991,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
         const s_t adj3 = adjugate[3][goff];
-        const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
-        const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
+        const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj2) / det;
+        const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj3) / det;
         output[test * NC] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
         output[test * NC + 1] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
       }
@@ -1474,10 +1516,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC];
-        u0_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_grad_0_ref_values += current[trial * NC] * trial_grad_0_ref;
+        u0_grad_1_ref_values += current[trial * NC] * trial_grad_1_ref;
       }
     }
     {
@@ -1485,10 +1528,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u0_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC];
-        u0_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u0_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u0_old_grad_0_ref_values += previous[trial * NC] * trial_grad_0_ref;
+        u0_old_grad_1_ref_values += previous[trial * NC] * trial_grad_1_ref;
       }
     }
     {
@@ -1496,10 +1540,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = current[trial * NC + 1];
-        u1_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_grad_0_ref_values += current[trial * NC + 1] * trial_grad_0_ref;
+        u1_grad_1_ref_values += current[trial * NC + 1] * trial_grad_1_ref;
       }
     }
     {
@@ -1507,10 +1552,11 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       u1_old_grad_1_ref_values = s_t(0);
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_0_ref = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_1_ref = grad_ref_y[q * NS + trial];
       {
-        const s_t coeff = previous[trial * NC + 1];
-        u1_old_grad_0_ref_values += coeff * grad_ref_x[q * NS + trial];
-        u1_old_grad_1_ref_values += coeff * grad_ref_y[q * NS + trial];
+        u1_old_grad_0_ref_values += previous[trial * NC + 1] * trial_grad_0_ref;
+        u1_old_grad_1_ref_values += previous[trial * NC + 1] * trial_grad_1_ref;
       }
     }
     {
@@ -1644,6 +1690,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
       tangent[15] = tangent_grad_d1_1_grad1_1;
     }
     for (int trial = 0; trial < NS; ++trial) {
+      const s_t trial_grad_ref0 = grad_ref_x[q * NS + trial];
+      const s_t trial_grad_ref1 = grad_ref_y[q * NS + trial];
       {
         const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
@@ -1651,8 +1699,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
         const s_t adj3 = adjugate[3][goff];
-        const s_t trial_grad0 = (grad_ref_x[q * NS + trial] * adj0 + grad_ref_y[q * NS + trial] * adj2) / det;
-        const s_t trial_grad1 = (grad_ref_x[q * NS + trial] * adj1 + grad_ref_y[q * NS + trial] * adj3) / det;
+        const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj2) / det;
+        const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj3) / det;
         const s_t grad_coeff0_0 = trial_grad0 * tangent[0] + trial_grad1 * tangent[4];
         const s_t grad_coeff0_1 = trial_grad0 * tangent[1] + trial_grad1 * tangent[5];
         const s_t grad_coeff1_0 = trial_grad0 * tangent[2] + trial_grad1 * tangent[6];
@@ -1663,6 +1711,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
         grad_coeff1_1_values = grad_coeff1_1;
       }
       for (int test = 0; test < NS; ++test) {
+        const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
+        const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
         {
           const ptrdiff_t goff = q * geometry_stride;
           const s_t det = determinant[goff];
@@ -1670,8 +1720,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
           const s_t adj1 = adjugate[1][goff];
           const s_t adj2 = adjugate[2][goff];
           const s_t adj3 = adjugate[3][goff];
-          const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
-          const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
+          const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj2) / det;
+          const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj3) / det;
           element_matrix[(0 * NS + test) * 2 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
           element_matrix[(1 * NS + test) * 2 * NS + 0 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
         }
@@ -1683,8 +1733,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
         const s_t adj1 = adjugate[1][goff];
         const s_t adj2 = adjugate[2][goff];
         const s_t adj3 = adjugate[3][goff];
-        const s_t trial_grad0 = (grad_ref_x[q * NS + trial] * adj0 + grad_ref_y[q * NS + trial] * adj2) / det;
-        const s_t trial_grad1 = (grad_ref_x[q * NS + trial] * adj1 + grad_ref_y[q * NS + trial] * adj3) / det;
+        const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj2) / det;
+        const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj3) / det;
         const s_t grad_coeff0_0 = trial_grad0 * tangent[8] + trial_grad1 * tangent[12];
         const s_t grad_coeff0_1 = trial_grad0 * tangent[9] + trial_grad1 * tangent[13];
         const s_t grad_coeff1_0 = trial_grad0 * tangent[10] + trial_grad1 * tangent[14];
@@ -1695,6 +1745,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
         grad_coeff1_1_values = grad_coeff1_1;
       }
       for (int test = 0; test < NS; ++test) {
+        const s_t test_grad_ref0 = grad_ref_x[q * NS + test];
+        const s_t test_grad_ref1 = grad_ref_y[q * NS + test];
         {
           const ptrdiff_t goff = q * geometry_stride;
           const s_t det = determinant[goff];
@@ -1702,8 +1754,8 @@ __host__ __device__ __forceinline__ void mooney_rivlin_kelvin_voigt_total_d2_sim
           const s_t adj1 = adjugate[1][goff];
           const s_t adj2 = adjugate[2][goff];
           const s_t adj3 = adjugate[3][goff];
-          const s_t test_grad0 = (grad_ref_x[q * NS + test] * adj0 + grad_ref_y[q * NS + test] * adj2) / det;
-          const s_t test_grad1 = (grad_ref_x[q * NS + test] * adj1 + grad_ref_y[q * NS + test] * adj3) / det;
+          const s_t test_grad0 = (test_grad_ref0 * adj0 + test_grad_ref1 * adj2) / det;
+          const s_t test_grad1 = (test_grad_ref0 * adj1 + test_grad_ref1 * adj3) / det;
           element_matrix[(0 * NS + test) * 2 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff0_0_values * test_grad0 + grad_coeff0_1_values * test_grad1);
           element_matrix[(1 * NS + test) * 2 * NS + 1 * NS + trial] += q_weight[q] * det * (grad_coeff1_0_values * test_grad0 + grad_coeff1_1_values * test_grad1);
         }

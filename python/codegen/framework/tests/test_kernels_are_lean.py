@@ -166,6 +166,23 @@ UNUSED_CONSTANT_BUDGET = 0
 #: different shape and still a ratchet to drive down.
 UNUSED_PARAMETER_BUDGET = 0
 
+#: Index arithmetic inside a work-item loop that the work item does not enter.
+#:
+#: The work-item loop is the vectorised inner loop, so an address it does not
+#: appear in is the same address every iteration: `grad_ref_x[q * NS + test]` is
+#: one value and `bout_data[shape * NC + d]` is one row of the tile.  Both belong
+#: above the loop, named once -- which is the standing shape rule for this tree,
+#: and was Patrick's `q * NS + should be done outside`.
+#:
+#: There were 4923, in 112 files.  What is left has a shape rather than a site:
+#: thirteen writes into `element_matrix` from the element-matrix kernels, whose
+#: work-item loop runs exactly once because assembly holds one element -- the
+#: loop itself is what should go, not the address inside it -- and ten in the
+#: shared micro-kernel templates, whose scalar rendering is produced by a textual
+#: expansion that rewrites `streams[..][0]` and would have to rewrite a hoisted
+#: pointer with it.
+LANE_LOOP_INVARIANT_BUDGET = 23
+
 #: Node-ordering permutations built inside a kernel.
 #:
 #: A micro-kernel is written against the lexicographic basis, so an element
@@ -248,6 +265,16 @@ class KernelsAreLeanTest(unittest.TestCase):
             UNUSED_PARAMETER_BUDGET,
             "these parameters are named and never read:\n%s"
             % "\n".join("  %s: %s" % row for row in parameters[:20]),
+        )
+
+    def test_no_lane_loop_computes_an_address_it_could_hoist(self):
+        invariants = self.survey["lane_loop_invariants"]
+        self.assertLessEqual(
+            len(invariants),
+            LANE_LOOP_INVARIANT_BUDGET,
+            "these subscripts are computed inside a work-item loop and do not "
+            "depend on it:\n%s"
+            % "\n".join("  %s: %s: %s" % row for row in invariants[:20]),
         )
 
     def test_no_kernel_reorders_its_own_nodes(self):

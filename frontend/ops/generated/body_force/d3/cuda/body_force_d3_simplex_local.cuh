@@ -57,13 +57,16 @@ __host__ __device__ __forceinline__ void body_force_d3_simplex_residual_block(
       value_coeff2_values = value_coeff2;
     }
     for (int test = 0; test < NS; ++test) {
+      const s_t test_value = shape[q * NS + test];
+      s_t *const RSTR output_row0 = output[test * NC];
+      s_t *const RSTR output_row1 = output[test * NC + 1];
+      s_t *const RSTR output_row2 = output[test * NC + 2];
       {
         const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
-        output[test * NC][0] += q_weight[q] * det * (value_coeff0_values * test_value);
-        output[test * NC + 1][0] += q_weight[q] * det * (value_coeff1_values * test_value);
-        output[test * NC + 2][0] += q_weight[q] * det * (value_coeff2_values * test_value);
+        output_row0[0] += q_weight[q] * det * (value_coeff0_values * test_value);
+        output_row1[0] += q_weight[q] * det * (value_coeff1_values * test_value);
+        output_row2[0] += q_weight[q] * det * (value_coeff2_values * test_value);
       }
     }
   }
@@ -96,10 +99,10 @@ __host__ __device__ __forceinline__ void body_force_d3_simplex_residual_block_co
       value_coeff2_values = value_coeff2;
     }
     for (int test = 0; test < NS; ++test) {
+      const s_t test_value = shape[q * NS + test];
       {
         const ptrdiff_t goff = q * geometry_stride;
         const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
         output[test * NC] += q_weight[q] * det * (value_coeff0_values * test_value);
         output[test * NC + 1] += q_weight[q] * det * (value_coeff1_values * test_value);
         output[test * NC + 2] += q_weight[q] * det * (value_coeff2_values * test_value);

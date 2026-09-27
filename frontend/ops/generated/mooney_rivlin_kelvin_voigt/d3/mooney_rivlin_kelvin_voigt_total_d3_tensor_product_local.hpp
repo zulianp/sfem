@@ -2538,6 +2538,9 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
       const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
       const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
       const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
+      const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
+      const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
+      const s_t trial_grad_ref2 = shape_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * grad_1d[q_z * NS1 + trial_z];
       const s_t *const RSTR tangent_grad_d0_0_grad0_0_q = &tangent[q * VS];
       const s_t *const RSTR tangent_grad_d0_1_grad0_0_q = &tangent[(9 * NQ + q) * VS];
       const s_t *const RSTR tangent_grad_d0_2_grad0_0_q = &tangent[(18 * NQ + q) * VS];
@@ -2589,9 +2592,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
         const s_t adj6 = adj_q6[lane];
         const s_t adj7 = adj_q7[lane];
         const s_t adj8 = adj_q8[lane];
-        const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-        const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-        const s_t trial_grad_ref2 = shape_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * grad_1d[q_z * NS1 + trial_z];
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj3 + trial_grad_ref2 * adj6) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj4 + trial_grad_ref2 * adj7) / det;
         const s_t trial_grad2 = (trial_grad_ref0 * adj2 + trial_grad_ref1 * adj5 + trial_grad_ref2 * adj8) / det;
@@ -2645,6 +2645,9 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
       const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
       const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
       const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
+      const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
+      const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
+      const s_t trial_grad_ref2 = shape_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * grad_1d[q_z * NS1 + trial_z];
       const s_t *const RSTR tangent_grad_d1_0_grad0_0_q = &tangent[(27 * NQ + q) * VS];
       const s_t *const RSTR tangent_grad_d1_1_grad0_0_q = &tangent[(36 * NQ + q) * VS];
       const s_t *const RSTR tangent_grad_d1_2_grad0_0_q = &tangent[(45 * NQ + q) * VS];
@@ -2696,9 +2699,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
         const s_t adj6 = adj_q6[lane];
         const s_t adj7 = adj_q7[lane];
         const s_t adj8 = adj_q8[lane];
-        const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-        const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-        const s_t trial_grad_ref2 = shape_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * grad_1d[q_z * NS1 + trial_z];
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj3 + trial_grad_ref2 * adj6) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj4 + trial_grad_ref2 * adj7) / det;
         const s_t trial_grad2 = (trial_grad_ref0 * adj2 + trial_grad_ref1 * adj5 + trial_grad_ref2 * adj8) / det;
@@ -2752,6 +2752,9 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
       const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
       const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
       const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
+      const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
+      const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
+      const s_t trial_grad_ref2 = shape_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * grad_1d[q_z * NS1 + trial_z];
       const s_t *const RSTR tangent_grad_d2_0_grad0_0_q = &tangent[(54 * NQ + q) * VS];
       const s_t *const RSTR tangent_grad_d2_1_grad0_0_q = &tangent[(63 * NQ + q) * VS];
       const s_t *const RSTR tangent_grad_d2_2_grad0_0_q = &tangent[(72 * NQ + q) * VS];
@@ -2803,9 +2806,6 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
         const s_t adj6 = adj_q6[lane];
         const s_t adj7 = adj_q7[lane];
         const s_t adj8 = adj_q8[lane];
-        const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-        const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-        const s_t trial_grad_ref2 = shape_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * grad_1d[q_z * NS1 + trial_z];
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj3 + trial_grad_ref2 * adj6) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj4 + trial_grad_ref2 * adj7) / det;
         const s_t trial_grad2 = (trial_grad_ref0 * adj2 + trial_grad_ref1 * adj5 + trial_grad_ref2 * adj8) / det;

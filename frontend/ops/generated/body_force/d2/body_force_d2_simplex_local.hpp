@@ -57,13 +57,15 @@ static SFEM_INLINE void body_force_d2_simplex_residual_block(
       value_coeff1_values[lane] = value_coeff1;
     }
     for (int test = 0; test < NS; ++test) {
+      const s_t test_value = shape[q * NS + test];
+      s_t *const RSTR output_row0 = output[test * NC];
+      s_t *const RSTR output_row1 = output[test * NC + 1];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         const ptrdiff_t goff = q * geometry_stride + lane;
         const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
-        output[test * NC][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value);
-        output[test * NC + 1][lane] += q_weight[q] * det * (value_coeff1_values[lane] * test_value);
+        output_row0[lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value);
+        output_row1[lane] += q_weight[q] * det * (value_coeff1_values[lane] * test_value);
       }
     }
   }
@@ -93,13 +95,15 @@ static SFEM_INLINE void body_force_d2_simplex_residual_block_contiguous(
       value_coeff1_values[lane] = value_coeff1;
     }
     for (int test = 0; test < NS; ++test) {
+      const s_t test_value = shape[q * NS + test];
+      s_t *const RSTR output_row0 = output[test * NC];
+      s_t *const RSTR output_row1 = output[test * NC + 1];
       #pragma omp simd
       for (int lane = 0; lane < ne; ++lane) {
         const ptrdiff_t goff = q * geometry_stride + lane;
         const s_t det = determinant[goff];
-        const s_t test_value = shape[q * NS + test];
-        output[test * NC][lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value);
-        output[test * NC + 1][lane] += q_weight[q] * det * (value_coeff1_values[lane] * test_value);
+        output_row0[lane] += q_weight[q] * det * (value_coeff0_values[lane] * test_value);
+        output_row1[lane] += q_weight[q] * det * (value_coeff1_values[lane] * test_value);
       }
     }
   }

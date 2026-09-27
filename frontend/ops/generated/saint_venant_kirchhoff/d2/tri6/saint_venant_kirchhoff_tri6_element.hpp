@@ -125,12 +125,14 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_energy_ecoords_soa(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd
@@ -205,12 +207,14 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_energy_esoa(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd
@@ -347,12 +351,14 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_gradient_ecoords_soa(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd
@@ -429,12 +435,14 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_gradient_esoa(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd
@@ -575,12 +583,14 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_hessian_ecoords_soa(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd
@@ -671,12 +681,14 @@ static SFEM_INLINE int saint_venant_kirchhoff_tri6_hessian_esoa(
       for (int shape = 0; shape < NS; ++shape) {
         const s_t g0 = grad_ref_x[q * NS + shape];
         const s_t g1 = grad_ref_y[q * NS + shape];
+        const s_t *const RSTR coordinate_row0 = bcoordinate_data[2 * shape];
+        const s_t *const RSTR coordinate_row1 = bcoordinate_data[2 * shape + 1];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
+          J00_values[lane] += coordinate_row0[lane] * g0;
+          J01_values[lane] += coordinate_row0[lane] * g1;
+          J10_values[lane] += coordinate_row1[lane] * g0;
+          J11_values[lane] += coordinate_row1[lane] * g1;
         }
       }
       #pragma omp simd

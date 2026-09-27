@@ -386,10 +386,11 @@ static SFEM_INLINE int navier_stokes_form_2_u_p_proteus_hex27_proteus_hex8_jacob
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR element_shape = elements[shape];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinates[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = element_shape[evb + lane];
-          bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
+          bcoordinate_row[lane] = coordinate_components[d][node];
         }
       }
     }

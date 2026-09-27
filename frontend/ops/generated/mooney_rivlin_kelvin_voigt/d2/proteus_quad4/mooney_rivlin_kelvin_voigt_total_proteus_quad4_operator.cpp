@@ -584,10 +584,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_proteus_quad4_residual_i
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR element_shape = elements[shape];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinates[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = element_shape[evb + lane];
-          bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
+          bcoordinate_row[lane] = coordinate_components[d][node];
         }
       }
     }
@@ -936,10 +937,11 @@ static SFEM_INLINE int mooney_rivlin_kelvin_voigt_total_proteus_quad4_jacobian_a
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR element_shape = elements[shape];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinates[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = element_shape[evb + lane];
-          bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
+          bcoordinate_row[lane] = coordinate_components[d][node];
         }
       }
     }

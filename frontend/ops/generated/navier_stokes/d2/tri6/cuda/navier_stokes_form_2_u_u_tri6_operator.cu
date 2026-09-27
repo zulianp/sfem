@@ -374,11 +374,23 @@ __global__ void navier_stokes_form_2_u_u_tri6_jacobian_action_isoparametric_mesh
 
     s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
     for (int q = 0; q < NQ; ++q) {
+      const s_t cell_grad_ref0_0 = isoparametric_cell_grad_ref_0[q * CELL_NS];
+      const s_t cell_grad_ref0_1 = isoparametric_cell_grad_ref_0[q * CELL_NS + 1];
+      const s_t cell_grad_ref0_2 = isoparametric_cell_grad_ref_0[q * CELL_NS + 2];
+      const s_t cell_grad_ref0_3 = isoparametric_cell_grad_ref_0[q * CELL_NS + 3];
+      const s_t cell_grad_ref0_4 = isoparametric_cell_grad_ref_0[q * CELL_NS + 4];
+      const s_t cell_grad_ref0_5 = isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
+      const s_t cell_grad_ref1_0 = isoparametric_cell_grad_ref_1[q * CELL_NS];
+      const s_t cell_grad_ref1_1 = isoparametric_cell_grad_ref_1[q * CELL_NS + 1];
+      const s_t cell_grad_ref1_2 = isoparametric_cell_grad_ref_1[q * CELL_NS + 2];
+      const s_t cell_grad_ref1_3 = isoparametric_cell_grad_ref_1[q * CELL_NS + 3];
+      const s_t cell_grad_ref1_4 = isoparametric_cell_grad_ref_1[q * CELL_NS + 4];
+      const s_t cell_grad_ref1_5 = isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
       {
-        const s_t J00 = bcoordinates[0] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[2] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[4] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[6] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[8] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[10] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
-        const s_t J01 = bcoordinates[0] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[2] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[4] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[6] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[8] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[10] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
-        const s_t J10 = bcoordinates[1] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[3] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[5] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[7] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[9] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[11] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
-        const s_t J11 = bcoordinates[1] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[3] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[5] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[7] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[9] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[11] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
+        const s_t J00 = bcoordinates[0] * cell_grad_ref0_0 + bcoordinates[2] * cell_grad_ref0_1 + bcoordinates[4] * cell_grad_ref0_2 + bcoordinates[6] * cell_grad_ref0_3 + bcoordinates[8] * cell_grad_ref0_4 + bcoordinates[10] * cell_grad_ref0_5;
+        const s_t J01 = bcoordinates[0] * cell_grad_ref1_0 + bcoordinates[2] * cell_grad_ref1_1 + bcoordinates[4] * cell_grad_ref1_2 + bcoordinates[6] * cell_grad_ref1_3 + bcoordinates[8] * cell_grad_ref1_4 + bcoordinates[10] * cell_grad_ref1_5;
+        const s_t J10 = bcoordinates[1] * cell_grad_ref0_0 + bcoordinates[3] * cell_grad_ref0_1 + bcoordinates[5] * cell_grad_ref0_2 + bcoordinates[7] * cell_grad_ref0_3 + bcoordinates[9] * cell_grad_ref0_4 + bcoordinates[11] * cell_grad_ref0_5;
+        const s_t J11 = bcoordinates[1] * cell_grad_ref1_0 + bcoordinates[3] * cell_grad_ref1_1 + bcoordinates[5] * cell_grad_ref1_2 + bcoordinates[7] * cell_grad_ref1_3 + bcoordinates[9] * cell_grad_ref1_4 + bcoordinates[11] * cell_grad_ref1_5;
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
             J00, J01, J10, J11, badjugate_streams, bdeterminant, q);
       }
