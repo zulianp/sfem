@@ -1745,8 +1745,12 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
   s_t previous_grad_ref[NC * NQ * ND];
   tensor_evaluate_contiguous_scalar<s_t, NQ, NS, ND, NC>(
       shape_1d, grad_1d, previous, previous_value, previous_grad_ref);
-  s_t value_coeff[NC * NQ];
-  s_t grad_coeff_ref[NC * NQ * ND];
+  s_t value_coeff_c0[NC * NQ];
+  s_t value_coeff_c1[NC * NQ];
+  s_t value_coeff_c2[NC * NQ];
+  s_t grad_coeff_ref_c0[NC * NQ * ND];
+  s_t grad_coeff_ref_c1[NC * NQ * ND];
+  s_t grad_coeff_ref_c2[NC * NQ * ND];
   static constexpr int NQ1 = integer_root(NQ, ND);
   static constexpr int NS1 = integer_root(NS, ND);
   s_t * column[NC * NS];
@@ -2485,85 +2489,18 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
       const s_t *const RSTR tangent_grad_d0_0_grad2_2_q = &tangent[(8 * NQ + q)];
       const s_t *const RSTR tangent_grad_d0_1_grad2_2_q = &tangent[(17 * NQ + q)];
       const s_t *const RSTR tangent_grad_d0_2_grad2_2_q = &tangent[(26 * NQ + q)];
-      s_t *const RSTR value_coeff_q0 = &value_coeff[q];
-      s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
-      s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
-      s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2)];
-      s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
-      s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
-      s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
-      s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2)];
-      s_t *const RSTR value_coeff_q2 = &value_coeff[(2 * NQ + q)];
-      s_t *const RSTR grad_coeff_ref_q2_0 = &grad_coeff_ref[((2 * NQ + q) * ND)];
-      s_t *const RSTR grad_coeff_ref_q2_1 = &grad_coeff_ref[((2 * NQ + q) * ND + 1)];
-      s_t *const RSTR grad_coeff_ref_q2_2 = &grad_coeff_ref[((2 * NQ + q) * ND + 2)];
-      {
-        const s_t det = det_q[0];
-        const s_t adj0 = adj_q0[0];
-        const s_t adj1 = adj_q1[0];
-        const s_t adj2 = adj_q2[0];
-        const s_t adj3 = adj_q3[0];
-        const s_t adj4 = adj_q4[0];
-        const s_t adj5 = adj_q5[0];
-        const s_t adj6 = adj_q6[0];
-        const s_t adj7 = adj_q7[0];
-        const s_t adj8 = adj_q8[0];
-        const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj3 + trial_grad_ref2 * adj6) / det;
-        const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj4 + trial_grad_ref2 * adj7) / det;
-        const s_t trial_grad2 = (trial_grad_ref0 * adj2 + trial_grad_ref1 * adj5 + trial_grad_ref2 * adj8) / det;
-        const s_t grad_coeff0_0 = trial_grad0 * tangent_grad_d0_0_grad0_0_q[0] + trial_grad1 * tangent_grad_d0_1_grad0_0_q[0] + trial_grad2 * tangent_grad_d0_2_grad0_0_q[0];
-        const s_t grad_coeff0_1 = trial_grad0 * tangent_grad_d0_0_grad0_1_q[0] + trial_grad1 * tangent_grad_d0_1_grad0_1_q[0] + trial_grad2 * tangent_grad_d0_2_grad0_1_q[0];
-        const s_t grad_coeff0_2 = trial_grad0 * tangent_grad_d0_0_grad0_2_q[0] + trial_grad1 * tangent_grad_d0_1_grad0_2_q[0] + trial_grad2 * tangent_grad_d0_2_grad0_2_q[0];
-        const s_t grad_coeff1_0 = trial_grad0 * tangent_grad_d0_0_grad1_0_q[0] + trial_grad1 * tangent_grad_d0_1_grad1_0_q[0] + trial_grad2 * tangent_grad_d0_2_grad1_0_q[0];
-        const s_t grad_coeff1_1 = trial_grad0 * tangent_grad_d0_0_grad1_1_q[0] + trial_grad1 * tangent_grad_d0_1_grad1_1_q[0] + trial_grad2 * tangent_grad_d0_2_grad1_1_q[0];
-        const s_t grad_coeff1_2 = trial_grad0 * tangent_grad_d0_0_grad1_2_q[0] + trial_grad1 * tangent_grad_d0_1_grad1_2_q[0] + trial_grad2 * tangent_grad_d0_2_grad1_2_q[0];
-        const s_t grad_coeff2_0 = trial_grad0 * tangent_grad_d0_0_grad2_0_q[0] + trial_grad1 * tangent_grad_d0_1_grad2_0_q[0] + trial_grad2 * tangent_grad_d0_2_grad2_0_q[0];
-        const s_t grad_coeff2_1 = trial_grad0 * tangent_grad_d0_0_grad2_1_q[0] + trial_grad1 * tangent_grad_d0_1_grad2_1_q[0] + trial_grad2 * tangent_grad_d0_2_grad2_1_q[0];
-        const s_t grad_coeff2_2 = trial_grad0 * tangent_grad_d0_0_grad2_2_q[0] + trial_grad1 * tangent_grad_d0_1_grad2_2_q[0] + trial_grad2 * tangent_grad_d0_2_grad2_2_q[0];
-        value_coeff_q0[0] = s_t(0);
-        grad_coeff_ref_q0_0[0] = qw * (adj0 * grad_coeff0_0 + adj1 * grad_coeff0_1 + adj2 * grad_coeff0_2);
-        grad_coeff_ref_q0_1[0] = qw * (adj3 * grad_coeff0_0 + adj4 * grad_coeff0_1 + adj5 * grad_coeff0_2);
-        grad_coeff_ref_q0_2[0] = qw * (adj6 * grad_coeff0_0 + adj7 * grad_coeff0_1 + adj8 * grad_coeff0_2);
-        value_coeff_q1[0] = s_t(0);
-        grad_coeff_ref_q1_0[0] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
-        grad_coeff_ref_q1_1[0] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
-        grad_coeff_ref_q1_2[0] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
-        value_coeff_q2[0] = s_t(0);
-        grad_coeff_ref_q2_0[0] = qw * (adj0 * grad_coeff2_0 + adj1 * grad_coeff2_1 + adj2 * grad_coeff2_2);
-        grad_coeff_ref_q2_1[0] = qw * (adj3 * grad_coeff2_0 + adj4 * grad_coeff2_1 + adj5 * grad_coeff2_2);
-        grad_coeff_ref_q2_2[0] = qw * (adj6 * grad_coeff2_0 + adj7 * grad_coeff2_1 + adj8 * grad_coeff2_2);
-      }
-    }
-    for (int out_shape = 0; out_shape < NS; ++out_shape) {
-      column[out_shape * NC + 0] = &element_matrix[(0 * NS + out_shape) * 3 * NS + 0 * NS + trial];
-      column[out_shape * NC + 1] = &element_matrix[(1 * NS + out_shape) * 3 * NS + 0 * NS + trial];
-      column[out_shape * NC + 2] = &element_matrix[(2 * NS + out_shape) * 3 * NS + 0 * NS + trial];
-    }
-    tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
-        shape_1d, grad_1d, value_coeff, grad_coeff_ref, column);
-  }
-  for (int trial = 0; trial < NS; ++trial) {
-    const int trial_x = trial % NS1;
-    const int trial_y = (trial / NS1) % NS1;
-    const int trial_z = trial / (NS1 * NS1);
-    for (int q = 0; q < NQ; ++q) {
-      const int q_x = q % NQ1;
-      const int q_y = (q / NQ1) % NQ1;
-      const int q_z = q / (NQ1 * NQ1);
-      const s_t qw = q_weight_1d[q_x] * q_weight_1d[q_y] * q_weight_1d[q_z];
-      const s_t *const RSTR det_q = determinant + q * geometry_stride;
-      const s_t *const RSTR adj_q0 = adjugate[0] + q * geometry_stride;
-      const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
-      const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
-      const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
-      const s_t *const RSTR adj_q4 = adjugate[4] + q * geometry_stride;
-      const s_t *const RSTR adj_q5 = adjugate[5] + q * geometry_stride;
-      const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
-      const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
-      const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
-      const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-      const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-      const s_t trial_grad_ref2 = shape_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * grad_1d[q_z * NS1 + trial_z];
+      s_t *const RSTR value_coeff_q0_c0 = &value_coeff_c0[q];
+      s_t *const RSTR grad_coeff_ref_q0_0_c0 = &grad_coeff_ref_c0[(q * ND)];
+      s_t *const RSTR grad_coeff_ref_q0_1_c0 = &grad_coeff_ref_c0[(q * ND + 1)];
+      s_t *const RSTR grad_coeff_ref_q0_2_c0 = &grad_coeff_ref_c0[(q * ND + 2)];
+      s_t *const RSTR value_coeff_q1_c0 = &value_coeff_c0[(NQ + q)];
+      s_t *const RSTR grad_coeff_ref_q1_0_c0 = &grad_coeff_ref_c0[((NQ + q) * ND)];
+      s_t *const RSTR grad_coeff_ref_q1_1_c0 = &grad_coeff_ref_c0[((NQ + q) * ND + 1)];
+      s_t *const RSTR grad_coeff_ref_q1_2_c0 = &grad_coeff_ref_c0[((NQ + q) * ND + 2)];
+      s_t *const RSTR value_coeff_q2_c0 = &value_coeff_c0[(2 * NQ + q)];
+      s_t *const RSTR grad_coeff_ref_q2_0_c0 = &grad_coeff_ref_c0[((2 * NQ + q) * ND)];
+      s_t *const RSTR grad_coeff_ref_q2_1_c0 = &grad_coeff_ref_c0[((2 * NQ + q) * ND + 1)];
+      s_t *const RSTR grad_coeff_ref_q2_2_c0 = &grad_coeff_ref_c0[((2 * NQ + q) * ND + 2)];
       const s_t *const RSTR tangent_grad_d1_0_grad0_0_q = &tangent[(27 * NQ + q)];
       const s_t *const RSTR tangent_grad_d1_1_grad0_0_q = &tangent[(36 * NQ + q)];
       const s_t *const RSTR tangent_grad_d1_2_grad0_0_q = &tangent[(45 * NQ + q)];
@@ -2591,85 +2528,18 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
       const s_t *const RSTR tangent_grad_d1_0_grad2_2_q = &tangent[(35 * NQ + q)];
       const s_t *const RSTR tangent_grad_d1_1_grad2_2_q = &tangent[(44 * NQ + q)];
       const s_t *const RSTR tangent_grad_d1_2_grad2_2_q = &tangent[(53 * NQ + q)];
-      s_t *const RSTR value_coeff_q0 = &value_coeff[q];
-      s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
-      s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
-      s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2)];
-      s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
-      s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
-      s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
-      s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2)];
-      s_t *const RSTR value_coeff_q2 = &value_coeff[(2 * NQ + q)];
-      s_t *const RSTR grad_coeff_ref_q2_0 = &grad_coeff_ref[((2 * NQ + q) * ND)];
-      s_t *const RSTR grad_coeff_ref_q2_1 = &grad_coeff_ref[((2 * NQ + q) * ND + 1)];
-      s_t *const RSTR grad_coeff_ref_q2_2 = &grad_coeff_ref[((2 * NQ + q) * ND + 2)];
-      {
-        const s_t det = det_q[0];
-        const s_t adj0 = adj_q0[0];
-        const s_t adj1 = adj_q1[0];
-        const s_t adj2 = adj_q2[0];
-        const s_t adj3 = adj_q3[0];
-        const s_t adj4 = adj_q4[0];
-        const s_t adj5 = adj_q5[0];
-        const s_t adj6 = adj_q6[0];
-        const s_t adj7 = adj_q7[0];
-        const s_t adj8 = adj_q8[0];
-        const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj3 + trial_grad_ref2 * adj6) / det;
-        const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj4 + trial_grad_ref2 * adj7) / det;
-        const s_t trial_grad2 = (trial_grad_ref0 * adj2 + trial_grad_ref1 * adj5 + trial_grad_ref2 * adj8) / det;
-        const s_t grad_coeff0_0 = trial_grad0 * tangent_grad_d1_0_grad0_0_q[0] + trial_grad1 * tangent_grad_d1_1_grad0_0_q[0] + trial_grad2 * tangent_grad_d1_2_grad0_0_q[0];
-        const s_t grad_coeff0_1 = trial_grad0 * tangent_grad_d1_0_grad0_1_q[0] + trial_grad1 * tangent_grad_d1_1_grad0_1_q[0] + trial_grad2 * tangent_grad_d1_2_grad0_1_q[0];
-        const s_t grad_coeff0_2 = trial_grad0 * tangent_grad_d1_0_grad0_2_q[0] + trial_grad1 * tangent_grad_d1_1_grad0_2_q[0] + trial_grad2 * tangent_grad_d1_2_grad0_2_q[0];
-        const s_t grad_coeff1_0 = trial_grad0 * tangent_grad_d1_0_grad1_0_q[0] + trial_grad1 * tangent_grad_d1_1_grad1_0_q[0] + trial_grad2 * tangent_grad_d1_2_grad1_0_q[0];
-        const s_t grad_coeff1_1 = trial_grad0 * tangent_grad_d1_0_grad1_1_q[0] + trial_grad1 * tangent_grad_d1_1_grad1_1_q[0] + trial_grad2 * tangent_grad_d1_2_grad1_1_q[0];
-        const s_t grad_coeff1_2 = trial_grad0 * tangent_grad_d1_0_grad1_2_q[0] + trial_grad1 * tangent_grad_d1_1_grad1_2_q[0] + trial_grad2 * tangent_grad_d1_2_grad1_2_q[0];
-        const s_t grad_coeff2_0 = trial_grad0 * tangent_grad_d1_0_grad2_0_q[0] + trial_grad1 * tangent_grad_d1_1_grad2_0_q[0] + trial_grad2 * tangent_grad_d1_2_grad2_0_q[0];
-        const s_t grad_coeff2_1 = trial_grad0 * tangent_grad_d1_0_grad2_1_q[0] + trial_grad1 * tangent_grad_d1_1_grad2_1_q[0] + trial_grad2 * tangent_grad_d1_2_grad2_1_q[0];
-        const s_t grad_coeff2_2 = trial_grad0 * tangent_grad_d1_0_grad2_2_q[0] + trial_grad1 * tangent_grad_d1_1_grad2_2_q[0] + trial_grad2 * tangent_grad_d1_2_grad2_2_q[0];
-        value_coeff_q0[0] = s_t(0);
-        grad_coeff_ref_q0_0[0] = qw * (adj0 * grad_coeff0_0 + adj1 * grad_coeff0_1 + adj2 * grad_coeff0_2);
-        grad_coeff_ref_q0_1[0] = qw * (adj3 * grad_coeff0_0 + adj4 * grad_coeff0_1 + adj5 * grad_coeff0_2);
-        grad_coeff_ref_q0_2[0] = qw * (adj6 * grad_coeff0_0 + adj7 * grad_coeff0_1 + adj8 * grad_coeff0_2);
-        value_coeff_q1[0] = s_t(0);
-        grad_coeff_ref_q1_0[0] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
-        grad_coeff_ref_q1_1[0] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
-        grad_coeff_ref_q1_2[0] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
-        value_coeff_q2[0] = s_t(0);
-        grad_coeff_ref_q2_0[0] = qw * (adj0 * grad_coeff2_0 + adj1 * grad_coeff2_1 + adj2 * grad_coeff2_2);
-        grad_coeff_ref_q2_1[0] = qw * (adj3 * grad_coeff2_0 + adj4 * grad_coeff2_1 + adj5 * grad_coeff2_2);
-        grad_coeff_ref_q2_2[0] = qw * (adj6 * grad_coeff2_0 + adj7 * grad_coeff2_1 + adj8 * grad_coeff2_2);
-      }
-    }
-    for (int out_shape = 0; out_shape < NS; ++out_shape) {
-      column[out_shape * NC + 0] = &element_matrix[(0 * NS + out_shape) * 3 * NS + 1 * NS + trial];
-      column[out_shape * NC + 1] = &element_matrix[(1 * NS + out_shape) * 3 * NS + 1 * NS + trial];
-      column[out_shape * NC + 2] = &element_matrix[(2 * NS + out_shape) * 3 * NS + 1 * NS + trial];
-    }
-    tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
-        shape_1d, grad_1d, value_coeff, grad_coeff_ref, column);
-  }
-  for (int trial = 0; trial < NS; ++trial) {
-    const int trial_x = trial % NS1;
-    const int trial_y = (trial / NS1) % NS1;
-    const int trial_z = trial / (NS1 * NS1);
-    for (int q = 0; q < NQ; ++q) {
-      const int q_x = q % NQ1;
-      const int q_y = (q / NQ1) % NQ1;
-      const int q_z = q / (NQ1 * NQ1);
-      const s_t qw = q_weight_1d[q_x] * q_weight_1d[q_y] * q_weight_1d[q_z];
-      const s_t *const RSTR det_q = determinant + q * geometry_stride;
-      const s_t *const RSTR adj_q0 = adjugate[0] + q * geometry_stride;
-      const s_t *const RSTR adj_q1 = adjugate[1] + q * geometry_stride;
-      const s_t *const RSTR adj_q2 = adjugate[2] + q * geometry_stride;
-      const s_t *const RSTR adj_q3 = adjugate[3] + q * geometry_stride;
-      const s_t *const RSTR adj_q4 = adjugate[4] + q * geometry_stride;
-      const s_t *const RSTR adj_q5 = adjugate[5] + q * geometry_stride;
-      const s_t *const RSTR adj_q6 = adjugate[6] + q * geometry_stride;
-      const s_t *const RSTR adj_q7 = adjugate[7] + q * geometry_stride;
-      const s_t *const RSTR adj_q8 = adjugate[8] + q * geometry_stride;
-      const s_t trial_grad_ref0 = grad_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-      const s_t trial_grad_ref1 = shape_1d[q_x * NS1 + trial_x] * grad_1d[q_y * NS1 + trial_y] * shape_1d[q_z * NS1 + trial_z];
-      const s_t trial_grad_ref2 = shape_1d[q_x * NS1 + trial_x] * shape_1d[q_y * NS1 + trial_y] * grad_1d[q_z * NS1 + trial_z];
+      s_t *const RSTR value_coeff_q0_c1 = &value_coeff_c1[q];
+      s_t *const RSTR grad_coeff_ref_q0_0_c1 = &grad_coeff_ref_c1[(q * ND)];
+      s_t *const RSTR grad_coeff_ref_q0_1_c1 = &grad_coeff_ref_c1[(q * ND + 1)];
+      s_t *const RSTR grad_coeff_ref_q0_2_c1 = &grad_coeff_ref_c1[(q * ND + 2)];
+      s_t *const RSTR value_coeff_q1_c1 = &value_coeff_c1[(NQ + q)];
+      s_t *const RSTR grad_coeff_ref_q1_0_c1 = &grad_coeff_ref_c1[((NQ + q) * ND)];
+      s_t *const RSTR grad_coeff_ref_q1_1_c1 = &grad_coeff_ref_c1[((NQ + q) * ND + 1)];
+      s_t *const RSTR grad_coeff_ref_q1_2_c1 = &grad_coeff_ref_c1[((NQ + q) * ND + 2)];
+      s_t *const RSTR value_coeff_q2_c1 = &value_coeff_c1[(2 * NQ + q)];
+      s_t *const RSTR grad_coeff_ref_q2_0_c1 = &grad_coeff_ref_c1[((2 * NQ + q) * ND)];
+      s_t *const RSTR grad_coeff_ref_q2_1_c1 = &grad_coeff_ref_c1[((2 * NQ + q) * ND + 1)];
+      s_t *const RSTR grad_coeff_ref_q2_2_c1 = &grad_coeff_ref_c1[((2 * NQ + q) * ND + 2)];
       const s_t *const RSTR tangent_grad_d2_0_grad0_0_q = &tangent[(54 * NQ + q)];
       const s_t *const RSTR tangent_grad_d2_1_grad0_0_q = &tangent[(63 * NQ + q)];
       const s_t *const RSTR tangent_grad_d2_2_grad0_0_q = &tangent[(72 * NQ + q)];
@@ -2697,18 +2567,18 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
       const s_t *const RSTR tangent_grad_d2_0_grad2_2_q = &tangent[(62 * NQ + q)];
       const s_t *const RSTR tangent_grad_d2_1_grad2_2_q = &tangent[(71 * NQ + q)];
       const s_t *const RSTR tangent_grad_d2_2_grad2_2_q = &tangent[(80 * NQ + q)];
-      s_t *const RSTR value_coeff_q0 = &value_coeff[q];
-      s_t *const RSTR grad_coeff_ref_q0_0 = &grad_coeff_ref[(q * ND)];
-      s_t *const RSTR grad_coeff_ref_q0_1 = &grad_coeff_ref[(q * ND + 1)];
-      s_t *const RSTR grad_coeff_ref_q0_2 = &grad_coeff_ref[(q * ND + 2)];
-      s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
-      s_t *const RSTR grad_coeff_ref_q1_0 = &grad_coeff_ref[((NQ + q) * ND)];
-      s_t *const RSTR grad_coeff_ref_q1_1 = &grad_coeff_ref[((NQ + q) * ND + 1)];
-      s_t *const RSTR grad_coeff_ref_q1_2 = &grad_coeff_ref[((NQ + q) * ND + 2)];
-      s_t *const RSTR value_coeff_q2 = &value_coeff[(2 * NQ + q)];
-      s_t *const RSTR grad_coeff_ref_q2_0 = &grad_coeff_ref[((2 * NQ + q) * ND)];
-      s_t *const RSTR grad_coeff_ref_q2_1 = &grad_coeff_ref[((2 * NQ + q) * ND + 1)];
-      s_t *const RSTR grad_coeff_ref_q2_2 = &grad_coeff_ref[((2 * NQ + q) * ND + 2)];
+      s_t *const RSTR value_coeff_q0_c2 = &value_coeff_c2[q];
+      s_t *const RSTR grad_coeff_ref_q0_0_c2 = &grad_coeff_ref_c2[(q * ND)];
+      s_t *const RSTR grad_coeff_ref_q0_1_c2 = &grad_coeff_ref_c2[(q * ND + 1)];
+      s_t *const RSTR grad_coeff_ref_q0_2_c2 = &grad_coeff_ref_c2[(q * ND + 2)];
+      s_t *const RSTR value_coeff_q1_c2 = &value_coeff_c2[(NQ + q)];
+      s_t *const RSTR grad_coeff_ref_q1_0_c2 = &grad_coeff_ref_c2[((NQ + q) * ND)];
+      s_t *const RSTR grad_coeff_ref_q1_1_c2 = &grad_coeff_ref_c2[((NQ + q) * ND + 1)];
+      s_t *const RSTR grad_coeff_ref_q1_2_c2 = &grad_coeff_ref_c2[((NQ + q) * ND + 2)];
+      s_t *const RSTR value_coeff_q2_c2 = &value_coeff_c2[(2 * NQ + q)];
+      s_t *const RSTR grad_coeff_ref_q2_0_c2 = &grad_coeff_ref_c2[((2 * NQ + q) * ND)];
+      s_t *const RSTR grad_coeff_ref_q2_1_c2 = &grad_coeff_ref_c2[((2 * NQ + q) * ND + 1)];
+      s_t *const RSTR grad_coeff_ref_q2_2_c2 = &grad_coeff_ref_c2[((2 * NQ + q) * ND + 2)];
       {
         const s_t det = det_q[0];
         const s_t adj0 = adj_q0[0];
@@ -2723,36 +2593,92 @@ static SFEM_INLINE void mooney_rivlin_kelvin_voigt_total_d3_tensor_product_hessi
         const s_t trial_grad0 = (trial_grad_ref0 * adj0 + trial_grad_ref1 * adj3 + trial_grad_ref2 * adj6) / det;
         const s_t trial_grad1 = (trial_grad_ref0 * adj1 + trial_grad_ref1 * adj4 + trial_grad_ref2 * adj7) / det;
         const s_t trial_grad2 = (trial_grad_ref0 * adj2 + trial_grad_ref1 * adj5 + trial_grad_ref2 * adj8) / det;
-        const s_t grad_coeff0_0 = trial_grad0 * tangent_grad_d2_0_grad0_0_q[0] + trial_grad1 * tangent_grad_d2_1_grad0_0_q[0] + trial_grad2 * tangent_grad_d2_2_grad0_0_q[0];
-        const s_t grad_coeff0_1 = trial_grad0 * tangent_grad_d2_0_grad0_1_q[0] + trial_grad1 * tangent_grad_d2_1_grad0_1_q[0] + trial_grad2 * tangent_grad_d2_2_grad0_1_q[0];
-        const s_t grad_coeff0_2 = trial_grad0 * tangent_grad_d2_0_grad0_2_q[0] + trial_grad1 * tangent_grad_d2_1_grad0_2_q[0] + trial_grad2 * tangent_grad_d2_2_grad0_2_q[0];
-        const s_t grad_coeff1_0 = trial_grad0 * tangent_grad_d2_0_grad1_0_q[0] + trial_grad1 * tangent_grad_d2_1_grad1_0_q[0] + trial_grad2 * tangent_grad_d2_2_grad1_0_q[0];
-        const s_t grad_coeff1_1 = trial_grad0 * tangent_grad_d2_0_grad1_1_q[0] + trial_grad1 * tangent_grad_d2_1_grad1_1_q[0] + trial_grad2 * tangent_grad_d2_2_grad1_1_q[0];
-        const s_t grad_coeff1_2 = trial_grad0 * tangent_grad_d2_0_grad1_2_q[0] + trial_grad1 * tangent_grad_d2_1_grad1_2_q[0] + trial_grad2 * tangent_grad_d2_2_grad1_2_q[0];
-        const s_t grad_coeff2_0 = trial_grad0 * tangent_grad_d2_0_grad2_0_q[0] + trial_grad1 * tangent_grad_d2_1_grad2_0_q[0] + trial_grad2 * tangent_grad_d2_2_grad2_0_q[0];
-        const s_t grad_coeff2_1 = trial_grad0 * tangent_grad_d2_0_grad2_1_q[0] + trial_grad1 * tangent_grad_d2_1_grad2_1_q[0] + trial_grad2 * tangent_grad_d2_2_grad2_1_q[0];
-        const s_t grad_coeff2_2 = trial_grad0 * tangent_grad_d2_0_grad2_2_q[0] + trial_grad1 * tangent_grad_d2_1_grad2_2_q[0] + trial_grad2 * tangent_grad_d2_2_grad2_2_q[0];
-        value_coeff_q0[0] = s_t(0);
-        grad_coeff_ref_q0_0[0] = qw * (adj0 * grad_coeff0_0 + adj1 * grad_coeff0_1 + adj2 * grad_coeff0_2);
-        grad_coeff_ref_q0_1[0] = qw * (adj3 * grad_coeff0_0 + adj4 * grad_coeff0_1 + adj5 * grad_coeff0_2);
-        grad_coeff_ref_q0_2[0] = qw * (adj6 * grad_coeff0_0 + adj7 * grad_coeff0_1 + adj8 * grad_coeff0_2);
-        value_coeff_q1[0] = s_t(0);
-        grad_coeff_ref_q1_0[0] = qw * (adj0 * grad_coeff1_0 + adj1 * grad_coeff1_1 + adj2 * grad_coeff1_2);
-        grad_coeff_ref_q1_1[0] = qw * (adj3 * grad_coeff1_0 + adj4 * grad_coeff1_1 + adj5 * grad_coeff1_2);
-        grad_coeff_ref_q1_2[0] = qw * (adj6 * grad_coeff1_0 + adj7 * grad_coeff1_1 + adj8 * grad_coeff1_2);
-        value_coeff_q2[0] = s_t(0);
-        grad_coeff_ref_q2_0[0] = qw * (adj0 * grad_coeff2_0 + adj1 * grad_coeff2_1 + adj2 * grad_coeff2_2);
-        grad_coeff_ref_q2_1[0] = qw * (adj3 * grad_coeff2_0 + adj4 * grad_coeff2_1 + adj5 * grad_coeff2_2);
-        grad_coeff_ref_q2_2[0] = qw * (adj6 * grad_coeff2_0 + adj7 * grad_coeff2_1 + adj8 * grad_coeff2_2);
+        const s_t grad_coeff0_0_c0 = trial_grad0 * tangent_grad_d0_0_grad0_0_q[0] + trial_grad1 * tangent_grad_d0_1_grad0_0_q[0] + trial_grad2 * tangent_grad_d0_2_grad0_0_q[0];
+        const s_t grad_coeff0_1_c0 = trial_grad0 * tangent_grad_d0_0_grad0_1_q[0] + trial_grad1 * tangent_grad_d0_1_grad0_1_q[0] + trial_grad2 * tangent_grad_d0_2_grad0_1_q[0];
+        const s_t grad_coeff0_2_c0 = trial_grad0 * tangent_grad_d0_0_grad0_2_q[0] + trial_grad1 * tangent_grad_d0_1_grad0_2_q[0] + trial_grad2 * tangent_grad_d0_2_grad0_2_q[0];
+        const s_t grad_coeff1_0_c0 = trial_grad0 * tangent_grad_d0_0_grad1_0_q[0] + trial_grad1 * tangent_grad_d0_1_grad1_0_q[0] + trial_grad2 * tangent_grad_d0_2_grad1_0_q[0];
+        const s_t grad_coeff1_1_c0 = trial_grad0 * tangent_grad_d0_0_grad1_1_q[0] + trial_grad1 * tangent_grad_d0_1_grad1_1_q[0] + trial_grad2 * tangent_grad_d0_2_grad1_1_q[0];
+        const s_t grad_coeff1_2_c0 = trial_grad0 * tangent_grad_d0_0_grad1_2_q[0] + trial_grad1 * tangent_grad_d0_1_grad1_2_q[0] + trial_grad2 * tangent_grad_d0_2_grad1_2_q[0];
+        const s_t grad_coeff2_0_c0 = trial_grad0 * tangent_grad_d0_0_grad2_0_q[0] + trial_grad1 * tangent_grad_d0_1_grad2_0_q[0] + trial_grad2 * tangent_grad_d0_2_grad2_0_q[0];
+        const s_t grad_coeff2_1_c0 = trial_grad0 * tangent_grad_d0_0_grad2_1_q[0] + trial_grad1 * tangent_grad_d0_1_grad2_1_q[0] + trial_grad2 * tangent_grad_d0_2_grad2_1_q[0];
+        const s_t grad_coeff2_2_c0 = trial_grad0 * tangent_grad_d0_0_grad2_2_q[0] + trial_grad1 * tangent_grad_d0_1_grad2_2_q[0] + trial_grad2 * tangent_grad_d0_2_grad2_2_q[0];
+        value_coeff_q0_c0[0] = s_t(0);
+        grad_coeff_ref_q0_0_c0[0] = qw * (adj0 * grad_coeff0_0_c0 + adj1 * grad_coeff0_1_c0 + adj2 * grad_coeff0_2_c0);
+        grad_coeff_ref_q0_1_c0[0] = qw * (adj3 * grad_coeff0_0_c0 + adj4 * grad_coeff0_1_c0 + adj5 * grad_coeff0_2_c0);
+        grad_coeff_ref_q0_2_c0[0] = qw * (adj6 * grad_coeff0_0_c0 + adj7 * grad_coeff0_1_c0 + adj8 * grad_coeff0_2_c0);
+        value_coeff_q1_c0[0] = s_t(0);
+        grad_coeff_ref_q1_0_c0[0] = qw * (adj0 * grad_coeff1_0_c0 + adj1 * grad_coeff1_1_c0 + adj2 * grad_coeff1_2_c0);
+        grad_coeff_ref_q1_1_c0[0] = qw * (adj3 * grad_coeff1_0_c0 + adj4 * grad_coeff1_1_c0 + adj5 * grad_coeff1_2_c0);
+        grad_coeff_ref_q1_2_c0[0] = qw * (adj6 * grad_coeff1_0_c0 + adj7 * grad_coeff1_1_c0 + adj8 * grad_coeff1_2_c0);
+        value_coeff_q2_c0[0] = s_t(0);
+        grad_coeff_ref_q2_0_c0[0] = qw * (adj0 * grad_coeff2_0_c0 + adj1 * grad_coeff2_1_c0 + adj2 * grad_coeff2_2_c0);
+        grad_coeff_ref_q2_1_c0[0] = qw * (adj3 * grad_coeff2_0_c0 + adj4 * grad_coeff2_1_c0 + adj5 * grad_coeff2_2_c0);
+        grad_coeff_ref_q2_2_c0[0] = qw * (adj6 * grad_coeff2_0_c0 + adj7 * grad_coeff2_1_c0 + adj8 * grad_coeff2_2_c0);
+        const s_t grad_coeff0_0_c1 = trial_grad0 * tangent_grad_d1_0_grad0_0_q[0] + trial_grad1 * tangent_grad_d1_1_grad0_0_q[0] + trial_grad2 * tangent_grad_d1_2_grad0_0_q[0];
+        const s_t grad_coeff0_1_c1 = trial_grad0 * tangent_grad_d1_0_grad0_1_q[0] + trial_grad1 * tangent_grad_d1_1_grad0_1_q[0] + trial_grad2 * tangent_grad_d1_2_grad0_1_q[0];
+        const s_t grad_coeff0_2_c1 = trial_grad0 * tangent_grad_d1_0_grad0_2_q[0] + trial_grad1 * tangent_grad_d1_1_grad0_2_q[0] + trial_grad2 * tangent_grad_d1_2_grad0_2_q[0];
+        const s_t grad_coeff1_0_c1 = trial_grad0 * tangent_grad_d1_0_grad1_0_q[0] + trial_grad1 * tangent_grad_d1_1_grad1_0_q[0] + trial_grad2 * tangent_grad_d1_2_grad1_0_q[0];
+        const s_t grad_coeff1_1_c1 = trial_grad0 * tangent_grad_d1_0_grad1_1_q[0] + trial_grad1 * tangent_grad_d1_1_grad1_1_q[0] + trial_grad2 * tangent_grad_d1_2_grad1_1_q[0];
+        const s_t grad_coeff1_2_c1 = trial_grad0 * tangent_grad_d1_0_grad1_2_q[0] + trial_grad1 * tangent_grad_d1_1_grad1_2_q[0] + trial_grad2 * tangent_grad_d1_2_grad1_2_q[0];
+        const s_t grad_coeff2_0_c1 = trial_grad0 * tangent_grad_d1_0_grad2_0_q[0] + trial_grad1 * tangent_grad_d1_1_grad2_0_q[0] + trial_grad2 * tangent_grad_d1_2_grad2_0_q[0];
+        const s_t grad_coeff2_1_c1 = trial_grad0 * tangent_grad_d1_0_grad2_1_q[0] + trial_grad1 * tangent_grad_d1_1_grad2_1_q[0] + trial_grad2 * tangent_grad_d1_2_grad2_1_q[0];
+        const s_t grad_coeff2_2_c1 = trial_grad0 * tangent_grad_d1_0_grad2_2_q[0] + trial_grad1 * tangent_grad_d1_1_grad2_2_q[0] + trial_grad2 * tangent_grad_d1_2_grad2_2_q[0];
+        value_coeff_q0_c1[0] = s_t(0);
+        grad_coeff_ref_q0_0_c1[0] = qw * (adj0 * grad_coeff0_0_c1 + adj1 * grad_coeff0_1_c1 + adj2 * grad_coeff0_2_c1);
+        grad_coeff_ref_q0_1_c1[0] = qw * (adj3 * grad_coeff0_0_c1 + adj4 * grad_coeff0_1_c1 + adj5 * grad_coeff0_2_c1);
+        grad_coeff_ref_q0_2_c1[0] = qw * (adj6 * grad_coeff0_0_c1 + adj7 * grad_coeff0_1_c1 + adj8 * grad_coeff0_2_c1);
+        value_coeff_q1_c1[0] = s_t(0);
+        grad_coeff_ref_q1_0_c1[0] = qw * (adj0 * grad_coeff1_0_c1 + adj1 * grad_coeff1_1_c1 + adj2 * grad_coeff1_2_c1);
+        grad_coeff_ref_q1_1_c1[0] = qw * (adj3 * grad_coeff1_0_c1 + adj4 * grad_coeff1_1_c1 + adj5 * grad_coeff1_2_c1);
+        grad_coeff_ref_q1_2_c1[0] = qw * (adj6 * grad_coeff1_0_c1 + adj7 * grad_coeff1_1_c1 + adj8 * grad_coeff1_2_c1);
+        value_coeff_q2_c1[0] = s_t(0);
+        grad_coeff_ref_q2_0_c1[0] = qw * (adj0 * grad_coeff2_0_c1 + adj1 * grad_coeff2_1_c1 + adj2 * grad_coeff2_2_c1);
+        grad_coeff_ref_q2_1_c1[0] = qw * (adj3 * grad_coeff2_0_c1 + adj4 * grad_coeff2_1_c1 + adj5 * grad_coeff2_2_c1);
+        grad_coeff_ref_q2_2_c1[0] = qw * (adj6 * grad_coeff2_0_c1 + adj7 * grad_coeff2_1_c1 + adj8 * grad_coeff2_2_c1);
+        const s_t grad_coeff0_0_c2 = trial_grad0 * tangent_grad_d2_0_grad0_0_q[0] + trial_grad1 * tangent_grad_d2_1_grad0_0_q[0] + trial_grad2 * tangent_grad_d2_2_grad0_0_q[0];
+        const s_t grad_coeff0_1_c2 = trial_grad0 * tangent_grad_d2_0_grad0_1_q[0] + trial_grad1 * tangent_grad_d2_1_grad0_1_q[0] + trial_grad2 * tangent_grad_d2_2_grad0_1_q[0];
+        const s_t grad_coeff0_2_c2 = trial_grad0 * tangent_grad_d2_0_grad0_2_q[0] + trial_grad1 * tangent_grad_d2_1_grad0_2_q[0] + trial_grad2 * tangent_grad_d2_2_grad0_2_q[0];
+        const s_t grad_coeff1_0_c2 = trial_grad0 * tangent_grad_d2_0_grad1_0_q[0] + trial_grad1 * tangent_grad_d2_1_grad1_0_q[0] + trial_grad2 * tangent_grad_d2_2_grad1_0_q[0];
+        const s_t grad_coeff1_1_c2 = trial_grad0 * tangent_grad_d2_0_grad1_1_q[0] + trial_grad1 * tangent_grad_d2_1_grad1_1_q[0] + trial_grad2 * tangent_grad_d2_2_grad1_1_q[0];
+        const s_t grad_coeff1_2_c2 = trial_grad0 * tangent_grad_d2_0_grad1_2_q[0] + trial_grad1 * tangent_grad_d2_1_grad1_2_q[0] + trial_grad2 * tangent_grad_d2_2_grad1_2_q[0];
+        const s_t grad_coeff2_0_c2 = trial_grad0 * tangent_grad_d2_0_grad2_0_q[0] + trial_grad1 * tangent_grad_d2_1_grad2_0_q[0] + trial_grad2 * tangent_grad_d2_2_grad2_0_q[0];
+        const s_t grad_coeff2_1_c2 = trial_grad0 * tangent_grad_d2_0_grad2_1_q[0] + trial_grad1 * tangent_grad_d2_1_grad2_1_q[0] + trial_grad2 * tangent_grad_d2_2_grad2_1_q[0];
+        const s_t grad_coeff2_2_c2 = trial_grad0 * tangent_grad_d2_0_grad2_2_q[0] + trial_grad1 * tangent_grad_d2_1_grad2_2_q[0] + trial_grad2 * tangent_grad_d2_2_grad2_2_q[0];
+        value_coeff_q0_c2[0] = s_t(0);
+        grad_coeff_ref_q0_0_c2[0] = qw * (adj0 * grad_coeff0_0_c2 + adj1 * grad_coeff0_1_c2 + adj2 * grad_coeff0_2_c2);
+        grad_coeff_ref_q0_1_c2[0] = qw * (adj3 * grad_coeff0_0_c2 + adj4 * grad_coeff0_1_c2 + adj5 * grad_coeff0_2_c2);
+        grad_coeff_ref_q0_2_c2[0] = qw * (adj6 * grad_coeff0_0_c2 + adj7 * grad_coeff0_1_c2 + adj8 * grad_coeff0_2_c2);
+        value_coeff_q1_c2[0] = s_t(0);
+        grad_coeff_ref_q1_0_c2[0] = qw * (adj0 * grad_coeff1_0_c2 + adj1 * grad_coeff1_1_c2 + adj2 * grad_coeff1_2_c2);
+        grad_coeff_ref_q1_1_c2[0] = qw * (adj3 * grad_coeff1_0_c2 + adj4 * grad_coeff1_1_c2 + adj5 * grad_coeff1_2_c2);
+        grad_coeff_ref_q1_2_c2[0] = qw * (adj6 * grad_coeff1_0_c2 + adj7 * grad_coeff1_1_c2 + adj8 * grad_coeff1_2_c2);
+        value_coeff_q2_c2[0] = s_t(0);
+        grad_coeff_ref_q2_0_c2[0] = qw * (adj0 * grad_coeff2_0_c2 + adj1 * grad_coeff2_1_c2 + adj2 * grad_coeff2_2_c2);
+        grad_coeff_ref_q2_1_c2[0] = qw * (adj3 * grad_coeff2_0_c2 + adj4 * grad_coeff2_1_c2 + adj5 * grad_coeff2_2_c2);
+        grad_coeff_ref_q2_2_c2[0] = qw * (adj6 * grad_coeff2_0_c2 + adj7 * grad_coeff2_1_c2 + adj8 * grad_coeff2_2_c2);
       }
     }
+    for (int out_shape = 0; out_shape < NS; ++out_shape) {
+      column[out_shape * NC + 0] = &element_matrix[(0 * NS + out_shape) * 3 * NS + 0 * NS + trial];
+      column[out_shape * NC + 1] = &element_matrix[(1 * NS + out_shape) * 3 * NS + 0 * NS + trial];
+      column[out_shape * NC + 2] = &element_matrix[(2 * NS + out_shape) * 3 * NS + 0 * NS + trial];
+    }
+    tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
+        shape_1d, grad_1d, value_coeff_c0, grad_coeff_ref_c0, column);
+    for (int out_shape = 0; out_shape < NS; ++out_shape) {
+      column[out_shape * NC + 0] = &element_matrix[(0 * NS + out_shape) * 3 * NS + 1 * NS + trial];
+      column[out_shape * NC + 1] = &element_matrix[(1 * NS + out_shape) * 3 * NS + 1 * NS + trial];
+      column[out_shape * NC + 2] = &element_matrix[(2 * NS + out_shape) * 3 * NS + 1 * NS + trial];
+    }
+    tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
+        shape_1d, grad_1d, value_coeff_c1, grad_coeff_ref_c1, column);
     for (int out_shape = 0; out_shape < NS; ++out_shape) {
       column[out_shape * NC + 0] = &element_matrix[(0 * NS + out_shape) * 3 * NS + 2 * NS + trial];
       column[out_shape * NC + 1] = &element_matrix[(1 * NS + out_shape) * 3 * NS + 2 * NS + trial];
       column[out_shape * NC + 2] = &element_matrix[(2 * NS + out_shape) * 3 * NS + 2 * NS + trial];
     }
     tensor_integrate_scalar<s_t, NQ, NS, ND, NC>(
-        shape_1d, grad_1d, value_coeff, grad_coeff_ref, column);
+        shape_1d, grad_1d, value_coeff_c2, grad_coeff_ref_c2, column);
   }
 }
 
