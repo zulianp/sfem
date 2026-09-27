@@ -229,6 +229,19 @@ WRAPPED_HELPER_BUDGET = 0
 DEVICE_DEAD_ASSIGNMENT_BUDGET = 2
 DEVICE_UNUSED_PARAMETER_BUDGET = 0
 
+#: Loop-structure names a body reads without declaring them or being given them.
+#:
+#: A floor, not a ratchet: source that reads an undeclared name does not
+#: compile, so the only correct number is zero.  It exists because nothing here
+#: measured that direction -- `unused_parameters` catches declared-and-unread,
+#: and its mirror had no instrument.  Removing the work-item count left
+#: `ageom_stream` taking an `ne` the SIMT mesh loop no longer declares, and 11
+#: device translation units failed on nvcc while every host gate was green,
+#: because the host mesh loop still declares it.  Adding this measurement then
+#: found 42 more reads in the mixed-order device operators that the failing
+#: build had not yet reached.
+UNDECLARED_LOOP_NAME_BUDGET = 0
+
 
 class KernelsAreLeanTest(unittest.TestCase):
     def setUp(self):
@@ -245,6 +258,20 @@ class KernelsAreLeanTest(unittest.TestCase):
                 "  %s: %s: %s" % (row[0], row[1], row[3][:100]) for row in dead[:20]
             ),
         )
+
+    def test_no_kernel_reads_a_loop_name_it_was_never_given(self):
+        for label, measured in (
+            ("host", self.survey),
+            ("device", self.device_survey),
+        ):
+            names = measured["undeclared_work_item_names"]
+            with self.subTest(sources=label):
+                self.assertLessEqual(
+                    len(names),
+                    UNDECLARED_LOOP_NAME_BUDGET,
+                    "these %s bodies read a loop name nothing declares:\n%s"
+                    % (label, "\n".join("  %s: %s" % row for row in names[:20])),
+                )
 
     def test_no_device_kernel_names_a_parameter_it_ignores(self):
         parameters = self.device_survey["unused_parameters"]
