@@ -2707,6 +2707,26 @@ def _local_header(
 
 
 def _constant_p1_affine_specialized_local(local_prefix, specialization):
+    """The constant-P1 specialisation, for the element that *is* one.
+
+    A higher-order simplex used to get one synthesised for it: generating TET10
+    also published a `_tet4_` kernel into the shared simplex header, built from
+    `sfem_soa_element_specialization("TET4")` -- TET4's *default* rule, not the
+    rule this material uses for TET4.
+
+    The companion is not dead code -- the shared header has to come out identical
+    from every element that writes it, so a higher-order simplex must publish the
+    family's P1 kernel too.  What was wrong is the rule it used: a material whose
+    TET4 integration case is richer than the default -- `two_phase_flow`, at six
+    points -- had TET4 publish the quadrature shape while TET10 published the
+    closed-form shape under one name, and the merge refused it with `conflicting
+    generated source for d3/two_phase_flow_d3_simplex_local.hpp`.  Materials
+    whose TET4 rule happens to be the default agreed by coincidence, which is why
+    it took adding TET10 to `two_phase_flow` to find this.
+
+    `specialization.companion` is what fixes it: the same integration case, at
+    the P1 element's order for it.
+    """
     rule = specialization.quadrature_rule
     specialized_prefix = _constant_p1_affine_specialized_local_prefix(
         local_prefix,
@@ -2718,14 +2738,11 @@ def _constant_p1_affine_specialized_local(local_prefix, specialization):
     if rule is None or not str(local_prefix).endswith("_simplex"):
         return None
 
-    element_type = {2: "TRI3", 3: "TET4"}.get(int(getattr(rule, "dim", 0)))
+    element_type = _SIMPLEX_P1_ELEMENT.get(int(getattr(rule, "dim", 0)))
     if element_type is None:
         return None
 
-    p1_specialization = sfem_soa_element_specialization(
-        element_type,
-        vector_size=specialization.vector_size,
-    )
+    p1_specialization = specialization.companion(element_type)
     p1_prefix = _constant_p1_affine_specialized_local_prefix(
         local_prefix,
         p1_specialization.quadrature_rule,
@@ -2733,6 +2750,10 @@ def _constant_p1_affine_specialized_local(local_prefix, specialization):
     if p1_prefix is None:
         return None
     return p1_prefix, p1_specialization
+
+
+#: The constant-P1 member of the simplex family, per spatial dimension.
+_SIMPLEX_P1_ELEMENT = {2: "TRI3", 3: "TET4"}
 
 
 def _constant_p1_affine_specialized_local_prefix(local_prefix, rule):
