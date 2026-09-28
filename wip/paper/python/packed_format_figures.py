@@ -580,13 +580,15 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
     are drawn, and the cells carry the colour of the pack that staged them so a contribution can be
     followed from a faded node in F1 to the node it lands on.
     """
-    a, b = adjacent_pair(pk)
     out = [PREAMBLE, COLOR_DEFS,
            r"\begin{tikzpicture}[scale=%.2f,font=\scriptsize]" % scale]
 
-    # Entries staged by the two detached packs, in the order they sit in ghost_buf.
+    # EVERY pack, not just the pair Figure 1 detaches: the reduction graph spans the whole mesh,
+    # and a buffer showing one pair's entries would suggest the gather is a per-neighbour exchange.
+    # In ghost_buf order, which is pack-major by construction.
+    packs = list(range(pk.n_packs))
     entries = []
-    for p in (a, b):
+    for p in packs:
         for k in range(pk.ghost_ptr[p], pk.ghost_ptr[p + 1]):
             entries.append((k, p, pk.ghost_idx[k]))
     # Rows that consume at least two of them: a row of one term shows nothing about summation.
@@ -599,25 +601,30 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
     rows.sort()
     shown = [k for _r, ks in rows for k in ks]
 
-    # ---- phase one: two packs, their owned rows written out, their ghosts staged -----------
+    # ---- phase one: every pack, owned rows written out, ghosts staged ----------------------
     W, top = 9.2, 0.0
-    for i, p in enumerate((a, b)):
+    bw = min(2.5, (W - 1.4) / max(1, len(packs)))
+    for i, p in enumerate(packs):
         col = PACK_COLORS[p % len(PACK_COLORS)]
-        x = 0.7 + i * 3.1
+        x = 0.7 + i * (bw + 0.18)
         out.append(r"  \draw[%s,fill=%s!16,rounded corners=2pt,line width=0.6pt] "
-                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (col, col, x, top, x + 2.5, top + 1.05))
-        out.append(r"  \node[%s,font=\bfseries] at (%.2f,%.2f) {$P_%d$};" % (col, x + 0.42, top + 0.75, p))
+                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (col, col, x, top, x + bw, top + 1.05))
+        out.append(r"  \node[%s,font=\bfseries] at (%.2f,%.2f) {$P_%d$};"
+                   % (col, x + 0.34, top + 0.75, p))
+        # Shortened deliberately: at three packs the boxes are 2.5 wide and "owned rows" ran past
+        # the border.
         out.append(r"  \node[align=left,font=\tiny,anchor=north west] at (%.2f,%.2f) "
-                   r"{pack-private buffer\\owned rows $\;\to\;$ write\\ghosts $\;\to\;$ stage};"
-                   % (x + 0.78, top + 0.98))
+                   r"{private buffer\\owned $\to$ write\\ghosts $\to$ stage};"
+                   % (x + 0.62, top + 0.96))
 
+    # Above the boxes, not beside them: with every pack drawn the row now reaches the right margin.
     out.append(r"  \node[anchor=west,font=\tiny\itshape,black!65] at (%.2f,%.2f) "
-               r"{phase 1: accumulate locally};" % (7.0, top + 0.52))
+               r"{phase 1: accumulate locally};" % (0.7, top + 1.30))
 
     # Owned rows leave directly for the global vector: the arrow that needs no reduction.
-    out.append(r"  \draw[->,>=stealth,black!60,line width=0.7pt] (3.2,%.2f) -- (3.2,%.2f);"
+    out.append(r"  \draw[->,>=stealth,black!60,line width=0.7pt] (2.6,%.2f) -- (2.6,%.2f);"
                % (top - 0.08, top - 0.62))
-    out.append(r"  \node[anchor=west,font=\tiny,black!70] at (3.30,%.2f) "
+    out.append(r"  \node[anchor=west,font=\tiny,black!70] at (2.70,%.2f) "
                r"{owned rows: plain write, no atomic and no zero-fill};" % (top - 0.36))
 
     # ---- ghost_buf ------------------------------------------------------------------------
@@ -638,8 +645,8 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
                r"{one slot per staged contribution};" % (0.7 + len(entries) * cw + 0.15, ybuf + 0.20))
 
     # ---- phase two: the CSR gather --------------------------------------------------------
-    out.append(r"  \node[anchor=west,font=\tiny\itshape,black!65] at (%.2f,%.2f) "
-               r"{phase 2: gather};" % (7.0, ybuf - 0.55))
+    out.append(r"  \node[anchor=east,font=\tiny\itshape,black!65] at (%.2f,%.2f) "
+               r"{phase 2: gather};" % (0.62, ybuf - 0.95))
     ydest = ybuf - 1.55
     n = len(rows)
     for i, (r, ks) in enumerate(rows):
@@ -709,7 +716,7 @@ def fig_scatters(scale=1.0):
 FIGURES = ("packed_decomposition", "packed_id_space", "packed_reduction", "packed_scatters")
 
 
-def build(out_dir, nx=9, ny=7, eper=22):
+def build(out_dir, nx=9, ny=7, eper=42):
     mesh = TriMesh(nx, ny)
     pk = Packing(mesh, morton_order(mesh), eper)
     os.makedirs(out_dir, exist_ok=True)
@@ -957,7 +964,7 @@ def main():
     # an unstructured triangulation of those points.
     ap.add_argument("--nx", type=int, default=9)
     ap.add_argument("--ny", type=int, default=7)
-    ap.add_argument("--elements-per-pack", type=int, default=22)
+    ap.add_argument("--elements-per-pack", type=int, default=42)
     args = ap.parse_args()
 
     if args.selftest:
