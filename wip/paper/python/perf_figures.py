@@ -784,28 +784,77 @@ def macros_packsize(sweep, order, meta):
 
 # Compulsory traffic per degree of freedom for one matrix-free apply, in bytes.
 #
-# MODELLED, NOT MEASURED, and the paper says so. The benchmark reports flops but not bytes, so
-# this is a lower bound on traffic and therefore an UPPER bound on operational intensity: a
-# point drawn with it sits at or to the right of where the kernel really is, which is the
-# conservative direction for a claim that the kernel is near the memory roof.
+# MODELLED, and used only where a measurement is unavailable; roofline_points prefers measured
+# DRAM traffic when it is given some. An earlier version of this model was wrong in a way that
+# mattered, and the correction moved the residual from the compute-bound to the memory-bound side
+# of the ridge, so the itemisation below is deliberately explicit about what the kernel reads.
 #
-# What is counted, per dof:
-#   * the input field, read once                                              8 B
-#   * the output field, written once                                          8 B
-#   * the mesh the sweep must traverse -- pack-local connectivity and the
-#     coordinates -- taken from the footprint model in footprint_rows()      ~6.9 B
-# What is NOT counted: re-reads of a node's input by elements in other packs, which the format
-# exists to avoid but does not eliminate at pack boundaries; and any spill. Both would raise
-# traffic and lower intensity, which is why this is a bound rather than an estimate.
-VECTOR_BYTES_PER_DOF = 16.0
+# Per element, once per apply:
+#   * the cached affine geometry -- nine adjugate components and the determinant, `scalar_t`,
+#     which is what gather_hex8_adj_soa reads. TEN DOUBLES PER ELEMENT, about 19.5 B/dof on a
+#     hexahedral mesh, and the largest single term. The earlier model omitted it entirely and
+#     counted nodal coordinates instead, which the bare affine kernel never touches: coordinates
+#     are staged only when Rhie-Chow or the boundary closure is on.
+#   * the connectivity, whose width is the layout's -- `pack_idx_t` (2 B) packed against the
+#     global `idx_t` (4 B) flat. The earlier model applied the packed width to both layouts, so
+#     the two points were drawn at identical intensity BY CONSTRUCTION and the paper then
+#     reasoned from their being identical.
+# Per node, once per apply:
+#   * the input field read and the result written, N_FIELDS each.
+#
+# Still not counted: re-reads of a node's input by elements in other packs, and spill. Both raise
+# traffic and lower intensity, so this remains a lower bound on traffic and an upper bound on
+# intensity -- which is why the measured figures are preferred where they exist.
+GEOM_SCALARS_PER_ELEM = 10      # 9 adjugate components + determinant
+SCALAR_BYTES = 8
+FIELDS_PER_NODE = 4
 
 
-def roofline_points(rows, mesh_bytes_per_dof, n=128):
-    """(label, intensity FLOP/byte, achieved GFLOP/s) for the representations compared.
+def compulsory_bytes_per_dof(nelems, nnodes, layout):
+    idx_bytes = PACK_IDX_BYTES if layout in ("packed", "colored", "store") else GLOBAL_IDX_BYTES
+    geom = GEOM_SCALARS_PER_ELEM * SCALAR_BYTES * nelems
+    conn = NODES_PER_ELEM * idx_bytes * nelems
+    vec = 2 * FIELDS_PER_NODE * SCALAR_BYTES * nnodes
+    return (geom + conn + vec) / float(FIELDS_PER_NODE * nnodes)
 
-    The assembled SpMV is handled separately: its traffic is the matrix, not the mesh, and its
-    flop count is two per nonzero scalar entry.
+
+def parse_dram(path):
+    """Measured DRAM bytes per dof, from two SCF captures differenced across repeat count.
+
+    The counters cover a whole process, so a single capture includes mesh setup, pack
+    construction and warmup. Differencing two runs that differ ONLY in the number of timed
+    applies cancels all of it exactly, which is why the file carries a pair of repeat counts
+    rather than one. Format, one row per configuration:
+
+        operation layout repeat_lo repeat_hi bytes_lo bytes_hi dofs
     """
+    out = {}
+    for line in open(path):
+        f = line.split()
+        if len(f) != 7 or f[0].startswith("#"):
+            continue
+        try:
+            op, lay = f[0], f[1]
+            r_lo, r_hi = int(f[2]), int(f[3])
+            b_lo, b_hi = float(f[4]), float(f[5])
+            dofs = int(f[6])
+        except ValueError:
+            continue
+        if r_hi <= r_lo or dofs <= 0:
+            continue
+        out[(op, lay)] = (b_hi - b_lo) / float(r_hi - r_lo) / dofs
+    return out
+
+
+def roofline_points(rows, n=128, measured_bytes=None):
+    """(label, intensity FLOP/byte, achieved GFLOP/s, measured?) for the representations compared.
+
+    ``measured_bytes`` maps (operation, layout) to DRAM bytes per dof, from the Grace SCF
+    counters differenced across two repeat counts so that setup and warmup cancel. Where a pair
+    is present it is used; where it is absent the model above is, and the flag in the returned
+    tuple records which, so the figure can distinguish them rather than implying one provenance.
+    """
+    measured_bytes = measured_bytes or {}
     at_n = [r for r in rows if r["_n"] == n]
     pts = []
     for op, lay, label in (("residual", "packed", "residual, packed"),
@@ -818,13 +867,15 @@ def roofline_points(rows, mesh_bytes_per_dof, n=128):
         b = max(cand, key=lambda r: r["_mdof"])
         try:
             gflops = float(b["GFLOP_s_model"])
+            nelems, nnodes = int(b["elements"]), int(b["nodes"])
         except (KeyError, ValueError):
             continue
         if b["_mdof"] <= 0:
             continue
         flop_per_dof = gflops * 1e9 / (b["_mdof"] * 1e6)
-        ai = flop_per_dof / (VECTOR_BYTES_PER_DOF + mesh_bytes_per_dof)
-        pts.append((label, ai, gflops))
+        meas = measured_bytes.get((op, lay))
+        byts = meas if meas else compulsory_bytes_per_dof(nelems, nnodes, lay)
+        pts.append((label, flop_per_dof / byts, gflops, meas is not None))
     for store, label in (("f64", r"SpMV \texttt{f64}"), ("f32", r"SpMV \texttt{f32}")):
         cand = [r for r in at_n if r["operation"] == "bsr_apply" and r["bsr_storage"] == store]
         if not cand:
@@ -835,39 +886,74 @@ def roofline_points(rows, mesh_bytes_per_dof, n=128):
             vals = float(b["bsr_values_MiB"]) * 1024 * 1024
         except (KeyError, ValueError):
             continue
-        # Two flops per scalar entry of the 4x4 blocks; traffic is the matrix plus the vectors.
         flop = 2.0 * blocks * BLOCK * BLOCK
-        byts = vals + blocks * GLOBAL_IDX_BYTES + dofs * VECTOR_BYTES_PER_DOF
-        ai = flop / byts
-        pts.append((label, ai, b["_mdof"] * 1e6 * (flop / dofs) * 1e-9))
+        meas = measured_bytes.get(("bsr_apply", store))
+        if meas:
+            byts_per_dof = meas
+        else:
+            byts_per_dof = (vals + blocks * GLOBAL_IDX_BYTES
+                            + dofs * 2 * FIELDS_PER_NODE * SCALAR_BYTES / FIELDS_PER_NODE) / dofs
+        pts.append((label, (flop / dofs) / byts_per_dof, b["_mdof"] * 1e6 * (flop / dofs) * 1e-9,
+                    meas is not None))
     return pts
 
 
-def fig_roofline(pts, bandwidth_gbs, peak_gflops):
-    """F8. Both roofs measured on the same node as the points."""
-    ridge = peak_gflops / bandwidth_gbs
+# Vendor figures for one Grace die, against which the measured roofs are reported. Quoted rather
+# than derived, and cited in the paper where they appear.
+SPEC_BW_GBS = 500.0
+SPEC_PEAK_GFLOPS = 3550.0
+
+
+def _roof(ai_lo, ai_hi, bw, peak):
+    """The two segments of a roof: bandwidth-bound below the ridge, compute-bound above."""
+    ridge = peak / bw
+    return [(ai_lo, ai_lo * bw), (ridge, peak), (ai_hi, peak)]
+
+
+def fig_roofline(pts, bandwidth_gbs, peak_gflops,
+                 spec_bw=SPEC_BW_GBS, spec_peak=SPEC_PEAK_GFLOPS):
+    """F8. Measured and vendor roofs together, with the kernels placed on measured traffic.
+
+    Both roofs are drawn because they answer different questions. The measured pair bounds what
+    this node delivered to a benchmark under the same conditions as the kernels, and is the
+    correct reference for an efficiency. The vendor pair bounds what the hardware is specified to
+    do, and the gap between the two is itself information -- it is where a library GEMM and a
+    triad stop short of nominal, which no kernel measured here can recover.
+    """
+    xmin, xmax = 0.3, 64.0
+    ymax = max(peak_gflops, spec_peak) * 1.8
     out = [PREAMBLE,
            r"\begin{tikzpicture}",
            r"\begin{loglogaxis}[",
-           r"  width=\columnwidth, height=0.55\columnwidth,",
+           r"  width=\columnwidth, height=0.58\columnwidth,",
            r"  xlabel={operational intensity [FLOP/byte]}, ylabel={GFLOP/s},",
-           r"  xmin=0.3, xmax=64, ymin=20, ymax=%.0f," % (peak_gflops * 1.8),
-           r"  legend pos=south east, legend cell align=left,",
+           r"  xmin=%.1f, xmax=%.0f, ymin=20, ymax=%.0f," % (xmin, xmax, ymax),
+           r"  legend pos=south east, legend cell align=left, legend columns=2,",
            r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},",
            r"  grid=both, major grid style={black!12}, minor grid style={black!6},",
            r"  tick label style={font=\tiny}, label style={font=\scriptsize},",
            r"]"]
-    # The two roofs: bandwidth-limited below the ridge, compute-limited above.
-    out.append(r"\addplot[black,thick,no marks,forget plot] coordinates "
-               r"{(0.3,%.2f) (%.3f,%.1f) (64,%.1f)};"
-               % (0.3 * bandwidth_gbs, ridge, peak_gflops, peak_gflops))
-    out.append(r"\node[black!70,font=\scriptsize,anchor=south east,rotate=45] "
-               r"at (axis cs:1.2,%.1f) {\ %.0f GB/s};" % (1.2 * bandwidth_gbs, bandwidth_gbs))
-    out.append(r"\node[black!70,font=\scriptsize,anchor=south east] "
-               r"at (axis cs:48,%.1f) {%.1f TFLOP/s\ };" % (peak_gflops * 1.06, peak_gflops / 1000.0))
+
+    def roof_plot(bw, peak, style, label):
+        coords = " ".join("(%.3f,%.1f)" % c for c in _roof(xmin, xmax, bw, peak))
+        out.append(r"\addplot[%s,no marks,forget plot] coordinates {%s};" % (style, coords))
+        out.append(r"\node[black!55,font=\tiny,anchor=south west] at (axis cs:%.2f,%.1f) {%s};"
+                   % (xmax * 0.32, peak * 1.05, label))
+
+    # Vendor first, so the measured roof is drawn over it.
+    roof_plot(spec_bw, spec_peak, "black!45,thick,densely dashed",
+              r"spec %.2f TFLOP/s" % (spec_peak / 1000.0))
+    roof_plot(bandwidth_gbs, peak_gflops, "black,thick",
+              r"measured %.2f TFLOP/s" % (peak_gflops / 1000.0))
+    # Bandwidth labels sit on the sloped segment, where the two roofs are furthest apart.
+    out.append(r"\node[black!55,font=\tiny,anchor=south east,rotate=45] "
+               r"at (axis cs:1.05,%.1f) {spec %.0f GB/s};" % (1.05 * spec_bw, spec_bw))
+    out.append(r"\node[black!70,font=\tiny,anchor=north west,rotate=45] "
+               r"at (axis cs:1.15,%.1f) {meas.\ %.0f GB/s};" % (1.15 * bandwidth_gbs, bandwidth_gbs))
+
     marks = ["*", "square*", "triangle*", "diamond*", "pentagon*", "otimes*"]
     cols = ["PackA", "PackD", "PackC", "PackE", "PackB", "PackF"]
-    for i, (label, ai, gf) in enumerate(pts):
+    for i, (label, ai, gf, _meas) in enumerate(pts):
         out.append(r"\addplot[%s,mark=%s,mark size=2.1pt,only marks] coordinates {(%.3f,%.1f)};"
                    % (cols[i % len(cols)], marks[i % len(marks)], ai, gf))
         out.append(r"\addlegendentry{%s}" % label)
@@ -1297,10 +1383,12 @@ def build(out_dir, tab_dir):
         peak = parse_peak(os.path.join(DATA, pk[-1]))
         rates = parse_stream(os.path.join(DATA, st[-1]))
         bw = rates.get(max(rates)) if rates else None
-        fr = footprint_rows(os.path.join(DATA, camp[-1]))
-        mesh_b = fr[0]["packed"] if fr else 0.0
+        # Measured DRAM traffic per dof, if a differenced SCF capture is present. Preferred over
+        # the model; see roofline_points.
+        dm = [f for f in sorted(os.listdir(DATA)) if f.startswith("dram_")]
+        measured_dram = parse_dram(os.path.join(DATA, dm[-1])) if dm else {}
         if peak and bw:
-            pts = roofline_points(rows, mesh_b)
+            pts = roofline_points(rows, n=128, measured_bytes=measured_dram)
             if pts:
                 with open(os.path.join(out_dir, "roofline.tex"), "w") as fh:
                     fh.write(fig_roofline(pts, bw, peak))
@@ -1309,18 +1397,27 @@ def build(out_dir, tab_dir):
                              + "\\newcommand{\\rlPeak}{%.0f}\n" % peak
                              + "\\newcommand{\\rlBw}{%.0f}\n" % bw
                              + "\\newcommand{\\rlRidge}{%.1f}\n" % (peak / bw)
-                             + "\\newcommand{\\rlMeshBytes}{%.1f}\n" % mesh_b
+                             + "\\newcommand{\\rlSpecPeak}{%.2f}\n" % (SPEC_PEAK_GFLOPS / 1000.0)
+                             + "\\newcommand{\\rlSpecBw}{%.0f}\n" % SPEC_BW_GBS
+                             + "\\newcommand{\\rlSpecRidge}{%.1f}\n"
+                               % (SPEC_PEAK_GFLOPS / SPEC_BW_GBS)
+                             + "\\newcommand{\\rlPeakPctSpec}{%.0f}\n"
+                               % (100.0 * peak / SPEC_PEAK_GFLOPS)
+                             + "\\newcommand{\\rlBwPctSpec}{%.0f}\n"
+                               % (100.0 * bw / SPEC_BW_GBS)
                              + "".join("\\newcommand{\\rl%s}{%.0f}\n" % (_macro_name(l), g)
-                                       for l, a, g in pts)
+                                       for l, a, g, _m in pts)
                              + "".join("\\newcommand{\\rl%sAi}{%.1f}\n" % (_macro_name(l), a)
-                                       for l, a, g in pts)
+                                       for l, a, g, _m in pts)
                              # Each point as a percentage of the roof BINDING AT ITS OWN
                              # intensity -- memory below the ridge, compute above. This is the
                              # comparison the figure invites and it is easy to state wrongly by
                              # dividing everything by the compute peak.
                              + "".join("\\newcommand{\\rl%sPct}{%.0f}\n"
                                        % (_macro_name(l), 100.0 * g / min(peak, bw * a))
-                                       for l, a, g in pts))
+                                       for l, a, g, _m in pts)
+                             + "\\newcommand{\\rlTrafficSource}{%s}\n"
+                               % ("measured" if any(m for _l, _a, _g, m in pts) else "modelled"))
                 written += ["figures/roofline.tex", "figures/roofline_macros.tex"]
     return written
 
@@ -1469,6 +1566,35 @@ def selftest():
             # A missing block must yield nothing rather than a partial total.
             check(meshfoot_totals(mf, 99999) is None,
                   "a pack size that was not measured yields no total")
+
+        # ---- measured DRAM traffic --------------------------------------------------------
+        # The differencing is the whole point of the two-capture format, and getting it wrong
+        # would silently divide setup and warmup into the per-apply figure.
+        with tempfile.TemporaryDirectory() as td4:
+            dp = os.path.join(td4, "dram_x.out")
+            open(dp, "w").write(
+                "# comment\n"
+                "residual  packed  10  40   1000   4000   100\n"
+                "residual  atomic  10  40   2000   2300   100\n")
+            dm = parse_dram(dp)
+            # (4000-1000)/(40-10)/100 = 1.0 byte per dof per apply
+            check(abs(dm[("residual", "packed")] - 1.0) < 1e-12,
+                  "traffic is differenced across repeat count, not divided by it")
+            check(abs(dm[("residual", "atomic")] - 0.1) < 1e-12,
+                  "a second configuration is read independently")
+            check(("residual", "colored") not in dm,
+                  "a configuration absent from the capture yields no entry")
+
+        # A point with measured traffic must report it as measured, and one without must not.
+        camp_pts = [{"_n": 128, "_dofs": 400, "_mdof": 100.0, "operation": "residual",
+                     "ran_layout": "packed", "GFLOP_s_model": "40", "elements": "100",
+                     "nodes": "100", "ran_rc": "off", "ran_boundary": "off", "transient": "0"}]
+        got = roofline_points(camp_pts, n=128, measured_bytes={("residual", "packed"): 2.0})
+        check(bool(got) and got[0][3] is True and abs(got[0][1] - 200.0) < 1e-9,
+              "measured traffic is used where present, and flagged")
+        got = roofline_points(camp_pts, n=128, measured_bytes={})
+        check(bool(got) and got[0][3] is False,
+              "the model is used where no measurement exists, and flagged")
 
         # Missing data must be absent, not fabricated.
         with tempfile.TemporaryDirectory() as td2:

@@ -472,10 +472,12 @@ and a full pass over it disappears from every application.
 
 \begin{table}[t]
   \centering
-  \caption{\fostag{} What the operator must read per degree of freedom, excluding the solution and result
-    vectors, which are identical for every representation. The assembled side carries its values
-    and its sparsity pattern; the matrix-free side carries the mesh. The two mesh rows are
-    measured, array by array; the assembled rows follow from the sparsity pattern.}
+  \caption{\fostag{} Stored size per degree of freedom, excluding the solution and result vectors,
+    which are identical for every representation: the assembled matrix carries its values and
+    sparsity pattern, the matrix-free side its mesh. The two mesh rows are measured array by
+    array; the assembled rows follow from the sparsity pattern. The matrix-free side also reads
+    cached affine geometry, \SI{19.5}{\byte} per degree of freedom, which is not a property of the
+    mesh format and is accounted for in the roofline of \S\ref{sec:res:spmv} instead.}
   \label{tab:footprint}
   \input{tables/footprint}
 \end{table}
@@ -877,37 +879,51 @@ cancellation, so a term can be present at every node and absent from the total. 
 \begin{figure}[t]
   \centering
   \input{figures/roofline}
-  \caption{\fostag{} Both roofs measured on the same node as the points: a STREAM triad at
-    \SI{\rlBw}{\giga\byte\per\second} and a large double-precision GEMM at
-    \SI{\rlPeak}{\giga\flops}. The matrix-free points are the \emph{bare} element kernels, with
-    no Rhie--Chow term, so the exact/lagged distinction does not arise; the SpMV points apply
-    the assembled, lagged matrix. Intensity uses compulsory traffic, an upper bound, so every
-    point lies at or right of its kernel's true position.}
+  \caption{\fostag{} Two roof pairs. The solid roof is measured on the node the points were
+    measured on --- a STREAM triad at \SI{\rlBw}{\giga\byte\per\second} and a large
+    double-precision GEMM at \SI{\rlPeak}{\giga\flops} --- and the dashed roof is the vendor
+    specification, \SI{\rlSpecBw}{\giga\byte\per\second} and \SI{\rlSpecPeak}{\tflops}. Ridges
+    at \rlRidge{} and \rlSpecRidge{}~FLOP/byte respectively. Matrix-free points are the
+    \emph{bare} element kernels, with no Rhie--Chow term; the SpMV points apply the assembled,
+    lagged matrix. Intensity uses \emph{measured} DRAM traffic (\S\ref{sec:res:spmv}), not a
+    compulsory-traffic model.}
   \label{fig:roofline}
 \end{figure}
 
-The matrix-free kernels operate at $\rlResidualPackedAi{}$--$\rlJacobianPackedAi{}$~FLOP/byte and
-the assembled product at $\rlSpmvFSixFourAi{}$, a factor of thirty-four lower: it reads a matrix
-whose size grows with the stencil where the matrix-free kernels read a mesh. This is the footprint
-of Table~\ref{tab:footprint} expressed as intensity, and it is why halving the value precision ---
-moving the SpMV from $\rlSpmvFSixFourAi{}$ to $\rlSpmvFThreeTwoAi{}$ --- is close to the assembled
+\paragraph{Traffic is measured, not modelled.} A matrix-free kernel's intensity is dominated by
+data that is neither the solution nor the result, and a compulsory-traffic model of it is easy to
+get wrong. Per element the sweep reads the cached affine geometry --- nine adjugate components and
+the determinant, \SI{19.5}{\byte} per degree of freedom on this mesh --- which exceeds the
+connectivity and both field vectors combined; the connectivity itself is \SI{3.9}{\byte} per degree
+of freedom packed against \SI{7.8}{} flat, so the two layouts do not share an intensity; and nodal
+coordinates, which such a model naturally reaches for, are not read by the bare affine kernel at
+all. We therefore place the points using DRAM traffic read from the memory-system counters, with
+two captures differenced across the number of timed applies so that setup and warmup cancel. The
+measured traffic is \num{1.3} to \num{1.5} times the compulsory bound, the balance being node
+re-reads at pack boundaries and partial-line writes.
+
+The matrix-free kernels then sit at $\rlResidualAtomicAi{}$--$\rlResidualPackedAi{}$~FLOP/byte and
+the assembled product at $\rlSpmvFSixFourAi{}$, a factor of twenty lower: it reads a matrix whose
+size grows with the stencil where the matrix-free kernels read a mesh. Halving the value precision,
+moving the SpMV from $\rlSpmvFSixFourAi{}$ to $\rlSpmvFThreeTwoAi{}$, is close to the assembled
 operator's only lever.
 
-\paragraph{Attained fractions.} The ridge lies at \rlRidge{}~FLOP/byte, so the two representations
-are bound by different roofs. Measured against the roof binding at its own intensity, the SpMV
-attains \rlSpmvFSixFourPct\%, the packed residual \rlResidualPackedPct\% of the compute roof, and
-the atomic sweep \rlResidualAtomicPct\%. The packed kernel leads not by using the machine better
-but by playing against a roof some twenty times higher, of which it reaches a fifth. The layout has
-removed the scatter as a constraint without making the kernel either bandwidth- or arithmetic-bound,
-so what limits it is the element kernel's instruction mix and dependencies.
+\paragraph{Attained fractions.} Every matrix-free point lies below the measured ridge of
+\rlRidge{}~FLOP/byte, so the memory roof is the binding one --- but none of them is close to it.
+Against the roof binding at its own intensity the packed residual attains
+\rlResidualPackedPct\%, the packed Jacobian action \rlJacobianPackedPct\%, and the atomic sweeps
+\rlResidualAtomicPct\%, while the assembled SpMV attains \rlSpmvFSixFourPct\%. The asymmetry is the
+result: the assembled operator is genuinely bandwidth-bound and has almost nothing left to recover,
+whereas the matrix-free kernels are limited neither by bandwidth nor by arithmetic but by the
+element kernel's instruction mix and dependencies, and retain the corresponding headroom. The
+format's contribution is to need far less traffic in the first place, not to use the available
+bandwidth better.
 
-The atomic layout sits on the same axes. Both do the same
-arithmetic at the same compulsory intensity --- $\rlResidualPackedAi{}$~FLOP/byte for the
-residual --- yet reach \SI{\rlResidualPacked}{\giga\flops} and
-\SI{\rlResidualAtomic}{\giga\flops}. Since the model gives them identical intensity by
-construction, the vertical gap is exactly what the atomic implementation adds over compulsory
-traffic: re-reading each node once per incident element rather than once per pack, the global
-zeroing pass, and the atomic updates themselves.
+\paragraph{Measured against specified.} The two roof pairs differ by more than any kernel here can
+recover: the triad attains \rlBwPctSpec\% of specified bandwidth and the \textsc{gemm}
+\rlPeakPctSpec\% of specified peak. Efficiencies above are quoted against the measured roofs, with
+the specified pair drawn for reference; quoting against the specification would understate every
+kernel by those factors.
 
 %================================================================================================
 \begin{table}[t]
