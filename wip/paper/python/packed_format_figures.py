@@ -671,10 +671,12 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
         out.append(r"  \draw[%s,fill=%s!22,rounded corners=1.5pt,line width=0.5pt] "
                    r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (dcol, dcol, dx, y2b + 0.42, dx + dw, y2b + 0.92))
         out.append(r"  \node[font=\tiny] at (%.2f,%.2f) {node %d};" % (dx + dw / 2.0, y2b + 0.67, dest))
-        # Left-aligned under the box, leaving the box's right end as a clear lane for the drop.
+        # Set left of the box, not under its centre: the label is about as wide as the box, and
+        # the drop to the global field leaves from the box's right end, so anything centred here
+        # runs into it. The offset is what keeps the two apart.
         out.append(r"  \node[font=\tiny,black!50,anchor=north west] at (%.2f,%.2f) "
                    r"{row %d: \texttt{ptr}[%d..%d)};"
-                   % (dx - 0.06, y2b + 0.38, r, pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]))
+                   % (dx - 0.38, y2b + 0.38, r, pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]))
         for k in ks:
             if k in xof:
                 out.append(r"  \draw[->,>=stealth,%s,line width=0.45pt,draw opacity=0.8] "
