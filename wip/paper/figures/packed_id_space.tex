@@ -9,19 +9,19 @@
 \definecolor{PackF}{HTML}{937860}
 
 \begin{tikzpicture}[scale=1.00]
-  \fill[PackB!45] (0.000,0) rectangle (7.680,0.8);
-  \draw[black!55] (0.000,0) rectangle (7.680,0.8);
-  \node[font=\scriptsize,align=center] at (3.840,0.4) {exclusively owned\\($16$)};
-  \fill[PackB!85] (7.680,0) rectangle (9.600,0.8);
-  \draw[black!55] (7.680,0) rectangle (9.600,0.8);
-  \node[font=\scriptsize,align=center] at (8.640,0.4) {owned, shared\\($4$)};
-  \fill[black!12] (9.600,0) rectangle (12.000,0.8);
-  \draw[black!55] (9.600,0) rectangle (12.000,0.8);
-  \node[font=\scriptsize,align=center] at (10.800,0.4) {ghost\\($5$)};
-  \draw[black,line width=0.6pt] (7.680,-0.12) -- (7.680,0.92);
-  \node[font=\scriptsize,below] at (7.680,-0.14) {$n_c-n_s$};
-  \draw[black,line width=0.6pt] (9.600,-0.12) -- (9.600,0.92);
-  \node[font=\scriptsize,below] at (9.600,-0.14) {$n_c$};
+  \fill[PackB!45] (0.000,0) rectangle (3.130,0.8);
+  \draw[black!55] (0.000,0) rectangle (3.130,0.8);
+  \node[font=\scriptsize,align=center] at (1.565,0.4) {exclusively owned\\($6$)};
+  \fill[PackB!85] (3.130,0) rectangle (8.348,0.8);
+  \draw[black!55] (3.130,0) rectangle (8.348,0.8);
+  \node[font=\scriptsize,align=center] at (5.739,0.4) {owned, shared\\($10$)};
+  \fill[black!12] (8.348,0) rectangle (12.000,0.8);
+  \draw[black!55] (8.348,0) rectangle (12.000,0.8);
+  \node[font=\scriptsize,align=center] at (10.174,0.4) {ghost\\($7$)};
+  \draw[black,line width=0.6pt] (3.130,-0.12) -- (3.130,0.92);
+  \node[font=\scriptsize,below] at (3.130,-0.14) {$n_c-n_s$};
+  \draw[black,line width=0.6pt] (8.348,-0.12) -- (8.348,0.92);
+  \node[font=\scriptsize,below] at (8.348,-0.14) {$n_c$};
   \node[font=\scriptsize,below right] at (0,-0.14) {$0$};
   \node[font=\scriptsize,below left] at (12.000,-0.14) {$n_{\mathrm{pack}}$};
   \node[font=\scriptsize,anchor=west,align=left] at (0,1.55) {$\ell < n_c$:\ \ global $=$ \texttt{owned\_nodes\_ptr}$[p]+\ell$\\$\ell \ge n_c$:\ \ global $=$ \texttt{ghost\_idx}$[\,$\texttt{ghost\_ptr}$[p]+\ell-n_c\,]$};
