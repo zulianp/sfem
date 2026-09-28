@@ -388,6 +388,42 @@ def pack_node_ids(pk, p):
     return owned, list(ghosts)
 
 
+def pack_label_point(pk, p, dx=0.0, dy=0.0):
+    """A point well inside pack p, for its label.
+
+    The centroid of the pack's element centres is the obvious choice and the wrong one: a pack is
+    a contiguous range of a space-filling order, so its region is often L-shaped or notched, and
+    the centroid then drifts toward an edge or out of the pack altogether. This takes the discrete
+    pole of inaccessibility instead -- the pack's own element whose centre is farthest from any
+    element the pack does not contain -- which is inside the region by construction and away from
+    its boundary.
+    """
+    m = pk.mesh
+    mine = pk.pack_elements[p]
+    # What the label must keep away from: the other packs AND the domain boundary. Omitting the
+    # boundary put every label in a corner of the mesh, which is indeed as far from the other
+    # packs as one can get and is not the middle of anything.
+    avoid = [m.element_centre(e) for q in range(pk.n_packs) if q != p
+             for e in pk.pack_elements[q]]
+    seen = {}
+    for e in range(m.nelements):
+        nn = m.element_nodes(e)
+        for u, v in zip(nn, nn[1:] + nn[:1]):
+            key = (min(u, v), max(u, v))
+            seen[key] = seen.get(key, 0) + 1
+    for (u, v), c in seen.items():
+        if c == 1:
+            avoid.append(((m.points[u][0] + m.points[v][0]) / 2.0,
+                          (m.points[u][1] + m.points[v][1]) / 2.0))
+    best, bestd = m.element_centre(mine[0]), -1.0
+    for e in mine:
+        cx, cy = m.element_centre(e)
+        d = min(((cx - ox) ** 2 + (cy - oy) ** 2 for ox, oy in avoid), default=1e9)
+        if d > bestd:
+            best, bestd = (cx, cy), d
+    return (best[0] + dx, best[1] + dy)
+
+
 def _node_xy(pk, n):
     """A node's coordinates. Coordinates belong to the node, so they follow the renumbering."""
     return pk.mesh.coord(pk.old_of_new[n])
@@ -424,9 +460,7 @@ def fig_decomposition(pk, scale=0.78, gap=1.6):
             out.append(poly(e, "%s!30" % col))
     for p in range(pk.n_packs):
         col = PACK_COLORS[p % len(PACK_COLORS)]
-        cs = [m.element_centre(e) for e in pk.pack_elements[p]]
-        cx = sum(c[0] for c in cs) / len(cs)
-        cy = sum(c[1] for c in cs) / len(cs)
+        cx, cy = pack_label_point(pk, p)
         out.append(r"  \node[%s,font=\bfseries\scriptsize,fill=white,inner sep=1.6pt,"
                    r"rounded corners=1pt,draw=%s!60] at (%.2f,%.2f) {$P_%d$};" % (col, col, cx, cy, p))
     out.append(r"  \node[anchor=north,font=\scriptsize\itshape,black!65] at (%.2f,%.2f) "
@@ -488,9 +522,9 @@ def fig_decomposition(pk, scale=0.78, gap=1.6):
                 odx, ody = offs[pk.owner_new[n]]
                 ox, oy = _node_xy(pk, n)
                 arcs.append(((x, y), (ox + odx, oy + ody), ocol))
-        lx = sum(_node_xy(pk, n)[0] for n in owned) / len(owned) + dx
-        out.append(r"  \node[%s,font=\bfseries\scriptsize,anchor=north] at (%.2f,%.2f) {$P_%d$};"
-                   % (col, lx, label_y, p))
+        lx, ly = pack_label_point(pk, p, dx, dy)
+        out.append(r"  \node[%s,font=\bfseries\scriptsize,fill=white,inner sep=1.6pt,"
+                   r"rounded corners=1pt,draw=%s!60] at (%.2f,%.2f) {$P_%d$};" % (col, col, lx, ly, p))
 
     # ---- the relation: each ghost to the node it duplicates --------------------------------
     for (x0, y0), (x1, y1), col in arcs:
