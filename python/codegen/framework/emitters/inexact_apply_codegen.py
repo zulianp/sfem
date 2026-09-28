@@ -260,20 +260,25 @@ def _inexact_apply_kernel_source(
     # leaves the scatter naming a value that was never declared.  It passes no
     # alias dict and keeps every declaration.
     aliases = {}
+    #: The last stage is held back rather than rendered here, because where its
+    #: names belong is the variant's answer: a stored apply writes them into its
+    #: staged output buffers, a compressed one declares them and scales them into
+    #: the scatter.  `final_stage` carries the assignments so each can say.
+    final_stage = ()
+    final_prefix = ""
     for position, stage in enumerate(stages):
         assignments = [
             (symbol, expression.xreplace(aliases))
             for symbol, expression in stage.assignments
         ]
-        action_body.extend(
-            _assignment_lines(
-                assignments,
-                stage.name,
-                aliases=None if position == len(stages) - 1 else aliases,
-            )
-        )
         action_body_expressions.extend(
             expression for _symbol, expression in assignments
+        )
+        if position == len(stages) - 1:
+            final_stage, final_prefix = assignments, stage.name
+            continue
+        action_body.extend(
+            _assignment_lines(assignments, stage.name, aliases=aliases)
         )
 
     parameters = tuple(str(name) for name in parameter_names)
@@ -300,9 +305,17 @@ def _inexact_apply_kernel_source(
     # tested: `test_emission_is_a_printer` is the reason.
     for layout in plan.apply_layouts:
         lines.extend(
-            _stored_lines(prefix, n_nodes, component, plan, action_body, layout)
+            _stored_lines(
+                prefix, n_nodes, component, plan, action_body, layout,
+                final_stage, final_prefix,
+            )
         )
-    lines.extend(_compressed_lines(prefix, n_nodes, component, plan, action_body))
+    lines.extend(
+        _compressed_lines(
+            prefix, n_nodes, component, plan, action_body,
+            final_stage, final_prefix,
+        )
+    )
     lines.extend(["} // namespace codegen", "} // namespace sfem", ""])
 
     # The extern "C" definitions go in their own translation unit, the way the
@@ -483,7 +496,7 @@ def _scatter_lines(lhs, rhs, indent):
     return list(target.scatter_add_lines(lhs, rhs, indent))
 
 
-def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
+def _assignment_lines(assignments, prefix, indent="    ", aliases=None, destinations=None):
     """Common subexpressions first, then the named values, as C declarations.
 
     When `aliases` is a dict, a named value whose reduced expression is a bare
@@ -538,9 +551,32 @@ def _assignment_lines(assignments, prefix, indent="    ", aliases=None):
             aliases[symbol] = expression
             continue
         lines.append(
-            "%sconst s_t %s = %s;" % (indent, symbol, _sfem_ccode(expression))
+            _NAMED_VALUE[str(symbol) in (destinations or {})](
+                indent, symbol, _sfem_ccode(expression), destinations or {}
+            )
         )
     return lines
+
+
+#: How a stage's named value is written: as its own `const s_t`, or straight into
+#: the buffer the caller says it belongs in.
+#:
+#: The last stage's names are the kernel's outputs, and the stored variants copied
+#: each one into a staged buffer on the line after declaring it -- `bout0_0[lane]
+#: = element_out0_0;`, 322 of them across the four PROTEUS_HEX8 and TET10
+#: headers, which is the remainder of ISSUES.md item 5.  A destination makes the
+#: declaration the store.
+#:
+#: Not every consumer wants that: the compressed variant scales its outputs into
+#: an indirect scatter outside this loop, so there the names stay declared.
+_NAMED_VALUE = {
+    False: lambda indent, symbol, expression, destinations: (
+        "%sconst s_t %s = %s;" % (indent, symbol, expression)
+    ),
+    True: lambda indent, symbol, expression, destinations: (
+        "%s%s = %s;" % (indent, destinations[str(symbol)], expression)
+    ),
+}
 
 
 def _element_lines(n_nodes, indent="    "):
@@ -1234,7 +1270,10 @@ def _tangent_lines(
 
 
 
-def _stored_lines(prefix, n_nodes, component, plan, action_body, layout="standard"):
+def _stored_lines(
+    prefix, n_nodes, component, plan, action_body, layout="standard",
+    final_stage=(), final_prefix="",
+):
     """The apply: stored tangent and the vector, and nothing else.
 
     Two layouts, one arithmetic.  Everything between the gather and the scatter is
@@ -1269,10 +1308,22 @@ def _stored_lines(prefix, n_nodes, component, plan, action_body, layout="standar
         for slot in range(plan.tangent_components)
     )
     compute.extend("  %s" % line for line in action_body)
+    # Straight into the staged buffers.  This used to declare `element_out0_0`
+    # and copy it into `bout0_0[lane]` on the next line, which is ISSUES.md
+    # item 5's shape in the one emitter the AST pass cannot reach -- these lines
+    # are text, so the declaration was never a node.
     compute.extend(
-        "      bout%d_%d%s = element_out%d_%d;" % (index, node, _work_item(), index, node)
-        for index in range(len(component))
-        for node in range(n_nodes)
+        "  %s" % line
+        for line in _assignment_lines(
+            final_stage,
+            final_prefix,
+            destinations={
+                "element_out%d_%d" % (index, node): "bout%d_%d%s"
+                % (index, node, _work_item())
+                for index in range(len(component))
+                for node in range(n_nodes)
+            },
+        )
     )
     store = _STORED_SCATTER_BY_LAYOUT[layout](component, n_nodes)
 
@@ -1295,7 +1346,9 @@ def _standard_stored_prologue(_component, _n_components):
     ]
 
 
-def _compressed_lines(prefix, n_nodes, component, plan, action_body):
+def _compressed_lines(
+    prefix, n_nodes, component, plan, action_body, final_stage=(), final_prefix="",
+):
     """The same apply from a scaled low-precision store.
 
     The scale multiplies the outputs, not the tangent: the action is linear in
@@ -1311,6 +1364,9 @@ def _compressed_lines(prefix, n_nodes, component, plan, action_body):
         for slot in range(plan.tangent_components)
     )
     body.extend(action_body)
+    # Declared, not stored: the scatter below multiplies each one by the scale and
+    # accumulates it into an indirect address outside any lane loop.
+    body.extend(_assignment_lines(final_stage, final_prefix))
     body.extend(_scatter_body(component, n_nodes, scale="scale * "))
 
     signature = ["    const ptrdiff_t nelements,", "    idx_t **const RSTR elements,"]

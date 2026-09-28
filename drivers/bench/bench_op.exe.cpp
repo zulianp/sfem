@@ -325,6 +325,15 @@ int main(int argc, char *argv[]) {
 
             double start = MPI_Wtime();
             f->update(x->data());
+            //: The partially assembled tangent belongs to the linearization, so
+            //: `create_linear_operator` does not build it -- a Newton step calls
+            //: `inexact_update` once and applies the operator for every Krylov
+            //: iteration.  A benchmark is that caller here, and without this the
+            //: first apply aborts with "requires inexact_update first".  It is
+            //: inside the timed region because it is what the Newton step pays.
+            if (op_desc.type == sfem::op_type::INEXACT && f->inexact_supported()) {
+                f->inexact_update(x->data());
+            }
             auto   linear_op = sfem::create_linear_operator(op_desc.type, f, x, es);
             double stop      = MPI_Wtime();
             op_desc.setup    = stop - start;

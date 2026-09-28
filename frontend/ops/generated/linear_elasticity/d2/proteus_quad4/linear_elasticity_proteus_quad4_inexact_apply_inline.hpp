@@ -252,22 +252,14 @@ static SFEM_INLINE int linear_elasticity_proteus_quad4_inexact_apply_stored_a_ms
       const s_t output_t5 = reference_product_t13*tangent5 + reference_product_t30*tangent8;
       const s_t output_t6 = reference_product_t15*tangent5 + reference_product_t32*tangent8;
       const s_t output_t7 = reference_product_t12*tangent3 + reference_product_t29*tangent8;
-      const s_t element_out0_0 = output_t0 + output_t1 + reference_product_t14*tangent4 + reference_product_t20*tangent2 + reference_product_t3*tangent0 + reference_product_t31*tangent6;
-      const s_t element_out0_1 = output_t0 + output_t2 + pa_g0_0_1_0*tangent0 + pa_g1_0_1_0*tangent2 + reference_product_t16*tangent4 + reference_product_t33*tangent6;
-      const s_t element_out0_2 = output_t1 + output_t3 + pa_g0_1_2_1*tangent4 + pa_g1_1_2_1*tangent6 + reference_product_t11*tangent0 + reference_product_t28*tangent2;
-      const s_t element_out0_3 = output_t2 + output_t3 + pa_g0_0_3_0*tangent0 + pa_g0_1_3_1*tangent4 + pa_g1_0_3_0*tangent2 + pa_g1_1_3_1*tangent6;
-      const s_t element_out1_0 = output_t4 + output_t5 + reference_product_t14*tangent6 + reference_product_t20*tangent7 + reference_product_t3*tangent2 + reference_product_t31*tangent9;
-      const s_t element_out1_1 = output_t4 + output_t6 + pa_g0_0_1_0*tangent2 + pa_g1_0_1_0*tangent7 + reference_product_t16*tangent6 + reference_product_t33*tangent9;
-      const s_t element_out1_2 = output_t5 + output_t7 + pa_g0_1_2_1*tangent6 + pa_g1_1_2_1*tangent9 + reference_product_t11*tangent2 + reference_product_t28*tangent7;
-      const s_t element_out1_3 = output_t6 + output_t7 + pa_g0_0_3_0*tangent2 + pa_g0_1_3_1*tangent6 + pa_g1_0_3_0*tangent7 + pa_g1_1_3_1*tangent9;
-      bout0_0[lane] = element_out0_0;
-      bout0_1[lane] = element_out0_1;
-      bout0_2[lane] = element_out0_2;
-      bout0_3[lane] = element_out0_3;
-      bout1_0[lane] = element_out1_0;
-      bout1_1[lane] = element_out1_1;
-      bout1_2[lane] = element_out1_2;
-      bout1_3[lane] = element_out1_3;
+      bout0_0[lane] = output_t0 + output_t1 + reference_product_t14*tangent4 + reference_product_t20*tangent2 + reference_product_t3*tangent0 + reference_product_t31*tangent6;
+      bout0_1[lane] = output_t0 + output_t2 + pa_g0_0_1_0*tangent0 + pa_g1_0_1_0*tangent2 + reference_product_t16*tangent4 + reference_product_t33*tangent6;
+      bout0_2[lane] = output_t1 + output_t3 + pa_g0_1_2_1*tangent4 + pa_g1_1_2_1*tangent6 + reference_product_t11*tangent0 + reference_product_t28*tangent2;
+      bout0_3[lane] = output_t2 + output_t3 + pa_g0_0_3_0*tangent0 + pa_g0_1_3_1*tangent4 + pa_g1_0_3_0*tangent2 + pa_g1_1_3_1*tangent6;
+      bout1_0[lane] = output_t4 + output_t5 + reference_product_t14*tangent6 + reference_product_t20*tangent7 + reference_product_t3*tangent2 + reference_product_t31*tangent9;
+      bout1_1[lane] = output_t4 + output_t6 + pa_g0_0_1_0*tangent2 + pa_g1_0_1_0*tangent7 + reference_product_t16*tangent6 + reference_product_t33*tangent9;
+      bout1_2[lane] = output_t5 + output_t7 + pa_g0_1_2_1*tangent6 + pa_g1_1_2_1*tangent9 + reference_product_t11*tangent2 + reference_product_t28*tangent7;
+      bout1_3[lane] = output_t6 + output_t7 + pa_g0_0_3_0*tangent2 + pa_g0_1_3_1*tangent6 + pa_g1_0_3_0*tangent7 + pa_g1_1_3_1*tangent9;
     }
     for (int lane = 0; lane < ne; ++lane) {
       #pragma omp atomic update

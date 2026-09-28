@@ -171,18 +171,12 @@ static SFEM_INLINE int linear_elasticity_tri3_inexact_apply_stored_a_msoa_impl(
       const s_t output_t1 = ((s_t(1) / s_t(2)))*pa_q0_0_1;
       const s_t output_t2 = ((s_t(1) / s_t(2)))*pa_q1_0_0;
       const s_t output_t3 = ((s_t(1) / s_t(2)))*pa_q1_0_1;
-      const s_t element_out0_0 = output_t0 + output_t1;
-      const s_t element_out0_1 = -output_t0;
-      const s_t element_out0_2 = -output_t1;
-      const s_t element_out1_0 = output_t2 + output_t3;
-      const s_t element_out1_1 = -output_t2;
-      const s_t element_out1_2 = -output_t3;
-      bout0_0[lane] = element_out0_0;
-      bout0_1[lane] = element_out0_1;
-      bout0_2[lane] = element_out0_2;
-      bout1_0[lane] = element_out1_0;
-      bout1_1[lane] = element_out1_1;
-      bout1_2[lane] = element_out1_2;
+      bout0_0[lane] = output_t0 + output_t1;
+      bout0_1[lane] = -output_t0;
+      bout0_2[lane] = -output_t1;
+      bout1_0[lane] = output_t2 + output_t3;
+      bout1_1[lane] = -output_t2;
+      bout1_2[lane] = -output_t3;
     }
     for (int lane = 0; lane < ne; ++lane) {
       #pragma omp atomic update
