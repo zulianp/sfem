@@ -46,12 +46,12 @@
   \node[anchor=west,font=\tiny,black!60] at (8.67,-1.78) {ghost contributions};
   \draw[PackA,fill=PackA!22,rounded corners=1.5pt,line width=0.5pt] (1.42,-4.03) rectangle (2.87,-3.53);
   \node[font=\tiny] at (2.15,-3.78) {node $i$};
-  \node[font=\tiny,black!50,anchor=north west] at (0.70,-4.07) {row $k$: \texttt{ptr}[$k$..$k{+}1$)};
+  \node[font=\tiny,black!50,anchor=north west] at (0.70,-4.07) {row $k$: \texttt{idx}[$a$..$b$)};
   \draw[->,>=stealth,PackA,line width=0.45pt,draw opacity=0.8] (3.635,-1.97) to[out=-90,in=90] (2.15,-3.51);
   \draw[->,>=stealth,PackA,line width=0.45pt,draw opacity=0.8] (8.042,-1.97) to[out=-90,in=90] (2.15,-3.51);
   \draw[PackA,fill=PackA!22,rounded corners=1.5pt,line width=0.5pt] (6.75,-4.03) rectangle (8.20,-3.53);
   \node[font=\tiny] at (7.48,-3.78) {node $i{+}1$};
-  \node[font=\tiny,black!50,anchor=north west] at (5.81,-4.07) {row $k{+}1$: \texttt{ptr}[$k{+}1$..$k{+}2$)};
+  \node[font=\tiny,black!50,anchor=north west] at (5.81,-4.07) {row $k{+}1$: \texttt{idx}[$b$..$c$)};
   \draw[->,>=stealth,PackA,line width=0.45pt,draw opacity=0.8] (3.974,-1.97) to[out=-90,in=90] (7.48,-3.51);
   \draw[->,>=stealth,PackA,line width=0.45pt,draw opacity=0.8] (5.330,-1.97) to[out=-90,in=90] (7.48,-3.51);
   \draw[black!45,fill=black!5,rounded corners=2pt,line width=0.6pt] (1.12,-4.95) rectangle (8.50,-4.53);
