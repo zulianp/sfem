@@ -652,14 +652,18 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
     # ---- phase 1: a private accumulator per pack ------------------------------------------
     bw = (R - L - 1.0) / len(packs) - 0.2
     bx = {}
+    # The box's own extent, named once: the label goes at ITS centre. Deriving the label's y from
+    # the band instead put it a quarter of the box height above centre, which reads as a caption
+    # stuck to the top edge rather than as the box's name.
+    box_b, box_t = y1b + 0.28, y1t - 0.34
     for i, p in enumerate(packs):
         col = PACK_COLORS[p % len(PACK_COLORS)]
         x = L + 0.5 + i * (bw + 0.2)
         bx[p] = x + bw / 2.0
         out.append(r"  \draw[%s,fill=%s!18,rounded corners=2pt,line width=0.6pt] "
-                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (col, col, x, y1b + 0.28, x + bw, y1t - 0.34))
+                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (col, col, x, box_b, x + bw, box_t))
         out.append(r"  \node[%s,font=\bfseries] at (%.2f,%.2f) {$P_%d$};"
-                   % (col, x + bw / 2.0, (y1t + y1b) / 2.0 + 0.10, p))
+                   % (col, x + bw / 2.0, (box_b + box_t) / 2.0, p))
     out.append(r"  \node[anchor=east,font=\tiny,black!55] at (%.2f,%.2f) "
                r"{pack-private accumulators};" % (R - 0.14, y1t - 0.20))
 
@@ -687,7 +691,7 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
         mid = (xof[lo] + xof[hi_ - 1]) / 2.0
         out.append(r"  \draw[->,>=stealth,%s,line width=0.55pt,draw opacity=0.9] "
                    r"(%.2f,%.2f) to[out=-90,in=90] (%.2f,%.2f);"
-                   % (col, bx[p], y1b + 0.26, mid, ybuf + 0.36))
+                   % (col, bx[p], box_b, mid, ybuf + 0.36))
     out.append(r"  \node[anchor=west,font=\tiny,black!60] at (%.2f,%.2f) {ghost contributions};"
                % (bufx + len(entries) * cw + 0.12, ybuf + 0.17))
 
@@ -726,7 +730,7 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
     # path that needs no reduction is also the one that touches nothing on its way.
     out.append(r"  \draw[->,>=stealth,black!55,line width=0.7pt] "
                r"(%.2f,%.2f) to[out=180,in=90] (%.2f,%.2f) to[out=-90,in=180] (%.2f,%.2f);"
-               % (L + 0.5, (y1t + y1b) / 2.0, LANE, (y1b + yglob) / 2.0, L + 0.52, yglob + 0.21))
+               % (L + 0.5, (box_b + box_t) / 2.0, LANE, (y1b + yglob) / 2.0, L + 0.52, yglob + 0.21))
     out.append(r"  \node[font=\tiny,black!60,rotate=90,anchor=south] at (%.2f,%.2f) {owned rows};"
                % (LANE - 0.06, (y1b + yglob) / 2.0))
     for dx in dxs:
