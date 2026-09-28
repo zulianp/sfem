@@ -334,12 +334,13 @@ the rest of the paper rests on:
 \begin{figure}[t]
   \centering
   \resizebox{\columnwidth}{!}{\input{figures/packed_reduction}}
-  \caption{The two phases of an apply, for the packs detached in
+  \caption{The two phases of an apply, over all $\figPackNPacks$ packs of
     Figure~\ref{fig:decomposition}. Phase one accumulates into a pack-private buffer and writes
     the owned rows straight out, staging only the ghost contributions; phase two gathers those,
-    one row of the reduction graph per destination. Cells carry the colour of the pack that
-    staged them. The mesh has $\figPackGhostEntries$ staged entries in $\figPackReduceRows$ rows;
-    those drawn are the rows summing more than one term.}
+    one row of the reduction graph per destination, so the gather is a single global pass and not
+    a per-neighbour exchange. Cells carry the colour of the pack that staged them. The mesh has
+    $\figPackGhostEntries$ staged entries in $\figPackReduceRows$ rows; those drawn are the rows
+    summing more than one term.}
   \label{fig:reduction}
 \end{figure}
 
