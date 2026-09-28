@@ -605,6 +605,41 @@ def fig_id_space(pk, p, scale=1.0):
     return "\n".join(out) + "\n"
 
 
+def _sym(base, t):
+    """`i`, `i+1`, `i+2`, ... as TeX. The braces keep the sign tight against the digit."""
+    return base if t == 0 else r"%s{+}%d" % (base, t)
+
+
+def reduction_rows_shown(pk, max_rows=2):
+    """The reduction rows the figure draws, and whether they may be labelled symbolically.
+
+    Returns (rows, symbolic). A row worth drawing sums more than one term -- a single-term row
+    shows nothing about summation. Beyond that the figure prefers a run of CONSECUTIVE rows whose
+    destinations are also consecutive, because only then may it label them row $k$, row $k{+}1$
+    against node $i$, node $i{+}1$. Rows are ordered by destination, so consecutive rows have
+    increasing destinations, but not necessarily adjacent ones; a run that does not qualify is
+    drawn with its actual indices rather than labelled with a relation the data does not have.
+    """
+    multi = []
+    for r in range(len(pk.ghost_reduce_dest)):
+        ks = pk.ghost_reduce_idx[pk.ghost_reduce_ptr[r]:pk.ghost_reduce_ptr[r + 1]]
+        if len(ks) >= 2:
+            multi.append((r, ks))
+    have = {r for r, _ in multi}
+    for i, (r, _ks) in enumerate(multi):
+        run = [multi[i]]
+        while len(run) < max_rows:
+            nxt = run[-1][0] + 1
+            if nxt not in have:
+                break
+            if pk.ghost_reduce_dest[nxt] != pk.ghost_reduce_dest[nxt - 1] + 1:
+                break
+            run.append(next(x for x in multi if x[0] == nxt))
+        if len(run) >= 2:
+            return run, True
+    return sorted(multi, key=lambda rk: -len(rk[1]))[:max_rows], False
+
+
 def fig_reduction(pk, scale=0.92, max_rows=4):
     """F3: the apply's two phases, framed.
 
@@ -624,12 +659,7 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
     for p in packs:
         for k in range(pk.ghost_ptr[p], pk.ghost_ptr[p + 1]):
             entries.append((k, p, pk.ghost_idx[k]))
-    rows = []
-    for r in range(len(pk.ghost_reduce_dest)):
-        ks = pk.ghost_reduce_idx[pk.ghost_reduce_ptr[r]:pk.ghost_reduce_ptr[r + 1]]
-        if len(ks) >= 2:
-            rows.append((r, ks))
-    rows = sorted(rows, key=lambda rk: -len(rk[1]))[:max_rows]
+    rows, symbolic = reduction_rows_shown(pk, min(max_rows, 2))
     rows.sort()
     shown = [k for _r, ks in rows for k in ks]
 
@@ -705,16 +735,27 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
         dx = L + 0.8 + i * ((R - L - 1.6 - dw) / max(1, n - 1) if n > 1 else 0)
         # The drop to the global field leaves from the box's right, so it does not run through
         # the row label centred beneath it.
-        dxs.append(dx + dw - 0.18)
+        dxs.append(dx + dw - 0.08)
         out.append(r"  \draw[%s,fill=%s!22,rounded corners=1.5pt,line width=0.5pt] "
                    r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (dcol, dcol, dx, y2b + 0.42, dx + dw, y2b + 0.92))
-        out.append(r"  \node[font=\tiny] at (%.2f,%.2f) {node %d};" % (dx + dw / 2.0, y2b + 0.67, dest))
+        # Symbolic indices where the data supports them: what the figure is about is the shape of
+        # the gather, not which node happened to land in row six of this mesh.
+        if symbolic:
+            node_lbl = r"node $%s$" % _sym("i", i)
+            row_lbl = (r"row $%s$: \texttt{ptr}[$%s$..$%s$)"
+                       % (_sym("k", i), _sym("k", i), _sym("k", i + 1)))
+        else:
+            node_lbl = r"node %d" % dest
+            row_lbl = (r"row %d: \texttt{ptr}[%d..%d)"
+                       % (r, pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]))
+        out.append(r"  \node[font=\tiny] at (%.2f,%.2f) {%s};" % (dx + dw / 2.0, y2b + 0.67, node_lbl))
         # Set left of the box, not under its centre: the label is about as wide as the box, and
         # the drop to the global field leaves from the box's right end, so anything centred here
         # runs into it. The offset is what keeps the two apart.
-        out.append(r"  \node[font=\tiny,black!50,anchor=north west] at (%.2f,%.2f) "
-                   r"{row %d: \texttt{ptr}[%d..%d)};"
-                   % (dx - 0.38, y2b + 0.38, r, pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]))
+        # The offset grows with the index because the label does: "row k+1: ptr[k+1..k+2)" is
+        # wider than "row k: ptr[k..k+1)", and a fixed offset left the later one under its arrow.
+        out.append(r"  \node[font=\tiny,black!50,anchor=north west] at (%.2f,%.2f) {%s};"
+                   % (dx - 0.72 - 0.22 * i, y2b + 0.38, row_lbl))
         for k in ks:
             if k in xof:
                 out.append(r"  \draw[->,>=stealth,%s,line width=0.45pt,draw opacity=0.8] "
@@ -997,22 +1038,30 @@ def selftest():
     check(dec.count("fill opacity=0.30") == nghost,
           "F1 draws exactly one faded node per ghost id",
           "faded %d, ghosts %d" % (dec.count("fill opacity=0.30"), nghost))
-    # Every row F3 draws is a real reduction row, drawn with the model's own pointers, and every
-    # row it draws sums at least two terms -- a one-term row would illustrate nothing. Counted
-    # rather than short-circuited: a tag that never matches would make this check vacuous, which
-    # is exactly how the first version of it passed while testing nothing.
+    # What F3 draws must be real. Every row it selects sums at least two terms -- a one-term row
+    # illustrates nothing about summation -- and the arrows it draws are one per entry of those
+    # rows. Checked against the selection rather than by matching label text: the labels are now
+    # symbolic, and a check that greps for them would pass while testing nothing, which is exactly
+    # how an earlier version of this check behaved.
     red = fig_reduction(fpk)
-    drawn = 0
-    for r in range(len(fpk.ghost_reduce_dest)):
-        tag = "row %d: " % r
-        if tag not in red:
-            continue
-        drawn += 1
-        ks = fpk.ghost_reduce_idx[fpk.ghost_reduce_ptr[r]:fpk.ghost_reduce_ptr[r + 1]]
-        check(len(ks) >= 2, "F3 row %d sums several terms" % r)
-        check(("[%d..%d)" % (fpk.ghost_reduce_ptr[r], fpk.ghost_reduce_ptr[r + 1])) in red,
-              "F3 row %d carries the model's own pointer range" % r)
-    check(drawn > 0, "F3 draws at least one reduction row", "drew %d" % drawn)
+    sel, sym = reduction_rows_shown(fpk)
+    check(len(sel) >= 2, "F3 selects at least two reduction rows", "got %d" % len(sel))
+    check(all(len(ks) >= 2 for _r, ks in sel), "every row F3 draws sums several terms")
+    check(red.count("node $") + red.count("{node ") >= len(sel),
+          "F3 draws one destination per selected row")
+    nterms = sum(len(ks) for _r, ks in sel)
+    check(red.count("to[out=-90,in=90]") >= nterms,
+          "F3 draws one fan-in arrow per entry of the rows it shows",
+          "arrows %d, entries %d" % (red.count("to[out=-90,in=90]"), nterms))
+    # The symbolic labels assert two relations. They may only be used when the data has them.
+    if sym:
+        idx = [r for r, _ in sel]
+        check(all(b == a + 1 for a, b in zip(idx, idx[1:])),
+              "F3's row $k$, $k{+}1$ labels are used only on consecutive rows")
+        dst = [fpk.ghost_reduce_dest[r] for r in idx]
+        check(all(b == a + 1 for a, b in zip(dst, dst[1:])),
+              "F3's node $i$, $i{+}1$ labels are used only on consecutive destinations")
+        check("$i$" in red and "$k$" in red, "F3 emits the symbolic indices it selected for")
 
     print()
     if fails:
