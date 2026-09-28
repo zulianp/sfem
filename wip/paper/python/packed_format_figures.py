@@ -741,9 +741,13 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
         # Symbolic indices where the data supports them: what the figure is about is the shape of
         # the gather, not which node happened to land in row six of this mesh.
         if symbolic:
+            # The row index is k; the range is over ENTRIES, which is a different thing and so
+            # gets its own letters. Consecutive rows share a bound -- row k ends where row k{+}1
+            # begins -- which is what a..b, b..c says and is true of the graph by construction.
+            bounds = "abcdefgh"
             node_lbl = r"node $%s$" % _sym("i", i)
-            row_lbl = (r"row $%s$: \texttt{ptr}[$%s$..$%s$)"
-                       % (_sym("k", i), _sym("k", i), _sym("k", i + 1)))
+            row_lbl = (r"row $%s$: \texttt{idx}[$%s$..$%s$)"
+                       % (_sym("k", i), bounds[i], bounds[i + 1]))
         else:
             node_lbl = r"node %d" % dest
             row_lbl = (r"row %d: \texttt{ptr}[%d..%d)"
@@ -1062,6 +1066,11 @@ def selftest():
         check(all(b == a + 1 for a, b in zip(dst, dst[1:])),
               "F3's node $i$, $i{+}1$ labels are used only on consecutive destinations")
         check("$i$" in red and "$k$" in red, "F3 emits the symbolic indices it selected for")
+        # a..b, b..c claims consecutive rows share a bound. The CSR gives that, and the check
+        # keeps the labels honest if the selection ever stops being a contiguous run.
+        check(all(fpk.ghost_reduce_ptr[a + 1] == fpk.ghost_reduce_ptr[b]
+                  for a, b in zip(idx, idx[1:])),
+              "F3's a..b, b..c labels are used only where the rows share a bound")
 
     print()
     if fails:
