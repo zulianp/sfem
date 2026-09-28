@@ -583,6 +583,18 @@ LADDER = [
 ]
 
 
+def ladder_ratios(rows, op="residual", n=128):
+    """The first and last rungs of the completeness ladder, which the prose quotes."""
+    at_n = [r for r in rows if r["_n"] == n and r["operation"] == op]
+    got = []
+    for _label, sel in LADDER:
+        p = best(at_n, ran_layout="packed", **sel)
+        a = best(at_n, ran_layout="atomic", **sel)
+        if p is not None and a is not None:
+            got.append(p / a)
+    return (got[0], got[-1]) if got else (None, None)
+
+
 def table_ladder(rows, op="residual", n=128):
     at_n = [r for r in rows if r["_n"] == n and r["operation"] == op]
     out = [PREAMBLE, r"\begin{tabular}{lrrr}", r"\toprule",
@@ -643,6 +655,12 @@ def macros_throughput(rows, host, n=128, provisional=False):
                  if r["operation"] == "bsr_apply" and r["bsr_storage"] == store), default=None)
         if v:
             out.append(r"\newcommand{\camp%s}{%.0f}" % (name, v))
+    # The completeness ladder's first and last rungs, so the prose can state the range without
+    # a number being typed next to a table that already carries it.
+    lo, hi = ladder_ratios(rows, n=n)
+    if lo and hi:
+        out.append(r"\newcommand{\ladderBare}{$%.2f\times$}" % lo)
+        out.append(r"\newcommand{\ladderFull}{$%.2f\times$}" % hi)
     return "\n".join(out) + "\n"
 
 
