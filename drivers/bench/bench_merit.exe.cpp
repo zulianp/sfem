@@ -306,11 +306,6 @@ int main(int argc, char *argv[]) {
                 static_cast<smesh::ElemType>(element) == smesh::TET4 && block == 3) {
                 auto patch = sfem::build_patch_incidence(mesh);
                 std::vector<real_t> accumulator((size_t)ndofs, 0);
-                const void *grad_ref[3] = {
-                        sfem::codegen::ref_tet4_q1<real_t>::grad_ref_x(),
-                        sfem::codegen::ref_tet4_q1<real_t>::grad_ref_y(),
-                        sfem::codegen::ref_tet4_q1<real_t>::grad_ref_z(),
-                };
                 const real_t mu = real_t(1), lmbda = real_t(1);
                 const real_t eta_s = real_t(0.1), eta_b = real_t(0), dt_shift = real_t(1);
                 double patch_first = 0;
@@ -336,12 +331,6 @@ int main(int argc, char *argv[]) {
                                 patch->element_local->data(),
                                 mesh->elements(0)->data(),
                                 const_cast<const geom_t *const *>(mesh->points()->data()),
-                                // No `shape`: this material's residual
-                                // contracts only test gradients, and the
-                                // kernel names a reference table only where it
-                                // reads one.
-                                grad_ref,
-                                sfem::codegen::quad_tet_q1<real_t>::q_weight(),
                                 eta_b, eta_s, lmbda, mu, dt_shift,
                                 nsteps, steps.data(),
                                 x_host->data(), h_host->data(), previous_host->data(),

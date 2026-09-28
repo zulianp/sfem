@@ -11,18 +11,16 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
@@ -91,7 +89,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_proteus_
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -128,14 +126,13 @@ __global__ void linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl(
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
-    s_t bh_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -145,53 +142,53 @@ __global__ void linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy, hz};
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
-    s_t badj0_data[VS];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
-    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
-    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
-    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
-    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
-    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data;
+    const s_t *const badj4 = ageom_stream<s_t, g_t>(
+        g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data;
+    const s_t *const badj5 = ageom_stream<s_t, g_t>(
+        g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data;
+    const s_t *const badj6 = ageom_stream<s_t, g_t>(
+        g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data;
+    const s_t *const badj7 = ageom_stream<s_t, g_t>(
+        g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data;
+    const s_t *const badj8 = ageom_stream<s_t, g_t>(
+        g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
     for (int step = 0; step < nsteps; ++step) {
       {
@@ -199,7 +196,7 @@ __global__ void linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl(
       }
     }
 
-    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS>(0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -241,13 +238,13 @@ extern "C" int cu_linear_elasticity_proteus_hex8_objective_steps_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+        sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+        sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_objective_steps_a_msoa_impl");
     }
     default:
@@ -260,7 +257,7 @@ extern "C" int cu_linear_elasticity_proteus_hex8_objective_steps_a_msoa(
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -292,25 +289,24 @@ __global__ void linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl(
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
-    s_t bh_data[NS * NC][VS];
-    s_t bcoordinate_data[NS * ND][VS];
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bh_data[NS * NC];
+    s_t bcoordinate_data[NS * ND];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -318,10 +314,10 @@ __global__ void linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl(
     const g_t *const coordinate_components[ND] = {x, y, z};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < ND; ++d) {
         {
-          bcoordinate_data[shape * ND + d][0] = coordinate_components[d][ev_shape[0]];
+          bcoordinate_data[shape * ND + d] = coordinate_components[d][ev_shape[0]];
         }
       }
     }
@@ -330,38 +326,38 @@ __global__ void linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy, hz};
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
 
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
         coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
-        coordinate_grad_ref + 2 * NQ * ND * VS);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
     for (int step = 0; step < nsteps; ++step) {
       {
@@ -369,7 +365,7 @@ __global__ void linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl(
       }
     }
 
-    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
+    linear_elasticity_d3_tensor_product_objective_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bh_streams, nsteps, steps, nelements, &value[evb]);
   }
 
 }
@@ -402,13 +398,13 @@ extern "C" int cu_linear_elasticity_proteus_hex8_objective_steps_i_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
+        sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, nsteps, (const double *)steps, (double *)value);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
+        sfem::codegen::linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, nsteps, (const float *)steps, (float *)value);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_objective_steps_i_msoa_impl");
     }
     default:
@@ -476,7 +472,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_proteus_
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void linear_elasticity_proteus_hex8_gradient_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -510,14 +506,13 @@ __global__ void linear_elasticity_proteus_hex8_gradient_a_msoa_impl(
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bout_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -525,67 +520,67 @@ __global__ void linear_elasticity_proteus_hex8_gradient_a_msoa_impl(
     const s_t *const u_components[NC] = {ux, uy, uz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
-    s_t badj0_data[VS];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
-    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
-    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
-    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
-    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
-    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data;
+    const s_t *const badj4 = ageom_stream<s_t, g_t>(
+        g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data;
+    const s_t *const badj5 = ageom_stream<s_t, g_t>(
+        g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data;
+    const s_t *const badj6 = ageom_stream<s_t, g_t>(
+        g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data;
+    const s_t *const badj7 = ageom_stream<s_t, g_t>(
+        g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data;
+    const s_t *const badj8 = ageom_stream<s_t, g_t>(
+        g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    linear_elasticity_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
+    linear_elasticity_d3_tensor_product_gradient_block<s_t, NQ, NS>(0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -626,13 +621,13 @@ extern "C" int cu_linear_elasticity_proteus_hex8_gradient_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_gradient_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::linear_elasticity_proteus_hex8_gradient_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_gradient_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_gradient_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::linear_elasticity_proteus_hex8_gradient_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_gradient_a_msoa_impl");
     }
     default:
@@ -645,7 +640,7 @@ extern "C" int cu_linear_elasticity_proteus_hex8_gradient_a_msoa(
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void linear_elasticity_proteus_hex8_gradient_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -674,25 +669,24 @@ __global__ void linear_elasticity_proteus_hex8_gradient_i_msoa_impl(
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bu_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
-    s_t bcoordinate_data[NS * ND][VS];
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    idx_t ev[NS];
+    s_t bu_data[NS * NC];
+    s_t bout_data[NS * NC];
+    s_t bcoordinate_data[NS * ND];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -700,62 +694,62 @@ __global__ void linear_elasticity_proteus_hex8_gradient_i_msoa_impl(
     const g_t *const coordinate_components[ND] = {x, y, z};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < ND; ++d) {
         {
-          bcoordinate_data[shape * ND + d][0] = coordinate_components[d][ev_shape[0]];
+          bcoordinate_data[shape * ND + d] = coordinate_components[d][ev_shape[0]];
         }
       }
     }
     const s_t *const u_components[NC] = {ux, uy, uz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bu_data[shape * NC + d][0] = u_components[d][node * u_stride];
+          bu_data[shape * NC + d] = u_components[d][node * u_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bu_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bu_streams[stream] = bu_data[stream];
+      bu_streams[stream] = &bu_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
 
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
         coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
-        coordinate_grad_ref + 2 * NQ * ND * VS);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    linear_elasticity_d3_tensor_product_gradient_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
+    linear_elasticity_d3_tensor_product_gradient_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bu_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -787,13 +781,13 @@ extern "C" int cu_linear_elasticity_proteus_hex8_gradient_i_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_gradient_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::linear_elasticity_proteus_hex8_gradient_i_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const double *)ux, (const double *)uy, (const double *)uz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_gradient_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_gradient_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::linear_elasticity_proteus_hex8_gradient_i_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, u_stride, (const float *)ux, (const float *)uy, (const float *)uz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_gradient_i_msoa_impl");
     }
     default:
@@ -861,7 +855,7 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_linear_elasticity_proteus_
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void linear_elasticity_proteus_hex8_apply_a_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -895,14 +889,13 @@ __global__ void linear_elasticity_proteus_hex8_apply_a_msoa_impl(
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bh_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
+    idx_t ev[NS];
+    s_t bh_data[NS * NC];
+    s_t bout_data[NS * NC];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -910,67 +903,67 @@ __global__ void linear_elasticity_proteus_hex8_apply_a_msoa_impl(
     const s_t *const h_components[NC] = {hx, hy, hz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
-    s_t badj0_data[VS];
-    const s_t *const badj0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj0 + evb, badj0_data, std::is_same<g_t, s_t>());
-    s_t badj1_data[VS];
-    const s_t *const badj1 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj1 + evb, badj1_data, std::is_same<g_t, s_t>());
-    s_t badj2_data[VS];
-    const s_t *const badj2 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj2 + evb, badj2_data, std::is_same<g_t, s_t>());
-    s_t badj3_data[VS];
-    const s_t *const badj3 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj3 + evb, badj3_data, std::is_same<g_t, s_t>());
-    s_t badj4_data[VS];
-    const s_t *const badj4 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj4 + evb, badj4_data, std::is_same<g_t, s_t>());
-    s_t badj5_data[VS];
-    const s_t *const badj5 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj5 + evb, badj5_data, std::is_same<g_t, s_t>());
-    s_t badj6_data[VS];
-    const s_t *const badj6 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj6 + evb, badj6_data, std::is_same<g_t, s_t>());
-    s_t badj7_data[VS];
-    const s_t *const badj7 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj7 + evb, badj7_data, std::is_same<g_t, s_t>());
-    s_t badj8_data[VS];
-    const s_t *const badj8 = ageom_stream<s_t, g_t, VS>(
-        ne, g_adj8 + evb, badj8_data, std::is_same<g_t, s_t>());
-    s_t bdet0_data[VS];
-    const s_t *const bdet0 = ageom_stream<s_t, g_t, VS>(
-        ne, g_det0 + evb, bdet0_data, std::is_same<g_t, s_t>());
+    s_t badj0_data;
+    const s_t *const badj0 = ageom_stream<s_t, g_t>(
+        g_adj0 + evb, &badj0_data, std::is_same<g_t, s_t>());
+    s_t badj1_data;
+    const s_t *const badj1 = ageom_stream<s_t, g_t>(
+        g_adj1 + evb, &badj1_data, std::is_same<g_t, s_t>());
+    s_t badj2_data;
+    const s_t *const badj2 = ageom_stream<s_t, g_t>(
+        g_adj2 + evb, &badj2_data, std::is_same<g_t, s_t>());
+    s_t badj3_data;
+    const s_t *const badj3 = ageom_stream<s_t, g_t>(
+        g_adj3 + evb, &badj3_data, std::is_same<g_t, s_t>());
+    s_t badj4_data;
+    const s_t *const badj4 = ageom_stream<s_t, g_t>(
+        g_adj4 + evb, &badj4_data, std::is_same<g_t, s_t>());
+    s_t badj5_data;
+    const s_t *const badj5 = ageom_stream<s_t, g_t>(
+        g_adj5 + evb, &badj5_data, std::is_same<g_t, s_t>());
+    s_t badj6_data;
+    const s_t *const badj6 = ageom_stream<s_t, g_t>(
+        g_adj6 + evb, &badj6_data, std::is_same<g_t, s_t>());
+    s_t badj7_data;
+    const s_t *const badj7 = ageom_stream<s_t, g_t>(
+        g_adj7 + evb, &badj7_data, std::is_same<g_t, s_t>());
+    s_t badj8_data;
+    const s_t *const badj8 = ageom_stream<s_t, g_t>(
+        g_adj8 + evb, &badj8_data, std::is_same<g_t, s_t>());
+    s_t bdet0_data;
+    const s_t *const bdet0 = ageom_stream<s_t, g_t>(
+        g_det0 + evb, &bdet0_data, std::is_same<g_t, s_t>());
 
-    linear_elasticity_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, 0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bh_streams, bout_streams);
+    linear_elasticity_d3_tensor_product_apply_block<s_t, NQ, NS>(0, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, lmbda, mu, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -1011,13 +1004,13 @@ extern "C" int cu_linear_elasticity_proteus_hex8_apply_a_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_apply_a_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::linear_elasticity_proteus_hex8_apply_a_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_adj4, g_adj5, g_adj6, g_adj7, g_adj8, g_det0, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_apply_a_msoa_impl");
     }
     default:
@@ -1030,7 +1023,7 @@ extern "C" int cu_linear_elasticity_proteus_hex8_apply_a_msoa(
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __global__ void linear_elasticity_proteus_hex8_apply_i_msoa_impl(
         const ptrdiff_t nelements,
         const ptrdiff_t,
@@ -1059,25 +1052,24 @@ __global__ void linear_elasticity_proteus_hex8_apply_i_msoa_impl(
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q2<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    idx_t ev[VS * NS];
-    s_t bh_data[NS * NC][VS];
-    s_t bout_data[NS * NC][VS];
-    s_t bcoordinate_data[NS * ND][VS];
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t badj4[NQ * VS];
-    s_t badj5[NQ * VS];
-    s_t badj6[NQ * VS];
-    s_t badj7[NQ * VS];
-    s_t badj8[NQ * VS];
-    s_t bdet0[NQ * VS];
+    idx_t ev[NS];
+    s_t bh_data[NS * NC];
+    s_t bout_data[NS * NC];
+    s_t bcoordinate_data[NS * ND];
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t badj4[NQ];
+    s_t badj5[NQ];
+    s_t badj6[NQ];
+    s_t badj7[NQ];
+    s_t badj8[NQ];
+    s_t bdet0[NQ];
 
     for (int element_node = 0; element_node < NS; ++element_node) {
       const idx_t *const RSTR element_shape = elements[element_node] + evb;
-      idx_t *const RSTR ev_node = &ev[element_node * VS];
+      idx_t *const RSTR ev_node = &ev[element_node];
       {
         ev_node[0] = element_shape[0];
       }
@@ -1085,62 +1077,62 @@ __global__ void linear_elasticity_proteus_hex8_apply_i_msoa_impl(
     const g_t *const coordinate_components[ND] = {x, y, z};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < ND; ++d) {
         {
-          bcoordinate_data[shape * ND + d][0] = coordinate_components[d][ev_shape[0]];
+          bcoordinate_data[shape * ND + d] = coordinate_components[d][ev_shape[0]];
         }
       }
     }
     const s_t *const h_components[NC] = {hx, hy, hz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
         {
           const idx_t node = ev_shape[0];
-          bh_data[shape * NC + d][0] = h_components[d][node * h_stride];
+          bh_data[shape * NC + d] = h_components[d][node * h_stride];
         }
       }
     }
     for (int stream = 0; stream < NS * NC; ++stream) {
       {
-        bout_data[stream][0] = s_t(0);
+        bout_data[stream] = s_t(0);
       }
     }
 
     const s_t *bh_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bh_streams[stream] = bh_data[stream];
+      bh_streams[stream] = &bh_data[stream];
     }
     s_t *bout_streams[NS * NC];
     for (int stream = 0; stream < NS * NC; ++stream) {
-      bout_streams[stream] = bout_data[stream];
+      bout_streams[stream] = &bout_data[stream];
     }
 
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 0,
         coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
-        coordinate_grad_ref + NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
-        coordinate_grad_ref + 2 * NQ * ND * VS);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 1,
+        coordinate_grad_ref + NQ * ND);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinate_data, 2,
+        coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdet0);
 
-    linear_elasticity_d3_tensor_product_apply_block<s_t, NQ, NS, VS>(ne, VS, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bh_streams, bout_streams);
+    linear_elasticity_d3_tensor_product_apply_block<s_t, NQ, NS>(1, badj0, badj1, badj2, badj3, badj4, badj5, badj6, badj7, badj8, bdet0, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, lmbda, mu, bh_streams, bout_streams);
 
     s_t *const out_components[NC] = {outx, outy, outz};
 
     for (int shape = 0; shape < NS; ++shape) {
-      const idx_t *const RSTR ev_shape = &ev[shape * VS];
+      const idx_t *const RSTR ev_shape = &ev[shape];
       for (int d = 0; d < NC; ++d) {
-        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d][0]);
+        atomicAdd(&(out_components[d][ev_shape[0] * out_stride]), bout_data[shape * NC + d]);
       }
     }
   }
@@ -1172,13 +1164,13 @@ extern "C" int cu_linear_elasticity_proteus_hex8_apply_i_msoa(
     case (int)sizeof(double): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<double, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
+        sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<double, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const double *)hx, (const double *)hy, (const double *)hz, out_stride, (double *)outx, (double *)outy, (double *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_apply_i_msoa_impl");
     }
     case (int)sizeof(float): {
         const int block_size = 256;
         const int grid_size = (int)((nelements + block_size - 1) / block_size);
-        sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<float, geom_t, 1><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
+        sfem::codegen::linear_elasticity_proteus_hex8_apply_i_msoa_impl<float, geom_t><<<grid_size, block_size, 0, (cudaStream_t)stream>>>(nelements, nnodes, elements, points, lmbda, mu, h_stride, (const float *)hx, (const float *)hy, (const float *)hz, out_stride, (float *)outx, (float *)outy, (float *)outz);
         return sfem::codegen::launch_status("linear_elasticity_proteus_hex8_apply_i_msoa_impl");
     }
     default:

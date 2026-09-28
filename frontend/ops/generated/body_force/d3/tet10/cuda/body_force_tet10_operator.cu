@@ -21,24 +21,20 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int ne,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
-  {
-    converted[0] = s_t(source[0]);
-  }
+  converted[0] = s_t(source[0]);
   return converted;
 }
 
@@ -154,7 +150,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_body_force_tet10_jacobian_
 
 extern "C" int cu_body_force_tet10_residual_esoa(
     const int scalar_bytes,
-    const int ne,
     const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const real_t density,
@@ -166,11 +161,11 @@ extern "C" int cu_body_force_tet10_residual_esoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::body_force_d3_simplex_residual_block<double, 4, 10, 1>(ne, geometry_stride, (const double *)determinant, sfem::codegen::ref_tet10_q4<double>::shape(), sfem::codegen::quad_tet_q4<double>::q_weight(), density, g0, g1, g2, (double *const *)output);
+        sfem::codegen::body_force_d3_simplex_residual_block<double, 4, 10>(geometry_stride, (const double *)determinant, sfem::codegen::ref_tet10_q4<double>::shape(), sfem::codegen::quad_tet_q4<double>::q_weight(), density, g0, g1, g2, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::body_force_d3_simplex_residual_block<float, 4, 10, 1>(ne, geometry_stride, (const float *)determinant, sfem::codegen::ref_tet10_q4<float>::shape(), sfem::codegen::quad_tet_q4<float>::q_weight(), density, g0, g1, g2, (float *const *)output);
+        sfem::codegen::body_force_d3_simplex_residual_block<float, 4, 10>(geometry_stride, (const float *)determinant, sfem::codegen::ref_tet10_q4<float>::shape(), sfem::codegen::quad_tet_q4<float>::q_weight(), density, g0, g1, g2, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -200,7 +195,6 @@ __global__ void body_force_tet10_residual_a_msoa_impl(
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
   static constexpr int NC = 3;
-  static constexpr int VS = 1;
   const s_t *const affine_shape = sfem::codegen::ref_tet10_q4<s_t>::shape();
   const s_t *const affine_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const affine_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
@@ -208,22 +202,21 @@ __global__ void body_force_tet10_residual_a_msoa_impl(
   const s_t *const affine_q_weight = sfem::codegen::quad_tet_q4<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    s_t boutput[NC * NS][VS];
+    s_t boutput[NC * NS];
 
     for (int stream = 0; stream < 30; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
     const g_t *const affine_geometry_sources[1] = {g_det0 + evb};
-    s_t baffine_geometry_data[1][VS];
+    s_t baffine_geometry_data[1];
     const s_t *bageom_streams[1];
-    bageom_streams[0] = ageom_stream<s_t, g_t, VS>(
-        ne, affine_geometry_sources[0], baffine_geometry_data[0], std::is_same<g_t, s_t>());
+    bageom_streams[0] = ageom_stream<s_t, g_t>(
+        affine_geometry_sources[0], &baffine_geometry_data[0], std::is_same<g_t, s_t>());
 
-    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[0], affine_shape, affine_q_weight, density, g0, g1, g2, boutput);
+    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS>(0, bageom_streams[0], affine_shape, affine_q_weight, density, g0, g1, g2, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -231,8 +224,8 @@ __global__ void body_force_tet10_residual_a_msoa_impl(
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -300,7 +293,6 @@ __global__ void body_force_tet10_residual_i_msoa_impl(
   static constexpr int NQ = 4;
   static constexpr int NS = 10;
   static constexpr int NC = 3;
-  static constexpr int VS = 1;
   const s_t *const isoparametric_shape = sfem::codegen::ref_tet10_q4<s_t>::shape();
   const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_x();
   const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tet10_q4<s_t>::grad_ref_y();
@@ -308,11 +300,10 @@ __global__ void body_force_tet10_residual_i_msoa_impl(
   const s_t *const isoparametric_q_weight = sfem::codegen::quad_tet_q4<s_t>::q_weight();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    s_t bcoordinates[3 * NS][VS];
-    s_t badjugate_data[9][NQ * VS];
-    s_t bdeterminant[NQ * VS];
-    s_t boutput[NC * NS][VS];
+    s_t bcoordinates[3 * NS];
+    s_t badjugate_data[9][NQ];
+    s_t bdeterminant[NQ];
+    s_t boutput[NC * NS];
 
     const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
     for (int shape = 0; shape < NS; ++shape) {
@@ -320,37 +311,67 @@ __global__ void body_force_tet10_residual_i_msoa_impl(
       for (int d = 0; d < ND; ++d) {
         {
           const idx_t node = element_shape[evb];
-          bcoordinates[shape * ND + d][0] = coordinate_components[d][node];
+          bcoordinates[shape * ND + d] = coordinate_components[d][node];
         }
       }
     }
 
     for (int stream = 0; stream < 30; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
     s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
     for (int q = 0; q < NQ; ++q) {
+      const s_t cell_grad_ref0_0 = isoparametric_grad_ref_x[q * NS + 0];
+      const s_t cell_grad_ref0_1 = isoparametric_grad_ref_x[q * NS + 1];
+      const s_t cell_grad_ref0_2 = isoparametric_grad_ref_x[q * NS + 2];
+      const s_t cell_grad_ref0_3 = isoparametric_grad_ref_x[q * NS + 3];
+      const s_t cell_grad_ref0_4 = isoparametric_grad_ref_x[q * NS + 4];
+      const s_t cell_grad_ref0_5 = isoparametric_grad_ref_x[q * NS + 5];
+      const s_t cell_grad_ref0_6 = isoparametric_grad_ref_x[q * NS + 6];
+      const s_t cell_grad_ref0_7 = isoparametric_grad_ref_x[q * NS + 7];
+      const s_t cell_grad_ref0_8 = isoparametric_grad_ref_x[q * NS + 8];
+      const s_t cell_grad_ref0_9 = isoparametric_grad_ref_x[q * NS + 9];
+      const s_t cell_grad_ref1_0 = isoparametric_grad_ref_y[q * NS + 0];
+      const s_t cell_grad_ref1_1 = isoparametric_grad_ref_y[q * NS + 1];
+      const s_t cell_grad_ref1_2 = isoparametric_grad_ref_y[q * NS + 2];
+      const s_t cell_grad_ref1_3 = isoparametric_grad_ref_y[q * NS + 3];
+      const s_t cell_grad_ref1_4 = isoparametric_grad_ref_y[q * NS + 4];
+      const s_t cell_grad_ref1_5 = isoparametric_grad_ref_y[q * NS + 5];
+      const s_t cell_grad_ref1_6 = isoparametric_grad_ref_y[q * NS + 6];
+      const s_t cell_grad_ref1_7 = isoparametric_grad_ref_y[q * NS + 7];
+      const s_t cell_grad_ref1_8 = isoparametric_grad_ref_y[q * NS + 8];
+      const s_t cell_grad_ref1_9 = isoparametric_grad_ref_y[q * NS + 9];
+      const s_t cell_grad_ref2_0 = isoparametric_grad_ref_z[q * NS + 0];
+      const s_t cell_grad_ref2_1 = isoparametric_grad_ref_z[q * NS + 1];
+      const s_t cell_grad_ref2_2 = isoparametric_grad_ref_z[q * NS + 2];
+      const s_t cell_grad_ref2_3 = isoparametric_grad_ref_z[q * NS + 3];
+      const s_t cell_grad_ref2_4 = isoparametric_grad_ref_z[q * NS + 4];
+      const s_t cell_grad_ref2_5 = isoparametric_grad_ref_z[q * NS + 5];
+      const s_t cell_grad_ref2_6 = isoparametric_grad_ref_z[q * NS + 6];
+      const s_t cell_grad_ref2_7 = isoparametric_grad_ref_z[q * NS + 7];
+      const s_t cell_grad_ref2_8 = isoparametric_grad_ref_z[q * NS + 8];
+      const s_t cell_grad_ref2_9 = isoparametric_grad_ref_z[q * NS + 9];
       {
-        const s_t J00 = bcoordinates[0][0] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[3][0] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[6][0] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[9][0] * isoparametric_grad_ref_x[q * NS + 3] + bcoordinates[12][0] * isoparametric_grad_ref_x[q * NS + 4] + bcoordinates[15][0] * isoparametric_grad_ref_x[q * NS + 5] + bcoordinates[18][0] * isoparametric_grad_ref_x[q * NS + 6] + bcoordinates[21][0] * isoparametric_grad_ref_x[q * NS + 7] + bcoordinates[24][0] * isoparametric_grad_ref_x[q * NS + 8] + bcoordinates[27][0] * isoparametric_grad_ref_x[q * NS + 9];
-        const s_t J01 = bcoordinates[0][0] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[3][0] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[6][0] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[9][0] * isoparametric_grad_ref_y[q * NS + 3] + bcoordinates[12][0] * isoparametric_grad_ref_y[q * NS + 4] + bcoordinates[15][0] * isoparametric_grad_ref_y[q * NS + 5] + bcoordinates[18][0] * isoparametric_grad_ref_y[q * NS + 6] + bcoordinates[21][0] * isoparametric_grad_ref_y[q * NS + 7] + bcoordinates[24][0] * isoparametric_grad_ref_y[q * NS + 8] + bcoordinates[27][0] * isoparametric_grad_ref_y[q * NS + 9];
-        const s_t J02 = bcoordinates[0][0] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[3][0] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[6][0] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[9][0] * isoparametric_grad_ref_z[q * NS + 3] + bcoordinates[12][0] * isoparametric_grad_ref_z[q * NS + 4] + bcoordinates[15][0] * isoparametric_grad_ref_z[q * NS + 5] + bcoordinates[18][0] * isoparametric_grad_ref_z[q * NS + 6] + bcoordinates[21][0] * isoparametric_grad_ref_z[q * NS + 7] + bcoordinates[24][0] * isoparametric_grad_ref_z[q * NS + 8] + bcoordinates[27][0] * isoparametric_grad_ref_z[q * NS + 9];
-        const s_t J10 = bcoordinates[1][0] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[4][0] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[7][0] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[10][0] * isoparametric_grad_ref_x[q * NS + 3] + bcoordinates[13][0] * isoparametric_grad_ref_x[q * NS + 4] + bcoordinates[16][0] * isoparametric_grad_ref_x[q * NS + 5] + bcoordinates[19][0] * isoparametric_grad_ref_x[q * NS + 6] + bcoordinates[22][0] * isoparametric_grad_ref_x[q * NS + 7] + bcoordinates[25][0] * isoparametric_grad_ref_x[q * NS + 8] + bcoordinates[28][0] * isoparametric_grad_ref_x[q * NS + 9];
-        const s_t J11 = bcoordinates[1][0] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[4][0] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[7][0] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[10][0] * isoparametric_grad_ref_y[q * NS + 3] + bcoordinates[13][0] * isoparametric_grad_ref_y[q * NS + 4] + bcoordinates[16][0] * isoparametric_grad_ref_y[q * NS + 5] + bcoordinates[19][0] * isoparametric_grad_ref_y[q * NS + 6] + bcoordinates[22][0] * isoparametric_grad_ref_y[q * NS + 7] + bcoordinates[25][0] * isoparametric_grad_ref_y[q * NS + 8] + bcoordinates[28][0] * isoparametric_grad_ref_y[q * NS + 9];
-        const s_t J12 = bcoordinates[1][0] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[4][0] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[7][0] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[10][0] * isoparametric_grad_ref_z[q * NS + 3] + bcoordinates[13][0] * isoparametric_grad_ref_z[q * NS + 4] + bcoordinates[16][0] * isoparametric_grad_ref_z[q * NS + 5] + bcoordinates[19][0] * isoparametric_grad_ref_z[q * NS + 6] + bcoordinates[22][0] * isoparametric_grad_ref_z[q * NS + 7] + bcoordinates[25][0] * isoparametric_grad_ref_z[q * NS + 8] + bcoordinates[28][0] * isoparametric_grad_ref_z[q * NS + 9];
-        const s_t J20 = bcoordinates[2][0] * isoparametric_grad_ref_x[q * NS + 0] + bcoordinates[5][0] * isoparametric_grad_ref_x[q * NS + 1] + bcoordinates[8][0] * isoparametric_grad_ref_x[q * NS + 2] + bcoordinates[11][0] * isoparametric_grad_ref_x[q * NS + 3] + bcoordinates[14][0] * isoparametric_grad_ref_x[q * NS + 4] + bcoordinates[17][0] * isoparametric_grad_ref_x[q * NS + 5] + bcoordinates[20][0] * isoparametric_grad_ref_x[q * NS + 6] + bcoordinates[23][0] * isoparametric_grad_ref_x[q * NS + 7] + bcoordinates[26][0] * isoparametric_grad_ref_x[q * NS + 8] + bcoordinates[29][0] * isoparametric_grad_ref_x[q * NS + 9];
-        const s_t J21 = bcoordinates[2][0] * isoparametric_grad_ref_y[q * NS + 0] + bcoordinates[5][0] * isoparametric_grad_ref_y[q * NS + 1] + bcoordinates[8][0] * isoparametric_grad_ref_y[q * NS + 2] + bcoordinates[11][0] * isoparametric_grad_ref_y[q * NS + 3] + bcoordinates[14][0] * isoparametric_grad_ref_y[q * NS + 4] + bcoordinates[17][0] * isoparametric_grad_ref_y[q * NS + 5] + bcoordinates[20][0] * isoparametric_grad_ref_y[q * NS + 6] + bcoordinates[23][0] * isoparametric_grad_ref_y[q * NS + 7] + bcoordinates[26][0] * isoparametric_grad_ref_y[q * NS + 8] + bcoordinates[29][0] * isoparametric_grad_ref_y[q * NS + 9];
-        const s_t J22 = bcoordinates[2][0] * isoparametric_grad_ref_z[q * NS + 0] + bcoordinates[5][0] * isoparametric_grad_ref_z[q * NS + 1] + bcoordinates[8][0] * isoparametric_grad_ref_z[q * NS + 2] + bcoordinates[11][0] * isoparametric_grad_ref_z[q * NS + 3] + bcoordinates[14][0] * isoparametric_grad_ref_z[q * NS + 4] + bcoordinates[17][0] * isoparametric_grad_ref_z[q * NS + 5] + bcoordinates[20][0] * isoparametric_grad_ref_z[q * NS + 6] + bcoordinates[23][0] * isoparametric_grad_ref_z[q * NS + 7] + bcoordinates[26][0] * isoparametric_grad_ref_z[q * NS + 8] + bcoordinates[29][0] * isoparametric_grad_ref_z[q * NS + 9];
+        const s_t J00 = bcoordinates[0] * cell_grad_ref0_0 + bcoordinates[3] * cell_grad_ref0_1 + bcoordinates[6] * cell_grad_ref0_2 + bcoordinates[9] * cell_grad_ref0_3 + bcoordinates[12] * cell_grad_ref0_4 + bcoordinates[15] * cell_grad_ref0_5 + bcoordinates[18] * cell_grad_ref0_6 + bcoordinates[21] * cell_grad_ref0_7 + bcoordinates[24] * cell_grad_ref0_8 + bcoordinates[27] * cell_grad_ref0_9;
+        const s_t J01 = bcoordinates[0] * cell_grad_ref1_0 + bcoordinates[3] * cell_grad_ref1_1 + bcoordinates[6] * cell_grad_ref1_2 + bcoordinates[9] * cell_grad_ref1_3 + bcoordinates[12] * cell_grad_ref1_4 + bcoordinates[15] * cell_grad_ref1_5 + bcoordinates[18] * cell_grad_ref1_6 + bcoordinates[21] * cell_grad_ref1_7 + bcoordinates[24] * cell_grad_ref1_8 + bcoordinates[27] * cell_grad_ref1_9;
+        const s_t J02 = bcoordinates[0] * cell_grad_ref2_0 + bcoordinates[3] * cell_grad_ref2_1 + bcoordinates[6] * cell_grad_ref2_2 + bcoordinates[9] * cell_grad_ref2_3 + bcoordinates[12] * cell_grad_ref2_4 + bcoordinates[15] * cell_grad_ref2_5 + bcoordinates[18] * cell_grad_ref2_6 + bcoordinates[21] * cell_grad_ref2_7 + bcoordinates[24] * cell_grad_ref2_8 + bcoordinates[27] * cell_grad_ref2_9;
+        const s_t J10 = bcoordinates[1] * cell_grad_ref0_0 + bcoordinates[4] * cell_grad_ref0_1 + bcoordinates[7] * cell_grad_ref0_2 + bcoordinates[10] * cell_grad_ref0_3 + bcoordinates[13] * cell_grad_ref0_4 + bcoordinates[16] * cell_grad_ref0_5 + bcoordinates[19] * cell_grad_ref0_6 + bcoordinates[22] * cell_grad_ref0_7 + bcoordinates[25] * cell_grad_ref0_8 + bcoordinates[28] * cell_grad_ref0_9;
+        const s_t J11 = bcoordinates[1] * cell_grad_ref1_0 + bcoordinates[4] * cell_grad_ref1_1 + bcoordinates[7] * cell_grad_ref1_2 + bcoordinates[10] * cell_grad_ref1_3 + bcoordinates[13] * cell_grad_ref1_4 + bcoordinates[16] * cell_grad_ref1_5 + bcoordinates[19] * cell_grad_ref1_6 + bcoordinates[22] * cell_grad_ref1_7 + bcoordinates[25] * cell_grad_ref1_8 + bcoordinates[28] * cell_grad_ref1_9;
+        const s_t J12 = bcoordinates[1] * cell_grad_ref2_0 + bcoordinates[4] * cell_grad_ref2_1 + bcoordinates[7] * cell_grad_ref2_2 + bcoordinates[10] * cell_grad_ref2_3 + bcoordinates[13] * cell_grad_ref2_4 + bcoordinates[16] * cell_grad_ref2_5 + bcoordinates[19] * cell_grad_ref2_6 + bcoordinates[22] * cell_grad_ref2_7 + bcoordinates[25] * cell_grad_ref2_8 + bcoordinates[28] * cell_grad_ref2_9;
+        const s_t J20 = bcoordinates[2] * cell_grad_ref0_0 + bcoordinates[5] * cell_grad_ref0_1 + bcoordinates[8] * cell_grad_ref0_2 + bcoordinates[11] * cell_grad_ref0_3 + bcoordinates[14] * cell_grad_ref0_4 + bcoordinates[17] * cell_grad_ref0_5 + bcoordinates[20] * cell_grad_ref0_6 + bcoordinates[23] * cell_grad_ref0_7 + bcoordinates[26] * cell_grad_ref0_8 + bcoordinates[29] * cell_grad_ref0_9;
+        const s_t J21 = bcoordinates[2] * cell_grad_ref1_0 + bcoordinates[5] * cell_grad_ref1_1 + bcoordinates[8] * cell_grad_ref1_2 + bcoordinates[11] * cell_grad_ref1_3 + bcoordinates[14] * cell_grad_ref1_4 + bcoordinates[17] * cell_grad_ref1_5 + bcoordinates[20] * cell_grad_ref1_6 + bcoordinates[23] * cell_grad_ref1_7 + bcoordinates[26] * cell_grad_ref1_8 + bcoordinates[29] * cell_grad_ref1_9;
+        const s_t J22 = bcoordinates[2] * cell_grad_ref2_0 + bcoordinates[5] * cell_grad_ref2_1 + bcoordinates[8] * cell_grad_ref2_2 + bcoordinates[11] * cell_grad_ref2_3 + bcoordinates[14] * cell_grad_ref2_4 + bcoordinates[17] * cell_grad_ref2_5 + bcoordinates[20] * cell_grad_ref2_6 + bcoordinates[23] * cell_grad_ref2_7 + bcoordinates[26] * cell_grad_ref2_8 + bcoordinates[29] * cell_grad_ref2_9;
         geometry_jacobian_adjugate_and_determinant_3<s_t>(
             J00, J01, J02, J10, J11, J12, J20, J21, J22,
-            badjugate_streams, bdeterminant, q * VS);
+            badjugate_streams, bdeterminant, q);
       }
     }
 
 
-    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS, VS>(ne, VS, bdeterminant, isoparametric_shape, isoparametric_q_weight, density, g0, g1, g2, boutput);
+    body_force_d3_simplex_residual_block_contiguous<s_t, NQ, NS>(1, bdeterminant, isoparametric_shape, isoparametric_q_weight, density, g0, g1, g2, boutput);
 
     s_t *const output_components[NC] = {u0_out, u1_out, u2_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -358,8 +379,8 @@ __global__ void body_force_tet10_residual_i_msoa_impl(
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }

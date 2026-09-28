@@ -28,24 +28,20 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int ne,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
-  {
-    converted[0] = s_t(source[0]);
-  }
+  converted[0] = s_t(source[0]);
   return converted;
 }
 
@@ -193,23 +189,21 @@ __global__ void navier_stokes_tri6_tri3_residual_affine_mesh_mixed_impl(
   static constexpr int CELL_NS = 6;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 15;
-  static constexpr int VS = 16;
   const s_t *const field_shape[NC] = {sfem::codegen::ref_tri6_q6<s_t>::shape(), sfem::codegen::ref_tri3_q6<s_t>::shape()};
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y()};
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    s_t bcurrent[N_FIELD_STREAMS][VS];
-    s_t bprevious[N_FIELD_STREAMS][VS];
-    s_t boutput[N_FIELD_STREAMS][VS];
+    s_t bcurrent[N_FIELD_STREAMS];
+    s_t bprevious[N_FIELD_STREAMS];
+    s_t boutput[N_FIELD_STREAMS];
 
     for (int local_shape = 0; local_shape < 6; ++local_shape) {
       const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 0 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[0][node * current_stride];
-        bprevious[stream][0] = u_old_data[0][node * previous_stride];
+        bcurrent[stream] = u_data[0][node * current_stride];
+        bprevious[stream] = u_old_data[0][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 6; ++local_shape) {
@@ -217,8 +211,8 @@ __global__ void navier_stokes_tri6_tri3_residual_affine_mesh_mixed_impl(
       const int stream = 6 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[1][node * current_stride];
-        bprevious[stream][0] = u_old_data[1][node * previous_stride];
+        bcurrent[stream] = u_data[1][node * current_stride];
+        bprevious[stream] = u_old_data[1][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 3; ++local_shape) {
@@ -226,37 +220,37 @@ __global__ void navier_stokes_tri6_tri3_residual_affine_mesh_mixed_impl(
       const int stream = 12 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = p_data[node * current_stride];
-        bprevious[stream][0] = p_old_data[node * previous_stride];
+        bcurrent[stream] = p_data[node * current_stride];
+        bprevious[stream] = p_old_data[node * previous_stride];
       }
     }
 
     for (int stream = 0; stream < 15; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
     const g_t *const affine_geometry_sources[5] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_det0 + evb};
-    s_t baffine_geometry_data[5][VS];
+    s_t baffine_geometry_data[5];
     const s_t *bageom_streams[5];
     for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
-      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t>(
+          affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
     }
     const s_t *badjugate[ND * ND];
     for (int component = 0; component < ND * ND; ++component) {
       badjugate[component] = bageom_streams[component];
     }
 
-    navier_stokes_d2_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bcurrent, bprevious, convection_scale, dt, f0, f1, nu, rho, boutput);
+    navier_stokes_d2_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS>(0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bcurrent, bprevious, convection_scale, dt, f0, f1, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 6; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -265,8 +259,8 @@ __global__ void navier_stokes_tri6_tri3_residual_affine_mesh_mixed_impl(
       for (int local_shape = 0; local_shape < 6; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 6 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -275,8 +269,8 @@ __global__ void navier_stokes_tri6_tri3_residual_affine_mesh_mixed_impl(
       for (int local_shape = 0; local_shape < 3; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 12 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -363,17 +357,15 @@ __global__ void navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl(
   static constexpr int NS = CELL_NS;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 15;
-  static constexpr int VS = 16;
   const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    s_t bcoordinates[ND * CELL_NS][VS];
-    s_t badjugate_data[ND * ND][NQ * VS];
-    s_t bdeterminant[NQ * VS];
-    s_t bcurrent[N_FIELD_STREAMS][VS];
-    s_t bprevious[N_FIELD_STREAMS][VS];
-    s_t boutput[N_FIELD_STREAMS][VS];
+    s_t bcoordinates[ND * CELL_NS];
+    s_t badjugate_data[ND * ND][NQ];
+    s_t bdeterminant[NQ];
+    s_t bcurrent[N_FIELD_STREAMS];
+    s_t bprevious[N_FIELD_STREAMS];
+    s_t boutput[N_FIELD_STREAMS];
 
     const geom_t *const coordinate_components[ND] = {points[0], points[1]};
     for (int shape = 0; shape < NS; ++shape) {
@@ -381,7 +373,7 @@ __global__ void navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl(
       for (int d = 0; d < ND; ++d) {
         {
           const idx_t node = element_shape[evb];
-          bcoordinates[shape * ND + d][0] = coordinate_components[d][node];
+          bcoordinates[shape * ND + d] = coordinate_components[d][node];
         }
       }
     }
@@ -391,8 +383,8 @@ __global__ void navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl(
       const int stream = 0 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[0][node * current_stride];
-        bprevious[stream][0] = u_old_data[0][node * previous_stride];
+        bcurrent[stream] = u_data[0][node * current_stride];
+        bprevious[stream] = u_old_data[0][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 6; ++local_shape) {
@@ -400,8 +392,8 @@ __global__ void navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl(
       const int stream = 6 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = u_data[1][node * current_stride];
-        bprevious[stream][0] = u_old_data[1][node * previous_stride];
+        bcurrent[stream] = u_data[1][node * current_stride];
+        bprevious[stream] = u_old_data[1][node * previous_stride];
       }
     }
     for (int local_shape = 0; local_shape < 3; ++local_shape) {
@@ -409,26 +401,38 @@ __global__ void navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl(
       const int stream = 12 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bcurrent[stream][0] = p_data[node * current_stride];
-        bprevious[stream][0] = p_old_data[node * previous_stride];
+        bcurrent[stream] = p_data[node * current_stride];
+        bprevious[stream] = p_old_data[node * previous_stride];
       }
     }
 
     for (int stream = 0; stream < 15; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
     s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
     for (int q = 0; q < NQ; ++q) {
+      const s_t cell_grad_ref0_0 = isoparametric_cell_grad_ref_0[q * CELL_NS];
+      const s_t cell_grad_ref0_1 = isoparametric_cell_grad_ref_0[q * CELL_NS + 1];
+      const s_t cell_grad_ref0_2 = isoparametric_cell_grad_ref_0[q * CELL_NS + 2];
+      const s_t cell_grad_ref0_3 = isoparametric_cell_grad_ref_0[q * CELL_NS + 3];
+      const s_t cell_grad_ref0_4 = isoparametric_cell_grad_ref_0[q * CELL_NS + 4];
+      const s_t cell_grad_ref0_5 = isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
+      const s_t cell_grad_ref1_0 = isoparametric_cell_grad_ref_1[q * CELL_NS];
+      const s_t cell_grad_ref1_1 = isoparametric_cell_grad_ref_1[q * CELL_NS + 1];
+      const s_t cell_grad_ref1_2 = isoparametric_cell_grad_ref_1[q * CELL_NS + 2];
+      const s_t cell_grad_ref1_3 = isoparametric_cell_grad_ref_1[q * CELL_NS + 3];
+      const s_t cell_grad_ref1_4 = isoparametric_cell_grad_ref_1[q * CELL_NS + 4];
+      const s_t cell_grad_ref1_5 = isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
       {
-        const s_t J00 = bcoordinates[0][0] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[2][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[4][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[6][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[8][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[10][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
-        const s_t J01 = bcoordinates[0][0] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[2][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[4][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[6][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[8][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[10][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
-        const s_t J10 = bcoordinates[1][0] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[3][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[5][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[7][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[9][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[11][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
-        const s_t J11 = bcoordinates[1][0] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[3][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[5][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[7][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[9][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[11][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
+        const s_t J00 = bcoordinates[0] * cell_grad_ref0_0 + bcoordinates[2] * cell_grad_ref0_1 + bcoordinates[4] * cell_grad_ref0_2 + bcoordinates[6] * cell_grad_ref0_3 + bcoordinates[8] * cell_grad_ref0_4 + bcoordinates[10] * cell_grad_ref0_5;
+        const s_t J01 = bcoordinates[0] * cell_grad_ref1_0 + bcoordinates[2] * cell_grad_ref1_1 + bcoordinates[4] * cell_grad_ref1_2 + bcoordinates[6] * cell_grad_ref1_3 + bcoordinates[8] * cell_grad_ref1_4 + bcoordinates[10] * cell_grad_ref1_5;
+        const s_t J10 = bcoordinates[1] * cell_grad_ref0_0 + bcoordinates[3] * cell_grad_ref0_1 + bcoordinates[5] * cell_grad_ref0_2 + bcoordinates[7] * cell_grad_ref0_3 + bcoordinates[9] * cell_grad_ref0_4 + bcoordinates[11] * cell_grad_ref0_5;
+        const s_t J11 = bcoordinates[1] * cell_grad_ref1_0 + bcoordinates[3] * cell_grad_ref1_1 + bcoordinates[5] * cell_grad_ref1_2 + bcoordinates[7] * cell_grad_ref1_3 + bcoordinates[9] * cell_grad_ref1_4 + bcoordinates[11] * cell_grad_ref1_5;
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badjugate_streams, bdeterminant, q * VS);
+            J00, J01, J10, J11, badjugate_streams, bdeterminant, q);
       }
     }
 
@@ -436,15 +440,15 @@ __global__ void navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl(
     const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y()};
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-    navier_stokes_d2_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bcurrent, bprevious, convection_scale, dt, f0, f1, nu, rho, boutput);
+    navier_stokes_d2_simplex_mixed_residual_block_contiguous<s_t, NQ, CELL_NS>(1, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bcurrent, bprevious, convection_scale, dt, f0, f1, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 6; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -453,8 +457,8 @@ __global__ void navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl(
       for (int local_shape = 0; local_shape < 6; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 6 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -463,8 +467,8 @@ __global__ void navier_stokes_tri6_tri3_residual_isoparametric_mesh_mixed_impl(
       for (int local_shape = 0; local_shape < 3; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 12 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -548,23 +552,21 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_affine_mesh_mixed_impl(
   static constexpr int CELL_NS = 6;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 15;
-  static constexpr int VS = 16;
   const s_t *const field_shape[NC] = {sfem::codegen::ref_tri6_q6<s_t>::shape(), sfem::codegen::ref_tri3_q6<s_t>::shape()};
   const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y()};
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    s_t bprevious[N_FIELD_STREAMS][VS];
-    s_t bdirection[N_FIELD_STREAMS][VS];
-    s_t boutput[N_FIELD_STREAMS][VS];
+    s_t bprevious[N_FIELD_STREAMS];
+    s_t bdirection[N_FIELD_STREAMS];
+    s_t boutput[N_FIELD_STREAMS];
 
     for (int local_shape = 0; local_shape < 6; ++local_shape) {
       const idx_t *const RSTR element_shape = elements[local_shape];
       const int stream = 0 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[0][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[0][node * direction_stride];
+        bprevious[stream] = u_old_data[0][node * previous_stride];
+        bdirection[stream] = u_direction_data[0][node * direction_stride];
       }
     }
     for (int local_shape = 0; local_shape < 6; ++local_shape) {
@@ -572,8 +574,8 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_affine_mesh_mixed_impl(
       const int stream = 6 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[1][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[1][node * direction_stride];
+        bprevious[stream] = u_old_data[1][node * previous_stride];
+        bdirection[stream] = u_direction_data[1][node * direction_stride];
       }
     }
     for (int local_shape = 0; local_shape < 3; ++local_shape) {
@@ -581,37 +583,37 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_affine_mesh_mixed_impl(
       const int stream = 12 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = p_old_data[node * previous_stride];
-        bdirection[stream][0] = p_direction_data[node * direction_stride];
+        bprevious[stream] = p_old_data[node * previous_stride];
+        bdirection[stream] = p_direction_data[node * direction_stride];
       }
     }
 
     for (int stream = 0; stream < 15; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
     const g_t *const affine_geometry_sources[5] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_det0 + evb};
-    s_t baffine_geometry_data[5][VS];
+    s_t baffine_geometry_data[5];
     const s_t *bageom_streams[5];
     for (int geometry_stream = 0; geometry_stream < 5; ++geometry_stream) {
-      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t>(
+          affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
     }
     const s_t *badjugate[ND * ND];
     for (int component = 0; component < ND * ND; ++component) {
       badjugate[component] = bageom_streams[component];
     }
 
-    navier_stokes_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, 0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
+    navier_stokes_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS>(0, bageom_streams[4], badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 6; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -620,8 +622,8 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_affine_mesh_mixed_impl(
       for (int local_shape = 0; local_shape < 6; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 6 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -630,8 +632,8 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_affine_mesh_mixed_impl(
       for (int local_shape = 0; local_shape < 3; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 12 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -714,17 +716,15 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed
   static constexpr int NS = CELL_NS;
   static constexpr int NC = 2;
   static constexpr int N_FIELD_STREAMS = 15;
-  static constexpr int VS = 16;
   const s_t *const isoparametric_cell_grad_ref_0 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x();
   const s_t *const isoparametric_cell_grad_ref_1 = sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y();
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    s_t bcoordinates[ND * CELL_NS][VS];
-    s_t badjugate_data[ND * ND][NQ * VS];
-    s_t bdeterminant[NQ * VS];
-    s_t bprevious[N_FIELD_STREAMS][VS];
-    s_t bdirection[N_FIELD_STREAMS][VS];
-    s_t boutput[N_FIELD_STREAMS][VS];
+    s_t bcoordinates[ND * CELL_NS];
+    s_t badjugate_data[ND * ND][NQ];
+    s_t bdeterminant[NQ];
+    s_t bprevious[N_FIELD_STREAMS];
+    s_t bdirection[N_FIELD_STREAMS];
+    s_t boutput[N_FIELD_STREAMS];
 
     const geom_t *const coordinate_components[ND] = {points[0], points[1]};
     for (int shape = 0; shape < NS; ++shape) {
@@ -732,7 +732,7 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed
       for (int d = 0; d < ND; ++d) {
         {
           const idx_t node = element_shape[evb];
-          bcoordinates[shape * ND + d][0] = coordinate_components[d][node];
+          bcoordinates[shape * ND + d] = coordinate_components[d][node];
         }
       }
     }
@@ -742,8 +742,8 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed
       const int stream = 0 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[0][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[0][node * direction_stride];
+        bprevious[stream] = u_old_data[0][node * previous_stride];
+        bdirection[stream] = u_direction_data[0][node * direction_stride];
       }
     }
     for (int local_shape = 0; local_shape < 6; ++local_shape) {
@@ -751,8 +751,8 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed
       const int stream = 6 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = u_old_data[1][node * previous_stride];
-        bdirection[stream][0] = u_direction_data[1][node * direction_stride];
+        bprevious[stream] = u_old_data[1][node * previous_stride];
+        bdirection[stream] = u_direction_data[1][node * direction_stride];
       }
     }
     for (int local_shape = 0; local_shape < 3; ++local_shape) {
@@ -760,26 +760,38 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed
       const int stream = 12 + local_shape;
       {
         const idx_t node = element_shape[evb];
-        bprevious[stream][0] = p_old_data[node * previous_stride];
-        bdirection[stream][0] = p_direction_data[node * direction_stride];
+        bprevious[stream] = p_old_data[node * previous_stride];
+        bdirection[stream] = p_direction_data[node * direction_stride];
       }
     }
 
     for (int stream = 0; stream < 15; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
     s_t *badjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
     for (int q = 0; q < NQ; ++q) {
+      const s_t cell_grad_ref0_0 = isoparametric_cell_grad_ref_0[q * CELL_NS];
+      const s_t cell_grad_ref0_1 = isoparametric_cell_grad_ref_0[q * CELL_NS + 1];
+      const s_t cell_grad_ref0_2 = isoparametric_cell_grad_ref_0[q * CELL_NS + 2];
+      const s_t cell_grad_ref0_3 = isoparametric_cell_grad_ref_0[q * CELL_NS + 3];
+      const s_t cell_grad_ref0_4 = isoparametric_cell_grad_ref_0[q * CELL_NS + 4];
+      const s_t cell_grad_ref0_5 = isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
+      const s_t cell_grad_ref1_0 = isoparametric_cell_grad_ref_1[q * CELL_NS];
+      const s_t cell_grad_ref1_1 = isoparametric_cell_grad_ref_1[q * CELL_NS + 1];
+      const s_t cell_grad_ref1_2 = isoparametric_cell_grad_ref_1[q * CELL_NS + 2];
+      const s_t cell_grad_ref1_3 = isoparametric_cell_grad_ref_1[q * CELL_NS + 3];
+      const s_t cell_grad_ref1_4 = isoparametric_cell_grad_ref_1[q * CELL_NS + 4];
+      const s_t cell_grad_ref1_5 = isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
       {
-        const s_t J00 = bcoordinates[0][0] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[2][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[4][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[6][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[8][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[10][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
-        const s_t J01 = bcoordinates[0][0] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[2][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[4][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[6][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[8][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[10][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
-        const s_t J10 = bcoordinates[1][0] * isoparametric_cell_grad_ref_0[q * CELL_NS] + bcoordinates[3][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 1] + bcoordinates[5][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 2] + bcoordinates[7][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 3] + bcoordinates[9][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 4] + bcoordinates[11][0] * isoparametric_cell_grad_ref_0[q * CELL_NS + 5];
-        const s_t J11 = bcoordinates[1][0] * isoparametric_cell_grad_ref_1[q * CELL_NS] + bcoordinates[3][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 1] + bcoordinates[5][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 2] + bcoordinates[7][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 3] + bcoordinates[9][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 4] + bcoordinates[11][0] * isoparametric_cell_grad_ref_1[q * CELL_NS + 5];
+        const s_t J00 = bcoordinates[0] * cell_grad_ref0_0 + bcoordinates[2] * cell_grad_ref0_1 + bcoordinates[4] * cell_grad_ref0_2 + bcoordinates[6] * cell_grad_ref0_3 + bcoordinates[8] * cell_grad_ref0_4 + bcoordinates[10] * cell_grad_ref0_5;
+        const s_t J01 = bcoordinates[0] * cell_grad_ref1_0 + bcoordinates[2] * cell_grad_ref1_1 + bcoordinates[4] * cell_grad_ref1_2 + bcoordinates[6] * cell_grad_ref1_3 + bcoordinates[8] * cell_grad_ref1_4 + bcoordinates[10] * cell_grad_ref1_5;
+        const s_t J10 = bcoordinates[1] * cell_grad_ref0_0 + bcoordinates[3] * cell_grad_ref0_1 + bcoordinates[5] * cell_grad_ref0_2 + bcoordinates[7] * cell_grad_ref0_3 + bcoordinates[9] * cell_grad_ref0_4 + bcoordinates[11] * cell_grad_ref0_5;
+        const s_t J11 = bcoordinates[1] * cell_grad_ref1_0 + bcoordinates[3] * cell_grad_ref1_1 + bcoordinates[5] * cell_grad_ref1_2 + bcoordinates[7] * cell_grad_ref1_3 + bcoordinates[9] * cell_grad_ref1_4 + bcoordinates[11] * cell_grad_ref1_5;
         geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badjugate_streams, bdeterminant, q * VS);
+            J00, J01, J10, J11, badjugate_streams, bdeterminant, q);
       }
     }
 
@@ -787,15 +799,15 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed
     const s_t *const fgref[NC * ND] = {sfem::codegen::ref_tri6_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri6_q6<s_t>::grad_ref_y(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_x(), sfem::codegen::ref_tri3_q6<s_t>::grad_ref_y()};
     const s_t *const badjugate[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3]};
 
-    navier_stokes_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS, VS>(ne, VS, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
+    navier_stokes_d2_simplex_mixed_jacobian_action_block_contiguous<s_t, NQ, CELL_NS>(1, bdeterminant, badjugate, field_shape, fgref, sfem::codegen::quad_tri_q6<s_t>::q_weight(), bprevious, bdirection, convection_scale, dt, nu, rho, boutput);
 
     {
       s_t *const RSTR out = u_out[0];
       for (int local_shape = 0; local_shape < 6; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 0 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -804,8 +816,8 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed
       for (int local_shape = 0; local_shape < 6; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 6 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -814,8 +826,8 @@ __global__ void navier_stokes_tri6_tri3_jacobian_action_isoparametric_mesh_mixed
       for (int local_shape = 0; local_shape < 3; ++local_shape) {
         const idx_t *const RSTR element_shape = elements[local_shape];
         const int stream = 12 + local_shape;
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }

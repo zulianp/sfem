@@ -21,24 +21,20 @@
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
   return source;
 }
 
-template <typename s_t, typename g_t, int VS>
+template <typename s_t, typename g_t>
 __host__ __device__ __forceinline__ const s_t *ageom_stream(
-    const int ne,
     const g_t *const RSTR source,
     s_t *const RSTR converted,
     std::false_type) {
-  {
-    converted[0] = s_t(source[0]);
-  }
+  converted[0] = s_t(source[0]);
   return converted;
 }
 
@@ -370,7 +366,6 @@ extern "C" const sfem::codegen::KernelDiagnostics *cu_two_phase_flow_form_2_p_c_
 
 extern "C" int cu_two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_esoa(
     const int scalar_bytes,
-    const int ne,
     const ptrdiff_t geometry_stride,
     const void *const RSTR determinant,
     const void *const RSTR adjugate[9],
@@ -402,11 +397,11 @@ extern "C" int cu_two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_eso
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        sfem::codegen::two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian_action_block<double, 27, 8, 1>(ne, geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::ref_line_p1_q3<double>::grad_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), (const double *const *)current, (const double *const *)direction, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (double *const *)output);
+        sfem::codegen::two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian_action_block<double, 27, 8>(geometry_stride, (const double *)determinant, (const double *const *)adjugate, sfem::codegen::ref_line_p1_q3<double>::shape_1d(), sfem::codegen::ref_line_p1_q3<double>::grad_1d(), sfem::codegen::quad_line_q3<double>::q_weight_1d(), (const double *const *)current, (const double *const *)direction, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (double *const *)output);
         return SFEM_SUCCESS;
     }
     case (int)sizeof(float): {
-        sfem::codegen::two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian_action_block<float, 27, 8, 1>(ne, geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::ref_line_p1_q3<float>::grad_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), (const float *const *)current, (const float *const *)direction, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (float *const *)output);
+        sfem::codegen::two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian_action_block<float, 27, 8>(geometry_stride, (const float *)determinant, (const float *const *)adjugate, sfem::codegen::ref_line_p1_q3<float>::shape_1d(), sfem::codegen::ref_line_p1_q3<float>::grad_1d(), sfem::codegen::quad_line_q3<float>::q_weight_1d(), (const float *const *)current, (const float *const *)direction, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, (float *const *)output);
         return SFEM_SUCCESS;
     }
     default:
@@ -467,16 +462,14 @@ __global__ void two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_a_mso
   static constexpr int NQ = 27;
   static constexpr int NS = 8;
   static constexpr int NC = 2;
-  static constexpr int VS = 1;
   const s_t *const affine_shape_1d = sfem::codegen::ref_line_p1_q3<s_t>::shape_1d();
   const s_t *const affine_grad_1d = sfem::codegen::ref_line_p1_q3<s_t>::grad_1d();
   const s_t *const affine_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    s_t bcurrent[NC * NS][VS];
-    s_t bdirection[NC * NS][VS];
-    s_t boutput[NC * NS][VS];
+    s_t bcurrent[NC * NS];
+    s_t bdirection[NC * NS];
+    s_t boutput[NC * NS];
     const s_t *const current_components[NC] = {p_w, p_c};
     const s_t *const direction_components[NC] = {p_w_direction, p_c_direction};
 
@@ -486,31 +479,31 @@ __global__ void two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_a_mso
         const int stream = shape * NC + field;
         {
           const idx_t node = element_shape[evb];
-          bcurrent[stream][0] = current_components[field][node * current_stride];
-          bdirection[stream][0] = direction_components[field][node * direction_stride];
+          bcurrent[stream] = current_components[field][node * current_stride];
+          bdirection[stream] = direction_components[field][node * direction_stride];
         }
       }
     }
 
     for (int stream = 0; stream < 16; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
     const g_t *const affine_geometry_sources[10] = {g_adj0 + evb, g_adj1 + evb, g_adj2 + evb, g_adj3 + evb, g_adj4 + evb, g_adj5 + evb, g_adj6 + evb, g_adj7 + evb, g_adj8 + evb, g_det0 + evb};
-    s_t baffine_geometry_data[10][VS];
+    s_t baffine_geometry_data[10];
     const s_t *bageom_streams[10];
     for (int geometry_stream = 0; geometry_stream < 10; ++geometry_stream) {
-      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t, VS>(
-          ne, affine_geometry_sources[geometry_stream], baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
+      bageom_streams[geometry_stream] = ageom_stream<s_t, g_t>(
+          affine_geometry_sources[geometry_stream], &baffine_geometry_data[geometry_stream], std::is_same<g_t, s_t>());
     }
     const s_t *badjugate[9];
     for (int component = 0; component < 9; ++component) {
       badjugate[component] = bageom_streams[component];
     }
 
-    two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, 0, bageom_streams[9], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bdirection, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, boutput);
+    two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(0, bageom_streams[9], badjugate, affine_shape_1d, affine_grad_1d, affine_q_weight_1d, bcurrent, bdirection, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, boutput);
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -518,8 +511,8 @@ __global__ void two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_a_mso
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }
@@ -640,19 +633,17 @@ __global__ void two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_i_mso
   static constexpr int NQ = 27;
   static constexpr int NS = 8;
   static constexpr int NC = 2;
-  static constexpr int VS = 1;
   const s_t *const isoparametric_shape_1d = sfem::codegen::ref_line_p1_q3<s_t>::shape_1d();
   const s_t *const isoparametric_grad_1d = sfem::codegen::ref_line_p1_q3<s_t>::grad_1d();
   const s_t *const isoparametric_q_weight_1d = sfem::codegen::quad_line_q3<s_t>::q_weight_1d();
 
   for (ptrdiff_t evb = (ptrdiff_t)blockIdx.x * blockDim.x + threadIdx.x; evb < nelements; evb += (ptrdiff_t)blockDim.x * gridDim.x) {
-    const int ne = 1;
-    s_t bcoordinates[3 * NS][VS];
-    s_t badjugate_data[9][NQ * VS];
-    s_t bdeterminant[NQ * VS];
-    s_t bcurrent[NC * NS][VS];
-    s_t bdirection[NC * NS][VS];
-    s_t boutput[NC * NS][VS];
+    s_t bcoordinates[3 * NS];
+    s_t badjugate_data[9][NQ];
+    s_t bdeterminant[NQ];
+    s_t bcurrent[NC * NS];
+    s_t bdirection[NC * NS];
+    s_t boutput[NC * NS];
 
     const geom_t *const coordinate_components[ND] = {points[0], points[1], points[2]};
     for (int shape = 0; shape < NS; ++shape) {
@@ -660,7 +651,7 @@ __global__ void two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_i_mso
       for (int d = 0; d < ND; ++d) {
         {
           const idx_t node = element_shape[evb];
-          bcoordinates[shape * ND + d][0] = coordinate_components[d][node];
+          bcoordinates[shape * ND + d] = coordinate_components[d][node];
         }
       }
     }
@@ -673,36 +664,36 @@ __global__ void two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_i_mso
         const int stream = shape * NC + field;
         {
           const idx_t node = element_shape[evb];
-          bcurrent[stream][0] = current_components[field][node * current_stride];
-          bdirection[stream][0] = direction_components[field][node * direction_stride];
+          bcurrent[stream] = current_components[field][node * current_stride];
+          bdirection[stream] = direction_components[field][node * direction_stride];
         }
       }
     }
 
     for (int stream = 0; stream < 16; ++stream) {
       {
-        boutput[stream][0] = s_t(0);
+        boutput[stream] = s_t(0);
       }
     }
 
-    s_t coordinate_grad_ref[ND * NQ * ND * VS];
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
+    s_t coordinate_grad_ref[ND * NQ * ND];
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 0,
         coordinate_grad_ref + 0);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
-        coordinate_grad_ref + NQ * ND * VS);
-    tensor_gradient_contiguous<s_t, NQ, NS, VS, 3>(
-        ne, isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
-        coordinate_grad_ref + 2 * NQ * ND * VS);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 1,
+        coordinate_grad_ref + NQ * ND);
+    tensor_gradient_contiguous_scalar<s_t, NQ, NS, 3>(
+        isoparametric_shape_1d, isoparametric_grad_1d, bcoordinates, 2,
+        coordinate_grad_ref + 2 * NQ * ND);
 
     s_t *coordinate_grad_ref_adjugate_streams[ND * ND] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
-    geometry_jacobian_adjugate_and_determinant<s_t, ND, NQ, VS>(
-        ne, coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
+    geometry_jacobian_adjugate_and_determinant_scalar<s_t, ND, NQ>(
+        coordinate_grad_ref, coordinate_grad_ref_adjugate_streams, bdeterminant);
 
     const s_t *const badjugate[9] = {badjugate_data[0], badjugate_data[1], badjugate_data[2], badjugate_data[3], badjugate_data[4], badjugate_data[5], badjugate_data[6], badjugate_data[7], badjugate_data[8]};
 
-    two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS, VS>(ne, VS, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bdirection, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, boutput);
+    two_phase_flow_form_2_p_c_p_w_d3_tensor_product_jacobian_action_block_contiguous<s_t, NQ, NS>(1, bdeterminant, badjugate, isoparametric_shape_1d, isoparametric_grad_1d, isoparametric_q_weight_1d, bcurrent, bdirection, C_ka1, C_ka2, K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7, K_8, M_c, P_r, R, S_res, T, Z, dt, m, mu_c, porosity, boutput);
 
     s_t *const output_components[NC] = {p_w_out, p_c_out};
     for (int shape = 0; shape < NS; ++shape) {
@@ -710,8 +701,8 @@ __global__ void two_phase_flow_form_2_p_c_p_w_proteus_hex8_jacobian_action_i_mso
       for (int field = 0; field < NC; ++field) {
         const int stream = shape * NC + field;
         s_t *const RSTR out = output_components[field];
-        for (int scatter = 0; scatter < ne; ++scatter) {
-          atomicAdd(&(out[element_shape[evb + scatter] * out_stride]), boutput[stream][scatter]);
+        {
+          atomicAdd(&(out[element_shape[evb] * out_stride]), boutput[stream]);
         }
       }
     }

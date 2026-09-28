@@ -2649,12 +2649,22 @@ int main() {
                 os.path.join("d2", "cuda", "neohookean_ogden_d2_tensor_product_local.cuh"),
                 relative,
             )
+            # The kernels live with the PROTEUS twin, because a micro-kernel
+            # works in Cartesian node order and the mesh-order element
+            # delegates to it.  That is how the host has always been arranged;
+            # the device only joined once the alias pass was run under the
+            # target whose extension it was looking for.
+            delegating_path = os.path.join(
+                out_dir, "d2", "quad4", "cuda", "neohookean_ogden_quad4_operator.cu"
+            )
+            with open(delegating_path, encoding="utf-8") as input_file:
+                self.assertIn("proteus_elements", input_file.read())
             operator_path = os.path.join(
                 out_dir,
                 "d2",
-                "quad4",
+                "proteus_quad4",
                 "cuda",
-                "neohookean_ogden_quad4_operator.cu",
+                "neohookean_ogden_proteus_quad4_operator.cu",
             )
             with open(operator_path, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
@@ -2675,7 +2685,8 @@ int main() {
             # the `Op`'s `value` calls the stepped dispatch on both: on the
             # device it found nothing to call.
             self.assertIn(
-                "__global__ void neohookean_ogden_quad4_objective_steps_i_msoa_impl", operator_source
+                "__global__ void neohookean_ogden_proteus_quad4_objective_steps_i_msoa_impl",
+                operator_source,
             )
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
@@ -2709,12 +2720,22 @@ int main() {
                 os.path.join("d2", "quad4", "hip", "neohookean_ogden_quad4_operator.hip"),
                 relative,
             )
+            # The kernels live with the PROTEUS twin, because a micro-kernel
+            # works in Cartesian node order and the mesh-order element
+            # delegates to it.  That is how the host has always been arranged;
+            # the device only joined once the alias pass was run under the
+            # target whose extension it was looking for.
+            delegating_path = os.path.join(
+                out_dir, "d2", "quad4", "hip", "neohookean_ogden_quad4_operator.hip"
+            )
+            with open(delegating_path, encoding="utf-8") as input_file:
+                self.assertIn("proteus_elements", input_file.read())
             operator_path = os.path.join(
                 out_dir,
                 "d2",
-                "quad4",
+                "proteus_quad4",
                 "hip",
-                "neohookean_ogden_quad4_operator.hip",
+                "neohookean_ogden_proteus_quad4_operator.hip",
             )
             with open(operator_path, encoding="utf-8") as input_file:
                 operator_source = input_file.read()
@@ -2736,7 +2757,8 @@ int main() {
             # the `Op`'s `value` calls the stepped dispatch on both: on the
             # device it found nothing to call.
             self.assertIn(
-                "__global__ void neohookean_ogden_quad4_objective_steps_i_msoa_impl", operator_source
+                "__global__ void neohookean_ogden_proteus_quad4_objective_steps_i_msoa_impl",
+                operator_source,
             )
             self.assertIn("blockIdx.x * blockDim.x + threadIdx.x", operator_source)
             self.assertIn("atomicAdd", operator_source)
@@ -2805,7 +2827,14 @@ int main() {
                     with self.subTest(source=os.path.basename(path)):
                         with open(path, encoding="utf-8") as input_file:
                             source = input_file.read()
-                        self.assertIn("__global__ void", source)
+                        # A mesh-order element delegates to the PROTEUS twin
+                        # that carries the kernels, so its own source forwards
+                        # and holds no `__global__` at all.  It does that on
+                        # the device now as it always did on the host; the
+                        # contract below is about the sources that have a mesh
+                        # loop to get wrong.
+                        if "proteus_elements" not in source:
+                            self.assertIn("__global__ void", source)
                         self.assertNotIn(
                             "for (ptrdiff_t element = 0; element < nelements;",
                             source,

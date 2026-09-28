@@ -43,6 +43,42 @@ def _linear_index_offset(values):
     return None
 
 
+def component_major_index_decomposition(values, n_fields, n_shape):
+    """The node order behind a component-major to node-major stream mapping.
+
+    A vector field's local index runs component-major -- `local = c * n_shape +
+    n` -- while the streams it maps onto are node-major with the components
+    interleaved, `order[n] * n_fields + c`.  Everything in that but `order` is
+    arithmetic, so a kernel with this mapping should nest one loop per factor
+    and compute the index rather than flatten both factors into a table of
+    twenty-four results.
+
+    Returns `order` when the mapping decomposes, and `None` when it does not,
+    in which case the caller has nothing better than the table.  `order` is the
+    identity exactly when the element already numbers its nodes the way the
+    kernel wants them, and then there is no table left at all.
+    """
+    values = tuple(values)
+    if len(values) != n_fields * n_shape:
+        return None
+    order = []
+    for node in range(n_shape):
+        target, remainder = divmod(values[node], n_fields)
+        if remainder != 0:
+            return None
+        order.append(target)
+    for component in range(n_fields):
+        for node in range(n_shape):
+            if values[component * n_shape + node] != order[node] * n_fields + component:
+                return None
+    return tuple(order)
+
+
+def is_identity_order(order):
+    """Whether an order leaves every index where it found it."""
+    return tuple(order) == tuple(range(len(order)))
+
+
 def uses_cartesian_ordering(element_type):
     """Whether this element's mesh already numbers its nodes lexicographically.
 

@@ -47,16 +47,6 @@ struct neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_
     return data;
   }
 
-  static __host__ __device__ __forceinline__ const s_t *grad() {
-    static const s_t data[4] = {
-      s_t(-1),
-      s_t(1),
-      s_t(-1),
-      s_t(1)
-    };
-    return data;
-  }
-
   static __host__ __device__ __forceinline__ const s_t *weight() {
     static const s_t data[2] = {
       s_t(0.5),
@@ -64,23 +54,15 @@ struct neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_
     };
     return data;
   }
+
 };
 
 template <typename s_t>
 __host__ __device__ __forceinline__ s_t neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_measure(
-    const int q,
     const idx_t *const RSTR ev,
     const geom_t *const *const RSTR points) {
-  const s_t *const grad = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::grad();
-  const int n_shape = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
-    s_t dx0 = s_t(0);
-  s_t dx1 = s_t(0);
-  for (int i = 0; i < n_shape; ++i) {
-    const s_t gi = grad[q * n_shape + i];
-    const idx_t node = ev[i];
-    dx0 += s_t(points[0][node]) * gi;
-    dx1 += s_t(points[1][node]) * gi;
-  }
+  const s_t dx0 = s_t(points[0][ev[1]]) - s_t(points[0][ev[0]]);
+  const s_t dx1 = s_t(points[1][ev[1]]) - s_t(points[1][ev[0]]);
   return sqrt(dx0 * dx0 + dx1 * dx1);
 }
 
@@ -117,13 +99,13 @@ __host__ __device__ __forceinline__ void neumann_general_proteus_quad4_edgeshell
     s_t element_vector[2][2]) {
   const s_t *const shape = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::shape();
   const s_t *const weight = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::weight();
-  const int n_shape = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
   const int n_qp = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NQ;
+  const int n_shape = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_reference_data<s_t>::NS;
 
 
 
   for (int q = 0; q < n_qp; ++q) {
-    const s_t dS = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_measure<s_t>(q, ev, points);
+    const s_t dS = neumann_general_proteus_quad4_edgeshell2_boundary_residual_soa_measure<s_t>(ev, points);
     const s_t qw = weight[q] * dS;
     s_t x0 = s_t(0);
     s_t x1 = s_t(0);

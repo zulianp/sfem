@@ -115,11 +115,6 @@ namespace {
 
     int run_patch_kernel(Fixture &fx, const std::vector<real_t> &steps,
                          const real_t *const accumulator, real_t *const merit) {
-        const void *grad_ref[3] = {
-                sfem::codegen::ref_tet4_q1<real_t>::grad_ref_x(),
-                sfem::codegen::ref_tet4_q1<real_t>::grad_ref_y(),
-                sfem::codegen::ref_tet4_q1<real_t>::grad_ref_z(),
-        };
         return mooney_rivlin_kelvin_voigt_total_merit_patch_3d_a_msoa(
                 smesh::TET4,
                 smesh::TypeToEnum<real_t>::value(),
@@ -132,8 +127,6 @@ namespace {
                 // No `shape`: this material's residual contracts only test
                 // gradients, and the kernel names a reference table only where
                 // it reads one.
-                grad_ref,
-                sfem::codegen::quad_tet_q1<real_t>::q_weight(),
                 kEtaB, kEtaS, kLambda, kMu, kDtShift,
                 (int)steps.size(),
                 steps.data(),

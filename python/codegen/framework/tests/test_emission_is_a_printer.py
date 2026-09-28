@@ -445,7 +445,16 @@ PLAN_INPUTS = (
 #: `emitters/residual_codegen.py`, and this test caught it at 118.  The test
 #: moved to `plans.direct_assembly.closed_form_assembly_admits`, where an
 #: assembly and an apply read one answer instead of two.
-BUDGET = 101
+#:
+#: 101 -> 96: the five questions a closed-form residual body used to ask about
+#: the *form* before it would fold anything -- no value coefficients, no field
+#: values, test gradients present, trial gradients present, the right number of
+#: reference gradients.  Which evaluation an element gets is the element's
+#: property, and `plans.evaluation_strategy` says so; the body could only fold the
+#: reference gradients, so every form that read a field's value fell back to the
+#: quadrature body and its tables.  Folding the shape values and the weight as
+#: well left `_uses_constant_p1_expansion` asking one question, of the rule.
+BUDGET = 96
 
 
 def _tested_names(test):

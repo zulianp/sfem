@@ -68,6 +68,8 @@ MATERIALS = (
     "neumann_general",
     "two_phase_flow",
     "navier_stokes",
+    "saint_venant_kirchhoff",
+    "modified_mooney_rivlin",
 )
 
 # Byte-for-byte comparison would otherwise trip over editor and interpreter

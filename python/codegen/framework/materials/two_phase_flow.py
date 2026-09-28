@@ -76,7 +76,7 @@ for dim in (2, 3):
 material = gen.CodeGenerator(
     "two_phase_flow",
     systems,
-    elements=("TRI3", "TET4", "QUAD4", "HEX8"),
+    elements=gen.sfem_default_element_types(),
     op_name="GeneratedTwoPhaseFlow",
     parameter_defaults=(
         ("porosity", 0.1),

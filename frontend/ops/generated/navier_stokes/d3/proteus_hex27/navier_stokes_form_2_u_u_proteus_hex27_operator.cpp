@@ -32,7 +32,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int,
+    const int ne,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -380,10 +380,11 @@ static SFEM_INLINE int navier_stokes_form_2_u_u_proteus_hex27_jacobian_action_is
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t *const RSTR element_shape = elements[shape];
       for (int d = 0; d < ND; ++d) {
+        s_t *const RSTR bcoordinate_row = bcoordinates[shape * ND + d];
         #pragma omp simd
         for (int lane = 0; lane < ne; ++lane) {
           const idx_t node = element_shape[evb + lane];
-          bcoordinates[shape * ND + d][lane] = coordinate_components[d][node];
+          bcoordinate_row[lane] = coordinate_components[d][node];
         }
       }
     }

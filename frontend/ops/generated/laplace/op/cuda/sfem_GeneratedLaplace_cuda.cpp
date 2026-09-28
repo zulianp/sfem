@@ -202,13 +202,36 @@ namespace sfem {
       std::shared_ptr<smesh::FFF> metric_soa;
         };
 
+    //! Whether this element leaves the operator no choice of geometry.
+    //!
+    //! A constant-P1 simplex publishes no isoparametric kernel -- its affine
+    //! kernel computes the same numbers on a constant Jacobian -- so the
+    //! operator takes the affine route for it whatever the caller asked, and
+    //! has to have cached the adjugate it reads.  Every other element still
+    //! caches only when asked, which is what keeps an isoparametric run from
+    //! paying for geometry it never reads.
+    bool geometry_is_forced_affine(const smesh::ElemType element_type) {
+      switch (element_type) {
+        case smesh::TET4:
+          return true;
+        case smesh::TRI3:
+          return true;
+        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
-                                  MultiDomainOp &domains) {
+                                  MultiDomainOp &domains,
+                                  const bool requested) {
       auto mesh = space->mesh_ptr();
       const bool needs_jacobian_aos =
           false ||
           false;
       for (auto &entry : domains.domains()) {
+        if (!requested && !geometry_is_forced_affine(entry.second.element_type)) {
+          continue;
+        }
         const smesh::block_idx_t block_id =
             block_id_for_domain(*mesh, *entry.second.block);
         auto cache = std::make_shared<AffineGeometryCache>();
@@ -546,6 +569,9 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
+    // Not only what the caller asked for.  An element whose geometry is
+    // constant by construction has no isoparametric kernel, so the operator
+    // takes the affine route for it either way and needs the cache either way.
     const bool needs_affine_geometry =
         impl_->objective_uses_affine ||
         impl_->gradient_uses_affine ||
@@ -560,8 +586,11 @@ namespace sfem {
     // one never built the metric, so an operator whose affine kernels read
     // it worked when the option was set after initialize and failed when it
     // was set before.
-    if (needs_affine_geometry &&
-      cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+    // Unconditionally, because the loop skips a domain that neither asked for
+    // affine geometry nor is an element that forces it.  Gating the call on
+    // the request alone left an operator meshing a constant-P1 simplex with no
+    // cached adjugate and an affine kernel as its only route to that element.
+    if (cache_affine_geometry(impl_->space, *impl_->domains, needs_affine_geometry) != SFEM_SUCCESS) {
       return SFEM_FAILURE;
     }
     impl_->element_values = create_buffer<real_t>(impl_->element_capacity, EXECUTION_SPACE_DEVICE);
@@ -596,7 +625,7 @@ namespace sfem {
       const geom_t *adjugate_aos = nullptr;
       const geom_t *determinant = nullptr;
       const geom_t *const *geom_metric = nullptr;
-            if (impl_->gradient_uses_affine) {
+            if (impl_->gradient_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -627,13 +656,13 @@ namespace sfem {
 
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
-        if (impl_->gradient_uses_affine) {
+        if ((impl_->gradient_uses_affine || domain.element_type == smesh::TRI3) && (domain.element_type == smesh::TRI3)) {
           return cu_laplace_gradient_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0, stream);
         }
         return cu_laplace_gradient_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0, stream);
       }
       else if (dim == 3) {
-        if (impl_->gradient_uses_affine) {
+        if (impl_->gradient_uses_affine || domain.element_type == smesh::TET4) {
           if (domain.element_type == smesh::TET4) {
             return cu_laplace_gradient_3d_a_met_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 1, out + 0, stream);
           }
@@ -662,7 +691,7 @@ namespace sfem {
       const geom_t *adjugate_aos = nullptr;
       const geom_t *determinant = nullptr;
       const geom_t *const *geom_metric = nullptr;
-            if (impl_->apply_uses_affine) {
+            if (impl_->apply_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -692,13 +721,13 @@ namespace sfem {
             }
       const int dim = mesh->spatial_dimension();
       if (dim == 2) {
-        if (impl_->apply_uses_affine) {
+        if ((impl_->apply_uses_affine || domain.element_type == smesh::TRI3) && (domain.element_type == smesh::TRI3)) {
           return cu_laplace_apply_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0, stream);
         }
         return cu_laplace_apply_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0, stream);
       }
       else if (dim == 3) {
-        if (impl_->apply_uses_affine) {
+        if (impl_->apply_uses_affine || domain.element_type == smesh::TET4) {
           if (domain.element_type == smesh::TET4) {
             return cu_laplace_apply_3d_a_met_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, h + 0, 1, out + 0, stream);
           }
@@ -760,7 +789,7 @@ namespace sfem {
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
       const geom_t *const *geom_metric = nullptr;
-            if (impl_->objective_uses_affine) {
+            if (impl_->objective_uses_affine || domain.element_type == smesh::TET4 || domain.element_type == smesh::TRI3) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -795,14 +824,14 @@ namespace sfem {
       if (status == SFEM_FAILURE) {
         const int dim = mesh->spatial_dimension();
         if (dim == 2) {
-          if (impl_->objective_uses_affine) {
+          if ((impl_->objective_uses_affine || domain.element_type == smesh::TRI3) && (domain.element_type == smesh::TRI3)) {
             status = cu_laplace_objective_steps_2d_a_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), geom_metric[0], geom_metric[1], geom_metric[2], domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, impl_->step_values->data(), impl_->element_values->data(), stream);
           } else {
             status = cu_laplace_objective_steps_2d_i_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), points, domain.parameters->require_real_value("kappa"), 1, x + 0, 2, h + 0, nsteps, impl_->step_values->data(), impl_->element_values->data(), stream);
           }
         }
         else if (dim == 3) {
-          if (impl_->objective_uses_affine) {
+          if (impl_->objective_uses_affine || domain.element_type == smesh::TET4) {
             if (domain.element_type == smesh::TET4) {
               status = cu_laplace_objective_steps_3d_a_met_msoa(domain.element_type, real_type, nelements, mesh->n_nodes(), element_connectivity(domain), geom_metric[0], geom_metric[1], geom_metric[2], geom_metric[3], geom_metric[4], geom_metric[5], domain.parameters->require_real_value("kappa"), 1, x + 0, 3, h + 0, nsteps, impl_->step_values->data(), impl_->element_values->data(), stream);
             } else {
@@ -932,7 +961,7 @@ namespace sfem {
     };
     const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
     if (matched && val && impl_->domains) {
-      if (cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+      if (cache_affine_geometry(impl_->space, *impl_->domains, true) != SFEM_SUCCESS) {
         SFEM_ERROR("GPUGeneratedLaplace failed to cache affine geometry\n");
       }
     }

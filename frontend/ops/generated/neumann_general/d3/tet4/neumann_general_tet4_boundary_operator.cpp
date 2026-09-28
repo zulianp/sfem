@@ -51,30 +51,6 @@ struct neumann_general_tet4_trishell3_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static const s_t *grad() {
-    static const s_t data[18] = {
-      s_t(-1),
-      s_t(-1),
-      s_t(1),
-      s_t(0),
-      s_t(0),
-      s_t(1),
-      s_t(-1),
-      s_t(-1),
-      s_t(1),
-      s_t(0),
-      s_t(0),
-      s_t(1),
-      s_t(-1),
-      s_t(-1),
-      s_t(1),
-      s_t(0),
-      s_t(0),
-      s_t(1)
-    };
-    return data;
-  }
-
   static const s_t *weight() {
     static const s_t data[3] = {
       s_t(0.16666666666666666),
@@ -83,35 +59,19 @@ struct neumann_general_tet4_trishell3_boundary_residual_soa_reference_data {
     };
     return data;
   }
+
 };
 
 template <typename s_t>
 static SFEM_INLINE s_t neumann_general_tet4_trishell3_boundary_residual_soa_measure(
-    const int q,
     const idx_t *const RSTR ev,
     const geom_t *const *const RSTR points) {
-  const s_t *const grad = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::grad();
-  const int n_shape = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NS;
-    s_t dxdr0 = s_t(0);
-  s_t dxdr1 = s_t(0);
-  s_t dxdr2 = s_t(0);
-  s_t dxds0 = s_t(0);
-  s_t dxds1 = s_t(0);
-  s_t dxds2 = s_t(0);
-  for (int i = 0; i < n_shape; ++i) {
-    const s_t gr = grad[(q * n_shape + i) * 2 + 0];
-    const s_t gs = grad[(q * n_shape + i) * 2 + 1];
-    const idx_t node = ev[i];
-    const s_t x = s_t(points[0][node]);
-    const s_t y = s_t(points[1][node]);
-    const s_t z = s_t(points[2][node]);
-    dxdr0 += x * gr;
-    dxdr1 += y * gr;
-    dxdr2 += z * gr;
-    dxds0 += x * gs;
-    dxds1 += y * gs;
-    dxds2 += z * gs;
-  }
+  const s_t dxdr0 = s_t(points[0][ev[1]]) - s_t(points[0][ev[0]]);
+  const s_t dxdr1 = s_t(points[1][ev[1]]) - s_t(points[1][ev[0]]);
+  const s_t dxdr2 = s_t(points[2][ev[1]]) - s_t(points[2][ev[0]]);
+  const s_t dxds0 = s_t(points[0][ev[2]]) - s_t(points[0][ev[0]]);
+  const s_t dxds1 = s_t(points[1][ev[2]]) - s_t(points[1][ev[0]]);
+  const s_t dxds2 = s_t(points[2][ev[2]]) - s_t(points[2][ev[0]]);
   const s_t c0 = dxdr1 * dxds2 - dxdr2 * dxds1;
   const s_t c1 = dxdr2 * dxds0 - dxdr0 * dxds2;
   const s_t c2 = dxdr0 * dxds1 - dxdr1 * dxds0;
@@ -155,13 +115,13 @@ static SFEM_INLINE void neumann_general_tet4_trishell3_boundary_residual_soa_ele
     s_t element_vector[3][3]) {
   const s_t *const shape = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::shape();
   const s_t *const weight = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::weight();
-  const int n_shape = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NS;
   const int n_qp = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NQ;
+  const int n_shape = neumann_general_tet4_trishell3_boundary_residual_soa_reference_data<s_t>::NS;
 
 
 
   for (int q = 0; q < n_qp; ++q) {
-    const s_t dS = neumann_general_tet4_trishell3_boundary_residual_soa_measure<s_t>(q, ev, points);
+    const s_t dS = neumann_general_tet4_trishell3_boundary_residual_soa_measure<s_t>(ev, points);
     const s_t qw = weight[q] * dS;
     s_t x0 = s_t(0);
     s_t x1 = s_t(0);

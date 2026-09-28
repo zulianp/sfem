@@ -68,11 +68,39 @@ class LoopLoweringPolicy:
     matrix_unit: MatrixUnitKind = MatrixUnitKind.NONE
 
 
+#: What a work item holds, as the two answers every consumer of the width is
+#: already keyed on.  `False` is not a second kind of target: it is this target
+#: with the block taken away, which is what an element-matrix kernel runs on.
+_WORK_ITEM_WIDTH = {True: "VS", False: None}
+
+
 @dataclass(frozen=True)
 class TargetPlatform:
     name: str
     language: TargetLanguage
     default_alignment: int = 64
+    #: Whether a work item of this target holds a block of elements.
+    #:
+    #: True for a CPU target, where a work item is one lane of `VS`.  False for a
+    #: device thread -- and false for any kernel that holds a single element
+    #: whatever it runs on, which is what `holding_one_element` returns.  Every
+    #: answer that depends on having a width already reads
+    #: `kernel_vector_width`, so turning this off is the whole of it: no width
+    #: constant, no `[VS]` extent, no work-item loop, no slot to index and the
+    #: scalar rendering of the shared micro-kernels.
+    work_item_holds_a_block: bool = True
+
+    def holding_one_element(self):
+        """This target with the block taken away.
+
+        An element-matrix kernel holds one element on every target: `plans` says
+        assembly has one element in hand, and the scatter that reads the matrix
+        has no lane index to give it.  Emitting it under this target is what
+        stops it declaring `VS = 1`, sizing its tiles `[1]` and opening a lane
+        loop that runs once -- all of which is the width surviving at one, which
+        is the thing it does not have.
+        """
+        return dataclass_replace(self, work_item_holds_a_block=False)
 
     @property
     def generated_language(self):
@@ -222,9 +250,81 @@ class TargetPlatform:
             "%sconst %s %s = 0;" % (indent, policy.lane_index_type, policy.lane_index),
         )
 
+    def kernel_vector_width(self):
+        """What a kernel calls the number of elements one work item holds.
+
+        `VS` where a work item strides over a block of them, so the kernel is
+        parameterised by how many and sizes its buffers in terms of it.  `None`
+        where a work item *is* one element -- a device thread, or any kernel
+        emitted under `holding_one_element` -- and there is no width to be
+        parameterised by: no template argument, no width-sized buffers, no tile
+        loop over blocks of that width, and the scalar rendering of the shared
+        micro-kernels rather than the blocked one.
+        """
+        return _WORK_ITEM_WIDTH[self.work_item_holds_a_block]
+
+    def work_item_extent(self):
+        """The trailing extent of a staged buffer: `[VS]`, or nothing.
+
+        A buffer holds one slot per work item, and where a work item *is* one
+        element there is no slot to hold -- the buffer is the value.  Spelling
+        that as `[1]` type-checks and is the width surviving under another name,
+        which is what `kernel_vector_width` says a target without a width does
+        not have.
+        """
+        width = self.kernel_vector_width()
+        return "[%s]" % width if width is not None else ""
+
     def work_item_subscript(self):
-        """How a staged buffer is indexed at this work item: `[lane]`, or `[0]`."""
+        """How a staged buffer is indexed at this work item: `[lane]`, or nothing.
+
+        Paired with `work_item_extent`: a buffer with no trailing extent has no
+        trailing subscript either, and the two have to move together or the
+        kernel indexes a scalar.
+        """
+        if self.kernel_vector_width() is None:
+            return ""
         return "[%s]" % self.work_item_index()
+
+    def staged_buffer_address(self, name):
+        """The pointer to a staged buffer: the array, or the scalar's address.
+
+        A buffer with a slot per work item is an array and decays to a pointer
+        on its own.  Where a work item *is* one element the buffer is the value,
+        so the pointer is its address -- which is the whole difference between
+        the two spellings at a call boundary that takes `s_t *`.
+        """
+        if self.kernel_vector_width() is None:
+            return "&%s" % name
+        return name
+
+    def work_item_block_offset_at(self, outer, index):
+        """Where `outer`'s slot of the work item at `index` sits in a staged block.
+
+        `outer * VS + index` where a work item is a lane of a block of `VS`
+        elements, and `outer` alone where a work item *is* the element: the
+        array holds one entry per `outer` and there is no lane to add.  The
+        index is a parameter because the loop that supplies it is not always the
+        work-item loop -- a scatter walks the same block by its own name.
+        """
+        width = self.kernel_vector_width()
+        if width is None:
+            return str(outer)
+        return "%s * %s + %s" % (outer, width, index)
+
+    def work_item_block_offset(self, outer):
+        """A flat offset into a per-point block of work items.
+
+        `q * VS + lane` where a work item is one lane of a block of `VS`
+        elements, and `q` alone where a work item *is* the element: there is no
+        block to stride over and no lane to add, so neither term is spelled.
+        Distinct from `work_item_offset`, whose stride is usually a runtime mesh
+        parameter that survives however wide a work item is.
+        """
+        width = self.kernel_vector_width()
+        if width is None:
+            return outer
+        return self.work_item_offset(outer, width)
 
     def work_item_offset(self, outer, stride):
         """A flat offset into a per-point, per-work-item stream.
@@ -629,11 +729,15 @@ class OpenMPTarget(TargetPlatform):
         return "__builtin_assume_aligned(%s, %d)" % (str(pointer), alignment)
 
     def loop_lowering_policy(self):
+        # The lane loop is the block being walked, so a work item that holds no
+        # block opens no loop -- one element, written where it is.  The rest of
+        # the policy is unchanged: the *element* loop is still parallel, which is
+        # what an assembly kernel runs over.
         return LoopLoweringPolicy(
             execution_model=ExecutionModel.VECTOR_LANES,
-            emits_lane_loop=True,
+            emits_lane_loop=self.work_item_holds_a_block,
             maps_lane_to_thread=False,
-            vectorize_lane_loop=True,
+            vectorize_lane_loop=self.work_item_holds_a_block,
             parallel_element_loop=True,
             supports_shared_memory=False,
         )
@@ -781,12 +885,13 @@ class CUDATarget(TargetPlatform):
     def mesh_loop_nodes(self):
         """A grid-stride pass over the mesh, one element per thread.
 
-        `ne` is 1 rather than the block's tail count: here the block is one
-        thread, and the work-item scope below it opens no loop at all.
+        It declares no work-item count.  The count exists for the lane loop and
+        for the kernels that loop to it, and here the block is one thread: the
+        work-item scope below opens no loop, and every kernel this pass calls
+        has stopped taking a count.  Declaring `ne = 1` anyway left it dead in
+        88 device kernels.
         """
-        return self._grid_stride_nodes(
-            "evb", (BufferDeclNode("const int", "ne", (), "1"),)
-        )
+        return self._grid_stride_nodes("evb", ())
 
     def element_loop_nodes(self, index="element", extent="nelements"):
         return self._grid_stride_nodes(index, (), extent)
@@ -829,6 +934,10 @@ class CUDATarget(TargetPlatform):
     def effective_vector_size(self, vector_size):
         #: One thread, one element.
         return 1
+
+    def kernel_vector_width(self):
+        #: And so no width: see `Target.kernel_vector_width`.
+        return None
 
     def execution_space(self):
         return "EXECUTION_SPACE_DEVICE"

@@ -633,7 +633,7 @@ namespace sfem {
       if (dim == 2) {
         static constexpr ptrdiff_t FIELD_STRIDE = 2;
           real_t *const RSTR u_out[2] = {out + 0, out + 1};
-        if (impl_->residual_uses_affine) {
+        if (impl_->residual_uses_affine || domain.element_type == smesh::TRI3) {
           return cu_body_force_residual_2d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), determinant, storage[0], storage[1], storage[2], FIELD_STRIDE, u_out[0], u_out[1], stream);
         }
         return cu_body_force_residual_2d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], FIELD_STRIDE, u_out[0], u_out[1], stream);
@@ -641,7 +641,7 @@ namespace sfem {
       else if (dim == 3) {
         static constexpr ptrdiff_t FIELD_STRIDE = 3;
           real_t *const RSTR u_out[3] = {out + 0, out + 1, out + 2};
-        if (impl_->residual_uses_affine) {
+        if (impl_->residual_uses_affine || domain.element_type == smesh::TET4) {
           return cu_body_force_residual_3d_a_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), determinant, storage[0], storage[1], storage[2], storage[3], FIELD_STRIDE, u_out[0], u_out[1], u_out[2], stream);
         }
         return cu_body_force_residual_3d_i_msoa(domain.element_type, real_type, domain.block->n_elements(), mesh->n_nodes(), element_connectivity(domain), points, storage[0], storage[1], storage[2], storage[3], FIELD_STRIDE, u_out[0], u_out[1], u_out[2], stream);

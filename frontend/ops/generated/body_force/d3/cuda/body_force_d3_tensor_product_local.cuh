@@ -30,9 +30,8 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void body_force_d3_tensor_product_residual_block(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR shape_1d,
@@ -45,7 +44,7 @@ __host__ __device__ __forceinline__ void body_force_d3_tensor_product_residual_b
 ) {
   static constexpr int ND = 3;
   static constexpr int NC = 3;
-  s_t value_coeff[NC * NQ * VS];
+  s_t value_coeff[NC * NQ];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -53,9 +52,9 @@ __host__ __device__ __forceinline__ void body_force_d3_tensor_product_residual_b
     const int qz = q / (NQ1 * NQ1);
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
     const s_t *const RSTR det_q = determinant + q * geometry_stride;
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR value_coeff_q2 = &value_coeff[(2 * NQ + q) * VS];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR value_coeff_q2 = &value_coeff[(2 * NQ + q)];
     {
       const s_t det = det_q[0];
       const s_t value_coeff0 = -density*g0;
@@ -66,13 +65,12 @@ __host__ __device__ __forceinline__ void body_force_d3_tensor_product_residual_b
       value_coeff_q2[0] = qw * det * value_coeff2;
     }
   }
-  tensor_integrate_value<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, value_coeff, output);
+  tensor_integrate_value_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, value_coeff, output);
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 __host__ __device__ __forceinline__ void body_force_d3_tensor_product_residual_block_contiguous(
-    const int ne,
     const ptrdiff_t geometry_stride,
     const s_t *const RSTR determinant,
     const s_t *const RSTR shape_1d,
@@ -81,11 +79,11 @@ __host__ __device__ __forceinline__ void body_force_d3_tensor_product_residual_b
     const s_t g0,
     const s_t g1,
     const s_t g2,
-    s_t output[3 * NS][VS]
+    s_t output[3 * NS]
 ) {
   static constexpr int ND = 3;
   static constexpr int NC = 3;
-  s_t value_coeff[NC * NQ * VS];
+  s_t value_coeff[NC * NQ];
   static constexpr int NQ1 = integer_root(NQ, ND);
   for (int q = 0; q < NQ; ++q) {
     const int qx = q % NQ1;
@@ -93,9 +91,9 @@ __host__ __device__ __forceinline__ void body_force_d3_tensor_product_residual_b
     const int qz = q / (NQ1 * NQ1);
     const s_t qw = q_weight_1d[qx] * q_weight_1d[qy] * q_weight_1d[qz];
     const s_t *const RSTR det_q = determinant + q * geometry_stride;
-    s_t *const RSTR value_coeff_q0 = &value_coeff[q * VS];
-    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q) * VS];
-    s_t *const RSTR value_coeff_q2 = &value_coeff[(2 * NQ + q) * VS];
+    s_t *const RSTR value_coeff_q0 = &value_coeff[q];
+    s_t *const RSTR value_coeff_q1 = &value_coeff[(NQ + q)];
+    s_t *const RSTR value_coeff_q2 = &value_coeff[(2 * NQ + q)];
     {
       const s_t det = det_q[0];
       const s_t value_coeff0 = -density*g0;
@@ -106,8 +104,8 @@ __host__ __device__ __forceinline__ void body_force_d3_tensor_product_residual_b
       value_coeff_q2[0] = qw * det * value_coeff2;
     }
   }
-  tensor_integrate_value_contiguous<s_t, NQ, NS, VS, ND, NC>(
-      ne, shape_1d, value_coeff, output);
+  tensor_integrate_value_contiguous_scalar<s_t, NQ, NS, ND, NC>(
+      shape_1d, value_coeff, output);
 }
 
 

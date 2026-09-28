@@ -237,11 +237,29 @@ class SfemReferenceData:
 class SfemSoAElementSpecialization:
     quadrature_rule: SfemElementQuadratureRule
     vector_size: int = 16
+    #: The integration case the rule came from, carried so that a companion
+    #: specialisation can be built under the same one.  The shared simplex
+    #: header is emitted by every element of the family and has to come out
+    #: identical from each, so a higher-order simplex publishes the family's
+    #: constant-P1 kernel too -- and it has to pick the rule that element's own
+    #: generation would pick, which is this case at P1's order, not P1's
+    #: default.  Without it `two_phase_flow` at six points had TET4 publish the
+    #: quadrature shape and TET10 the closed-form shape under one name.
+    integration_case: str = "standard"
 
     def __post_init__(self):
         object.__setattr__(self, "vector_size", int(self.vector_size))
+        object.__setattr__(self, "integration_case", str(self.integration_case))
         if self.vector_size <= 0:
             raise ValueError("vector_size must be positive")
+
+    def companion(self, element_type):
+        """The same integration case, for another element of the family."""
+        return sfem_soa_element_specialization(
+            element_type,
+            vector_size=self.vector_size,
+            integration_case=self.integration_case,
+        )
 
     @property
     def element_type(self):
@@ -464,7 +482,9 @@ def sfem_fem_policy(
             integration_case=integration_case,
         )
     quadrature_rule = sfem_element_quadrature_rule(cell_element_type, quadrature_order)
-    specialization = SfemSoAElementSpecialization(quadrature_rule, vector_size)
+    specialization = SfemSoAElementSpecialization(
+        quadrature_rule, vector_size, integration_case
+    )
     return SfemFEMPolicy(
         element,
         compatible.name.lower() if compatible else cell_element_type.lower(),
@@ -842,6 +862,7 @@ def sfem_soa_element_specialization(
     return SfemSoAElementSpecialization(
         sfem_element_quadrature_rule(element_type, quadrature_order),
         vector_size,
+        integration_case,
     )
 
 

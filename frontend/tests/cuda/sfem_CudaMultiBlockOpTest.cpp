@@ -27,8 +27,8 @@ namespace {
 
     std::shared_ptr<Buffer<real_t>> fill_scalar_host(const FunctionSpace &fs) {
         auto            h      = create_host_buffer<real_t>(fs.n_dofs());
-        geom_t **const  points = fs.mesh().points()->data();
-        const ptrdiff_t n      = fs.mesh().n_nodes();
+        geom_t **const  points = fs.mesh_ptr()->points()->data();
+        const ptrdiff_t n      = fs.mesh_ptr()->n_nodes();
         for (ptrdiff_t i = 0; i < n; ++i) {
             const real_t px = points[0][i];
             const real_t py = points[1][i];
@@ -40,8 +40,8 @@ namespace {
 
     std::shared_ptr<Buffer<real_t>> fill_vector_host(const FunctionSpace &fs) {
         auto            h      = create_host_buffer<real_t>(fs.n_dofs());
-        geom_t **const  points = fs.mesh().points()->data();
-        const ptrdiff_t n      = fs.mesh().n_nodes();
+        geom_t **const  points = fs.mesh_ptr()->points()->data();
+        const ptrdiff_t n      = fs.mesh_ptr()->n_nodes();
         for (ptrdiff_t i = 0; i < n; ++i) {
             const real_t px  = points[0][i];
             const real_t py  = points[1][i];

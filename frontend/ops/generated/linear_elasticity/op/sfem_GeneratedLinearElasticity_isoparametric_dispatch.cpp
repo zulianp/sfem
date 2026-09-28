@@ -191,16 +191,6 @@ extern "C" int linear_elasticity_quad4_hessian_block_diag_sym_i_msoa(
         const real_t mu,
         void *const RSTR values
 );
-extern "C" int linear_elasticity_tri3_hessian_block_diag_sym_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t lmbda,
-        const real_t mu,
-        void *const RSTR values
-);
 extern "C" int linear_elasticity_hex8_hessian_block_diag_sym_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -231,16 +221,6 @@ extern "C" int linear_elasticity_tet10_hessian_block_diag_sym_i_msoa(
         const real_t mu,
         void *const RSTR values
 );
-extern "C" int linear_elasticity_tet4_hessian_block_diag_sym_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t lmbda,
-        const real_t mu,
-        void *const RSTR values
-);
 extern "C" int linear_elasticity_proteus_quad4_hessian_bsr_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -254,18 +234,6 @@ extern "C" int linear_elasticity_proteus_quad4_hessian_bsr_i_msoa(
         void *const RSTR values
 );
 extern "C" int linear_elasticity_quad4_hessian_bsr_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t lmbda,
-        const real_t mu,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        void *const RSTR values
-);
-extern "C" int linear_elasticity_tri3_hessian_bsr_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -302,18 +270,6 @@ extern "C" int linear_elasticity_proteus_hex8_hessian_bsr_i_msoa(
         void *const RSTR values
 );
 extern "C" int linear_elasticity_tet10_hessian_bsr_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t lmbda,
-        const real_t mu,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        void *const RSTR values
-);
-extern "C" int linear_elasticity_tet4_hessian_bsr_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -578,8 +534,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_block_diag_sy
       return linear_elasticity_proteus_quad4_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values);
     case smesh::QUAD4:
       return linear_elasticity_quad4_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values);
-    case smesh::TRI3:
-      return linear_elasticity_tri3_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values);
     default:
       break;
   }
@@ -609,8 +563,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_block_diag_sy
       return linear_elasticity_proteus_hex8_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values);
     case smesh::TET10:
       return linear_elasticity_tet10_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values);
-    case smesh::TET4:
-      return linear_elasticity_tet4_hessian_block_diag_sym_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, values);
     default:
       break;
   }
@@ -640,8 +592,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_2d_i_msoa
       return linear_elasticity_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
     case smesh::QUAD4:
       return linear_elasticity_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
-    case smesh::TRI3:
-      return linear_elasticity_tri3_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
     default:
       break;
   }
@@ -673,8 +623,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int linear_elasticity_hessian_bsr_3d_i_msoa
       return linear_elasticity_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
     case smesh::TET10:
       return linear_elasticity_tet10_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
-    case smesh::TET4:
-      return linear_elasticity_tet4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, lmbda, mu, rowptr, colidx, values);
     default:
       break;
   }

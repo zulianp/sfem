@@ -295,15 +295,14 @@ def _residual_diagnostics_entries(
     action_plan = by_order.get(FormOrder.TWO)
     if action_plan is not None and include_block_entries:
         for block_name in _diagnostic_block_names(unit, action_plan):
-            diagnostic_block_name = _diagnostic_block_name(block_name)
             entries.append(
                 _entry_from_expression_plan(
-                    "%s_%s" % (operator_prefix, diagnostic_block_name),
+                    "%s_%s" % (operator_prefix, block_name),
                     action_plan,
                     mesh_signature,
                     local_by_order,
                     reference_data_plan.isoparametric,
-                    block_name=diagnostic_block_name,
+                    block_name=block_name,
                 )
             )
     if action_plan is not None:
@@ -338,14 +337,26 @@ def _boundary_diagnostics_entries(unit, operator_prefix, mesh_signature, local_b
 def _diagnostic_block_names(unit, action_plan):
     """Names of the Jacobian-action blocks, in field order.
 
-    Read from the form collection's own 2-form block metadata.  This used to
-    call `jacobian_blocks()` on the pre-lowering system through
-    `FormCollection.source`; the blocks carry the same names and are already
-    part of the lowered collection.
+    The *component* blocks, because those are the kernels.  A vector field is
+    one block in the collection's own 2-form metadata -- `form_2_u_u` for a
+    displacement -- and that grouping is the right answer for the form layer
+    and the wrong one here: `plans.residual_model.residual_emission_model`
+    hands the emitter `component_blocks_for`, so the block entry points it
+    publishes are `jacobian_u0_u0` and its siblings, one per pair of
+    components.  Reading the grouped names promised one record called
+    `jacobian_u_u` for four kernels that exist under other names, and
+    generation refused with "diagnostics plan is missing entries".
+
+    It stayed hidden because nothing reached this branch with a vector field
+    and a non-zero Jacobian: a multi-field system takes the mixed path, which
+    asks for no block entries, and a body force's Jacobian is identically zero
+    so it publishes no blocks at all.  A material whose whole residual is one
+    vector field is the first, and it is what the combined residual unit of a
+    mixed energy/residual material is.
     """
     collection = unit.form_collection
     try:
-        blocks = collection.blocks_for(FormOrder.TWO)
+        blocks = collection.component_blocks_for(FormOrder.TWO)
     except (AttributeError, ValueError):
         blocks = ()
     names = tuple(block.name for block in blocks if getattr(block, "name", ""))
@@ -355,13 +366,6 @@ def _diagnostic_block_names(unit, action_plan):
     if names:
         return names
     return ()
-
-
-def _diagnostic_block_name(block_name):
-    block_name = str(block_name)
-    if block_name.startswith("form_2_"):
-        return "jacobian_%s" % block_name[len("form_2_"):]
-    return block_name
 
 
 def _entry_from_expression_plan(

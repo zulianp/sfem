@@ -17,8 +17,6 @@ extern "C" int body_force_total_tri3_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR shape,
-    const void *const RSTR q_weight,
     const real_t density,
     const real_t g0,
     const real_t g1,
@@ -37,8 +35,6 @@ extern "C" int body_force_total_tet4_merit_patch_a_msoa(
     const uint8_t *const RSTR n2e_local,
     idx_t **const RSTR elements,
     const geom_t *const *const RSTR points,
-    const void *const RSTR shape,
-    const void *const RSTR q_weight,
     const real_t density,
     const real_t g0,
     const real_t g1,
@@ -60,8 +56,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int body_force_total_merit_patch_2d_a_msoa(
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR shape,
-        const void *const RSTR q_weight,
         const real_t density,
         const real_t g0,
         const real_t g1,
@@ -78,7 +72,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int body_force_total_merit_patch_2d_a_msoa(
           : real_type;
   switch (element_type) {
     case smesh::TRI3:
-      return body_force_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, shape, q_weight, density, g0, g1, nsteps, steps, x, h, accumulator, merit);
+      return body_force_total_tri3_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, nsteps, steps, x, h, accumulator, merit);
     default:
       break;
   }
@@ -95,8 +89,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int body_force_total_merit_patch_3d_a_msoa(
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR shape,
-        const void *const RSTR q_weight,
         const real_t density,
         const real_t g0,
         const real_t g1,
@@ -114,7 +106,7 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int body_force_total_merit_patch_3d_a_msoa(
           : real_type;
   switch (element_type) {
     case smesh::TET4:
-      return body_force_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, shape, q_weight, density, g0, g1, g2, nsteps, steps, x, h, accumulator, merit);
+      return body_force_total_tet4_merit_patch_a_msoa((int)resolved_real_type, n_owned_nodes, n2e_ptr, n2e_idx, n2e_local, elements, points, density, g0, g1, g2, nsteps, steps, x, h, accumulator, merit);
     default:
       break;
   }

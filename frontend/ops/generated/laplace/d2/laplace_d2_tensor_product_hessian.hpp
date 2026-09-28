@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static SFEM_INLINE void laplace_d2_tensor_product_direct_hessian_tensor_product_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -45,7 +45,6 @@ static SFEM_INLINE void laplace_d2_tensor_product_direct_hessian_tensor_product_
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(NS > 0, "NS must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NC = 1;
   static constexpr int ND = 2;
   static constexpr int NDOFS = NC * NS;
@@ -66,8 +65,7 @@ static SFEM_INLINE void laplace_d2_tensor_product_direct_hessian_tensor_product_
         const int qx = q % NQ1;
         const int qy = q / NQ1;
         const s_t qw = q_weight_1d[qx] * q_weight_1d[qy];
-        const int lane = 0;
-        const ptrdiff_t goff = q * VS + lane;
+        const ptrdiff_t goff = q;
         const s_t adj_lane0 = badj0[goff];
         const s_t adj_lane1 = badj1[goff];
         const s_t adj_lane2 = badj2[goff];
@@ -91,7 +89,7 @@ static SFEM_INLINE void laplace_d2_tensor_product_direct_hessian_tensor_product_
       for (int out_shape = 0; out_shape < NS; ++out_shape) {
         column[out_shape * NC + 0] = &element_matrix[(0 * NS + out_shape) * NDOFS + trial_component * NS + trial_shape];
       }
-      tensor_test_scalar<s_t, NQ, NS, VS, 2, NC>(
+      tensor_test_scalar<s_t, NQ, NS, 2, NC>(
           shape_1d, grad_1d, flux + 0, column, 0);
     }
   }

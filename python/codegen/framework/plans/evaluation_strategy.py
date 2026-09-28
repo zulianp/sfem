@@ -111,8 +111,7 @@ def element_evaluation_plan(element_type):
 #: printer discipline is there to stop.  ``%(indent)s`` is filled by the caller.
 QUADRATURE_SCOPE_LINES = {
     EvaluationStrategy.EXPANDED: (
-        "%(indent)s{",
-        "%(indent)s    const int q = 0;  // %(element)s evaluates in closed form",
+        "%(indent)s{  // %(element)s evaluates in closed form",
     ),
     EvaluationStrategy.SUM_FACTORIZED: (
         "%(indent)sfor (int q = 0; q < NQ; ++q) {",
@@ -128,10 +127,15 @@ def quadrature_scope_lines(element_type, indent=""):
 
     A lowest-order simplex has one quadrature point and constant basis
     gradients, so the loop has one trip and collapses to the point itself.
-    ``const int q = 0`` rather than substituting zero throughout: the bodies
-    index reference tables as ``[q * NS + shape]`` at a dozen sites, and
-    the compiler folds that where rewriting each site would not be worth the
-    churn.  What leaves the emitted source is the loop.
+
+    The scope once declared ``const int q = 0`` so that bodies could keep
+    indexing reference tables as ``[q * NS + shape]`` and let the compiler fold
+    it.  They no longer index any: the basis gradients are folded into the
+    expressions, the weight is a folded constant and the geometry offsets have
+    lost their stride, so a declared ``q`` would be a constant nothing reads --
+    which is what `test_kernels_are_lean` forbids, and what "no per-point data"
+    was supposed to mean all along.  What leaves the emitted source is the loop
+    *and* everything the loop existed to index.
     """
     strategy = evaluation_strategy(element_type)
     substitution = {"indent": indent, "element": str(element_type).upper()}

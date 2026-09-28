@@ -23,6 +23,7 @@ import os
 import re
 
 from codegen.framework.emitters.cprinter import parameter_list_lines
+from codegen.framework.forms.equations import total_residual_collection
 from codegen.framework.symbolic.fields import is_time_rate_shift
 from codegen.framework.plans.form_transformations import (
     symmetric_metric_component_count,
@@ -61,9 +62,40 @@ def generate_op_files(material, elements, kernel_sources=None):
     abi_sources.update(dispatch_sources)
     systems_by_dim = _systems_by_dim(material, elements)
     equations = _representative_equations(systems_by_dim)
-    if len(equations) > 1:
+    if len(equations) > 1 and _uses_mixed_field_arrays(elements):
+        # A mixed-order element has no combined unit: `_total_residual_unit`
+        # refuses one, because `total_residual_collection` would sum forms
+        # living on two different spaces.  Its parts therefore still publish,
+        # and the wrapper that forwards to them is still the right one.
         header, source = _coupled_energy_residual_op(
             material, elements, c_abi_header, systems_by_dim, abi_sources
+        )
+    elif len(equations) > 1:
+        # A material written as several units exports from the one carrying its
+        # whole residual and from none of its parts, so its wrapper is an
+        # ordinary residual wrapper over that unit's forms.  It used to be a
+        # shape of its own, forwarding two calls per operation -- one per unit,
+        # two traversals of the data -- which is what ISSUES.md item 6 objects
+        # to.  The forms were always summable; what was missing was letting the
+        # sum be the thing that is published.
+        form_collections = {
+            dim: total_residual_collection(
+                system,
+                # The same three orders a hand-written residual material
+                # arrives with.  The 0-form is what tells the wrapper its
+                # merit is a norm over the assembled residual rather than a
+                # potential; without it `value` falls back to the stub that
+                # says the material has no scalar at all.
+                orders=(
+                    _form_order_zero(),
+                    _form_order_one(),
+                    _form_order_two(),
+                ),
+            )
+            for dim, system in systems_by_dim.items()
+        }
+        header, source = _residual_op(
+            material, elements, c_abi_header, form_collections, abi_sources
         )
     elif not equations:
         raise ValueError("generated Op wrappers require at least one equation")
@@ -1379,13 +1411,32 @@ namespace sfem {
       std::shared_ptr<smesh::JacobianAdjugateAndDeterminant> jacobian_aos;
 %(metric_cache_field)s%(inexact_cache_field)s        };
 
+    //! Whether this element leaves the operator no choice of geometry.
+    //!
+    //! A constant-P1 simplex publishes no isoparametric kernel -- its affine
+    //! kernel computes the same numbers on a constant Jacobian -- so the
+    //! operator takes the affine route for it whatever the caller asked, and
+    //! has to have cached the adjugate it reads.  Every other element still
+    //! caches only when asked, which is what keeps an isoparametric run from
+    //! paying for geometry it never reads.
+    bool geometry_is_forced_affine(const smesh::ElemType element_type) {
+      switch (element_type) {
+%(forced_affine_element_cases)s        default:
+          return false;
+      }
+    }
+
     int cache_affine_geometry(const std::shared_ptr<FunctionSpace> &space,
-                                  MultiDomainOp &domains) {
+                                  MultiDomainOp &domains,
+                                  const bool requested) {
       auto mesh = space->mesh_ptr();
       const bool needs_jacobian_aos =
           %(gradient_affine_uses_jacobian_aos)s ||
           %(apply_affine_uses_jacobian_aos)s;
       for (auto &entry : domains.domains()) {
+        if (!requested && !geometry_is_forced_affine(entry.second.element_type)) {
+          continue;
+        }
         const smesh::block_idx_t block_id =
             block_id_for_domain(*mesh, *entry.second.block);
         auto cache = std::make_shared<AffineGeometryCache>();
@@ -1524,6 +1575,9 @@ namespace sfem {
         return SFEM_FAILURE;
       }
     }
+    // Not only what the caller asked for.  An element whose geometry is
+    // constant by construction has no isoparametric kernel, so the operator
+    // takes the affine route for it either way and needs the cache either way.
     const bool needs_affine_geometry =
         impl_->objective_uses_affine ||
         impl_->gradient_uses_affine ||
@@ -1538,8 +1592,11 @@ namespace sfem {
     // one never built the metric, so an operator whose affine kernels read
     // it worked when the option was set after initialize and failed when it
     // was set before.
-    if (needs_affine_geometry &&
-      cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+    // Unconditionally, because the loop skips a domain that neither asked for
+    // affine geometry nor is an element that forces it.  Gating the call on
+    // the request alone left an operator meshing a constant-P1 simplex with no
+    // cached adjugate and an affine kernel as its only route to that element.
+    if (cache_affine_geometry(impl_->space, *impl_->domains, needs_affine_geometry) != SFEM_SUCCESS) {
       return SFEM_FAILURE;
     }
 %(element_scratch_alloc)s
@@ -1571,7 +1628,7 @@ namespace sfem {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
       const geom_t *determinant = nullptr;
-%(metric_declaration)s            if (impl_->gradient_uses_affine) {
+%(metric_declaration)s            if (%(gradient_affine_condition)s) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -1613,7 +1670,7 @@ namespace sfem {
       const geom_t *const *adjugate = nullptr;
       const geom_t *adjugate_aos = nullptr;
       const geom_t *determinant = nullptr;
-%(metric_declaration)s            if (impl_->apply_uses_affine) {
+%(metric_declaration)s            if (%(apply_affine_condition)s) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -1687,7 +1744,7 @@ namespace sfem {
       const ptrdiff_t nvalues = (ptrdiff_t)nsteps * nelements;
       const geom_t *const *adjugate = nullptr;
       const geom_t *determinant = nullptr;
-%(metric_declaration)s            if (impl_->objective_uses_affine) {
+%(metric_declaration)s            if (%(objective_affine_condition)s) {
         auto cache = std::static_pointer_cast<AffineGeometryCache>(
             domain.user_data);
         if (!cache || !cache->jacobian_soa) {
@@ -1782,7 +1839,7 @@ namespace sfem {
     };
     const bool matched = set_affine_option(name, val, options, sizeof(options) / sizeof(options[0]));
     if (matched && val && impl_->domains) {
-      if (cache_affine_geometry(impl_->space, *impl_->domains) != SFEM_SUCCESS) {
+      if (cache_affine_geometry(impl_->space, *impl_->domains, true) != SFEM_SUCCESS) {
         SFEM_ERROR("%(op)s failed to cache affine geometry\\n");
       }
     }
@@ -1888,6 +1945,34 @@ namespace sfem {
         "geometry_memory_space": _geometry_memory_space_expression(),
         "block_size_lines": _residual_block_size_lines(n_field_components_by_dim),
         "metric_declaration": _metric_declaration(any(affine_metric_flags)),
+        "forced_affine_element_cases": _forced_affine_element_cases(
+            operation_forced_affine_elements(
+                kernel_sources,
+                material.name,
+                ("objective", "objective_steps", "gradient", "apply"),
+            )
+        ),
+        "gradient_affine_condition": _affine_preamble_condition(
+            kernel_sources, material.name, ("gradient",), "gradient_uses_affine"
+        ),
+        "apply_affine_condition": _affine_preamble_condition(
+            kernel_sources, material.name, ("apply",), "apply_uses_affine"
+        ),
+        "objective_affine_condition": _affine_preamble_condition(
+            kernel_sources,
+            material.name,
+            ("objective", "objective_steps"),
+            "objective_uses_affine",
+        ),
+        "affine_geometry_is_required": _cpp_bool(
+            bool(
+                operation_forced_affine_elements(
+                    kernel_sources,
+                    material.name,
+                    ("objective", "objective_steps", "gradient", "apply"),
+                )
+            )
+        ),
         "gradient_metric_binding": _metric_binding(
             any(affine_metric_flags), _op_class_name(material), "gradient"
         ),
@@ -2044,6 +2129,33 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     if "ds" in measures:
         raise ValueError("generated residual Op wrappers cannot mix dx and ds forms yet")
 
+    # The dimension-generic entry points carry the unit's name too.  The
+    # per-element kernels spell it -- `mooney_rivlin_kelvin_voigt_total_tet4_*`
+    # -- and `_dispatch_mapping` keeps it when it splices the dimension in, so
+    # the roll-up it publishes is `..._total_residual_3d_a_msoa`.  Rebuilding
+    # that name from the material alone finds nothing, and the wrapper then
+    # emits its "dispatch was not generated" arm for a dispatch that is sitting
+    # right there in the generated source.
+    # The same question the header asks: does this material carry a rate,
+    # and so hold a scheme?  Until now only the coupled wrapper could
+    # answer it, which is why its machinery lived only there.
+    holds_scheme = _has_time_rate(material)
+    # Where the history comes from.  A scheme owns it, so a wrapper holding
+    # one has to ask the scheme rather than the buffer a caller set -- that
+    # buffer is null for the whole run, and every body guarding on it refuses
+    # before it computes anything.
+    previous_state = _RESIDUAL_PREVIOUS_STATE[holds_scheme]
+    dispatch_stem = "_".join(
+        part
+        for part in (
+            material.name,
+            str(
+                next(iter(form_collections.values())).equation_name or ""
+            ),
+        )
+        if part
+    )
+
     # A residual whose 0-form is a merit can compute it here: it is half the
     # squared norm of what `gradient` already produces.  One whose 0-form is a
     # potential generally needs an element kernel this emitter cannot yet build,
@@ -2102,7 +2214,20 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         parameter_index = {
             name: index for index, name in enumerate(parameter_names_by_dim[dim])
         }
-        stem = "%s_%s" % (material.name, _element_name(element).lower())
+        # The unit's name sits between the material and the element, exactly
+        # as the kernels spell it.  It is empty for a material written as one
+        # unnamed equation, and `total` for one whose wrapper is built over the
+        # unit carrying its whole residual -- which is what lets a mixed
+        # material reach this path at all.
+        stem = "_".join(
+            part
+            for part in (
+                material.name,
+                str(collection.equation_name or ""),
+                _element_name(element).lower(),
+            )
+            if part
+        )
         performance_cases["gradient"].append(
             _performance_case(
                 element,
@@ -2432,8 +2557,18 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             hessian_common_args.extend(
                 _residual_soa_field_argument_names(fields_by_dim[dim], "old_data", mixed_order)
             )
-        hessian_crs_function = "%s_hessian_crs_i_msoa" % stem
-        if _c_abi_function_exists(kernel_sources, hessian_crs_function):
+        # This list says whether the material assembles at all; the dispatch is
+        # `_residual_hessian_dispatch_body`, which already reaches an element's
+        # affine kernel through the cached adjugate.  So the question is whether
+        # the element publishes *a* hessian, not an isoparametric one -- asking
+        # only the latter left out every lowest-order simplex, and a material
+        # whose elements are all lowest-order simplices got `return
+        # SFEM_FAILURE;` for kernels it had generated.  `two_phase_flow` on TRI3
+        # and TET4 is that material.
+        hessian_crs_function = _residual_hessian_entry_point(
+            kernel_sources, stem, "hessian_crs"
+        )
+        if hessian_crs_function is not None:
             hessian_crs_cases.append(
                 _residual_soa_case(
                     element,
@@ -2451,8 +2586,10 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                     hessian_setup,
                 )
             )
-        hessian_bsr_function = "%s_hessian_bsr_i_msoa" % stem
-        if _c_abi_function_exists(kernel_sources, hessian_bsr_function):
+        hessian_bsr_function = _residual_hessian_entry_point(
+            kernel_sources, stem, "hessian_bsr"
+        )
+        if hessian_bsr_function is not None:
             hessian_bsr_cases.append(
                 _residual_soa_case(
                     element,
@@ -2495,7 +2632,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                 condition
                 for condition in (
                     "!current" if action_uses_current else "",
-                    "!impl_->previous" if action_uses_previous else "",
+                    "!%s" % previous_state if action_uses_previous else "",
                 )
                 if condition
             ),
@@ -2514,7 +2651,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
         else ""
     )
     hessian_previous_alias = (
-        "      const real_t *const previous = impl_->previous;"
+        "      const real_t *const previous = %s;" % previous_state
         if action_uses_previous
         else ""
     )
@@ -2525,7 +2662,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
     action_packed_affine_uses_metric_soa = any(
         _c_abi_function_uses_cached_metric(
             kernel_sources,
-            "%s_jacobian_action_packed_%dd_a_msoa" % (material.name, dim),
+            "%s_jacobian_action_packed_%dd_a_msoa" % (dispatch_stem, dim),
         )
         for dim in (2, 3)
     )
@@ -2732,7 +2869,7 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
 
 namespace sfem {
   namespace {
-    constexpr int MAX_PARAMETERS = %(max_parameters)d;
+%(scheme_term_helper)s    constexpr int MAX_PARAMETERS = %(max_parameters)d;
 
     void seed_parameters(Parameters &parameters) {
 %(defaults)s
@@ -2813,7 +2950,7 @@ namespace sfem {
       return SFEM_SUCCESS;
     }
 
-    void parameter_array(const Parameters &parameters,
+    void parameter_array(const Parameters &parameters,%(scheme_parameter)s
                              const int dim,
                              real_t *const values) {
       int index = 0;
@@ -2852,12 +2989,12 @@ namespace sfem {
     std::shared_ptr<FunctionSpace> space;
     std::shared_ptr<MultiDomainOp> domains;
 %(laplace_packed_member)s
-    std::shared_ptr<Buffer<real_t>> previous_buffer;
+%(time_scheme_member)s    std::shared_ptr<Buffer<real_t>> previous_buffer;
     const real_t *previous{nullptr};
     const real_t *current{nullptr};
     bool residual_uses_affine{false};
     bool jacobian_action_uses_affine{false};
-  };
+%(previous_state_accessor)s  };
 
   std::unique_ptr<Op> %(op)s::create(const std::shared_ptr<FunctionSpace> &space) {
     const ptrdiff_t expected_block_size =
@@ -2980,7 +3117,7 @@ namespace sfem {
 
   int %(op)s::gradient(const real_t *const state, real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::gradient");
-%(gradient_previous_check)s
+%(gradient_previous_check)s%(scheme_gradient_term)s
     impl_->current = state;
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
@@ -3024,7 +3161,7 @@ namespace sfem {
         }
       }
       real_t storage[MAX_PARAMETERS];
-      parameter_array(*domain.parameters,
+      parameter_array(*domain.parameters,%(scheme_argument)s
               mesh->spatial_dimension(),
               storage);
 %(gradient_previous_alias)s
@@ -3037,7 +3174,7 @@ namespace sfem {
                       real_t *const out) {
     SFEM_TRACE_SCOPE("%(op)s::apply");
     const real_t *const current = state ? state : impl_->current;
-%(apply_state_check)s
+%(apply_state_check)s%(scheme_apply_term)s
     auto mesh = impl_->space->mesh_ptr();
     auto points = element_points(mesh);
 %(laplace_packed_apply_fast_path)s
@@ -3081,7 +3218,7 @@ namespace sfem {
         }
       }
       real_t storage[MAX_PARAMETERS];
-      parameter_array(*domain.parameters,
+      parameter_array(*domain.parameters,%(scheme_argument)s
               mesh->spatial_dimension(),
               storage);
 %(apply_previous_alias)s
@@ -3136,7 +3273,7 @@ namespace sfem {
       }
     }
   }
-
+%(set_time_scheme_method)s
 #ifdef SFEM_ENABLE_RYAML
   std::shared_ptr<Op> %(op)s::create_from_yaml(const std::shared_ptr<FunctionSpace> &space,
                                                  const ryml::ConstNodeRef             &node) {
@@ -3237,6 +3374,19 @@ namespace sfem {
         "block_size_lines": _residual_block_size_lines(block_size_by_dim),
         "laplace_packed_helpers": laplace_packed_helpers,
         "laplace_packed_member": laplace_packed_member,
+        # The time scheme, which used to reach only the coupled wrapper.
+        # A material carrying a rate needs the same six hooks whichever
+        # shape its wrapper has, and they were already factored into
+        # tables keyed on exactly that question.
+        "time_scheme_member": _COUPLED_SCHEME_MEMBER[holds_scheme],
+        "previous_state_accessor": _RESIDUAL_PREVIOUS_STATE_ACCESSOR[holds_scheme],
+        "scheme_term_helper": _COUPLED_SCHEME_TERM_HELPER[holds_scheme],
+        "set_time_scheme_method": _COUPLED_SET_TIME_SCHEME[holds_scheme]
+        % {"op": _op_class_name(material)},
+        "scheme_gradient_term": _RESIDUAL_SCHEME_GRADIENT[holds_scheme],
+        "scheme_apply_term": _RESIDUAL_SCHEME_APPLY[holds_scheme],
+        "scheme_parameter": _COUPLED_SCHEME_PARAMETER[holds_scheme],
+        "scheme_argument": _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
         "laplace_packed_apply_fast_path": laplace_packed_apply_fast_path,
         "inexact_cache_field": _inexact_cache_field(material),
         "inexact_needs_affine": _inexact_needs_affine(material),
@@ -3260,7 +3410,7 @@ namespace sfem {
         "residual_cases": "\n".join(residual_cases),
         "action_cases": "\n".join(action_cases),
         "residual_dispatch_body": _residual_apply_dispatch_body(
-            material.name,
+            dispatch_stem,
             "residual",
             "residual_uses_affine",
             "state",
@@ -3275,7 +3425,7 @@ namespace sfem {
                     mixed_order=mixed_order,
                 ),
         "action_dispatch_body": _residual_apply_dispatch_body(
-            material.name,
+            dispatch_stem,
             "jacobian_action",
             "jacobian_action_uses_affine",
             "current",
@@ -3296,7 +3446,11 @@ namespace sfem {
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
-            "      parameter_array(*domain.parameters,\n"
+            # The scheme's shift arrives through the same parameter array the
+            # gradient and the apply fill, so this call takes the same
+            # argument.  Spelling it without the scheme compiled only while no
+            # material reaching this path held one.
+            "      parameter_array(*domain.parameters,%s\n"
             "              mesh->spatial_dimension(),\n"
             "              storage);\n"
             "%s\n"
@@ -3305,9 +3459,10 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
+                _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
-                    material.name,
+                    dispatch_stem,
                     "hessian_crs",
                     kernel_sources,
                     {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
@@ -3329,7 +3484,11 @@ namespace sfem {
             "    auto points = element_points(mesh);\n"
             "    return impl_->domains->iterate([&](const OpDomain &domain) {\n"
             "      real_t storage[MAX_PARAMETERS];\n"
-            "      parameter_array(*domain.parameters,\n"
+            # The scheme's shift arrives through the same parameter array the
+            # gradient and the apply fill, so this call takes the same
+            # argument.  Spelling it without the scheme compiled only while no
+            # material reaching this path held one.
+            "      parameter_array(*domain.parameters,%s\n"
             "              mesh->spatial_dimension(),\n"
             "              storage);\n"
             "%s\n"
@@ -3338,9 +3497,10 @@ namespace sfem {
             % (
                 hessian_state_alias,
                 hessian_state_check,
+                _RESIDUAL_SCHEME_ARGUMENT[holds_scheme],
                 hessian_previous_alias,
                 _residual_hessian_dispatch_body(
-                    material.name,
+                    dispatch_stem,
                     "hessian_bsr",
                     kernel_sources,
                     {dim: deps[1] for dim, deps in dependencies_by_dim.items()},
@@ -3373,7 +3533,7 @@ namespace sfem {
             owner="ret->impl_",
         ),
         "gradient_previous_check": (
-            "    if (!impl_->previous) {\n"
+            "    if (!%s) {\n" % previous_state +
             '      SFEM_ERROR("%s requires a previous state\\n");\n'
             "      return SFEM_FAILURE;\n"
             "    }" % _op_class_name(material)
@@ -3381,7 +3541,7 @@ namespace sfem {
             else ""
         ),
         "gradient_previous_alias": (
-            "      const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = %s;" % previous_state
             if residual_uses_previous
             else ""
         ),
@@ -3395,7 +3555,7 @@ namespace sfem {
                     condition
                     for condition in (
                         "!current" if action_uses_current else "",
-                        "!impl_->previous" if action_uses_previous else "",
+                        "!%s" % previous_state if action_uses_previous else "",
                     )
                     if condition
                 ),
@@ -3414,7 +3574,7 @@ namespace sfem {
             else ""
         ),
         "apply_previous_alias": (
-            "      const real_t *const previous = impl_->previous;"
+            "      const real_t *const previous = %s;" % previous_state
             if action_uses_previous
             else ""
         ),
@@ -5318,6 +5478,37 @@ def _coupled_parameter_array_lines(defaults):
     return "\n".join(lines)
 
 
+#: How the residual wrapper's bodies name the history.  With a scheme attached
+#: the scheme owns it and `previous` stays null for the whole run, so reading
+#: the buffer makes every body guarding on it refuse before it computes
+#: anything -- which is what `sfem_TimeSchemeIndependenceTest` saw.
+_RESIDUAL_PREVIOUS_STATE = {
+    False: "impl_->previous",
+    True: "impl_->previous_state()",
+}
+
+
+#: The history accessor, for the residual wrapper.  Absent without a scheme:
+#: its bodies read `impl_->previous` directly, and an accessor nothing calls is
+#: what `test_kernels_are_lean` counts.
+_RESIDUAL_PREVIOUS_STATE_ACCESSOR = {
+    False: "",
+    True: """
+    //! The history the form reads: the scheme's when one is attached, and the
+    //! buffer a caller set otherwise.
+    const real_t *previous_state() const {
+      return time_scheme ? time_scheme->history() : previous;
+    }
+""",
+}
+
+
+#: The scheme argument at a `parameter_array` call whose arguments continue on
+#: the next line, spelled so that its absence leaves that line exactly as it
+#: was rather than trailing a space.
+_RESIDUAL_SCHEME_ARGUMENT = {False: "", True: " impl_->time_scheme.get(),"}
+
+
 #: The scheme reaches `parameter_array` as an argument because that function is
 #: a free one in an anonymous namespace and has no `impl_`.  It is declared only
 #: when the material has a rate: a parameter no body reads is what
@@ -5365,6 +5556,21 @@ _COUPLED_SCHEME_APPLY = {
       }
     }
 """,
+}
+
+#: The same two terms, for the residual template, which places them directly
+#: after the state check rather than on a line of their own.  The check is
+#: itself a hook and is empty for a material that needs no previous state, so
+#: the separating newline has to travel with the term: putting it in the
+#: template would leave a blank line in every wrapper that has neither.
+_RESIDUAL_SCHEME_GRADIENT = {
+    False: "",
+    True: "\n" + _COUPLED_SCHEME_GRADIENT[True],
+}
+
+_RESIDUAL_SCHEME_APPLY = {
+    False: "",
+    True: "\n" + _COUPLED_SCHEME_APPLY[True],
 }
 
 _COUPLED_SCHEME_HESSIAN_BSR = {
@@ -5740,14 +5946,32 @@ def _form_order_two():
     return FormOrder.TWO
 
 
+#: Where one parameter's value comes from, keyed on whether it is a rate's
+#: shift.  The indexed twin of `_COUPLED_PARAMETER_SOURCE`.
+_RESIDUAL_PARAMETER_SOURCE = {
+    False: lambda name: (
+        '          values[index++] = parameters.require_real_value("%s");' % name
+    ),
+    True: lambda name: (
+        "          values[index++] = time_scheme ? time_scheme->shift()\n"
+        '                                        : parameters.require_real_value("%s");'
+        % name
+    ),
+}
+
+
 def _residual_parameter_array_lines(parameter_names_by_dim):
     lines = ["      switch (dim) {"]
     for dim in sorted(parameter_names_by_dim):
         lines.append("        case %d:" % dim)
         for name in parameter_names_by_dim[dim]:
+            # A rate's shift comes from the scheme when one is attached, and
+            # from the parameters otherwise, so a material carrying a rate
+            # stays usable without a scheme.  Same rule as the coupled path's
+            # `_COUPLED_PARAMETER_SOURCE`, spelled for the indexed form this
+            # switch uses.
             lines.append(
-                '          values[index++] = parameters.require_real_value("%s");'
-                % name
+                _RESIDUAL_PARAMETER_SOURCE[is_time_rate_shift(name)](name)
             )
         lines.append("          break;")
     lines.extend(
@@ -8216,6 +8440,21 @@ def _case(element, function, arguments):
     }
 
 
+#: Which per-element hessian entry point an element publishes, isoparametric
+#: first.  An element with no isoparametric kernel -- every lowest-order simplex,
+#: which reads a cached adjugate instead of the coordinates -- still assembles,
+#: through the affine one.
+_RESIDUAL_HESSIAN_GEOMETRIES = ("i_msoa", "a_msoa")
+
+
+def _residual_hessian_entry_point(kernel_sources, stem, operation):
+    for geometry in _RESIDUAL_HESSIAN_GEOMETRIES:
+        name = "%s_%s_%s" % (stem, operation, geometry)
+        if _c_abi_function_exists(kernel_sources, name):
+            return name
+    return None
+
+
 def _residual_hessian_dispatch_body(
     material_name,
     operation,
@@ -8228,7 +8467,48 @@ def _residual_hessian_dispatch_body(
     indent,
     mixed_order=False,
 ):
-    lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
+    lines = []
+    # Assembly takes the element's own geometry, like every other kernel it
+    # publishes.  An element with no isoparametric kernel assembles through its
+    # affine one, reading the adjugate the operator has already cached rather
+    # than rebuilding it from the coordinates.
+    affine_by_dim = {
+        dim: _c_abi_public_dispatch_case_elements(
+            kernel_sources, "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
+        )
+        if _c_abi_function_exists(
+            kernel_sources,
+            "%s_%s_%dd_a_msoa" % (material_name, operation, dim),
+            public_only=True,
+        )
+        else ()
+        for dim in (2, 3)
+    }
+    affine_elements = tuple(
+        element for dim in (2, 3) for element in affine_by_dim[dim]
+    )
+    if affine_elements:
+        lines.extend(
+            [
+                "%sconst geom_t *const *adjugate = nullptr;" % indent,
+                "%sconst geom_t *determinant = nullptr;" % indent,
+                "%sif (%s) {"
+                % (indent, _element_condition("domain.element_type", affine_elements)),
+                "%s  auto cache = std::static_pointer_cast<AffineGeometryCache>(" % indent,
+                "%s      domain.user_data);" % indent,
+                "%s  if (!cache || !cache->jacobian) {" % indent,
+                '%s    SFEM_ERROR("%s affine %s requires cached geometry\\n");'
+                % (indent, material_name, operation),
+                "%s    return SFEM_FAILURE;" % indent,
+                "%s  }" % indent,
+                "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
+                "%s      cache->jacobian->jacobian_adjugate_SoA()->data());" % indent,
+                "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
+                "%s      cache->jacobian->jacobian_determinant()->data());" % indent,
+                "%s}" % indent,
+            ]
+        )
+    lines.append("%sconst int dim = mesh->spatial_dimension();" % indent)
     for dim in (2, 3):
         dependencies = action_dependencies_by_dim.get(dim)
         if dependencies is None:
@@ -8238,24 +8518,30 @@ def _residual_hessian_dispatch_body(
             operation,
             dim,
         )
-        prefix = "if" if not any(line.endswith("{") for line in lines) else "else if"
+        affine_function = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
+        prefix = "if" if not any(line.endswith("(dim == 2) {") or line.endswith("(dim == 3) {") for line in lines) else "else if"
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
         lines.append(
             "%s  static constexpr ptrdiff_t FIELD_STRIDE = %d;"
             % (indent, block_size_by_dim[dim])
         )
         setup = []
-        args = [
+        common = [
             "domain.element_type",
             "real_type",
             "domain.block->n_elements()",
             "mesh->n_nodes()",
             "element_connectivity(domain)",
-            "points",
+        ]
+        args = [*common, "points"]
+        affine_args = [
+            *common,
+            *_affine_geometry_call_args(kernel_sources, affine_function, dim),
         ]
         parameter_index = {
             name: index for index, name in enumerate(parameter_names_by_dim[dim])
         }
+        trailing_start = len(args)
         args.extend(_dependency_storage_args(dependencies.parameters, parameter_index))
         fields = fields_by_dim[dim]
         if dependencies.current:
@@ -8281,14 +8567,38 @@ def _residual_hessian_dispatch_body(
             args.append("FIELD_STRIDE")
             args.extend(_residual_soa_field_argument_names(fields, "old_data", mixed_order))
         args.extend(tail_args)
+        affine_args.extend(args[trailing_start:])
         for line in setup:
             lines.append(line)
+        if affine_by_dim[dim]:
+            lines.append(
+                "%s  if (%s) {"
+                % (
+                    indent,
+                    _element_condition("domain.element_type", affine_by_dim[dim]),
+                )
+            )
+            lines.append(
+                "%s    return %s(%s);"
+                % (
+                    indent,
+                    _entry_point_name(affine_function),
+                    _with_stream(", ".join(affine_args)),
+                )
+            )
+            lines.append("%s  }" % indent)
         if _c_abi_function_exists(kernel_sources, function, public_only=True):
             lines.append("%s  return %s(%s);" % (indent, _entry_point_name(function), _with_stream(", ".join(args))))
-        else:
+        elif not affine_by_dim[dim]:
             lines.append(
                 '%s  SFEM_ERROR("%s %s %dd dispatch was not generated\\n");'
                 % (indent, material_name, operation, dim)
+            )
+            lines.append("%s  return SFEM_FAILURE;" % indent)
+        else:
+            lines.append(
+                '%s  SFEM_ERROR("%s %s does not support element type %%d\\n", domain.element_type);'
+                % (indent, material_name, operation)
             )
             lines.append("%s  return SFEM_FAILURE;" % indent)
         lines.append("%s}" % indent)
@@ -8300,6 +8610,134 @@ def _residual_hessian_dispatch_body(
         ]
     )
     return "\n".join(lines)
+
+
+def _affine_dispatch_elements(kernel_sources, affine_names):
+    """Every element the affine route can serve, over all its entry points.
+
+    More than one, because the geometry an affine kernel takes depends on what
+    it contracts: a linear simplex Laplacian asks for the symmetric metric and
+    gets a dispatch of its own beside the adjugate one, and both stand inside
+    the same branch.
+    """
+    elements = []
+    for name in affine_names:
+        if not name or not _c_abi_function_exists(
+            kernel_sources, name, public_only=True
+        ):
+            continue
+        for element in _c_abi_public_dispatch_case_elements(kernel_sources, name):
+            if element not in elements:
+                elements.append(element)
+    return tuple(elements)
+
+
+def forced_affine_elements(kernel_sources, affine_names, isoparametric_name):
+    """The elements the affine route is the only route for.
+
+    A constant-P1 simplex publishes no isoparametric kernel, because its affine
+    kernel already computes the same numbers on a constant Jacobian.  The
+    operator therefore has to take the affine route for it whatever the caller
+    asked, and -- since that route reads a cached adjugate -- has to have
+    cached the geometry for it whether or not anybody asked for that either.
+    """
+    affine_elements = _affine_dispatch_elements(kernel_sources, affine_names)
+    isoparametric_elements = (
+        _c_abi_public_dispatch_case_elements(kernel_sources, isoparametric_name)
+        if isoparametric_name
+        and _c_abi_function_exists(kernel_sources, isoparametric_name, public_only=True)
+        else ()
+    )
+    return tuple(
+        element for element in affine_elements if element not in isoparametric_elements
+    )
+
+
+def operation_forced_affine_elements(kernel_sources, material_name, operations):
+    """`forced_affine_elements` over every dimension and every operation named.
+
+    The geometry preamble sits outside the dimension switch and above every
+    dispatch body it feeds, so it has to hold for all of them: it binds the
+    cached adjugate that those bodies then pass, and a body reaching an affine
+    entry point with the preamble skipped passes a null pointer.
+    """
+    forced = []
+    for operation in operations:
+        for dim in (2, 3):
+            affine = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
+            names = (
+                affine,
+                _metric_dispatch_name(affine),
+                "%s_a_msoa_aos_unit" % affine[: -len("_a_msoa")],
+            )
+            isoparametric = "%s_%s_%dd_i_msoa" % (material_name, operation, dim)
+            for element in forced_affine_elements(kernel_sources, names, isoparametric):
+                if element not in forced:
+                    forced.append(element)
+    return tuple(forced)
+
+
+def _forced_affine_element_cases(forced_elements):
+    """The switch arms of `geometry_is_forced_affine`, one per element."""
+    return "".join(
+        "        case smesh::%s:\n          return true;\n" % element
+        for element in sorted(set(forced_elements))
+    )
+
+
+def _affine_preamble_condition(kernel_sources, material_name, operations, affine_flag):
+    """The preamble's guard: the flag, widened by the elements that force it."""
+    forced = operation_forced_affine_elements(kernel_sources, material_name, operations)
+    condition = "impl_->%s" % affine_flag
+    if forced:
+        condition = "%s || %s" % (
+            condition,
+            _element_condition("domain.element_type", forced),
+        )
+    return condition
+
+
+def _affine_branch_condition(kernel_sources, affine_flag, affine_names, isoparametric_name):
+    """When this dimension takes the affine route.
+
+    The flag is the caller's preference, and a preference is all it can be.
+    Which elements each mode serves is settled when the kernels are generated,
+    and the two modes do not serve the same ones: a constant-P1 simplex has no
+    isoparametric kernel, because its affine kernel already computes the same
+    numbers, and a quadrilateral has no affine kernel in 2D.  Reading the flag
+    alone therefore sent TET4 and TRI3 to a dispatch with no case for them
+    whenever it was off, and QUAD4 to one with no case for it whenever it was
+    on -- `unsupported_dispatch` at runtime either way, on an element the
+    operator meshes.
+
+    So the preference is widened by the elements the affine route is the only
+    one for, and narrowed to the ones it can serve at all.  Both clauses are
+    omitted when they would be vacuous, which is why a material whose modes
+    cover the same elements is spelled exactly as before.
+    """
+    affine_elements = _affine_dispatch_elements(kernel_sources, affine_names)
+    isoparametric_elements = (
+        _c_abi_public_dispatch_case_elements(kernel_sources, isoparametric_name)
+        if isoparametric_name
+        and _c_abi_function_exists(kernel_sources, isoparametric_name, public_only=True)
+        else ()
+    )
+    condition = "impl_->%s" % affine_flag
+    forced = forced_affine_elements(kernel_sources, affine_names, isoparametric_name)
+    if forced:
+        condition = "%s || %s" % (
+            condition,
+            _element_condition("domain.element_type", forced),
+        )
+    unserved = tuple(
+        element for element in isoparametric_elements if element not in affine_elements
+    )
+    if unserved and affine_elements:
+        condition = "(%s) && (%s)" % (
+            condition,
+            _element_condition("domain.element_type", affine_elements),
+        )
+    return condition
 
 
 def _element_condition(variable_name, mesh_elements):
@@ -8429,7 +8867,18 @@ def _residual_apply_dispatch_body(
             "domain.element_type", affine_aos_unit_elements_by_dim.get(dim, ())
         )
 
-        lines.append("%s  if (impl_->%s) {" % (indent, affine_flag))
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    affine_flag,
+                    (affine_soa, _metric_dispatch_name(affine_soa)),
+                    isop,
+                ),
+            )
+        )
         if operation == "jacobian_action" and _c_abi_function_exists(
             kernel_sources, packed_affine, public_only=True
         ):
@@ -8882,7 +9331,18 @@ def _hyperelastic_gradient_dispatch_body(material_name, kernel_sources, gradient
         affine_aos_unit = "%s_gradient_%dd_a_msoa_aos_unit" % (material_name, dim)
         isop = "%s_gradient_%dd_i_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s  if (impl_->gradient_uses_affine) {" % indent)
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    "gradient_uses_affine",
+                    (affine, _metric_dispatch_name(affine), affine_aos_unit),
+                    isop,
+                ),
+            )
+        )
         affine_aos_unit_elements = _c_abi_public_dispatch_case_elements(
             kernel_sources,
             affine_aos_unit,
@@ -9001,7 +9461,18 @@ def _hyperelastic_objective_dispatch_body(material_name, kernel_sources, objecti
         affine = "%s_objective_%dd_a_msoa" % (material_name, dim)
         isop = "%s_objective_%dd_i_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s  if (impl_->objective_uses_affine) {" % indent)
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    "objective_uses_affine",
+                    (affine, _metric_dispatch_name(affine)),
+                    isop,
+                ),
+            )
+        )
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             lines.append(
                 "%s    status = %s(%s);"
@@ -9079,7 +9550,18 @@ def _hyperelastic_objective_steps_dispatch_body(material_name, kernel_sources, o
         affine = "%s_objective_steps_%dd_a_msoa" % (material_name, dim)
         isop = "%s_objective_steps_%dd_i_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s  if (impl_->objective_uses_affine) {" % indent)
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    "objective_uses_affine",
+                    (affine, _metric_dispatch_name(affine)),
+                    isop,
+                ),
+            )
+        )
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             lines.extend(
                 _affine_dispatch_status_lines(
@@ -9168,7 +9650,18 @@ def _hyperelastic_apply_dispatch_body(material_name, kernel_sources, apply_depen
         packed = "%s_apply_packed_%dd_i_msoa" % (material_name, dim)
         packed_affine = "%s_apply_packed_%dd_a_msoa" % (material_name, dim)
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
-        lines.append("%s  if (impl_->apply_uses_affine) {" % indent)
+        lines.append(
+            "%s  if (%s) {"
+            % (
+                indent,
+                _affine_branch_condition(
+                    kernel_sources,
+                    "apply_uses_affine",
+                    (affine, _metric_dispatch_name(affine)),
+                    isop,
+                ),
+            )
+        )
         if _c_abi_function_exists(kernel_sources, affine, public_only=True):
             if _c_abi_function_exists(kernel_sources, packed_affine, public_only=True):
                 lines.extend(
@@ -9565,7 +10058,49 @@ def _hyperelastic_objective_steps_packed_dispatch_body(material_name, kernel_sou
 
 
 def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources, apply_dependencies_by_dim, tail_args, indent, n_field_components_by_dim=None):
-    lines = ["%sconst int dim = mesh->spatial_dimension();" % indent]
+    lines = []
+    # Assembly takes the element's own geometry, like every other kernel.  An
+    # element with no isoparametric kernel assembles through its affine one,
+    # which reads the adjugate the operator has already cached rather than
+    # rebuilding it from the coordinates -- the second spelling of the same
+    # Jacobian that ISSUES.md item 1 objects to.
+    affine_by_dim = {
+        dim: _c_abi_public_dispatch_case_elements(
+            kernel_sources, "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
+        )
+        if _c_abi_function_exists(
+            kernel_sources,
+            "%s_%s_%dd_a_msoa" % (material_name, operation, dim),
+            public_only=True,
+        )
+        else ()
+        for dim in (2, 3)
+    }
+    affine_elements = tuple(
+        element for dim in (2, 3) for element in affine_by_dim[dim]
+    )
+    if affine_elements:
+        lines.extend(
+            [
+                "%sconst geom_t *const *adjugate = nullptr;" % indent,
+                "%sconst geom_t *determinant = nullptr;" % indent,
+                "%sif (%s) {"
+                % (indent, _element_condition("domain.element_type", affine_elements)),
+                "%s  auto cache = std::static_pointer_cast<AffineGeometryCache>(" % indent,
+                "%s      domain.user_data);" % indent,
+                "%s  if (!cache || !cache->jacobian_soa) {" % indent,
+                '%s    SFEM_ERROR("%s affine %s requires cached geometry\\n");'
+                % (indent, material_name, operation),
+                "%s    return SFEM_FAILURE;" % indent,
+                "%s  }" % indent,
+                "%s  adjugate = reinterpret_cast<const geom_t *const *>(" % indent,
+                "%s      cache->jacobian_soa->jacobian_adjugate_SoA()->data());" % indent,
+                "%s  determinant = reinterpret_cast<const geom_t *>(" % indent,
+                "%s      cache->jacobian_soa->jacobian_determinant()->data());" % indent,
+                "%s}" % indent,
+            ]
+        )
+    lines.append("%sconst int dim = mesh->spatial_dimension();" % indent)
     for dim in (2, 3):
         prefix = "if" if dim == 2 else "else if"
         function = "%s_%s_%dd_i_msoa" % (
@@ -9573,6 +10108,7 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
             operation,
             dim,
         )
+        affine_function = "%s_%s_%dd_a_msoa" % (material_name, operation, dim)
         dependencies = apply_dependencies_by_dim.get(dim)
         parameter_args = list(_dependency_domain_parameter_args(dependencies))
         # The stride and the offsets are the field's component count, not the
@@ -9586,6 +10122,35 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
             else []
         )
         lines.append("%s%s (dim == %d) {" % (indent, prefix, dim))
+        if affine_by_dim[dim]:
+            lines.append(
+                "%s  if (%s) {"
+                % (
+                    indent,
+                    _element_condition("domain.element_type", affine_by_dim[dim]),
+                )
+            )
+            lines.append(
+                "%s    return %s(%s);"
+                % (
+                    indent, _entry_point_name(affine_function), _with_stream(", ".join(
+                        [
+                            "domain.element_type",
+                            "real_type",
+                            "domain.block->n_elements()",
+                            "mesh->n_nodes()",
+                            "element_connectivity(domain)",
+                            *_affine_geometry_call_args(
+                                kernel_sources, affine_function, dim
+                            ),
+                            *parameter_args,
+                            *current_args,
+                            *tail_args,
+                        ]
+                    )),
+                )
+            )
+            lines.append("%s  }" % indent)
         if _c_abi_function_exists(kernel_sources, function, public_only=True):
             lines.append(
                 "%s  return %s(%s);"
@@ -9605,8 +10170,11 @@ def _hyperelastic_hessian_dispatch_body(material_name, operation, kernel_sources
                     )),
                 )
             )
-        else:
+        elif not affine_by_dim[dim]:
             lines.append('%s  SFEM_ERROR("%s %s %dd dispatch was not generated\\n");' % (indent, material_name, operation, dim))
+            lines.append("%s  return SFEM_FAILURE;" % indent)
+        else:
+            lines.append('%s  SFEM_ERROR("%s %s does not support element type %%d\\n", domain.element_type);' % (indent, material_name, operation))
             lines.append("%s  return SFEM_FAILURE;" % indent)
         lines.append("%s}" % indent)
     lines.extend(

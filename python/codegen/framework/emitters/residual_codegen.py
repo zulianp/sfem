@@ -5,6 +5,7 @@ import sympy as sp
 from codegen.framework.emitters.kernel_prologue import (
     discard_unused,
     kernel_constant,
+    kernel_local,
     resolve_dead_parameters,
     resolve_kernel_constants,
     retag_constants,
@@ -12,6 +13,7 @@ from codegen.framework.emitters.kernel_prologue import (
 from codegen.framework.plans.conventions import (
     PREFIXES,
     abi_geometry_name,
+    abi_mesh_fragment,
     restrict_prelude,
     sfem_scalar_type_fallback,
     sfem_scalar_type_prelude,
@@ -27,6 +29,13 @@ _PACK_FMT = PREFIXES["pack"] + "%s"
 from codegen.framework.emitters.runtime_typed_abi import (
     cast_arguments,
     runtime_typed_entry_point_lines,
+)
+from codegen.framework.emitters.tensor_product_kernels import (
+    micro_kernel as _micro_kernel,
+    micro_kernel_count as _micro_kernel_count,
+    micro_kernel_template as _micro_kernel_template,
+    width_factors as _width_factors,
+    work_item_block_stride as _work_item_block_stride,
 )
 from codegen.framework.plans.flops import element_flops_plan
 from codegen.framework.plans.residual_model import ResidualEmissionModel
@@ -87,6 +96,8 @@ from codegen.framework.plans.kernel_signature import (
     packed_mesh_ghost_reduce_arguments,
 )
 from codegen.framework.plans.layout import (
+    component_major_index_decomposition,
+    is_identity_order,
     _compatible_matrix_stream_indices,
     compatible_matrix_stream_fields,
     _field_element_type,
@@ -160,7 +171,7 @@ from codegen.framework.emitters.tensor_product_geometry import (
 )
 from codegen.framework.emitters.tensor_product_kernels import tensor_product_kernels_header_source_for
 from codegen.framework.fem.geometry import GeometryMode
-from codegen.framework.targets import current_target
+from codegen.framework.targets import current_target, use_target
 from codegen.framework.fem.reference import (
     sfem_mesh_reference_data,
     sfem_reference_data,
@@ -189,6 +200,8 @@ from codegen.framework.plans.affine_element_kernel import (
 from codegen.framework.plans.geometry_variants import geometry_variant_plan
 from codegen.framework.plans.form_transformations import (
     constant_p1_simplex_reference_gradients,
+    constant_p1_simplex_shape_values,
+    constant_p1_simplex_weight,
     simplex_gradient_metric_transformation,
     symmetric_metric_component_count,
     symmetric_metric_component_index,
@@ -217,6 +230,7 @@ from codegen.framework.emitters.patch_merit_codegen import (
     patch_orientation_table_lines,
 )
 from codegen.framework.emitters.energy_codegen import (
+    affine_geometry_stream_helper_lines,
     _sfem_soa_diagnostics_header,
     _sfem_packed_thread_scratch_header_source,
 )
@@ -310,36 +324,6 @@ def _target():
 
 
 
-
-
-def _local_index_mapping_expr(name, values, index_expr):
-    offset = _linear_index_offset(values)
-    if offset is None:
-        return "%s(%s)" % (name, index_expr)
-    if offset == 0:
-        return index_expr
-    return "(%s + %d)" % (index_expr, offset)
-
-
-def _local_index_mapping_lambda_lines(name, values, indent):
-    if _linear_index_offset(values) is not None:
-        return []
-    lines = [
-        "%sconst auto %s = [](const int local) -> int {" % (indent, name),
-        "%s  switch (local) {" % indent,
-    ]
-    lines.extend(
-        "%s    case %d: return %d;" % (indent, local, value)
-        for local, value in enumerate(values)
-    )
-    lines.extend(
-        [
-            "%s    default: return 0;" % indent,
-            "%s  }" % indent,
-            "%s};" % indent,
-        ]
-    )
-    return lines
 
 
 def _single_field_element_alias_lines(n_shape, shape_order, indent, array_name="field_elements", pointer_type="idx_t"):
@@ -499,9 +483,163 @@ def _wi():
     return _target().work_item_subscript()
 
 
+#: How a block's contributions are scattered, keyed on whether the staged output
+#: has a slot per work item.  A block is walked by a scatter loop of its own --
+#: separate from the SIMD lane loop, because the writes collide -- and where a
+#: work item *is* the element there is no block to walk: one contribution,
+#: written where it is.
+_SCATTER_SCOPE = {
+    True: lambda indent: (
+        "%sfor (int scatter = 0; scatter < ne; ++scatter) {" % indent,
+    ),
+    False: lambda indent: ("%s{" % indent,),
+}
+
+_SCATTER_ELEMENT = {True: "evb + scatter", False: "evb"}
+
+_SCATTER_SLOT = {True: "[scatter]", False: ""}
+
+
+def _scatter_element():
+    """The element a scatter writes for: `evb + scatter`, or `evb` itself."""
+    return _SCATTER_ELEMENT[bool(_wi_extent())]
+
+
+def _scatter_slot():
+    """That element's slot in the staged output: `[scatter]`, or nothing."""
+    return _SCATTER_SLOT[bool(_wi_extent())]
+
+
+#: How a stream container is read at this work item, keyed on the layout the
+#: caller laid the streams out in.  Both spellings are `[lane]` where a work item
+#: is a lane of a block, which is why one spelling served for both; where a work
+#: item *is* the element they part company, because a pointer array is still an
+#: array of pointers and a contiguous tile has lost its second dimension.
+_STREAM_SUBSCRIPT = {
+    "pointer": lambda: _ptr(),
+    "contiguous": lambda: _wi(),
+}
+
+
+def _stream_slot(stream_layout="pointer"):
+    return _STREAM_SUBSCRIPT[stream_layout]()
+
+
+#: How a work-item-invariant row is reached, keyed on whether the row still has a
+#: slot per work item.  Where it does -- a lane of a block, or a pointer array on
+#: a device -- the row is an address, so it is named above the work-item loop and
+#: the loop indexes the name.  Where the slot is gone the row has collapsed to the
+#: value itself and there is nothing to name.
+_HOISTED_ROW = {
+    True: lambda qualifier, alias, expression, slot: (
+        [BufferDeclNode(qualifier, alias, (), expr_ref(expression))],
+        alias + slot,
+    ),
+    False: lambda qualifier, alias, expression, slot: ([], expression),
+}
+
+
+def _hoisted_row(alias, expression, slot, qualifier="const s_t *const RSTR"):
+    """Name a row above the work-item loop, and say how to read it inside.
+
+    The work-item loop is the vectorised inner loop, so an address that does not
+    depend on the work item is the same address every iteration.  Returns the
+    declarations to place above the loop and the expression to read inside it,
+    so the caller has one body rather than one per target.
+    """
+    return _HOISTED_ROW[bool(slot)](qualifier, alias, expression, slot)
+
+
+#: The line-based twin of `_HOISTED_ROW`, for the bodies that are still lines.
+_HOISTED_ROW_LINES = {
+    True: lambda qualifier, alias, expression, indent: (
+        ["%s%s %s = %s;" % (indent, qualifier, alias, expression)],
+        alias,
+    ),
+    False: lambda qualifier, alias, expression, indent: ([], expression),
+}
+
+
+def _hoisted_row_lines(qualifier, alias, expression, indent):
+    """`_hoisted_row`, as lines, returning the base the loop reads."""
+    return _HOISTED_ROW_LINES[bool(_wi())](qualifier, alias, expression, indent)
+
+
+def _hoisted_value(alias, expression):
+    """Name a work-item-invariant value above the work-item loop.
+
+    Unconditional, unlike `_hoisted_row`: a value is a value on every target, so
+    there is no shape to key on.  This is `grad_ref_x[q * NS + test]` and its
+    kind -- one entry of a reference table, read once per test function rather
+    than once per element of the block.
+    """
+    return (
+        [BufferDeclNode("const s_t", alias, (), expr_ref(expression))],
+        alias,
+    )
+
+
+def _ptr():
+    """The subscript for a *pointer* at this work item: `[lane]`, or `[0]`.
+
+    The twin of `_wi()`, and the distinction matters: `_wi()` indexes a staged
+    buffer, which on a target whose work item is one element has no slot at all,
+    while a pointer alias -- a `_q` slice into a per-point buffer, or an entry of
+    a stream array -- is still a pointer there and is read at zero.
+    """
+    return "[%s]" % _work_item_index()
+
+
 def _elem(block="evb"):
     """The element this work item holds: `evb + lane`, or `evb` itself."""
     return _target().element_index(block)
+
+
+#: The one slot a kernel that holds a single element writes: `[0]` where the
+#: target's buffers have a slot at all, and nothing where a work item *is* the
+#: element and the staged buffer is the value.
+_FIRST_SLOT = {True: "[0]", False: ""}
+
+
+def _first_slot():
+    return _FIRST_SLOT[bool(_target().work_item_extent())]
+
+
+def _wi_extent():
+    """The trailing extent of a staged buffer: `[VS]`, or nothing at all."""
+    return _target().work_item_extent()
+
+
+def _wi_parameters():
+    """The work-item width, spelled as template parameters -- none where there is none."""
+    return tuple("int %s" % name for name in _width_factors())
+
+
+def _width_product(*factors):
+    """A staged extent, with the work-item width as its last factor where there is one."""
+    return c_product(*(factors + _width_factors()))
+
+
+def _block_offset(outer):
+    """`q * VS + lane`, or `q` alone where a work item is the element."""
+    return _target().work_item_block_offset(outer)
+
+
+#: The work-item count a micro-kernel call passes, where the micro-kernel takes
+#: one.  The scalar rendering has no block of work items to count.
+_MICRO_KERNEL_COUNT_ARGUMENT = {True: ("ne",), False: ()}
+
+
+def _micro_kernel_arguments(arguments):
+    """A micro-kernel's arguments, without the work-item count where it has none."""
+    return _MICRO_KERNEL_COUNT_ARGUMENT[bool(_width_factors())] + tuple(arguments[1:])
+
+
+def _width_constant_lines(vector_size, indent="  "):
+    """The kernel's own width constant, where it has a width to declare."""
+    return tuple(
+        kernel_constant(name, vector_size, indent=indent) for name in _width_factors()
+    )
 
 
 def _offset(outer, stride):
@@ -552,8 +690,8 @@ def _affine_geometry_stream_conversion_lines(streams, indent):
             n_streams,
             ", ".join(abi_geometry_name(stream) + " + evb" for stream in streams),
         ),
-        "%ss_t baffine_geometry_data[%d][VS];"
-        % (indent, n_streams),
+        "%ss_t baffine_geometry_data[%d]%s;"
+        % (indent, n_streams, _wi_extent()),
         "%sconst s_t *bageom_streams[%d];"
         % (indent, n_streams),
     ] + _affine_geometry_stream_assignment_lines(indent, n_streams)
@@ -568,10 +706,16 @@ def _affine_geometry_stream_assignment_lines(indent, n_streams):
     """
     def convert(index, extra):
         return [
-            "%s%sbageom_streams[%s] = ageom_stream<s_t, g_t, VS>("
-            % (indent, extra, index),
-            "%s%s    ne, affine_geometry_sources[%s], baffine_geometry_data[%s], std::is_same<g_t, s_t>());"
-            % (indent, extra, index, index),
+            "%s%sbageom_streams[%s] = ageom_stream<%s>("
+            % (indent, extra, index, ", ".join(("s_t", "g_t") + _width_factors())),
+            "%s%s    %saffine_geometry_sources[%s], %s, std::is_same<g_t, s_t>());"
+            % (
+                indent,
+                extra,
+                _micro_kernel_count(),
+                index,
+                _target().staged_buffer_address("baffine_geometry_data[%s]" % index),
+            ),
         ]
 
     if n_streams == 1:
@@ -584,42 +728,6 @@ def _affine_geometry_stream_assignment_lines(indent, n_streams):
         + convert("geometry_stream", "  ")
         + ["%s}" % indent]
     )
-
-
-def _affine_geometry_stream_helper_lines():
-    lines = [
-        "namespace sfem {",
-        "namespace codegen {",
-        "",
-        "template <typename s_t, typename g_t, int VS>",
-        "%s const s_t *ageom_stream(" % _inline_qualifier(),
-        "    const int,",
-        "    const g_t *const RSTR source,",
-        "    s_t *const RSTR,",
-        "    std::true_type) {",
-        "  return source;",
-        "}",
-        "",
-        "template <typename s_t, typename g_t, int VS>",
-        "%s const s_t *ageom_stream(" % _inline_qualifier(),
-        "    const int ne,",
-        "    const g_t *const RSTR source,",
-        "    s_t *const RSTR converted,",
-        "    std::false_type) {",
-    ]
-    lines.extend(work_item_scope_header_lines("  "))
-    lines.extend(
-        [
-            "    converted%s = s_t(source%s);" % (_wi(), _wi()),
-            "  }",
-            "  return converted;",
-            "}",
-            "",
-            "} // namespace codegen",
-            "} // namespace sfem",
-        ]
-    )
-    return lines
 
 
 def _uses_cached_affine_metric(gradient_metric):
@@ -1206,8 +1314,7 @@ def _mesh_block_scatter_loop_lines(indent, loop, accumulation):
     lines.extend(loop.setup_lines)
     lines.extend(
         [
-            "%sfor (int scatter = 0; scatter < ne; ++scatter) {"
-            % loop.scatter_indent,
+            *_SCATTER_SCOPE[bool(_wi_extent())](loop.scatter_indent),
             *_scatter_add_lines(
                 accumulation[0], accumulation[1], "%s  " % loop.scatter_indent
             ),
@@ -1281,13 +1388,31 @@ def _coordinate_gather_lines(dim, indent, element_array="elements", pointer_type
                 shape_count="NS",
                 element_array=element_array,
                 element_pointer_type=pointer_type,
-                setup_lines=("%s  for (int d = 0; d < ND; ++d) {" % indent,),
+                setup_lines=(
+                    "%s  for (int d = 0; d < ND; ++d) {" % indent,
+                )
+                + tuple(
+                    _hoisted_row_lines(
+                        "s_t *const RSTR",
+                        "bcoordinate_row",
+                        "bcoordinates[shape * ND + d]",
+                        "%s    " % indent,
+                    )[0]
+                ),
                 close_lines=("%s  }" % indent,),
                 lane_indent="%s    " % indent,
             ),
             [
-                ('%s      bcoordinates[shape * ND + d]' + _wi() + ' = coordinate_components[d][node];')
-                % indent
+                ('%s      %s' + _wi() + ' = coordinate_components[d][node];')
+                % (
+                    indent,
+                    _hoisted_row_lines(
+                        "s_t *const RSTR",
+                        "bcoordinate_row",
+                        "bcoordinates[shape * ND + d]",
+                        "%s    " % indent,
+                    )[1],
+                )
             ],
         ),
     ]
@@ -1311,7 +1436,10 @@ def _field_atomic_scatter_lines(system, indent, element_array="elements"):
                 close_lines=("%s  }" % indent,),
                 scatter_indent="%s    " % indent,
             ),
-            ("out[element_shape[evb + scatter] * out_stride]", "boutput[stream][scatter]"),
+            (
+                "out[element_shape[%s] * out_stride]" % _scatter_element(),
+                "boutput[stream]%s" % _scatter_slot(),
+            ),
         ),
     ]
 
@@ -1851,7 +1979,10 @@ def _mixed_field_atomic_scatter_lines(system, layout, indent, field_element_arra
                         ),
                         scatter_indent="%s    " % indent,
                     ),
-                    ("out[element_shape[evb + scatter] * out_stride]", "boutput[stream][scatter]"),
+                    (
+                "out[element_shape[%s] * out_stride]" % _scatter_element(),
+                "boutput[stream]%s" % _scatter_slot(),
+            ),
                 ),
                 "%s}" % indent,
             ]
@@ -1887,6 +2018,7 @@ def generate_coupled_residual_sfem_files(
     diagnostics_plan=None,
     matrix_format_plan=None,
     unit_name="",
+    mixes_energy_and_residual=False,
 ):
     if not isinstance(system, ResidualEmissionModel):
         raise TypeError(
@@ -1956,6 +2088,7 @@ def generate_coupled_residual_sfem_files(
             ),
         },
         unit_name,
+        mixes_energy_and_residual,
     )
     local_files = published_local_kernel_files(published_here, unit_name)
     operator_files = published_mesh_operator_files(
@@ -1978,6 +2111,7 @@ def generate_coupled_residual_sfem_files(
             *_compatible_matrix_field_indices_from_prefix(prefix, system, element_type)
         ),
         unit_name=unit_name,
+        mixes_energy_and_residual=mixes_energy_and_residual,
     )
     operator_source = _operator_source(
         system,
@@ -1993,6 +2127,7 @@ def generate_coupled_residual_sfem_files(
         matrix_format_plan=matrix_format_plan,
         emit_diagnostics=diagnostics_plan is not None,
         unit_name=unit_name,
+        mixes_energy_and_residual=mixes_energy_and_residual,
         local_files=local_files,
     )
     diagnostics_name = _header("kernel_diagnostics")
@@ -2300,7 +2435,19 @@ def _element_matrix_kernels(
     return kernels
 
 
-def _element_matrix_functions(
+def _element_matrix_functions(*arguments, **keywords):
+    """The element-matrix kernels, emitted for a work item of one element.
+
+    The same binding the assembly mesh loop is emitted under, for the same
+    reason and so that the two agree by construction: a kernel declared with a
+    width and called without one does not compile, which is how the pair was
+    found.
+    """
+    with use_target(_target().holding_one_element()):
+        return _holding_one_element_matrix_functions(*arguments, **keywords)
+
+
+def _holding_one_element_matrix_functions(
     system,
     local_prefix,
     specialization,
@@ -2355,6 +2502,7 @@ def _local_header(
     matrix_format_plan=None,
     matrix_block=None,
     unit_name="",
+    mixes_energy_and_residual=False,
 ):
     """The element-local header for one kernel.
 
@@ -2436,6 +2584,7 @@ def _local_header(
     published = _published_forms(
         {"residual": residual_dependencies, "jacobian_action": action_dependencies},
         unit_name,
+        mixes_energy_and_residual,
     )
     for _residual in [form for form in published if form == "residual"]:
         lines.extend(
@@ -2558,6 +2707,26 @@ def _local_header(
 
 
 def _constant_p1_affine_specialized_local(local_prefix, specialization):
+    """The constant-P1 specialisation, for the element that *is* one.
+
+    A higher-order simplex used to get one synthesised for it: generating TET10
+    also published a `_tet4_` kernel into the shared simplex header, built from
+    `sfem_soa_element_specialization("TET4")` -- TET4's *default* rule, not the
+    rule this material uses for TET4.
+
+    The companion is not dead code -- the shared header has to come out identical
+    from every element that writes it, so a higher-order simplex must publish the
+    family's P1 kernel too.  What was wrong is the rule it used: a material whose
+    TET4 integration case is richer than the default -- `two_phase_flow`, at six
+    points -- had TET4 publish the quadrature shape while TET10 published the
+    closed-form shape under one name, and the merge refused it with `conflicting
+    generated source for d3/two_phase_flow_d3_simplex_local.hpp`.  Materials
+    whose TET4 rule happens to be the default agreed by coincidence, which is why
+    it took adding TET10 to `two_phase_flow` to find this.
+
+    `specialization.companion` is what fixes it: the same integration case, at
+    the P1 element's order for it.
+    """
     rule = specialization.quadrature_rule
     specialized_prefix = _constant_p1_affine_specialized_local_prefix(
         local_prefix,
@@ -2569,14 +2738,11 @@ def _constant_p1_affine_specialized_local(local_prefix, specialization):
     if rule is None or not str(local_prefix).endswith("_simplex"):
         return None
 
-    element_type = {2: "TRI3", 3: "TET4"}.get(int(getattr(rule, "dim", 0)))
+    element_type = _SIMPLEX_P1_ELEMENT.get(int(getattr(rule, "dim", 0)))
     if element_type is None:
         return None
 
-    p1_specialization = sfem_soa_element_specialization(
-        element_type,
-        vector_size=specialization.vector_size,
-    )
+    p1_specialization = specialization.companion(element_type)
     p1_prefix = _constant_p1_affine_specialized_local_prefix(
         local_prefix,
         p1_specialization.quadrature_rule,
@@ -2584,6 +2750,10 @@ def _constant_p1_affine_specialized_local(local_prefix, specialization):
     if p1_prefix is None:
         return None
     return p1_prefix, p1_specialization
+
+
+#: The constant-P1 member of the simplex family, per spatial dimension.
+_SIMPLEX_P1_ELEMENT = {2: "TRI3", 3: "TET4"}
 
 
 def _constant_p1_affine_specialized_local_prefix(local_prefix, rule):
@@ -2636,9 +2806,7 @@ def _mixed_local_function(
     rule = specialization.quadrature_rule
     dim = system.dim
     layout = MixedFieldLayout.create(system, rule, field_element_types)
-    params = [
-        "const int ne",
-        "const ptrdiff_t geometry_stride",
+    params = list(_local_kernel_count_params(False)) + [
         "const s_t *const RSTR determinant",
     ]
     params.extend(
@@ -2664,7 +2832,7 @@ def _mixed_local_function(
         "typename s_t",
         "int NQ",
         "int CELL_NS",
-        "int VS",
+        *_wi_parameters(),
     ]
     lines = [
         "template <%s>" % ", ".join(template_params),
@@ -2695,12 +2863,21 @@ def _mixed_local_function(
             )
         )
     else:
-        lines.extend(_mixed_simplex_local_body(system, layout, coefficients, dependencies))
+        lines.extend(
+            _mixed_simplex_local_body(
+                system,
+                layout,
+                coefficients,
+                dependencies,
+                stream_layout=stream_layout,
+            )
+        )
     lines.append("}")
     return lines
 
 
-def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
+def _mixed_simplex_local_body(system, layout, coefficients, dependencies,
+                              stream_layout="pointer"):
     dim = system.dim
     lines = [
         "  for (int q = 0; q < NQ; ++q) {",
@@ -2719,6 +2896,7 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
             dependencies,
             "      ",
             unroll=True,
+            stream_layout=stream_layout,
         )
     )
     lines.extend(
@@ -2753,7 +2931,8 @@ def _mixed_simplex_local_body(system, layout, coefficients, dependencies):
             ]
             if terms:
                 lines.append(
-                    ('      output[%d]' + _wi() + ' += q_weight[q] * det * (%s);')
+                    ('      output[%d]' + _stream_slot(stream_layout)
+                     + ' += q_weight[q] * det * (%s);')
                     % (offset + test, " + ".join(terms))
                 )
     lines.extend(["    }", "  }"])
@@ -2789,8 +2968,13 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     # One fact -- whether the streams arrive contiguous -- decided once and
     # spelled into four helper names, rather than asked four times.
     contiguous_suffix = _STREAM_HELPER_SUFFIX[field_stream_layout(stream_layout)]
-    tensor_evaluate_name = "tensor_evaluate" + contiguous_suffix
-    tensor_evaluate_value_name = "tensor_evaluate_value" + contiguous_suffix
+    # The scalar suffix goes outside the contiguous one -- the rendered name is
+    # `tensor_evaluate_contiguous_scalar` -- so the target's choice wraps the
+    # stream layout's rather than competing with it.
+    tensor_evaluate_name = _micro_kernel("tensor_evaluate" + contiguous_suffix)
+    tensor_evaluate_value_name = _micro_kernel(
+        "tensor_evaluate_value" + contiguous_suffix
+    )
 
     for field_index, field in enumerate(system.fields):
         reference_index = layout.reference_index(field_index)
@@ -2803,13 +2987,13 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 continue
             if read.uses_value or read.uses_gradient:
                 lines.append(
-                    "  s_t %s_%s_value[NQ * VS];"
-                    % (group.name, field.name)
+                    "  s_t %s_%s_value[%s];"
+                    % (group.name, field.name, _width_product("NQ"))
                 )
             if read.uses_gradient:
                 lines.append(
-                    "  s_t %s_%s_grad_ref[NQ * ND * VS];"
-                    % (group.name, field.name)
+                    "  s_t %s_%s_grad_ref[%s];"
+                    % (group.name, field.name, _width_product("NQ", "ND"))
                 )
             stream_arg, declaration = _FIELD_STREAM_ARGUMENT[
                 field_stream_layout(stream_layout)
@@ -2818,10 +3002,14 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             if read.uses_gradient:
                 lines.extend(
                     [
-                        "  %s<s_t, NQ, %s, VS, ND, 1>("
-                        % (tensor_evaluate_name, shape_name),
-                        "      ne, field_shape_1d[%d], field_grad_1d[%d], %s, %s_%s_value, %s_%s_grad_ref);"
+                        "  %s%s("
                         % (
+                            tensor_evaluate_name,
+                            _micro_kernel_template("ND", 1, shape=shape_name),
+                        ),
+                        "      %sfield_shape_1d[%d], field_grad_1d[%d], %s, %s_%s_value, %s_%s_grad_ref);"
+                        % (
+                            _micro_kernel_count(),
                             reference_index,
                             reference_index,
                             stream_arg,
@@ -2835,17 +3023,26 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             elif read.uses_value:
                 lines.extend(
                     [
-                        "  %s<s_t, NQ, %s, VS, ND, 1>("
-                        % (tensor_evaluate_value_name, shape_name),
-                        "      ne, field_shape_1d[%d], %s, %s_%s_value);"
-                        % (reference_index, stream_arg, group.name, field.name),
+                        "  %s%s("
+                        % (
+                            tensor_evaluate_value_name,
+                            _micro_kernel_template("ND", 1, shape=shape_name),
+                        ),
+                        "      %sfield_shape_1d[%d], %s, %s_%s_value);"
+                        % (
+                            _micro_kernel_count(),
+                            reference_index,
+                            stream_arg,
+                            group.name,
+                            field.name,
+                        ),
                     ]
                 )
 
     for row, field in enumerate(system.fields):
         for quantity in staged_test_quantities(dependencies):
             suffix, extent = _STAGED_COEFFICIENT_BUFFER[quantity]
-            lines.append("  s_t %s_%s[%s];" % (field.name, suffix, extent))
+            lines.append("  s_t %s_%s[%s];" % (field.name, suffix, extent()))
 
     lines.extend(["  for (int q = 0; q < NQ; ++q) {"])
     if dim == 2:
@@ -2879,9 +3076,9 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         for i in _adjugate_components(dependencies, dim)
     )
     if uses_determinant:
-        body.append('      const s_t det = det_q' + _wi() + ';')
+        body.append('      const s_t det = det_q' + _ptr() + ';')
     body.extend(
-        ('      const s_t adj%d = adj_q%d' + _wi() + ';') % (i, i)
+        ('      const s_t adj%d = adj_q%d' + _ptr() + ';') % (i, i)
         for i in _adjugate_components(dependencies, dim)
     )
     for field_index, field in enumerate(system.fields):
@@ -2889,21 +3086,34 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             read = field_stream_usage(dependencies, field, group.name)
             if read.uses_value:
                 hoisted.append(
-                    "    const s_t *const RSTR %s_%s_value_q = &%s_%s_value[q * VS];"
-                    % (group.name, field.name, group.name, field.name)
+                    "    const s_t *const RSTR %s_%s_value_q = &%s_%s_value[%s];"
+                    % (
+                        group.name,
+                        field.name,
+                        group.name,
+                        field.name,
+                        _width_product("q"),
+                    )
                 )
                 body.append(
-                    ('      const s_t %s%s = %s_%s_value_q' + _wi() + ';')
+                    ('      const s_t %s%s = %s_%s_value_q' + _ptr() + ';')
                     % (field.name, group.symbol_suffix, group.name, field.name)
                 )
             if read.uses_gradient:
                 for k in range(dim):
                     hoisted.append(
-                        "    const s_t *const RSTR %s_%s_grad_ref_q%d = &%s_%s_grad_ref[(q * ND + %d) * VS];"
-                        % (group.name, field.name, k, group.name, field.name, k)
+                        "    const s_t *const RSTR %s_%s_grad_ref_q%d = &%s_%s_grad_ref[%s];"
+                        % (
+                            group.name,
+                            field.name,
+                            k,
+                            group.name,
+                            field.name,
+                            _width_product(c_group(c_sum(c_product("q", "ND"), k))),
+                        )
                     )
                     body.append(
-                        ('      const s_t %s%s_grad_%d_ref = %s_%s_grad_ref_q%d' + _wi() + ';')
+                        ('      const s_t %s%s_grad_%d_ref = %s_%s_grad_ref_q%d' + _ptr() + ';')
                         % (field.name, group.symbol_suffix, k, group.name, field.name, k)
                     )
                 body.extend(
@@ -2911,12 +3121,17 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
                 )
     for row, field in enumerate(system.fields):
         hoisted.append(
-            "    s_t *const RSTR %s_value_coeff_q = &%s_value_coeff[q * VS];"
-            % (field.name, field.name)
+            "    s_t *const RSTR %s_value_coeff_q = &%s_value_coeff[%s];"
+            % (field.name, field.name, _width_product("q"))
         )
         hoisted.extend(
-            "    s_t *const RSTR %s_grad_coeff_ref_q%d = &%s_grad_coeff_ref[(q * ND + %d) * VS];"
-            % (field.name, k, field.name, k)
+            "    s_t *const RSTR %s_grad_coeff_ref_q%d = &%s_grad_coeff_ref[%s];"
+            % (
+                field.name,
+                k,
+                field.name,
+                _width_product(c_group(c_sum(c_product("q", "ND"), k))),
+            )
             for k in contracted_gradient_components(dependencies, dim)
         )
     lines.extend(hoisted)
@@ -2938,9 +3153,9 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
     for row, field in enumerate(system.fields):
         value = _VALUE_COEFFICIENT_TERM[
             bool(dependencies.value_coefficients[row])
-        ](row)
+        ](row, None)
         lines.append(
-            ('      %s_value_coeff_q' + _wi() + ' = %s;') % (field.name, value)
+            ('      %s_value_coeff_q' + _ptr() + ' = %s;') % (field.name, value)
         )
         for k in contracted_gradient_components(dependencies, dim):
             terms = [
@@ -2950,7 +3165,7 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
             ]
             value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
             lines.append(
-                ('      %s_grad_coeff_ref_q%d' + _wi() + ' = %s;') % (field.name, k, value)
+                ('      %s_grad_coeff_ref_q%d' + _ptr() + ' = %s;') % (field.name, k, value)
             )
     lines.extend(["    }", "  }"])
     for row, field in enumerate(system.fields):
@@ -2966,10 +3181,18 @@ def _mixed_tensor_local_body(system, layout, coefficients, dependencies, stream_
         ]
         lines.extend(
             [
-                "  %s%s<s_t, NQ, %s, VS, ND, 1>("
-                % (stem, contiguous_suffix, shape_name),
+                "  %s%s("
+                % (
+                    _micro_kernel(stem + contiguous_suffix),
+                    _micro_kernel_template("ND", 1, shape=shape_name),
+                ),
                 argument_format
-                % {"i": reference_index, "f": field.name, "out": output_arg},
+                % {
+                    "ne": _micro_kernel_count(),
+                    "i": reference_index,
+                    "f": field.name,
+                    "out": output_arg,
+                },
             ]
         )
     return lines
@@ -2982,6 +3205,7 @@ def _mixed_local_field_evaluation_lines(
     indent,
     *,
     unroll=False,
+    stream_layout="pointer",
 ):
     dim = system.dim
     lines = []
@@ -3007,7 +3231,8 @@ def _mixed_local_field_evaluation_lines(
                 for trial in range(layout.n_shape(field_index)):
                     coeff_name = "coeff_%s_%s_%d" % (group.name, field.name, trial)
                     lines.append(
-                        ('%sconst s_t %s = %s[%d]' + _wi() + ';')
+                        ('%sconst s_t %s = %s[%d]'
+                         + _stream_slot(stream_layout) + ';')
                         % (indent, coeff_name, group.name, offset + trial)
                     )
                     if read.uses_value:
@@ -3039,7 +3264,8 @@ def _mixed_local_field_evaluation_lines(
             else:
                 lines.append("%sfor (int trial = 0; trial < %s; ++trial) {" % (indent, n_shape_name))
                 lines.append(
-                    ('%s  const s_t coeff = %s[%d + trial]' + _wi() + ';')
+                    ('%s  const s_t coeff = %s[%d + trial]'
+                     + _stream_slot(stream_layout) + ';')
                     % (indent, group.name, offset)
                 )
                 if read.uses_value:
@@ -3094,7 +3320,8 @@ def _mesh_stream_arguments(dependencies, fields, output=True):
 
 
 def _block_stream_plans(
-    dependencies, dim, n_fields, tensor_product, gradient_metric=None
+    dependencies, dim, n_fields, tensor_product, gradient_metric=None,
+    needs_reference_basis=True,
 ):
     """The streams a block call site hands its local kernel, in the plan's order.
 
@@ -3103,9 +3330,14 @@ def _block_stream_plans(
     metric or determinant, adjugate when the form needs one, one-dimensional or
     simplex reference basis -- in four near-identical copies that nothing held
     to the signature they were calling.
+
+    ``needs_reference_basis`` is the one answer that has to travel: a closed-form
+    kernel declares none of the reference streams, so a call site left at the
+    default would hand it three arguments the signature no longer has.
     """
     return local_kernel_stream_plans(
         dependencies,
+        needs_reference_basis=needs_reference_basis,
         dim=dim,
         n_fields=n_fields,
         tensor_product=tensor_product,
@@ -3231,8 +3463,8 @@ def _stream_call_arguments(streams, spell):
 #:   DENSE  one flat array the kernel addresses itself, with nothing per degree
 #:          of freedom at the boundary to describe
 _LAYOUT_DECLARATIONS = {
-    DataStreamLayout.AOS: lambda qualifier, stream: "%s %s[%d * NS][VS]"
-    % (qualifier, stream.name, stream.components),
+    DataStreamLayout.AOS: lambda qualifier, stream: "%s %s[%d * NS]%s"
+    % (qualifier, stream.name, stream.components, _wi_extent()),
     DataStreamLayout.DENSE: lambda qualifier, stream: "%s *const RSTR %s"
     % (qualifier, stream.name),
 }
@@ -3303,7 +3535,18 @@ def _local_function(
         gradient_metric,
         constant_p1_gradient_expansion,
     )
-    params = ["const int ne", "const ptrdiff_t geometry_stride"]
+    # The whole reference basis, not the gradients alone: a closed-form body
+    # folds the shape values and the weight too, so `shape`, `grad_ref` and
+    # `q_weight` are three dead parameters at every call site.  Distinct from
+    # `folds_gradients` because the gradient-metric kernel folds only the
+    # gradients -- the basis is contracted into the metric before it is called,
+    # and the weight still crosses the boundary.
+    folds_basis = (
+        not tensor_product
+        and constant_p1_gradient_expansion
+        and _uses_constant_p1_expansion(rule)
+    )
+    params = list(_local_kernel_count_params(folds_basis))
     params.extend(
         _declare_stream(stream)
         for stream in local_kernel_stream_plans(
@@ -3315,6 +3558,7 @@ def _local_function(
             metric_components=symmetric_metric_component_count(dim),
             stream_layout=stream_layout,
             grad_ref_name=lambda d: sfem_simplex_grad_ref_name("grad_ref", d),
+            needs_reference_basis=not folds_basis,
             needs_reference_gradients=not folds_gradients,
         )
     )
@@ -3322,7 +3566,7 @@ def _local_function(
         "typename s_t",
         "int NQ",
         "int NS",
-        "int VS",
+        *_wi_parameters(),
     ]
     body = [
         BufferDeclNode("static constexpr int", "ND", (), expr_ref(str(dim))),
@@ -3350,6 +3594,7 @@ def _local_function(
                 gradient_metric,
                 allow_gradient_metric=allow_simplex_gradient_metric,
                 constant_p1_gradient_expansion=constant_p1_gradient_expansion,
+                stream_layout=stream_layout,
             )
         )
 
@@ -3416,6 +3661,154 @@ def _tensor_index_nodes(name, extent, dim):
     ]
 
 
+#: The trial function's own value as a direction, where the flux contracts it.
+_TRIAL_VALUE_DIRECTION = {False: [], True: [("value", None)]}
+
+#: What one direction substitutes for the trial function's value: one when it
+#: *is* that direction, zero when the flux reads a value it is not varying, and
+#: nothing at all where the flux reads no value.
+_TRIAL_VALUE_SUBSTITUTION = {
+    (False, False): None,
+    (False, True): sp.Integer(0),
+    (True, True): sp.Integer(1),
+    (True, False): sp.Integer(1),
+}
+
+
+def _trial_directions(dependencies, dim, contracts_value):
+    """The trial degrees of freedom one column field carries, as directions.
+
+    A trial basis function enters the flux through its gradient -- one direction
+    per live axis -- and, where the flux contracts it, through its value as
+    well.  Each is a unit direction the flux is linear in, so substituting it
+    gives that column of the tangent rather than the whole column of the matrix.
+    """
+    return tuple(
+        [("grad", axis) for axis in live_gradient_directions(dependencies, dim)]
+        + _TRIAL_VALUE_DIRECTION[bool(contracts_value)]
+    )
+
+
+#: A unit direction's components, by whether this is the one being varied.
+_UNIT_DIRECTION = {False: sp.Integer(0), True: sp.Integer(1)}
+
+#: Which half of a coefficient a tangent target names.
+_COEFFICIENT_COMPONENT = {
+    False: lambda coefficient, index: coefficient.gradient[index],
+    True: lambda coefficient, index: coefficient.value,
+}
+
+
+def _tangent_targets_for_row(row, dependencies, dim):
+    """One row field's coefficients: what each is called and where it lives.
+
+    The name carries the row and the component; the index says which entry of
+    the coefficient record holds it, so the staging reads the expression and
+    the contraction writes the coefficient without either spelling the other's
+    layout.
+    """
+    return tuple(
+        [("value%d" % row, "value_coeff%d" % row, 0)]
+        * bool(dependencies.value_coefficients[row])
+        + [
+            ("grad%d_%d" % (row, d), "grad_coeff%d_%d" % (row, d), d)
+            for d in range(dim)
+            if dependencies.gradient_coefficients[row][d]
+        ]
+    )
+
+
+def _tangent_entry_name(column_field, kind, axis, target):
+    """What one entry of the staged tangent is called.
+
+    Indexed by the trial degree of freedom it differentiates -- the column
+    field and which of its quantities -- and by the coefficient it contributes
+    to.  Spelled in one place because the staging writes it and the trial loop
+    reads it.
+    """
+    trial = "d%d" % column_field if axis is None else "d%d_%d" % (column_field, axis)
+    return "tangent_%s_%s_%s" % (kind, trial, target)
+
+
+def _tangent_targets_for_column(block, dependencies, dim):
+    """The coefficients one column pass builds, and what each is called.
+
+    The same sequence `_tangent_evaluation_nodes` named its entries after, so
+    the staging and the contraction agree on which entry feeds which
+    coefficient without either of them saying it twice.
+    """
+    return tuple(
+        (suffix, coefficient)
+        for row in block.row_fields
+        for suffix, coefficient, _index in _tangent_targets_for_row(
+            row, dependencies, dim
+        )
+    )
+
+
+def _tangent_evaluation_nodes(system, coefficients, block, dependencies, dim, contracts_value):
+    """The tangent itself, eliminated once for every column and every direction.
+
+    The flux is linear in the direction, so the column belonging to one trial
+    degree of freedom is the flux with that basis function substituted -- and
+    the coefficient of each of the basis function's own quantities is the
+    tangent.  Substituting the *symbol* `trial_grad<e>`, as this used to, leaves
+    the tangent inside the loop over trial functions: measured on Mooney-Rivlin
+    Kelvin-Voigt in 3D, 188 temporaries and 2,358 operations that do not depend
+    on the trial function at all, recomputed once per trial function and
+    emitted again for each of the three column fields.
+
+    Substituting a unit direction instead gives the same tangent as an
+    expression that can be hoisted.  It is not the expansion
+    `plans/direct_assembly` measured at 56.7 million operations and rejected:
+    nothing is expanded, the substitution just puts a one and some zeros where
+    a symbol was, which is why it comes out *cheaper* -- 444 temporaries and
+    2,221 operations for all 81 entries, against 437 and 2,358 for the 27
+    coefficients it replaces, and 3.7 seconds of sympy against 6.7.
+    """
+    entries = []
+    for column_field in block.column_fields:
+        for kind, axis in _trial_directions(dependencies, dim, contracts_value):
+            column = _trial_substituted_coefficients(
+                system,
+                coefficients,
+                column_field,
+                [_UNIT_DIRECTION[(kind, axis) == ("grad", d)] for d in range(dim)],
+                _TRIAL_VALUE_SUBSTITUTION[(kind == "value", bool(contracts_value))],
+            )
+            entries.extend(
+                (
+                    _tangent_entry_name(column_field, kind, axis, suffix),
+                    _COEFFICIENT_COMPONENT[suffix.startswith("value")](
+                        column[row], index
+                    ),
+                )
+                for row in block.row_fields
+                for suffix, _coefficient, index in _tangent_targets_for_row(
+                    row, dependencies, dim
+                )
+            )
+    targets = tuple(name for name, _ in entries)
+    expressions = [expression for _, expression in entries]
+    if not expressions:
+        return [], ()
+    temporaries, reduced = sp.cse(
+        expressions, symbols=sp.numbered_symbols("tangent_tmp")
+    )
+    temporaries = _prune_dead_cse_intermediates(temporaries, reduced)
+    nodes = [
+        BufferDeclNode(
+            "const s_t", str(symbol), (), expr_ref(_sfem_ccode(expression))
+        )
+        for symbol, expression in temporaries
+    ]
+    nodes.extend(
+        BufferDeclNode("const s_t", target, (), expr_ref(_sfem_ccode(expression)))
+        for target, expression in zip(targets, reduced)
+    )
+    return nodes, tuple(targets)
+
+
 def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
     """Every entry of the element matrix, one column at a time, factorised.
 
@@ -3449,7 +3842,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
     dim = system.dim
     n_fields = len(system.fields)
     assembled = assembled_matrix_dependencies(dependencies)
-    templates = ("s_t", "NQ", "NS", "VS", "ND", "NC")
+    templates = ("s_t", "NQ", "NS") + _width_factors() + ("ND", "NC")
     quantities = contracted_test_quantities(dependencies)
     uses_determinant = uses_geometry_values(dependencies)
 
@@ -3466,19 +3859,21 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
     for group in _dependency_stream_groups(assembled):
         uses_gradient = getattr(assembled, "%s_gradient" % group.name)
         nodes.append(
-            BufferDeclNode("s_t", "%s_value" % group.name, ("NC * NQ * VS",))
+            BufferDeclNode("s_t", "%s_value" % group.name, (_width_product("NC", "NQ"),))
         )
         if uses_gradient:
             nodes.append(
                 BufferDeclNode(
-                    "s_t", "%s_grad_ref" % group.name, ("NC * NQ * ND * VS",)
+                    "s_t", "%s_grad_ref" % group.name, (_width_product("NC", "NQ", "ND"),)
                 )
             )
             nodes.append(
                 CallNode(
-                    "tensor_evaluate_contiguous",
-                    ("ne", "shape_1d", "grad_1d", group.name,
-                     "%s_value" % group.name, "%s_grad_ref" % group.name),
+                    _micro_kernel("tensor_evaluate_contiguous"),
+                    _micro_kernel_arguments(
+                        ("ne", "shape_1d", "grad_1d", group.name,
+                         "%s_value" % group.name, "%s_grad_ref" % group.name)
+                    ),
                     templates,
                     wrap_arguments=True,
                 )
@@ -3486,16 +3881,33 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         else:
             nodes.append(
                 CallNode(
-                    "tensor_evaluate_value_contiguous",
-                    ("ne", "shape_1d", group.name, "%s_value" % group.name),
+                    _micro_kernel("tensor_evaluate_value_contiguous"),
+                    _micro_kernel_arguments(
+                        ("ne", "shape_1d", group.name, "%s_value" % group.name)
+                    ),
                     templates,
                     wrap_arguments=True,
                 )
             )
 
-    nodes.append(BufferDeclNode("s_t", "value_coeff", ("NC * NQ * VS",)))
+    # One set per column pass.  The three passes used to take turns through one
+    # buffer, which is what forced a quadrature loop each; sharing the loop means
+    # all of them are written before any is integrated.
     nodes.extend(
-        BufferDeclNode("s_t", "grad_coeff_ref", ("NC * NQ * ND * VS",))
+        BufferDeclNode(
+            "s_t",
+            column_coefficient("value_coeff", column),
+            (_width_product("NC", "NQ"),),
+        )
+        for column in range(len(block.column_fields))
+    )
+    nodes.extend(
+        BufferDeclNode(
+            "s_t",
+            column_coefficient("grad_coeff_ref", column),
+            (_width_product("NC", "NQ", "ND"),),
+        )
+        for column in range(len(block.column_fields))
         for quantity in quantities
         if quantity == "gradient"
     )
@@ -3516,6 +3928,7 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
     )
 
     entry_point, arguments = _TENSOR_INTEGRATE_BY_QUANTITIES[quantities]
+    arguments = _micro_kernel_arguments(arguments)
     # The trial function's value, where the flux contracts it: on this element
     # it is the product of the one-dimensional factors, as its gradient is.
     trial_value_nodes = [
@@ -3533,128 +3946,263 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         for quantity in substituted_trial_quantities(dependencies)
         if quantity == "value"
     ]
-    for trial_component in block.column_fields:
-        column = _trial_substituted_coefficients(
-            system,
-            coefficients,
-            trial_component,
-            [sp.Symbol("trial_grad%d" % d) for d in range(dim)],
-            sp.Symbol("trial_value") if trial_value_nodes else None,
-        )
-
-        quadrature_body = list(_tensor_index_nodes("q", "NQ", dim))
-        quadrature_body.append(
-            BufferDeclNode(
-                "const s_t",
-                "qw",
-                (),
-                expr_ref(
-                    " * ".join(
-                        "q_weight_1d[q_%s]" % letter
-                        for letter in _TENSOR_AXES[:dim]
-                    )
+    # The tangent, staged once for every quadrature point.
+    #
+    # It is what the flux becomes when the direction is a trial basis function,
+    # and it does not depend on *which* trial function that is -- so it belongs
+    # outside the loop over them and outside the unrolled column fields, both
+    # of which it used to sit inside.
+    tangent_nodes, tangent_targets = _tangent_evaluation_nodes(
+        system, coefficients, block, dependencies, dim, bool(trial_value_nodes)
+    )
+    if tangent_targets:
+        nodes.extend(
+            [
+                BufferDeclNode(
+                    "static constexpr int",
+                    "N_TANGENT",
+                    (),
+                    expr_ref("%d" % len(tangent_targets)),
                 ),
-            )
+                BufferDeclNode("s_t", "tangent", (_width_product("N_TANGENT", "NQ"),)),
+            ]
         )
-        lane_body = []
+        staging_quadrature_body = []
+        staging_lane_body = []
         if uses_determinant:
-            quadrature_body.append(
+            staging_quadrature_body.append(
                 BufferDeclNode(
                     "const s_t *const RSTR", "det_q", (),
                     expr_ref("determinant + q * geometry_stride"),
                 )
             )
-            lane_body.append(
-                BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _wi()))
+            staging_lane_body.append(
+                BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
             )
         for i in _adjugate_components(dependencies, dim):
-            quadrature_body.append(
+            staging_quadrature_body.append(
                 BufferDeclNode(
                     "const s_t *const RSTR", "adj_q%d" % i, (),
                     expr_ref("adjugate[%d] + q * geometry_stride" % i),
                 )
             )
-            lane_body.append(
+            staging_lane_body.append(
                 BufferDeclNode(
-                    "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _wi()) % i)
+                    "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
                 )
             )
-        field_hoists, field_aliases = _tensor_field_alias_nodes(system, assembled)
-        quadrature_body.extend(field_hoists)
-        lane_body.extend(field_aliases)
-        lane_body.extend(
-            _basis_gradient_nodes(
-                "trial_grad",
-                "trial",
-                dim,
-                directions=tuple(live_gradient_directions(dependencies, dim)),
-                tensor_product=True,
+        staging_hoists, staging_aliases = _tensor_field_alias_nodes(system, assembled)
+        staging_quadrature_body.extend(staging_hoists)
+        staging_lane_body.extend(staging_aliases)
+        staging_lane_body.extend(tangent_nodes)
+        for index, target in enumerate(tangent_targets):
+            staging_quadrature_body.append(
+                BufferDeclNode(
+                    "s_t *const RSTR", "%s_q" % target, (),
+                    expr_ref(
+                        "&tangent[%s]"
+                        % _width_product(
+                            c_group(c_sum(c_product("%d" % index, "NQ"), "q"))
+                        )
+                    ),
+                )
+            )
+            staging_lane_body.append(
+                AssignmentNode(
+                    expr_ref(('%s_q' % target) + _ptr()), expr_ref(target)
+                )
+            )
+        staging_quadrature_body.append(_work_item_loop_node(staging_lane_body))
+        staging_quadrature = iterator("q", "int")
+        nodes.append(
+            LoopNode(
+                LoopKind.QUADRATURE,
+                staging_quadrature,
+                iteration_range(0, expr_ref("NQ", "quadrature_count")),
+                pre_increment(staging_quadrature),
+                body=tuple(staging_quadrature_body),
             )
         )
-        lane_body.extend(trial_value_nodes)
-        lane_body.extend(
-            _coefficient_evaluation_nodes(system, column, dependencies)
+    tangent_index = {target: index for index, target in enumerate(tangent_targets)}
+
+    # One trial loop for all the column fields, not one loop each.  The preamble
+    # -- the tensor indices, the quadrature weight, the adjugate offsets, the
+    # trial function's reference gradient and its physical gradient with three
+    # divisions by the determinant -- does not depend on which column is being
+    # built, and a loop per column recomputed every bit of it.  That is
+    # ISSUES.md item 7: "a big chunk of the block is also not depending on the
+    # trial function".
+    #
+    # What has to stay per column is the coefficient each pass contracts into,
+    # because all of them are now written during one quadrature loop and read by
+    # the integrations after it; `column_coefficient` carries that.
+    quadrature_body = list(_tensor_index_nodes("q", "NQ", dim))
+    quadrature_body.append(
+        BufferDeclNode(
+            "const s_t",
+            "qw",
+            (),
+            expr_ref(
+                " * ".join(
+                    "q_weight_1d[q_%s]" % letter
+                    for letter in _TENSOR_AXES[:dim]
+                )
+            ),
         )
+    )
+    lane_body = []
+    if uses_determinant:
+        quadrature_body.append(
+            BufferDeclNode(
+                "const s_t *const RSTR", "det_q", (),
+                expr_ref("determinant + q * geometry_stride"),
+            )
+        )
+        lane_body.append(
+            BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
+        )
+    for i in _adjugate_components(dependencies, dim):
+        quadrature_body.append(
+            BufferDeclNode(
+                "const s_t *const RSTR", "adj_q%d" % i, (),
+                expr_ref("adjugate[%d] + q * geometry_stride" % i),
+            )
+        )
+        lane_body.append(
+            BufferDeclNode(
+                "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
+            )
+        )
+    # No state here any more: this loop contracts the staged tangent with
+    # the trial function, and the tangent is all the state it needs.
+    #
+    # The reference half is the product of one-dimensional factors at this
+    # point and this trial function -- both outer -- so it is named at
+    # quadrature scope and the vectorised loop only pushes it forward.
+    trial_reference, trial_physical = _basis_gradient_split_nodes(
+        "trial_grad",
+        "trial",
+        dim,
+        directions=tuple(live_gradient_directions(dependencies, dim)),
+        tensor_product=True,
+    )
+    quadrature_body.extend(trial_reference)
+    lane_body.extend(trial_physical)
+    lane_body.extend(trial_value_nodes)
+    directions = _trial_directions(dependencies, dim, bool(trial_value_nodes))
+    for column, trial_component in enumerate(block.column_fields):
+        for target_suffix, wanted in _tangent_targets_for_column(
+            block, dependencies, dim
+        ):
+            terms = []
+            for kind, axis in directions:
+                name = _tangent_entry_name(trial_component, kind, axis, target_suffix)
+                if name not in tangent_index:
+                    continue
+                quantity = "trial_value" if kind == "value" else "trial_grad%d" % axis
+                quadrature_body.append(
+                    BufferDeclNode(
+                        "const s_t *const RSTR", "%s_q" % name, (),
+                        expr_ref(
+                            "&tangent[%s]"
+                            % _width_product(
+                                c_group(
+                                    c_sum(
+                                        c_product("%d" % tangent_index[name], "NQ"), "q"
+                                    )
+                                )
+                            )
+                        ),
+                    )
+                )
+                terms.append("%s * %s" % (quantity, ('%s_q' % name) + _ptr()))
+            lane_body.append(
+                BufferDeclNode(
+                    "const s_t",
+                    column_coefficient(wanted, column),
+                    (),
+                    expr_ref(" + ".join(terms) if terms else "s_t(0)"),
+                )
+            )
         for row in block.row_fields:
             value = _VALUE_COEFFICIENT_TERM[
                 bool(dependencies.value_coefficients[row])
-            ](row)
+            ](row, column)
+            value_pointer = column_coefficient("value_coeff_q%d" % row, column)
             quadrature_body.append(
                 BufferDeclNode(
-                    "s_t *const RSTR", "value_coeff_q%d" % row, (),
+                    "s_t *const RSTR", value_pointer, (),
                     expr_ref(
-                        "&value_coeff[%s * VS]"
-                        % c_group(c_sum(c_product(row, "NQ"), "q"))
+                        "&%s[%s]"
+                        % (
+                            column_coefficient("value_coeff", column),
+                            _width_product(
+                                c_group(c_sum(c_product(row, "NQ"), "q"))
+                            ),
+                        )
                     ),
                 )
             )
             lane_body.append(
-                AssignmentNode(
-                    expr_ref(('value_coeff_q%d' + _wi()) % row), expr_ref(value)
-                )
+                AssignmentNode(expr_ref(value_pointer + _ptr()), expr_ref(value))
             )
             for k in contracted_gradient_components(dependencies, dim):
                 terms = [
-                    "adj%d * grad_coeff%d_%d" % (k * dim + d, row, d)
+                    "adj%d * %s"
+                    % (
+                        k * dim + d,
+                        column_coefficient("grad_coeff%d_%d" % (row, d), column),
+                    )
                     for d in range(dim)
                     if dependencies.gradient_coefficients[row][d]
                 ]
                 value = "qw * (%s)" % " + ".join(terms) if terms else "s_t(0)"
+                gradient_pointer = column_coefficient(
+                    "grad_coeff_ref_q%d_%d" % (row, k), column
+                )
                 quadrature_body.append(
                     BufferDeclNode(
-                        "s_t *const RSTR", "grad_coeff_ref_q%d_%d" % (row, k), (),
+                        "s_t *const RSTR", gradient_pointer, (),
                         expr_ref(
-                            "&grad_coeff_ref[%s * VS]"
-                            % c_group(
-                                c_sum(
-                                    c_product(
-                                        c_group(c_sum(c_product(row, "NQ"), "q")), "ND"
-                                    ),
-                                    k,
-                                )
+                            "&%s[%s]"
+                            % (
+                                column_coefficient("grad_coeff_ref", column),
+                                _width_product(
+                                    c_group(
+                                        c_sum(
+                                            c_product(
+                                                c_group(
+                                                    c_sum(c_product(row, "NQ"), "q")
+                                                ),
+                                                "ND",
+                                            ),
+                                            k,
+                                        )
+                                    )
+                                ),
                             )
                         ),
                     )
                 )
                 lane_body.append(
                     AssignmentNode(
-                        expr_ref(('grad_coeff_ref_q%d_%d' + _wi()) % (row, k)),
-                        expr_ref(value),
+                        expr_ref(gradient_pointer + _ptr()), expr_ref(value)
                     )
                 )
-        quadrature_body.append(_work_item_loop_node(lane_body))
+    quadrature_body.append(_work_item_loop_node(lane_body))
 
-        trial_body = list(_tensor_index_nodes("trial", "NS", dim))
-        quadrature = iterator("q", "int")
-        trial_body.append(
-            LoopNode(
-                LoopKind.QUADRATURE,
-                quadrature,
-                iteration_range(0, expr_ref("NQ", "quadrature_count")),
-                pre_increment(quadrature),
-                body=tuple(quadrature_body),
-            )
+    trial_body = list(_tensor_index_nodes("trial", "NS", dim))
+    quadrature = iterator("q", "int")
+    trial_body.append(
+        LoopNode(
+            LoopKind.QUADRATURE,
+            quadrature,
+            iteration_range(0, expr_ref("NQ", "quadrature_count")),
+            pre_increment(quadrature),
+            body=tuple(quadrature_body),
         )
+    )
+    for column, trial_component in enumerate(block.column_fields):
         trial_body.append(
             _shape_loop_node(
                 "out_shape",
@@ -3672,16 +4220,15 @@ def _tensor_element_matrix_nodes(system, coefficients, dependencies, block):
         )
         trial_body.append(
             CallNode(
-                entry_point % "",
+                _micro_kernel(entry_point % ""),
                 tuple(
-                    "column" if argument == "output" else argument
-                    for argument in arguments
+                    _integrate_argument(argument, column) for argument in arguments
                 ),
                 templates,
                 wrap_arguments=True,
             )
         )
-        nodes.append(_shape_loop_node("trial", trial_body))
+    nodes.append(_shape_loop_node("trial", trial_body))
     return tuple(nodes)
 
 
@@ -3731,7 +4278,7 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
     ]
     body.extend(_simplex_state_staging_nodes(system, assembled, usage))
     body.extend(
-        BufferDeclNode("s_t", "%s_values" % name, ("VS",))
+        BufferDeclNode("s_t", "%s_values" % name, _width_factors())
         for row in range(n_fields)
         for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
     )
@@ -3747,25 +4294,69 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
         for quantity in substituted_trial_quantities(dependencies)
         if quantity == "value"
     ]
-    trial_body = []
+    # The tangent, once per quadrature point rather than once per trial
+    # function and column field.  It is the flux with a trial degree of freedom
+    # substituted for the direction, and which trial function that is does not
+    # reach it -- so the state transform and the material both belong out here,
+    # where they used to sit inside the loop over trial functions and be
+    # emitted again for every column field.
+    tangent_nodes, tangent_targets = _tangent_evaluation_nodes(
+        system, coefficients, block, dependencies, dim, bool(trial_value_nodes)
+    )
+    tangent_index = {target: index for index, target in enumerate(tangent_targets)}
+    tangent_staging = []
+    if tangent_targets:
+        body.append(
+            BufferDeclNode("s_t", "tangent", ("%d" % len(tangent_targets),) + _width_factors())
+        )
+        staging_lane_body = list(_simplex_state_transform_nodes(system, assembled, usage))
+        staging_lane_body.extend(tangent_nodes)
+        staging_lane_body.extend(
+            AssignmentNode(
+                expr_ref(('tangent[%d]' % index) + _wi()), expr_ref(target)
+            )
+            for target, index in tangent_index.items()
+        )
+        tangent_staging.append(_work_item_loop_node(staging_lane_body))
+
+    # The trial function's reference gradient, named once for the whole trial
+    # loop: it depends on the point and the trial function, not on which column
+    # field is being built, so one declaration serves every component -- and a
+    # declaration per component would be a redefinition in the same scope.
+    trial_reference, trial_physical = _basis_gradient_split_nodes(
+        "trial_grad", "trial", dim, directions=directions
+    )
+    trial_body = list(trial_reference)
     for trial_component in block.column_fields:
-        column = _trial_substituted_coefficients(
-            system,
-            coefficients,
-            trial_component,
-            [sp.Symbol("trial_grad%d" % d) for d in range(dim)],
-            sp.Symbol("trial_value") if trial_value_nodes else None,
-        )
-        # The transform is rebuilt per trial component rather than staged: it is
-        # a handful of multiplies and one divide per field direction, while the
-        # material block beside it is thousands of operations, and staging it
-        # would cost a buffer per field and role.
-        material = list(_simplex_state_transform_nodes(system, assembled, usage))
-        material.extend(
-            _basis_gradient_nodes("trial_grad", "trial", dim, directions=directions)
-        )
+        # The geometry, because the trial function's gradient is pushed forward
+        # here.  It used to arrive with the state transform, which has moved
+        # out to the staging pass above.
+        material = list(_geometry_value_nodes(dependencies, dim))
+        material.extend(trial_physical)
         material.extend(trial_value_nodes)
-        material.extend(_coefficient_evaluation_nodes(system, column, dependencies))
+        for target_suffix, wanted in _tangent_targets_for_column(
+            block, dependencies, dim
+        ):
+            terms = []
+            for kind, axis in _trial_directions(
+                dependencies, dim, bool(trial_value_nodes)
+            ):
+                name = _tangent_entry_name(trial_component, kind, axis, target_suffix)
+                if name not in tangent_index:
+                    continue
+                quantity = "trial_value" if kind == "value" else "trial_grad%d" % axis
+                terms.append(
+                    "%s * %s"
+                    % (quantity, ('tangent[%d]' % tangent_index[name]) + _wi())
+                )
+            material.append(
+                BufferDeclNode(
+                    "const s_t",
+                    wanted,
+                    (),
+                    expr_ref(" + ".join(terms) if terms else "s_t(0)"),
+                )
+            )
         material.extend(
             AssignmentNode(expr_ref(('%s_values' + _wi()) % name), expr_ref(name))
             for row in range(n_fields)
@@ -3773,11 +4364,12 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
         )
         trial_body.append(_work_item_loop_node(material))
 
+        test_reference, test_physical = _basis_gradient_split_nodes(
+            "test_grad", "test", dim, directions=directions
+        )
         test_body = list(_geometry_value_nodes(dependencies, dim))
         test_body.extend(_test_value_nodes(dependencies))
-        test_body.extend(
-            _basis_gradient_nodes("test_grad", "test", dim, directions=directions)
-        )
+        test_body.extend(test_physical)
         for row in block.row_fields:
             terms = [
                 ('%s_values' + _wi() + ' * %s') % (name, _LOCAL_TEST_FACTOR[kind](axis))
@@ -3793,10 +4385,15 @@ def _quadrature_element_matrix_nodes(system, coefficients, dependencies, block):
                 )
             )
         trial_body.append(
-            _shape_loop_node("test", [_work_item_loop_node(test_body)])
+            _shape_loop_node(
+                "test", test_reference + [_work_item_loop_node(test_body)]
+            )
         )
 
-    quadrature_body = list(_simplex_state_gather_nodes(system, assembled, usage))
+    quadrature_body = list(
+        _simplex_state_gather_nodes(system, assembled, usage, "contiguous")
+    )
+    quadrature_body.extend(tangent_staging)
     quadrature_body.append(_shape_loop_node("trial", trial_body))
     quadrature = iterator("q", "int")
     body.append(
@@ -3850,7 +4447,9 @@ def _closed_form_element_matrix_nodes(
 
     body = list(_geometry_value_nodes(assembled, dim))
     body.extend(
-        _constant_p1_state_gradient_nodes(system, assembled, reference_gradients)
+        _constant_p1_state_gradient_nodes(
+            system, assembled, reference_gradients, "contiguous"
+        )
     )
     # Test and trial run over the same space, so one gradient per shape serves
     # both -- the hand-written kernel does the same.
@@ -4004,7 +4603,7 @@ def _element_matrix_function(system, kernel, coefficients, dependencies):
     dim = system.dim
     n_fields = len(system.fields)
     shape = _ELEMENT_MATRIX_SHAPES[kernel.strategy]
-    params = ["const int ne", "const ptrdiff_t geometry_stride"]
+    params = list(_local_kernel_count_params(False))
     params.extend(
         _declare_stream(stream)
         for stream in local_kernel_stream_plans(
@@ -4032,7 +4631,7 @@ def _element_matrix_function(system, kernel, coefficients, dependencies):
             params=tuple(params),
             body=tuple(body),
             qualifier=_function_qualifier(),
-            template_params=("typename s_t", "int NQ", "int NS", "int VS"),
+            template_params=("typename s_t", "int NQ", "int NS") + _wi_parameters(),
         )
     )
 
@@ -4075,19 +4674,20 @@ def _simplex_state_staging_nodes(system, dependencies, usage):
             read = usage[(field.name, group.name)]
             if read.uses_value:
                 nodes.append(
-                    BufferDeclNode("s_t", "%s_values" % stem, ("VS",))
+                    BufferDeclNode("s_t", "%s_values" % stem, _width_factors())
                 )
             if read.uses_gradient:
                 nodes.extend(
                     BufferDeclNode(
-                        "s_t", "%s_grad_%d_ref_values" % (stem, d), ("VS",)
+                        "s_t", "%s_grad_%d_ref_values" % (stem, d), _width_factors()
                     )
                     for d in range(dim)
                 )
     return nodes
 
 
-def _simplex_state_gather_nodes(system, dependencies, usage):
+def _simplex_state_gather_nodes(system, dependencies, usage,
+                                stream_layout="pointer"):
     """Zero the staging buffers, then accumulate over trial functions."""
     dim = system.dim
     nodes = []
@@ -4116,39 +4716,49 @@ def _simplex_state_gather_nodes(system, dependencies, usage):
                     ]
                 )
             )
-            trial_body = [
-                BufferDeclNode(
-                    "const s_t",
-                    "coeff",
-                    (),
-                    expr_ref(
-                        ('%s[%s]' + _wi())
-                        % (group.name, c_sum(c_product("trial", "NC"), field_index))
-                    ),
-                )
-            ]
+            # The trial function's coefficients are a row of the stream and its
+            # basis is an entry of a table: one address and one value per trial
+            # function, both of them the same for every element of the block.
+            # They are named between the trial loop and the work-item loop, so
+            # the vectorised loop holds the accumulation and nothing else.
+            hoisted, coeff = _hoisted_row(
+                "coeff_stream",
+                ('%s[%s]')
+                % (group.name, c_sum(c_product("trial", "NC"), field_index)),
+                _stream_slot(stream_layout),
+            )
+            trial_body = []
             if read.uses_value:
+                shape_nodes, trial_shape = _hoisted_value(
+                    "trial_shape", "shape[q * NS + trial]"
+                )
+                hoisted.extend(shape_nodes)
                 trial_body.append(
                     ScatterNode(
                         expr_ref(('%s_values' + _wi()) % stem),
-                        expr_ref("coeff * shape[q * NS + trial]"),
+                        expr_ref("%s * %s" % (coeff, trial_shape)),
                         "+=",
                     )
                 )
             if read.uses_gradient:
-                trial_body.extend(
-                    ScatterNode(
-                        expr_ref(('%s_grad_%d_ref_values' + _wi()) % (stem, d)),
-                        expr_ref(
-                            "coeff * %s[q * NS + trial]"
-                            % sfem_simplex_grad_ref_name("grad_ref", d)
-                        ),
-                        "+=",
+                for d in range(dim):
+                    gradient_nodes, trial_gradient = _hoisted_value(
+                        "trial_grad_%d_ref" % d,
+                        "%s[q * NS + trial]"
+                        % sfem_simplex_grad_ref_name("grad_ref", d),
                     )
-                    for d in range(dim)
-                )
+                    hoisted.extend(gradient_nodes)
+                    trial_body.append(
+                        ScatterNode(
+                            expr_ref(('%s_grad_%d_ref_values' + _wi()) % (stem, d)),
+                            expr_ref("%s * %s" % (coeff, trial_gradient)),
+                            "+=",
+                        )
+                    )
             nodes.append(
-                _shape_loop_node("trial", [_work_item_loop_node(trial_body)])
+                _shape_loop_node(
+                    "trial", hoisted + [_work_item_loop_node(trial_body)]
+                )
             )
     return nodes
 
@@ -4229,6 +4839,36 @@ def _simplex_state_transform_nodes(system, dependencies, usage, stepped=False):
     )
 
 
+#: What a local kernel takes before its streams, from two independent facts: how
+#: many elements it holds, and whether it evaluates in closed form.
+#:
+#: A kernel that holds one element counts nothing -- `ne` was read only by the
+#: work-item loop it no longer opens.  A stride *between quadrature points* is
+#: meaningless where there is one point: every caller passed either a literal zero
+#: or a stride that multiplied an index of zero.
+_LOCAL_KERNEL_COUNT = {True: ("const int ne",), False: ()}
+_LOCAL_KERNEL_STRIDE = {True: (), False: ("const ptrdiff_t geometry_stride",)}
+
+
+def _local_kernel_count_params(folds_basis):
+    return (
+        _LOCAL_KERNEL_COUNT[bool(_width_factors())]
+        + _LOCAL_KERNEL_STRIDE[bool(folds_basis)]
+    )
+
+
+#: The arguments that match it, for a call site that names its own.
+_LOCAL_KERNEL_COUNT_ARG = {True: lambda count: [count], False: lambda count: []}
+_LOCAL_KERNEL_STRIDE_ARG = {True: lambda stride: [], False: lambda stride: [stride]}
+
+
+def _local_kernel_count_args(folds_basis, count, stride):
+    return (
+        _LOCAL_KERNEL_COUNT_ARG[bool(_width_factors())](count)
+        + _LOCAL_KERNEL_STRIDE_ARG[bool(folds_basis)](stride)
+    )
+
+
 def _folds_reference_gradients(system, rule, coefficients, dependencies,
                                gradient_metric, constant_p1_gradient_expansion):
     """Whether the body about to be built reads no reference gradient tables.
@@ -4247,9 +4887,7 @@ def _folds_reference_gradients(system, rule, coefficients, dependencies,
         return True
     if not constant_p1_gradient_expansion:
         return False
-    return _uses_constant_p1_gradient_expansion(
-        system, dependencies, constant_p1_simplex_reference_gradients(rule)
-    )
+    return _uses_constant_p1_expansion(rule)
 
 
 def _simplex_local_body(
@@ -4261,19 +4899,25 @@ def _simplex_local_body(
     allow_gradient_metric=True,
     constant_p1_gradient_expansion=True,
     stepped=False,
+    stream_layout="pointer",
 ):
     if gradient_metric is None and allow_gradient_metric:
         gradient_metric = simplex_gradient_metric_transformation(system.fields, rule, coefficients, dependencies)
     if gradient_metric is not None:
-        return (_simplex_gradient_metric_body(system, rule, dependencies, gradient_metric),)
-    reference_gradients = constant_p1_simplex_reference_gradients(rule)
-    if constant_p1_gradient_expansion and _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
         return (
-            _constant_p1_gradient_expanded_body(
+            _simplex_gradient_metric_body(
+                system, rule, dependencies, gradient_metric, stream_layout
+            ),
+        )
+    if constant_p1_gradient_expansion and _uses_constant_p1_expansion(rule):
+        return (
+            _constant_p1_expanded_body(
                 system,
+                rule,
                 coefficients,
                 dependencies,
-                reference_gradients,
+                stream_layout,
+                stepped,
             ),
         )
 
@@ -4282,11 +4926,11 @@ def _simplex_local_body(
 
     staging = list(_simplex_state_staging_nodes(system, dependencies, usage))
     staging.extend(
-        BufferDeclNode("s_t", "%s_values" % name, ("VS",))
+        BufferDeclNode("s_t", "%s_values" % name, _width_factors())
         for row in range(len(system.fields))
         for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
     )
-    gather = _simplex_state_gather_nodes(system, dependencies, usage)
+    gather = _simplex_state_gather_nodes(system, dependencies, usage, stream_layout)
     transform = _simplex_state_transform_nodes(system, dependencies, usage, stepped)
 
     # EVALUATE_MATERIAL: the constitutive evaluation, staged for the contraction.
@@ -4303,23 +4947,27 @@ def _simplex_local_body(
         for _kind, _axis, name in live_test_coefficients(dependencies, row, dim)
     )
 
-    # Contract the staged coefficients against each test function.
+    # Contract the staged coefficients against each test function.  The test
+    # function's own basis is a table entry per test function -- the same value
+    # for every element of the block -- so it is named between the test loop and
+    # the work-item loop, and the vectorised loop reads a scalar instead of
+    # computing `q * NS + test` again per element.
+    # `_basis_gradient_split_nodes` owns the push-forward and the three reference
+    # spellings, so this reads the one answer instead of naming the table itself:
+    # the reference half is hoisted, the contraction with the adjugate stays in
+    # the loop.
+    test_reference, test_physical = _basis_gradient_split_nodes(
+        "test_grad",
+        "test",
+        dim,
+        directions=tuple(live_gradient_directions(dependencies, dim)),
+    )
+    hoisted_test = list(test_reference)
     test_body = list(_geometry_value_nodes(dependencies, dim))
-    test_body.extend(_test_value_nodes(dependencies))
-    for d in live_gradient_directions(dependencies, dim):
-        terms = " + ".join(
-            "%s[q * NS + test] * adj%d"
-            % (sfem_simplex_grad_ref_name("grad_ref", k), k * dim + d)
-            for k in range(dim)
-        )
-        test_body.append(
-            BufferDeclNode(
-                "const s_t",
-                "test_grad%d" % d,
-                (),
-                expr_ref("(%s) / det" % terms),
-            )
-        )
+    value_nodes, test_value_nodes = _hoisted_test_value_nodes(dependencies)
+    hoisted_test.extend(value_nodes)
+    test_body.extend(test_value_nodes)
+    test_body.extend(test_physical)
     for row in range(len(system.fields)):
         terms = [
             ('%s_values' + _wi() + ' * %s') % (name, _LOCAL_TEST_FACTOR[kind](axis))
@@ -4333,9 +4981,19 @@ def _simplex_local_body(
             stream = c_sum(c_product("test", "NC"), row)
             if stepped:
                 stream = c_sum(c_product("step", "NC * NS"), stream)
+            # The row this test function accumulates into, named above the lane
+            # loop: `test` and `step` are both outer, so the address is the same
+            # for every element of the block.
+            output_rows, output_row = _hoisted_row(
+                "output_row%d" % row,
+                "output[%s]" % stream,
+                _stream_slot(stream_layout),
+                qualifier="s_t *const RSTR",
+            )
+            hoisted_test.extend(output_rows)
             test_body.append(
                 ScatterNode(
-                    expr_ref(('output[%s]' + _wi()) % stream),
+                    expr_ref(output_row),
                     expr_ref("q_weight[q] * det * (%s)" % " + ".join(terms)),
                     "+=",
                 )
@@ -4350,7 +5008,11 @@ def _simplex_local_body(
         LocalPhase.EVALUATE_MATERIAL: (_LANE_SCOPE, tuple(material)),
         LocalPhase.CONTRACT_TEST: (
             _QUADRATURE_SCOPE,
-            (_shape_loop_node("test", [_work_item_loop_node(test_body)]),),
+            (
+                _shape_loop_node(
+                    "test", hoisted_test + [_work_item_loop_node(test_body)]
+                ),
+            ),
         ),
     }
     quadrature = iterator("q", "int")
@@ -4411,6 +5073,100 @@ def _trial_substituted_coefficients(
 _TENSOR_AXES = ("x", "y", "z")
 
 
+#: Which of the three reference spellings a basis function has, from the two
+#: facts that decide it: whether the element is a tensor product, and whether its
+#: reference gradients are constants this emitter already holds.  A table rather
+#: than a chain of tests, because `plans.evaluation_strategy` is what names the
+#: three and emission only spells the one it is handed.
+_BASIS_GRADIENT_SPELLING = {
+    (True, True): "sum_factorized",
+    (True, False): "sum_factorized",
+    (False, True): "quadrature",
+    (False, False): "expanded",
+}
+
+
+def _sum_factorized_reference_nodes(name, shape_index, dim):
+    """A tensor-product basis function's reference gradient needs no contraction.
+
+    Differentiating a product of one-dimensional factors replaces exactly one of
+    them by its derivative.
+    """
+    return [
+        BufferDeclNode(
+            "const s_t",
+            "%s_ref%d" % (name, k),
+            (),
+            expr_ref(
+                " * ".join(
+                    "%s_1d[q_%s * NS1 + %s_%s]"
+                    % ("grad" if axis == k else "shape", letter, shape_index, letter)
+                    for axis, letter in enumerate(_TENSOR_AXES[:dim])
+                )
+            ),
+        )
+        for k in range(dim)
+    ]
+
+
+def _quadrature_reference_nodes(name, shape_index, dim):
+    """The table entry for this shape function at this point.
+
+    A value, and not the work item's, so it is named once and the contraction
+    reads the name.
+    """
+    return [
+        BufferDeclNode(
+            "const s_t",
+            "%s_ref%d" % (name, k),
+            (),
+            expr_ref(
+                "%s[q * NS + %s]"
+                % (sfem_simplex_grad_ref_name("grad_ref", k), shape_index)
+            ),
+        )
+        for k in range(dim)
+    ]
+
+
+#: How many components the reference half declares: all of them where a gradient
+#: is pushed forward, and none where none is.
+_BASIS_REFERENCE_EXTENT = {True: lambda dim: dim, False: lambda dim: 0}
+
+
+_BASIS_REFERENCE_NODES = {
+    "sum_factorized": _sum_factorized_reference_nodes,
+    "quadrature": _quadrature_reference_nodes,
+    #: Constants folded into the arithmetic: no table, so nothing to name.
+    "expanded": lambda name, shape_index, dim: [],
+}
+
+
+def _named_reference_gradient(name, shape_index, dim, d, reference_gradients):
+    """The push-forward of a reference gradient this emitter has named."""
+    return " + ".join(
+        "%s_ref%d * adj%d" % (name, k, k * dim + d) for k in range(dim)
+    )
+
+
+def _folded_reference_gradient(name, shape_index, dim, d, reference_gradients):
+    """The same push-forward with the reference gradients folded in as rationals."""
+    terms = []
+    for k in range(dim):
+        factor = _reference_gradient_expr(reference_gradients, shape_index, k)
+        if factor == 0:
+            continue
+        terms.append(_scaled_cpp_term(factor, "adj%d" % (k * dim + d)))
+    return _sum_cpp_terms(terms)
+
+
+_BASIS_PHYSICAL_GRADIENT = {
+    "sum_factorized": _named_reference_gradient,
+    "quadrature": _named_reference_gradient,
+    "expanded": _folded_reference_gradient,
+}
+
+
 def _basis_gradient_nodes(
     name,
     shape_index,
@@ -4439,66 +5195,75 @@ def _basis_gradient_nodes(
     One owner for all three.  The constant spelling used to be written out again
     inside `_constant_p1_gradient_expanded_body`, where nothing held the two to
     the same chain rule.
+
+    Returned in one list for the callers that place the whole thing at one depth.
+    `_basis_gradient_split_nodes` is the same computation with the reference half
+    handed back separately, for a caller that hoists it above the work-item loop.
     """
-    nodes = []
-    if tensor_product:
-        # A tensor-product basis function's reference gradient needs no
-        # contraction: differentiating a product of one-dimensional factors
-        # replaces exactly one of them by its derivative.
-        nodes.extend(
-            BufferDeclNode(
-                "const s_t",
-                "%s_ref%d" % (name, k),
-                (),
-                expr_ref(
-                    " * ".join(
-                        "%s_1d[q_%s * NS1 + %s_%s]"
-                        % ("grad" if axis == k else "shape", letter, shape_index, letter)
-                        for axis, letter in enumerate(_TENSOR_AXES[:dim])
-                    )
-                ),
-            )
-            for k in range(dim)
+    reference, physical = _basis_gradient_split_nodes(
+        name, shape_index, dim, reference_gradients, directions, tensor_product
+    )
+    return reference + physical
+
+
+def _basis_gradient_split_nodes(
+    name,
+    shape_index,
+    dim,
+    reference_gradients=None,
+    directions=None,
+    tensor_product=False,
+):
+    """The same nodes, split into the reference half and the physical half.
+
+    The reference half depends on the quadrature point and the shape function and
+    not on the work item, so it belongs above the vectorised loop; the physical
+    half contracts it with the adjugate, which is the work item's.  Splitting
+    them is what lets a caller standing in a shape loop hoist the first and keep
+    the second inside.
+    """
+    spelling = _BASIS_GRADIENT_SPELLING[
+        (bool(tensor_product), reference_gradients is None)
+    ]
+    pushed = tuple(range(dim)) if directions is None else tuple(directions)
+    # A form that pushes no gradient forward names no reference gradient either:
+    # `body_force` contracts a test *value*, so its kernel is handed no table and
+    # declaring a read of one would name a parameter it does not have.
+    reference = list(
+        _BASIS_REFERENCE_NODES[spelling](
+            name, shape_index, _BASIS_REFERENCE_EXTENT[bool(pushed)](dim)
         )
-    for d in range(dim) if directions is None else directions:
-        if tensor_product:
-            gradient = " + ".join(
-                "%s_ref%d * adj%d" % (name, k, k * dim + d) for k in range(dim)
-            )
-        elif reference_gradients is None:
-            gradient = " + ".join(
-                "%s[q * NS + %s] * adj%d"
-                % (sfem_simplex_grad_ref_name("grad_ref", k), shape_index, k * dim + d)
-                for k in range(dim)
-            )
-        else:
-            terms = []
-            for k in range(dim):
-                factor = _reference_gradient_expr(reference_gradients, shape_index, k)
-                if factor == 0:
-                    continue
-                terms.append(_scaled_cpp_term(factor, "adj%d" % (k * dim + d)))
-            gradient = _sum_cpp_terms(terms)
+    )
+    nodes = []
+    for d in pushed:
+        gradient = _BASIS_PHYSICAL_GRADIENT[spelling](
+            name, shape_index, dim, d, reference_gradients
+        )
         nodes.append(
             BufferDeclNode(
                 "const s_t", "%s%d" % (name, d), (), expr_ref("(%s) / det" % gradient)
             )
         )
-    return nodes
+    return reference, nodes
 
 
-def _uses_constant_p1_gradient_expansion(system, dependencies, reference_gradients):
-    if reference_gradients is None:
-        return False
-    if any(dependencies.value_coefficients):
-        return False
-    if not dependencies.uses_test_gradients:
-        return False
-    if dependencies.current_value or dependencies.previous_value or dependencies.direction_value:
-        return False
-    if not dependencies.uses_trial_gradients:
-        return False
-    return len(reference_gradients) == system.dim + 1
+def _uses_constant_p1_expansion(rule):
+    """Whether this rule's element evaluates in closed form.
+
+    One question, about the element: `plans.evaluation_strategy` says a
+    lowest-order simplex is EXPANDED, and `constant_p1_simplex_shape_values`
+    answers whether this particular rule is the one-point rule that makes the
+    basis constant.
+
+    It used to ask five more, all about the *form* -- no value coefficients, no
+    field values, test gradients present, trial gradients present -- because the
+    body could only fold the reference gradients and a form reading anything else
+    had to fall back.  The body folds the shape values and the weight as well
+    now, so the strategy is the element's alone, which is what the plan says it
+    is.  Those five refusals were why every TET4 kernel of a material that reads
+    a field value carried the quadrature body and its tables.
+    """
+    return constant_p1_simplex_shape_values(rule) is not None
 
 
 def _reference_gradient_expr(reference_gradients, shape, component):
@@ -4515,7 +5280,8 @@ def _constant_reference_gradient_sum(reference_gradients, n_shape, dim, expr_for
     return _sum_cpp_terms(terms)
 
 
-def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients):
+def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients,
+                                      stream_layout="pointer"):
     """The element's state gradients, on an element whose basis is constant.
 
     Every live role of every field, contracted against the constant reference
@@ -4554,7 +5320,9 @@ def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients)
                     reference_gradients,
                     dim + 1,
                     d,
-                    lambda shape, group=group, field_index=field_index: ('%s[%d]' + _wi())
+                    lambda shape, group=group, field_index=field_index: (
+                        '%s[%d]' + _stream_slot(stream_layout)
+                    )
                     % (group.name, shape * n_fields + field_index),
                 )
                 nodes.append(
@@ -4569,44 +5337,101 @@ def _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients)
     return nodes
 
 
-def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, reference_gradients):
-    """The expanded constant-P1 gradient kernel, built as IR.
+def _constant_p1_state_value_nodes(system, dependencies, shape_values,
+                                   stream_layout="pointer"):
+    """The element's state *values*, on an element whose basis is constant.
 
-    The second kernel whose body is a tree rather than a list of strings, and
-    the one that shows the first generalises.  It is the same quadrature-over-
-    lane nest, but fed by five statement sources instead of two -- the geometry
-    loads, the reference-gradient contraction, the chain rule, the CSE'd
-    coefficients and the test-function gradients -- each of which now hands
-    back nodes.
+    The twin of `_constant_p1_state_gradient_nodes`, and the piece that was
+    missing: a form reading a field's value -- a viscoelastic material reads the
+    current and the previous state, a body force contracts a test value against
+    a source -- went to the general body, which accumulates over trial functions
+    with `shape[q * NS + trial]` out of a table.  On a one-point rule over a
+    constant basis those shape values are constants, so the accumulation is a
+    folded sum and there is no table and no trial loop.
+
+    The symbol is the stem itself, which is what the lowered form's coefficient
+    expressions are printed against -- the same naming
+    `_simplex_state_transform_nodes` gives the staged version.
+    """
+    n_fields = len(system.fields)
+    groups = _dependency_stream_groups(dependencies)
+    nodes = []
+    for field_index, field in enumerate(system.fields):
+        for group in groups:
+            read = field_stream_usage(dependencies, field, group.name)
+            if not read.uses_value:
+                continue
+            stem = field.name + group.symbol_suffix
+            terms = [
+                _scaled_cpp_term(
+                    shape_values[shape],
+                    ('%s[%d]' + _stream_slot(stream_layout))
+                    % (group.name, shape * n_fields + field_index),
+                )
+                for shape in range(len(shape_values))
+                if shape_values[shape] != 0
+            ]
+            nodes.append(
+                BufferDeclNode(
+                    "const s_t", stem, (), expr_ref(_sum_cpp_terms(terms))
+                )
+            )
+    return nodes
+
+
+def _constant_p1_expanded_body(system, rule, coefficients, dependencies,
+                               stream_layout="pointer", stepped=False):
+    """The constant-P1 kernel, with every constant of its rule folded in.
+
+    `plans.evaluation_strategy` calls this element's strategy EXPANDED: *no
+    quadrature loop and no per-point data at all*.  Three constants stand behind
+    that, and this body now folds all three rather than the gradients alone --
+    the reference gradients, the shape values and the single quadrature weight,
+    from `constant_p1_simplex_reference_gradients`,
+    `constant_p1_simplex_shape_values` and `constant_p1_simplex_weight`.  What it
+    used to leave behind was `q_weight[q]` in the measure and, for any form that
+    reads a field's value or contracts a test value, the whole general body with
+    its `shape[q * NS + trial]` table and its trial loop.
+
+    So the reach widened with the folding.  The body was taken only by a form
+    that contracts test gradients and nothing else; every other form on a TET4
+    fell back to the quadrature body, which is why a `_tet4_` kernel was a
+    verbatim copy of the generic one under a different name.
+
+    The test functions are unrolled, because that is what lets their values and
+    gradients be constants at all, and the scatter is written per test.
     """
     dim = system.dim
     n_fields = len(system.fields)
+    reference_gradients = constant_p1_simplex_reference_gradients(rule)
+    shape_values = constant_p1_simplex_shape_values(rule)
+    weight = constant_p1_simplex_weight(rule)
+    n_shape = len(shape_values)
 
-    body = list(_geometry_value_nodes(dependencies, dim))
+    # The offset is the work item's alone: one point, so there is no point to
+    # stride by, and `q` is not in scope because there is no loop to open it.
+    body = list(
+        _geometry_value_nodes(dependencies, dim, offset=_work_item_index())
+    )
     body.extend(
-        _constant_p1_state_gradient_nodes(system, dependencies, reference_gradients)
+        _constant_p1_state_value_nodes(
+            system, dependencies, shape_values, stream_layout
+        )
+    )
+    body.extend(
+        _constant_p1_state_gradient_nodes(
+            system, dependencies, reference_gradients, stream_layout
+        )
     )
     body.extend(_coefficient_evaluation_nodes(system, coefficients, dependencies))
 
-    for row in range(n_fields):
-        for d in range(dim):
-            if dependencies.gradient_coefficients[row][d]:
-                body.append(
-                    BufferDeclNode(
-                        "const s_t",
-                        "grad_coeff%d_%d_value" % (row, d),
-                        (),
-                        expr_ref("grad_coeff%d_%d" % (row, d)),
-                    )
-                )
-
+    # No staging between the coefficients and the contraction.  The quadrature
+    # body stages them because the two stand in different loops; here everything
+    # is in one work-item scope, so each test function multiplies the coefficient
+    # `_coefficient_evaluation_nodes` already named and a `%s_value = %s` alias
+    # would be a name for a name.
     directions = tuple(live_gradient_directions(dependencies, dim))
-    test_grad_names = {
-        (test, d): "test%d_grad%d" % (test, d)
-        for test in range(dim + 1)
-        for d in directions
-    }
-    for test in range(dim + 1):
+    for test in range(n_shape):
         body.extend(
             _basis_gradient_nodes(
                 "test%d_grad" % test,
@@ -4617,25 +5442,54 @@ def _constant_p1_gradient_expanded_body(system, coefficients, dependencies, refe
             )
         )
 
-    for test in range(dim + 1):
+    # `det` times the rule's one weight, folded: the measure is a constant of
+    # the element up to the determinant it cannot know.
+    measure = _scaled_cpp_term(weight, "det")
+    for test in range(n_shape):
         for row in range(n_fields):
             terms = [
-                "grad_coeff%d_%d_value * %s" % (row, d, test_grad_names[(test, d)])
-                for d in range(dim)
-                if dependencies.gradient_coefficients[row][d]
+                _CONSTANT_P1_TEST_FACTOR[kind](name, axis, test, shape_values)
+                for kind, axis, name in live_test_coefficients(dependencies, row, dim)
             ]
             if terms:
+                stream = test * n_fields + row
                 body.append(
                     ScatterNode(
-                        expr_ref(('output[%d]' + _wi()) % (test * n_fields + row)),
-                        expr_ref("q_weight[q] * det * (%s)" % _sum_cpp_terms(terms)),
+                        expr_ref(
+                            ('output[%d]' + _stream_slot(stream_layout)) % stream
+                        ),
+                        expr_ref(
+                            "%s * (%s)" % (measure, _sum_cpp_terms(terms))
+                        ),
                         "+=",
                     )
                 )
 
-    return _quadrature_lane_kernel_node(
-        body, name="constant_p1_gradient_expanded_body"
-    )
+    return _expanded_lane_kernel_node(body)
+
+
+def _expanded_lane_kernel_node(lane_body, name="constant_p1_expanded_body"):
+    """The closed-form body's scope: the work items, and no quadrature loop.
+
+    The sibling of `_quadrature_lane_kernel_node`, and the shape
+    `plans.evaluation_strategy` asks for -- one point, folded, so there is
+    nothing to loop over.  A named node rather than a bare call so the body is
+    still one slice that `tests/test_kernel_ast_slice.py` can reach and hold to
+    being nodes.
+    """
+    return _work_item_loop_node(lane_body)
+
+
+#: What a coefficient of each kind multiplies in the expanded body: the test
+#: function's gradient, which is a folded constant pushed through the geometry,
+#: or its value, which is a constant of the rule and needs no name at all.
+_CONSTANT_P1_TEST_FACTOR = {
+    "value": lambda coefficient, axis, test, shape_values: _scaled_cpp_term(
+        shape_values[test], coefficient
+    ),
+    "gradient": lambda coefficient, axis, test, shape_values: "%s * test%d_grad%d"
+    % (coefficient, test, axis),
+}
 
 
 #: Where a local phase's statements sit.  A phase is either emitted at
@@ -4665,6 +5519,21 @@ def _assemble_mesh_phases(sections):
     return ordered
 
 
+def _hoisted_test_value_nodes(dependencies):
+    """The test function's value, named above the lane loop where it is read.
+
+    The twin of `_test_value_nodes`, which declared `test_value` inside the
+    work-item loop; the shape table does not depend on the work item, so the
+    declaration moves out and the loop keeps the name.
+    """
+    nodes = []
+    for quantity in contracted_test_quantities(dependencies):
+        if quantity == "value":
+            declarations, _ = _hoisted_value("test_value", "shape[q * NS + test]")
+            nodes.extend(declarations)
+    return nodes, []
+
+
 def _test_value_nodes(dependencies):
     """The test function's value, when the form contracts one.
 
@@ -4690,7 +5559,7 @@ def _test_value_nodes(dependencies):
 
 #: The forms a coupled residual unit emits, in the order it has always emitted
 #: them.
-def _published_forms(form_dependencies, unit_name=""):
+def _published_forms(form_dependencies, unit_name="", mixes_energy_and_residual=False):
     """Those of `RESIDUAL_FORMS` this unit publishes, from the plan.
 
     The sequence is `plans.residual_structure.published_residual_forms`; this is
@@ -4698,10 +5567,12 @@ def _published_forms(form_dependencies, unit_name=""):
     nor dispatched to, and an empty sequence emits nothing at all -- which is
     what a unit carrying only the material's whole residual for the merit gets.
     """
-    return published_residual_forms(form_dependencies, unit_name)
+    return published_residual_forms(
+        form_dependencies, unit_name, mixes_energy_and_residual
+    )
 
 
-def _geometry_value_nodes(dependencies, dim):
+def _geometry_value_nodes(dependencies, dim, offset=None):
     """The per-point geometry a body reads, from the plan that decides it.
 
     `plans.geometry_quantities.local_geometry_quantities` already says which of
@@ -4720,7 +5591,9 @@ def _geometry_value_nodes(dependencies, dim):
                     "const ptrdiff_t",
                     "goff",
                     (),
-                    expr_ref(_offset("q", "geometry_stride")),
+                    expr_ref(
+                        _offset("q", "geometry_stride") if offset is None else offset
+                    ),
                 )
             )
         elif quantity.name == "determinant":
@@ -4820,6 +5693,11 @@ def _work_item_loop_node(body):
     The body of this used to live here, and it was the only one of six
     re-spellings of the work-item loop that read the policy and returned a
     node.  It now lives on `TargetPlatform`, where the other five can reach it.
+
+    A temporary this body declares and copies once into a staged buffer is
+    fused by `SingleUseCopyPass`, not here: that shape occurs in bodies no
+    work-item loop wraps, so the pass sits at the one place every AST is
+    rendered rather than at each place one is built.
     """
     return _target().work_item_scope_node(body)
 
@@ -4879,7 +5757,8 @@ def _quadrature_lane_kernel_lines(lane_body, indent="  ", name="quadrature_lane_
     return ["%s%s" % (indent, line) for line in ast_lines]
 
 
-def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
+def _simplex_gradient_metric_body(system, rule, dependencies, specialization,
+                                  stream_layout="pointer"):
     """The constant-P1 simplex gradient-metric kernel body, built as a KernelAST.
 
     This is the first kernel whose structure is expressed in the IR rather than
@@ -4906,7 +5785,8 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
         body.append(
             declare(
                 "coeff_%s_%s_%d" % (group.name, field.name, trial),
-                ('%s[%d]' + _wi()) % (group.name, trial * len(system.fields) + field_index),
+                ('%s[%d]' + _stream_slot(stream_layout))
+                % (group.name, trial * len(system.fields) + field_index),
             )
         )
     for d in range(dim):
@@ -4983,7 +5863,8 @@ def _simplex_gradient_metric_body(system, rule, dependencies, specialization):
             body.append(
                 ScatterNode(
                     expr_ref(
-                        ('output[%d]' + _wi()) % (test * len(system.fields) + field_index),
+                        ('output[%d]' + _stream_slot(stream_layout))
+                        % (test * len(system.fields) + field_index),
                         "scatter_target",
                     ),
                     expr_ref(_sum_cpp_terms(terms), "scatter_value"),
@@ -5036,7 +5917,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
 
     contiguous = stream_layout == "contiguous"
     suffix = "_contiguous" if contiguous else ""
-    templates = ("s_t", "NQ", "NS", "VS", "ND", "NC")
+    templates = ("s_t", "NQ", "NS") + _width_factors() + ("ND", "NC")
 
     nodes = []
     for group, enabled in (
@@ -5049,7 +5930,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         uses_gradient = getattr(dependencies, "%s_gradient" % group)
         nodes.append(
             BufferDeclNode(
-                "s_t", "%s_value" % group, ("NC * NQ * VS",)
+                "s_t", "%s_value" % group, (_width_product("NC", "NQ"),)
             )
         )
         if uses_gradient:
@@ -5057,14 +5938,16 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
                 BufferDeclNode(
                     "s_t",
                     "%s_grad_ref" % group,
-                    ("NC * NQ * ND * VS",),
+                    (_width_product("NC", "NQ", "ND"),),
                 )
             )
             nodes.append(
                 CallNode(
-                    "tensor_evaluate%s" % suffix,
-                    ("ne", "shape_1d", "grad_1d", group,
-                     "%s_value" % group, "%s_grad_ref" % group),
+                    _micro_kernel("tensor_evaluate%s" % suffix),
+                    _micro_kernel_arguments(
+                        ("ne", "shape_1d", "grad_1d", group,
+                         "%s_value" % group, "%s_grad_ref" % group)
+                    ),
                     templates,
                     wrap_arguments=True,
                 )
@@ -5072,22 +5955,24 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         else:
             nodes.append(
                 CallNode(
-                    "tensor_evaluate_value%s" % suffix,
-                    ("ne", "shape_1d", group, "%s_value" % group),
+                    _micro_kernel("tensor_evaluate_value%s" % suffix),
+                    _micro_kernel_arguments(
+                        ("ne", "shape_1d", group, "%s_value" % group)
+                    ),
                     templates,
                     wrap_arguments=True,
                 )
             )
 
     nodes.append(
-        BufferDeclNode("s_t", "value_coeff", ("NC * NQ * VS",))
+        BufferDeclNode("s_t", "value_coeff", (_width_product("NC", "NQ"),))
     )
     # One buffer per contracted quantity beyond the value, which is always
     # staged.  `contracted_test_quantities` is the plan's list; a form that
     # contracts no test gradient names no reference-gradient buffer because the
     # sequence does not contain one.
     nodes.extend(
-        BufferDeclNode("s_t", "grad_coeff_ref", ("NC * NQ * ND * VS",))
+        BufferDeclNode("s_t", "grad_coeff_ref", (_width_product("NC", "NQ", "ND"),))
         for quantity in contracted_test_quantities(dependencies)
         if quantity == "gradient"
     )
@@ -5131,7 +6016,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             )
         )
         lane_body.append(
-            BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _wi()))
+            BufferDeclNode("const s_t", "det", (), expr_ref('det_q' + _ptr()))
         )
     for i in _adjugate_components(dependencies, dim):
         quadrature_body.append(
@@ -5142,7 +6027,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         )
         lane_body.append(
             BufferDeclNode(
-                "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _wi()) % i)
+                "const s_t", "adj%d" % i, (), expr_ref(('adj_q%d' + _ptr()) % i)
             )
         )
     field_hoists, field_aliases = _tensor_field_alias_nodes(system, dependencies)
@@ -5154,19 +6039,19 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
     for row in range(n_fields):
         value = _VALUE_COEFFICIENT_TERM[
             bool(dependencies.value_coefficients[row])
-        ](row)
+        ](row, None)
         quadrature_body.append(
             BufferDeclNode(
                 "s_t *const RSTR", "value_coeff_q%d" % row, (),
                 expr_ref(
-                    "&value_coeff[%s * VS]"
-                    % c_group(c_sum(c_product(row, "NQ"), "q"))
+                    "&value_coeff[%s]"
+                    % _width_product(c_group(c_sum(c_product(row, "NQ"), "q")))
                 ),
             )
         )
         lane_body.append(
             AssignmentNode(
-                expr_ref(('value_coeff_q%d' + _wi()) % row), expr_ref(value)
+                expr_ref(('value_coeff_q%d' + _ptr()) % row), expr_ref(value)
             )
         )
         # `contracted_gradient_components` is this question phrased as a range,
@@ -5183,11 +6068,15 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
                 BufferDeclNode(
                     "s_t *const RSTR", "grad_coeff_ref_q%d_%d" % (row, k), (),
                     expr_ref(
-                        "&grad_coeff_ref[%s * VS]"
-                        % c_group(
-                            c_sum(
-                                c_product(c_group(c_sum(c_product(row, "NQ"), "q")), "ND"),
-                                k,
+                        "&grad_coeff_ref[%s]"
+                        % _width_product(
+                            c_group(
+                                c_sum(
+                                    c_product(
+                                        c_group(c_sum(c_product(row, "NQ"), "q")), "ND"
+                                    ),
+                                    k,
+                                )
                             )
                         )
                     ),
@@ -5195,7 +6084,7 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
             )
             lane_body.append(
                 AssignmentNode(
-                    expr_ref(('grad_coeff_ref_q%d_%d' + _wi()) % (row, k)),
+                    expr_ref(('grad_coeff_ref_q%d_%d' + _ptr()) % (row, k)),
                     expr_ref(value),
                 )
             )
@@ -5216,7 +6105,12 @@ def _tensor_local_body(system, prefix, coefficients, dependencies, stream_layout
         contracted_test_quantities(dependencies)
     ]
     nodes.append(
-        CallNode(entry_point % suffix, arguments, templates, wrap_arguments=True)
+        CallNode(
+            _micro_kernel(entry_point % suffix),
+            _micro_kernel_arguments(arguments),
+            templates,
+            wrap_arguments=True,
+        )
     )
     return tuple(nodes)
 
@@ -5352,10 +6246,12 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "%s_value_q%d" % (group.name, field_index),
                         (),
                         expr_ref(
-                            "&%s_value[%s * VS]"
+                            "&%s_value[%s]"
                             % (
                                 group.name,
-                                c_group(c_sum(c_product(field_index, "NQ"), "q")),
+                                _width_product(
+                                    c_group(c_sum(c_product(field_index, "NQ"), "q"))
+                                ),
                             )
                         ),
                     )
@@ -5365,7 +6261,7 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "const s_t",
                         stem,
                         (),
-                        expr_ref(('%s_value_q%d' + _wi()) % (group.name, field_index)),
+                        expr_ref(('%s_value_q%d' + _ptr()) % (group.name, field_index)),
                     )
                 )
             if read.uses_gradient:
@@ -5375,16 +6271,22 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "%s_grad_ref_q%d_%d" % (group.name, field_index, k),
                         (),
                         expr_ref(
-                            "&%s_grad_ref[%s * VS]"
+                            "&%s_grad_ref[%s]"
                             % (
                                 group.name,
-                                c_group(
-                                    c_sum(
-                                        c_product(
-                                            c_group(c_sum(c_product(field_index, "NQ"), "q")),
-                                            "ND",
-                                        ),
-                                        k,
+                                _width_product(
+                                    c_group(
+                                        c_sum(
+                                            c_product(
+                                                c_group(
+                                                    c_sum(
+                                                        c_product(field_index, "NQ"), "q"
+                                                    )
+                                                ),
+                                                "ND",
+                                            ),
+                                            k,
+                                        )
                                     )
                                 ),
                             )
@@ -5398,7 +6300,7 @@ def _tensor_field_alias_nodes(system, dependencies):
                         "%s_grad_%d_ref" % (stem, k),
                         (),
                         expr_ref(
-                            ('%s_grad_ref_q%d_%d' + _wi()) % (group.name, field_index, k)
+                            ('%s_grad_ref_q%d_%d' + _ptr()) % (group.name, field_index, k)
                         ),
                     )
                     for k in range(dim)
@@ -5544,9 +6446,17 @@ def _reference_header_files(rules, references_for):
 
 
 def _reference_includes(rules, references_for):
-    """The shared reference headers a source forwards into, once each."""
+    """The shared reference headers a source forwards into, once each.
+
+    A rule whose element evaluates in closed form contributes none: its kernels
+    name no table, so the header held the accessors for declarations that are
+    gone, and the `#include` outlived the last use of what it brings in.  The
+    test is the strategy's -- one point -- and not "is this a P1 element", whose
+    gradients are constant under a rule of any size while its shape values are
+    not.
+    """
     seen = []
-    for rule in rules:
+    for rule in (rule for rule in rules if not _uses_constant_p1_expansion(rule)):
         for line in reference_include_lines(rule, references_for(rule)):
             if line not in seen:
                 seen.append(line)
@@ -5586,6 +6496,7 @@ def _operator_source(
     matrix_format_plan=None,
     emit_diagnostics=True,
     unit_name="",
+    mixes_energy_and_residual=False,
     local_files=("local",),
 ):
     rule = specialization.quadrature_rule
@@ -5630,7 +6541,7 @@ def _operator_source(
         "#include <cstdio>",
         "",
     ]
-    lines.extend(_affine_geometry_stream_helper_lines())
+    lines.extend(affine_geometry_stream_helper_lines())
     # Built before the diagnostics rather than after, because the diagnostics
     # describe the kernels below and have to be told which of them exist.
     form_dependencies = {
@@ -5655,19 +6566,31 @@ def _operator_source(
     # Which forms publish a kernel is the plan's answer, and the loop walks
     # what it returns: a form that contracts nothing has no element entry
     # point, rather than one wrapping an empty loop nest.
-    for form in _published_forms(form_dependencies, unit_name):
+    for form in _published_forms(
+        form_dependencies, unit_name, mixes_energy_and_residual
+    ):
         dependencies = form_dependencies[form]
         coefficients = residual_coeffs if form == "residual" else action_coeffs
         gradient_metric = None
         function = "%s_%s_esoa" % (prefix, form)
-        block = "%s_%s_block" % (local_prefix, form)
+        # The element-SoA entry point reaches the same kernel the mesh operator
+        # does.  Where this element evaluates in closed form that is the
+        # specialisation, which takes no reference data -- so the plan is asked
+        # for the streams with the same answer the signature was built with,
+        # and the entry point stops fetching three tables to pass them on.
+        specialized_block_prefix = _constant_p1_affine_specialized_local_prefix(
+            local_prefix, rule
+        )
+        block_needs_reference_basis = not _uses_constant_p1_expansion(rule)
+        block = "%s_%s_block" % (
+            specialized_block_prefix or local_prefix,
+            form,
+        )
         if True:
             scalar_type = "s_t"
-            params = [
-                "const int ne",
-                "const ptrdiff_t geometry_stride",
-                "const %s *const RSTR determinant" % scalar_type,
-            ]
+            params = list(
+                _local_kernel_count_params(_uses_constant_p1_expansion(rule))
+            ) + ["const %s *const RSTR determinant" % scalar_type]
             params.extend(
                 "const %s *const RSTR %s[%d]"
                 % (scalar_type, quantity.name, quantity.components)
@@ -5687,15 +6610,21 @@ def _operator_source(
                 "%s *const RSTR output[%d]"
                 % (scalar_type, n_fields * n_shape)
             )
-            call_args = ["ne", "geometry_stride"]
+            call_args = _local_kernel_count_args(
+                _uses_constant_p1_expansion(rule), "ne", "geometry_stride"
+            )
             pre_call_lines = []
             if gradient_metric is not None:
                 pre_call_lines.extend(
                     [
                         kernel_constant("NQ", n_qp, indent="  "),
-                        kernel_constant("VS", vector_size, indent="  "),
-                        "  %s geom_metric_data[%d][NQ * VS];"
-                        % (scalar_type, gradient_metric.metric_components),
+                        *_width_constant_lines(vector_size),
+                        "  %s geom_metric_data[%d][%s];"
+                        % (
+                            scalar_type,
+                            gradient_metric.metric_components,
+                            _width_product("NQ"),
+                        ),
                         "  const %s *const geom_metric[%d] = %s;"
                         % (
                             scalar_type,
@@ -5715,7 +6644,7 @@ def _operator_source(
                         dim,
                         "determinant[goff]",
                         lambda component: "adjugate[%d][goff]" % component,
-                        lambda component: "geom_metric_data[%d][" + _offset("q", "VS") + "]"
+                        lambda component: "geom_metric_data[%d][" + _block_offset("q") + "]"
                         % component,
                         "      ",
                         "metric",
@@ -5752,6 +6681,7 @@ def _operator_source(
                         grad_ref_name=lambda d: sfem_simplex_grad_ref_name(
                             "grad_ref", d
                         ),
+                        needs_reference_basis=block_needs_reference_basis,
                     ),
                     spell,
                 )
@@ -5770,13 +6700,13 @@ def _operator_source(
                 return list(
                     line.replace("s_t", concrete) for line in _pre
                 ) + [
-                    "  sfem::codegen::%s<%s, %d, %d, %d>(%s);"
+                    "  sfem::codegen::%s<%s>(%s);"
                     % (
                         block,
-                        concrete,
-                        n_qp,
-                        n_shape,
-                        vector_size,
+                        ", ".join(
+                            (concrete, str(n_qp), str(n_shape))
+                            + tuple(str(vector_size) for _ in _width_factors())
+                        ),
                         ", ".join(spelled),
                     ),
                     "  return SFEM_SUCCESS;",
@@ -5813,19 +6743,27 @@ def _operator_source(
                     dependencies,
                 )
             )
-    lines.extend(
-        _scalar_crs_matrix_assembly_source(
-            system,
-            prefix,
-            local_prefix,
-            specialization,
-            form_dependencies["jacobian_action"],
-            action_coeffs,
-            basis_family,
-            geometry_family,
-            matrix_format_plan,
+    # Assembly takes the element's own geometry, which is the plan's answer and
+    # not this emitter's: an element with an isoparametric kernel assembles
+    # through it, and one without has an affine kernel that computes the same
+    # numbers on a constant Jacobian.
+    for _assembly_mode in geometry_variant_plan(
+        None, rule, specialized=False, assembles_matrix=True
+    ).assembly_modes:
+        lines.extend(
+            _scalar_crs_matrix_assembly_source(
+                system,
+                prefix,
+                local_prefix,
+                specialization,
+                form_dependencies["jacobian_action"],
+                action_coeffs,
+                basis_family,
+                geometry_family,
+                matrix_format_plan,
+                geometry_mode=_assembly_mode,
+            )
         )
-    )
     # The node-centric merit kernel, where the unit and the element admit one.
     # It goes in the per-element source rather than the family header because
     # it is both: it needs an orientation, which only the affine simplices
@@ -5928,7 +6866,7 @@ def _mixed_operator_source(
         "#endif",
         "",
     ]
-    lines.extend(_affine_geometry_stream_helper_lines())
+    lines.extend(affine_geometry_stream_helper_lines())
     lines.extend(
         _mixed_residual_diagnostics_lines(
             system,
@@ -5971,7 +6909,15 @@ def _mixed_operator_source(
                 element,
                 rule,
                 AFFINE_MODE,
-                cell_specialization.vector_size,
+                # Through the target, as every other mesh operator's width
+                # is.  Passed raw, a device mixed kernel declared `VS = 16`
+                # and blocked its staging over sixteen elements while the
+                # micro-kernels it calls hold one, so it handed a scalar entry
+                # point a lane-blocked tile -- which nvcc rejects, and which
+                # would have computed the wrong numbers had it compiled.
+                current_target().effective_vector_size(
+                    cell_specialization.vector_size
+                ),
                 field_element_types,
                 form,
                 dependencies,
@@ -5986,7 +6932,15 @@ def _mixed_operator_source(
                 element,
                 rule,
                 ISOPARAMETRIC_MODE,
-                cell_specialization.vector_size,
+                # Through the target, as every other mesh operator's width
+                # is.  Passed raw, a device mixed kernel declared `VS = 16`
+                # and blocked its staging over sixteen elements while the
+                # micro-kernels it calls hold one, so it handed a scalar entry
+                # point a lane-blocked tile -- which nvcc rejects, and which
+                # would have computed the wrong numbers had it compiled.
+                current_target().effective_vector_size(
+                    cell_specialization.vector_size
+                ),
                 field_element_types,
                 form,
                 coefficients,
@@ -6151,7 +7105,7 @@ def _mixed_affine_function(
             kernel_constant("NS", "CELL_NS", indent="  "),
             kernel_constant("NC", layout.n_reference_fields, indent="  "),
             kernel_constant("N_FIELD_STREAMS", layout.total_streams, indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -6183,11 +7137,11 @@ def _mixed_affine_function(
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "    s_t b%s[N_FIELD_STREAMS][VS];" % role.name
+            "    s_t b%s[N_FIELD_STREAMS]%s;" % (role.name, _wi_extent())
         )
     lines.extend(
         [
-            "    s_t boutput[N_FIELD_STREAMS][VS];",
+            "    s_t boutput[N_FIELD_STREAMS]%s;" % _wi_extent(),
         ]
     )
     field_gather = _mixed_field_gather_lines(system, layout, dependencies, "    ", field_element_arrays)
@@ -6225,9 +7179,7 @@ def _mixed_affine_function(
     )
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
-    call_args = [
-        "ne",
-        "0",
+    call_args = list(_local_kernel_count_args(False, "ne", "0")) + [
         "bageom_streams[%d]"
         % affine_geometry_stream_indices["det0"],
     ]
@@ -6244,8 +7196,12 @@ def _mixed_affine_function(
     lines.extend(
         [
             "",
-            "    %s<s_t, NQ, CELL_NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "    %s%s(%s);"
+            % (
+                block_function,
+                _micro_kernel_template(shape="CELL_NS"),
+                ", ".join(call_args),
+            ),
             "",
         ]
     )
@@ -6336,7 +7292,7 @@ def _mixed_isoparametric_function(
             kernel_constant("NS", "CELL_NS", indent="  "),
             kernel_constant("NC", layout.n_reference_fields, indent="  "),
             kernel_constant("N_FIELD_STREAMS", layout.total_streams, indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -6370,18 +7326,18 @@ def _mixed_isoparametric_function(
     lines.extend(
         [
             *_mesh_loop_lines(),
-            "    s_t bcoordinates[ND * CELL_NS][VS];",
-            "    s_t badjugate_data[ND * ND][NQ * VS];",
-            "    s_t bdeterminant[NQ * VS];",
+            "    s_t bcoordinates[ND * CELL_NS]%s;" % _wi_extent(),
+            "    s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+            "    s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "    s_t b%s[N_FIELD_STREAMS][VS];" % role.name
+            "    s_t b%s[N_FIELD_STREAMS]%s;" % (role.name, _wi_extent())
         )
     lines.extend(
         [
-            "    s_t boutput[N_FIELD_STREAMS][VS];",
+            "    s_t boutput[N_FIELD_STREAMS]%s;" % _wi_extent(),
         ]
     )
     lines.extend(["", *_coordinate_gather_lines(dim, "    ", coordinate_element_array)])
@@ -6424,18 +7380,44 @@ def _mixed_isoparametric_function(
                     for component in range(dim * dim)
                 ),
                 "    for (int q = 0; q < NQ; ++q) {",
-                *_work_item_loop_lines("      "),
             ]
         )
-        for i in range(dim):
-            for j in range(dim):
-                terms = [
-                    ('bcoordinates[%d]' + _wi() + ' * %s_cell_grad_ref_%d[%s]')
+        # The cell's coordinates and its reference gradients, named above the
+        # work-item loop: `dim * dim` Jacobian entries each read the same
+        # `n_shape * dim` rows and table entries, and every one of them is the
+        # same for every element of the block.
+        coordinate_row = {}
+        reference_name = {}
+        for shape in range(cell_rule.n_shape):
+            for i in range(dim):
+                declarations, coordinate_row[(shape, i)] = _hoisted_row_lines(
+                    "const s_t *const RSTR",
+                    "coordinate_row%d" % (shape * dim + i),
+                    "bcoordinates[%d]" % (shape * dim + i),
+                    "      ",
+                )
+                lines.extend(declarations)
+        for j in range(dim):
+            for shape in range(cell_rule.n_shape):
+                reference_name[(j, shape)] = "cell_grad_ref%d_%d" % (j, shape)
+                lines.append(
+                    "      const s_t %s = %s_cell_grad_ref_%d[%s];"
                     % (
-                        shape * dim + i,
+                        reference_name[(j, shape)],
                         reference_stage,
                         j,
                         c_sum(c_product("q", "CELL_NS"), shape),
+                    )
+                )
+        lines.extend(_work_item_loop_lines("      "))
+        for i in range(dim):
+            for j in range(dim):
+                terms = [
+                    "%s%s * %s"
+                    % (
+                        coordinate_row[(shape, i)],
+                        _wi(),
+                        reference_name[(j, shape)],
                     )
                     for shape in range(cell_rule.n_shape)
                 ]
@@ -6443,7 +7425,7 @@ def _mixed_isoparametric_function(
                     "        const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
                 )
-        lines.extend(_isoparametric_geometry_assignment_lines(dim, "        "))
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "        ", cell_rule))
         lines.extend(["      }", "    }"])
     lines.extend([""])
     lines.extend(
@@ -6471,11 +7453,9 @@ def _mixed_isoparametric_function(
     )
     lines.extend(block_stream_lines)
     block_function = "%s_contiguous" % block if not block_stream_lines else block
-    call_args = [
-        "ne",
-        "VS",
-        "bdeterminant",
-    ]
+    call_args = list(
+        _local_kernel_count_args(False, "ne", _work_item_block_stride())
+    ) + ["bdeterminant"]
     call_args.extend(
         _geometry_buffer_arguments(dependencies, dim, {"adjugate": "badjugate"})
     )
@@ -6489,8 +7469,12 @@ def _mixed_isoparametric_function(
     lines.extend(
         [
             "",
-            "    %s<s_t, NQ, CELL_NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "    %s%s(%s);"
+            % (
+                block_function,
+                _micro_kernel_template(shape="CELL_NS"),
+                ", ".join(call_args),
+            ),
             "",
         ]
     )
@@ -6800,7 +7784,8 @@ _STREAM_HELPER_SUFFIX = {
 
 _STREAM_PARAMETER = {
     DataStreamLayout.AOS: (
-        lambda qualifier, name, total: "%s %s[%d][VS]" % (qualifier, name, total)
+        lambda qualifier, name, total: "%s %s[%d]%s"
+        % (qualifier, name, total, _wi_extent())
     ),
     DataStreamLayout.SOA: (
         lambda qualifier, name, total: "%s *const RSTR %s[%d]"
@@ -6859,8 +7844,8 @@ _OUTPUT_STREAM_ARGUMENT = {
 #: Which of them exist is `plans.dependencies.staged_test_quantities`; how many
 #: elements each holds is emission's, because `NQ` and `ND` are this text's.
 _STAGED_COEFFICIENT_BUFFER = {
-    "value": ("value_coeff", "NQ * VS"),
-    "gradient": ("grad_coeff_ref", "NQ * ND * VS"),
+    "value": ("value_coeff", lambda: _width_product("NQ")),
+    "gradient": ("grad_coeff_ref", lambda: _width_product("NQ", "ND")),
 }
 
 
@@ -6872,11 +7857,11 @@ _STAGED_COEFFICIENT_BUFFER = {
 _TENSOR_INTEGRATE_CALL_BY_QUANTITIES = {
     ("value",): (
         "tensor_integrate_value",
-        "      ne, field_shape_1d[%(i)d], %(f)s_value_coeff, %(out)s);",
+        "      %(ne)sfield_shape_1d[%(i)d], %(f)s_value_coeff, %(out)s);",
     ),
     ("value", "gradient"): (
         "tensor_integrate",
-        "      ne, field_shape_1d[%(i)d], field_grad_1d[%(i)d], "
+        "      %(ne)sfield_shape_1d[%(i)d], field_grad_1d[%(i)d], "
         "%(f)s_value_coeff, %(f)s_grad_coeff_ref, %(out)s);",
     ),
 }
@@ -6946,8 +7931,53 @@ _MIXED_TEST_FACTOR = {
 #: needs, so unlike the staging above this cannot be an absent entry -- a row
 #: with no value coefficient writes a zero rather than writing nothing.
 _VALUE_COEFFICIENT_TERM = {
-    True: lambda row: "qw * det * value_coeff%d" % row,
-    False: lambda row: "s_t(0)",
+    True: lambda row, column: "qw * det * %s" % column_coefficient(
+        "value_coeff%d" % row, column
+    ),
+    False: lambda row, column: "s_t(0)",
+}
+
+
+def column_coefficient(coefficient, column):
+    """One column pass's copy of a tangent coefficient.
+
+    The tensor-product element matrix used to open one trial loop per column
+    field, and each of them recomputed the whole trial-independent preamble: the
+    tensor indices, the quadrature weight, nine adjugate offsets, the trial
+    function's reference gradient, and its physical gradient with three
+    divisions by the determinant.  None of that depends on the column, so the
+    three loops are now one and share it.
+
+    What does depend on the column is the coefficient each pass contracts into,
+    so the name carries it.  `None` means there is only one pass and the name
+    stays as it was, which is what every other caller wants.
+    """
+    return _COLUMN_COEFFICIENT[column is None](coefficient, column)
+
+
+_COLUMN_COEFFICIENT = {
+    True: lambda coefficient, column: coefficient,
+    False: lambda coefficient, column: "%s_c%d" % (coefficient, column),
+}
+
+#: Which of a tensor integration's arguments belong to one column pass.  The
+#: output is the matrix column this pass fills; the two coefficient buffers are
+#: what it filled during the shared quadrature loop.  Everything else -- the
+#: work-item count and the one-dimensional tables -- is the element's.
+_INTEGRATE_COLUMN_ARGUMENTS = frozenset(("value_coeff", "grad_coeff_ref"))
+
+
+def _integrate_argument(argument, column):
+    return _INTEGRATE_ARGUMENT[argument in _INTEGRATE_COLUMN_ARGUMENTS](
+        argument, column
+    )
+
+
+_INTEGRATE_ARGUMENT = {
+    True: lambda argument, column: column_coefficient(argument, column),
+    False: lambda argument, column: (
+        "column" if argument == "output" else argument
+    ),
 }
 
 
@@ -7022,7 +8052,15 @@ def _mesh_operator_source(
         )
     )
     uses_cached_affine_metric = _uses_cached_affine_metric(gradient_metric)
-    omit_simplex_reference_basis_inputs = gradient_metric is not None
+    # The aliases go when nothing reads them: a gradient-metric loop has the
+    # basis contracted into the metric before the call, and a closed-form one has
+    # the whole reference basis folded into the kernel.  A specialisation exists
+    # for any P1 rule -- its gradients are constant however many points it
+    # carries -- but it folds only under the one-point rule, so the question is
+    # the strategy's and not the specialisation's.
+    omit_simplex_reference_basis_inputs = (
+        gradient_metric is not None or _uses_constant_p1_expansion(rule)
+    )
     shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
         tuple(range(n_fields * n_shape)),
@@ -7030,7 +8068,12 @@ def _mesh_operator_source(
         shape_order,
     )
     impl = "%s_%s_a_msoa_impl" % (prefix, form)
-    block_prefix = specialized_prefix if gradient_metric is not None else local_prefix
+    # Wherever a specialisation exists, which is wherever this element evaluates
+    # in closed form.  It used to be routed to only when a gradient metric had
+    # been isolated, so on every other form the specialised kernel was emitted,
+    # never called, and -- having nothing to specialise before the shape values
+    # and the weight were folded -- byte-identical to the generic one.
+    block_prefix = specialized_prefix if specialized_prefix is not None else local_prefix
     block = "%s_%s_block" % (block_prefix, form)
     lines = [
         "namespace sfem {",
@@ -7066,7 +8109,7 @@ def _mesh_operator_source(
             kernel_constant("NQ", n_qp, indent="  "),
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -7178,16 +8221,16 @@ def _mesh_operator_source(
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "    s_t b%s[NC * NS][VS];" % role.name
+            "    s_t b%s[NC * NS]%s;" % (role.name, _wi_extent())
         )
     if gradient_metric is not None and not uses_cached_affine_metric:
         lines.append(
-            "    s_t bgeom_metric_data[%d][VS];"
-            % gradient_metric.metric_components
+            "    s_t bgeom_metric_data[%d]%s;"
+            % (gradient_metric.metric_components, _wi_extent())
         )
     lines.extend(
         [
-            "    s_t boutput[NC * NS][VS];",
+            "    s_t boutput[NC * NS]%s;" % _wi_extent(),
         ]
     )
     # The element loop runs four phases.  MeshPhasePlan states which and in
@@ -7246,9 +8289,9 @@ def _mesh_operator_source(
         geometry.extend(
             _geometry_metric_grouping_lines(
                 dim,
-                ('bageom_streams[%d]' + _wi())
+                ('bageom_streams[%d]' + _ptr())
                 % affine_geometry_stream_indices["det0"],
-                lambda component: ('bageom_streams[%d]' + _wi())
+                lambda component: ('bageom_streams[%d]' + _ptr())
                 % affine_geometry_stream_indices["adj%d" % component],
                 lambda component: ('bgeom_metric_data[%d]' + _wi()) % component,
                 "      ",
@@ -7266,11 +8309,18 @@ def _mesh_operator_source(
                 ),
             )
         )
-    call_args = ["ne", "0"]
+    call_args = _local_kernel_count_args(
+        _uses_constant_p1_expansion(rule), "ne", "0"
+    )
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
-                dependencies, dim, n_fields, tensor_product, gradient_metric
+                dependencies,
+                dim,
+                n_fields,
+                tensor_product,
+                gradient_metric,
+                needs_reference_basis=not _uses_constant_p1_expansion(rule),
             ),
             lambda stream: _block_call_argument(
                 stream,
@@ -7284,8 +8334,8 @@ def _mesh_operator_source(
     local_call.extend(
         [
             "",
-            "    %s<s_t, NQ, NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "    %s%s(%s);"
+            % (block_function, _micro_kernel_template(), ", ".join(call_args)),
             "",
         ]
     )
@@ -7789,6 +8839,7 @@ def _scalar_crs_packed_matrix_helpers(function_base, n_shape, n_fields, row_stre
 
 
 def _scalar_crs_precision_entry_points(
+    geometry_streams,
     dependencies,
     function_base,
     impl,
@@ -7812,7 +8863,9 @@ def _scalar_crs_precision_entry_points(
     converted.  A material with both, Mooney-Rivlin Kelvin-Voigt, published one
     symbol for its elastic block and two for its viscous one.
     """
-    matrix_arguments = ["nelements", "nnodes", "elements", "points"]
+    # The geometry the implementation takes, which is the element's own: the
+    # coordinates, or the cached Jacobian an affine assembly reads.
+    matrix_arguments = ["nelements", "nnodes", "elements", *geometry_streams]
     matrix_arguments.extend(map(str, dependencies.parameters))
     matrix_arguments.extend(
         _mesh_stream_arguments(state_dependencies, system.fields, output=False)
@@ -7934,6 +8987,99 @@ def _scalar_crs_precision_entry_points(
         )
 
 
+def _node_order_lines(name, order, indent):
+    """The node order, where the element does not already have it.
+
+    An element whose mesh numbers its nodes the way the kernel wants emits
+    nothing; the rest emit the convention itself, which is `n_shape` entries
+    rather than the `n_fields * n_shape` product a flattened table would hold.
+    """
+    return [
+        "%sstatic const int %s[%d] = {%s};"
+        % (indent, name, len(order), ", ".join(str(value) for value in order))
+        for _ in (order,)
+        if not is_identity_order(order)
+    ]
+
+
+def _node_order_expr(name, order, index):
+    """`order[index]`, or `index` where the order is the identity."""
+    return (
+        [index]
+        + ["%s[%s]" % (name, index) for _ in (order,) if not is_identity_order(order)]
+    )[-1]
+
+
+def _nested_element_matrix_fill_lines(
+    indent,
+    row_streams,
+    column_streams,
+    row_order,
+    column_order,
+    n_fields,
+    n_shape,
+    block_function,
+    call_args,
+):
+    """Probing, with the local index nested rather than tabulated.
+
+    The local index is component-major over a node-major stream layout, and
+    every part of that but the node order is arithmetic.  So the loops that
+    produce it are nested and the index is computed; what is left is the node
+    convention, and only for the elements that do not already carry the
+    kernel's one.
+
+    This is still probing, which is the defect `plans.direct_assembly` exists
+    to retire.  Nesting the index does not make it less so; it makes it read as
+    what it is instead of hiding the shape behind a twenty-four case switch.
+    """
+    n_columns = len(column_streams)
+    lines = [
+        "%sfor (int entry = 0; entry < %d; ++entry) {"
+        % (indent, len(row_streams) * n_columns),
+        "%s  element_matrix[entry] = s_t(0);" % indent,
+        "%s}" % indent,
+    ]
+    lines.extend(_node_order_lines("trial_node_order", column_order, indent))
+    lines.extend(_node_order_lines("test_node_order", row_order, indent))
+    trial = _node_order_expr("trial_node_order", column_order, "trial_node")
+    test = _node_order_expr("test_node_order", row_order, "test_node")
+    lines.extend(
+        [
+            "%sfor (int trial_component = 0; trial_component < %d; ++trial_component) {"
+            % (indent, n_fields),
+            "%s  for (int trial_node = 0; trial_node < %d; ++trial_node) {"
+            % (indent, n_shape),
+            "%s    const int trial_local = trial_component * %d + trial_node;"
+            % (indent, n_shape),
+            "%s    const int trial = %s * %d + trial_component;"
+            % (indent, trial, n_fields),
+            "%s    for (int stream = 0; stream < N_STREAMS; ++stream) {" % indent,
+            "%s      bdirection[stream][0] = s_t(0);" % indent,
+            "%s      boutput[stream][0] = s_t(0);" % indent,
+            "%s    }" % indent,
+            "%s    bdirection[trial][0] = s_t(1);" % indent,
+            "%s    %s%s(%s);"
+            % (indent, block_function, _micro_kernel_template(), ", ".join(call_args)),
+            "%s    for (int test_component = 0; test_component < %d; ++test_component) {"
+            % (indent, n_fields),
+            "%s      for (int test_node = 0; test_node < %d; ++test_node) {"
+            % (indent, n_shape),
+            "%s        const int test_local = test_component * %d + test_node;"
+            % (indent, n_shape),
+            "%s        const int test = %s * %d + test_component;"
+            % (indent, test, n_fields),
+            "%s        element_matrix[test_local * %d + trial_local] = boutput[test][0];"
+            % (indent, n_columns),
+            "%s      }" % indent,
+            "%s    }" % indent,
+            "%s  }" % indent,
+            "%s}" % indent,
+        ]
+    )
+    return lines
+
+
 def _element_matrix_fill_lines(
     indent,
     row_streams,
@@ -7944,6 +9090,8 @@ def _element_matrix_fill_lines(
     call_args,
     element_matrix_kernel=None,
     element_matrix_args=(),
+    n_fields=None,
+    n_shape=None,
 ):
     """Fill `element_matrix` with this element's entries.
 
@@ -7961,53 +9109,55 @@ def _element_matrix_fill_lines(
     """
     if element_matrix_kernel is not None:
         return [
-            "%s%s<s_t, NQ, NS, VS>(%s);"
-            % (indent, element_matrix_kernel, ", ".join(element_matrix_args))
-        ]
-    lines = list(
-        _local_index_mapping_lambda_lines("row_tensor_stream", row_tensor_streams, indent)
-    )
-    lines.extend(
-        _local_index_mapping_lambda_lines("col_tensor_stream", column_tensor_streams, indent)
-    )
-    lines.extend(
-        [
-            "%sfor (int entry = 0; entry < %d; ++entry) {"
-            % (indent, len(row_streams) * len(column_streams)),
-            "%s  element_matrix[entry] = s_t(0);" % indent,
-            "%s}" % indent,
-            "%sfor (int trial_local = 0; trial_local < %d; ++trial_local) {"
-            % (indent, len(column_streams)),
-            "%s  const int trial = %s;"
+            "%s%s%s(%s);"
             % (
                 indent,
-                _local_index_mapping_expr(
-                    "col_tensor_stream", column_tensor_streams, "trial_local"
-                ),
-            ),
-            "%s  for (int stream = 0; stream < N_STREAMS; ++stream) {" % indent,
-            "%s    bdirection[stream][0] = s_t(0);" % indent,
-            "%s    boutput[stream][0] = s_t(0);" % indent,
-            "%s  }" % indent,
-            "%s  bdirection[trial][0] = s_t(1);" % indent,
-            "%s  %s<s_t, NQ, NS, VS>(%s);"
-            % (indent, block_function, ", ".join(call_args)),
-            "%s  for (int test_local = 0; test_local < %d; ++test_local) {"
-            % (indent, len(row_streams)),
-            "%s    const int test = %s;"
-            % (
-                indent,
-                _local_index_mapping_expr(
-                    "row_tensor_stream", row_tensor_streams, "test_local"
-                ),
-            ),
-            "%s    element_matrix[test_local * %d + trial_local] = boutput[test][0];"
-            % (indent, len(column_streams)),
-            "%s  }" % indent,
-            "%s}" % indent,
+                element_matrix_kernel,
+                _micro_kernel_template(),
+                ", ".join(element_matrix_args),
+            )
         ]
+    # Nested where the mapping decomposes, tabulated where it does not.
+    # `component_major_index_decomposition` is the question, so this site walks
+    # the answer rather than deciding what the index looks like.
+    row_order = component_major_index_decomposition(
+        row_tensor_streams, n_fields, n_shape
     )
-    return lines
+    column_order = component_major_index_decomposition(
+        column_tensor_streams, n_fields, n_shape
+    )
+    nested = [
+        _nested_element_matrix_fill_lines(
+            indent,
+            row_streams,
+            column_streams,
+            row_order,
+            column_order,
+            n_fields,
+            n_shape,
+            block_function,
+            call_args,
+        )
+        for _ in (row_order,)
+        if row_order is not None and column_order is not None
+    ]
+    if nested:
+        return nested[0]
+    # The index used to be tabulated here, as a switch from local index to
+    # stream with one case per degree of freedom, and the loop under it probed
+    # -- one apply per trial degree of freedom, through a unit basis vector.
+    # Both are banned: the table is the flattening `plans/layout` says to nest,
+    # and probing is what `plans/direct_assembly` exists to retire.  Nothing
+    # the generator produces reaches here, because every element either writes
+    # its entries where the kernel puts them or delegates to the twin that
+    # does, so refusing is the honest end rather than a third spelling nobody
+    # may have.
+    raise ValueError(
+        "no element-matrix kernel and no nested index for this block: the "
+        "mapping from local index to stream does not decompose into a node "
+        "order and a component, so the only shapes left are a lookup table "
+        "and probing, and neither is allowed"
+    )
 
 
 #: What an element settles for when its own shape declines the form.  A
@@ -8032,7 +9182,36 @@ def _element_matrix_kernel_for(strategy, kernels):
     return kernels.get(_ELEMENT_MATRIX_FALLBACK.get(strategy))
 
 
-def _scalar_crs_matrix_assembly_source(
+def _assembly_geometry_stream_names(dim):
+    """The adjugate and determinant an assembly kernel stages, in ABI order.
+
+    The block kernel takes the adjugate and the determinant whatever the
+    element, so an affine assembly reads exactly those two streams; the metric
+    form is a matrix-free contraction and has no bearing here.
+    """
+    return tuple(
+        ["adj%d" % component for component in range(dim * dim)] + ["det0"]
+    )
+
+
+def _scalar_crs_matrix_assembly_source(*arguments, **keywords):
+    """The assembly, emitted for a target whose work item is one element.
+
+    Assembly holds one element -- `plans` says so, and the scatter that reads the
+    element matrix has no lane index to give it -- so it is emitted under
+    `Target.holding_one_element`.  Every answer that depends on having a width
+    already reads `kernel_vector_width`, so the width constant, the `[VS]`
+    extents, the one-trip lane loop, the slot and the choice between the blocked
+    and the scalar micro-kernels all follow: the same machinery the device
+    kernels use, asked of a kernel rather than of a machine.
+    """
+    with use_target(_target().holding_one_element()):
+        return _holding_one_element_crs_matrix_assembly_source(
+            *arguments, **keywords
+        )
+
+
+def _holding_one_element_crs_matrix_assembly_source(
     system,
     prefix,
     local_prefix,
@@ -8042,6 +9221,7 @@ def _scalar_crs_matrix_assembly_source(
     basis_family,
     geometry_family,
     matrix_format_plan,
+    geometry_mode=ISOPARAMETRIC_MODE,
 ):
     matrix_formats = published_matrix_formats(matrix_format_plan)
     if not {"crs", "bsr"}.intersection(matrix_formats):
@@ -8109,13 +9289,20 @@ def _scalar_crs_matrix_assembly_source(
         else None
     )
     serves_this_matrix = element_matrix_kernel is not None
+    # Whether this mesh loop maps the element itself or reads a cached adjugate.
+    # Asked here because `kept_reference_tables` below needs it: an affine loop
+    # builds no Jacobian, so it reads no reference gradient either.
+    builds_its_own_jacobian = geometry_mode != AFFINE_MODE
     element_matrix_call = (
         element_matrix_kernel.name if serves_this_matrix else None
     )
-    # The mesh loop still builds its Jacobian from the reference gradients.
-    # Which of the other tables survive is the kernel's: a closed-form one reads
-    # none of them, so the shape values and the quadrature weights would be two
-    # aliases with no reader, while a quadrature one is handed all of them.
+    # A mesh loop that maps the element builds its Jacobian from the reference
+    # gradients.  Which of the other tables survive is the kernel's: a
+    # closed-form one reads none of them, so the shape values and the quadrature
+    # weights would be two aliases with no reader, while a quadrature one is
+    # handed all of them.  An *affine* loop maps nothing -- it reads the cached
+    # adjugate -- so even the gradients had no reader there, which is three dead
+    # aliases per assembly on every constant-P1 element.
     kernel_shape = (
         _ELEMENT_MATRIX_SHAPES[element_matrix_kernel.strategy]
         if serves_this_matrix
@@ -8126,10 +9313,16 @@ def _scalar_crs_matrix_assembly_source(
         if kernel_shape is not None
         and not kernel_shape.needs_reference_basis
         and not tensor_product_geometry
-        else None
+        and builds_its_own_jacobian
+        else _KEPT_REFERENCE_TABLES[
+            (
+                kernel_shape is not None and kernel_shape.needs_reference_basis,
+                bool(builds_its_own_jacobian),
+            )
+        ]
     )
     element_matrix_call_args = (
-        ["1", "1"]
+        list(_local_kernel_count_args(False, "1", "1"))
         + _stream_call_arguments(
             local_kernel_stream_plans(
                 assembled_matrix_dependencies(dependencies),
@@ -8166,15 +9359,29 @@ def _scalar_crs_matrix_assembly_source(
         if tensor_product_geometry
         else ([], "elements")
     )
-    function_base = "%s_hessian_crs_i_msoa" % prefix
+    is_affine_assembly = geometry_mode == AFFINE_MODE
+    # `crs` stays in the base: the `bsr` twin and the packed passes are spliced
+    # out of this name, so dropping it renames every format at once.
+    function_base = "%s_hessian_crs_%s" % (prefix, abi_mesh_fragment(geometry_mode))
     impl = "%s_impl" % function_base
     block = "%s_jacobian_action_block" % local_prefix
     params = [
         "const ptrdiff_t nelements",
         "const ptrdiff_t nnodes",
         "idx_t **const RSTR elements",
-        "const geom_t *const *const RSTR points",
     ]
+    # The geometry this element's other kernels already read, or the
+    # coordinates.  An element whose Jacobian is constant has it cached once,
+    # and rebuilding it here is the same quantity computed a second way --
+    # which is what left a constant-P1 simplex affine everywhere except in the
+    # kernel that assembles its matrix.
+    if is_affine_assembly:
+        params.extend(
+            "const geom_t *const RSTR %s" % abi_geometry_name(stream)
+            for stream in _assembly_geometry_stream_names(dim)
+        )
+    else:
+        params.append("const geom_t *const *const RSTR points")
     params.extend(
         "const s_t %s" % parameter for parameter in dependencies.parameters
     )
@@ -8253,40 +9460,59 @@ def _scalar_crs_matrix_assembly_source(
         [
             "",
             *element_loop_lines(_target()),
-            "    const ptrdiff_t evb = element;",
-            "    const int ne = 1;",
+            kernel_local("evb", "element", "const ptrdiff_t", indent="    "),
+            kernel_local("ne", "1", "const int", indent="    "),
             "    idx_t ev[NS];",
             "    s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
-            "    s_t bcoordinates[ND * NS][VS];",
-            "    s_t badjugate_data[ND * ND][NQ * VS];",
-            "    s_t bdeterminant[NQ * VS];",
+            *([] if is_affine_assembly else ["    s_t bcoordinates[ND * NS]%s;" % _wi_extent()]),
+            "    s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+            "    s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
     for role in live_field_roles(state_dependencies):
         lines.append(
-            "    s_t b%s[N_STREAMS][VS];" % role.name
+            "    s_t b%s[N_STREAMS]%s;" % (role.name, _wi_extent())
         )
     if not serves_this_matrix:
         # The direction and the answer to applying the operator to it exist
         # only for probing.  A closed-form element applies nothing.
         lines.extend(
             [
-                "    s_t bdirection[N_STREAMS][VS];",
-                "    s_t boutput[N_STREAMS][VS];",
+                "    s_t bdirection[N_STREAMS]%s;" % _wi_extent(),
+                "    s_t boutput[N_STREAMS]%s;" % _wi_extent(),
             ]
         )
     lines.extend(
         [
-            "    const geom_t *const coordinate_components[ND] = {%s};"
-            % ", ".join("points[%d]" % d for d in range(dim)),
+            *(
+                []
+                if is_affine_assembly
+                else [
+                    "    const geom_t *const coordinate_components[ND] = {%s};"
+                    % ", ".join("points[%d]" % d for d in range(dim))
+                ]
+            ),
             "",
             "    for (int shape = 0; shape < NS; ++shape) {",
             "      const idx_t node = elements[shape][element];",
-            "      const idx_t coordinate_node = %s[shape][element];" % coordinate_element_array,
+            *(
+                []
+                if is_affine_assembly
+                else [
+                    "      const idx_t coordinate_node = %s[shape][element];"
+                    % coordinate_element_array
+                ]
+            ),
             "      ev[shape] = node;",
-            "      for (int d = 0; d < ND; ++d) {",
-            "        bcoordinates[shape * ND + d][0] = s_t(coordinate_components[d][coordinate_node]);",
-            "      }",
+            *(
+                []
+                if is_affine_assembly
+                else [
+                    "      for (int d = 0; d < ND; ++d) {",
+                    "        bcoordinates[shape * ND + d]%s = s_t(coordinate_components[d][coordinate_node]);" % _first_slot(),
+                    "      }",
+                ]
+            ),
         ]
     )
     for position, role in enumerate(live_field_roles(state_dependencies)):
@@ -8297,14 +9523,26 @@ def _scalar_crs_matrix_assembly_source(
                 lines.append("      const idx_t field_node = %s[shape][element];" % field_element_array)
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "      b%s[shape * NC + %d][0] = %s[field_node * %s];"
-                    % (role.name, field_index, role.field_pointer(field.name), role.stride)
+                    "      b%s[shape * NC + %d]%s = %s[field_node * %s];"
+                    % (
+                        role.name,
+                        field_index,
+                        _first_slot(),
+                        role.field_pointer(field.name),
+                        role.stride,
+                    )
                 )
         else:
             for field_index, field in enumerate(system.fields):
                 lines.append(
-                    "      b%s[shape * NC + %d][0] = %s[node * %s];"
-                    % (role.name, field_index, role.field_pointer(field.name), role.stride)
+                    "      b%s[shape * NC + %d]%s = %s[node * %s];"
+                    % (
+                        role.name,
+                        field_index,
+                        _first_slot(),
+                        role.field_pointer(field.name),
+                        role.stride,
+                    )
                 )
     lines.extend(
         [
@@ -8312,7 +9550,20 @@ def _scalar_crs_matrix_assembly_source(
             "",
         ]
     )
-    if tensor_product_geometry:
+    if is_affine_assembly:
+        # One element's worth: this is the mode a constant-P1 simplex takes and
+        # its Jacobian does not vary over the element, so `NQ` and `VS` are both
+        # one and the staged buffers hold a single entry each.
+        lines.append("")
+        lines.extend(
+            "    badjugate_data[%d][0] = s_t(%s[element]);"
+            % (component, abi_geometry_name("adj%d" % component))
+            for component in range(dim * dim)
+        )
+        lines.append(
+            "    bdeterminant[0] = s_t(%s[element]);" % abi_geometry_name("det0")
+        )
+    elif tensor_product_geometry:
         lines.extend(
             tensor_product_gradient_isoparametric_geometry_lines(
                 dim=dim,
@@ -8345,28 +9596,23 @@ def _scalar_crs_matrix_assembly_source(
                     for component in range(dim * dim)
                 ),
                 *quadrature_scope_lines(rule.element_type, "    "),
-                *_target().work_item_prologue_lines("      "),
             ]
         )
+        hoists, coordinate, reference = _isoparametric_jacobian_hoists(
+            rule, dim, n_shape, "      "
+        )
+        lines.extend(hoists)
+        lines.extend(_target().work_item_prologue_lines("      "))
         for i in range(dim):
             for j in range(dim):
-                terms = [
-                    ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
-                    % (
-                        shape * dim + i,
-                        _mesh_reference_name(
-                            ISOPARAMETRIC_MODE,
-                            sfem_simplex_grad_ref_name("grad_ref", j),
-                        ),
-                        shape,
-                    )
-                    for shape in range(n_shape)
-                ]
+                terms = _isoparametric_jacobian_terms(
+                    rule, dim, n_shape, i, j, coordinate, reference
+                )
                 lines.append(
                     "      const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
                 )
-        lines.extend(_isoparametric_geometry_assignment_lines(dim, "      "))
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "      ", rule))
         lines.extend(["    }"])
     if field_element_lines:
         state_stream_args = {
@@ -8446,6 +9692,8 @@ def _scalar_crs_matrix_assembly_source(
             call_args,
             element_matrix_kernel=element_matrix_call,
             element_matrix_args=element_matrix_call_args,
+            n_fields=n_fields,
+            n_shape=n_shape,
         )
     )
     lines.extend(
@@ -8634,23 +9882,22 @@ def _scalar_crs_matrix_assembly_source(
             [
                 "",
                 "      for (ptrdiff_t element = e_start; element < e_end; ++element) {",
-                "        const int ne = 1;",
+                kernel_local("ne", "1", "const int", indent="        "),
                 "        s_t element_matrix[%d];" % (len(row_streams) * len(column_streams)),
-                "        s_t bcoordinates[ND * NS][VS];",
-                "        s_t badjugate_data[ND * ND][NQ * VS];",
-                "        s_t bdeterminant[NQ * VS];",
+                "        s_t bcoordinates[ND * NS]%s;" % _wi_extent(),
+                "        s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+                "        s_t bdeterminant[%s];" % _width_product("NQ"),
             ]
         )
         for role in live_field_roles(state_dependencies):
             lines.append(
-                "        s_t b%s[N_STREAMS][VS];"
-                % role.name
+                "        s_t b%s[N_STREAMS]%s;" % (role.name, _wi_extent())
             )
         if not serves_this_matrix:
             lines.extend(
                 [
-                    "        s_t bdirection[N_STREAMS][VS];",
-                    "        s_t boutput[N_STREAMS][VS];",
+                    "        s_t bdirection[N_STREAMS]%s;" % _wi_extent(),
+                    "        s_t boutput[N_STREAMS]%s;" % _wi_extent(),
                 ]
             )
         lines.extend(
@@ -8660,7 +9907,7 @@ def _scalar_crs_matrix_assembly_source(
                 "          const uint16_t packed_node = elements[shape][element];",
                 "          const uint16_t coordinate_packed_node = %s[shape][element];" % packed_coordinate_element_array,
                 "          for (int d = 0; d < ND; ++d) {",
-                "            bcoordinates[shape * ND + d][0] = pk_coordinates[d * max_nodes_per_pack + coordinate_packed_node];",
+                "            bcoordinates[shape * ND + d]%s = pk_coordinates[d * max_nodes_per_pack + coordinate_packed_node];" % _first_slot(),
                 "        }",
             ]
         )
@@ -8670,13 +9917,13 @@ def _scalar_crs_matrix_assembly_source(
                     lines.append("          const uint16_t field_packed_node = %s[shape][element];" % packed_field_element_array)
                 for field_index in range(len(system.fields)):
                     lines.append(
-                        "          b%s[shape * NC + %d][0] = pk_%s[%d * max_nodes_per_pack + field_packed_node];"
+                        "          b%s[shape * NC + %d]" + _first_slot() + " = pk_%s[%d * max_nodes_per_pack + field_packed_node];"
                         % (role.name, field_index, role.name, field_index)
                     )
             else:
                 for field_index in range(len(system.fields)):
                     lines.append(
-                        "          b%s[shape * NC + %d][0] = pk_%s[%d * max_nodes_per_pack + packed_node];"
+                        "          b%s[shape * NC + %d]" + _first_slot() + " = pk_%s[%d * max_nodes_per_pack + packed_node];"
                         % (role.name, field_index, role.name, field_index)
                     )
         lines.extend(["        }", ""])
@@ -8713,28 +9960,23 @@ def _scalar_crs_matrix_assembly_source(
                         for component in range(dim * dim)
                     ),
                     *quadrature_scope_lines(rule.element_type, "      "),
-                    *_target().work_item_prologue_lines("        "),
                 ]
             )
+            hoists, coordinate, reference = _isoparametric_jacobian_hoists(
+                rule, dim, n_shape, "        "
+            )
+            lines.extend(hoists)
+            lines.extend(_target().work_item_prologue_lines("        "))
             for i in range(dim):
                 for j in range(dim):
-                    terms = [
-                        ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
-                        % (
-                            shape * dim + i,
-                            _mesh_reference_name(
-                                ISOPARAMETRIC_MODE,
-                                sfem_simplex_grad_ref_name("grad_ref", j),
-                            ),
-                            shape,
-                        )
-                        for shape in range(n_shape)
-                    ]
+                    terms = _isoparametric_jacobian_terms(
+                        rule, dim, n_shape, i, j, coordinate, reference
+                    )
                     lines.append(
                         "        const s_t J%d%d = %s;"
                         % (i, j, " + ".join(terms))
                     )
-            lines.extend(_isoparametric_geometry_assignment_lines(dim, "        "))
+            lines.extend(_isoparametric_geometry_assignment_lines(dim, "        ", rule))
             lines.extend(["      }"])
         if packed_field_element_lines:
             state_stream_args.update(
@@ -8796,6 +10038,8 @@ def _scalar_crs_matrix_assembly_source(
                 packed_call_args,
                 element_matrix_kernel=element_matrix_call,
                 element_matrix_args=element_matrix_call_args,
+                n_fields=n_fields,
+                n_shape=n_shape,
             )
         )
         lines.extend(
@@ -8823,6 +10067,9 @@ def _scalar_crs_matrix_assembly_source(
         ]
     )
     _scalar_crs_precision_entry_points(
+        tuple(abi_geometry_name(stream) for stream in _assembly_geometry_stream_names(dim))
+        if is_affine_assembly
+        else ("points",),
         dependencies,
         function_base,
         impl,
@@ -8896,7 +10143,7 @@ def _isoparametric_mesh_operator_source(
             kernel_constant("NQ", n_qp, indent="  "),
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -8923,25 +10170,24 @@ def _isoparametric_mesh_operator_source(
         [
             "",
             *_mesh_loop_lines(),
-            "    s_t bcoordinates[%d * NS][VS];"
-            % dim,
-            "    s_t badjugate_data[%d][NQ * VS];"
-            % (dim * dim),
-            "    s_t bdeterminant[NQ * VS];",
+            "    s_t bcoordinates[%d * NS]%s;" % (dim, _wi_extent()),
+            "    s_t badjugate_data[%d][%s];"
+            % (dim * dim, _width_product("NQ")),
+            "    s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
     for role in live_field_roles(dependencies):
         lines.append(
-            "    s_t b%s[NC * NS][VS];" % role.name
+            "    s_t b%s[NC * NS]%s;" % (role.name, _wi_extent())
         )
     if gradient_metric is not None:
         lines.append(
-            "    s_t bgeom_metric_data[%d][NQ * VS];"
-            % gradient_metric.metric_components
+            "    s_t bgeom_metric_data[%d][%s];"
+            % (gradient_metric.metric_components, _width_product("NQ"))
         )
     lines.extend(
         [
-            "    s_t boutput[NC * NS][VS];",
+            "    s_t boutput[NC * NS]%s;" % _wi_extent(),
         ]
     )
     lines.extend(["", *_coordinate_gather_lines(dim, "    ", coordinate_element_array)])
@@ -8982,28 +10228,23 @@ def _isoparametric_mesh_operator_source(
                     for component in range(dim * dim)
                 ),
                 *quadrature_scope_lines(rule.element_type, "    "),
-                *_work_item_loop_lines("      "),
             ]
         )
+        hoists, coordinate, reference = _isoparametric_jacobian_hoists(
+            rule, dim, n_shape, "      "
+        )
+        lines.extend(hoists)
+        lines.extend(_work_item_loop_lines("      "))
         for i in range(dim):
             for j in range(dim):
-                terms = [
-                    ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
-                    % (
-                        shape * dim + i,
-                        _mesh_reference_name(
-                            ISOPARAMETRIC_MODE,
-                            sfem_simplex_grad_ref_name("grad_ref", j),
-                        ),
-                        shape,
-                    )
-                    for shape in range(n_shape)
-                ]
+                terms = _isoparametric_jacobian_terms(
+                    rule, dim, n_shape, i, j, coordinate, reference
+                )
                 lines.append(
                     "        const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
                 )
-        lines.extend(_isoparametric_geometry_assignment_lines(dim, "        "))
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "        ", rule))
         lines.extend(["      }", "    }"])
     if gradient_metric is not None:
         lines.extend(
@@ -9011,7 +10252,7 @@ def _isoparametric_mesh_operator_source(
                 "",
                 *quadrature_scope_lines(rule.element_type, "    "),
                 *_work_item_loop_lines("      "),
-                "        const ptrdiff_t goff = %s;" % _offset("q", "VS"),
+                "        const ptrdiff_t goff = %s;" % _block_offset("q"),
             ]
         )
         lines.extend(
@@ -9049,11 +10290,15 @@ def _isoparametric_mesh_operator_source(
                 ),
             )
         )
-    call_args = ["ne", "VS"]
+    call_args = _local_kernel_count_args(False, "ne", _work_item_block_stride())
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
-                dependencies, dim, n_fields, tensor_product, gradient_metric
+                dependencies,
+                dim,
+                n_fields,
+                tensor_product,
+                gradient_metric,
             ),
             lambda stream: _block_call_argument(
                 stream, ISOPARAMETRIC_MODE, block_stream_args
@@ -9063,8 +10308,8 @@ def _isoparametric_mesh_operator_source(
     lines.extend(
         [
             "",
-            "    %s<s_t, NQ, NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "    %s%s(%s);"
+            % (block_function, _micro_kernel_template(), ", ".join(call_args)),
             "",
         ]
     )
@@ -9181,7 +10426,7 @@ def _scalar_packed_jacobian_action_source(
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
             kernel_constant("N_STREAMS", "NC * NS", indent="  "),
-            kernel_constant("VS", current_target().effective_vector_size(specialization.vector_size), indent="  "),
+            *_width_constant_lines(current_target().effective_vector_size(specialization.vector_size)),
             discard_unused("nnodes", indent="  "),
         ]
     )
@@ -9263,26 +10508,42 @@ def _scalar_packed_jacobian_action_source(
             "",
             "      for (ptrdiff_t evb = e_start; evb < e_end; evb += VS) {",
             "        const int ne = (int)MIN((ptrdiff_t)VS, e_end - evb);",
-            "        s_t bcoordinates[ND * NS][VS];",
-            "        s_t badjugate_data[ND * ND][NQ * VS];",
-            "        s_t bdeterminant[NQ * VS];",
+            "        s_t bcoordinates[ND * NS]%s;" % _wi_extent(),
+            "        s_t badjugate_data[ND * ND][%s];" % _width_product("NQ"),
+            "        s_t bdeterminant[%s];" % _width_product("NQ"),
         ]
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.append(
-            "        s_t b%s[N_STREAMS][VS];" % role.name
+            "        s_t b%s[N_STREAMS]%s;" % (role.name, _wi_extent())
         )
     lines.extend(
         [
-            "        s_t bdirection[N_STREAMS][VS];",
-            "        s_t boutput[N_STREAMS][VS];",
+            "        s_t bdirection[N_STREAMS]%s;" % _wi_extent(),
+            "        s_t boutput[N_STREAMS]%s;" % _wi_extent(),
             "",
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR coordinate_shape = %s[shape];" % coordinate_element_array,
             "          const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
             "          for (int d = 0; d < ND; ++d) {",
+            *_hoisted_row_lines(
+                "s_t *const RSTR",
+                "bcoordinate_row",
+                "bcoordinates[shape * ND + d]",
+                "            ",
+            )[0],
             *work_item_scope_header_lines("            "),
-            '              bcoordinates[shape * ND + d]' + _wi() + ' = pk_coordinates[d * max_nodes_per_pack + coordinate_shape[' + _elem() + ']];',
+            "              %s%s = pk_coordinates[d * max_nodes_per_pack + coordinate_shape[%s]];"
+            % (
+                _hoisted_row_lines(
+                    "s_t *const RSTR",
+                    "bcoordinate_row",
+                    "bcoordinates[shape * ND + d]",
+                    "            ",
+                )[1],
+                _wi(),
+                _elem(),
+            ),
             "            }",
             "          }",
         ]
@@ -9338,33 +10599,28 @@ def _scalar_packed_jacobian_action_source(
                     for component in range(dim * dim)
                 ),
                 *quadrature_scope_lines(rule.element_type, "        "),
-                *_work_item_loop_lines("          "),
             ]
         )
+        hoists, coordinate, reference = _isoparametric_jacobian_hoists(
+            rule, dim, n_shape, "          "
+        )
+        lines.extend(hoists)
+        lines.extend(_work_item_loop_lines("          "))
         for i in range(dim):
             for j in range(dim):
-                terms = [
-                    ('bcoordinates[%d]' + _wi() + ' * %s[q * NS + %d]')
-                    % (
-                        shape * dim + i,
-                        _mesh_reference_name(
-                            ISOPARAMETRIC_MODE,
-                            sfem_simplex_grad_ref_name("grad_ref", j),
-                        ),
-                        shape,
-                    )
-                    for shape in range(n_shape)
-                ]
+                terms = _isoparametric_jacobian_terms(
+                    rule, dim, n_shape, i, j, coordinate, reference
+                )
                 lines.append(
                     "            const s_t J%d%d = %s;"
                     % (i, j, " + ".join(terms))
                 )
-        lines.extend(_isoparametric_geometry_assignment_lines(dim, "            "))
+        lines.extend(_isoparametric_geometry_assignment_lines(dim, "            ", rule))
         lines.extend(["          }", "        }"])
     lines.extend(
         _blocked_adjugate_array_lines(dependencies, dim, "ND * ND", "        ")
     )
-    call_args = ["ne", "VS"]
+    call_args = _local_kernel_count_args(False, "ne", _work_item_block_stride())
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
@@ -9378,8 +10634,8 @@ def _scalar_packed_jacobian_action_source(
     lines.extend(
         [
             "",
-            "        %s<s_t, NQ, NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "        %s%s(%s);"
+            % (block_function, _micro_kernel_template(), ", ".join(call_args)),
             "",
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR field_shape = %s[shape];"
@@ -9545,7 +10801,15 @@ def _scalar_packed_affine_jacobian_action_source(
         )
     )
     uses_cached_affine_metric = _uses_cached_affine_metric(gradient_metric)
-    omit_simplex_reference_basis_inputs = gradient_metric is not None
+    # The aliases go when nothing reads them: a gradient-metric loop has the
+    # basis contracted into the metric before the call, and a closed-form one has
+    # the whole reference basis folded into the kernel.  A specialisation exists
+    # for any P1 rule -- its gradients are constant however many points it
+    # carries -- but it folds only under the one-point rule, so the question is
+    # the strategy's and not the specialisation's.
+    omit_simplex_reference_basis_inputs = (
+        gradient_metric is not None or _uses_constant_p1_expansion(rule)
+    )
     shape_order = gather_shape_order(rule.element_type, dim, n_shape, tensor_product)
     field_stream_order = streams_in_shape_order(
         tuple(range(n_fields * n_shape)),
@@ -9555,7 +10819,12 @@ def _scalar_packed_affine_jacobian_action_source(
     packed_token = "jacobian_action_packed_two_pass_a_msoa" if two_pass else "jacobian_action_packed_a_msoa"
     function = "%s_%s" % (prefix, packed_token)
     impl = "%s_impl" % function
-    block_prefix = specialized_prefix if gradient_metric is not None else local_prefix
+    # Wherever a specialisation exists, which is wherever this element evaluates
+    # in closed form.  It used to be routed to only when a gradient metric had
+    # been isolated, so on every other form the specialised kernel was emitted,
+    # never called, and -- having nothing to specialise before the shape values
+    # and the weight were folded -- byte-identical to the generic one.
+    block_prefix = specialized_prefix if specialized_prefix is not None else local_prefix
     block = "%s_jacobian_action_block" % block_prefix
     block_function = "%s_contiguous" % block
     # Which geometry streams an affine kernel carries, and in what order, is
@@ -9612,7 +10881,7 @@ def _scalar_packed_affine_jacobian_action_source(
             kernel_constant("NS", n_shape, indent="  "),
             kernel_constant("NC", n_fields, indent="  "),
             kernel_constant("N_STREAMS", "NC * NS", indent="  "),
-            kernel_constant("VS", vector_size, indent="  "),
+            *_width_constant_lines(vector_size),
             discard_unused("nnodes", indent="  "),
             discard_unused("max_nodes_per_pack", indent="  "),
         ]
@@ -9691,12 +10960,12 @@ def _scalar_packed_affine_jacobian_action_source(
     )
     for role in live_field_roles(dependencies, roles=STATE_FIELD_ROLES):
         lines.append(
-            "        s_t b%s[N_STREAMS][VS];" % role.name
+            "        s_t b%s[N_STREAMS]%s;" % (role.name, _wi_extent())
         )
     lines.extend(
         [
-            "        s_t bdirection[N_STREAMS][VS];",
-            "        s_t boutput[N_STREAMS][VS];",
+            "        s_t bdirection[N_STREAMS]%s;" % _wi_extent(),
+            "        s_t boutput[N_STREAMS]%s;" % _wi_extent(),
             "",
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
@@ -9743,16 +11012,16 @@ def _scalar_packed_affine_jacobian_action_source(
         )
     elif gradient_metric is not None:
         lines.append(
-            "        s_t bgeom_metric_data[%d][VS];"
-            % gradient_metric.metric_components
+            "        s_t bgeom_metric_data[%d]%s;"
+            % (gradient_metric.metric_components, _wi_extent())
         )
         lines.extend(["", *_work_item_loop_lines("        ")])
         lines.extend(
             _geometry_metric_grouping_lines(
                 dim,
-                ('bageom_streams[%d]' + _wi())
+                ('bageom_streams[%d]' + _ptr())
                 % affine_geometry_stream_indices["det0"],
-                lambda component: ('bageom_streams[%d]' + _wi())
+                lambda component: ('bageom_streams[%d]' + _ptr())
                 % affine_geometry_stream_indices["adj%d" % component],
                 lambda component: ('bgeom_metric_data[%d]' + _wi()) % component,
                 "          ",
@@ -9770,11 +11039,18 @@ def _scalar_packed_affine_jacobian_action_source(
                 ),
             )
         )
-    call_args = ["ne", "0"]
+    call_args = _local_kernel_count_args(
+        _uses_constant_p1_expansion(rule), "ne", "0"
+    )
     call_args.extend(
         _stream_call_arguments(
             _block_stream_plans(
-                jacobian_action_dependencies(dependencies), dim, n_fields, tensor_product, gradient_metric
+                jacobian_action_dependencies(dependencies),
+                dim,
+                n_fields,
+                tensor_product,
+                gradient_metric,
+                needs_reference_basis=not _uses_constant_p1_expansion(rule),
             ),
             lambda stream: _block_call_argument(
                 stream,
@@ -9788,8 +11064,8 @@ def _scalar_packed_affine_jacobian_action_source(
     lines.extend(
         [
             "",
-            "        %s<s_t, NQ, NS, VS>(%s);"
-            % (block_function, ", ".join(call_args)),
+            "        %s%s(%s);"
+            % (block_function, _micro_kernel_template(), ", ".join(call_args)),
             "",
             "        for (int shape = 0; shape < NS; ++shape) {",
             "          const uint16_t *const RSTR field_shape = %s[shape];" % field_element_array,
@@ -9874,14 +11150,141 @@ def _scalar_packed_affine_jacobian_action_source(
     return lines
 
 
-def _isoparametric_geometry_assignment_lines(dim, indent):
+def _isoparametric_jacobian_hoists(rule, dim, n_shape, indent):
+    """Everything the isoparametric Jacobian reads that the work item does not.
+
+    The Jacobian is a sum over the shape functions, unrolled, and every one of
+    its `dim * dim` entries reads the same two things: a row of the coordinate
+    tile, whose offset is a compile-time constant, and an entry of the reference
+    gradient table, which is a constant of the quadrature point.  Written inline
+    that is `n_shape * dim` address computations and `n_shape * dim` table reads
+    *per entry*, all of them inside the vectorised loop -- ninety reads of thirty
+    values for a TET10.
+
+    Returns the lines to place above the work-item loop and two lookups the terms
+    are then spelled with.  A constant-P1 element folds its gradients, so it has
+    no table to read and the reference lookup is empty.
+    """
+    lines = []
+    coordinate = {}
+    for shape in range(n_shape):
+        for row in range(dim):
+            declarations, base = _hoisted_row_lines(
+                "const s_t *const RSTR",
+                "coordinate_row%d" % (shape * dim + row),
+                "bcoordinates[%d]" % (shape * dim + row),
+                indent,
+            )
+            lines.extend(declarations)
+            coordinate[(shape, row)] = base
+    reference = {}
+    for _ in (constant_p1_simplex_reference_gradients(rule),):
+        if _ is not None:
+            continue
+        for col in range(dim):
+            for shape in range(n_shape):
+                name = "cell_grad_ref%d_%d" % (col, shape)
+                lines.append(
+                    "%sconst s_t %s = %s[q * NS + %d];"
+                    % (
+                        indent,
+                        name,
+                        _mesh_reference_name(
+                            ISOPARAMETRIC_MODE,
+                            sfem_simplex_grad_ref_name("grad_ref", col),
+                        ),
+                        shape,
+                    )
+                )
+                reference[(col, shape)] = name
+    return lines, coordinate, reference
+
+
+def _isoparametric_jacobian_terms(rule, dim, n_shape, row, col,
+                                  coordinate=None, reference=None):
+    """One Jacobian entry's terms: a sum over the shape functions, or its fold.
+
+    An affine simplex has constant reference gradients, so the sum collapses to
+    the edge from the element's first vertex to its `col`-th neighbour and the
+    reference table disappears with it.  Folded as exact rationals, and the
+    zero terms drop out by arithmetic rather than by a test written here.
+
+    The energy path folds the same sum in
+    `emitters/energy_codegen._constant_p1_jacobian_value_lines`; this is the
+    residual path's four copies of it reaching the same answer.
+    """
+    gradients = constant_p1_simplex_reference_gradients(rule)
+    folded = [
+        [
+            _sfem_ccode(
+                sum(
+                    (
+                        sp.sympify(gradients[shape][col])
+                        * sp.Symbol(
+                            "%s%s" % (coordinate[(shape, row)], _wi())
+                        )
+                        for shape in range(n_shape)
+                    ),
+                    sp.S.Zero,
+                )
+            )
+        ]
+        for _ in (gradients,)
+        if gradients is not None
+    ]
+    general = [
+        [
+            "%s%s * %s"
+            % (coordinate[(shape, row)], _wi(), reference[(col, shape)])
+            for shape in range(n_shape)
+        ]
+        for _ in (gradients,)
+        if gradients is None
+    ]
+    return (folded + general)[0]
+
+
+#: Where an isoparametric tile writes its adjugate, keyed on whether the
+#: element carries a single quadrature point.  With one point there is no
+#: stride, and after the Jacobian above is folded there is no `q` in scope to
+#: stride with either.
+_ISOPARAMETRIC_GEOMETRY_INDEX = {
+    True: lambda: _wi().strip("[]"),
+    False: lambda: _block_offset("q"),
+}
+
+
+def _isoparametric_geometry_assignment_lines(dim, indent, rule=None):
     return isoparametric_adjugate_call_lines(
         dim=dim,
         indent=indent,
-        index=_offset("q", "VS"),
+        index=_ISOPARAMETRIC_GEOMETRY_INDEX[
+            constant_p1_simplex_reference_gradients(rule) is not None
+        ](),
         stream_array_name="badjugate_streams",
         determinant_stream="bdeterminant",
     )
+
+
+#: What survives when the kernel takes no reference basis: nothing at all where
+#: the loop maps no element either, and "whatever the rule carries" where it does.
+#: What a mesh loop keeps when the gradient-only case below does not apply:
+#: every table the rule publishes (`None`), or none of them.
+#:
+#: Two things read these aliases -- the element-matrix kernel the loop calls,
+#: and the loop's own Jacobian -- so the key is both.  Keying on the Jacobian
+#: alone was wrong for an *affine* assembly, which maps nothing and therefore
+#: reads no gradient itself: a 6-point TRI3 was handed `shape`, `grad_ref_x`,
+#: `grad_ref_y` and `q_weight` that nothing in the function had declared, and
+#: the configuration that shows it -- `two_phase_flow` with the crs and bsr
+#: formats -- is not in the shipped tree, so no gate compiled it.
+_KEPT_REFERENCE_TABLES = {
+    # (the kernel reads the reference basis, the loop builds its own Jacobian)
+    (True, True): None,
+    (True, False): None,
+    (False, True): None,
+    (False, False): (),
+}
 
 
 def _mesh_reference_alias_lines(
@@ -9897,9 +11300,11 @@ def _mesh_reference_alias_lines(
     """
     references = tuple(sfem_mesh_reference_data(rule))
     if not emit_reference_basis:
-        references = tuple(
-            reference for reference in references if reference.name.startswith("q_weight")
-        )
+        # Nothing, not "the weights only": a kernel that takes no reference
+        # basis takes no weight either -- a closed-form one has it folded, and a
+        # cached-metric one reads the `cached_affine_metric_q_weight` this file
+        # declares beside the call.  The alias was dead in both.
+        references = ()
     if keep is not None:
         wanted = set(keep)
         references = tuple(

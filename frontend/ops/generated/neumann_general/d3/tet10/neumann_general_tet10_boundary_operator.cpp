@@ -78,6 +78,18 @@ struct neumann_general_tet10_trishell6_boundary_residual_soa_reference_data {
     return data;
   }
 
+  static const s_t *weight() {
+    static const s_t data[6] = {
+      s_t(0.11169079483900569),
+      s_t(0.11169079483900569),
+      s_t(0.11169079483900569),
+      s_t(0.054975871827660998),
+      s_t(0.054975871827660998),
+      s_t(0.054975871827660998)
+    };
+    return data;
+  }
+
   static const s_t *grad() {
     static const s_t data[72] = {
       s_t(0.56758792732771912),
@@ -156,17 +168,6 @@ struct neumann_general_tet10_trishell6_boundary_residual_soa_reference_data {
     return data;
   }
 
-  static const s_t *weight() {
-    static const s_t data[6] = {
-      s_t(0.11169079483900569),
-      s_t(0.11169079483900569),
-      s_t(0.11169079483900569),
-      s_t(0.054975871827660998),
-      s_t(0.054975871827660998),
-      s_t(0.054975871827660998)
-    };
-    return data;
-  }
 };
 
 template <typename s_t>
@@ -251,8 +252,8 @@ static SFEM_INLINE void neumann_general_tet10_trishell6_boundary_residual_soa_el
     s_t element_vector[3][6]) {
   const s_t *const shape = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::shape();
   const s_t *const weight = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::weight();
-  const int n_shape = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::NS;
   const int n_qp = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::NQ;
+  const int n_shape = neumann_general_tet10_trishell6_boundary_residual_soa_reference_data<s_t>::NS;
 
 
 

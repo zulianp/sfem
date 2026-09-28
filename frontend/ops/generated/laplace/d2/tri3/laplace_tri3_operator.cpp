@@ -2,8 +2,6 @@
 #include <type_traits>
 #include "../laplace_d2_simplex_local.hpp"
 #include "../laplace_d2_simplex_hessian.hpp"
-#include "../../../reference/quad_tri_q1.hpp"
-#include "../../../reference/tri3_q1.hpp"
 #include "../../../geometry_kernels.hpp"
 #include "../../../kernel_diagnostics.hpp"
 #ifdef _OPENMP
@@ -18,7 +16,7 @@ namespace codegen {
 
 template <typename s_t, typename g_t, int VS>
 SFEM_INLINE const s_t *ageom_stream(
-    const int,
+    const int ne,
     const g_t *const RSTR source,
     s_t *const RSTR,
     std::true_type) {
@@ -448,7 +446,7 @@ extern "C" int laplace_tri3_apply_a_msoa(
 namespace sfem {
 namespace codegen {
 
-static SFEM_INLINE void laplace_tri3_hessian_i_msoa_find_cols(
+static SFEM_INLINE void laplace_tri3_hessian_a_msoa_find_cols(
     const idx_t *const RSTR targets,
     const idx_t *const RSTR row,
     const int lenrow,
@@ -466,7 +464,7 @@ static SFEM_INLINE void laplace_tri3_hessian_i_msoa_find_cols(
 }
 
 template <typename s_t>
-static SFEM_INLINE void laplace_tri3_hessian_i_msoa_scatter_bsr(
+static SFEM_INLINE void laplace_tri3_hessian_a_msoa_scatter_bsr(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
@@ -481,7 +479,7 @@ static SFEM_INLINE void laplace_tri3_hessian_i_msoa_scatter_bsr(
     const count_t row_begin = rowptr[dof_i];
     const int lenrow = (int)(rowptr[dof_i + 1] - row_begin);
     const idx_t *const RSTR cols = &colidx[row_begin];
-    laplace_tri3_hessian_i_msoa_find_cols(ev, cols, lenrow, ks);
+    laplace_tri3_hessian_a_msoa_find_cols(ev, cols, lenrow, ks);
     for (int j = 0; j < NS; ++j) {
       entries[i * NS + j] = row_begin + ks[j];
     }
@@ -502,7 +500,7 @@ static SFEM_INLINE void laplace_tri3_hessian_i_msoa_scatter_bsr(
 }
 
 template <typename s_t>
-static SFEM_INLINE void laplace_tri3_hessian_i_msoa_scatter_crs(
+static SFEM_INLINE void laplace_tri3_hessian_a_msoa_scatter_crs(
     const idx_t *const RSTR ev,
     const s_t *const RSTR element_matrix,
     const count_t *const RSTR rowptr,
@@ -518,7 +516,7 @@ static SFEM_INLINE void laplace_tri3_hessian_i_msoa_scatter_crs(
     row_begin[i] = rowptr[ev[i]];
     lenrow[i] = (int)(rowptr[ev[i] + 1] - row_begin[i]);
     const idx_t *const RSTR cols = &colidx[row_begin[i]];
-    laplace_tri3_hessian_i_msoa_find_cols(ev, cols, lenrow[i], ks);
+    laplace_tri3_hessian_a_msoa_find_cols(ev, cols, lenrow[i], ks);
     for (int j = 0; j < NS; ++j) {
       local_col[i * NS + j] = (int)ks[j];
     }
@@ -542,11 +540,15 @@ static SFEM_INLINE void laplace_tri3_hessian_i_msoa_scatter_crs(
 }
 
 template <typename s_t, typename g_t, int FORMAT>
-static int laplace_tri3_hessian_i_msoa_assemble_impl(
+static int laplace_tri3_hessian_a_msoa_assemble_impl(
     const ptrdiff_t nelements,
     const ptrdiff_t,
     idx_t **const RSTR elements,
-    const g_t *const *const RSTR points,
+    const g_t *const RSTR g_adj0,
+    const g_t *const RSTR g_adj1,
+    const g_t *const RSTR g_adj2,
+    const g_t *const RSTR g_adj3,
+    const g_t *const RSTR g_det0,
     const s_t kappa,
     const count_t *const RSTR rowptr,
     const idx_t *const RSTR colidx,
@@ -559,16 +561,9 @@ static int laplace_tri3_hessian_i_msoa_assemble_impl(
     idx_t *const RSTR,
     idx_t *const RSTR) {
   static constexpr int NC = 1;
-  static constexpr int ND = 2;
   static constexpr int NQ = 1;
   static constexpr int NS = 3;
-  static constexpr int VS = 1;
   static constexpr int NDOFS = NC * NS;
-  const g_t *const RSTR x = points[0];
-  const g_t *const RSTR y = points[1];
-  const s_t *const isoparametric_grad_ref_x = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_x();
-  const s_t *const isoparametric_grad_ref_y = sfem::codegen::ref_tri3_q1<s_t>::grad_ref_y();
-  const s_t *const isoparametric_q_weight = sfem::codegen::quad_tri_q1<s_t>::q_weight();
 
   static_assert(FORMAT == 0 || FORMAT == 1,
                 "this kernel has no scatter for the requested matrix format");
@@ -576,66 +571,30 @@ static int laplace_tri3_hessian_i_msoa_assemble_impl(
   for (ptrdiff_t element = 0; element < nelements; ++element) {
     idx_t ev[NS];
     s_t element_matrix[NDOFS * NDOFS];
-    s_t bcoordinate_data[NS * ND][VS];
-    static constexpr int ne = VS;
-    s_t badj0[NQ * VS];
-    s_t badj1[NQ * VS];
-    s_t badj2[NQ * VS];
-    s_t badj3[NQ * VS];
-    s_t bdet0[NQ * VS];
-    s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
+    s_t badj0[NQ];
+    s_t badj1[NQ];
+    s_t badj2[NQ];
+    s_t badj3[NQ];
+    s_t bdet0[NQ];
 
     for (int shape = 0; shape < NS; ++shape) {
       const idx_t node = elements[shape][element];
       ev[shape] = node;
-      for (int d = 0; d < ND; ++d) {
-        bcoordinate_data[shape * ND + d][0] = s_t(points[d][node]);
-      }
     }
 
 
-    {
-        const int q = 0;  // TRI3 evaluates in closed form
-      s_t *badj_streams[ND * ND] = {badj0, badj1, badj2, badj3};
-      s_t J00_values[VS];
-      s_t J01_values[VS];
-      s_t J10_values[VS];
-      s_t J11_values[VS];
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        J00_values[lane] = s_t(0);
-        J01_values[lane] = s_t(0);
-        J10_values[lane] = s_t(0);
-        J11_values[lane] = s_t(0);
-      }
-      for (int shape = 0; shape < NS; ++shape) {
-        const s_t g0 = isoparametric_grad_ref_x[q * NS + shape];
-        const s_t g1 = isoparametric_grad_ref_y[q * NS + shape];
-        #pragma omp simd
-        for (int lane = 0; lane < ne; ++lane) {
-          J00_values[lane] += bcoordinate_data[2 * shape][lane] * g0;
-          J01_values[lane] += bcoordinate_data[2 * shape][lane] * g1;
-          J10_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g0;
-          J11_values[lane] += bcoordinate_data[2 * shape + 1][lane] * g1;
-        }
-      }
-      #pragma omp simd
-      for (int lane = 0; lane < ne; ++lane) {
-        const s_t J00 = J00_values[lane];
-        const s_t J01 = J01_values[lane];
-        const s_t J10 = J10_values[lane];
-        const s_t J11 = J11_values[lane];
-        geometry_jacobian_adjugate_and_determinant_2<s_t>(
-            J00, J01, J10, J11, badj_streams, bdet0, q * VS + lane);
-      }
-    }
+    badj0[0] = s_t(g_adj0[element]);
+    badj1[0] = s_t(g_adj1[element]);
+    badj2[0] = s_t(g_adj2[element]);
+    badj3[0] = s_t(g_adj3[element]);
+    bdet0[0] = s_t(g_det0[element]);
 
-    laplace_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NQ, NS, VS>(badj0, badj1, badj2, badj3, bdet0, kappa, element_matrix);
+    laplace_d2_simplex_tri3_direct_hessian_element_matrix<s_t, NS>(badj0, badj1, badj2, badj3, bdet0, kappa, element_matrix);
 
     if constexpr (FORMAT == 1) {
-      laplace_tri3_hessian_i_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
+      laplace_tri3_hessian_a_msoa_scatter_bsr(ev, element_matrix, rowptr, colidx, values);
     } else if constexpr (FORMAT == 0) {
-      laplace_tri3_hessian_i_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
+      laplace_tri3_hessian_a_msoa_scatter_crs(ev, element_matrix, rowptr, colidx, values);
     }
   }
 
@@ -645,12 +604,16 @@ static int laplace_tri3_hessian_i_msoa_assemble_impl(
 } // namespace codegen
 } // namespace sfem
 
-extern "C" int laplace_tri3_hessian_crs_i_msoa(
+extern "C" int laplace_tri3_hessian_crs_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
@@ -658,23 +621,27 @@ extern "C" int laplace_tri3_hessian_crs_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::laplace_tri3_hessian_i_msoa_assemble_impl<double, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::laplace_tri3_hessian_a_msoa_assemble_impl<double, geom_t, 0>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::laplace_tri3_hessian_i_msoa_assemble_impl<float, geom_t, 0>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::laplace_tri3_hessian_a_msoa_assemble_impl<float, geom_t, 0>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("laplace_tri3_hessian_crs_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("laplace_tri3_hessian_crs_a_msoa", -1, (int)scalar_bytes);
 }
 
-extern "C" int laplace_tri3_hessian_bsr_i_msoa(
+extern "C" int laplace_tri3_hessian_bsr_a_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
         const real_t kappa,
         const count_t *const RSTR rowptr,
         const idx_t *const RSTR colidx,
@@ -682,13 +649,13 @@ extern "C" int laplace_tri3_hessian_bsr_i_msoa(
 ) {
   switch (scalar_bytes) {
     case (int)sizeof(double): {
-        return sfem::codegen::laplace_tri3_hessian_i_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::laplace_tri3_hessian_a_msoa_assemble_impl<double, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, kappa, rowptr, colidx, (double *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     case (int)sizeof(float): {
-        return sfem::codegen::laplace_tri3_hessian_i_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, points, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
+        return sfem::codegen::laplace_tri3_hessian_a_msoa_assemble_impl<float, geom_t, 1>(nelements, nnodes, elements, g_adj0, g_adj1, g_adj2, g_adj3, g_det0, kappa, rowptr, colidx, (float *)values, nullptr, 0, 0, nullptr, nullptr, nullptr, nullptr);
     }
     default:
       break;
   }
-  return sfem::codegen::unsupported_dispatch("laplace_tri3_hessian_bsr_i_msoa", -1, (int)scalar_bytes);
+  return sfem::codegen::unsupported_dispatch("laplace_tri3_hessian_bsr_a_msoa", -1, (int)scalar_bytes);
 }

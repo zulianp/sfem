@@ -526,6 +526,22 @@ extern "C" int linear_elasticity_gradient_packed_two_pass_3d_i_msoa(
         void *const RSTR outz
 );
 
+extern "C" int linear_elasticity_hessian_block_diag_sym_2d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values
+);
+
 extern "C" int linear_elasticity_hessian_block_diag_sym_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -533,6 +549,27 @@ extern "C" int linear_elasticity_hessian_block_diag_sym_2d_i_msoa(
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        void *const RSTR values
+);
+
+extern "C" int linear_elasticity_hessian_block_diag_sym_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const real_t lmbda,
         const real_t mu,
         void *const RSTR values
@@ -550,6 +587,24 @@ extern "C" int linear_elasticity_hessian_block_diag_sym_3d_i_msoa(
         void *const RSTR values
 );
 
+extern "C" int linear_elasticity_hessian_bsr_2d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_det0,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+
 extern "C" int linear_elasticity_hessian_bsr_2d_i_msoa(
         const smesh::ElemType element_type,
         const enum smesh::PrimitiveType real_type,
@@ -557,6 +612,29 @@ extern "C" int linear_elasticity_hessian_bsr_2d_i_msoa(
         const ptrdiff_t nnodes,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
+        const real_t lmbda,
+        const real_t mu,
+        const count_t *const RSTR rowptr,
+        const idx_t *const RSTR colidx,
+        void *const RSTR values
+);
+
+extern "C" int linear_elasticity_hessian_bsr_3d_a_msoa(
+        const smesh::ElemType element_type,
+        const enum smesh::PrimitiveType real_type,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        idx_t **const RSTR elements,
+        const geom_t *const RSTR g_adj0,
+        const geom_t *const RSTR g_adj1,
+        const geom_t *const RSTR g_adj2,
+        const geom_t *const RSTR g_adj3,
+        const geom_t *const RSTR g_adj4,
+        const geom_t *const RSTR g_adj5,
+        const geom_t *const RSTR g_adj6,
+        const geom_t *const RSTR g_adj7,
+        const geom_t *const RSTR g_adj8,
+        const geom_t *const RSTR g_det0,
         const real_t lmbda,
         const real_t mu,
         const count_t *const RSTR rowptr,
@@ -941,8 +1019,6 @@ extern "C" int linear_elasticity_total_merit_patch_2d_a_msoa(
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR grad_ref[2],
-        const void *const RSTR q_weight,
         const real_t lmbda,
         const real_t mu,
         const int nsteps,
@@ -962,8 +1038,6 @@ extern "C" int linear_elasticity_total_merit_patch_3d_a_msoa(
         const uint8_t *const RSTR n2e_local,
         idx_t **const RSTR elements,
         const geom_t *const *const RSTR points,
-        const void *const RSTR grad_ref[3],
-        const void *const RSTR q_weight,
         const real_t lmbda,
         const real_t mu,
         const int nsteps,

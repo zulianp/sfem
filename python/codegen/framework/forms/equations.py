@@ -582,6 +582,20 @@ def _symbols_from_fields(fields):
     return tuple(symbols)
 
 
+def system_mixes_energy_and_residual(system):
+    """Whether this material is written as an energy *and* a residual.
+
+    Mooney-Rivlin Kelvin-Voigt is the case: an energy for the elastic response
+    and a residual for the viscous one.  Such a material has no valid energy of
+    its own -- the residual half has no potential to add -- so its 0-form is
+    the residual merit of the whole system rather than the sum of anything.
+    """
+    equations = tuple(system.equations)
+    return any(equation.is_energy for equation in equations) and any(
+        equation.is_residual for equation in equations
+    )
+
+
 def total_residual_weak_coefficients(system):
     """Every unit's 1-form, summed on one basis: the system's whole residual.
 

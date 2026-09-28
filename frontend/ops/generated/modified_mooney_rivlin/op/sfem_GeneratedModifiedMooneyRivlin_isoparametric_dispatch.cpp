@@ -386,22 +386,6 @@ extern "C" int modified_mooney_rivlin_quad4_hessian_bsr_i_msoa(
         const idx_t *const RSTR colidx,
         void *const RSTR values
 );
-extern "C" int modified_mooney_rivlin_tri3_hessian_bsr_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t c1,
-        const real_t c2,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        void *const RSTR values
-);
 extern "C" int modified_mooney_rivlin_tri6_hessian_bsr_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
@@ -504,23 +488,6 @@ extern "C" int modified_mooney_rivlin_proteus_hex8_hessian_bsr_i_msoa(
         void *const RSTR values
 );
 extern "C" int modified_mooney_rivlin_tet10_hessian_bsr_i_msoa(
-        const int scalar_bytes,
-        const ptrdiff_t nelements,
-        const ptrdiff_t nnodes,
-        idx_t **const RSTR elements,
-        const geom_t *const *const RSTR points,
-        const real_t c1,
-        const real_t c2,
-        const real_t kappa,
-        const ptrdiff_t u_stride,
-        const void *const RSTR ux,
-        const void *const RSTR uy,
-        const void *const RSTR uz,
-        const count_t *const RSTR rowptr,
-        const idx_t *const RSTR colidx,
-        void *const RSTR values
-);
-extern "C" int modified_mooney_rivlin_tet4_hessian_bsr_i_msoa(
         const int scalar_bytes,
         const ptrdiff_t nelements,
         const ptrdiff_t nnodes,
@@ -910,8 +877,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_hessian_bsr_2d_i
       return modified_mooney_rivlin_proteus_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
     case smesh::QUAD4:
       return modified_mooney_rivlin_quad4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
-    case smesh::TRI3:
-      return modified_mooney_rivlin_tri3_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
     case smesh::TRI6:
       return modified_mooney_rivlin_tri6_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, rowptr, colidx, values);
     default:
@@ -956,8 +921,6 @@ SFEM_CODEGEN_PUBLIC_C_ABI extern "C" int modified_mooney_rivlin_hessian_bsr_3d_i
       return modified_mooney_rivlin_proteus_hex8_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
     case smesh::TET10:
       return modified_mooney_rivlin_tet10_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
-    case smesh::TET4:
-      return modified_mooney_rivlin_tet4_hessian_bsr_i_msoa((int)resolved_real_type, nelements, nnodes, elements, points, c1, c2, kappa, u_stride, ux, uy, uz, rowptr, colidx, values);
     default:
       break;
   }

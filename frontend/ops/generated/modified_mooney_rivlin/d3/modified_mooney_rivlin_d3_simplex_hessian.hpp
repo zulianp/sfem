@@ -30,7 +30,7 @@ typedef double geom_t;
 namespace sfem {
 namespace codegen {
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NQ, int NS>
 static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_direct_hessian_reference_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -49,12 +49,11 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_direct_hessian_referen
     const s_t c1,
     const s_t c2,
     const s_t kappa,
-    const s_t bu_data[NS * 3][VS],
+    const s_t bu_data[NS * 3],
     s_t *const RSTR element_matrix
 ) {
   static_assert(NQ > 0, "NQ must be positive");
   static_assert(NS > 0, "NS must be positive");
-  static_assert(VS > 0, "VS must be positive");
   static constexpr int NC = 3;
   static constexpr int ND = 3;
   static constexpr int NDOFS = NC * NS;
@@ -63,8 +62,7 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_direct_hessian_referen
   }
   for (int q = 0; q < NQ; ++q) {
     const s_t qw = q_weight[q];
-    const int lane = 0;
-    const ptrdiff_t goff = q * VS + lane;
+    const ptrdiff_t goff = q;
     const s_t adj_lane0 = badj0[goff];
     const s_t adj_lane1 = badj1[goff];
     const s_t adj_lane2 = badj2[goff];
@@ -89,15 +87,15 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_direct_hessian_referen
       const s_t state_grad_ref0 = grad_ref_x[q * NS + shape];
       const s_t state_grad_ref1 = grad_ref_y[q * NS + shape];
       const s_t state_grad_ref2 = grad_ref_z[q * NS + shape];
-      const s_t state_u0 = bu_data[shape * NC][lane];
+      const s_t state_u0 = bu_data[shape * NC];
       gu_ref0 += state_u0 * state_grad_ref0;
       gu_ref1 += state_u0 * state_grad_ref1;
       gu_ref2 += state_u0 * state_grad_ref2;
-      const s_t state_u1 = bu_data[shape * NC + 1][lane];
+      const s_t state_u1 = bu_data[shape * NC + 1];
       gu_ref3 += state_u1 * state_grad_ref0;
       gu_ref4 += state_u1 * state_grad_ref1;
       gu_ref5 += state_u1 * state_grad_ref2;
-      const s_t state_u2 = bu_data[shape * NC + 2][lane];
+      const s_t state_u2 = bu_data[shape * NC + 2];
       gu_ref6 += state_u2 * state_grad_ref0;
       gu_ref7 += state_u2 * state_grad_ref1;
       gu_ref8 += state_u2 * state_grad_ref2;
@@ -522,7 +520,7 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_direct_hessian_referen
   }
 }
 
-template <typename s_t, int NQ, int NS, int VS>
+template <typename s_t, int NS>
 static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_tet4_direct_hessian_element_matrix(
     const s_t *const RSTR badj0,
     const s_t *const RSTR badj1,
@@ -537,14 +535,11 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_tet4_direct_hessian_el
     const s_t c1,
     const s_t c2,
     const s_t kappa,
-    const s_t bu_data[NS * 3][VS],
+    const s_t bu_data[NS * 3],
     s_t *const RSTR element_matrix
 ) {
-  static_assert(NQ > 0, "NQ must be positive");
   static_assert(NS > 0, "NS must be positive");
-  static_assert(VS > 0, "VS must be positive");
-  const int lane = 0;
-  const ptrdiff_t goff = 0 * VS + lane;
+  const ptrdiff_t goff = 0;
   const s_t adj_lane0 = badj0[goff];
   const s_t adj_lane1 = badj1[goff];
   const s_t adj_lane2 = badj2[goff];
@@ -556,15 +551,15 @@ static SFEM_INLINE void modified_mooney_rivlin_d3_simplex_tet4_direct_hessian_el
   const s_t adj_lane8 = badj8[goff];
   const s_t det_lane0 = bdet0[goff];
   const s_t idet = s_t(1) / det_lane0;
-  const s_t gu_ref0 = -bu_data[0][lane] + bu_data[3][lane];
-  const s_t gu_ref1 = -bu_data[0][lane] + bu_data[6][lane];
-  const s_t gu_ref2 = -bu_data[0][lane] + bu_data[9][lane];
-  const s_t gu_ref3 = -bu_data[1][lane] + bu_data[4][lane];
-  const s_t gu_ref4 = -bu_data[1][lane] + bu_data[7][lane];
-  const s_t gu_ref5 = bu_data[10][lane] - bu_data[1][lane];
-  const s_t gu_ref6 = -bu_data[2][lane] + bu_data[5][lane];
-  const s_t gu_ref7 = -bu_data[2][lane] + bu_data[8][lane];
-  const s_t gu_ref8 = bu_data[11][lane] - bu_data[2][lane];
+  const s_t gu_ref0 = -bu_data[0] + bu_data[3];
+  const s_t gu_ref1 = -bu_data[0] + bu_data[6];
+  const s_t gu_ref2 = -bu_data[0] + bu_data[9];
+  const s_t gu_ref3 = -bu_data[1] + bu_data[4];
+  const s_t gu_ref4 = -bu_data[1] + bu_data[7];
+  const s_t gu_ref5 = bu_data[10] - bu_data[1];
+  const s_t gu_ref6 = -bu_data[2] + bu_data[5];
+  const s_t gu_ref7 = -bu_data[2] + bu_data[8];
+  const s_t gu_ref8 = bu_data[11] - bu_data[2];
   const s_t gu0 = (gu_ref0 * adj_lane0 + gu_ref1 * adj_lane3 + gu_ref2 * adj_lane6) * idet;
   const s_t gu1 = (gu_ref0 * adj_lane1 + gu_ref1 * adj_lane4 + gu_ref2 * adj_lane7) * idet;
   const s_t gu2 = (gu_ref0 * adj_lane2 + gu_ref1 * adj_lane5 + gu_ref2 * adj_lane8) * idet;
