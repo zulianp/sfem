@@ -572,13 +572,12 @@ def fig_id_space(pk, p, scale=1.0):
 
 
 def fig_reduction(pk, scale=0.92, max_rows=4):
-    """F3: the apply's two phases, anchored to the packs of Figure~F1.
+    """F3: the apply's two phases, framed.
 
-    The gather is phase two, and drawing it alone is why it reads as an abstract list: what makes
-    it possible is phase one, where a pack writes the rows it owns STRAIGHT OUT -- no accumulation,
-    no prior zero-fill, because no other pack owns them -- and stages only the rest. So both phases
-    are drawn, and the cells carry the colour of the pack that staged them so a contribution can be
-    followed from a faded node in F1 to the node it lands on.
+    Both phases end in the same global field, which is the point of drawing them together: the
+    owned rows go there directly and the staged ones go there through the gather. The figure
+    labels objects and leaves the properties to the text -- what the reduction graph buys is
+    argued in the prose, and repeating it on the drawing is words a reader has to step over.
     """
     out = [PREAMBLE, COLOR_DEFS,
            r"\begin{tikzpicture}[scale=%.2f,font=\scriptsize]" % scale]
@@ -591,7 +590,6 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
     for p in packs:
         for k in range(pk.ghost_ptr[p], pk.ghost_ptr[p + 1]):
             entries.append((k, p, pk.ghost_idx[k]))
-    # Rows that consume at least two of them: a row of one term shows nothing about summation.
     rows = []
     for r in range(len(pk.ghost_reduce_dest)):
         ks = pk.ghost_reduce_idx[pk.ghost_reduce_ptr[r]:pk.ghost_reduce_ptr[r + 1]]
@@ -601,75 +599,104 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
     rows.sort()
     shown = [k for _r, ks in rows for k in ks]
 
-    # ---- phase one: every pack, owned rows written out, ghosts staged ----------------------
-    W, top = 9.2, 0.0
-    bw = min(2.5, (W - 1.4) / max(1, len(packs)))
+    LANE = 0.0                          # the owned-rows bypass runs down this lane
+    L, R = 0.62, 9.0                    # the frames' left and right edges
+    y1t, y1b = 0.0, -1.15               # phase 1 band
+    ybuf = -1.95                        # the staging buffer, between the phases
+    y2t, y2b = -2.75, -4.45             # phase 2 band
+    yglob = -4.95                       # the global field, where both phases land
+
+    def frame(yt, yb, label):
+        out.append(r"  \draw[black!30,rounded corners=3pt,line width=0.5pt,dash pattern=on 2pt off 2pt] "
+                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (L, yb, R, yt))
+        out.append(r"  \node[anchor=west,font=\scriptsize\bfseries,black!55,fill=white,"
+                   r"inner xsep=3pt] at (%.2f,%.2f) {%s};" % (L + 0.28, yt, label))
+
+    frame(y1t, y1b, "Phase 1")
+    frame(y2t, y2b, "Phase 2")
+
+    # ---- phase 1: a private accumulator per pack ------------------------------------------
+    bw = (R - L - 1.0) / len(packs) - 0.2
+    bx = {}
     for i, p in enumerate(packs):
         col = PACK_COLORS[p % len(PACK_COLORS)]
-        x = 0.7 + i * (bw + 0.18)
-        out.append(r"  \draw[%s,fill=%s!16,rounded corners=2pt,line width=0.6pt] "
-                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (col, col, x, top, x + bw, top + 1.05))
+        x = L + 0.5 + i * (bw + 0.2)
+        bx[p] = x + bw / 2.0
+        out.append(r"  \draw[%s,fill=%s!18,rounded corners=2pt,line width=0.6pt] "
+                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (col, col, x, y1b + 0.28, x + bw, y1t - 0.34))
         out.append(r"  \node[%s,font=\bfseries] at (%.2f,%.2f) {$P_%d$};"
-                   % (col, x + 0.34, top + 0.75, p))
-        # Shortened deliberately: at three packs the boxes are 2.5 wide and "owned rows" ran past
-        # the border.
-        out.append(r"  \node[align=left,font=\tiny,anchor=north west] at (%.2f,%.2f) "
-                   r"{private buffer\\owned $\to$ write\\ghosts $\to$ stage};"
-                   % (x + 0.62, top + 0.96))
+                   % (col, x + bw / 2.0, (y1t + y1b) / 2.0 + 0.10, p))
+    out.append(r"  \node[anchor=east,font=\tiny,black!55] at (%.2f,%.2f) "
+               r"{pack-private accumulators};" % (R - 0.14, y1t - 0.20))
 
-    # Above the boxes, not beside them: with every pack drawn the row now reaches the right margin.
-    out.append(r"  \node[anchor=west,font=\tiny\itshape,black!65] at (%.2f,%.2f) "
-               r"{phase 1: accumulate locally};" % (0.7, top + 1.30))
-
-    # Owned rows leave directly for the global vector: the arrow that needs no reduction.
-    out.append(r"  \draw[->,>=stealth,black!60,line width=0.7pt] (2.6,%.2f) -- (2.6,%.2f);"
-               % (top - 0.08, top - 0.62))
-    out.append(r"  \node[anchor=west,font=\tiny,black!70] at (2.70,%.2f) "
-               r"{owned rows: plain write, no atomic and no zero-fill};" % (top - 0.36))
-
-    # ---- ghost_buf ------------------------------------------------------------------------
-    ybuf = top - 1.35
-    cw = min(0.62, (W - 1.4) / max(1, len(entries)))
-    out.append(r"  \node[anchor=east,font=\tiny\bfseries] at (0.62,%.2f) {\texttt{ghost\_buf}};" % (ybuf + 0.20))
+    # ---- the staging buffer ----------------------------------------------------------------
+    cw = min(0.52, (R - L - 1.6) / max(1, len(entries)))
+    bufx = L + 1.15
+    out.append(r"  \node[anchor=east,font=\tiny\ttfamily] at (%.2f,%.2f) {ghost\_buf};"
+               % (bufx - 0.12, ybuf + 0.17))
     xof = {}
-    for i, (k, p, dest) in enumerate(entries):
+    for i, (k, p, _dest) in enumerate(entries):
         col = PACK_COLORS[p % len(PACK_COLORS)]
-        x = 0.7 + i * cw
+        x = bufx + i * cw
         xof[k] = x + cw / 2.0
         hi = k in shown
         out.append(r"  \draw[%s,fill=%s!%d,line width=0.4pt] (%.3f,%.2f) rectangle (%.3f,%.2f);"
-                   % (col, col, 42 if hi else 16, x, ybuf, x + cw, ybuf + 0.40))
-        if hi:
-            out.append(r"  \node[font=\tiny] at (%.3f,%.2f) {%d};" % (x + cw / 2.0, ybuf + 0.20, k))
-    out.append(r"  \node[anchor=west,font=\tiny\itshape,black!65] at (%.2f,%.2f) "
-               r"{one slot per staged contribution};" % (0.7 + len(entries) * cw + 0.15, ybuf + 0.20))
+                   % (col, col, 45 if hi else 16, x, ybuf, x + cw, ybuf + 0.34))
 
-    # ---- phase two: the CSR gather --------------------------------------------------------
-    out.append(r"  \node[anchor=east,font=\tiny\itshape,black!65] at (%.2f,%.2f) "
-               r"{phase 2: gather};" % (0.62, ybuf - 0.95))
-    ydest = ybuf - 1.55
+    # Ghost contributions leave each pack for its slots; one arrow per pack, to the middle of
+    # the run of slots it staged, rather than one per slot -- which drew a thicket.
+    for p in packs:
+        lo, hi_ = pk.ghost_ptr[p], pk.ghost_ptr[p + 1]
+        if lo == hi_:
+            continue
+        col = PACK_COLORS[p % len(PACK_COLORS)]
+        mid = (xof[lo] + xof[hi_ - 1]) / 2.0
+        out.append(r"  \draw[->,>=stealth,%s,line width=0.55pt,draw opacity=0.9] "
+                   r"(%.2f,%.2f) to[out=-90,in=90] (%.2f,%.2f);"
+                   % (col, bx[p], y1b + 0.26, mid, ybuf + 0.36))
+    out.append(r"  \node[anchor=west,font=\tiny,black!60] at (%.2f,%.2f) {ghost contributions};"
+               % (bufx + len(entries) * cw + 0.12, ybuf + 0.17))
+
+    # ---- phase 2: one row of the reduction graph per destination ---------------------------
     n = len(rows)
+    dxs = []
     for i, (r, ks) in enumerate(rows):
         dest = pk.ghost_reduce_dest[r]
         dcol = PACK_COLORS[pk.owner_new[dest] % len(PACK_COLORS)]
-        dx = 1.0 + i * (7.2 / max(1, n))
+        dw = 1.45
+        dx = L + 0.8 + i * ((R - L - 1.6 - dw) / max(1, n - 1) if n > 1 else 0)
+        # The drop to the global field leaves from the box's right, so it does not run through
+        # the row label centred beneath it.
+        dxs.append(dx + dw - 0.18)
         out.append(r"  \draw[%s,fill=%s!22,rounded corners=1.5pt,line width=0.5pt] "
-                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (dcol, dcol, dx, ydest, dx + 1.5, ydest + 0.44))
-        out.append(r"  \node[font=\tiny] at (%.2f,%.2f) {node %d $\mathrel{+}=$};"
-                   % (dx + 0.75, ydest + 0.22, dest))
+                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (dcol, dcol, dx, y2b + 0.42, dx + dw, y2b + 0.92))
+        out.append(r"  \node[font=\tiny] at (%.2f,%.2f) {node %d};" % (dx + dw / 2.0, y2b + 0.67, dest))
+        # Left-aligned under the box, leaving the box's right end as a clear lane for the drop.
+        out.append(r"  \node[font=\tiny,black!50,anchor=north west] at (%.2f,%.2f) "
+                   r"{row %d: \texttt{ptr}[%d..%d)};"
+                   % (dx - 0.06, y2b + 0.38, r, pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]))
         for k in ks:
             if k in xof:
                 out.append(r"  \draw[->,>=stealth,%s,line width=0.45pt,draw opacity=0.8] "
                            r"(%.3f,%.2f) to[out=-90,in=90] (%.2f,%.2f);"
-                           % (dcol, xof[k], ybuf - 0.02, dx + 0.75, ydest + 0.46))
-        out.append(r"  \node[font=\tiny,black!55,anchor=north] at (%.2f,%.2f) "
-                   r"{row %d: \texttt{ptr}[%d..%d)};"
-                   % (dx + 0.75, ydest - 0.04, r, pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]))
+                           % (dcol, xof[k], ybuf - 0.02, dx + dw / 2.0, y2b + 0.94))
 
-    out.append(r"  \node[anchor=north,align=center,font=\tiny] at (%.2f,%.2f) {"
-               r"each destination is reached by exactly one row $\Rightarrow$ no atomic;\\"
-               r"its terms are visited in a stored index order $\Rightarrow$ bit-deterministic};"
-               % (4.4, ydest - 0.42))
+    # ---- the global field, reached by both phases ------------------------------------------
+    out.append(r"  \draw[black!45,fill=black!5,rounded corners=2pt,line width=0.6pt] "
+               r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (L + 0.5, yglob, R - 0.5, yglob + 0.42))
+    out.append(r"  \node[font=\tiny,black!70] at (%.2f,%.2f) {global field};"
+               % ((L + R) / 2.0, yglob + 0.21))
+    # Owned rows bypass the gather entirely: down the left lane, outside both frames, so the one
+    # path that needs no reduction is also the one that touches nothing on its way.
+    out.append(r"  \draw[->,>=stealth,black!55,line width=0.7pt] "
+               r"(%.2f,%.2f) to[out=180,in=90] (%.2f,%.2f) to[out=-90,in=180] (%.2f,%.2f);"
+               % (L + 0.5, (y1t + y1b) / 2.0, LANE, (y1b + yglob) / 2.0, L + 0.52, yglob + 0.21))
+    out.append(r"  \node[font=\tiny,black!60,rotate=90,anchor=south] at (%.2f,%.2f) {owned rows};"
+               % (LANE - 0.06, (y1b + yglob) / 2.0))
+    for dx in dxs:
+        out.append(r"  \draw[->,>=stealth,black!45,line width=0.5pt] (%.2f,%.2f) -- (%.2f,%.2f);"
+                   % (dx, y2b + 0.40, dx, yglob + 0.44))
+
     out.append(r"\end{tikzpicture}")
     return "\n".join(out) + "\n"
 
