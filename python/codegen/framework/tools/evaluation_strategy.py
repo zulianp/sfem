@@ -42,6 +42,22 @@ two points on an edge and three on a triangle and its loop is not a one-trip
 loop at all.  Surface integrals are therefore counted out of both rules rather
 than reported as departures -- see `survey`.
 
+A facet has a rule of its own, though, and the `facet grad` column states it.
+The *measure* of a flat facet is the same at every point of its rule, because it
+is built from reference gradients that do not vary over the facet -- so a table
+of them is one row repeated once per point, and the loop that reads it is a loop
+over constants.  On a device that table is a function-local
+`static const s_t data[18]`: three identical copies of the six numbers a triangle
+has.  This is the half of ISSUES.md item 11 the loop count cannot see, for the
+same reason it could not see rule two's data half.
+
+Told apart by the repetition rather than by the element's name, because it is a
+property of the facet's geometry and not of the cell it bounds: a TRISHELL6 on a
+TET10 is curved, its rows genuinely differ, and it is not a departure.  The first
+version of this column looked instead for a `grad()` accessor beside a
+point-free measure, which reported zero both before and after the fix it was
+meant to describe -- a measurement that cannot fail is not one.
+
 This reports the gap against the three rules, so closing it is measurable
 rather than asserted.  It reads a generated tree:
 
@@ -58,6 +74,38 @@ import re
 import sys
 
 from codegen.framework.fem.element_family import element_family as _element_family
+
+#: A facet's reference-gradient table, with the node count its struct declares.
+_FACET_GRADIENT_TABLE = re.compile(
+    r"static constexpr int NS = (?P<n_shape>\d+);"
+    r".*?const s_t \*grad\(\)\s*\{"
+    r"\s*static const s_t data\[\d+\] = \{(?P<values>[^}]*)\}",
+    re.S,
+)
+_FACET_GRADIENT_VALUE = re.compile(r"s_t\(([^)]*)\)")
+
+
+def flat_facet_tables(source, n_shape, values):
+    """Whether this table is one row repeated once per quadrature point.
+
+    A flat facet -- a straight edge, a planar triangle -- has the same reference
+    gradients at every point of its rule, so the table is `n_qp` identical
+    copies of the row the facet actually has, and the loop that reads it is a
+    loop over constants.  Told apart by the repetition rather than by the
+    element's name, because it is a property of the facet's geometry: a
+    TRISHELL6 on a curved TET10 facet has genuinely differing rows and is not
+    this.
+
+    The period is the node count times the reference dimension, and the facet's
+    reference dimension is not written down, so both are tried -- an edge is one
+    and a surface is two.
+    """
+    for reference_dim in (1, 2):
+        period = n_shape * reference_dim
+        if period and len(values) > period and len(values) % period == 0:
+            if values == values[:period] * (len(values) // period):
+                return True
+    return False
 
 def element_family(element):
     """The element's family, from the taxonomy the generator uses.
@@ -96,6 +144,7 @@ def survey(generated):
         by_element = {}
         volume = {}
         reference_data = {}
+        facet_gradients = {}
         for path in glob.glob(os.path.join(material_dir, "d*", "*", "*")):
             if os.path.isdir(path):
                 continue
@@ -123,6 +172,18 @@ def survey(generated):
             volume.setdefault(element, False)
             by_element.setdefault(element, 0)
             reference_data.setdefault(element, 0)
+            facet_gradients.setdefault(element, 0)
+            if "_boundary_operator" in os.path.basename(path):
+                # A flat facet still carrying one reference-gradient row per
+                # quadrature point -- see the module docstring.
+                facet_gradients[element] += sum(
+                    flat_facet_tables(
+                        source,
+                        int(match.group("n_shape")),
+                        _FACET_GRADIENT_VALUE.findall(match.group("values")),
+                    )
+                    for match in _FACET_GRADIENT_TABLE.finditer(source)
+                )
             if "_boundary_operator" not in os.path.basename(path):
                 volume[element] = True
                 by_element[element] += len(re.findall(r"for \(int q = 0", source))
@@ -146,6 +207,7 @@ def survey(generated):
                     "sum_factorised": factorised,
                     "quadrature_loops": quadrature_loops,
                     "reference_data": reference_data.get(element, 0),
+                    "facet_gradients": facet_gradients.get(element, 0),
                     "has_volume_kernels": volume.get(element, False),
                 }
             )
@@ -183,6 +245,14 @@ def violations(rows):
                     % (row["material"], row["element"], row["reference_data"]),
                 )
             )
+        if row.get("facet_gradients"):
+            found.append(
+                (
+                    "flat facet carrying one gradient row per quadrature point",
+                    "%s/%s (%d tables)"
+                    % (row["material"], row["element"], row["facet_gradients"]),
+                )
+            )
     return found
 
 
@@ -200,14 +270,17 @@ def main(argv=None):
         return 2
 
     print(
-        "%-24s %-16s %-16s %10s %10s %10s"
-        % ("material", "element", "family", "sum-fact", "qp loops", "ref data")
+        "%-24s %-16s %-16s %10s %10s %10s %11s"
+        % (
+            "material", "element", "family", "sum-fact", "qp loops", "ref data",
+            "facet grad",
+        )
     )
     for row in rows:
         if row["family"] == "mixed":
             continue
         print(
-            "%-24s %-16s %-16s %10s %10d %10d"
+            "%-24s %-16s %-16s %10s %10d %10d %11d"
             % (
                 row["material"],
                 row["element"],
@@ -215,6 +288,7 @@ def main(argv=None):
                 "yes" if row["sum_factorised"] else "NO",
                 row["quadrature_loops"],
                 row["reference_data"],
+                row.get("facet_gradients", 0),
             )
         )
 
