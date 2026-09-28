@@ -2557,8 +2557,18 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
             hessian_common_args.extend(
                 _residual_soa_field_argument_names(fields_by_dim[dim], "old_data", mixed_order)
             )
-        hessian_crs_function = "%s_hessian_crs_i_msoa" % stem
-        if _c_abi_function_exists(kernel_sources, hessian_crs_function):
+        # This list says whether the material assembles at all; the dispatch is
+        # `_residual_hessian_dispatch_body`, which already reaches an element's
+        # affine kernel through the cached adjugate.  So the question is whether
+        # the element publishes *a* hessian, not an isoparametric one -- asking
+        # only the latter left out every lowest-order simplex, and a material
+        # whose elements are all lowest-order simplices got `return
+        # SFEM_FAILURE;` for kernels it had generated.  `two_phase_flow` on TRI3
+        # and TET4 is that material.
+        hessian_crs_function = _residual_hessian_entry_point(
+            kernel_sources, stem, "hessian_crs"
+        )
+        if hessian_crs_function is not None:
             hessian_crs_cases.append(
                 _residual_soa_case(
                     element,
@@ -2576,8 +2586,10 @@ def _residual_op(material, elements, c_abi_header=None, form_collections=None, k
                     hessian_setup,
                 )
             )
-        hessian_bsr_function = "%s_hessian_bsr_i_msoa" % stem
-        if _c_abi_function_exists(kernel_sources, hessian_bsr_function):
+        hessian_bsr_function = _residual_hessian_entry_point(
+            kernel_sources, stem, "hessian_bsr"
+        )
+        if hessian_bsr_function is not None:
             hessian_bsr_cases.append(
                 _residual_soa_case(
                     element,
@@ -8426,6 +8438,21 @@ def _case(element, function, arguments):
         "function": function,
         "arguments": arguments,
     }
+
+
+#: Which per-element hessian entry point an element publishes, isoparametric
+#: first.  An element with no isoparametric kernel -- every lowest-order simplex,
+#: which reads a cached adjugate instead of the coordinates -- still assembles,
+#: through the affine one.
+_RESIDUAL_HESSIAN_GEOMETRIES = ("i_msoa", "a_msoa")
+
+
+def _residual_hessian_entry_point(kernel_sources, stem, operation):
+    for geometry in _RESIDUAL_HESSIAN_GEOMETRIES:
+        name = "%s_%s_%s" % (stem, operation, geometry)
+        if _c_abi_function_exists(kernel_sources, name):
+            return name
+    return None
 
 
 def _residual_hessian_dispatch_body(
