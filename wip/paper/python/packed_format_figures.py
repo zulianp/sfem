@@ -8,8 +8,12 @@ figure that goes stale.
 WHAT THIS MODELS, AND WHY IT IS NOT A DRAWING.
 
 The figures are not hand-placed. This module reimplements the *documented* packing rules from
-spikes/cvfem/docs/PACKED_FORMAT.md on a small 2D quadrilateral mesh and draws the result, so
-the pictures cannot disagree with the contract they illustrate. The rules implemented:
+spikes/cvfem/docs/PACKED_FORMAT.md on a small 2D UNSTRUCTURED mesh -- jittered points, Delaunay
+triangulated, ordered along a Hilbert curve -- and draws the result, so the pictures cannot
+disagree with the contract they illustrate. The mesh is unstructured because the figure has to
+show what a pack boundary is: on a grid the packs come out as rectangular blocks and read as a
+decomposition somebody chose, when in fact a pack is wherever a contiguous range of the element
+order happens to end. The rules implemented:
 
   * a pack is a contiguous range of element indices, p = e // elements_per_pack (spec S1);
   * each node has exactly one owning pack, and the owned ranges partition [0, nnodes) in
@@ -40,34 +44,128 @@ import os
 import sys
 
 # ---------------------------------------------------------------------------------------------
-# The model: a structured 2D quad mesh, spatially ordered, then packed.
+# The model: an unstructured 2D mesh, spatially ordered, then packed.
 # ---------------------------------------------------------------------------------------------
 
 
-class QuadMesh:
-    """nx x ny quadrilateral mesh. Nodes are (nx+1) x (ny+1), numbered lexicographically
-    before packing; packing renumbers them, exactly as PackedMesh::create does in place."""
+class _Lcg:
+    """A fixed linear congruential generator, so the point set is decided by this source file.
 
-    def __init__(self, nx, ny):
-        self.nx, self.ny = nx, ny
-        self.nnx, self.nny = nx + 1, ny + 1
-        self.nnodes = self.nnx * self.nny
-        self.nelements = nx * ny
+    `random` would do, and its Mersenne Twister is stable across CPython versions, but the whole
+    directory rests on a figure regenerating byte for byte; pinning the generator here removes
+    the interpreter from that guarantee entirely. Numerical Recipes' constants.
+    """
 
-    def node(self, i, j):
-        return j * self.nnx + i
+    def __init__(self, seed):
+        self.state = seed & 0xFFFFFFFF
+
+    def next(self):
+        self.state = (1664525 * self.state + 1013904223) & 0xFFFFFFFF
+        return self.state / 4294967296.0
+
+    def between(self, lo, hi):
+        return lo + (hi - lo) * self.next()
+
+
+def _circumcircle(a, b, c):
+    """Centre and squared radius, or None for a degenerate triangle."""
+    (ax, ay), (bx, by), (cx, cy) = a, b, c
+    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    if abs(d) < 1e-12:
+        return None
+    a2, b2, c2 = ax * ax + ay * ay, bx * bx + by * by, cx * cx + cy * cy
+    ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d
+    uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d
+    return (ux, uy), (ux - ax) ** 2 + (uy - ay) ** 2
+
+
+class TriMesh:
+    """An unstructured triangular mesh: jittered points, Delaunay-triangulated.
+
+    Unstructured rather than a grid because the figure has to show what a pack boundary actually
+    is. On a structured mesh the packs come out as rectangular blocks and read as a decomposition
+    somebody chose; the boundary of a pack is in fact wherever a contiguous range of the
+    space-filling element order happens to end, which on a real mesh is a ragged line that
+    follows nothing. That is only visible on a mesh whose elements are not in rows.
+
+    Bowyer-Watson, which is short enough to keep this module stdlib-only and dependency-free.
+    """
+
+    nodes_per_element = 3
+
+    def __init__(self, nx=9, ny=7, jitter=0.34, seed=20260928):
+        rng = _Lcg(seed)
+        pts = []
+        # A jittered lattice rather than uniform sampling: it keeps the element sizes within a
+        # narrow band, so no triangle is too small to see, while leaving the connectivity
+        # irregular. Boundary points are jittered only along their edge, which keeps the domain
+        # a clean rectangle and stops the triangulation growing slivers at the hull.
+        for j in range(ny + 1):
+            for i in range(nx + 1):
+                x, y = float(i), float(j)
+                on_x = i in (0, nx)
+                on_y = j in (0, ny)
+                if not on_x:
+                    x += rng.between(-jitter, jitter)
+                if not on_y:
+                    y += rng.between(-jitter, jitter)
+                pts.append((x, y))
+        self.points = pts
+        self.nnodes = len(pts)
+        self.tris = self._delaunay(pts)
+        self.nelements = len(self.tris)
+
+    @staticmethod
+    def _delaunay(pts):
+        # A super-triangle large enough to contain every point; its vertices carry negative ids
+        # so they are trivially identifiable and discarded at the end.
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        mx, my = (min(xs) + max(xs)) / 2.0, (min(ys) + max(ys)) / 2.0
+        span = max(max(xs) - min(xs), max(ys) - min(ys)) * 10.0
+        sup = [(mx - span, my - span), (mx + span, my - span), (mx, my + span)]
+
+        def pt(i):
+            return sup[-1 - i] if i < 0 else pts[i]
+
+        tris = [(-1, -2, -3)]
+        for i, p in enumerate(pts):
+            bad, keep = [], []
+            for t in tris:
+                cc = _circumcircle(pt(t[0]), pt(t[1]), pt(t[2]))
+                if cc and (p[0] - cc[0][0]) ** 2 + (p[1] - cc[0][1]) ** 2 < cc[1] * (1 - 1e-12):
+                    bad.append(t)
+                else:
+                    keep.append(t)
+            # The cavity boundary: edges of the bad triangles that are not shared by two of them.
+            count = {}
+            for t in bad:
+                for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+                    count[tuple(sorted(e))] = count.get(tuple(sorted(e)), 0) + 1
+            tris = keep
+            for e, c in sorted(count.items()):
+                if c == 1:
+                    tris.append((e[0], e[1], i))
+        out = []
+        for t in tris:
+            if min(t) < 0:
+                continue
+            # Counter-clockwise, the orientation the element kernels assume.
+            (ax, ay), (bx, by), (cx, cy) = pts[t[0]], pts[t[1]], pts[t[2]]
+            if (bx - ax) * (cy - ay) - (by - ay) * (cx - ax) < 0:
+                t = (t[0], t[2], t[1])
+            out.append(t)
+        return sorted(out)
 
     def coord(self, n):
-        return (n % self.nnx, n // self.nnx)
+        return self.points[n]
 
     def element_nodes(self, e):
-        """Counter-clockwise, the ordering the element kernels assume."""
-        i, j = e % self.nx, e // self.nx
-        return [self.node(i, j), self.node(i + 1, j), self.node(i + 1, j + 1), self.node(i, j + 1)]
+        return list(self.tris[e])
 
     def element_centre(self, e):
-        i, j = e % self.nx, e // self.nx
-        return (i + 0.5, j + 0.5)
+        ps = [self.points[n] for n in self.tris[e]]
+        return (sum(p[0] for p in ps) / 3.0, sum(p[1] for p in ps) / 3.0)
 
 
 def morton_order(mesh):
@@ -76,16 +174,44 @@ def morton_order(mesh):
     its node set is huge. Measured consequence at pack_size 2048 on the real mesh: 2735 nodes
     per pack when space-filling against 4373 when lexicographic, and 1.25x in throughput.
 
-    Morton rather than Hilbert because it is four lines and the figure only needs the order to
-    be spatially coherent; the production path uses smesh::SFC."""
+    Keyed on the element CENTROID, quantised to a fine lattice, so it applies to a mesh whose
+    elements are not in rows -- which is also what makes the pack boundaries in the figure fall
+    where the curve leaves rather than along a straight line.
+
+    HILBERT rather than Morton. Morton is shorter but its curve jumps, so a pack of contiguous
+    indices comes out as several disconnected shards -- true of Morton, misleading as a picture of
+    a pack, and not what production does: smesh::SFC walks a Hilbert curve, whose packs are
+    compact and simply connected. The figure detaches two packs and they have to look like
+    subdomains, because that is what they are."""
+    cs = [mesh.element_centre(e) for e in range(mesh.nelements)]
+    x0 = min(c[0] for c in cs)
+    y0 = min(c[1] for c in cs)
+    span = max(max(c[0] for c in cs) - x0, max(c[1] for c in cs) - y0) or 1.0
+    res = 1 << 10
+
+    def hilbert_d(x, y, order=10):
+        """Distance along a Hilbert curve of side 2**order. The standard xy-to-d rotation."""
+        rx = ry = 0
+        d = 0
+        side = 1 << (order - 1)
+        while side > 0:
+            rx = 1 if (x & side) > 0 else 0
+            ry = 1 if (y & side) > 0 else 0
+            d += side * side * ((3 * rx) ^ ry)
+            # Rotate the quadrant so the curve stays continuous across it.
+            if ry == 0:
+                if rx == 1:
+                    x = side - 1 - x
+                    y = side - 1 - y
+                x, y = y, x
+            side >>= 1
+        return d
 
     def key(e):
-        x, y = e % mesh.nx, e // mesh.nx
-        k = 0
-        for b in range(16):
-            k |= ((x >> b) & 1) << (2 * b)
-            k |= ((y >> b) & 1) << (2 * b + 1)
-        return k
+        cx, cy = cs[e]
+        x = min(res - 1, int((cx - x0) / span * res))
+        y = min(res - 1, int((cy - y0) / span * res))
+        return (hilbert_d(x, y), e)
 
     return sorted(range(mesh.nelements), key=key)
 
@@ -163,7 +289,7 @@ class Packing:
             elems = order[p * elements_per_pack:(p + 1) * elements_per_pack]
             self.pack_elements.append(elems)
             seen, ghosts = set(), []
-            for v in range(4):  # node-major
+            for v in range(mesh.nodes_per_element):  # node-major
                 for e in elems:  # element-minor
                     n = self.new_of_old[self.mesh.element_nodes(e)[v]]
                     if self.owner_new[n] != p and n not in seen:
@@ -227,43 +353,150 @@ COLOR_DEFS = r"""\definecolor{PackA}{HTML}{4C72B0}
 """
 
 
-def fig_decomposition(pk, scale=0.92):
-    """F1: the pack decomposition, and the three kinds of node.
+def adjacent_pair(pk):
+    """The two packs worth detaching.
 
-    The figure the format section hangs on. Elements are tinted by pack; nodes are drawn by
-    role: exclusively owned (solid, in the owner's colour), owned but shared (solid with a
-    ring, because it is the node another pack will ghost), and -- in the inset -- what one
-    pack sees as a ghost."""
+    Ghosts flow one way between any two packs: ownership is first-touch in pack order, so of two
+    packs sharing a node the LOWER always owns it and the higher always holds the ghost. A pair
+    therefore shows arcs in one direction only, and that is a property of the format rather than
+    an artefact of the choice.
+
+    Chosen to maximise, in order, the number of DISTINCT owners appearing in the two packs' ghost
+    lists, then the number of arcs between them. Diversity first because the point most easily
+    missed is that one pack's ghost list spans several owners -- a pair whose ghosts all come
+    from each other would suggest the ghost list is a per-neighbour thing, which it is not.
+    """
+    best, bestkey = (0, min(1, pk.n_packs - 1)), (-1, -1)
+    for a in range(pk.n_packs):
+        for b in range(a + 1, pk.n_packs):
+            ga = pk.ghost_idx[pk.ghost_ptr[a]:pk.ghost_ptr[a + 1]]
+            gb = pk.ghost_idx[pk.ghost_ptr[b]:pk.ghost_ptr[b + 1]]
+            owned_a = range(pk.owned_nodes_ptr[a], pk.owned_nodes_ptr[a + 1])
+            owned_b = range(pk.owned_nodes_ptr[b], pk.owned_nodes_ptr[b + 1])
+            cross = (len(set(ga) & set(owned_b)) + len(set(gb) & set(owned_a)))
+            owners = {pk.owner_new[n] for n in ga} | {pk.owner_new[n] for n in gb}
+            key = (len(owners), cross)
+            if key > bestkey:
+                best, bestkey = (a, b), key
+    return best
+
+
+def pack_node_ids(pk, p):
+    """Every global id pack p addresses: its owned range then its ghost list."""
+    owned = list(range(pk.owned_nodes_ptr[p], pk.owned_nodes_ptr[p + 1]))
+    ghosts = pk.ghost_idx[pk.ghost_ptr[p]:pk.ghost_ptr[p + 1]]
+    return owned, list(ghosts)
+
+
+def _node_xy(pk, n):
+    """A node's coordinates. Coordinates belong to the node, so they follow the renumbering."""
+    return pk.mesh.coord(pk.old_of_new[n])
+
+
+def fig_decomposition(pk, scale=0.78, gap=1.6):
+    """F1: the decomposition, and two packs detached so the interface is visible.
+
+    Three rules carry the whole figure and are stated in the caption rather than a legend:
+    element fill is the pack, node colour is the OWNER, and opacity is ownership. A faded node
+    drawn in another pack's colour is therefore a ghost, and says whose it is without a label.
+
+    The detached pair is drawn from the model's own arrays -- owned ranges for the solid nodes,
+    ghost_idx for the faded ones -- so the picture cannot show a relationship the format does
+    not have.
+    """
     m = pk.mesh
+    a, b = adjacent_pair(pk)
     out = [PREAMBLE, COLOR_DEFS, r"\begin{tikzpicture}[scale=%.2f]" % scale]
 
+    xs = [p[0] for p in m.points]
+    width = max(xs) - min(xs)
+
+    def poly(e, fill, opacity=1.0, draw="black!45", lw="0.3pt", dx=0.0, dy=0.0):
+        pts = " -- ".join("(%.3f,%.3f)" % (m.points[n][0] + dx, m.points[n][1] + dy)
+                          for n in m.element_nodes(e))
+        return (r"  \filldraw[fill=%s,draw=%s,line width=%s,fill opacity=%.2f] %s -- cycle;"
+                % (fill, draw, lw, opacity, pts))
+
+    # ---- context: the whole mesh, tinted by pack -------------------------------------------
     for p in range(pk.n_packs):
         col = PACK_COLORS[p % len(PACK_COLORS)]
         for e in pk.pack_elements[p]:
-            i, j = e % m.nx, e // m.nx
-            out.append(r"  \fill[%s!28] (%d,%d) rectangle (%d,%d);" % (col, i, j, i + 1, j + 1))
-
-    out.append(r"  \draw[black!25,very thin] (0,0) grid (%d,%d);" % (m.nx, m.ny))
-
-    # Pack labels at the centroid of each pack's elements, on a white plate: unplated they sat
-    # under the node markers and were unreadable.
+            out.append(poly(e, "%s!30" % col))
     for p in range(pk.n_packs):
         col = PACK_COLORS[p % len(PACK_COLORS)]
         cs = [m.element_centre(e) for e in pk.pack_elements[p]]
         cx = sum(c[0] for c in cs) / len(cs)
         cy = sum(c[1] for c in cs) / len(cs)
-        out.append(r"  \node[%s,font=\bfseries,fill=white,inner sep=3pt,"
+        out.append(r"  \node[%s,font=\bfseries\scriptsize,fill=white,inner sep=1.6pt,"
                    r"rounded corners=1pt,draw=%s!60] at (%.2f,%.2f) {$P_%d$};" % (col, col, cx, cy, p))
+    out.append(r"  \node[anchor=north,font=\scriptsize\itshape,black!65] at (%.2f,%.2f) "
+               r"{pack boundaries follow the element order, not the geometry};"
+               % ((min(xs) + max(xs)) / 2.0, min(q[1] for q in m.points) - 0.25))
 
-    for n in range(m.nnodes):
-        # Coordinates are a property of the node, so they follow the renumbering.
-        x, y = m.coord(pk.old_of_new[n])
-        col = PACK_COLORS[pk.owner_new[n] % len(PACK_COLORS)]
-        if pk.shared_new[n]:
-            out.append(r"  \draw[%s,fill=%s,line width=0.7pt] (%d,%d) circle (0.155);" % (col, col, x, y))
-            out.append(r"  \draw[black,line width=0.5pt] (%d,%d) circle (0.235);" % (x, y))
-        else:
-            out.append(r"  \fill[%s] (%d,%d) circle (0.135);" % (col, x, y))
+    # ---- the two detached packs ------------------------------------------------------------
+    # Laid out from each pack's OWN bounding box rather than at fractions of the mesh width: the
+    # packs are compact but not equal in extent, and placing them by mesh fraction overlapped them.
+    ymin = min(q[1] for q in m.points)
+
+    def bbox(p):
+        ns = set()
+        for e in pk.pack_elements[p]:
+            ns.update(m.element_nodes(e))
+        ps = [m.points[n] for n in ns]
+        return (min(q[0] for q in ps), min(q[1] for q in ps),
+                max(q[0] for q in ps), max(q[1] for q in ps))
+
+    bxa, bxb = bbox(a), bbox(b)
+    wa, wb = bxa[2] - bxa[0], bxb[2] - bxb[0]
+    ha, hb = bxa[3] - bxa[1], bxb[3] - bxb[1]
+    drop = 1.25
+    # Centre the pair under the mesh, with a gap wide enough for the arcs to read.
+    total = wa + gap + wb
+    x_start = min(xs) + (width - total) / 2.0
+    top_row = ymin - drop
+    offs = {
+        a: (x_start - bxa[0], top_row - bxa[3]),
+        b: (x_start + wa + gap - bxb[0], top_row - bxb[3]),
+    }
+    label_y = top_row - max(ha, hb) - 0.30
+
+    arcs = []
+    for p in (a, b):
+        col = PACK_COLORS[p % len(PACK_COLORS)]
+        dx, dy = offs[p]
+        for e in pk.pack_elements[p]:
+            out.append(poly(e, "%s!38" % col, draw="%s!70" % col, lw="0.4pt", dx=dx, dy=dy))
+        owned, ghosts = pack_node_ids(pk, p)
+        for n in owned:
+            x, y = _node_xy(pk, n)
+            x, y = x + dx, y + dy
+            if pk.shared_new[n]:
+                out.append(r"  \draw[%s,fill=%s,line width=0.5pt] (%.3f,%.3f) circle (0.135);"
+                           % (col, col, x, y))
+                out.append(r"  \draw[black,line width=0.4pt] (%.3f,%.3f) circle (0.205);" % (x, y))
+            else:
+                out.append(r"  \fill[%s] (%.3f,%.3f) circle (0.115);" % (col, x, y))
+        # Ghosts: the OWNER's colour, faded, dashed outline. The dashes are the redundant cue
+        # that survives a greyscale print, where the opacity alone would not.
+        for n in ghosts:
+            ocol = PACK_COLORS[pk.owner_new[n] % len(PACK_COLORS)]
+            x, y = _node_xy(pk, n)
+            x, y = x + dx, y + dy
+            out.append(r"  \filldraw[fill=%s,draw=%s,fill opacity=0.30,draw opacity=0.85,"
+                       r"dashed,line width=0.45pt] (%.3f,%.3f) circle (0.135);" % (ocol, ocol, x, y))
+            if pk.owner_new[n] in (a, b):
+                odx, ody = offs[pk.owner_new[n]]
+                ox, oy = _node_xy(pk, n)
+                arcs.append(((x, y), (ox + odx, oy + ody), ocol))
+        lx = sum(_node_xy(pk, n)[0] for n in owned) / len(owned) + dx
+        out.append(r"  \node[%s,font=\bfseries\scriptsize,anchor=north] at (%.2f,%.2f) {$P_%d$};"
+                   % (col, lx, label_y, p))
+
+    # ---- the relation: each ghost to the node it duplicates --------------------------------
+    for (x0, y0), (x1, y1), col in arcs:
+        out.append(r"  \draw[%s,dashed,line width=0.4pt,draw opacity=0.75,->,>=stealth,"
+                   r"bend left=14] (%.3f,%.3f) to[bend left=14] (%.3f,%.3f);"
+                   % (col, x0, y0, x1, y1))
 
     out.append(r"\end{tikzpicture}")
     return "\n".join(out) + "\n"
@@ -279,10 +512,16 @@ def representative_pack(pk):
     Either would draw a two-zone id space and quietly contradict the text beside it. A middle
     pack has both, so the choice maximises the smaller of the two counts and falls back to the
     largest ghost list only if no pack has both."""
-    both = [p for p in range(pk.n_packs)
-            if pk.n_shared[p] > 0 and pk.ghost_ptr[p + 1] - pk.ghost_ptr[p] > 0]
+    def zones(p):
+        nc, ns = pk.n_contiguous(p), pk.n_shared[p]
+        return (nc - ns, ns, pk.ghost_ptr[p + 1] - pk.ghost_ptr[p])
+
+    # Maximise the SMALLEST of the three zones, so none of them is a sliver: the bar is drawn to
+    # scale and a two-node zone is too narrow to carry its own label, which is what a rule keyed
+    # only on shared and ghost counts produced.
+    both = [p for p in range(pk.n_packs) if min(zones(p)) > 0]
     if both:
-        return max(both, key=lambda p: min(pk.n_shared[p], pk.ghost_ptr[p + 1] - pk.ghost_ptr[p]))
+        return max(both, key=lambda p: (min(zones(p)), sum(zones(p))))
     return max(range(pk.n_packs), key=lambda p: pk.ghost_ptr[p + 1] - pk.ghost_ptr[p])
 
 
@@ -332,54 +571,98 @@ def fig_id_space(pk, p, scale=1.0):
     return "\n".join(out) + "\n"
 
 
-def fig_reduction(pk, scale=1.0, max_rows=4):
-    """F3: the ghost reduction as a CSR gather.
+def fig_reduction(pk, scale=0.92, max_rows=4):
+    """F3: the apply's two phases, anchored to the packs of Figure~F1.
 
-    Each destination is exactly one row, so one thread owns it and no atomic is needed -- and
-    the row's terms are visited in a fixed index order, which is what makes the reduction
-    bit-deterministic rather than merely race-free."""
-    rows = min(max_rows, len(pk.ghost_reduce_dest))
-    out = [PREAMBLE, COLOR_DEFS, r"\begin{tikzpicture}[scale=%.2f,font=\scriptsize]" % scale]
+    The gather is phase two, and drawing it alone is why it reads as an abstract list: what makes
+    it possible is phase one, where a pack writes the rows it owns STRAIGHT OUT -- no accumulation,
+    no prior zero-fill, because no other pack owns them -- and stages only the rest. So both phases
+    are drawn, and the cells carry the colour of the pack that staged them so a contribution can be
+    followed from a faded node in F1 to the node it lands on.
+    """
+    a, b = adjacent_pair(pk)
+    out = [PREAMBLE, COLOR_DEFS,
+           r"\begin{tikzpicture}[scale=%.2f,font=\scriptsize]" % scale]
 
-    out.append(r"  \node[anchor=south,font=\scriptsize\bfseries] at (1.1,%.2f) "
-               r"{\texttt{ghost\_buf}};" % (rows * 0.50 + 0.15))
-    out.append(r"  \node[anchor=south,font=\scriptsize\bfseries] at (7.4,%.2f) "
-               r"{global field};" % (rows * 0.50 + 0.15))
+    # Entries staged by the two detached packs, in the order they sit in ghost_buf.
+    entries = []
+    for p in (a, b):
+        for k in range(pk.ghost_ptr[p], pk.ghost_ptr[p + 1]):
+            entries.append((k, p, pk.ghost_idx[k]))
+    # Rows that consume at least two of them: a row of one term shows nothing about summation.
+    rows = []
+    for r in range(len(pk.ghost_reduce_dest)):
+        ks = pk.ghost_reduce_idx[pk.ghost_reduce_ptr[r]:pk.ghost_reduce_ptr[r + 1]]
+        if len(ks) >= 2:
+            rows.append((r, ks))
+    rows = sorted(rows, key=lambda rk: -len(rk[1]))[:max_rows]
+    rows.sort()
+    shown = [k for _r, ks in rows for k in ks]
 
-    # Entries, grouped by the row that consumes them, so the gather is visible.
-    ypos = {}
-    y = rows * 0.50 - 0.3
-    for r in range(rows):
-        beg, end = pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]
-        for j in range(beg, end):
-            entry = pk.ghost_reduce_idx[j]
-            # Which pack staged this entry: the one whose ghost range contains it.
-            p = max(q for q in range(pk.n_packs) if pk.ghost_ptr[q] <= entry)
-            col = PACK_COLORS[p % len(PACK_COLORS)]
-            out.append(r"  \draw[%s,fill=%s!25] (0.2,%.2f) rectangle (2.0,%.2f);" % (col, col, y, y + 0.36))
-            out.append(r"  \node at (1.1,%.2f) {\texttt{[%d]} from $P_%d$};" % (y + 0.21, entry, p))
-            ypos[j] = y + 0.18
-            y -= 0.50
-        y -= 0.10
+    # ---- phase one: two packs, their owned rows written out, their ghosts staged -----------
+    W, top = 9.2, 0.0
+    for i, p in enumerate((a, b)):
+        col = PACK_COLORS[p % len(PACK_COLORS)]
+        x = 0.7 + i * 3.1
+        out.append(r"  \draw[%s,fill=%s!16,rounded corners=2pt,line width=0.6pt] "
+                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (col, col, x, top, x + 2.5, top + 1.05))
+        out.append(r"  \node[%s,font=\bfseries] at (%.2f,%.2f) {$P_%d$};" % (col, x + 0.42, top + 0.75, p))
+        out.append(r"  \node[align=left,font=\tiny,anchor=north west] at (%.2f,%.2f) "
+                   r"{pack-private buffer\\owned rows $\;\to\;$ write\\ghosts $\;\to\;$ stage};"
+                   % (x + 0.78, top + 0.98))
 
-    y = rows * 0.50 - 0.3
-    for r in range(rows):
-        beg, end = pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]
-        mid = sum(ypos[j] for j in range(beg, end)) / (end - beg)
+    out.append(r"  \node[anchor=west,font=\tiny\itshape,black!65] at (%.2f,%.2f) "
+               r"{phase 1: accumulate locally};" % (7.0, top + 0.52))
+
+    # Owned rows leave directly for the global vector: the arrow that needs no reduction.
+    out.append(r"  \draw[->,>=stealth,black!60,line width=0.7pt] (3.2,%.2f) -- (3.2,%.2f);"
+               % (top - 0.08, top - 0.62))
+    out.append(r"  \node[anchor=west,font=\tiny,black!70] at (3.30,%.2f) "
+               r"{owned rows: plain write, no atomic and no zero-fill};" % (top - 0.36))
+
+    # ---- ghost_buf ------------------------------------------------------------------------
+    ybuf = top - 1.35
+    cw = min(0.62, (W - 1.4) / max(1, len(entries)))
+    out.append(r"  \node[anchor=east,font=\tiny\bfseries] at (0.62,%.2f) {\texttt{ghost\_buf}};" % (ybuf + 0.20))
+    xof = {}
+    for i, (k, p, dest) in enumerate(entries):
+        col = PACK_COLORS[p % len(PACK_COLORS)]
+        x = 0.7 + i * cw
+        xof[k] = x + cw / 2.0
+        hi = k in shown
+        out.append(r"  \draw[%s,fill=%s!%d,line width=0.4pt] (%.3f,%.2f) rectangle (%.3f,%.2f);"
+                   % (col, col, 42 if hi else 16, x, ybuf, x + cw, ybuf + 0.40))
+        if hi:
+            out.append(r"  \node[font=\tiny] at (%.3f,%.2f) {%d};" % (x + cw / 2.0, ybuf + 0.20, k))
+    out.append(r"  \node[anchor=west,font=\tiny\itshape,black!65] at (%.2f,%.2f) "
+               r"{one slot per staged contribution};" % (0.7 + len(entries) * cw + 0.15, ybuf + 0.20))
+
+    # ---- phase two: the CSR gather --------------------------------------------------------
+    out.append(r"  \node[anchor=west,font=\tiny\itshape,black!65] at (%.2f,%.2f) "
+               r"{phase 2: gather};" % (7.0, ybuf - 0.55))
+    ydest = ybuf - 1.55
+    n = len(rows)
+    for i, (r, ks) in enumerate(rows):
         dest = pk.ghost_reduce_dest[r]
         dcol = PACK_COLORS[pk.owner_new[dest] % len(PACK_COLORS)]
-        out.append(r"  \draw[%s,fill=%s!20] (6.4,%.2f) rectangle (8.4,%.2f);" % (dcol, dcol, mid - 0.21, mid + 0.21))
-        out.append(r"  \node at (7.4,%.2f) {node $%d$ $\mathrel{+}=$};" % (mid, dest))
-        for j in range(beg, end):
-            out.append(r"  \draw[->,black!65,line width=0.5pt] (2.05,%.2f) -- (6.35,%.2f);" % (ypos[j], mid))
-        y = mid
+        dx = 1.0 + i * (7.2 / max(1, n))
+        out.append(r"  \draw[%s,fill=%s!22,rounded corners=1.5pt,line width=0.5pt] "
+                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (dcol, dcol, dx, ydest, dx + 1.5, ydest + 0.44))
+        out.append(r"  \node[font=\tiny] at (%.2f,%.2f) {node %d $\mathrel{+}=$};"
+                   % (dx + 0.75, ydest + 0.22, dest))
+        for k in ks:
+            if k in xof:
+                out.append(r"  \draw[->,>=stealth,%s,line width=0.45pt,draw opacity=0.8] "
+                           r"(%.3f,%.2f) to[out=-90,in=90] (%.2f,%.2f);"
+                           % (dcol, xof[k], ybuf - 0.02, dx + 0.75, ydest + 0.46))
+        out.append(r"  \node[font=\tiny,black!55,anchor=north] at (%.2f,%.2f) "
+                   r"{row %d: \texttt{ptr}[%d..%d)};"
+                   % (dx + 0.75, ydest - 0.04, r, pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]))
 
-    # The caption sits below the LOWEST drawn entry, computed rather than guessed -- a fixed
-    # offset overlapped the last rows whenever a row had more than one term.
-    lowest = min(ypos.values()) if ypos else 0.0
-    out.append(r"  \node[anchor=north,align=center,font=\scriptsize] at (4.2,%.2f) {"
-               r"one row per destination $\Rightarrow$ no atomic, and\\a fixed summation order "
-               r"$\Rightarrow$ bit-deterministic};" % (lowest - 0.45))
+    out.append(r"  \node[anchor=north,align=center,font=\tiny] at (%.2f,%.2f) {"
+               r"each destination is reached by exactly one row $\Rightarrow$ no atomic;\\"
+               r"its terms are visited in a stored index order $\Rightarrow$ bit-deterministic};"
+               % (4.4, ydest - 0.42))
     out.append(r"\end{tikzpicture}")
     return "\n".join(out) + "\n"
 
@@ -426,8 +709,8 @@ def fig_scatters(scale=1.0):
 FIGURES = ("packed_decomposition", "packed_id_space", "packed_reduction", "packed_scatters")
 
 
-def build(out_dir, nx=8, ny=8, eper=16):
-    mesh = QuadMesh(nx, ny)
+def build(out_dir, nx=9, ny=7, eper=22):
+    mesh = TriMesh(nx, ny)
     pk = Packing(mesh, morton_order(mesh), eper)
     os.makedirs(out_dir, exist_ok=True)
     figs = {
@@ -449,13 +732,16 @@ def build(out_dir, nx=8, ny=8, eper=16):
     # Counts the paper's prose quotes, as macros, so no number is typed twice.
     with open(os.path.join(out_dir, "packed_counts.tex"), "w") as fh:
         fh.write(PREAMBLE)
-        fh.write(r"\newcommand{\figPackNx}{%d}" % nx + "\n")
-        fh.write(r"\newcommand{\figPackNy}{%d}" % ny + "\n")
+        # Element and node counts, not grid dimensions: the mesh is unstructured and has none.
+        fh.write(r"\newcommand{\figPackNElems}{%d}" % mesh.nelements + "\n")
         fh.write(r"\newcommand{\figPackElemsPerPack}{%d}" % eper + "\n")
         fh.write(r"\newcommand{\figPackNPacks}{%d}" % pk.n_packs + "\n")
         fh.write(r"\newcommand{\figPackNNodes}{%d}" % mesh.nnodes + "\n")
         fh.write(r"\newcommand{\figPackGhostEntries}{%d}" % len(pk.ghost_idx) + "\n")
         fh.write(r"\newcommand{\figPackReduceRows}{%d}" % len(pk.ghost_reduce_dest) + "\n")
+        a, b = adjacent_pair(pk)
+        fh.write(r"\newcommand{\figPackDetachedA}{%d}" % a + "\n")
+        fh.write(r"\newcommand{\figPackDetachedB}{%d}" % b + "\n")
     return pk, len(figs) + 2
 
 
@@ -473,9 +759,9 @@ def selftest():
 
     # Several shapes, including a pack size that does not divide the element count and a
     # lexicographic order, because the invariants must not depend on either.
-    for nx, ny, eper, order_name in ((8, 6, 6, "morton"), (8, 6, 7, "morton"), (6, 6, 4, "lex"),
-                                     (10, 4, 5, "morton"), (3, 3, 9, "morton")):
-        m = QuadMesh(nx, ny)
+    for nx, ny, eper, order_name in ((9, 7, 22, "morton"), (9, 7, 25, "morton"), (7, 6, 16, "lex"),
+                                     (11, 5, 19, "morton"), (4, 4, 40, "morton")):
+        m = TriMesh(nx, ny)
         order = morton_order(m) if order_name == "morton" else list(range(m.nelements))
         pk = Packing(m, order, eper)
         tag = "%dx%d/%d/%s" % (nx, ny, eper, order_name)
@@ -555,7 +841,7 @@ def selftest():
 
     # Determinism of the model itself: same input, same arrays. A generator that is not
     # reproducible cannot illustrate reproducibility.
-    m = QuadMesh(8, 6)
+    m = TriMesh(9, 7)
     a = Packing(m, morton_order(m), 6)
     b = Packing(m, morton_order(m), 6)
     check(a.owned_nodes_ptr == b.owned_nodes_ptr and a.ghost_idx == b.ghost_idx
@@ -564,7 +850,7 @@ def selftest():
     # The SFC precondition, as a measurable statement: a space-filling order gives smaller
     # pack node sets than a lexicographic one. This is the figure's justification for saying
     # reordering is a precondition rather than a tuning knob.
-    m = QuadMesh(16, 16)
+    m = TriMesh(16, 14)
     sfc = Packing(m, morton_order(m), 16)
     lex = Packing(m, list(range(m.nelements)), 16)
     mean_sfc = sum(sfc.n_pack_nodes(p) for p in range(sfc.n_packs)) / sfc.n_packs
@@ -585,6 +871,75 @@ def selftest():
                   "figure %s emits a tikzpicture" % name)
         check(os.path.exists(os.path.join(td, "packed_counts.tex")), "the counts macros are emitted")
 
+    # ---- the mesh itself -----------------------------------------------------------------
+    # The figure argues from a mesh, so a malformed one would undermine it quietly. Delaunay by
+    # Bowyer-Watson can degenerate on nearly-cocircular points; these catch that if the point set
+    # is ever changed.
+    tm = TriMesh()
+    edge_count = {}
+    for e in range(tm.nelements):
+        nn = tm.element_nodes(e)
+        for u, v in ((nn[0], nn[1]), (nn[1], nn[2]), (nn[2], nn[0])):
+            edge_count[(min(u, v), max(u, v))] = edge_count.get((min(u, v), max(u, v)), 0) + 1
+    check(all(c in (1, 2) for c in edge_count.values()),
+          "every edge is shared by one or two triangles")
+    check(len({tuple(sorted(t)) for t in tm.tris}) == tm.nelements,
+          "the triangulation has no duplicate triangles")
+    check(tm.nnodes - len(edge_count) + tm.nelements == 1,
+          "Euler characteristic is that of a disc",
+          "V-E+F = %d" % (tm.nnodes - len(edge_count) + tm.nelements))
+    used = {n for e in range(tm.nelements) for n in tm.element_nodes(e)}
+    check(len(used) == tm.nnodes, "every node belongs to at least one triangle")
+    areas = []
+    for e in range(tm.nelements):
+        (ax, ay), (bx, by), (cx, cy) = [tm.points[n] for n in tm.element_nodes(e)]
+        areas.append(0.5 * ((bx - ax) * (cy - ay) - (by - ay) * (cx - ax)))
+    check(all(a > 1e-6 for a in areas),
+          "every triangle is counter-clockwise and non-degenerate",
+          "min area %.3g" % min(areas))
+    check([tuple(round(c, 12) for c in q) for q in TriMesh().points] ==
+          [tuple(round(c, 12) for c in q) for q in TriMesh().points],
+          "the point set is reproducible")
+
+    # ---- the figures say what the model says ----------------------------------------------
+    fm = TriMesh()
+    fpk = Packing(fm, morton_order(fm), 22)
+    pa, pbb = adjacent_pair(fpk)
+    check(pa != pbb and 0 <= pa < fpk.n_packs and 0 <= pbb < fpk.n_packs,
+          "the detached pair is two distinct packs")
+    # Every arc F1 draws is a real ghost relation, and every such relation is drawn.
+    want = set()
+    for p in (pa, pbb):
+        for k in range(fpk.ghost_ptr[p], fpk.ghost_ptr[p + 1]):
+            n = fpk.ghost_idx[k]
+            if fpk.owner_new[n] in (pa, pbb):
+                want.add((p, n))
+    dec = fig_decomposition(fpk)
+    check(dec.count("to[bend left") == len(want),
+          "F1 draws exactly one arc per ghost relation between the detached packs",
+          "arcs %d, relations %d" % (dec.count("to[bend left"), len(want)))
+    # Faded nodes: one per ghost id of each detached pack, whatever its owner.
+    nghost = sum(fpk.ghost_ptr[p + 1] - fpk.ghost_ptr[p] for p in (pa, pbb))
+    check(dec.count("fill opacity=0.30") == nghost,
+          "F1 draws exactly one faded node per ghost id",
+          "faded %d, ghosts %d" % (dec.count("fill opacity=0.30"), nghost))
+    # Every row F3 draws is a real reduction row, drawn with the model's own pointers, and every
+    # row it draws sums at least two terms -- a one-term row would illustrate nothing. Counted
+    # rather than short-circuited: a tag that never matches would make this check vacuous, which
+    # is exactly how the first version of it passed while testing nothing.
+    red = fig_reduction(fpk)
+    drawn = 0
+    for r in range(len(fpk.ghost_reduce_dest)):
+        tag = "row %d: " % r
+        if tag not in red:
+            continue
+        drawn += 1
+        ks = fpk.ghost_reduce_idx[fpk.ghost_reduce_ptr[r]:fpk.ghost_reduce_ptr[r + 1]]
+        check(len(ks) >= 2, "F3 row %d sums several terms" % r)
+        check(("[%d..%d)" % (fpk.ghost_reduce_ptr[r], fpk.ghost_reduce_ptr[r + 1])) in red,
+              "F3 row %d carries the model's own pointer range" % r)
+    check(drawn > 0, "F3 draws at least one reduction row", "drew %d" % drawn)
+
     print()
     if fails:
         print("%d check(s) FAILED" % len(fails))
@@ -598,9 +953,11 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "..", "figures"))
     ap.add_argument("--selftest", action="store_true")
-    ap.add_argument("--nx", type=int, default=8)
-    ap.add_argument("--ny", type=int, default=8)
-    ap.add_argument("--elements-per-pack", type=int, default=16)
+    # nx/ny are the jittered lattice the points come from, not a grid of elements: the mesh is
+    # an unstructured triangulation of those points.
+    ap.add_argument("--nx", type=int, default=9)
+    ap.add_argument("--ny", type=int, default=7)
+    ap.add_argument("--elements-per-pack", type=int, default=22)
     args = ap.parse_args()
 
     if args.selftest:

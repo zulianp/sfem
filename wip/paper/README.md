@@ -35,9 +35,16 @@ Both are stdlib-only and carry `--selftest`, following the repository's report g
 Alps uenv has no numpy or matplotlib, and a generator that cannot run where the measurements run
 goes stale.
 
-`packed_format_figures.py` is a *model*, not a drawing. It reimplements the ownership rules from
-`spikes/cvfem/docs/PACKED_FORMAT.md` and its selftest asserts the format's documented invariants
-against that model --- owned ranges partitioning the index space, non-shared indices preceding
+`packed_format_figures.py` is a *model*, not a drawing. It builds an **unstructured** mesh --
+jittered points, Delaunay-triangulated by Bowyer-Watson, ordered along a Hilbert curve -- then
+reimplements the ownership rules from `spikes/cvfem/docs/PACKED_FORMAT.md` on it. Unstructured and
+Hilbert both matter to what the figure can show: on a grid the packs come out as rectangular blocks
+and read as a decomposition somebody chose, when a pack boundary is really wherever a contiguous
+range of the element order ends; and under a Morton order a pack is several disconnected shards,
+which is true of Morton but is not what `smesh::SFC` does and is misleading as a picture of a
+subdomain. The point set comes from an explicit LCG rather than `random`, so regeneration is
+byte-identical without depending on the interpreter. Its selftest asserts the format's documented
+invariants against that model --- owned ranges partitioning the index space, non-shared indices preceding
 shared ones, ghost lists deduplicated, each reduction destination appearing in exactly one row,
 every staged entry consumed exactly once. So the figures cannot disagree with the contract they
 illustrate. It independently reproduces the reordering precondition too: mean nodes per pack
