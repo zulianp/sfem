@@ -29,7 +29,16 @@ them, which is the same call the report already made for sum factorization.
 import os
 import unittest
 
-from codegen.framework.tools.evaluation_strategy import survey, violations
+import re
+
+from codegen.framework.tools.evaluation_strategy import (
+    flat_facet_tables,
+    survey,
+    violations,
+)
+
+#: The table literal's values, as the tool reads them out of emitted source.
+_VALUES = re.compile(r"s_t\(([^)]*)\)")
 
 
 def _generated_tree():
@@ -106,6 +115,46 @@ class EvaluationStrategyConformance(unittest.TestCase):
         self.assertEqual(
             [kind for kind, _ in violations(rows)],
             ["lowest-order simplex generating quadrature data"],
+        )
+
+    def test_a_flat_facet_that_kept_its_per_point_rows_is_caught(self):
+        # Same reason as above, for the facet rule.  The first version of that
+        # column reported zero both before and after the change it described,
+        # because it looked for a table beside a point-free measure and the fix
+        # removed both halves at once -- so this asserts against the table the
+        # defect actually had.
+        rows = [
+            {
+                "material": "invented",
+                "element": "tet4",
+                "family": "simplex-lowest",
+                "sum_factorised": True,
+                "quadrature_loops": 0,
+                "facet_gradients": 1,
+                "has_volume_kernels": True,
+            }
+        ]
+        self.assertEqual(
+            [kind for kind, _ in violations(rows)],
+            ["flat facet carrying one gradient row per quadrature point"],
+        )
+
+    def test_a_flat_facet_is_told_from_a_curved_one_by_its_rows(self):
+        """A triangle's three identical rows, against a curved facet's six."""
+        flat = " ".join("s_t(%d)," % v for v in (-1, -1, 1, 0, 0, 1) * 3)
+        curved = " ".join(
+            "s_t(%.3f)," % v for v in (0.1, 0.2, 0.3, 0.4, 0.5, 0.6,
+                                       0.7, 0.8, 0.9, 1.0, 1.1, 1.2)
+        )
+        self.assertTrue(
+            flat_facet_tables(
+                "", 3, [value for value in _VALUES.findall(flat)]
+            )
+        )
+        self.assertFalse(
+            flat_facet_tables(
+                "", 3, [value for value in _VALUES.findall(curved)]
+            )
         )
 
 
