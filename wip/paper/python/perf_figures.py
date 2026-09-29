@@ -526,6 +526,29 @@ def best(rows, **eq):
     return max((r["_mdof"] for r in sel), default=None)
 
 
+# BSR rows whose scalar index does not fit in 32 bits are not plotted, whatever they contain.
+#
+# The matrix holds block_size^2 scalars per block, and the host SpMV and the assembly reach them
+# through the matrix's own count type, which is int32_t in the default build. Once
+# bsr_nnz * block_entries passes 2^31 the offset wraps. On a CVFEM HEX8 cube the block count is
+# (3n+1)^3, so the first affected size is n = 171: measured, n = 168 runs and n = 172 segfaults.
+#
+# Today those runs crash and are simply missing from the csv, so this filter changes nothing. It
+# is here because a crash is the lucky outcome -- a wrapped offset that happens to land inside the
+# allocation returns a number instead, and a number is what gets plotted. The condition is read
+# from the row rather than hard-coded against n, so it holds for any block size and any mesh.
+def _bsr_index_fits(r):
+    try:
+        nnz = int(r.get("bsr_nnz") or 0)
+    except ValueError:
+        return True
+    if nnz <= 0:
+        return True
+    dofs, nodes = int(r.get("dofs") or 0), int(r.get("nodes") or 0)
+    bs = (dofs // nodes) if nodes else 4
+    return nnz * bs * bs <= 2**31 - 1
+
+
 def fig_throughput(rows, host, op="residual"):
     """F5. Throughput against problem size for the three representations.
 
@@ -552,7 +575,7 @@ def fig_throughput(rows, host, op="residual"):
         for n in sizes:
             v = max((r["_mdof"] for r in rows
                      if r["operation"] == "bsr_apply" and r["bsr_storage"] == store
-                     and r["_n"] == n), default=None)
+                     and r["_n"] == n and _bsr_index_fits(r)), default=None)
             if v:
                 pts.append((n, v))
         if pts:
@@ -1030,29 +1053,42 @@ def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None,
 
     # Each higher-order path STARTS at that layout's first-order residual point, so it is read as
     # one operator gaining a term rather than as four unrelated markers: the first step is the
-    # correction being switched on, and the rest is the limiter growing. Filled markers, because
-    # a hollow one already means something else here -- modelled rather than measured traffic.
-    for lay, col, lab in (("packed", "PackA", r"$+$ higher order, packed"),
-                          ("atomic", "PackD", r"$+$ higher order, atomic")):
+    # correction being switched on, and the rest is the limiter growing.
+    #
+    # COLOUR is the layout, SHAPE is the scheme. The four schemes used to share one marker and be
+    # named by two floating labels on the packed path, which left the atomic path's schemes
+    # anonymous and the middle two unnamed on both. Now each scheme carries its own shape and its
+    # own legend entry, drawn in black there because the shape is what the entry is about.
+    #
+    # The shapes are deliberately none of the six the first-order points use: the unlimited
+    # higher-order point sits next to its own layout's residual point on the path, and sharing a
+    # shape with it there would be exactly where the confusion lands. Filled, because a hollow
+    # marker already means something else in this figure -- modelled rather than measured traffic.
+    HO_MARKS = ["oplus*", "halfsquare*", "halfcircle*", "star"]
+    ho_seen = []
+    for lay, col in (("packed", "PackA"), ("atomic", "PackD")):
         path = (ho or {}).get(lay)
         if not path:
             continue
         start = next(((ai, gf) for l, ai, gf, _m in pts if l == "residual, " + lay), None)
         coords = ([start] if start else []) + [(ai, gf) for _n, ai, gf in path]
-        out.append(r"\addplot[%s,mark=*,mark size=1.5pt,thin,densely dotted] coordinates {%s};"
+        # The connecting line carries no marker and no legend entry of its own: its colour is the
+        # layout, which the first-order entries already establish, and the caption says what a
+        # dotted path is. Marking it here would draw a fifth shape over the four real ones.
+        out.append(r"\addplot[%s,mark=none,thin,densely dotted,forget plot] coordinates {%s};"
                    % (col, " ".join("(%.3f,%.1f)" % c for c in coords)))
-        out.append(r"\addlegendentry{%s}" % lab)
-        # The two ends of the packed path are named on the plot. Naming all four would put two
-        # labels within four points of each other at the left end, where the unlimited and
-        # clipped arms differ by a tenth of a FLOP/byte.
-        if lay == "packed" and len(path) >= 2:
-            # Set BESIDE their points, not above or below them: the path runs through the points,
-            # so a label offset vertically lands on the segment leaving the point, and one offset
-            # above the last point lands on the second-to-last. Horizontally there is nothing.
-            out.append(r"\node[%s,font=\tiny,anchor=east] at (axis cs:%.3f,%.1f) {unlimited};"
-                       % (col, path[0][1] * 0.95, path[0][2]))
-            out.append(r"\node[%s,font=\tiny,anchor=west] at (axis cs:%.3f,%.1f) "
-                       r"{Venkatakrishnan};" % (col, path[-1][1] * 1.05, path[-1][2]))
+        for i, (name, ai, gf) in enumerate(path):
+            mk = HO_MARKS[i % len(HO_MARKS)]
+            out.append(r"\addplot[%s,mark=%s,mark size=2.0pt,only marks,forget plot,"
+                       r"mark options={draw=%s,fill=%s}] coordinates {(%.3f,%.1f)};"
+                       % (col, mk, col, col, ai, gf))
+            if name not in ho_seen:
+                ho_seen.append(name)
+    # One legend entry per SCHEME, once, after the plots so the order reads with the path.
+    for i, name in enumerate(ho_seen):
+        out.append(r"\addlegendimage{black,mark=%s,mark size=2.0pt,only marks,"
+                   r"mark options={draw=black,fill=black}}" % HO_MARKS[i % len(HO_MARKS)])
+        out.append(r"\addlegendentry{%s}" % name)
 
     out.append(r"\end{loglogaxis}")
     out.append(r"\end{tikzpicture}")
