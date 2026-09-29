@@ -3,6 +3,7 @@
 \begin{tikzpicture}
 \begin{axis}[width=\columnwidth, height=0.44\columnwidth,
   ybar, bar width=7pt, ymin=0, ylabel={MDOF/s},
+  legend image code/.code={\draw[#1] (0cm,-0.09cm) rectangle (0.22cm,0.09cm);},
   symbolic x coords={upwind,unlimited,clip,Venkat.,Darwish--M.}, xtick=data,
   x tick label style={font=\tiny}, enlarge x limits=0.13,
   legend pos=north east, legend cell align=left,

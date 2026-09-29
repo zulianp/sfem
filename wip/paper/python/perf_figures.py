@@ -1299,6 +1299,11 @@ def fig_convho(rows, spmv=None):
         r"\begin{tikzpicture}",
         r"\begin{axis}[width=\columnwidth, height=0.44\columnwidth,",
         r"  ybar, bar width=7pt, ymin=0, ylabel={MDOF/s},",
+        # ONE swatch per bar entry. The ybar default draws a pair of bars in the legend, which
+        # says nothing here -- each series is one bar per group, not two -- and doubles the width
+        # of a legend that also has to hold two dashed reference lines. The SpMV entries below
+        # give their own legend image code and are unaffected by this.
+        r"  legend image code/.code={\draw[#1] (0cm,-0.09cm) rectangle (0.22cm,0.09cm);},",
         r"  symbolic x coords={%s}, xtick=data," % coords,
         r"  x tick label style={font=\tiny}, enlarge x limits=0.13,",
         r"  legend pos=north east, legend cell align=left,",
