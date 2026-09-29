@@ -342,6 +342,9 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
     // exact form is wanted. Without this the packed Jacobian is the frozen-pg one while the
     // residual is not, and Newton is capped at a linear rate.
     const bool   with_qg   = with_rc && !d.qgx.empty();
+    // The exact higher-order action, signalled the same way: a non-empty d.vgrad means
+    // apply_jacobian_action_accumulate reconstructed the direction's velocity gradient for it.
+    const bool   with_ho   = d.conv_ho != 0 && !d.ugrad.empty() && !d.vgrad.empty();
 
 #pragma omp parallel
     {
@@ -398,6 +401,9 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
 
             Hex8InputPack    u_pack;
             Hex8InputPack    du_pack;
+            Hex8UGradPack    hop, hovp;
+            hop.limiter  = d.conv_limiter;
+            hop.venkat_c = d.conv_venkat_c;
             Hex8ResidualPack outp;
             Hex8RhieChowPack rcp;
             alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE], cof2[CVFEM_HEX8_VEC_SIZE];
@@ -431,6 +437,28 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
                 }
                 if (with_qg)
                     cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
+                if (with_ho) {
+                    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                        const ptrdiff_t e = begin + lane;
+                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                            if (lane >= nlanes) {
+                                hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
+                                for (int c = 0; c < 9; ++c) {
+                                    hop.g[a][c][lane] = scalar_t(0); hovp.g[a][c][lane] = scalar_t(0);
+                                }
+                                continue;
+                            }
+                            const smesh::idx_t gn = d.elems[a][e];
+                            hop.x[a][lane] = scalar_t(d.points[0][gn]);
+                            hop.y[a][lane] = scalar_t(d.points[1][gn]);
+                            hop.z[a][lane] = scalar_t(d.points[2][gn]);
+                            for (int c = 0; c < 9; ++c) {
+                                hop.g[a][c][lane]  = d.ugrad[(ptrdiff_t)gn * 9 + c];
+                                hovp.g[a][c][lane] = d.vgrad[(ptrdiff_t)gn * 9 + c];
+                            }
+                        }
+                    }
+                }
                 cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
                                                           mu,
                                                           cof0,
@@ -449,7 +477,9 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
                                                           with_rc ? &rcp : nullptr,
                                                           d.rhie_chow_scale,
                                                           with_qg,
-                                                          d.upwind_eps);
+                                                          d.upwind_eps,
+                                                          with_ho ? &hop : nullptr,
+                                                          with_ho ? &hovp : nullptr);
                 cvfem_hex8_scatter_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
             }
 

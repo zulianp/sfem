@@ -298,7 +298,12 @@ set_tests_properties(cvfem_flat_vs_ss_packed PROPERTIES ENVIRONMENT "SFEM_SS_PAC
 add_test(NAME cvfem_conv_freeze
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_conv_freeze_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
-set_tests_properties(cvfem_conv_freeze PROPERTIES TIMEOUT 300)
+# 600, not 300, because this test gained a fourth solver arm: the LAGGED Jacobian, which is the
+# point of the assertion it feeds -- it must cost Newton steps, and it does, 35 against 13, which
+# makes it the most expensive run in the file. Isolated the test takes 134 s; under the suite's own
+# `ctest -j 6` it has been seen at 238 s and has timed out at 300. The limit was sized for the
+# shorter test, not for a slow machine.
+set_tests_properties(cvfem_conv_freeze PROPERTIES TIMEOUT 600)
 
 # A run cut in two must be the run that was not cut. The pump is used because it is the
 # cheapest case with an exact identity AND a time-varying boundary condition, so a segment

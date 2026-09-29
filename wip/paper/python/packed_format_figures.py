@@ -536,71 +536,75 @@ def fig_decomposition(pk, scale=0.78, gap=1.6):
     return "\n".join(out) + "\n"
 
 
-def representative_pack(pk):
-    """A pack that exhibits all three zones, which the extreme packs do not.
+def fig_id_space(pk, scale=1.0):
+    """F2: the pack-local index space, one drawn cell per local id, for every pack.
 
-    Ownership is first-touch in pack order, and that makes both ends degenerate:
-      * the LOWEST pack owns every node it touches, so it has no ghosts;
-      * the HIGHEST pack owns only nodes no earlier pack reached, so none of what it owns is
-        shared and its shared zone is empty.
-    Either would draw a two-zone id space and quietly contradict the text beside it. A middle
-    pack has both, so the choice maximises the smaller of the two counts and falls back to the
-    largest ghost list only if no pack has both."""
-    def zones(p):
-        nc, ns = pk.n_contiguous(p), pk.n_shared[p]
-        return (nc - ns, ns, pk.ghost_ptr[p + 1] - pk.ghost_ptr[p])
-
-    # Maximise the SMALLEST of the three zones, so none of them is a sliver: the bar is drawn to
-    # scale and a two-node zone is too narrow to carry its own label, which is what a rule keyed
-    # only on shared and ghost counts produced.
-    both = [p for p in range(pk.n_packs) if min(zones(p)) > 0]
-    if both:
-        return max(both, key=lambda p: (min(zones(p)), sum(zones(p))))
-    return max(range(pk.n_packs), key=lambda p: pk.ghost_ptr[p + 1] - pk.ghost_ptr[p])
-
-
-def fig_id_space(pk, p, scale=1.0):
-    """F2: one pack's local id space, the three zones, and how an id resolves.
-
-    This is the least obvious property of the format (spec S3) and the one a reader needs in
-    order to follow the flush: the first zone can be written without synchronisation by any
-    implementation, the second only by one where a pack is a single thread, and the third never
-    directly."""
-    nc, ns = pk.n_contiguous(p), pk.n_shared[p]
-    ng = pk.ghost_ptr[p + 1] - pk.ghost_ptr[p]
-    assert ng > 0 and ns > 0, ("fig_id_space needs a pack with both a shared zone and "
-                               "ghosts; see representative_pack()")
-    total = nc + ng
-    w = 12.0
-    unit = w / total
-    col = PACK_COLORS[p % len(PACK_COLORS)]
+    The zones are shown rather than counted: a cell's fill is its zone, and a ghost cell is
+    filled in the colour of the pack that owns it -- the same rule the mesh figure uses for its
+    faded nodes, so a ghost can be followed from one figure to the other. Drawing all of the
+    packs instead of a representative one is what makes the degenerate ends self-evident:
+    ownership is first-touch in pack order, so the lowest pack owns everything it touches and
+    has no ghost zone, and the highest owns nothing another pack touches and has no shared
+    zone. Both are visible here as a missing colour, and neither needs a caption."""
+    npk = [pk.n_pack_nodes(p) for p in range(pk.n_packs)]
+    wmax = max(npk)
+    u = 12.0 / wmax
+    h, pitch = 0.30, 0.40
 
     out = [PREAMBLE, COLOR_DEFS, r"\begin{tikzpicture}[scale=%.2f]" % scale]
+    for p in range(pk.n_packs):
+        col = PACK_COLORS[p % len(PACK_COLORS)]
+        yb = (pk.n_packs - 1 - p) * pitch
+        yt = yb + h
+        for l in range(npk[p]):
+            x0, x1 = l * u, (l + 1) * u
+            z = pk.zone(p, l)
+            if z == "ghost":
+                ocol = PACK_COLORS[pk.owner_new[pk.local_to_global(p, l)] % len(PACK_COLORS)]
+                out.append(r"  \fill[%s!75,fill opacity=0.40] (%.3f,%.3f) rectangle (%.3f,%.3f);"
+                           % (ocol, x0, yb, x1, yt))
+                out.append(r"  \draw[%s!75,densely dashed,line width=0.3pt] "
+                           r"(%.3f,%.3f) rectangle (%.3f,%.3f);" % (ocol, x0, yb, x1, yt))
+            else:
+                out.append(r"  \fill[%s!%d] (%.3f,%.3f) rectangle (%.3f,%.3f);"
+                           % (col, 30 if z == "exclusive" else 80, x0, yb, x1, yt))
+                out.append(r"  \draw[black!45,line width=0.3pt] (%.3f,%.3f) rectangle (%.3f,%.3f);"
+                           % (x0, yb, x1, yt))
+        # The two boundaries as rules rather than as algebra. Where a zone is empty the two
+        # coincide, or fall on the end of the row and are dropped as the row edge already
+        # draws them, which is the honest picture of an end pack and costs no annotation.
+        nc, ns = pk.n_contiguous(p), pk.n_shared[p]
+        for at in sorted({nc - ns, nc} - {0, npk[p]}):
+            out.append(r"  \draw[black,line width=0.55pt] (%.3f,%.3f) -- (%.3f,%.3f);"
+                       % (at * u, yb - 0.05, at * u, yt + 0.05))
+        out.append(r"  \node[font=\scriptsize,anchor=east] at (-0.12,%.3f) {$P_{%d}$};"
+                   % ((yb + yt) / 2, p))
+
+    # The index axis. This is the local space itself, so it is drawn once and shared: every
+    # pack starts at zero, and the ragged right ends are the differing $n_{\mathrm{pack}}$.
+    ry = (pk.n_packs - 1) * pitch + h + 0.08
+    out.append(r"  \draw[black!45,line width=0.3pt] (0,%.3f) -- (%.3f,%.3f);" % (ry, wmax * u, ry))
+    for l in range(0, wmax + 1, 5):
+        out.append(r"  \draw[black!45,line width=0.3pt] (%.3f,%.3f) -- (%.3f,%.3f);"
+                   % (l * u, ry, l * u, ry + 0.08))
+        if l % 10 == 0:
+            out.append(r"  \node[font=\scriptsize,anchor=south] at (%.3f,%.3f) {$%d$};"
+                       % (l * u, ry + 0.07, l))
+    out.append(r"  \node[font=\scriptsize,anchor=east] at (-0.12,%.3f) {$\ell$};" % (ry + 0.04))
+
+    ly = -0.24
     x = 0.0
-    for label, count, style in (
-        (r"exclusively owned", nc - ns, r"%s!45" % col),
-        (r"owned, shared", ns, r"%s!85" % col),
-        (r"ghost", ng, r"black!12"),
+    for fill, edge, text in (
+        (r"black!15", r"black!45,line width=0.3pt", r"exclusively owned"),
+        (r"black!45", r"black!45,line width=0.3pt", r"owned, also shared"),
+        (r"black!45,fill opacity=0.40", r"black!55,densely dashed,line width=0.3pt",
+         r"ghost, in its owner's colour"),
     ):
-        if count <= 0:
-            continue
-        out.append(r"  \fill[%s] (%.3f,0) rectangle (%.3f,0.8);" % (style, x, x + count * unit))
-        out.append(r"  \draw[black!55] (%.3f,0) rectangle (%.3f,0.8);" % (x, x + count * unit))
-        out.append(r"  \node[font=\scriptsize,align=center] at (%.3f,0.4) {%s\\($%d$)};"
-                   % (x + count * unit / 2, label, count))
-        x += count * unit
+        out.append(r"  \fill[%s] (%.3f,%.3f) rectangle (%.3f,%.3f);" % (fill, x, ly - 0.11, x + 0.30, ly + 0.11))
+        out.append(r"  \draw[%s] (%.3f,%.3f) rectangle (%.3f,%.3f);" % (edge, x, ly - 0.11, x + 0.30, ly + 0.11))
+        out.append(r"  \node[font=\scriptsize,anchor=west] at (%.3f,%.3f) {%s};" % (x + 0.38, ly, text))
+        x += 3.9
 
-    # The two boundaries that matter, named as the code names them. Anchored east/west at the
-    # ends so the outer labels cannot collide with the interior ones when a zone is narrow.
-    for at, lab in ((nc - ns, r"$n_c-n_s$"), (nc, r"$n_c$")):
-        out.append(r"  \draw[black,line width=0.6pt] (%.3f,-0.12) -- (%.3f,0.92);" % (at * unit, at * unit))
-        out.append(r"  \node[font=\scriptsize,below] at (%.3f,-0.14) {%s};" % (at * unit, lab))
-    out.append(r"  \node[font=\scriptsize,below right] at (0,-0.14) {$0$};")
-    out.append(r"  \node[font=\scriptsize,below left] at (%.3f,-0.14) {$n_{\mathrm{pack}}$};" % w)
-
-    out.append(r"  \node[font=\scriptsize,anchor=west,align=left] at (0,1.55) {"
-               r"$\ell < n_c$:\ \ global $=$ \texttt{owned\_nodes\_ptr}$[p]+\ell$\\"
-               r"$\ell \ge n_c$:\ \ global $=$ \texttt{ghost\_idx}$[\,$\texttt{ghost\_ptr}$[p]+\ell-n_c\,]$};")
     out.append(r"\end{tikzpicture}")
     return "\n".join(out) + "\n"
 
@@ -727,39 +731,19 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
 
     # ---- phase 2: one row of the reduction graph per destination ---------------------------
     n = len(rows)
-    dxs = []
+    drops = []
     for i, (r, ks) in enumerate(rows):
         dest = pk.ghost_reduce_dest[r]
         dcol = PACK_COLORS[pk.owner_new[dest] % len(PACK_COLORS)]
         dw = 1.45
         dx = L + 0.8 + i * ((R - L - 1.6 - dw) / max(1, n - 1) if n > 1 else 0)
-        # The drop to the global field leaves from the box's right, so it does not run through
-        # the row label centred beneath it.
-        dxs.append(dx + dw - 0.08)
+        drops.append((dx + dw / 2.0, dest, dcol))
         out.append(r"  \draw[%s,fill=%s!22,rounded corners=1.5pt,line width=0.5pt] "
                    r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (dcol, dcol, dx, y2b + 0.42, dx + dw, y2b + 0.92))
         # Symbolic indices where the data supports them: what the figure is about is the shape of
         # the gather, not which node happened to land in row six of this mesh.
-        if symbolic:
-            # The row index is k; the range is over ENTRIES, which is a different thing and so
-            # gets its own letters. Consecutive rows share a bound -- row k ends where row k{+}1
-            # begins -- which is what a..b, b..c says and is true of the graph by construction.
-            bounds = "abcdefgh"
-            node_lbl = r"node $%s$" % _sym("i", i)
-            row_lbl = (r"row $%s$: \texttt{idx}[$%s$..$%s$)"
-                       % (_sym("k", i), bounds[i], bounds[i + 1]))
-        else:
-            node_lbl = r"node %d" % dest
-            row_lbl = (r"row %d: \texttt{ptr}[%d..%d)"
-                       % (r, pk.ghost_reduce_ptr[r], pk.ghost_reduce_ptr[r + 1]))
+        node_lbl = r"node $%s$" % _sym("i", i) if symbolic else r"node %d" % dest
         out.append(r"  \node[font=\tiny] at (%.2f,%.2f) {%s};" % (dx + dw / 2.0, y2b + 0.67, node_lbl))
-        # Set left of the box, not under its centre: the label is about as wide as the box, and
-        # the drop to the global field leaves from the box's right end, so anything centred here
-        # runs into it. The offset is what keeps the two apart.
-        # The offset grows with the index because the label does: "row k+1: ptr[k+1..k+2)" is
-        # wider than "row k: ptr[k..k+1)", and a fixed offset left the later one under its arrow.
-        out.append(r"  \node[font=\tiny,black!50,anchor=north west] at (%.2f,%.2f) {%s};"
-                   % (dx - 0.72 - 0.22 * i, y2b + 0.38, row_lbl))
         for k in ks:
             if k in xof:
                 out.append(r"  \draw[->,>=stealth,%s,line width=0.45pt,draw opacity=0.8] "
@@ -767,20 +751,47 @@ def fig_reduction(pk, scale=0.92, max_rows=4):
                            % (dcol, xof[k], ybuf - 0.02, dx + dw / 2.0, y2b + 0.94))
 
     # ---- the global field, reached by both phases ------------------------------------------
-    out.append(r"  \draw[black!45,fill=black!5,rounded corners=2pt,line width=0.6pt] "
-               r"(%.2f,%.2f) rectangle (%.2f,%.2f);" % (L + 0.5, yglob, R - 0.5, yglob + 0.42))
-    out.append(r"  \node[font=\tiny,black!70] at (%.2f,%.2f) {global field};"
-               % ((L + R) / 2.0, yglob + 0.21))
+    # Drawn in owner colour, one band per pack: the global ids are renumbered in pack order, so
+    # ownership along the field is monotonic and each pack owns exactly one contiguous run of it.
+    # That is what lets both paths below be drawn to a place rather than to the array as a whole.
+    gL, gR = L + 0.5, R - 0.5
+    nn = pk.owned_nodes_ptr[pk.n_packs]
+    band = [(gL + (gR - gL) * pk.owned_nodes_ptr[p] / nn,
+             gL + (gR - gL) * pk.owned_nodes_ptr[p + 1] / nn) for p in packs]
+    for p in packs:
+        col = PACK_COLORS[p % len(PACK_COLORS)]
+        x0, x1 = band[p]
+        out.append(r"  \draw[%s,fill=%s!16,line width=0.6pt] (%.2f,%.2f) rectangle (%.2f,%.2f);"
+                   % (col, col, x0, yglob, x1, yglob + 0.42))
+        out.append(r"  \node[%s,font=\tiny] at (%.2f,%.2f) {$P_%d$};"
+                   % (col, (x0 + x1) / 2.0, yglob + 0.21, p))
+    out.append(r"  \node[anchor=west,font=\tiny,black!60] at (%.2f,%.2f) {global field};"
+               % (gR + 0.12, yglob + 0.21))
+
     # Owned rows bypass the gather entirely: down the left lane, outside both frames, so the one
-    # path that needs no reduction is also the one that touches nothing on its way.
-    out.append(r"  \draw[->,>=stealth,black!55,line width=0.7pt] "
-               r"(%.2f,%.2f) to[out=180,in=90] (%.2f,%.2f) to[out=-90,in=180] (%.2f,%.2f);"
-               % (L + 0.5, (box_b + box_t) / 2.0, LANE, (y1b + yglob) / 2.0, L + 0.52, yglob + 0.21))
+    # path that needs no reduction is also the one that touches nothing on its way. It leaves the
+    # phase-1 frame rather than any one accumulator, because every pack writes its own owned rows,
+    # and it arrives as one arrow per pack into that pack's own band.
+    ybus = yglob - 0.62
+    out.append(r"  \draw[black!55,line width=0.7pt] (%.2f,%.2f) to[out=180,in=90] (%.2f,%.2f) "
+               r"to[out=-90,in=180] (%.2f,%.2f);"
+               % (L, (y1t + y1b) / 2.0, LANE, (y1b + ybus) / 2.0, gL + 0.1, ybus))
+    out.append(r"  \draw[black!55,line width=0.7pt] (%.2f,%.2f) -- (%.2f,%.2f);"
+               % (gL + 0.1, ybus, (band[-1][0] + band[-1][1]) / 2.0, ybus))
+    for p in packs:
+        col = PACK_COLORS[p % len(PACK_COLORS)]
+        x0, x1 = band[p]
+        out.append(r"  \draw[->,>=stealth,%s,line width=0.55pt] (%.2f,%.2f) -- (%.2f,%.2f);"
+                   % (col, (x0 + x1) / 2.0, ybus, (x0 + x1) / 2.0, yglob - 0.02))
     out.append(r"  \node[font=\tiny,black!60,rotate=90,anchor=south] at (%.2f,%.2f) {owned rows};"
-               % (LANE - 0.06, (y1b + yglob) / 2.0))
-    for dx in dxs:
-        out.append(r"  \draw[->,>=stealth,black!45,line width=0.5pt] (%.2f,%.2f) -- (%.2f,%.2f);"
-                   % (dx, y2b + 0.40, dx, yglob + 0.44))
+               % (LANE - 0.06, (y1b + ybus) / 2.0))
+
+    # Each gathered destination drops onto its own place in the field, which is inside the band
+    # of the pack that owns it -- the same colour the row's box carries.
+    for dx, dest, dcol in drops:
+        out.append(r"  \draw[->,>=stealth,%s,line width=0.5pt,draw opacity=0.85] "
+                   r"(%.2f,%.2f) to[out=-90,in=90] (%.2f,%.2f);"
+                   % (dcol, dx, y2b + 0.40, gL + (gR - gL) * (dest + 0.5) / nn, yglob + 0.44))
 
     out.append(r"\end{tikzpicture}")
     return "\n".join(out) + "\n"
@@ -823,9 +834,66 @@ def fig_scatters(scale=1.0):
     return "\n".join(out) + "\n"
 
 
+def fig_schemes(scale=1.0):
+    """F-schemes: what each convective scheme actually sweeps, as a graph.
+
+    Schematic, like the scatter panel: the subject is the pass structure, not any one mesh. The
+    three rows are the three schemes the results section reports, and they differ only in what
+    stands between the state and the element sweep -- which is the fact the throughput comparison
+    keeps running into, and which a reader otherwise has to assemble from a table of counts.
+
+    The pre-sweep column is reserved on every row, so a scheme that has none shows the gap rather
+    than sliding left and losing the comparison. A dashed box runs once per Newton step and is
+    reused across the Krylov solve; it is not free, it is amortised, and rebuilding it inside
+    every application instead makes it solid -- which is the per-apply variant of the ladder.
+    Each element sweep carries the ghost reduction that closes it, because in this format the two
+    are one algorithm and drawing them apart invites the reading that a sweep could be had
+    without its reduction.
+    """
+    rows = [
+        (r"first order",           None),
+        (r"$+$ Rhie--Chow",        r"$\nabla p(u)$"),
+        (r"$+$ higher-order flux", r"$\nabla u(u)$"),
+    ]
+    W, H, GAP = 1.55, 0.40, 0.34     # box width, box height, gap between boxes
+    PITCH = 0.60                     # row pitch
+    LABEL_W = 2.35                   # room for the row name at the left
+    out = [PREAMBLE, COLOR_DEFS, r"\begin{tikzpicture}[scale=%.2f,font=\scriptsize]" % scale]
+
+    def box(x, y, w, text, dashed, col):
+        out.append(r"  \draw[%s,fill=%s!14,rounded corners=2pt,line width=0.5pt%s] "
+                   r"(%.2f,%.2f) rectangle (%.2f,%.2f);"
+                   % (col, col, ",densely dashed" if dashed else "", x, y, x + w, y + H))
+        out.append(r"  \node[font=\tiny,align=center] at (%.2f,%.2f) {%s};"
+                   % (x + w / 2.0, y + H / 2.0, text))
+
+    def arrow(x0, x1, y, dashed):
+        out.append(r"  \draw[->,>=stealth,black!55,line width=0.5pt%s] (%.2f,%.2f) -- (%.2f,%.2f);"
+                   % (",densely dashed" if dashed else "", x0, y + H / 2.0, x1, y + H / 2.0))
+
+    for i, (name, pre) in enumerate(rows):
+        y = (len(rows) - 1 - i) * PITCH
+        out.append(r"  \node[anchor=east,font=\tiny] at (%.2f,%.2f) {%s};"
+                   % (LABEL_W - 0.12, y + H / 2.0, name))
+        if pre:
+            box(LABEL_W, y, W, r"%s sweep" % pre, True, "PackB")
+            arrow(LABEL_W + W, LABEL_W + W + GAP, y, True)
+        x = LABEL_W + W + GAP
+        box(x, y, W, r"element sweep", False, "PackA")
+        arrow(x + W, x + W + GAP, y, False)
+        box(x + W + GAP, y, W * 0.80, r"ghost reduce", False, "PackC")
+
+    out.append(r"  \node[anchor=west,font=\tiny,black!55] at (%.2f,%.2f) {"
+               r"dashed: once per Newton step, reused across the Krylov solve};"
+               % (0.1, -0.42))
+    out.append(r"\end{tikzpicture}")
+    return "\n".join(out) + "\n"
+
+
 # ---------------------------------------------------------------------------------------------
 
-FIGURES = ("packed_decomposition", "packed_id_space", "packed_reduction", "packed_scatters")
+FIGURES = ("packed_decomposition", "packed_id_space", "packed_reduction", "packed_scatters",
+           "scheme_passes")
 
 
 def build(out_dir, nx=9, ny=7, eper=42):
@@ -834,9 +902,10 @@ def build(out_dir, nx=9, ny=7, eper=42):
     os.makedirs(out_dir, exist_ok=True)
     figs = {
         "packed_decomposition": fig_decomposition(pk),
-        "packed_id_space": fig_id_space(pk, representative_pack(pk)),
+        "packed_id_space": fig_id_space(pk),
         "packed_reduction": fig_reduction(pk),
         "packed_scatters": fig_scatters(),
+        "scheme_passes": fig_schemes(),
     }
     for name, body in figs.items():
         with open(os.path.join(out_dir, name + ".tex"), "w") as fh:
@@ -1042,6 +1111,22 @@ def selftest():
     check(dec.count("fill opacity=0.30") == nghost,
           "F1 draws exactly one faded node per ghost id",
           "faded %d, ghosts %d" % (dec.count("fill opacity=0.30"), nghost))
+    # F2 draws the index space slot by slot, so the cells it emits are checked against the
+    # model rather than against their labels: one cell per local id, and every ghost cell
+    # filled in the colour of the pack that actually owns the node behind it.
+    ids = fig_id_space(fpk)
+    ncells = sum(fpk.n_pack_nodes(p) for p in range(fpk.n_packs))
+    check(ids.count(r"\fill[") == ncells + 3,
+          "F2 draws one cell per pack-local id, plus three legend swatches",
+          "fills %d, ids %d" % (ids.count(r"\fill["), ncells))
+    for owner in range(fpk.n_packs):
+        col = PACK_COLORS[owner % len(PACK_COLORS)]
+        want_g = sum(1 for n in fpk.ghost_idx if fpk.owner_new[n] == owner)
+        got = ids.count(r"\fill[%s!75,fill opacity=0.40]" % col)
+        check(got == want_g,
+              "F2 fills %d ghost cells in $P_{%d}$'s colour" % (want_g, owner),
+              "drawn %d" % got)
+
     # What F3 draws must be real. Every row it selects sums at least two terms -- a one-term row
     # illustrates nothing about summation -- and the arrows it draws are one per entry of those
     # rows. Checked against the selection rather than by matching label text: the labels are now
@@ -1057,20 +1142,21 @@ def selftest():
     check(red.count("to[out=-90,in=90]") >= nterms,
           "F3 draws one fan-in arrow per entry of the rows it shows",
           "arrows %d, entries %d" % (red.count("to[out=-90,in=90]"), nterms))
-    # The symbolic labels assert two relations. They may only be used when the data has them.
+    # The one symbolic label left asserts a relation, and may only be used when the data has it.
     if sym:
         idx = [r for r, _ in sel]
-        check(all(b == a + 1 for a, b in zip(idx, idx[1:])),
-              "F3's row $k$, $k{+}1$ labels are used only on consecutive rows")
         dst = [fpk.ghost_reduce_dest[r] for r in idx]
         check(all(b == a + 1 for a, b in zip(dst, dst[1:])),
               "F3's node $i$, $i{+}1$ labels are used only on consecutive destinations")
-        check("$i$" in red and "$k$" in red, "F3 emits the symbolic indices it selected for")
-        # a..b, b..c claims consecutive rows share a bound. The CSR gives that, and the check
-        # keeps the labels honest if the selection ever stops being a contiguous run.
-        check(all(fpk.ghost_reduce_ptr[a + 1] == fpk.ghost_reduce_ptr[b]
-                  for a, b in zip(idx, idx[1:])),
-              "F3's a..b, b..c labels are used only where the rows share a bound")
+        check("$i$" in red, "F3 emits the symbolic index it selected for")
+    # Both paths into the global field are drawn to a place in it, so the bands have to be the
+    # ownership partition: one per pack, covering it exactly and in order.
+    nn = fpk.owned_nodes_ptr[fpk.n_packs]
+    check(fpk.owned_nodes_ptr[0] == 0 and nn == fm.nnodes
+          and all(fpk.owned_nodes_ptr[p] <= fpk.owned_nodes_ptr[p + 1] for p in range(fpk.n_packs)),
+          "the global field's owner bands tile it in pack order")
+    check(red.count(r"{global field}") == 1 and red.count(r"rectangle") >= fpk.n_packs,
+          "F3 draws the global field once, banded")
 
     print()
     if fails:

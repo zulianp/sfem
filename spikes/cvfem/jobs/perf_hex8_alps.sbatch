@@ -206,6 +206,14 @@ op_flag() {
         # unquoted.
         residual-ho)      printf -- "--conv-ho 0" ;;
         residual-ho-simd) printf -- "--conv-ho 0 --ho-simd" ;;
+        # The nodal gradient reconstruction on its own, at one field (the pressure gradient every
+        # Rhie-Chow residual builds) and three (the velocity gradient the exact higher-order
+        # Jacobian action rebuilds per matvec). The counter groups are chosen for exactly the
+        # question this kernel poses: `simd` says whether the scalar element loop vectorises at
+        # all and what its indexed gather costs, `stalls` says whether the broadcast-to-eight-nodes
+        # scatter is stalling on memory, and `scf` gives it a roofline point.
+        nodal-grad-1)     printf -- "--nodal-grad 1" ;;
+        nodal-grad-3)     printf -- "--nodal-grad 3" ;;
         *) die "unknown operation '$1'" ;;
     esac
 }
@@ -250,7 +258,7 @@ for op in ${OPS}; do
 
         # a plain run first, so the csv carries the wall time the counters belong to
         run_step "${cmd[@]}" >"${OUT_DIR}/run_${cfg}.txt" 2>&1 || true
-        secs="$(grep -m1 -E 'seconds_per_(assemble|apply|jac_action|bsr_apply):' "${OUT_DIR}/run_${cfg}.txt" \
+        secs="$(grep -m1 -E 'seconds_per_(assemble|apply|jac_action|bsr_apply|nodal_grad):' "${OUT_DIR}/run_${cfg}.txt" \
                 | awk '{print $2}')"
         secs="${secs:-nan}"
 

@@ -39,6 +39,10 @@
 #include <cstdio>
 #include <vector>
 
+// Ghost staging for the packed reconstruction, held once for the whole test rather than
+// created per call: the sweep grows it to n_ghost_entries * 3 and reuses it thereafter.
+static std::vector<scalar_t> ng_gbuf;
+
 static int g_failures = 0;
 
 static void check(const bool ok, const char *what, const double got = 0.0) {
@@ -81,7 +85,7 @@ int main(int argc, char **argv) {
     precompute_affine_geometry(d);
     fill_fields(d);
     d.rhie_chow_scale = 1;
-    cvfem_hex8_assemble_nodal_grad_packed(d, packed, 0, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
+    cvfem_hex8_assemble_nodal_grads_packed(d, packed, 0, d.p.data(), 1, d.pgx, d.pgy, d.pgz, ng_gbuf);
 
     // A direction unrelated to the state, and its reconstructed pressure gradient, so the
     // exact Rhie-Chow term is live in both applies.
@@ -93,7 +97,7 @@ int main(int argc, char **argv) {
         dir[(size_t)i * N_FIELDS + 2] = scalar_t(0.23) + scalar_t(0.13) * y - scalar_t(0.19) * x;
         dir[(size_t)i * N_FIELDS + 3] = scalar_t(0.7) + std::sin(scalar_t(1.7) * x) * (scalar_t(1) + y);
     }
-    cvfem_hex8_assemble_nodal_grad_packed(d, packed, 0, dir.data() + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
+    cvfem_hex8_assemble_nodal_grads_packed(d, packed, 0, dir.data() + 3, N_FIELDS, d.qgx, d.qgy, d.qgz, ng_gbuf);
 
     std::vector<scalar_t> jv_direct((size_t)d.nnodes * N_FIELDS, 0);
     std::vector<scalar_t> jv_pa((size_t)d.nnodes * N_FIELDS, 0);
@@ -128,12 +132,12 @@ int main(int argc, char **argv) {
     {
         std::vector<scalar_t> dir2 = dir, jv2((size_t)d.nnodes * N_FIELDS, 0);
         for (scalar_t &v : dir2) v *= 2;
-        cvfem_hex8_assemble_nodal_grad_packed(d, packed, 0, dir2.data() + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
+        cvfem_hex8_assemble_nodal_grads_packed(d, packed, 0, dir2.data() + 3, N_FIELDS, d.qgx, d.qgy, d.qgz, ng_gbuf);
         apply_jacobian_action_packed_pa(d, packed, rho, mu, dir2.data(), jv2.data());
         scalar_t w = 0;
         for (size_t i = 0; i < jv2.size(); ++i) w = std::max(w, std::fabs(jv2[i] - 2 * jv_pa[i]));
         check(w <= scalar_t(1e-13) * scale, "the action is linear in the direction", (double)(w / scale));
-        cvfem_hex8_assemble_nodal_grad_packed(d, packed, 0, dir.data() + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
+        cvfem_hex8_assemble_nodal_grads_packed(d, packed, 0, dir.data() + 3, N_FIELDS, d.qgx, d.qgy, d.qgz, ng_gbuf);
     }
 
     // ---- the cache -----------------------------------------------------------------

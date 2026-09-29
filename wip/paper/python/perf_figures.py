@@ -15,6 +15,8 @@ Usage:
 """
 
 import argparse
+import collections
+import math
 import os
 import re
 import sys
@@ -74,28 +76,6 @@ def parse_determinism(path):
 
 
 OP_NAME = {"res": "residual", "jac": "Jacobian action"}
-
-
-def table_determinism(rows, meta):
-    """T2. The verdict column is the point: 1 distinct output means bit-reproducible.
-
-    Rows are compared DOWN a column and never across, because packing renumbers the mesh and a
-    fingerprint folds the output in node order -- so two layouts disagree by construction even
-    when both are perfectly reproducible. The table says so in its own note rather than relying
-    on the prose to carry it.
-    """
-    out = [PREAMBLE, r"\begin{tabular}{llcc}", r"\toprule",
-           r"& & \multicolumn{2}{c}{distinct outputs} \\",
-           r"\cmidrule(lr){3-4}",
-           r"layout & operator & repeats & thread counts \\",
-           r"\midrule"]
-    for layout, op, a, b in rows:
-        verdict = lambda d, n: (r"\textbf{%d} / %d" % (d, n)) if d == 1 else ("%d / %d" % (d, n))
-        out.append(r"\texttt{%s} & %s & %s & %s \\"
-                   % (layout, OP_NAME.get(op, op), verdict(*a), verdict(*b)))
-    out.append(r"\bottomrule")
-    out.append(r"\end{tabular}")
-    return "\n".join(out) + "\n"
 
 
 def macros_determinism(rows, meta):
@@ -323,6 +303,18 @@ def table_footprint(rows, mesh=None, n=128):
 # F6: thread scaling   (restored -- lost to an over-wide block replacement, see README)
 # ---------------------------------------------------------------------------------------------
 
+# What the scaling figure draws, in drawing order. The coloured sweep is measured and quoted in
+# the text but is not drawn: it differs from the packed layout in one thing only, the barrier per
+# colour, and that comparison belongs to the throughput section rather than to a scaling figure
+# whose subject is the departure from ideal. The higher-order arm is the same operator through a
+# limited deferred correction, so the pair says whether the scaling depends on the scheme.
+SCALING_SERIES = (
+    ("packed", "res",   "PackA", "*",       r"\texttt{packed}"),
+    ("atomic", "res",   "PackD", "square*", r"\texttt{atomic}"),
+    ("packed", "resho", "PackA", "o",       r"\texttt{packed}, higher order"),
+    ("atomic", "resho", "PackD", "square",  r"\texttt{atomic}, higher order"),
+)
+
 LAYOUT_STYLE = {
     "packed":  ("PackA", "*"),
     "atomic":  ("PackD", "square*"),
@@ -348,7 +340,7 @@ def parse_scaling(path):
                     meta["n"] = tok[2:]
             continue
         f = t.split()
-        if len(f) >= 4 and f[0] in LAYOUT_STYLE and f[1] in ("res", "jac"):
+        if len(f) >= 4 and f[0] in LAYOUT_STYLE and f[1] in ("res", "jac", "resho"):
             if f[3] == "-":
                 continue
             try:
@@ -367,7 +359,9 @@ def fig_scaling(series, meta, op="res"):
     """F6. Throughput against thread count, log-log with an ideal line.
 
     Log-log because the content is the DEPARTURE from ideal, and on linear axes the low thread
-    counts are invisible.
+    counts are invisible. Four curves: two layouts, each at first order and with the limited
+    higher-order flux, so the figure answers whether the layout's scaling depends on the scheme
+    as well as how each layout scales.
     """
     out = [PREAMBLE,
            r"\begin{tikzpicture}",
@@ -380,11 +374,11 @@ def fig_scaling(series, meta, op="res"):
            r"  grid=both, major grid style={black!12}, minor grid style={black!6},",
            r"  tick label style={font=\tiny}, label style={font=\scriptsize},",
            r"]"]
-    # The ideal line is anchored on the SLOWEST layout at one thread, so the reference is not
+    # The ideal line is anchored on the SLOWEST curve at one thread, so the reference is not
     # drawn from the layout being advocated.
     base = None
-    for layout in ("atomic", "packed", "colored"):
-        pts = series.get((layout, op))
+    for lay, o, _c, _m, _l in SCALING_SERIES:
+        pts = series.get((lay, o))
         if pts and pts[0][0] == 1 and (base is None or pts[0][1] < base[1]):
             base = pts[0]
     if base:
@@ -393,14 +387,13 @@ def fig_scaling(series, meta, op="res"):
                    r"{(1,%.4f) (72,%.4f)};" % (m0, m0 * 72.0 / t0))
         out.append(r"\node[black!55,font=\tiny,rotate=37,anchor=south east] "
                    r"at (axis cs:36,%.1f) {ideal};" % (m0 * 30.0))
-    for layout in ("packed", "atomic", "colored"):
-        pts = series.get((layout, op))
+    for lay, o, col, mark, lab in SCALING_SERIES:
+        pts = series.get((lay, o))
         if not pts:
             continue
-        col, mark = LAYOUT_STYLE[layout]
         out.append(r"\addplot[%s,mark=%s,mark size=1.4pt,thick] coordinates {%s};"
                    % (col, mark, " ".join("(%d,%.4f)" % q for q in pts)))
-        out.append(r"\addlegendentry{\texttt{%s}}" % layout)
+        out.append(r"\addlegendentry{%s}" % lab)
     out.append(r"\end{loglogaxis}")
     out.append(r"\end{tikzpicture}")
     return "\n".join(out) + "\n"
@@ -411,7 +404,14 @@ def macros_scaling(series, meta):
     out = [PREAMBLE]
     out.append(r"\newcommand{\scaleHost}{%s}" % meta.get("host", "?"))
     out.append(r"\newcommand{\scalePacks}{%s}" % meta.get("packs", "?"))
-    names = {"res": "Res", "jac": "Jac"}
+    # Packs per thread, which is the quantity the scaling and pack-size sections both reason
+    # about. Derived here so the prose stops carrying it as a typed word.
+    try:
+        out.append(r"\newcommand{\scalePacksPerThread}{%.0f}"
+                   % (int(meta["packs"]) / 72.0))
+    except (KeyError, ValueError):
+        pass
+    names = {"res": "Res", "jac": "Jac", "resho": "Resho"}
     for (layout, op), pts in sorted(series.items()):
         d = dict(pts)
         if not d:
@@ -425,6 +425,12 @@ def macros_scaling(series, meta):
         out.append(r"\newcommand{\scale%sTop}{%.0f}" % (key, top))
         out.append(r"\newcommand{\scale%sSpeedup}{%.1f}" % (key, top / one))
         out.append(r"\newcommand{\scale%sEff}{%.0f}" % (key, 100.0 * (top / one) / nthr))
+    # The single-thread layout factor the prose quotes. It is a ratio of two numbers already
+    # emitted above, so it moved with the measurements while the text kept the value it was
+    # written with -- which is exactly the kind of number that must not be typed by hand.
+    ones = {layout: dict(pts).get(1) for (layout, op), pts in series.items() if op == "res"}
+    if ones.get("packed") and ones.get("atomic"):
+        out.append(r"\newcommand{\scaleResLayoutOne}{%.1f}" % (ones["packed"] / ones["atomic"]))
     return "\n".join(out) + "\n"
 
 
@@ -754,9 +760,15 @@ def table_ordering(order):
     return "\n".join(out) + "\n"
 
 
+# The packer's target, mirrored from cvfem_hex8_pack_common.hpp so the paper quotes the constant
+# the code uses rather than a number typed beside it.
+CVFEM_PACKS_PER_THREAD = 28
+
+
 def macros_packsize(sweep, order, meta):
     out = [PREAMBLE]
     out.append(r"\newcommand{\packHost}{%s}" % meta.get("host", "?"))
+    out.append(r"\newcommand{\packsPerThread}{%d}" % CVFEM_PACKS_PER_THREAD)
     for n, rows in sweep.items():
         tag = "Small" if n == min(sweep) else "Large"
         best = max(rows, key=lambda r: r["jac"])
@@ -910,7 +922,36 @@ def _roof(ai_lo, ai_hi, bw, peak):
     return [(ai_lo, ai_lo * bw), (ridge, peak), (ai_hi, peak)]
 
 
-def fig_roofline(pts, bandwidth_gbs, peak_gflops,
+def roofline_ho_points(rows, dram_ho, n=128):
+    """The higher-order convective arms, on the same axes as the first-order operators.
+
+    Traffic is measured once per layout and shared by the four schemes. They read the same
+    arrays -- the mesh, the fields and the hoisted nodal velocity gradient -- and differ only
+    in arithmetic applied to values already in registers, so a limiter moves a point to the
+    right along the roofline and never changes what it moves. That is the claim the figure
+    makes, and it is why one capture per layout is enough to place four points.
+
+    Returns {layout: [(scheme label, intensity, GFLOP/s), ...]} ordered by intensity, which is
+    also the order of increasing limiter arithmetic.
+    """
+    out = {}
+    for lay, key in (("packed", ("residual-ho", "packed")), ("atomic", ("residual-ho", "atomic"))):
+        byts = (dram_ho or {}).get(key)
+        if not byts:
+            continue
+        pts = []
+        for arm in ("ho_unlimited", "ho_clip", "ho_darwish_moukalled", "ho_venkatakrishnan"):
+            r = next((r for r in rows if r.arm == arm and r.layout == lay), None)
+            if r is None or not r.flops_elem or not r.elems:
+                continue
+            flop_per_dof = r.flops_elem * r.elems / float(r.dofs)
+            pts.append((HO_NAME[arm], flop_per_dof / byts, r.mdof * 1e6 * flop_per_dof * 1e-9))
+        if len(pts) >= 2:
+            out[lay] = sorted(pts, key=lambda p: p[1])
+    return out
+
+
+def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None,
                  spec_bw=SPEC_BW_GBS, spec_peak=SPEC_PEAK_GFLOPS):
     """F8. Measured and vendor roofs together, with the kernels placed on measured traffic.
 
@@ -919,47 +960,127 @@ def fig_roofline(pts, bandwidth_gbs, peak_gflops,
     correct reference for an efficiency. The vendor pair bounds what the hardware is specified to
     do, and the gap between the two is itself information -- it is where a library GEMM and a
     triad stop short of nominal, which no kernel measured here can recover.
+
+    The higher-order arms are drawn as a path per layout rather than as four more legend
+    entries: what they show is a trajectory, one operator gaining arithmetic at fixed traffic,
+    and a path says that where four scattered markers would not.
     """
-    xmin, xmax = 0.3, 64.0
-    ymax = max(peak_gflops, spec_peak) * 1.8
+    xmin, xmax = 0.15, 64.0
+    # Head room above the vendor plateau, because its label goes above its own line and a
+    # tighter ceiling clips the label against the axis frame rather than crossing the roof.
+    ymin, ymax = 20.0, max(peak_gflops, spec_peak) * 2.6
+    # Axis geometry, so an annotation can be laid ALONG a roof instead of across it. The sloped
+    # segment has unit slope in decades, but the axis box is not square in decades per unit
+    # length, so its drawn angle is not 45 degrees and a label rotated to 45 crosses the line it
+    # is labelling. This is that angle.
+    h_over_w = 0.50
+    ang = math.degrees(math.atan2(h_over_w / math.log10(ymax / ymin),
+                                  1.0 / math.log10(xmax / xmin)))
     out = [PREAMBLE,
            r"\begin{tikzpicture}",
            r"\begin{loglogaxis}[",
-           r"  width=\columnwidth, height=0.58\columnwidth,",
+           r"  width=\columnwidth, height=%.2f\columnwidth," % h_over_w,
            r"  xlabel={operational intensity [FLOP/byte]}, ylabel={GFLOP/s},",
-           r"  xmin=%.1f, xmax=%.0f, ymin=20, ymax=%.0f," % (xmin, xmax, ymax),
-           r"  legend pos=south east, legend cell align=left, legend columns=2,",
-           r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},",
+           r"  xmin=%.2f, xmax=%.0f, ymin=%.0f, ymax=%.0f," % (xmin, xmax, ymin, ymax),
+           # Below the axis, not inside it: with the higher-order paths the key needs eight
+           # entries, and any corner large enough to hold them also holds a roof or a point.
+           r"  legend cell align=left, legend columns=3,",
+           r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt,",
+           r"    at={(0.5,-0.34)}, anchor=north, column sep=6pt},",
            r"  grid=both, major grid style={black!12}, minor grid style={black!6},",
            r"  tick label style={font=\tiny}, label style={font=\scriptsize},",
            r"]"]
 
-    def roof_plot(bw, peak, style, label):
+    def roof_plot(bw, peak, style, label, above):
         coords = " ".join("(%.3f,%.1f)" % c for c in _roof(xmin, xmax, bw, peak))
         out.append(r"\addplot[%s,no marks,forget plot] coordinates {%s};" % (style, coords))
-        out.append(r"\node[black!55,font=\tiny,anchor=south west] at (axis cs:%.2f,%.1f) {%s};"
-                   % (xmax * 0.32, peak * 1.05, label))
+        # Set against the right edge and clear of its own line: above it for the upper roof,
+        # below it for the lower one, so neither label crosses a roof and neither is clipped.
+        out.append(r"\node[black!55,font=\tiny,anchor=%s] at (axis cs:%.2f,%.1f) {%s};"
+                   % ("south east" if above else "north east",
+                      xmax * 0.97, peak * (1.13 if above else 0.88), label))
 
     # Vendor first, so the measured roof is drawn over it.
     roof_plot(spec_bw, spec_peak, "black!45,thick,densely dashed",
-              r"spec %.2f TFLOP/s" % (spec_peak / 1000.0))
+              r"spec %.2f TFLOP/s" % (spec_peak / 1000.0), True)
     roof_plot(bandwidth_gbs, peak_gflops, "black,thick",
-              r"measured %.2f TFLOP/s" % (peak_gflops / 1000.0))
-    # Bandwidth labels sit on the sloped segment, where the two roofs are furthest apart.
-    out.append(r"\node[black!55,font=\tiny,anchor=south east,rotate=45] "
-               r"at (axis cs:1.05,%.1f) {spec %.0f GB/s};" % (1.05 * spec_bw, spec_bw))
-    out.append(r"\node[black!70,font=\tiny,anchor=north west,rotate=45] "
-               r"at (axis cs:1.15,%.1f) {meas.\ %.0f GB/s};" % (1.15 * bandwidth_gbs, bandwidth_gbs))
+              r"measured %.2f TFLOP/s" % (peak_gflops / 1000.0), False)
+    # The bandwidth labels run ALONG their own sloped segment, at the drawn angle, and at two
+    # well-separated intensities: the roofs are only a few per cent apart there, so two labels
+    # at one place would sit on top of each other whatever the offset.
+    out.append(r"\node[black!55,font=\tiny,anchor=south,rotate=%.1f] "
+               r"at (axis cs:%.2f,%.1f) {spec %.0f GB/s};"
+               % (ang, 0.42, 0.42 * spec_bw * 1.14, spec_bw))
+    out.append(r"\node[black!70,font=\tiny,anchor=north,rotate=%.1f] "
+               r"at (axis cs:%.2f,%.1f) {meas.\ %.0f GB/s};"
+               % (ang, 2.2, 2.2 * bandwidth_gbs * 0.88, bandwidth_gbs))
 
     marks = ["*", "square*", "triangle*", "diamond*", "pentagon*", "otimes*"]
     cols = ["PackA", "PackD", "PackC", "PackE", "PackB", "PackF"]
-    for i, (label, ai, gf, _meas) in enumerate(pts):
-        out.append(r"\addplot[%s,mark=%s,mark size=2.1pt,only marks] coordinates {(%.3f,%.1f)};"
-                   % (cols[i % len(cols)], marks[i % len(marks)], ai, gf))
+    for i, (label, ai, gf, meas) in enumerate(pts):
+        # A hollow marker says the intensity rests on the compulsory-traffic model rather than
+        # on a DRAM capture. The distinction is the figure's own provenance and belongs in it.
+        fill = "" if meas else ",fill=white"
+        out.append(r"\addplot[%s,mark=%s,mark size=2.1pt,only marks,mark options={%s%s}] "
+                   r"coordinates {(%.3f,%.1f)};"
+                   % (cols[i % len(cols)], marks[i % len(marks)],
+                      "draw=" + cols[i % len(cols)], fill or ",fill=" + cols[i % len(cols)],
+                      ai, gf))
         out.append(r"\addlegendentry{%s}" % label)
+
+    # Each higher-order path STARTS at that layout's first-order residual point, so it is read as
+    # one operator gaining a term rather than as four unrelated markers: the first step is the
+    # correction being switched on, and the rest is the limiter growing. Filled markers, because
+    # a hollow one already means something else here -- modelled rather than measured traffic.
+    for lay, col, lab in (("packed", "PackA", r"$+$ higher order, packed"),
+                          ("atomic", "PackD", r"$+$ higher order, atomic")):
+        path = (ho or {}).get(lay)
+        if not path:
+            continue
+        start = next(((ai, gf) for l, ai, gf, _m in pts if l == "residual, " + lay), None)
+        coords = ([start] if start else []) + [(ai, gf) for _n, ai, gf in path]
+        out.append(r"\addplot[%s,mark=*,mark size=1.5pt,thin,densely dotted] coordinates {%s};"
+                   % (col, " ".join("(%.3f,%.1f)" % c for c in coords)))
+        out.append(r"\addlegendentry{%s}" % lab)
+        # The two ends of the packed path are named on the plot. Naming all four would put two
+        # labels within four points of each other at the left end, where the unlimited and
+        # clipped arms differ by a tenth of a FLOP/byte.
+        if lay == "packed" and len(path) >= 2:
+            # Set BESIDE their points, not above or below them: the path runs through the points,
+            # so a label offset vertically lands on the segment leaving the point, and one offset
+            # above the last point lands on the second-to-last. Horizontally there is nothing.
+            out.append(r"\node[%s,font=\tiny,anchor=east] at (axis cs:%.3f,%.1f) {unlimited};"
+                       % (col, path[0][1] * 0.95, path[0][2]))
+            out.append(r"\node[%s,font=\tiny,anchor=west] at (axis cs:%.3f,%.1f) "
+                       r"{Venkatakrishnan};" % (col, path[-1][1] * 1.05, path[-1][2]))
+
     out.append(r"\end{loglogaxis}")
     out.append(r"\end{tikzpicture}")
     return "\n".join(out) + "\n"
+
+
+def macros_roofline_ho(ho, measured_bytes):
+    """What the prose quotes about the higher-order arms' place on the roofline.
+
+    The traffic ratio is the number that matters and it is not the expected one: the correction
+    reads a nine-component nodal gradient the first-order sweep never touches, so it buys its
+    extra arithmetic at roughly twice the DRAM traffic rather than at none.
+    """
+    out = []
+    for lay, tag in (("packed", "Packed"), ("atomic", "Atomic")):
+        b = (measured_bytes or {}).get(("residual-ho", lay))
+        fo = (measured_bytes or {}).get(("residual", lay))
+        if b:
+            out.append(r"\newcommand{\hoBytes%s}{%.0f}" % (tag, b))
+        if fo:
+            out.append(r"\newcommand{\foBytes%s}{%.0f}" % (tag, fo))
+        if b and fo:
+            out.append(r"\newcommand{\hoBytesRatio%s}{%.2f}" % (tag, b / fo))
+        path = (ho or {}).get(lay)
+        if path:
+            out.append(r"\newcommand{\hoAi%sLo}{%.1f}" % (tag, path[0][1]))
+            out.append(r"\newcommand{\hoAi%sHi}{%.1f}" % (tag, path[-1][1]))
+    return "\n".join(out) + "\n" if out else ""
 
 
 def _macro_name(label):
@@ -1021,17 +1142,35 @@ HO_SCALAR_ARM = {
 HO_EXTRA = ("ho_unlim_simd", "ho_unlim_rc", "ho_unlim_rc_scalar")
 
 
+ConvHo = collections.namedtuple("ConvHo", "arm layout mdof dofs elems flops_elem checksum")
+
+
 def parse_convho(path):
-    """Read jobs/conv_ho_bench.sbatch: (arm, layout, MDOF/s, dofs, checksum)."""
+    """Read jobs/conv_ho_bench.sbatch's summary table.
+
+    Two widths are accepted. The job printed five columns before it carried a work model and
+    prints seven now, the two new ones being the element count and the modelled FLOPs per
+    element -- which is what puts these arms on the roofline. An archived five-column file
+    still parses, with those two fields empty, so a regeneration against older data produces
+    the table and simply omits the points that need them.
+    """
     known = set(HO_NAME) | set(HO_SCALAR_ARM) | set(HO_EXTRA)
     out = []
     for line in open(path):
         f = line.split()
-        if len(f) == 5 and f[0] in known and f[1] in ("atomic", "packed") and f[2] != "-":
-            try:
-                out.append((f[0], f[1], float(f[2]), int(f[3]), f[4]))
-            except ValueError:
-                continue
+        if not f or f[0] not in known or len(f) not in (5, 7):
+            continue
+        if f[1] not in ("atomic", "packed") or f[2] == "-":
+            continue
+        try:
+            if len(f) == 5:
+                out.append(ConvHo(f[0], f[1], float(f[2]), int(f[3]), None, None, f[4]))
+            else:
+                elems = int(f[4]) if f[4] != "-" else None
+                fpe = float(f[5]) if f[5] != "-" else None
+                out.append(ConvHo(f[0], f[1], float(f[2]), int(f[3]), elems, fpe, f[6]))
+        except ValueError:
+            continue
     return out
 
 
@@ -1039,7 +1178,7 @@ def _convho_index(rows):
     """{scheme: {"gen":x, "hand":x, "atomic":x}} plus the loose arms, by name."""
     by = {}
     loose = {}
-    for arm, lay, mdof, _dofs, _ck in rows:
+    for arm, lay, mdof, _dofs, _e, _fp, _ck in rows:
         if arm in HO_SCALAR_ARM and lay == "packed":
             by.setdefault(HO_SCALAR_ARM[arm], {})["hand"] = mdof
         elif arm in HO_NAME:
@@ -1081,12 +1220,29 @@ def table_convho(rows):
     return "\n".join(out) + "\n"
 
 
-def fig_convho(rows):
+def spmv_reference(rows, n=128):
+    """The assembled SpMV at one size, for the reference lines on the throughput bar chart.
+
+    Same source as F5, the campaign's bsr_apply rows, and taken at the size the convective arms
+    were measured at, so the line and the bars describe the same problem rather than two.
+    """
+    out = {}
+    for store in ("f64", "f32"):
+        v = max((r["_mdof"] for r in rows
+                 if r["operation"] == "bsr_apply" and r["bsr_storage"] == store
+                 and r["_n"] == n), default=None)
+        if v:
+            out[store] = v
+    return out
+
+
+def fig_convho(rows, spmv=None):
     """The same five variants as a figure, so the trend across schemes reads at a glance.
 
     A symbolic x axis rather than a size sweep: the higher-order arms are measured at the
     saturating size only, and plotting them against sizes they were not swept over would invent
-    data.
+    data. The two SpMV rates are drawn across it as reference lines, in the colours F5 gives
+    them, because what the reader wants from a rate is what it beats.
     """
     if not rows:
         return None
@@ -1117,9 +1273,32 @@ def fig_convho(rows):
         r"\addlegendentry{packed}",
         r"\addplot[draw=PackD, fill=PackD] coordinates {%s};" % series("atomic"),
         r"\addlegendentry{atomic}",
+    ] + _convho_spmv_lines(spmv, short[order[0]]) + [
         r"\end{axis}",
         r"\end{tikzpicture}",
     ]) + "\n"
+
+
+def _convho_spmv_lines(spmv, xref):
+    """Horizontal rules at the SpMV rates, with their own legend entries.
+
+    Drawn rather than plotted: the x axis is symbolic, so a rule has to take its x from the axis
+    edges and only its y from the data, which is what the -| operator does. The legend image is
+    added by hand for the same reason."""
+    out = []
+    for store, col, lab in (("f64", "PackE", r"BSR SpMV \texttt{f64}"),
+                            ("f32", "PackC", r"BSR SpMV \texttt{f32}")):
+        v = (spmv or {}).get(store)
+        if not v:
+            continue
+        out.append(r"\draw[%s,dashed,thick] ({axis cs:%s,%.1f} -| {rel axis cs:0,0}) -- "
+                   r"({axis cs:%s,%.1f} -| {rel axis cs:1,0});" % (col, xref, v, xref, v))
+        # An explicit legend image: the default one for a line-only entry draws a marker box
+        # here, which reads as a third kind of thing rather than as the rule it stands for.
+        out.append(r"\addlegendimage{legend image code/.code={\draw[%s,dashed,thick] "
+                   r"(0cm,0cm) -- (0.45cm,0cm);}}" % col)
+        out.append(r"\addlegendentry{%s}" % lab)
+    return out
 
 
 def _fmt0(v):
@@ -1153,14 +1332,123 @@ def macros_convho(rows):
 
 
 # ---------------------------------------------------------------------------------------------
+# The nodal gradient reconstruction, timed on its own
+# ---------------------------------------------------------------------------------------------
+
+def parse_ngrad(path):
+    """Read jobs/nodal_grad_bench.sbatch: {(nf, layout): (MDOF/s, MCOMP/s)}."""
+    out = {}
+    for line in open(path):
+        f = line.split()
+        if len(f) == 5 and f[1] in ("packed", "atomic") and f[2] != "-":
+            try:
+                out[(int(f[0]), f[1])] = (float(f[2]), float(f[3]))
+            except ValueError:
+                continue
+    return out
+
+
+def macros_ngrad(rows):
+    """The reconstruction's rates and, the point of them, its layout ratios.
+
+    Reported in MDOF/s like every other operator here, so the rows are comparable across the
+    paper, and in node-components per second beside it, which is the quantity the kernel actually
+    produces and the one that scales with the field count.
+    """
+    out = [PREAMBLE]
+    name = {1: "Pgrad", 3: "Ugrad"}
+    for nf, tag in name.items():
+        for lay in ("packed", "atomic"):
+            if (nf, lay) in rows:
+                out.append(r"\newcommand{\ng%s%s}{%.0f}" % (tag, lay.capitalize(), rows[(nf, lay)][0]))
+                out.append(r"\newcommand{\ng%s%sComp}{%.0f}"
+                           % (tag, lay.capitalize(), rows[(nf, lay)][1]))
+        if (nf, "packed") in rows and (nf, "atomic") in rows:
+            out.append(r"\newcommand{\ng%sRatio}{%.1f}"
+                       % (tag, rows[(nf, "packed")][0] / rows[(nf, "atomic")][0]))
+    return "\n".join(out) + "\n"
+
+
+# ---------------------------------------------------------------------------------------------
+# The exact higher-order Jacobian action, against the lagged one
+# ---------------------------------------------------------------------------------------------
+
+def parse_hoexact(path):
+    """Read jobs/ho_exact_jac.sbatch: {arm: MDOF/s}.
+
+    The verification lines above the table are parsed too and returned separately: a throughput
+    row for an operator whose finite-difference check did not run is not a result, and the macro
+    writer refuses to emit one without it.
+    """
+    rates, checks, frac = {}, {}, {}
+    for line in open(path):
+        f = line.split()
+        if len(f) in (3, 4) and f[0].startswith("jac_") and f[1] != "-":
+            try:
+                rates[f[0]] = float(f[1])
+            except ValueError:
+                pass
+            # The reconstruction's share of the matvec it sits in, recorded by the driver from
+            # the same pass that gave the rate. Older tables have three columns and no share.
+            if len(f) == 4 and f[3] != "-":
+                try:
+                    frac[f[0]] = float(f[3])
+                except ValueError:
+                    pass
+        elif len(f) >= 4 and f[0] == "limiter":
+            try:
+                checks[int(f[1])] = float(f[3])
+            except (ValueError, IndexError):
+                pass
+    return rates, checks, frac
+
+
+def macros_hoexact(rates, checks, frac=None):
+    """What the prose quotes about the exact action: its cost, and what it is checked to."""
+    out = [PREAMBLE]
+    def put(name, key):
+        if key in rates:
+            out.append(r"\newcommand{\hox%s}{%.0f}" % (name, rates[key]))
+    put("LaggedPacked", "jac_ho_lagged_packed")
+    put("ExactPacked", "jac_ho_exact_packed")
+    put("LaggedAtomic", "jac_ho_lagged_atomic")
+    put("ExactAtomic", "jac_ho_exact_atomic")
+    for name, a, b in (("CostPacked", "jac_ho_lagged_packed", "jac_ho_exact_packed"),
+                       ("CostAtomic", "jac_ho_lagged_atomic", "jac_ho_exact_atomic")):
+        if a in rates and b in rates:
+            out.append(r"\newcommand{\hox%s}{%.2f}" % (name, rates[a] / rates[b]))
+    # The layout ratio on each form. That it collapses is the result, so it is generated rather
+    # than left to a reader to divide two numbers in a table.
+    for name, lay in (("LayoutLagged", "lagged"), ("LayoutExact", "exact")):
+        p, a = "jac_ho_%s_packed" % lay, "jac_ho_%s_atomic" % lay
+        if p in rates and a in rates:
+            out.append(r"\newcommand{\hox%s}{%.2f}" % (name, rates[p] / rates[a]))
+    # The unlimited arm, for the sentence about what the limiter itself costs. It only became a
+    # separate number once the limiter left the vector body: with a runtime select every arm paid
+    # the same guard and the two read the same rate.
+    if "jac_ho_exact_packed_unlim" in rates and "jac_ho_exact_packed" in rates:
+        out.append(r"\newcommand{\hoxExactPackedUnlim}{%.0f}" % rates["jac_ho_exact_packed_unlim"])
+        out.append(r"\newcommand{\hoxLimiterCost}{%.2f}"
+                   % (rates["jac_ho_exact_packed_unlim"] / rates["jac_ho_exact_packed"]))
+    # What share of the matvec the added reconstruction is, on each layout. The prose used to
+    # carry these two as typed percentages; they move with the kernel, so they are generated.
+    for name, key in (("FracPacked", "jac_ho_exact_packed"), ("FracAtomic", "jac_ho_exact_atomic")):
+        if frac and key in frac:
+            out.append(r"\newcommand{\hox%s}{%.0f}" % (name, 100.0 * frac[key]))
+    if 0 in checks:
+        out.append(r"\newcommand{\hoxFdUnlim}{%.0e}" % checks[0])
+    return "\n".join(out) + "\n"
+
+
+# ---------------------------------------------------------------------------------------------
 # The like-for-like Jacobian comparison against the assembled matrix
 # ---------------------------------------------------------------------------------------------
 
 JF_NAME = {
     "jac_exact":  "Jacobian action, exact",
     "jac_lagged": "Jacobian action, lagged",
-    "spmv_f64":   r"SpMV, assembled \texttt{f64}",
-    "spmv_f32":   r"SpMV, assembled \texttt{f32}",
+    "spmv_f64":   r"SpMV, lagged \texttt{f64}",
+    "spmv_f32":   r"SpMV, lagged \texttt{f32}",
 }
 
 
@@ -1242,17 +1530,19 @@ def build(out_dir, tab_dir):
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(tab_dir, exist_ok=True)
     written = []
+    spmv_ref = {}
+    convho_rows = []
 
     det = [f for f in sorted(os.listdir(DATA)) if f.startswith("det_layout_")] if os.path.isdir(DATA) else []
     if det:
         # The newest run wins; older ones stay on disk as provenance.
         rows, meta = parse_determinism(os.path.join(DATA, det[-1]))
         if rows:
-            with open(os.path.join(tab_dir, "determinism.tex"), "w") as fh:
-                fh.write(table_determinism(rows, meta))
+            # No table: the finding is one sentence and the paper says it in prose. The macros
+            # stay, because the prose quotes the counts and must not type them.
             with open(os.path.join(out_dir, "determinism_macros.tex"), "w") as fh:
                 fh.write(macros_determinism(rows, meta))
-            written += ["tables/determinism.tex", "figures/determinism_macros.tex"]
+            written += ["figures/determinism_macros.tex"]
 
     camp = [f for f in sorted(os.listdir(DATA)) if f.startswith("campaign_")] if os.path.isdir(DATA) else []
     if camp:
@@ -1290,6 +1580,7 @@ def build(out_dir, tab_dir):
             if prov:
                 print("  NOTE: %s carries no job id -- figures marked provisional"
                       % os.path.basename(path))
+            spmv_ref = spmv_reference(rows)
             with open(os.path.join(out_dir, "throughput_size.tex"), "w") as fh:
                 fh.write(fig_throughput(rows, host))
             with open(os.path.join(out_dir, "campaign_macros.tex"), "w") as fh:
@@ -1340,8 +1631,9 @@ def build(out_dir, tab_dir):
            if f.startswith("convho_") and f.endswith(".out")] if os.path.isdir(DATA) else [])
     if ho:
         hr = parse_convho(os.path.join(DATA, ho[-1]))
+        convho_rows = hr
         t = table_convho(hr)
-        fg = fig_convho(hr)
+        fg = fig_convho(hr, spmv_ref)
         if fg:
             with open(os.path.join(out_dir, "convho.tex"), "w") as fh:
                 fh.write(fg)
@@ -1355,14 +1647,31 @@ def build(out_dir, tab_dir):
                 fh.write(macros_convho(hr))
             written.append("figures/convho_macros.tex")
             for lay in ("atomic", "packed"):
-                base = next((r for r in hr if r[0] == "first_order" and r[1] == lay), None)
+                base = next((r for r in hr if r.arm == "first_order" and r.layout == lay), None)
                 if not base:
                     continue
-                same = [r[0] for r in hr
-                        if r[0] != "first_order" and r[1] == lay and r[4] == base[4]]
+                same = [r.arm for r in hr
+                        if r.arm != "first_order" and r.layout == lay
+                        and r.checksum == base.checksum]
                 if same:
                     print("  WARNING: %s checksum identical to first order -- correction not"
                           " applied in: %s" % (lay, ", ".join(same)))
+
+    ng = [f for f in sorted(os.listdir(DATA)) if f.startswith("ngrad_")] if os.path.isdir(DATA) else []
+    if ng:
+        nr = parse_ngrad(os.path.join(DATA, ng[-1]))
+        if nr:
+            with open(os.path.join(out_dir, "ngrad_macros.tex"), "w") as fh:
+                fh.write(macros_ngrad(nr))
+            written.append("figures/ngrad_macros.tex")
+
+    hx = [f for f in sorted(os.listdir(DATA)) if f.startswith("hoexact_")] if os.path.isdir(DATA) else []
+    if hx:
+        hr, hc, hf = parse_hoexact(os.path.join(DATA, hx[-1]))
+        if hr:
+            with open(os.path.join(out_dir, "hoexact_macros.tex"), "w") as fh:
+                fh.write(macros_hoexact(hr, hc, hf))
+            written.append("figures/hoexact_macros.tex")
 
     jf = [f for f in sorted(os.listdir(DATA)) if f.startswith("jacfair_")] if os.path.isdir(DATA) else []
     if jf:
@@ -1385,18 +1694,25 @@ def build(out_dir, tab_dir):
         bw = rates.get(max(rates)) if rates else None
         # Measured DRAM traffic per dof, if a differenced SCF capture is present. Preferred over
         # the model; see roofline_points.
+        # EVERY dram_ file, not the newest: the captures were made by different jobs for
+        # different operators, each file named for the jobs behind it, and taking one would
+        # silently drop whichever operator was measured first.
         dm = [f for f in sorted(os.listdir(DATA)) if f.startswith("dram_")]
-        measured_dram = parse_dram(os.path.join(DATA, dm[-1])) if dm else {}
+        measured_dram = {}
+        for name in dm:
+            measured_dram.update(parse_dram(os.path.join(DATA, name)))
         if peak and bw:
             pts = roofline_points(rows, n=128, measured_bytes=measured_dram)
+            ho_path = roofline_ho_points(convho_rows, measured_dram)
             if pts:
                 with open(os.path.join(out_dir, "roofline.tex"), "w") as fh:
-                    fh.write(fig_roofline(pts, bw, peak))
+                    fh.write(fig_roofline(pts, bw, peak, ho=ho_path))
                 with open(os.path.join(out_dir, "roofline_macros.tex"), "w") as fh:
                     fh.write(PREAMBLE
                              + "\\newcommand{\\rlPeak}{%.0f}\n" % peak
                              + "\\newcommand{\\rlBw}{%.0f}\n" % bw
                              + "\\newcommand{\\rlRidge}{%.1f}\n" % (peak / bw)
+                             + macros_roofline_ho(ho_path, measured_dram)
                              + "\\newcommand{\\rlSpecPeak}{%.2f}\n" % (SPEC_PEAK_GFLOPS / 1000.0)
                              + "\\newcommand{\\rlSpecBw}{%.0f}\n" % SPEC_BW_GBS
                              + "\\newcommand{\\rlSpecRidge}{%.1f}\n"
@@ -1457,15 +1773,12 @@ def selftest():
         check(rows[1] == ("packed", "res", (1, 3), (1, 4)), "a reproducible row parses",
               str(rows[1]))
 
-        tex = table_determinism(rows, meta)
-        # The verdict must be visible as emphasis, and only for the reproducible rows --
-        # a table that bolds everything says nothing.
-        check(tex.count(r"\textbf{1}") == 3, "exactly the reproducible cells are emphasised",
-              "%d" % tex.count(r"\textbf{1}"))
-        check(r"3 / 3" in tex and r"4 / 4" in tex, "irreproducible cells are plain")
-        check(tex.count(r"\\") >= 4 and r"\toprule" in tex, "the table is well formed")
-
+        # No table any more: the finding is one sentence of prose, so what has to hold is that
+        # the macros the prose quotes carry the verdict -- one distinct output where the layout
+        # is reproducible, more where it is not.
         mac = macros_determinism(rows, meta)
+        check(r"\newcommand{\detPackedresRep}{1}" in mac and r"\newcommand{\detAtomicresThr}{4}" in mac,
+              "the macros carry the verdict the prose quotes")
         check(r"\newcommand{\detHost}{nid000000}" in mac, "the host macro is emitted")
         check(r"\newcommand{\detAtomicresRep}{3}" in mac, "a per-row macro is emitted")
         # LaTeX command names cannot contain digits or underscores.

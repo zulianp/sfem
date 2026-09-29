@@ -68,7 +68,7 @@ echo "### packed arms are the GENERATED kernel unless labelled _scalar"
 echo "### scalar-vs-scalar isolates the LAYOUT; generated-vs-scalar isolates the KERNEL"
 echo
 
-printf '%-22s %-8s %10s %10s %14s\n' arm layout MDOF_s dofs checksum
+printf '%-22s %-8s %10s %10s %10s %10s %14s\n' arm layout MDOF_s dofs elems flops_el checksum
 for arm in "first_order|atomic|" \
            "first_order|packed|" \
            "ho_unlimited|atomic|--conv-ho 0" \
@@ -87,7 +87,7 @@ for arm in "first_order|atomic|" \
            "ho_darwish_moukalled|packed|--conv-ho 3" \
            "ho_dm_scalar|packed|--conv-ho 3 --ho-scalar"; do
     IFS='|' read -r lbl lay extra <<<"$arm"
-    best=""; dofs=""; ck=""
+    best=""; dofs=""; ck=""; elems=""; fpe=""
     # Best of three passes: one pass cannot separate this band -- the residual carries a large
     # run-to-run variance that the pack-size sweep measured at up to 58% on a single pass.
     for pass in $(seq 1 "$PASSES"); do
@@ -100,8 +100,14 @@ for arm in "first_order|atomic|" \
         v=$(val 'MDOF/s'); [ -n "$v" ] || continue
         best=$(awk -v a="${best:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
         dofs=$(val 'dofs'); ck=$(val 'checksum')
+        # The work model and the element count are pass-invariant, so they may be read from any
+        # pass; the roofline multiplies them by the BEST rate, which is the rate this table
+        # reports. Reading a GFLOP/s line instead would bind the point to whichever pass it came
+        # from and disagree with the MDOF/s beside it.
+        elems=$(val 'elements'); fpe=$(val 'flops_per_element_model')
     done
-    printf '%-22s %-8s %10s %10s %14s\n' "$lbl" "$lay" "${best:--}" "${dofs:--}" "${ck:--}"
+    printf '%-22s %-8s %10s %10s %10s %10s %14s\n' "$lbl" "$lay" "${best:--}" "${dofs:--}" \
+           "${elems:--}" "${fpe:--}" "${ck:--}"
 done
 
 echo

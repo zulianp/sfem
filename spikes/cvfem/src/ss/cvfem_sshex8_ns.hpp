@@ -1218,7 +1218,7 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(SSMeshData &d, const scalar_t rho,
                                           nullptr, ux, uy, uz,  rcfg.tau};
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(gx, gy, gz, adj, &det);
-                    cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
+                    cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
                                                         rc, p, d.upwind_eps);
                     boundary_scs_add_jacobian_action(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                                      vx, vy, vz, q, r);
@@ -1329,7 +1329,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(SSMeshData &d, const scalar_
                                               nullptr, ux, uy, uz,  rcfg.tau};
                         scalar_t           adj[9], det;
                         sscvfem_micro_geom(gx, gy, gz, adj, &det);
-                        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
+                        cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
                                                         rc, p, d.upwind_eps);
                         boundary_scs_add_jacobian_action(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                                          vx, vy, vz, q, r);
@@ -1478,7 +1478,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
                         // The hoisted cell's distances, matching madj: see sscvfem_residual.
                         const Hex8RhieChow rc{gx,      gy,  gz,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                               nullptr, ux, uy, uz,  rcfg.tau};
-                        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, gadj, gdet, ux, uy, uz, vx, vy, vz, q, r,
+                        cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, gadj, gdet, ux, uy, uz, vx, vy, vz, q, r,
                                                              rc, p, d.upwind_eps);
                         boundary_scs_add_jacobian_action(rho, mu, 0, gadj, gdet, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                                          vx, vy, vz, q, r);

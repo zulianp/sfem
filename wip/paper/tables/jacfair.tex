@@ -7,10 +7,10 @@
 operator & packed & atomic & vs.\ \texttt{f64} \\
 & \multicolumn{2}{c}{MDOF/s} & \\
 \midrule
-Jacobian action, exact & 900 & 467 & $1.97\times$ \\
-Jacobian action, lagged & 1128 & 509 & $2.47\times$ \\
+Jacobian action, exact & 900 & 381 & $2.03\times$ \\
+Jacobian action, lagged & 1159 & 492 & $2.62\times$ \\
 \midrule
-SpMV, assembled \texttt{f64} & \multicolumn{2}{c}{456} & $1.00\times$ \\
-SpMV, assembled \texttt{f32} & \multicolumn{2}{c}{825} & $1.81\times$ \\
+SpMV, lagged \texttt{f64} & \multicolumn{2}{c}{443} & $1.00\times$ \\
+SpMV, lagged \texttt{f32} & \multicolumn{2}{c}{851} & $1.92\times$ \\
 \bottomrule
 \end{tabular}

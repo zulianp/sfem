@@ -11,13 +11,15 @@
   grid=both, major grid style={black!12}, minor grid style={black!6},
   tick label style={font=\tiny}, label style={font=\scriptsize},
 ]
-\addplot[black!45,dashed,no marks,forget plot] coordinates {(1,8.3980) (72,604.6560)};
-\node[black!55,font=\tiny,rotate=37,anchor=south east] at (axis cs:36,251.9) {ideal};
-\addplot[PackA,mark=*,mark size=1.4pt,thick] coordinates {(1,21.3140) (2,42.9800) (4,85.2480) (8,169.5850) (18,371.3450) (36,702.5660) (54,1040.0830) (72,1266.0700)};
+\addplot[black!45,dashed,no marks,forget plot] coordinates {(1,4.9360) (72,355.3920)};
+\node[black!55,font=\tiny,rotate=37,anchor=south east] at (axis cs:36,148.1) {ideal};
+\addplot[PackA,mark=*,mark size=1.4pt,thick] coordinates {(1,21.7470) (2,43.1990) (4,86.1930) (8,170.5590) (18,374.0520) (36,688.5290) (54,1032.8940) (72,1320.0460)};
 \addlegendentry{\texttt{packed}}
-\addplot[PackD,mark=square*,mark size=1.4pt,thick] coordinates {(1,8.3980) (2,16.8420) (4,33.4890) (8,66.6400) (18,150.5220) (36,295.0860) (54,440.1710) (72,576.3600)};
+\addplot[PackD,mark=square*,mark size=1.4pt,thick] coordinates {(1,8.5760) (2,17.2450) (4,33.8620) (8,68.0910) (18,153.2610) (36,301.1920) (54,440.5970) (72,576.5380)};
 \addlegendentry{\texttt{atomic}}
-\addplot[PackC,mark=triangle*,mark size=1.4pt,thick] coordinates {(1,21.1970) (2,42.3570) (4,83.0640) (8,154.0730) (18,312.2890) (36,508.8880) (54,724.2640) (72,751.1880)};
-\addlegendentry{\texttt{colored}}
+\addplot[PackA,mark=o,mark size=1.4pt,thick] coordinates {(1,8.7700) (2,17.5600) (4,34.8830) (8,69.5010) (18,154.4940) (36,300.6950) (54,419.6480) (72,550.7020)};
+\addlegendentry{\texttt{packed}, higher order}
+\addplot[PackD,mark=square,mark size=1.4pt,thick] coordinates {(1,4.9360) (2,9.9140) (4,19.8050) (8,39.1640) (18,88.4820) (36,169.9840) (54,256.9390) (72,336.9620)};
+\addlegendentry{\texttt{atomic}, higher order}
 \end{loglogaxis}
 \end{tikzpicture}

@@ -93,6 +93,10 @@ struct MeshData {
     // once per Krylov application: the correction is lagged by construction, so a gradient
     // from the current Newton iterate is exactly what it wants.
     std::vector<scalar_t> ugrad;
+    // The DIRECTION's nodal velocity gradient, rebuilt on every Jacobian apply when the exact
+    // higher-order action is on. Empty is the signal that the lagged one is wanted, exactly as an
+    // empty d.qgx signals the frozen Rhie-Chow form.
+    std::vector<scalar_t> vgrad;
     // Ghost staging for the fused nine-component sweep. PackedData::ghost_buf is N_FIELDS
     // wide and this needs nine, and it is held here so a residual does not allocate.
     std::vector<scalar_t> ugrad_ghost;
@@ -237,6 +241,16 @@ inline Hex8RcConfig cvfem_hex8_rc_config_for(const MeshData &d);
 // things -- which is exactly what they were doing.
 inline bool cvfem_hex8_rc_exact_jac() {
     static const int v = smesh::Env::read<int>("SFEM_RC_EXACT_JAC", 1);
+    return v != 0;
+}
+
+// SFEM_HO_EXACT_JAC, the same switch for the deferred correction. Default on, because a default
+// must be the option that is right: with it off the Jacobian is not the derivative of the
+// residual the solver evaluates, and Newton is capped at a linear rate on the correction exactly
+// as it is on a frozen Rhie-Chow term. Off restores the lagged action, which is the operator an
+// assembled first-order matrix can hold and is the like-for-like comparison against it.
+inline bool cvfem_hex8_ho_exact_jac() {
+    static const int v = smesh::Env::read<int>("SFEM_HO_EXACT_JAC", 1);
     return v != 0;
 }
 
@@ -477,9 +491,9 @@ inline void assemble_nodal_grad_strided(MeshData &d, const GeomKind geom_kind,
     // as a measurement escape hatch rather than a supported mode.
     static const int force_atomic = smesh::Env::read<int>("SFEM_QGRAD_ATOMIC", 0);
     if (d.packed && !force_atomic)
-        cvfem_hex8_assemble_nodal_grad_packed(d, *d.packed, iso, src, stride, ogx, ogy, ogz);
+        cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, src, stride, ogx, ogy, ogz, d.ugrad_ghost);
     else
-        cvfem_hex8_assemble_nodal_grad(d, iso, src, stride, ogx, ogy, ogz);
+        cvfem_hex8_assemble_nodal_grads_atomic(d, iso, src, stride, ogx, ogy, ogz);
 }
 
 inline void assemble_nodal_p_grad(MeshData &d, const GeomKind geom_kind) {
@@ -1479,7 +1493,7 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, cons
                               has_qg ? qgz : nullptr, ux, uy, uz, rcfg.tau};
         scalar_t adj[9], det;
         cvfem_hex8_load_adj(d, e, adj, &det);
-        cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, rc, p);
+        cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, rc, p);
         boundary_scs_add_jacobian_action(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, vx, vy, vz, q, r,
                                          cvfem_hex8_face_mask_of(d, e),
                                          d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
@@ -1529,6 +1543,23 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
 // caller decides both. The driver wants neither left to it and uses the wrapper below;
 // sfem::Op wants exactly this, because Op::apply accumulates and the Function owns the
 // constraints.
+// The direction's nodal velocity gradient, in the nine-per-node layout the correction reads. The
+// direction arrives interleaved by node, and the sweep reads it in place: its three components are
+// three base pointers into the same array with stride N_FIELDS. The de-interleave pass this used
+// to do first -- three full-length copies per matvec -- is what the sweep's per-field stride
+// removed.
+inline void assemble_nodal_vel_grad_of(MeshData &d, const GeomKind geom,
+                                       const scalar_t *const SFEM_RESTRICT dir,
+                                       std::vector<scalar_t> &out) {
+    const int       iso     = geom == GeomKind::Isoparam ? 1 : 0;
+    const scalar_t *srcs[3] = {dir + 0, dir + 1, dir + 2};
+    const int       st[3]   = {N_FIELDS, N_FIELDS, N_FIELDS};
+    if (d.packed)
+        cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, 3, out, d.ugrad_ghost, st);
+    else
+        cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, 3, out, st);
+}
+
 inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, const scalar_t mu, const GeomKind geom,
                                              const scalar_t *const SFEM_RESTRICT dir,
                                              scalar_t *const SFEM_RESTRICT       jv) {
@@ -1545,6 +1576,17 @@ inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, co
         assemble_nodal_grad_strided(d, geom, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
     } else {
         d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
+    }
+    // The same treatment for the deferred correction, and for the same reason: it reconstructs a
+    // nodal VELOCITY gradient, so differentiating it needs the direction's. Nine components rather
+    // than three, so this pass costs more than the Rhie-Chow one beside it -- which is why it is
+    // switchable. SFEM_HO_EXACT_JAC=0 gives the lagged action, the operator an assembled
+    // first-order matrix holds and what this solver applied before the term existed.
+    if (cvfem_hex8_ho_exact_jac() && d.conv_ho && !d.ugrad.empty()) {
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_v_grad");
+        assemble_nodal_vel_grad_of(d, geom, dir, d.vgrad);
+    } else {
+        d.vgrad.clear();
     }
     if (geom == GeomKind::Isoparam) {
         apply_jacobian_action_atomic_isoparam(d, rho, mu, dir, jv);

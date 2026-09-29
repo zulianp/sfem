@@ -35,11 +35,19 @@ WORK=$(mktemp -d 2>/dev/null || mktemp -d -t cvfem_dist_setup)
 trap 'rm -rf "$WORK"' EXIT
 
 # Whether this machine can place several ranks is a property of the machine, not of the code.
+#
+# THE PROBE RUNS THE DRIVER, not `true`. It used to run `true`, which needs no MPI at all, so it
+# answered "can the launcher start a process" when the question is "can an MPI-linked binary run
+# under it". On Alps those differ: as a nested job step the launcher works and the driver dies on
+# "libmpi_gnu_123.so.12: cannot open shared object file", because the inner step does not inherit
+# the uenv view. The weak probe turned that into two FAILs on a machine this test is meant to skip
+# on, which is worse than useless -- a red gate nobody can act on trains people to ignore it.
 LAUNCH_OPTS=""
-if ! "$MPIEXEC" -n 2 true > "$WORK/probe.log" 2>&1; then
+probe() { "$MPIEXEC" -n 2 $1 "$DRIVER" --help; }
+if ! probe "" > "$WORK/probe.log" 2>&1; then
     LAUNCH_OPTS="--oversubscribe"
-    if ! "$MPIEXEC" -n 2 $LAUNCH_OPTS true >> "$WORK/probe.log" 2>&1; then
-        echo "distributed_setup: SKIP -- $MPIEXEC cannot launch 2 ranks here"
+    if ! probe "$LAUNCH_OPTS" >> "$WORK/probe.log" 2>&1; then
+        echo "distributed_setup: SKIP -- $MPIEXEC cannot run $DRIVER on 2 ranks here"
         sed 's/^/    /' "$WORK/probe.log" | head -10
         exit 77
     fi

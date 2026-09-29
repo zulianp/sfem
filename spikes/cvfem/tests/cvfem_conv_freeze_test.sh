@@ -64,11 +64,29 @@ run ho_unfrozen SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_CONV_FREEZE=0 > /dev/nul
 [ "$(conv ho_unfrozen)" = 1 ] && note "unfrozen still converges when asked for" OK \
                               || note "unfrozen still converges when asked for" FAIL
 
-f=$(nt ho_frozen); u=$(nt ho_unfrozen)
-if [ -n "$f" ] && [ -n "$u" ] && [ "$f" -lt "$u" ]; then
-    note "frozen takes fewer Newton steps ($f < $u)" OK
+# WHAT FREEZING BUYS, NOW THAT THE JACOBIAN CAN CARRY THE CORRECTION.
+#
+# This used to assert that the frozen run takes FEWER Newton steps than the unfrozen one, and it
+# did: with the correction lagged out of the Jacobian, the unfrozen scheme is a fixed-point
+# iteration on a term the linearisation does not see, and it converges at a linear rate. Measured
+# here, cavity at Re 100 over five continuation stages: 61 steps unfrozen against 14 frozen.
+#
+# With SFEM_HO_EXACT_JAC on -- the default -- the Jacobian differentiates the correction, and the
+# unfrozen scheme converges in the SAME 14 steps as the frozen one. So freezing no longer buys
+# steps; it was a workaround for the missing derivative. What is still true, and is the stronger
+# statement, is that the unfrozen run must not be WORSE than the frozen one, and that the
+# advantage the freeze used to have reappears the moment the exact term is switched off.
+run ho_unfrozen_lagged SFEM_CONV_HO=1 SFEM_CONV_LIMITER=2 SFEM_CONV_FREEZE=0 SFEM_HO_EXACT_JAC=0 > /dev/null
+f=$(nt ho_frozen); u=$(nt ho_unfrozen); l=$(nt ho_unfrozen_lagged)
+if [ -n "$f" ] && [ -n "$u" ] && [ "$u" -le "$f" ]; then
+    note "unfrozen matches frozen with the exact Jacobian ($u <= $f)" OK
 else
-    note "frozen takes fewer Newton steps (${f:-?} vs ${u:-?})" FAIL
+    note "unfrozen matches frozen with the exact Jacobian (${u:-?} vs ${f:-?})" FAIL
+fi
+if [ -n "$l" ] && [ -n "$u" ] && [ "$l" -gt "$u" ]; then
+    note "the lagged Jacobian costs Newton steps ($l > $u)" OK
+else
+    note "the lagged Jacobian costs Newton steps (${l:-?} vs ${u:-?})" FAIL
 fi
 
 # ---- and the default really is frozen ----------------------------------------------

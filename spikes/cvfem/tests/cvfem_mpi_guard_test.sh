@@ -35,13 +35,18 @@ trap 'rm -rf "$WORK"' EXIT
 # code under test. A container without shared memory, or an oversubscribed host, fails here for
 # reasons that have nothing to do with the guard -- so probe first and report SKIP (ctest
 # SKIP_RETURN_CODE 77) rather than a failure nobody can act on.
+# The probe runs the DRIVER, not `true`: `true` needs no MPI, so it answers "can the launcher
+# start a process" when the question is "can an MPI-linked binary run under it". On Alps those
+# differ -- as a nested job step the launcher works and the driver dies on a missing libmpi,
+# because the inner step does not inherit the uenv view -- and the weak probe turned a machine
+# this test is meant to skip on into a failure nobody can act on.
 LAUNCH=("$MPIEXEC" -n 2)
-if ! "${LAUNCH[@]}" true > "$WORK/probe.log" 2>&1; then
+if ! "${LAUNCH[@]}" "$DRIVER" --help > "$WORK/probe.log" 2>&1; then
     # Open MPI refuses to place more ranks than it sees slots for; --oversubscribe is the
     # documented opt-in and changes nothing about what the ranks then do.
     LAUNCH=("$MPIEXEC" -n 2 --oversubscribe)
-    if ! "${LAUNCH[@]}" true >> "$WORK/probe.log" 2>&1; then
-        echo "mpi_guard: SKIP -- $MPIEXEC cannot launch 2 ranks here"
+    if ! "${LAUNCH[@]}" "$DRIVER" --help >> "$WORK/probe.log" 2>&1; then
+        echo "mpi_guard: SKIP -- $MPIEXEC cannot run $DRIVER on 2 ranks here"
         sed 's/^/    /' "$WORK/probe.log" | head -12
         exit 77
     fi
