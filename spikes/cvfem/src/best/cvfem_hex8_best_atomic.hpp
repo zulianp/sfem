@@ -205,6 +205,110 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
     }
 }
 
+// THE SAME SWEEP, LANE-BLOCKED. Identical arithmetic, identical scatter, vectorised.
+//
+// The atomic family had no SIMD path at all while the packed and coloured families both call
+// cvfem_hex8_ns_upwind_residual_sumfact_simd, so "standard against packed" was a scalar-against-
+// vector comparison as much as a format one. Counters at n=128 on Grace: the scalar atomic sweep
+// issues 0.1% vector instructions against the packed sweep's 26.6%, and 19e9 scalar FP ops, for
+// 1.95x the instructions in 2.66x the cycles.
+//
+// Nothing about atomics forces that. The element arithmetic vectorises here exactly as it does
+// for the packed sweep, and only the scatter stays a scalar loop over lanes -- which it is in the
+// packed sweep too, and for the same reason: two elements in one group may share a node, so the
+// eight updates per element cannot be a vector store whatever they land in.
+//
+// The gather reads the GLOBAL arrays through d.elems, so this keeps every property that makes
+// this the standard layout: the wide index, no pack-local staging, no reordering. What it gains
+// is the vector body. That is the point -- it isolates the format from the vectorisation.
+static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData &d, const scalar_t rho, const scalar_t mu) {
+    reset_residual(d);
+    const Hex8Extras opt(d);
+
+    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
+    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
+    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
+    scalar_t *const SFEM_RESTRICT rc_out = d.rc.data();
+
+#pragma omp parallel
+    {
+        alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof2[CVFEM_HEX8_VEC_SIZE], cof3[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof4[CVFEM_HEX8_VEC_SIZE], cof5[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof8[CVFEM_HEX8_VEC_SIZE], detv[CVFEM_HEX8_VEC_SIZE];
+        Hex8InputPack    in;
+        Hex8ResidualPack outp;
+        Hex8RhieChowPack rcp;
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t e0 = 0; e0 < d.nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
+            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, d.nelements - e0);
+            gather_hex8_adj_soa(d, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+
+            for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                if (lane < nlanes) {
+                    const ptrdiff_t e = e0 + lane;
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        const smesh::idx_t g = d.elems[a][e];
+                        in.ux[a][lane]       = d.ux[g];
+                        in.uy[a][lane]       = d.uy[g];
+                        in.uz[a][lane]       = d.uz[g];
+                        in.p[a][lane]        = d.p[g];
+                    }
+                } else {
+                    // A padding lane must carry a STATE, not zeros that the flux would treat as a
+                    // real element: the kernel has no lane mask, so its output is discarded by the
+                    // scatter below rather than by the kernel. Zeros are safe because the geometry
+                    // gather already zeroed the adjugate and set det to one for these lanes.
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
+                        in.ux[a][lane] = in.uy[a][lane] = in.uz[a][lane] = in.p[a][lane] = scalar_t(0);
+                }
+            }
+
+            if (opt.with_rc) {
+                const auto *const px = d.points[0];
+                const auto *const py = d.points[1];
+                const auto *const pz = d.points[2];
+                for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                    if (lane < nlanes) {
+                        const ptrdiff_t e = e0 + lane;
+                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                            const smesh::idx_t g = d.elems[a][e];
+                            rcp.x[a][lane]       = scalar_t(px[g]);
+                            rcp.y[a][lane]       = scalar_t(py[g]);
+                            rcp.z[a][lane]       = scalar_t(pz[g]);
+                            rcp.pgx[a][lane]     = d.pgx[g];
+                            rcp.pgy[a][lane]     = d.pgy[g];
+                            rcp.pgz[a][lane]     = d.pgz[g];
+                        }
+                    } else {
+                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                            rcp.x[a][lane] = rcp.y[a][lane] = rcp.z[a][lane] = scalar_t(0);
+                            rcp.pgx[a][lane] = rcp.pgy[a][lane] = rcp.pgz[a][lane] = scalar_t(0);
+                        }
+                    }
+                }
+            }
+
+            cvfem_hex8_ns_upwind_residual_sumfact_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5,
+                                                       cof6, cof7, cof8, detv, in, outp,
+                                                       opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale);
+
+            for (int lane = 0; lane < nlanes; ++lane) {
+                const ptrdiff_t e = e0 + lane;
+                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                    const smesh::idx_t g = d.elems[a][e];
+                    atomic_add(rx, g, outp.rx[a][lane]);
+                    atomic_add(ry, g, outp.ry[a][lane]);
+                    atomic_add(rz, g, outp.rz[a][lane]);
+                    atomic_add(rc_out, g, outp.rc[a][lane]);
+                }
+            }
+        }
+    }
+}
+
 // The DEFERRED-CORRECTION higher-order convective flux, on the atomic sum-factored sweep.
 //
 // The face value is reconstructed from the donor node and its nodal velocity gradient,
