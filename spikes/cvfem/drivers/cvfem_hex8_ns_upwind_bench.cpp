@@ -568,8 +568,6 @@ int main(int argc, char **argv) {
             mesh_footprint = 1;
         else if (arg == "--kernel-only")
             g_kernel_only = 1;
-        else if (arg == "--atomic-simd")
-            g_atomic_simd = 1;
         else if (arg == "--dense-flush")
             g_dense_flush = 1;
         else if (arg == "--rhie-chow") {
@@ -1703,10 +1701,12 @@ int main(int argc, char **argv) {
             apply_residual_atomic_sympy(d, rho, mu);
         else if (kernel_kind == KernelKind::Sumfact && conv_ho)
             apply_residual_atomic_sumfact_defcor(d, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
-        else if (kernel_kind == KernelKind::Sumfact && g_atomic_simd)
-            apply_residual_atomic_sumfact_simd(d, rho, mu);
         else if (kernel_kind == KernelKind::Sumfact)
-            apply_residual_atomic_sumfact(d, rho, mu);
+            // The lane-blocked sweep, unconditionally. The scalar one is not an option the
+            // standard layout should be measured on: it issues 0.1% vector instructions where
+            // this issues 23%, and reporting it would credit the packed format with a
+            // vectorisation difference that has nothing to do with the format.
+            apply_residual_atomic_sumfact_simd(d, rho, mu);
         else
             apply_residual_atomic(d, rho, mu);
 
@@ -1901,6 +1901,13 @@ int main(int argc, char **argv) {
                                          conv_limiter, scalar_t(0));
         else if (geom_kind == GeomKind::Isoparam)
             apply_jacobian_action_atomic_isoparam(d, rho, mu, dir_v, jac_out.data());
+        // The lane-blocked sweep wherever it applies, for the reason the residual gives: the
+        // standard layout is measured at its best or the comparison credits the format with a
+        // vectorisation difference. It carries the first-order flux and Rhie-Chow, exact or
+        // frozen; the higher-order exact action and the generated kernel arrangements are not in
+        // it, so those keep the scalar sweep and the row records which one ran.
+        else if (kernel_kind == KernelKind::Sumfact && !with_hograd)
+            apply_jacobian_action_atomic_simd(d, rho, mu, dir_v, jac_out.data());
         else
             apply_jacobian_action_atomic(d, rho, mu, dir_v, jac_out.data(), kernel_kind,
                                          with_hograd ? ugrad.data() : nullptr,
