@@ -78,8 +78,8 @@ namespace sfem {
 
                 b_colidx[offset] = b_j;
 
-                const TStorage* const SFEM_RESTRICT a_block = &a_values[(a_begin + a_k) * block_matrix_size];
-                TStorage* const SFEM_RESTRICT       b_block = &b_values[offset * block_matrix_size];
+                const TStorage* const SFEM_RESTRICT a_block = &a_values[((ptrdiff_t)a_begin + a_k) * block_matrix_size];
+                TStorage* const SFEM_RESTRICT       b_block = &b_values[(ptrdiff_t)offset * block_matrix_size];
 
                 for (int d2 = 0; d2 < ColBlockSize; d2++) {
                     TStorage* const SFEM_RESTRICT b_row = &b_block[d2 * RowBlockSize];
@@ -121,8 +121,8 @@ namespace sfem {
 
                 b_colidx[offset] = b_j;
 
-                const TStorage* const SFEM_RESTRICT a_block = &a_values[(a_begin + a_k) * block_matrix_size];
-                TStorage* const SFEM_RESTRICT       b_block = &b_values[offset * block_matrix_size];
+                const TStorage* const SFEM_RESTRICT a_block = &a_values[((ptrdiff_t)a_begin + a_k) * block_matrix_size];
+                TStorage* const SFEM_RESTRICT       b_block = &b_values[(ptrdiff_t)offset * block_matrix_size];
 
                 for (int d2 = 0; d2 < col_block_size; d2++) {
                     TStorage* const SFEM_RESTRICT b_row = &b_block[d2 * row_block_size];
@@ -355,7 +355,7 @@ namespace sfem {
             const int tid = 0;
 #endif
             R* const SFEM_RESTRICT        next = &next_workspace[tid * c_block_cols];
-            TStorage* const SFEM_RESTRICT acc  = &acc_workspace[tid * c_block_cols * c_block_matrix_size];
+            TStorage* const SFEM_RESTRICT acc  = &acc_workspace[(ptrdiff_t)tid * c_block_cols * c_block_matrix_size];
 
             for (ptrdiff_t i = 0; i < c_block_cols; i++) {
                 next[i] = unseen;
@@ -377,19 +377,19 @@ namespace sfem {
                     const R                      b_end   = b_rowptr[a_j + 1];
                     const C* const SFEM_RESTRICT b_cols  = &b_colidx[b_begin];
 
-                    const TStorage* const SFEM_RESTRICT a_block = &a_values[(a_begin + a_k) * a_block_matrix_size];
+                    const TStorage* const SFEM_RESTRICT a_block = &a_values[((ptrdiff_t)a_begin + a_k) * a_block_matrix_size];
 
                     for (R b_k = 0, b_len = b_end - b_begin; b_k < b_len; b_k++) {
                         const C b_j = b_cols[b_k];
 
-                        const TStorage* const SFEM_RESTRICT b_block = &b_values[(b_begin + b_k) * b_block_matrix_size];
+                        const TStorage* const SFEM_RESTRICT b_block = &b_values[((ptrdiff_t)b_begin + b_k) * b_block_matrix_size];
 
                         if (next[b_j] == unseen) {
                             next[b_j] = head;
                             head      = b_j;
                             bsr_block_mm_acc(a_block,
                                              b_block,
-                                             &acc[b_j * c_block_matrix_size],
+                                             &acc[(ptrdiff_t)b_j * c_block_matrix_size],
                                              a_row_block_size,
                                              a_col_block_size,
                                              b_col_block_size,
@@ -398,7 +398,7 @@ namespace sfem {
                         } else {
                             bsr_block_mm_acc(a_block,
                                              b_block,
-                                             &acc[b_j * c_block_matrix_size],
+                                             &acc[(ptrdiff_t)b_j * c_block_matrix_size],
                                              a_row_block_size,
                                              a_col_block_size,
                                              b_col_block_size,
@@ -411,8 +411,8 @@ namespace sfem {
                 for (R k = 0; k < len; k++) {
                     c_colidx[offset] = head;
 
-                    TStorage* const SFEM_RESTRICT       c_block   = &c_values[offset * c_block_matrix_size];
-                    const TStorage* const SFEM_RESTRICT acc_block = &acc[head * c_block_matrix_size];
+                    TStorage* const SFEM_RESTRICT       c_block   = &c_values[(ptrdiff_t)offset * c_block_matrix_size];
+                    const TStorage* const SFEM_RESTRICT acc_block = &acc[(ptrdiff_t)head * c_block_matrix_size];
                     for (int d = 0; d < c_block_matrix_size; d++) {
                         c_block[d] = acc_block[d];
                     }
@@ -513,6 +513,18 @@ namespace sfem {
     }
 
     // -------------------------------------------------------------------------
+    // Every ABSOLUTE block index is widened to ptrdiff_t before it is multiplied by a block's
+    // entry count. R is the matrix's count type and is int32_t in the default configuration, so
+    // `row_begin * block_matrix_size` is evaluated in 32 bits and wraps once the block index
+    // passes 2^31/block_matrix_size -- 134,217,727 for a 4x4 block. A CVFEM HEX8 cube has
+    // (3n+1)^3 blocks, so n=160 sits at 83% of that and n=192, at 192,100,033 blocks, wraps about
+    // seventy per cent of the way down the rows and segfaults there. It is the SCALAR count that
+    // overflows, not the block count: 192 million blocks is 9% of int32, the 3.07 billion scalars
+    // they address are 143% of it.
+    //
+    // The row-relative k inside the SpMV row loops is deliberately left narrow: `vals` is already
+    // offset by the row start, so that index is bounded by one row's length.
+    // -------------------------------------------------------------------------
     // Host BSR SpMV
     // Portable: fused scale, register y, unrolled 3x3, nnz blocking, software
     // prefetch of upcoming x/A blocks. TStorage may differ from T (mixed precision).
@@ -584,7 +596,7 @@ namespace sfem {
             const R extent    = rowptr[i + 1] - row_begin;
 
             const C* const SFEM_RESTRICT        cols = &colidx[row_begin];
-            const TStorage* const SFEM_RESTRICT vals = &values[row_begin * BENTRIES];
+            const TStorage* const SFEM_RESTRICT vals = &values[(ptrdiff_t)row_begin * BENTRIES];
             T* const SFEM_RESTRICT              yi   = &y[i * BS];
 
             T y0, y1, y2;
@@ -668,7 +680,7 @@ namespace sfem {
             const R extent    = rowptr[i + 1] - row_begin;
 
             const C* const SFEM_RESTRICT        cols = &colidx[row_begin];
-            const TStorage* const SFEM_RESTRICT vals = &values[row_begin * BENTRIES];
+            const TStorage* const SFEM_RESTRICT vals = &values[(ptrdiff_t)row_begin * BENTRIES];
             T* const SFEM_RESTRICT              yi   = &y[i * BS];
 
             T y0, y1, y2, y3;
@@ -736,7 +748,7 @@ namespace sfem {
             const R extent    = rowptr[i + 1] - row_begin;
 
             const C* const SFEM_RESTRICT        cols = &colidx[row_begin];
-            const TStorage* const SFEM_RESTRICT vals = &values[row_begin * block_matrix_size];
+            const TStorage* const SFEM_RESTRICT vals = &values[(ptrdiff_t)row_begin * block_matrix_size];
             T* const SFEM_RESTRICT              yi   = &y[i * RowBlockSize];
 
             T y_acc[RowBlockSize];
@@ -828,7 +840,7 @@ namespace sfem {
             for (R k = row_begin; k < row_end; k++) {
                 const C                         j       = colidx[k];
                 const auto* const SFEM_RESTRICT block_x = &x[j * col_block_size];
-                const auto* const SFEM_RESTRICT aij     = &values[k * block_matrix_size];
+                const auto* const SFEM_RESTRICT aij     = &values[(ptrdiff_t)k * block_matrix_size];
 
                 for (int d1 = 0; d1 < row_block_size; d1++) {
                     T sum = y_acc[d1];
