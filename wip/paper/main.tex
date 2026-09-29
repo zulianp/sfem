@@ -94,7 +94,7 @@ by thread arrival, which makes the result bitwise identical at every thread coun
 We evaluate the format on the operators of a colocated CVFEM incompressible Navier--Stokes
 discretisation --- residual and Jacobian action --- on an NVIDIA Grace CPU, against a standard
 atomic sweep and against sparse matrix--vector products with the lagged block-sparse matrix
-in double and single precision. On \num{8586756} degrees of freedom the packed residual reaches
+in double and single precision. On \campDofs{} degrees of freedom the packed residual reaches
 \campResPacked{}~MDOF/s against \campResAtomic{} for the atomic sweep and \campSpmvF{} for the
 lagged product, while reading two orders of magnitude less per degree of freedom than the
 matrix does. Measured over repeats and over thread counts, the atomic sweep returns a different
@@ -567,8 +567,8 @@ unambiguously compute-bound and the figure is a sustained rate rather than a pea
 repetitions agreed to \SI{0.2}{\percent}.
 
 \paragraph{Attained fractions.} The triad reaches \SI{\streamTriad}{\giga\byte\per\second},
-\SI{90}{\percent} of the bandwidth the vendor quotes~\cite{NvidiaGrace2023}; the \textsc{gemm}
-rate reaches \SI{\rlPeak}{\giga\flops}, \SI{65}{\percent} of the \SI{3.55}{\tflops} FP64 peak of a
+\SI{\rlBwPctSpec}{\percent} of the bandwidth the vendor quotes~\cite{NvidiaGrace2023}; the \textsc{gemm}
+rate reaches \SI{\rlPeak}{\giga\flops}, \SI{\rlPeakPctSpec}{\percent} of the \SI{3.55}{\tflops} FP64 peak of a
 single Grace die. The roofline of \S\ref{sec:res:spmv} uses the \emph{measured} pair, since the
 kernels placed on it were measured on the same node.
 
@@ -1017,7 +1017,7 @@ measured traffic is \num{1.3} to \num{1.5} times the compulsory bound, the balan
 re-reads at pack boundaries and partial-line writes.
 
 The first-order matrix-free kernels then sit at $\rlResidualAtomicAi{}$--$\rlResidualPackedAi{}$~FLOP/byte and
-the lagged product at $\rlSpmvFSixFourAi{}$, a factor of twenty lower: it reads a matrix whose
+the lagged product at $\rlSpmvFSixFourAi{}$, a factor of \rlMfOverSpmvLo--\rlMfOverSpmvHi{} lower: it reads a matrix whose
 size grows with the stencil where the matrix-free kernels read a mesh. Halving the value precision,
 moving the SpMV from $\rlSpmvFSixFourAi{}$ to $\rlSpmvFThreeTwoAi{}$, is close to the lagged
 operator's only lever.

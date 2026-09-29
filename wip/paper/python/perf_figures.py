@@ -1105,6 +1105,18 @@ def macros_roofline_ho(ho, measured_bytes):
     return "\n".join(out) + "\n" if out else ""
 
 
+def _rl_spmv_factor(pts):
+    """The first-order matrix-free intensities as a multiple of the lagged product's."""
+    ai = {l: a for l, a, _g, _m in pts}
+    spmv = ai.get(r"SpMV \texttt{f64}")
+    mf = [a for l, a in ai.items() if l.startswith("residual, ")]
+    if not spmv or not mf:
+        return ""
+    return ("\\newcommand{\\rlMfOverSpmvLo}{%.0f}\n"
+            "\\newcommand{\\rlMfOverSpmvHi}{%.0f}\n"
+            % (min(mf) / spmv, max(mf) / spmv))
+
+
 def _macro_name(label):
     """A LaTeX-safe, UNIQUE macro suffix for a roofline label.
 
@@ -1760,7 +1772,13 @@ def build(out_dir, tab_dir):
                                        % (_macro_name(l), 100.0 * g / min(peak, bw * a))
                                        for l, a, g, _m in pts)
                              + "\\newcommand{\\rlTrafficSource}{%s}\n"
-                               % ("measured" if any(m for _l, _a, _g, m in pts) else "modelled"))
+                               % ("measured" if any(m for _l, _a, _g, m in pts) else "modelled")
+                             # How far below the matrix-free kernels the lagged product sits on
+                             # the intensity axis. The text used to call this "a factor of
+                             # twenty"; it is 13.5 to 15.0, and the rounded macros invite the
+                             # same mistake again -- 3.6/0.2 reads as 18 -- so the ratio is taken
+                             # from the unrounded intensities here.
+                             + _rl_spmv_factor(pts))
                 written += ["figures/roofline.tex", "figures/roofline_macros.tex"]
     return written
 
