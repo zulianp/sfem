@@ -568,6 +568,8 @@ int main(int argc, char **argv) {
             mesh_footprint = 1;
         else if (arg == "--kernel-only")
             g_kernel_only = 1;
+        else if (arg == "--atomic-simd")
+            g_atomic_simd = 1;
         else if (arg == "--dense-flush")
             g_dense_flush = 1;
         else if (arg == "--rhie-chow") {
@@ -1701,6 +1703,8 @@ int main(int argc, char **argv) {
             apply_residual_atomic_sympy(d, rho, mu);
         else if (kernel_kind == KernelKind::Sumfact && conv_ho)
             apply_residual_atomic_sumfact_defcor(d, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
+        else if (kernel_kind == KernelKind::Sumfact && g_atomic_simd)
+            apply_residual_atomic_sumfact_simd(d, rho, mu);
         else if (kernel_kind == KernelKind::Sumfact)
             apply_residual_atomic_sumfact(d, rho, mu);
         else
