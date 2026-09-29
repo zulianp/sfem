@@ -22,6 +22,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -103,6 +104,34 @@ static T *thread_scratch(const int slot, const size_t n) {
         cap[slot] = ptr[slot] ? n : 0;
     }
     return ptr[slot];
+}
+
+// THE DEFAULT PACK SIZE, DERIVED FROM THE MACHINE RATHER THAN FROM THE INDEX TYPE.
+//
+// A pack is one OpenMP iteration, so the number of packs IS the available parallelism, and the
+// pack-size sweep locates the optimum at a fixed number of packs per THREAD rather than at a
+// fixed element count: plotted on that axis the problem sizes measured fail together, while
+// failing at different pack sizes. Sizing against the index-width ceiling instead -- the
+// pessimistic bound n_elements * nodes_per_element against what pack_idx_t can address, which
+// credits no sharing at all -- knows nothing about how many cores the machine has, and at 72
+// threads it gave up 1.2x.
+//
+// So the ceiling stays as the correctness bound it is and the default targets the measured
+// ratio, rounded to a power of two because that is the grid the sweep measured on.
+static constexpr int CVFEM_PACKS_PER_THREAD = 28;
+
+static int cvfem_default_pack_size(const ptrdiff_t nelements, const int threads) {
+    // What the index type admits, with the same pessimistic bound the packer uses.
+    const double ceiling = double(size_t(std::numeric_limits<pack_idx_t>::max()) + 1) / 8.0;
+    const double want    = double(nelements) / (double(threads > 0 ? threads : 1)
+                                                * double(CVFEM_PACKS_PER_THREAD));
+    // Nearest power of two in log space, not the next one down: the target ratio is a minimum
+    // of a curve rather than an upper bound, so overshooting it and undershooting it cost the
+    // same and the nearer grid point is the better estimate of the minimum.
+    double p = 64.0;
+    while (p * 2.0 <= ceiling && (p * 2.0) / want < want / p) p *= 2.0;
+    if (p > ceiling) p = ceiling;
+    return int(p);
 }
 
 static PackedData make_packed(const std::shared_ptr<smesh::Mesh> &mesh, const int pack_size) {

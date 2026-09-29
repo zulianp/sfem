@@ -49,7 +49,11 @@ mkdir -p "$OUT"
 CSV=$OUT/packsize.csv
 
 SIZES=${SIZES:-"64 128"}
-PACKS=${PACKS:-"256 1024 2048 4096 8192"}
+# 128 and 512 are in the grid because the optimum at n=128 sits at 512: a sweep whose grid does
+# not contain the peak reports the nearest point it happens to hold and every arm pinned from it
+# is then off the peak. They were dropped from this list once and the next run duly nominated
+# 1024.
+PACKS=${PACKS:-"128 256 512 1024 2048 4096 8192"}
 REPEAT=${REPEAT:-10}
 WARMUP=${WARMUP:-3}
 

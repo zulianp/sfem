@@ -411,6 +411,24 @@ static constexpr double CVFEM_HEX8_JAC_ACTION_FLOPS_PER_ELEMENT =
 // assembly rate by roughly 2.4x. Compare assembly variants with MDOF/s.
 static constexpr double CVFEM_HEX8_ASSEMBLE_FLOPS_PER_ELEMENT = 2304.0;
 
+// The deferred-correction higher-order flux, counted in the same idealised style as the
+// first-order number above and added to it when --conv-ho is on. Per sub-control surface:
+// the upwind split recovered from the mass flux (1) + its two weights (4) + the two
+// node-to-centroid vectors (6), then per velocity component the two directional derivatives
+// (5 each), the limiter applied to each (L each) and the flux-weighted combination (3), and
+// finally the correction added into both nodes' residuals (6 over the three components):
+//
+//     per surface = 1 + 4 + 6 + 3*(10 + 2L + 3) + 6 = 56 + 6L
+//
+// L is the limiter's own arithmetic: 0 unlimited; 2 for the bounded-face clip (one add to
+// reconstruct, one subtract to return the increment); 15 for Venkatakrishnan's rational psi;
+// 10 for Darwish-Moukalled. Twelve surfaces per hexahedron. Venkatakrishnan's eps^2 term is
+// not counted because it is reached only with a non-zero K, which no arm measured here uses.
+static constexpr double cvfem_hex8_defcor_flops_per_element(const int limiter) {
+    const double L = limiter == 1 ? 2.0 : limiter == 2 ? 15.0 : limiter == 3 ? 10.0 : 0.0;
+    return 12.0 * (56.0 + 6.0 * L);
+}
+
 // 12 SCS: dN (27) + J (144) + cof/det (33) + A (3) + ∇_ref u (144) + push (55)
 // + traction (24) + convection (36) + scatter (8) = 474 * 12.
 static constexpr double CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT = 5688.0;
@@ -1370,6 +1388,138 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     dfz = mpos * ii + mneg * jj;
 }
 
+// The deferred correction's DIRECTIONAL DERIVATIVE, which is what an exact Jacobian action needs.
+//
+// Structurally a mirror of cvfem_hex8_scs_defcor above, line for line, and deliberately so: the
+// two have to be the same term and its derivative, and the cheapest way to keep them that way is
+// to be able to read them side by side. Everything geometric -- the centroid, the two
+// node-to-centroid vectors, Venkatakrishnan's eps^2 -- is constant in the direction and carries
+// no derivative.
+//
+// What is NOT constant, and is the whole reason this costs more than the lagged action, is the
+// nodal velocity gradient: the reconstruction reads grad(u) at the donor, so the derivative reads
+// grad(v) there, and grad(v) has to be reconstructed from the direction by its own pass before
+// this kernel can run. `gv` is that field.
+// LIM IS A TEMPLATE PARAMETER, not the runtime int the residual's twin takes, and the difference
+// is worth 2x. This is called from inside a `#pragma omp simd` lane loop, and a runtime limiter
+// puts a three-way select there for every velocity component of every surface -- the same shape
+// of sweep-uniform guard this file has already measured at 1.83x, and the reason the residual's
+// higher-order path ships eight generated kernels selected outside the loop rather than one
+// taking the limiter as an argument. Measured before this was templated: the correction's
+// derivative added 27.7 ms to the packed matvec against 13.5 ms to the atomic scalar one, for
+// identical arithmetic.
+template <int STRIDE, int LIM, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor_jv(const scalar_t *const SFEM_RESTRICT g,
+                                                                  const scalar_t *const SFEM_RESTRICT gv,
+                                                                  const scalar_t *const SFEM_RESTRICT xe,
+                                                                  const scalar_t *const SFEM_RESTRICT ye,
+                                                                  const scalar_t *const SFEM_RESTRICT ze,
+                                                                  const scalar_t *const SFEM_RESTRICT ux,
+                                                                  const scalar_t *const SFEM_RESTRICT uy,
+                                                                  const scalar_t *const SFEM_RESTRICT uz,
+                                                                  const scalar_t *const SFEM_RESTRICT vx,
+                                                                  const scalar_t *const SFEM_RESTRICT vy,
+                                                                  const scalar_t *const SFEM_RESTRICT vz,
+                                                                  const int s, const int i, const int j,
+                                                                  const scalar_t mdot, const scalar_t dmdot,
+                                                                  const scalar_t ueps, const scalar_t venkat_c,
+                                                                  const int off,
+                                                                  const scalar_t sx, const scalar_t sy,
+                                                                  const scalar_t sz,
+                                                                  scalar_t &dfx, scalar_t &dfy, scalar_t &dfz) {
+    dfx = dfy = dfz = scalar_t(0);
+    if (!g || !gv) return;
+    (void)s;
+    const auto at = [off](const scalar_t *const SFEM_RESTRICT v, const int a) -> scalar_t {
+        return v[a * STRIDE + off];
+    };
+    const auto gat = [g, off](const int a, const int c) -> scalar_t {
+        return g[(a * 9 + c) * STRIDE + off];
+    };
+    const auto gvat = [gv, off](const int a, const int c) -> scalar_t {
+        return gv[(a * 9 + c) * STRIDE + off];
+    };
+
+    // The same split the flux and the correction use, and its derivative. d|m|/dm = sgn is the
+    // subgradient the first-order action already takes, so the two linearisations agree at m = 0
+    // rather than one of them being exact there and the other not.
+    scalar_t amdot, sgn;
+    cvfem_upwind_abs(mdot, ueps, amdot, sgn);
+    const scalar_t mpos = scalar_t(0.5) * (mdot + amdot);
+    const scalar_t mneg = scalar_t(0.5) * (mdot - amdot);
+    const scalar_t dpos = scalar_t(0.5) * (scalar_t(1) + sgn) * dmdot;
+    const scalar_t dneg = scalar_t(0.5) * (scalar_t(1) - sgn) * dmdot;
+
+    const scalar_t dix = sx - at(xe, i), diy = sy - at(ye, i), diz = sz - at(ze, i);
+    const scalar_t djx = sx - at(xe, j), djy = sy - at(ye, j), djz = sz - at(ze, j);
+
+    scalar_t veps2 = scalar_t(0);
+    if constexpr (LIM == 2) if (venkat_c != scalar_t(0)) {
+        const scalar_t ex = dix - djx, ey = diy - djy, ez = diz - djz;
+        const scalar_t h  = std::sqrt(ex * ex + ey * ey + ez * ez);
+        veps2             = venkat_c * h * h * h;
+    }
+
+    // One component's pair of increments and their derivatives, limited together against the
+    // same interval the residual uses. The bounds are nodal values, so they carry the direction's
+    // nodal values as their derivatives -- which is the part a reader is most likely to drop.
+    const auto lim = [&](const scalar_t *const SFEM_RESTRICT u, const scalar_t *const SFEM_RESTRICT v,
+                         const scalar_t inc_i, const scalar_t inc_j,
+                         const scalar_t dinc_i, const scalar_t dinc_j,
+                         scalar_t &oi, scalar_t &oj, scalar_t &doi, scalar_t &doj) {
+        oi = inc_i;  oj = inc_j;
+        doi = dinc_i; doj = dinc_j;
+        const scalar_t a  = at(u, i), b = at(u, j);
+        const scalar_t da = at(v, i), db = at(v, j);
+        const scalar_t lo = a < b ? a : b;
+        const scalar_t hi = a < b ? b : a;
+        const scalar_t dlo = a < b ? da : db;
+        const scalar_t dhi = a < b ? db : da;
+        if constexpr (LIM == 3) {
+            {
+                oi  = cvfem_darwish_moukalled_inc(a, b, inc_i);
+                oj  = cvfem_darwish_moukalled_inc(b, a, inc_j);
+                doi = cvfem_darwish_moukalled_inc_d(a, b, inc_i, da, db, dinc_i);
+                doj = cvfem_darwish_moukalled_inc_d(b, a, inc_j, db, da, dinc_j);
+            }
+        } else if constexpr (LIM == 1) {
+            {
+                oi  = cvfem_limiter_clip_inc(a, inc_i, lo, hi);
+                oj  = cvfem_limiter_clip_inc(b, inc_j, lo, hi);
+                doi = cvfem_limiter_clip_inc_d(a, inc_i, lo, hi, da, dinc_i, dlo, dhi);
+                doj = cvfem_limiter_clip_inc_d(b, inc_j, lo, hi, db, dinc_j, dlo, dhi);
+            }
+        } else if constexpr (LIM == 2) {
+            {
+                oi  = cvfem_venkata_inc(a, inc_i, lo, hi, veps2);
+                oj  = cvfem_venkata_inc(b, inc_j, lo, hi, veps2);
+                doi = cvfem_venkata_inc_d(a, inc_i, lo, hi, veps2, da, dinc_i, dlo, dhi);
+                doj = cvfem_venkata_inc_d(b, inc_j, lo, hi, veps2, db, dinc_j, dlo, dhi);
+            }
+        }
+    };
+
+    scalar_t ii, jj, dii, djj;
+    lim(ux, vx,
+        gat(i, 0) * dix + gat(i, 1) * diy + gat(i, 2) * diz,
+        gat(j, 0) * djx + gat(j, 1) * djy + gat(j, 2) * djz,
+        gvat(i, 0) * dix + gvat(i, 1) * diy + gvat(i, 2) * diz,
+        gvat(j, 0) * djx + gvat(j, 1) * djy + gvat(j, 2) * djz, ii, jj, dii, djj);
+    dfx = dpos * ii + mpos * dii + dneg * jj + mneg * djj;
+    lim(uy, vy,
+        gat(i, 3) * dix + gat(i, 4) * diy + gat(i, 5) * diz,
+        gat(j, 3) * djx + gat(j, 4) * djy + gat(j, 5) * djz,
+        gvat(i, 3) * dix + gvat(i, 4) * diy + gvat(i, 5) * diz,
+        gvat(j, 3) * djx + gvat(j, 4) * djy + gvat(j, 5) * djz, ii, jj, dii, djj);
+    dfy = dpos * ii + mpos * dii + dneg * jj + mneg * djj;
+    lim(uz, vz,
+        gat(i, 6) * dix + gat(i, 7) * diy + gat(i, 8) * diz,
+        gat(j, 6) * djx + gat(j, 7) * djy + gat(j, 8) * djz,
+        gvat(i, 6) * dix + gvat(i, 7) * diy + gvat(i, 8) * diz,
+        gvat(j, 6) * djx + gvat(j, 7) * djy + gvat(j, 8) * djz, ii, jj, dii, djj);
+    dfz = dpos * ii + mpos * dii + dneg * jj + mneg * djj;
+}
+
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_convection(const scalar_t rho,
                                                   const scalar_t ux_i,
@@ -1599,7 +1749,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
     }
 }
 
-template <typename scalar_t>
+// LIM is compile-time here too, so the atomic sweep selects the limiter once rather than at every
+// surface, and so that this and the packed sweep call one instantiation of one function. It leads
+// the list because it is given explicitly while scalar_t is deduced.
+template <int LIM, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action(const scalar_t                        rho,
                                                              const scalar_t                        mu,
                                                              const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
@@ -1613,8 +1766,25 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action(co
                                                              scalar_t *const SFEM_RESTRICT         r,
                                                              const Hex8RhieChowT<scalar_t>        &rc = {},
                                                              const scalar_t *const SFEM_RESTRICT   p  = nullptr,
-                                                             const scalar_t ueps = scalar_t(0)) {
+                                                             const scalar_t ueps = scalar_t(0),
+                                                             // The exact higher-order action, as on
+                                                             // the packed sweep: the element's node
+                                                             // coordinates, the state's nodal velocity
+                                                             // gradient and the direction's. All null
+                                                             // is the lagged action, which is what
+                                                             // this kernel computed before they existed.
+                                                             const scalar_t *const SFEM_RESTRICT xe = nullptr,
+                                                             const scalar_t *const SFEM_RESTRICT ye = nullptr,
+                                                             const scalar_t *const SFEM_RESTRICT ze = nullptr,
+                                                             const scalar_t *const SFEM_RESTRICT ugrad8 = nullptr,
+                                                             const scalar_t *const SFEM_RESTRICT vgrad8 = nullptr,
+                                                             const scalar_t venkat_c = scalar_t(0)) {
     for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) r[i] = scalar_t(0);
+
+    // The twelve centroids, once, exactly as the scalar residual builds them when it carries the
+    // correction.
+    scalar_t cenx[CVFEM_HEX8_N_SCS], ceny[CVFEM_HEX8_N_SCS], cenz[CVFEM_HEX8_N_SCS];
+    if (ugrad8 && vgrad8) cvfem_hex8_scs_centroids<1>(xe, ye, ze, /*off=*/0, cenx, ceny, cenz);
 
     scalar_t dgrad[9];
     cvfem_hex8_grad_sumfact(adj, det, vx, vy, vz, dgrad);
@@ -1680,9 +1850,18 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_action(co
         const scalar_t dpos  = d_pos * dmdot;
         const scalar_t dneg  = d_neg * dmdot;
         const scalar_t qmid  = half * (q[i] + q[j]);
-        const scalar_t fx    = dpos * ux[i] + mpos * vx[i] + dneg * ux[j] + mneg * vx[j] + qmid * ax;
-        const scalar_t fy    = dpos * uy[i] + mpos * vy[i] + dneg * uy[j] + mneg * vy[j] + qmid * ay;
-        const scalar_t fz    = dpos * uz[i] + mpos * vz[i] + dneg * uz[j] + mneg * vz[j] + qmid * az;
+        scalar_t fx    = dpos * ux[i] + mpos * vx[i] + dneg * ux[j] + mneg * vx[j] + qmid * ax;
+        scalar_t fy    = dpos * uy[i] + mpos * vy[i] + dneg * uy[j] + mneg * vy[j] + qmid * ay;
+        scalar_t fz    = dpos * uz[i] + mpos * vz[i] + dneg * uz[j] + mneg * vz[j] + qmid * az;
+        // The correction's derivative, from the same function the packed sweep calls, so the two
+        // layouts cannot carry different higher-order terms.
+        if (ugrad8 && vgrad8) {
+            scalar_t hx, hy, hz;
+            cvfem_hex8_scs_defcor_jv<1, LIM>(ugrad8, vgrad8, xe, ye, ze, ux, uy, uz, vx, vy, vz,
+                                             s, i, j, mdot, dmdot, ueps, venkat_c, /*off=*/0,
+                                             cenx[s], ceny[s], cenz[s], hx, hy, hz);
+            fx += hx; fy += hy; fz += hz;
+        }
         r[i * 4 + 0] += fx;
         r[i * 4 + 1] += fy;
         r[i * 4 + 2] += fz;
@@ -2350,8 +2529,12 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_simd(const
     }
 }
 
-template <int S, int I, int J, bool RC = false, bool QG = false, bool EPS = false>
-static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t                      rho,
+// FLATTEN for the same reason the residual face kernel carries it: with HO on this body calls
+// cvfem_hex8_scs_defcor_jv, and a call inside the `#pragma omp simd` loop stops the whole loop
+// vectorising -- the flux linearisation as well as the correction's.
+template <int S, int I, int J, bool RC = false, bool QG = false, bool EPS = false, bool HO = false,
+          int LIM = 0>
+static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(const scalar_t rho,
                                                      const scalar_t                      half,
                                                      const scalar_t                      one,
                                                      const scalar_t *const SFEM_RESTRICT Ax,
@@ -2361,8 +2544,18 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t             
                                                      const Hex8InputPack                &du,
                                                      const Hex8RhieChowPack             *rc,
                                                      Hex8ResidualPack                   &out,
-                                               const scalar_t ueps = scalar_t(0)) {
+                                               const scalar_t ueps = scalar_t(0),
+                                               // The state's nodal velocity gradient and the
+                                               // DIRECTION's, plus the centroids. Only the exact
+                                               // higher-order action reads them; the lagged one
+                                               // leaves them null and HO false.
+                                               const Hex8UGradPack *const ho = nullptr,
+                                               const Hex8UGradPack *const hov = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT cenx = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT ceny = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT cenz = nullptr) {
     if constexpr (!RC) (void)rc;
+    if constexpr (!HO) { (void)ho; (void)hov; (void)cenx; (void)ceny; (void)cenz; }
 #pragma omp simd
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         const scalar_t ax    = Ax[lane];
@@ -2428,13 +2621,28 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_simd(const scalar_t             
                 dpos * u.uy[I][lane] + mpos * du.uy[I][lane] + dneg * u.uy[J][lane] + mneg * du.uy[J][lane] + qmid * ay;
         const scalar_t fz =
                 dpos * u.uz[I][lane] + mpos * du.uz[I][lane] + dneg * u.uz[J][lane] + mneg * du.uz[J][lane] + qmid * az;
-        out.rx[I][lane] += fx;
-        out.ry[I][lane] += fy;
-        out.rz[I][lane] += fz;
+        // The correction's derivative, from the same function the residual's correction comes
+        // from. It touches momentum only -- the continuity row and the mass flux are untouched by
+        // the correction, so they are untouched by its derivative too.
+        scalar_t hx = scalar_t(0), hy = scalar_t(0), hz = scalar_t(0);
+        if constexpr (HO) {
+            cvfem_hex8_scs_defcor_jv<CVFEM_HEX8_VEC_SIZE, LIM>(
+                    &ho->g[0][0][0], &hov->g[0][0][0],
+                    &ho->x[0][0], &ho->y[0][0], &ho->z[0][0],
+                    &u.ux[0][0], &u.uy[0][0], &u.uz[0][0],
+                    &du.ux[0][0], &du.uy[0][0], &du.uz[0][0],
+                    S, I, J, mdot, dmdot, EPS ? ueps : scalar_t(0), ho->venkat_c,
+                    /*off=*/lane,
+                    cenx[S * CVFEM_HEX8_VEC_SIZE + lane], ceny[S * CVFEM_HEX8_VEC_SIZE + lane],
+                    cenz[S * CVFEM_HEX8_VEC_SIZE + lane], hx, hy, hz);
+        }
+        out.rx[I][lane] += fx + hx;
+        out.ry[I][lane] += fy + hy;
+        out.rz[I][lane] += fz + hz;
         out.rc[I][lane] += dmdot;
-        out.rx[J][lane] -= fx;
-        out.ry[J][lane] -= fy;
-        out.rz[J][lane] -= fz;
+        out.rx[J][lane] -= fx + hx;
+        out.ry[J][lane] -= fy + hy;
+        out.rz[J][lane] -= fz + hz;
         out.rc[J][lane] -= dmdot;
     }
 }
@@ -2608,7 +2816,7 @@ static SFEM_INLINE void cvfem_hex8_conv_all_jv_pa_simd(const scalar_t           
     cvfem_hex8_conv_face_jv_pa_simd<11, 3, 7, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
 }
 
-template <bool RC = false, bool QG = false, bool EPS = false>
+template <bool RC = false, bool QG = false, bool EPS = false, bool HO = false, int LIM = 0>
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
                                                     const scalar_t                      half,
                                                     const scalar_t                      one,
@@ -2625,19 +2833,24 @@ static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t              
                                                     const Hex8InputPack                &du,
                                                     const Hex8RhieChowPack             *rc,
                                                     Hex8ResidualPack                   &out,
-                                                    const scalar_t                      ueps = scalar_t(0)) {
-    cvfem_hex8_conv_face_jv_simd<0, 0, 1, RC, QG, EPS>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<1, 3, 2, RC, QG, EPS>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<2, 4, 5, RC, QG, EPS>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<3, 7, 6, RC, QG, EPS>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<4, 0, 3, RC, QG, EPS>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<5, 1, 2, RC, QG, EPS>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<6, 4, 7, RC, QG, EPS>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<7, 5, 6, RC, QG, EPS>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<8, 0, 4, RC, QG, EPS>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<9, 1, 5, RC, QG, EPS>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<10, 2, 6, RC, QG, EPS>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps);
-    cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG, EPS>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps);
+                                                    const scalar_t                      ueps = scalar_t(0),
+                                                    const Hex8UGradPack *const          ho = nullptr,
+                                                    const Hex8UGradPack *const          hov = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT cenx = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT ceny = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT cenz = nullptr) {
+    cvfem_hex8_conv_face_jv_simd<0, 0, 1, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<1, 3, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<2, 4, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<3, 7, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<4, 0, 3, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<5, 1, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<6, 4, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<7, 5, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<8, 0, 4, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<9, 1, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<10, 2, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+    cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
 }
 
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
@@ -3028,7 +3241,13 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
         const Hex8RhieChowPack               *rc       = nullptr,
         const scalar_t                        rc_scale = scalar_t(0),
         const bool                            has_qg   = false,
-        const scalar_t                        ueps     = scalar_t(0)) {
+        const scalar_t                        ueps     = scalar_t(0),
+        // The exact higher-order action. `ho` is the state's nodal velocity gradient, the same
+        // field the residual's correction reads; `hov` is the DIRECTION's, reconstructed by its
+        // own pass on every matvec. Both null is the lagged action, which is what this kernel
+        // computed before they existed and what it still computes bit for bit when they are.
+        const Hex8UGradPack                  *ho       = nullptr,
+        const Hex8UGradPack                  *hov      = nullptr) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
     const scalar_t half = scalar_t(0.5);
@@ -3065,29 +3284,63 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
     // band is a template flag: EPS=false passes a literal zero, the branch folds, and the
     // default path emits what it emitted before this parameter existed.
     const bool eps_on = ueps > scalar_t(0);
+    const bool ho_on  = ho != nullptr && hov != nullptr;
+
+    // The twelve centroids, exactly as the residual dispatcher builds them and for the same
+    // reason -- the correction's derivative needs the same node-to-centroid vectors the
+    // correction does.
+    alignas(ALIGN_BYTES) scalar_t cenx[CVFEM_HEX8_N_SCS * CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t ceny[CVFEM_HEX8_N_SCS * CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t cenz[CVFEM_HEX8_N_SCS * CVFEM_HEX8_VEC_SIZE];
+    if (ho_on) {
+#pragma omp simd
+        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+            cvfem_hex8_scs_centroids<CVFEM_HEX8_VEC_SIZE>(&ho->x[0][0], &ho->y[0][0], &ho->z[0][0],
+                                                          lane, cenx, ceny, cenz);
+        }
+    }
+    // A macro over the eight arguments the sixteen instantiations share, for the reason the
+    // residual side has one: sixteen hand-written copies of the argument list is where a
+    // transposed pack hides.
+// The limiter joins the compile-time set, and it is dispatched HERE rather than inside the lane
+// loop: it is uniform across the sweep, and a select on it in the vector body cost 2x. Only the
+// HO arms instantiate the four values; without the correction there is no limiter to select, so
+// LIM stays 0 and the non-HO instantiation count is unchanged.
+#define CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, HO_, LIM_)                                     \
+    cvfem_hex8_conv_all_jv_simd<RC_, QG_, EPS_, HO_, LIM_>(rho, half, one, Ax0, Ay0, Az0, Ax1,  \
+                                                     Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out,   \
+                                                     ueps, ho, hov, cenx, ceny, cenz)
+#define CVFEM_HEX8_CONV_ALL_JV(RC_, QG_, EPS_, HO_)                                             \
+    do {                                                                                        \
+        if constexpr (!(HO_)) {                                                                 \
+            CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, false, 0);                                 \
+        } else {                                                                                \
+            switch (ho->limiter) {                                                              \
+                case 1: CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, true, 1); break;               \
+                case 2: CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, true, 2); break;               \
+                case 3: CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, true, 3); break;               \
+                default: CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, true, 0); break;              \
+            }                                                                                   \
+        }                                                                                       \
+    } while (0)
     if (rc && rc_scale != scalar_t(0)) {
         if (has_qg) {
-            if (eps_on)
-                cvfem_hex8_conv_all_jv_simd<true, true, true>(
-                        rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out, ueps);
-            else
-                cvfem_hex8_conv_all_jv_simd<true, true, false>(
-                        rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+            if (eps_on) { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(true, true, true, true);
+                          else       CVFEM_HEX8_CONV_ALL_JV(true, true, true, false); }
+            else        { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(true, true, false, true);
+                          else       CVFEM_HEX8_CONV_ALL_JV(true, true, false, false); }
         } else {
-            if (eps_on)
-                cvfem_hex8_conv_all_jv_simd<true, false, true>(
-                        rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out, ueps);
-            else
-                cvfem_hex8_conv_all_jv_simd<true, false, false>(
-                        rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+            if (eps_on) { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(true, false, true, true);
+                          else       CVFEM_HEX8_CONV_ALL_JV(true, false, true, false); }
+            else        { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(true, false, false, true);
+                          else       CVFEM_HEX8_CONV_ALL_JV(true, false, false, false); }
         }
     } else {
-        if (eps_on)
-            cvfem_hex8_conv_all_jv_simd<false, false, true>(
-                    rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out, ueps);
-        else
-            cvfem_hex8_conv_all_jv_simd<false, false, false>(
-                    rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out);
+        if (eps_on) { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(false, false, true, true);
+                      else       CVFEM_HEX8_CONV_ALL_JV(false, false, true, false); }
+        else        { if (ho_on) CVFEM_HEX8_CONV_ALL_JV(false, false, false, true);
+                      else       CVFEM_HEX8_CONV_ALL_JV(false, false, false, false); }
+#undef CVFEM_HEX8_CONV_ALL_JV
     }
 }
 

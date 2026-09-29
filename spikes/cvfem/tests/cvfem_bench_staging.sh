@@ -187,7 +187,15 @@ same_across_layouts() {
     desc="$1"; shift
     ref=""
     for lay in atomic packed colored store; do
-        v=$(OMP_NUM_THREADS=1 "$BENCH" --n 8 --repeat 1 --warmup 0 --layout "$lay" "$@" 2>&1 | sed -n 's/^ *checksum: //p')
+        # THE PACK SIZE IS PINNED for the same reason the thread count is. This check wants one
+        # summation order across the four layouts, and at --n 8 it used to get it for free: the
+        # old fixed default of 2048 elements put all 512 elements of that mesh in a single pack,
+        # so the packed sweep summed in the flat order. The default now derives from the core
+        # count (cvfem_default_pack_size), which at one thread gives 32 packs and therefore a
+        # different order and a different last bit -- and since this checksum cancels to ~5e-12
+        # out of terms of order one, a last-bit move is a large RELATIVE move. Asking for one
+        # pack explicitly keeps the check testing the layouts rather than the packer's default.
+        v=$(OMP_NUM_THREADS=1 "$BENCH" --n 8 --repeat 1 --warmup 0 --pack-size 8192 --layout "$lay" "$@" 2>&1 | sed -n 's/^ *checksum: //p')
         if [ -z "$v" ]; then
             printf '%-62s FAIL (--layout %s produced no checksum)\n' "$desc" "$lay"
             FAIL=$((FAIL + 1))

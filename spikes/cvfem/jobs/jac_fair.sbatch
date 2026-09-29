@@ -38,6 +38,12 @@ CSV=$OUT/jacfair.csv
 N=${N:-128}
 REPEAT=${REPEAT:-10}
 PASSES=${PASSES:-3}
+# The measured optimum for this n, pinned rather than left to the library default. The default
+# derives from the index-type ceiling and the thread count, so it moves with the thread count and
+# with n, and an arm that takes it is not reproducible against the rest of the paper even when it
+# happens to land on the peak -- which at n=128 it does. Read it from the pack-size sweep
+# (\packLargeBest); PACK= (empty) restores the library default deliberately.
+PACK=${PACK:-1024}
 
 echo "### host $(hostname)  n=$N repeat=$REPEAT passes=$PASSES  $(date '+%F %T')"
 echo
@@ -52,6 +58,7 @@ for arm in "jac_exact|packed|--jac-action --rhie-chow" \
     # "none" rather than "n/a": the label reaches a filename and a slash there
     # silently redirected into a non-existent directory.
     layflag=""; [ "$lay" != "none" ] && layflag="--layout $lay"
+    [ -n "$PACK" ] && [ "$lay" = "packed" ] && layflag="$layflag --pack-size $PACK"
     best=""; dofs=""; qg=""
     for pass in $(seq 1 "$PASSES"); do
         log=$OUT/${lbl}_${lay}_p${pass}.log

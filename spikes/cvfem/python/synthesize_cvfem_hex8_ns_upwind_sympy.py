@@ -148,6 +148,14 @@ def build_symbols() -> dict[str, object]:
         "y": sp.symbols("y0:8"),
         "z": sp.symbols("z0:8"),
         "g": tuple(sp.symbols(f"g{a}_0:9") for a in range(N_NODE)),
+        # The DIRECTION's nodal velocity gradient, same layout as "g". The exact Jacobian
+        # action needs it because the reconstruction reads a gradient that is an input to the
+        # apply rather than a function of the element's own unknowns: differentiating
+        # grad(u_D) . (x_scs - x_D) in direction v gives grad(v_D) . (x_scs - x_D), and
+        # grad(v_D) can only come from a reconstruction pass over v. That pass is what makes
+        # the exact higher-order action cost more than the lagged one; see the driver's
+        # --conv-ho-exact.
+        "gv": tuple(sp.symbols(f"gv{a}_0:9") for a in range(N_NODE)),
         # Rhie-Chow. The per-sub-control-surface coefficient arrives as a SYMBOL rather than
         # being built here, and that is deliberate: cvfem_hex8_rhie_chow_mdot_coeff carries two
         # square roots, a division and a data-dependent degeneracy guard that returns zero, so
@@ -449,6 +457,95 @@ def defcor_kernels(sym: dict[str, object]) -> str:
     the repository's own budget checks, and nothing at run time.
     """
     return "".join(defcor_kernel(sym, lim, rc)
+                   for rc in (False, True) for lim in (0, 1, 2, 3))
+
+
+def defcor_action_exprs(sym: dict[str, object], rc: bool, limiter: int) -> tuple[list[sp.Expr], list[sp.Expr]]:
+    """The EXACT Jacobian action of the residual carrying the deferred correction.
+
+    A directional derivative taken term by term rather than a Jacobian built and contracted: the
+    correction's Jacobian is dense in a way the first-order one is not -- every momentum row picks
+    up the nine gradient components of both of its surface's nodes -- so forming the matrix first
+    would build 104 columns per row and throw almost all of them away.
+
+    Differentiated with respect to the element's unknowns AND with respect to the nodal gradient,
+    each contracted with its own direction. The second half is the part a lagged action drops, and
+    it is not a small correction to the first: for a smooth field the reconstruction IS the
+    correction, so dropping grad(v) drops the term's leading behaviour.
+
+    ``sgn`` stays a symbol, so d|m|/dm = sgn exactly as the hand-written action assumes. That is a
+    choice of subgradient at m = 0 and it is the same one the first-order kernel makes, which is
+    what keeps the two demonstrably one linearisation.
+    """
+    r, mdots = residual_defcor_exprs(sym, rc=rc, limiter=limiter)
+    pairs: list[tuple[sp.Symbol, sp.Symbol]] = []
+    for a in range(N_NODE):
+        pairs.append((sym["ux"][a], sym["vx"][a]))
+        pairs.append((sym["uy"][a], sym["vy"][a]))
+        pairs.append((sym["uz"][a], sym["vz"][a]))
+        pairs.append((sym["p"][a], sym["q"][a]))
+        for c in range(9):
+            pairs.append((sym["g"][a][c], sym["gv"][a][c]))
+    out = []
+    for k in range(N_DOF):
+        terms = []
+        for var, dvar in pairs:
+            if not r[k].has(var):
+                continue
+            d = sp.diff(r[k], var)
+            if d != 0:
+                terms.append(d * dvar)
+        out.append(sp.Add(*terms) if terms else sp.Integer(0))
+    return out, mdots
+
+
+def simd_direction_locals_defcor() -> str:
+    """The direction and its reconstructed gradient, hoisted per lane like the state is."""
+    lines = []
+    for name, field in (("vx", "ux"), ("vy", "uy"), ("vz", "uz"), ("q", "p")):
+        for i in range(N_NODE):
+            lines.append(f"        const scalar_t {name}{i} = dir.{field}[{i}][lane];")
+    for a in range(N_NODE):
+        for c in range(9):
+            lines.append(f"        const scalar_t gv{a}_{c} = hov.g[{a}][{c}][lane];")
+    return "\n".join(lines)
+
+
+def defcor_action_kernel(sym: dict[str, object], limiter: int, rc: bool) -> str:
+    """One lane-blocked EXACT higher-order Jacobian action: whole element, one CSE'd block."""
+    action, mdots = defcor_action_exprs(sym, rc=rc, limiter=limiter)
+    name = f"cvfem_hex8_ns_upwind_sympy_jv_defcor{'_rc' if rc else ''}_lim{limiter}_simd"
+    rc_arg = "        const Hex8RhieChowPack &rc,\n" if rc else ""
+    rc_loc = simd_rc_locals() + "\n" if rc else ""
+    return f"""
+// {LIMITER_NAME[limiter]}{', with Rhie-Chow' if rc else ''}, exact Jacobian action.
+static SFEM_INLINE void {name}(
+        const scalar_t rho,
+        const scalar_t mu,
+{defcor_simd_args()}
+        const Hex8InputPack &in,
+        const Hex8InputPack &dir,
+        const Hex8UGradPack &ho,
+        const Hex8UGradPack &hov,
+{rc_arg}        Hex8ResidualPack    &out) {{
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {{
+{simd_input_locals_defcor()}
+{simd_direction_locals_defcor()}
+{rc_loc}{sign_locals(mdots, indent="        ")}
+{cse_code(action, residual_pack_outputs(), indent="        ")}
+    }}
+}}
+"""
+
+
+def defcor_action_kernels(sym: dict[str, object]) -> str:
+    """The exact action for every limiter arm, with and without Rhie-Chow.
+
+    Same eight-way split as the residual and for the same reason: a runtime limiter would put a
+    four-way select inside the vector body at every surface and component.
+    """
+    return "".join(defcor_action_kernel(sym, lim, rc)
                    for rc in (False, True) for lim in (0, 1, 2, 3))
 
 

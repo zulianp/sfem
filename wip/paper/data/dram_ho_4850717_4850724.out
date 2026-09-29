@@ -1,0 +1,29 @@
+# MEASURED DRAM TRAFFIC, HIGHER-ORDER CONVECTIVE SWEEP. Grace SCF counters, jobs 4850717
+# (repeat=10) and 4850724 (repeat=80), --conv-ho 0, n=128, 72 threads, OMP_PROC_BIND=true,
+# --warmup 3, pack size 2048. Same method and same units as dram_4816010_4816011.out:
+#
+#   bytes = cmem_rd_data * 32 + cmem_wr_total_bytes
+#
+# and two captures differenced across repeat count so that mesh setup, pack construction and the
+# warmup applies cancel exactly.
+#
+# CROSS-CHECKED, because the first attempt at this pair produced one bad capture. A third job
+# (4816677, repeat=40) gives a second, independent difference against the repeat=10 capture:
+#
+#   layout   (80-10)/70 B/dof     (40-10)/30 B/dof
+#   packed        106.3                104.5
+#   atomic        103.6                103.4
+#
+# The two agree to within 2%, which is what says the differencing is sound here. The rows below
+# are the 10/80 pair, the wider of the two. The discarded capture is job 4816676's atomic row,
+# which reported 17 MB read for a run that built a two-million-element mesh -- three orders of
+# magnitude low, and rejected on that ground rather than because it was inconvenient.
+#
+# The traffic is roughly double the first-order sweep's and the two layouts are now within 3% of
+# each other. Both follow from the hoisted nodal velocity gradient: nine doubles per node is
+# 18 B/dof compulsory, and the packed sweep stages it into pack-local order, so it is written
+# once and read once more on top of that.
+#
+# operation   layout  repeat_lo  repeat_hi  bytes_lo        bytes_hi         dofs
+residual-ho   packed  10  80   14267553736   78165365464   8586756
+residual-ho   atomic  10  80   14219980320   76478913648   8586756

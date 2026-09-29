@@ -8,12 +8,21 @@
 
 #include "cvfem_hex8_best_common.hpp"
 
+// The two gradient arguments carry the exact higher-order action, as on the packed sweep; both
+// null is the lagged one. The atomic path exists here so the layouts can be compared on the same
+// operator -- a packed row carrying the correction against an atomic row that silently dropped it
+// would not be a layout comparison.
 static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
                                                        const scalar_t        rho,
                                                        const scalar_t        mu,
                                                        const scalar_t *const dir,
                                                        scalar_t *const       jv,
-                                                       const KernelKind      kernel = KernelKind::Sumfact) {
+                                                       const KernelKind      kernel = KernelKind::Sumfact,
+                                                       const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                       const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
+                                                       const int             limiter = 0,
+                                                       const scalar_t        venkat_c = scalar_t(0)) {
+    const bool with_ho = ugrad != nullptr && vgrad != nullptr;
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
 
     const Hex8Extras opt(d);
@@ -21,7 +30,20 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
+        scalar_t xe[8], ye[8], ze[8], g8[72], gv8[72];
         gather_element_fields(d, e, ux, uy, uz, p);
+        if (with_ho) {
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const smesh::idx_t gn = d.elems[a][e];
+                xe[a] = scalar_t(d.points[0][gn]);
+                ye[a] = scalar_t(d.points[1][gn]);
+                ze[a] = scalar_t(d.points[2][gn]);
+                for (int c = 0; c < 9; ++c) {
+                    g8[a * 9 + c]  = ugrad[(ptrdiff_t)gn * 9 + c];
+                    gv8[a * 9 + c] = vgrad[(ptrdiff_t)gn * 9 + c];
+                }
+            }
+        }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g         = d.elems[a][e];
             const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
@@ -57,9 +79,36 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
         else if (opt.with_rc) {
             Hex8ExtraScratch ex;
             ex.load(d, opt, e);
-            cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r, ex.rc, p);
+            // The limiter is selected at compile time, as it is on the packed sweep and for the
+            // same reason; the switch sits here, outside the element loop's face loop.
+#define CVFEM_HEX8_JV_RC(LIM_)                                                                  \
+    cvfem_hex8_ns_upwind_jacobian_action<LIM_>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,  \
+                                               ex.rc, p, scalar_t(0),                           \
+                                               with_ho ? xe : nullptr, with_ho ? ye : nullptr,  \
+                                               with_ho ? ze : nullptr, with_ho ? g8 : nullptr,  \
+                                               with_ho ? gv8 : nullptr, venkat_c)
+            switch (limiter) {
+                case 1: CVFEM_HEX8_JV_RC(1); break;
+                case 2: CVFEM_HEX8_JV_RC(2); break;
+                case 3: CVFEM_HEX8_JV_RC(3); break;
+                default: CVFEM_HEX8_JV_RC(0); break;
+            }
+#undef CVFEM_HEX8_JV_RC
         } else {
-            cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
+#define CVFEM_HEX8_JV_BARE(LIM_)                                                                \
+    cvfem_hex8_ns_upwind_jacobian_action<LIM_>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,  \
+                                               Hex8RhieChowT<scalar_t>{},                       \
+                                               (const scalar_t *)nullptr, scalar_t(0),          \
+                                               with_ho ? xe : nullptr, with_ho ? ye : nullptr,  \
+                                               with_ho ? ze : nullptr, with_ho ? g8 : nullptr,  \
+                                               with_ho ? gv8 : nullptr, venkat_c)
+            switch (limiter) {
+                case 1: CVFEM_HEX8_JV_BARE(1); break;
+                case 2: CVFEM_HEX8_JV_BARE(2); break;
+                case 3: CVFEM_HEX8_JV_BARE(3); break;
+                default: CVFEM_HEX8_JV_BARE(0); break;
+            }
+#undef CVFEM_HEX8_JV_BARE
         }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const smesh::idx_t g = d.elems[a][e];

@@ -621,91 +621,11 @@ static void cvfem_hex8_build_grad_weight(MeshT &d, const int isoparam) {
     d.grad_w_nelements = d.nelements;
 }
 
-template <typename MeshT>
-static void cvfem_hex8_assemble_nodal_grad(MeshT                        &d,
-                                           const int                     isoparam,
-                                           const scalar_t *const SFEM_RESTRICT src,
-                                           const int                     stride,
-                                           std::vector<scalar_t>        &ogx,
-                                           std::vector<scalar_t>        &ogy,
-                                           std::vector<scalar_t>        &ogz) {
-    cvfem_hex8_build_grad_weight(d, isoparam);
-    ogx.assign((size_t)d.nnodes, scalar_t(0));
-    ogy.assign((size_t)d.nnodes, scalar_t(0));
-    ogz.assign((size_t)d.nnodes, scalar_t(0));
-
-    scalar_t *const SFEM_RESTRICT pgx = ogx.data();
-    scalar_t *const SFEM_RESTRICT pgy = ogy.data();
-    scalar_t *const SFEM_RESTRICT pgz = ogz.data();
-    const scalar_t *const SFEM_RESTRICT pw = d.grad_w_inv.data();
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
-        scalar_t f[CVFEM_HEX8_N_NODES], gx, gy, gz;
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) f[a] = src[(ptrdiff_t)d.elems[a][e] * stride];
-
-        if (isoparam) {
-            const auto *const px = d.points[0];
-            const auto *const py = d.points[1];
-            const auto *const pz = d.points[2];
-            scalar_t x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const smesh::idx_t g = d.elems[a][e];
-                x[a]                 = scalar_t(px[g]);
-                y[a]                 = scalar_t(py[g]);
-                z[a]                 = scalar_t(pz[g]);
-            }
-            scalar_t dN[CVFEM_HEX8_N_NODES][3], adj[9], det;
-            cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
-            cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
-            if (std::fabs(det) < scalar_t(1e-30)) continue;
-            scalar_t dr = 0, ds = 0, dt = 0;
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                dr += f[a] * dN[a][0];
-                ds += f[a] * dN[a][1];
-                dt += f[a] * dN[a][2];
-            }
-            // sgn, not 1/det. What this sweep accumulates is |det| times the gradient, and
-            // the gradient is A^T d / det -- so the determinant cancels and only its sign
-            // survives. One division and three multiplies per element go with it, and the
-            // result is one rounding closer to exact.
-            cvfem_hex8_pushforward(adj, det > scalar_t(0) ? scalar_t(1) : scalar_t(-1), dr, ds, dt, gx, gy, gz);
-        } else {
-            scalar_t adj[9], det;
-            load_hex8_adj(d, e, adj, &det);
-            if (std::fabs(det) < scalar_t(1e-30)) continue;
-            // This is cvfem_hex8_grad_scalar spelled out, with the same det cancellation as
-            // above. That function lives in cvfem_hex8_boundary_scs.hpp, which both families
-            // include *after* this header, so it cannot be called from here -- and it is
-            // itself only these two lines over cvfem_hex8_face_diff and
-            // cvfem_hex8_pushforward, both of which come from the kernel header above.
-            scalar_t dr, ds, dt;
-            cvfem_hex8_face_diff(f, dr, ds, dt);
-            cvfem_hex8_pushforward(adj, det > scalar_t(0) ? scalar_t(1) : scalar_t(-1), dr, ds, dt, gx, gy, gz);
-        }
-
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t id = d.elems[a][e];
-            CVFEM_ATOMIC_ADD(pgx[id], gx);
-            CVFEM_ATOMIC_ADD(pgy[id], gy);
-            CVFEM_ATOMIC_ADD(pgz[id], gz);
-        }
-    }
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        const scalar_t inv = pw[i];
-        pgx[i] *= inv;
-        pgy[i] *= inv;
-        pgz[i] *= inv;
-    }
-}
-
 
 // ------------------------------------------------- the same reconstruction, over packs
 //
-// Same operator, same result to round-off, different sweep. The version above walks the
-// flat element table and accumulates with `#pragma omp atomic update` -- 24 atomics per
+// Same operator, same result to round-off, different sweep. The flat version below walks
+// the flat element table and accumulates with `#pragma omp atomic update` -- 24 atomics per
 // element into three global arrays that must first be zeroed. This one reuses the
 // arrangement the element sweep next to it already uses: stage the field into a per-pack
 // buffer, accumulate into a private per-pack buffer with plain `+=`, write the pack's owned
@@ -722,7 +642,7 @@ static void cvfem_hex8_assemble_nodal_grad(MeshT                        &d,
 //     which is eight times less, and contiguously for the owned majority -- so a field read
 //     with stride 4 out of an interleaved Krylov vector costs what a contiguous one costs.
 //
-// Scratch slots 5 and 6, which nothing else uses.
+// Scratch slots 7 and 8, which nothing else uses.
 // All nine components in one FLAT sweep, for the path with no pack to sweep.
 //
 // The same fusion as the packed version below, and worth doing for a different balance of
@@ -731,23 +651,50 @@ static void cvfem_hex8_assemble_nodal_grad(MeshT                        &d,
 // the d.elems[a][e] indirection drop to a third, the three zeroing passes become one, the
 // weight pass runs once instead of three times, and the transpose into the interleaved array
 // disappears because this writes there directly.
-template <typename MeshT>
-static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                               &d,
-                                                   const int                            isoparam,
-                                                   const scalar_t *const SFEM_RESTRICT *srcs,
-                                                   const int                            nf,
-                                                   std::vector<scalar_t>               &out) {
-    const int nc = 3 * nf;
+// WHERE the result goes is a parameter, not a second kernel.
+//
+// The callers want it in two shapes: interleaved, nc components per node in one buffer, which
+// is what the deferred correction and the fused sets read; and one array per component, which
+// is what the pressure gradient's consumers -- every element kernel, generated and hand
+// written -- read as pgx/pgy/pgz. Both are "a base pointer per component plus a stride shared
+// by all of them": interleaved is base = out + c with stride nc, split is base = og_c with
+// stride 1. So the sweep takes `outp` and `out_stride` and serves both, where before there
+// were two copies of it differing in nothing else.
+//
+// The input field's stride is per field for the same reason. The exact higher-order Jacobian
+// action reconstructs the gradient of the Krylov direction, which is interleaved four-wide;
+// with a unit-stride-only sweep it had to de-interleave three components into scratch on every
+// matvec, and that pass is now gone.
+// ISO is compile time beside NC, for the same reason the limiter is on the Jacobian action: it is
+// SWEEP-UNIFORM, so a runtime test of it inside the element loop asks the same question of every
+// element and blocks the vectoriser from either body. It also lets the reference shape derivatives
+// be hoisted: they are evaluated at the fixed element centre, so `dN` does not depend on the
+// element at all and computing it per element was work the affine path did not even want.
+// The geometry kind stays a RUNTIME argument, unlike NC beside it, and that is a measured
+// decision rather than an oversight. Making it a template parameter -- with `if constexpr` on both
+// branches and the reference table hoisted -- is the tidier shape and cost the velocity
+// reconstruction 4654 -> 4243 MDOF/s on Grace at n=128, reproduced on three nodes, while leaving
+// the pressure arm unchanged. It was tried with the table inside the parallel region as well, at
+// 4172. The branch is perfectly predicted and the ISO=0 body is what runs; whatever the extra
+// instantiations do to inlining or register allocation in the nine-component sweep costs more than
+// the branch does. Revisit only with a measurement.
+template <int NC, typename MeshT>
+static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                               &d,
+                                             const int                            isoparam,
+                                             const scalar_t *const SFEM_RESTRICT *srcs,
+                                             const int *const                     src_stride,
+                                             scalar_t *const *const               outp,
+                                             const ptrdiff_t                      out_stride) {
+    constexpr int nc = NC;
+    constexpr int nf = NC / 3;
     cvfem_hex8_build_grad_weight(d, isoparam);
-    // Grown, never shrunk: the caller alternates component counts between evaluations (a
-    // frozen residual asks for p alone, the two that build the held correction ask for p and
-    // u together), and reassigning would reallocate on every one of them. Everything in
-    // [0, nnodes * nc) is zeroed because the accumulation below is additive.
-    if ((ptrdiff_t)out.size() < d.nnodes * nc) out.resize((size_t)d.nnodes * nc);
-    std::fill(out.begin(), out.begin() + (size_t)d.nnodes * nc, scalar_t(0));
 
-    scalar_t *const SFEM_RESTRICT       g_out   = out.data();
-    const scalar_t *const SFEM_RESTRICT pw      = d.grad_w_inv.data();
+    const scalar_t *const SFEM_RESTRICT pw = d.grad_w_inv.data();
+
+    // Everything is zeroed because the accumulation below is additive.
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+        for (int c = 0; c < nc; ++c) outp[c][i * out_stride] = scalar_t(0);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -773,10 +720,11 @@ static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                        
         if (std::fabs(det) < scalar_t(1e-30)) continue;
         const scalar_t sgn = det > scalar_t(0) ? scalar_t(1) : scalar_t(-1);
 
-        scalar_t g[12];
+        scalar_t g[nc];
         for (int r = 0; r < nf; ++r) {
-            scalar_t f[CVFEM_HEX8_N_NODES];
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) f[a] = srcs[r][id[a]];
+            const ptrdiff_t st = src_stride ? (ptrdiff_t)src_stride[r] : (ptrdiff_t)1;
+            scalar_t        f[CVFEM_HEX8_N_NODES];
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) f[a] = srcs[r][(ptrdiff_t)id[a] * st];
             scalar_t dr, ds, dt;
             if (isoparam) {
                 dr = ds = dt = 0;
@@ -792,17 +740,82 @@ static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                        
         }
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            scalar_t *const SFEM_RESTRICT o = g_out + (ptrdiff_t)id[a] * nc;
-            for (int c = 0; c < nc; ++c) CVFEM_ATOMIC_ADD(o[c], g[c]);
+            const ptrdiff_t o = (ptrdiff_t)id[a] * out_stride;
+            for (int c = 0; c < nc; ++c) CVFEM_ATOMIC_ADD(outp[c][o], g[c]);
         }
     }
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
         const scalar_t inv = pw[i];
-        for (int c = 0; c < nc; ++c) g_out[i * nc + c] *= inv;
+        for (int c = 0; c < nc; ++c) outp[c][i * out_stride] *= inv;
     }
 }
+
+// HOW MANY components is compile time, so the scatter's trip count is.
+//
+// The element gradient is broadcast to all eight of the element's nodes, which is nc adds per
+// node and the hottest loop in the sweep. With nc a runtime value that loop keeps a counter and
+// cannot be unrolled, and the pressure gradient -- three components, the shortest trip -- pays
+// most for it: unifying the two sweeps cost it 5.7% on Grace until the count moved into the
+// template. The same lesson the limiter select in the Jacobian action taught, in the same place.
+//
+// Four fields is the widest set any caller asks for: the pressure and the three velocity
+// components together. The count is checked here and not inside the sweep.
+template <typename MeshT>
+static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                               &d,
+                                                   const int                            isoparam,
+                                                   const scalar_t *const SFEM_RESTRICT *srcs,
+                                                   const int *const                     src_stride,
+                                                   const int                            nf,
+                                                   scalar_t *const *const               outp,
+                                                   const ptrdiff_t                      out_stride) {
+    switch (nf) {
+        case 1: cvfem_hex8_nodal_grads_atomic_nc<3>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 2: cvfem_hex8_nodal_grads_atomic_nc<6>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 3: cvfem_hex8_nodal_grads_atomic_nc<9>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 4: cvfem_hex8_nodal_grads_atomic_nc<12>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        default: assert(false && "nodal gradient sweep takes 1 to 4 fields"); break;
+    }
+}
+
+// Interleaved output into a vector the sweep grows for the caller. Grown, never shrunk: the
+// caller alternates component counts between evaluations (a frozen residual asks for p alone,
+// the two that build the held correction ask for p and u together), and reassigning would
+// reallocate on every one of them.
+template <typename MeshT>
+static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                               &d,
+                                                   const int                            isoparam,
+                                                   const scalar_t *const SFEM_RESTRICT *srcs,
+                                                   const int                            nf,
+                                                   std::vector<scalar_t>               &out,
+                                                   const int *const                     src_stride = nullptr) {
+    const int nc = 3 * nf;
+    if ((ptrdiff_t)out.size() < d.nnodes * nc) out.resize((size_t)d.nnodes * nc);
+    scalar_t *outp[12];
+    for (int c = 0; c < nc; ++c) outp[c] = out.data() + c;
+    cvfem_hex8_assemble_nodal_grads_atomic(d, isoparam, srcs, src_stride, nf, outp, nc);
+}
+
+// One strided field into three component arrays -- the pressure gradient, and the Krylov
+// direction's pressure component inside the Jacobian action.
+template <typename MeshT>
+static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                              &d,
+                                                   const int                           isoparam,
+                                                   const scalar_t *const SFEM_RESTRICT src,
+                                                   const int                           stride,
+                                                   std::vector<scalar_t>              &ogx,
+                                                   std::vector<scalar_t>              &ogy,
+                                                   std::vector<scalar_t>              &ogz) {
+    ogx.resize((size_t)d.nnodes);
+    ogy.resize((size_t)d.nnodes);
+    ogz.resize((size_t)d.nnodes);
+    const scalar_t *const SFEM_RESTRICT srcs[1] = {src};
+    const int                           st[1]   = {stride};
+    scalar_t                           *outp[3] = {ogx.data(), ogy.data(), ogz.data()};
+    cvfem_hex8_assemble_nodal_grads_atomic(d, isoparam, srcs, st, 1, outp, 1);
+}
+
 
 // All NINE components of the nodal velocity gradient in ONE pack sweep.
 //
@@ -818,29 +831,34 @@ static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                        
 //
 // It keeps its own ghost buffer because PackedData::ghost_buf is sized N_FIELDS (four) wide
 // and this needs nine. Held by the caller and reused, so a residual does not allocate.
-template <typename MeshT, typename PackT>
-static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                               &d,
-                                                   PackT                               &p,
-                                                   const int                            isoparam,
-                                                   const scalar_t *const SFEM_RESTRICT *srcs,
-                                                   const int                            nf,
-                                                   std::vector<scalar_t>               &out,
-                                                   std::vector<scalar_t>               &gbuf) {
-    const int nc = 3 * nf;
+template <int NC, typename MeshT, typename PackT>
+static void cvfem_hex8_nodal_grads_packed_nc(MeshT                               &d,
+                                             PackT                               &p,
+                                             const int                            isoparam,
+                                             const scalar_t *const SFEM_RESTRICT *srcs,
+                                             const int *const                     src_stride,
+                                             scalar_t *const *const               outp,
+                                             const ptrdiff_t                      out_stride,
+                                             std::vector<scalar_t>               &gbuf) {
+    constexpr int nc = NC;
+    constexpr int nf = NC / 3;
     cvfem_hex8_build_grad_weight(d, isoparam);
 
     const bool owns_all = p.n_packs > 0 && p.owned_nodes_ptr[0] == 0 && p.owned_nodes_ptr[p.n_packs] == d.nnodes;
-    // Grown, never shrunk -- see the flat sweep above. A buffer wider than nnodes * nc is
-    // harmless because every index below is i * nc + c.
-    if ((ptrdiff_t)out.size() < d.nnodes * nc) out.resize((size_t)d.nnodes * nc);
-    if (!owns_all) std::fill(out.begin(), out.begin() + (size_t)d.nnodes * nc, scalar_t(0));
+    // The owned ranges tile [0, nnodes) exactly, so every entry is written below and there is
+    // nothing to pre-zero. If that ever stopped holding, a node no pack owns would keep
+    // whatever was in the buffer, so it is checked rather than assumed.
+    if (!owns_all) {
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i)
+            for (int c = 0; c < nc; ++c) outp[c][i * out_stride] = scalar_t(0);
+    }
     // The ghost entries are stored, not accumulated, so growing the buffer is all this needs.
     if ((ptrdiff_t)gbuf.size() < (ptrdiff_t)p.n_ghost_entries * nc)
         gbuf.resize((size_t)p.n_ghost_entries * nc, scalar_t(0));
 
-    scalar_t *const SFEM_RESTRICT       g_out = out.data();
-    scalar_t *const SFEM_RESTRICT       gb    = gbuf.data();
-    const scalar_t *const SFEM_RESTRICT w     = d.grad_w_inv.data();
+    scalar_t *const SFEM_RESTRICT       gb = gbuf.data();
+    const scalar_t *const SFEM_RESTRICT w  = d.grad_w_inv.data();
     const ptrdiff_t node_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
 
 #pragma omp parallel
@@ -862,12 +880,26 @@ static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                        
             // One gather for all three fields, component-major so the element read below is
             // three contiguous strides rather than three separate arrays.
             for (int r = 0; r < nf; ++r) {
+                const ptrdiff_t               st  = src_stride ? (ptrdiff_t)src_stride[r] : (ptrdiff_t)1;
                 scalar_t *const SFEM_RESTRICT dst = pack_f + (ptrdiff_t)r * node_n;
-                for (ptrdiff_t k = 0; k < n_contiguous; ++k) dst[k] = srcs[r][owned + k];
-                for (ptrdiff_t k = 0; k < n_ghost; ++k) dst[n_contiguous + k] = srcs[r][(ptrdiff_t)ghosts[k]];
+                for (ptrdiff_t k = 0; k < n_contiguous; ++k) dst[k] = srcs[r][(owned + k) * st];
+                for (ptrdiff_t k = 0; k < n_ghost; ++k) dst[n_contiguous + k] = srcs[r][(ptrdiff_t)ghosts[k] * st];
             }
             std::memset(pack_out, 0, (size_t)n_pack_nodes * nc * sizeof(scalar_t));
 
+            // THE ELEMENT LOOP IS SCALAR, and stays scalar. Lane-blocking it over
+            // CVFEM_HEX8_VEC_SIZE elements -- reusing gather_hex8_adj_soa for the geometry, as
+            // every operator sweep beside this one does -- was built and measured: the velocity
+            // reconstruction fell 4716 -> 3647 MDOF/s, and 3781 with the geometry branch hoisted
+            // out of the vector body, at n=128 on Grace.
+            //
+            // The reason it loses is that the half a lane loop can vectorise is not the half that
+            // costs. The scatter broadcasts the element gradient to all eight nodes and cannot be
+            // vectorised at all, because two elements in a batch may share a node; and the
+            // per-element work a lane loop does speed up is dominated by the adjugate LOAD, which
+            // staging turns into a memcpy without making it cheaper. What lane-blocking adds is a
+            // transpose the scalar loop never pays -- 8xVEC_SIZE gathers into fe, plus loc, cof,
+            // dr/ds/dt and g held as batches -- to feed a scatter that is still scalar.
             for (ptrdiff_t e = e_start; e < e_end; ++e) {
                 int      loc[CVFEM_HEX8_N_NODES];
                 scalar_t adj[9], det;
@@ -893,7 +925,7 @@ static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                        
                 if (std::fabs(det) < scalar_t(1e-30)) continue;
                 const scalar_t sgn = det > scalar_t(0) ? scalar_t(1) : scalar_t(-1);
 
-                scalar_t g[12];
+                scalar_t g[nc];
                 for (int r = 0; r < nf; ++r) {
                     const scalar_t *const SFEM_RESTRICT fsrc = pack_f + (ptrdiff_t)r * node_n;
                     scalar_t fe[CVFEM_HEX8_N_NODES];
@@ -918,9 +950,22 @@ static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                        
                 }
             }
 
+            // WHY THE OWNED ROWS ARE STAGED AT ALL, given that no other pack writes them and
+            // they could be accumulated straight into the output. That was built and measured:
+            // the velocity reconstruction fell 4716 -> 4054 MDOF/s and the pressure one
+            // 10268 -> 9695, at n=128 on Grace. Writing through costs a per-node owned/ghost test
+            // in the innermost scatter and it breaks the fusion below -- the weight stops being
+            // free and becomes its own read-modify-write over the owned window -- and together
+            // those outweigh the staging read they remove.
+            //
+            // The denominator is applied here and again in the ghost reduction rather than in
+            // a pass of its own, because the average is linear in its numerator:
+            // (owned + ghost) * w is owned * w + ghost * w. That removes a full read-modify-
+            // write over the nodal arrays from every matvec.
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const scalar_t wi = w[owned + k];
-                for (int c = 0; c < nc; ++c) g_out[(owned + k) * nc + c] = pack_out[k * nc + c] * wi;
+                const scalar_t  wi = w[owned + k];
+                const ptrdiff_t o  = (owned + k) * out_stride;
+                for (int c = 0; c < nc; ++c) outp[c][o] = pack_out[k * nc + c] * wi;
             }
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
                 const scalar_t *const SFEM_RESTRICT o = pack_out + (n_contiguous + k) * nc;
@@ -934,152 +979,85 @@ static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                        
         const smesh::idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
-        scalar_t           s[12] = {0};
+        scalar_t           s[nc] = {0};
         for (ptrdiff_t j = begin; j < end; ++j) {
             const ptrdiff_t idx = p.ghost_reduce_idx[j];
             for (int c = 0; c < nc; ++c) s[c] += gb[idx * nc + c];
         }
-        const scalar_t wd = w[dest];
-        for (int c = 0; c < nc; ++c) g_out[(ptrdiff_t)dest * nc + c] += s[c] * wd;
+        const scalar_t  wd = w[dest];
+        const ptrdiff_t o  = (ptrdiff_t)dest * out_stride;
+        for (int c = 0; c < nc; ++c) outp[c][o] += s[c] * wd;
     }
 }
 
+// HOW MANY components is compile time, so the scatter's trip count is.
+//
+// The element gradient is broadcast to all eight of the element's nodes, which is nc adds per
+// node and the hottest loop in the sweep. With nc a runtime value that loop keeps a counter and
+// cannot be unrolled, and the pressure gradient -- three components, the shortest trip -- pays
+// most for it: unifying the two sweeps cost it 5.7% on Grace until the count moved into the
+// template. The same lesson the limiter select in the Jacobian action taught, in the same place.
+//
+// Four fields is the widest set any caller asks for: the pressure and the three velocity
+// components together. The count is checked here and not inside the sweep.
 template <typename MeshT, typename PackT>
-static void cvfem_hex8_assemble_nodal_grad_packed(MeshT                             &d,
-                                                  PackT                             &p,
-                                                  const int                          isoparam,
-                                                  const scalar_t *const SFEM_RESTRICT src,
-                                                  const int                          stride,
-                                                  std::vector<scalar_t>             &ogx,
-                                                  std::vector<scalar_t>             &ogy,
-                                                  std::vector<scalar_t>             &ogz) {
-    cvfem_hex8_build_grad_weight(d, isoparam);
-
-    // The owned ranges tile [0, nnodes) exactly, so every entry is written below and there
-    // is nothing to pre-zero. If that ever stopped holding, a node no pack owns would keep
-    // whatever was in the buffer, so it is checked rather than assumed.
-    const bool owns_all = p.n_packs > 0 && p.owned_nodes_ptr[0] == 0 && p.owned_nodes_ptr[p.n_packs] == d.nnodes;
-    if (owns_all && (ptrdiff_t)ogx.size() == d.nnodes) {
-        ogy.resize((size_t)d.nnodes);
-        ogz.resize((size_t)d.nnodes);
-    } else {
-        ogx.assign((size_t)d.nnodes, scalar_t(0));
-        ogy.assign((size_t)d.nnodes, scalar_t(0));
-        ogz.assign((size_t)d.nnodes, scalar_t(0));
-    }
-
-    scalar_t *const SFEM_RESTRICT       gx_out = ogx.data();
-    scalar_t *const SFEM_RESTRICT       gy_out = ogy.data();
-    scalar_t *const SFEM_RESTRICT       gz_out = ogz.data();
-    const scalar_t *const SFEM_RESTRICT w      = d.grad_w_inv.data();
-    const ptrdiff_t node_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
-
-#pragma omp parallel
-    {
-        scalar_t *const SFEM_RESTRICT pack_f   = thread_scratch<scalar_t>(5, (size_t)node_n);
-        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(6, 3 * (size_t)node_n);
-
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
-            const ptrdiff_t e_start      = pack * p.n_elements_per_pack;
-            const ptrdiff_t e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
-            const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
-            const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
-            const ptrdiff_t n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts = &p.ghost_idx[p.ghost_ptr[pack]];
-            const ptrdiff_t                         ghost_off = p.ghost_ptr[pack];
-
-            for (ptrdiff_t k = 0; k < n_contiguous; ++k) pack_f[k] = src[(owned + k) * stride];
-            for (ptrdiff_t k = 0; k < n_ghost; ++k)
-                pack_f[n_contiguous + k] = src[(ptrdiff_t)ghosts[k] * stride];
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * 3 * sizeof(scalar_t));
-
-            for (ptrdiff_t e = e_start; e < e_end; ++e) {
-                scalar_t fe[CVFEM_HEX8_N_NODES], gx, gy, gz;
-                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) fe[a] = pack_f[p.elems[a][e]];
-
-                if (isoparam) {
-                    const auto *const px = d.points[0];
-                    const auto *const py = d.points[1];
-                    const auto *const pz = d.points[2];
-                    scalar_t x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
-                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const smesh::idx_t g = pack_local_to_global(p, pack, n_contiguous, p.elems[a][e]);
-                        x[a]                 = scalar_t(px[g]);
-                        y[a]                 = scalar_t(py[g]);
-                        z[a]                 = scalar_t(pz[g]);
-                    }
-                    scalar_t dN[CVFEM_HEX8_N_NODES][3], adj[9], det;
-                    cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
-                    cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
-                    if (std::fabs(det) < scalar_t(1e-30)) continue;
-                    scalar_t dr = 0, ds = 0, dt = 0;
-                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        dr += fe[a] * dN[a][0];
-                        ds += fe[a] * dN[a][1];
-                        dt += fe[a] * dN[a][2];
-                    }
-                    cvfem_hex8_pushforward(adj, det > scalar_t(0) ? scalar_t(1) : scalar_t(-1), dr, ds, dt, gx, gy, gz);
-                } else {
-                    scalar_t adj[9], det;
-                    load_hex8_adj(d, e, adj, &det);
-                    if (std::fabs(det) < scalar_t(1e-30)) continue;
-                    scalar_t dr, ds, dt;
-                    cvfem_hex8_face_diff(fe, dr, ds, dt);
-                    cvfem_hex8_pushforward(adj, det > scalar_t(0) ? scalar_t(1) : scalar_t(-1), dr, ds, dt, gx, gy, gz);
-                }
-
-                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    scalar_t *const SFEM_RESTRICT o = pack_out + (ptrdiff_t)p.elems[a][e] * 3;
-                    o[0] += gx;
-                    o[1] += gy;
-                    o[2] += gz;
-                }
-            }
-
-            // The denominator is applied here and again in the ghost reduction rather than
-            // in a pass of its own, because the average is linear in its numerator:
-            // (owned + ghost) * w is owned * w + ghost * w. That removes a full read-modify-
-            // write over three nodal arrays from every matvec.
-            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const scalar_t wi = w[owned + k];
-                gx_out[owned + k] = pack_out[k * 3 + 0] * wi;
-                gy_out[owned + k] = pack_out[k * 3 + 1] * wi;
-                gz_out[owned + k] = pack_out[k * 3 + 2] * wi;
-            }
-            scalar_t *const SFEM_RESTRICT bx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT by = p.ghost_buf.data() + 1 * p.n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT bz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT o = pack_out + (n_contiguous + k) * 3;
-                bx[ghost_off + k]                     = o[0];
-                by[ghost_off + k]                     = o[1];
-                bz[ghost_off + k]                     = o[2];
-            }
-        }
-    }
-
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
-        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
-        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
-        scalar_t           sx = 0, sy = 0, sz = 0;
-        const scalar_t *const SFEM_RESTRICT bx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
-        const scalar_t *const SFEM_RESTRICT by = p.ghost_buf.data() + 1 * p.n_ghost_entries;
-        const scalar_t *const SFEM_RESTRICT bz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
-        for (ptrdiff_t j = begin; j < end; ++j) {
-            const ptrdiff_t idx = p.ghost_reduce_idx[j];
-            sx += bx[idx];
-            sy += by[idx];
-            sz += bz[idx];
-        }
-        const scalar_t wd = w[dest];
-        gx_out[dest] += sx * wd;
-        gy_out[dest] += sy * wd;
-        gz_out[dest] += sz * wd;
+static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                               &d,
+                                                   PackT                               &p,
+                                                   const int                            isoparam,
+                                                   const scalar_t *const SFEM_RESTRICT *srcs,
+                                                   const int *const                     src_stride,
+                                                   const int                            nf,
+                                                   scalar_t *const *const               outp,
+                                                   const ptrdiff_t                      out_stride,
+                                                   std::vector<scalar_t>               &gbuf) {
+    switch (nf) {
+        case 1: cvfem_hex8_nodal_grads_packed_nc<3>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 2: cvfem_hex8_nodal_grads_packed_nc<6>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 3: cvfem_hex8_nodal_grads_packed_nc<9>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 4: cvfem_hex8_nodal_grads_packed_nc<12>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        default: assert(false && "nodal gradient sweep takes 1 to 4 fields"); break;
     }
 }
+
+// Interleaved output into a vector the sweep grows for the caller -- see the flat twin above
+// for why it is grown and never shrunk. A buffer wider than nnodes * nc is harmless because
+// every index below is i * nc + c.
+template <typename MeshT, typename PackT>
+static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                               &d,
+                                                   PackT                               &p,
+                                                   const int                            isoparam,
+                                                   const scalar_t *const SFEM_RESTRICT *srcs,
+                                                   const int                            nf,
+                                                   std::vector<scalar_t>               &out,
+                                                   std::vector<scalar_t>               &gbuf,
+                                                   const int *const                     src_stride = nullptr) {
+    const int nc = 3 * nf;
+    if ((ptrdiff_t)out.size() < d.nnodes * nc) out.resize((size_t)d.nnodes * nc);
+    scalar_t *outp[12];
+    for (int c = 0; c < nc; ++c) outp[c] = out.data() + c;
+    cvfem_hex8_assemble_nodal_grads_packed(d, p, isoparam, srcs, src_stride, nf, outp, nc, gbuf);
+}
+
+// One strided field into three component arrays -- the pressure gradient, and the Krylov
+// direction's pressure component inside the Jacobian action.
+template <typename MeshT, typename PackT>
+static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                              &d,
+                                                   PackT                              &p,
+                                                   const int                           isoparam,
+                                                   const scalar_t *const SFEM_RESTRICT src,
+                                                   const int                           stride,
+                                                   std::vector<scalar_t>              &ogx,
+                                                   std::vector<scalar_t>              &ogy,
+                                                   std::vector<scalar_t>              &ogz,
+                                                   std::vector<scalar_t>              &gbuf) {
+    ogx.resize((size_t)d.nnodes);
+    ogy.resize((size_t)d.nnodes);
+    ogz.resize((size_t)d.nnodes);
+    const scalar_t *const SFEM_RESTRICT srcs[1] = {src};
+    const int                           st[1]   = {stride};
+    scalar_t                           *outp[3] = {ogx.data(), ogy.data(), ogz.data()};
+    cvfem_hex8_assemble_nodal_grads_packed(d, p, isoparam, srcs, st, 1, outp, 1, gbuf);
+}
+
 
 #endif  // CVFEM_HEX8_PACK_HELPERS_HPP

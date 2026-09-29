@@ -381,4 +381,80 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_darwish_moukalled_inc(const s
     return (den != scalar_t(0)) ? (a * ab + aa * b) / den : scalar_t(0);
 }
 
+// ---------------------------------------------------------------------------------------------
+// DIRECTIONAL DERIVATIVES OF THE THREE LIMITERS.
+//
+// The deferred correction is applied lagged, so for years none of these was needed: the term is
+// a constant within a Newton step and drops out of the Jacobian. They exist for the EXACT
+// higher-order Jacobian action, which carries the correction and therefore has to differentiate
+// the limiter that shaped it.
+//
+// Hand-written rather than generated, and the reason is measured rather than assumed. The
+// element's exact action was built symbolically first (synthesize_cvfem_hex8_ns_upwind_sympy.py,
+// defcor_action_exprs): the unlimited arm takes 8 s to build and 9 s to CSE into 2197 lines,
+// which is fine and is generated; Venkatakrishnan takes 1124 s to CSE into 13502 lines and
+// Darwish-Moukalled 2816 s to build. Straight-line blocks of that size are the shape this tree
+// has already measured at 234 s and 4.45 GB of gcc on one kernel. So the limited arms keep the
+// structure the residual has -- a small function per limiter, called from the face kernel -- and
+// the generated unlimited arm becomes the independent check on this code rather than a
+// replacement for it.
+//
+// Each takes the argument's own derivative in the Krylov direction and returns the derivative of
+// the limited increment. They are the derivative where one exists; at a branch boundary they
+// return the value of one side, which is a subgradient choice and the same one the first-order
+// upwind switch makes with sgn.
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_limiter_clip_inc_d(const scalar_t base, const scalar_t inc,
+                                                                      const scalar_t lo, const scalar_t hi,
+                                                                      const scalar_t dbase, const scalar_t dinc,
+                                                                      const scalar_t dlo, const scalar_t dhi) {
+    const scalar_t f = base + inc;
+    // Unclipped, the limiter is the identity and so is its derivative. Clipped, the increment is
+    // pinned to a bound that is itself one of the two nodal values, so what survives is that
+    // bound's derivative minus the base's.
+    if (f < lo) return dlo - dbase;
+    if (f > hi) return dhi - dbase;
+    return dinc;
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_venkata_inc_d(const scalar_t base, const scalar_t inc,
+                                                                 const scalar_t lo, const scalar_t hi,
+                                                                 const scalar_t eps2,
+                                                                 const scalar_t dbase, const scalar_t dinc,
+                                                                 const scalar_t dlo, const scalar_t dhi) {
+    const scalar_t dp  = (inc >= scalar_t(0)) ? (hi - base) : (lo - base);
+    const scalar_t ddp = (inc >= scalar_t(0)) ? (dhi - dbase) : (dlo - dbase);
+    const scalar_t num = dp * dp + scalar_t(2) * inc * dp + eps2;
+    const scalar_t den = dp * dp + scalar_t(2) * inc * inc + inc * dp + eps2;
+    if (den == scalar_t(0)) return dinc;
+    const scalar_t dnum = scalar_t(2) * dp * ddp + scalar_t(2) * (dinc * dp + inc * ddp);
+    const scalar_t dden = scalar_t(2) * dp * ddp + scalar_t(4) * inc * dinc + (dinc * dp + inc * ddp);
+    const scalar_t psi  = num / den;
+    // Quotient rule once, then the product with the increment the limiter scales.
+    return ((dnum - psi * dden) / den) * inc + psi * dinc;
+}
+
+template <typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_darwish_moukalled_inc_d(const scalar_t phi_c, const scalar_t phi_d,
+                                                                           const scalar_t grad_dot_d,
+                                                                           const scalar_t dphi_c, const scalar_t dphi_d,
+                                                                           const scalar_t dgrad_dot_d) {
+    const scalar_t a   = scalar_t(2) * grad_dot_d;
+    const scalar_t b   = phi_d - phi_c;
+    const scalar_t da  = scalar_t(2) * dgrad_dot_d;
+    const scalar_t db  = dphi_d - dphi_c;
+    const scalar_t aa  = a < scalar_t(0) ? -a : a;
+    const scalar_t ab  = b < scalar_t(0) ? -b : b;
+    const scalar_t daa = a < scalar_t(0) ? -da : da;
+    const scalar_t dab = b < scalar_t(0) ? -db : db;
+    const scalar_t den = scalar_t(2) * (aa + ab);
+    if (den == scalar_t(0)) return scalar_t(0);
+    const scalar_t num  = a * ab + aa * b;
+    const scalar_t dnum = da * ab + a * dab + daa * b + aa * db;
+    const scalar_t dden = scalar_t(2) * (daa + dab);
+    return (dnum - (num / den) * dden) / den;
+}
+
 #endif  // CVFEM_VENKATA_LIMITER_HPP

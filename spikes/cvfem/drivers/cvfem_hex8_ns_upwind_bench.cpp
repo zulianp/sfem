@@ -52,15 +52,144 @@ static void bsr4_spmv(const BSR4 &b, const ptrdiff_t nnodes, const scalar_t *con
 // atomics, deterministic -- and over the flat element table otherwise, or when
 // --qgrad-atomic asks for it as a measurement escape hatch.
 static int g_qgrad_atomic = 0;
+// Force the PACKED nodal-gradient sweep on a layout that would otherwise use the atomic one.
+// Exists only to reproduce measurements taken before the sweep followed the layout; see the
+// note where these are resolved.
+static int g_qgrad_packed = 0;
 
 static void bench_nodal_grad(MeshData &d, PackedData &p, const GeomKind geom_kind,
                              const scalar_t *const SFEM_RESTRICT src, const int stride,
                              std::vector<scalar_t> &ox, std::vector<scalar_t> &oy, std::vector<scalar_t> &oz) {
     const int iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+    // Held across calls so a repeated sweep does not allocate, as the solver's own buffer is.
+    static std::vector<scalar_t> gbuf;
     if (p.n_packs > 0 && !g_qgrad_atomic)
-        cvfem_hex8_assemble_nodal_grad_packed(d, p, iso, src, stride, ox, oy, oz);
+        cvfem_hex8_assemble_nodal_grads_packed(d, p, iso, src, stride, ox, oy, oz, gbuf);
     else
-        cvfem_hex8_assemble_nodal_grad(d, iso, src, stride, ox, oy, oz);
+        cvfem_hex8_assemble_nodal_grads_atomic(d, iso, src, stride, ox, oy, oz);
+}
+
+// THE EXACT HIGHER-ORDER JACOBIAN ACTION, AGAINST A FINITE DIFFERENCE OF THE RESIDUAL.
+//
+// The only check that can tell the exact action from the lagged one, and it turns on a detail
+// that is easy to get wrong in the checker rather than in the kernel: the nodal velocity gradient
+// must be REBUILT at each perturbed state. Freezing it would difference the operator the lagged
+// action computes, both arms would agree, and the check would pass while testing nothing -- the
+// same shape of vacuous gate this driver has already shipped once, when a packed sweep with no
+// pack built compared two zeros.
+//
+// Central difference, so the error is O(eps^2) and the comparison is not dominated by the
+// truncation of a one-sided one. Returns max|fd - jv| / max|fd|, and prints the lagged action
+// against the same reference beside it, because the number that matters to a solver is not
+// whether the exact action is right but how wrong the lagged one is.
+static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu,
+                                    const int limiter, const GeomKind geom_kind, scalar_t &lagged_rel,
+                                    // The fraction of degrees of freedom where the two disagree by
+                                    // more than the tolerance. A max norm cannot verify a
+                                    // piecewise-differentiable operator: the limiters switch branch
+                                    // somewhere inside the +/- eps step for a handful of surfaces,
+                                    // and at such a surface the difference quotient is not a
+                                    // derivative of anything. What must hold is that those surfaces
+                                    // are a vanishing fraction and that everywhere else the
+                                    // agreement is the unlimited arm's.
+                                    scalar_t &frac_bad, scalar_t &lagged_frac_bad) {
+    const ptrdiff_t n   = d.nnodes;
+    const int       iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+    // THE STATE IS PERTURBED FIRST, and this is not cosmetic. On a uniform hex mesh with a
+    // smooth field the reconstruction lands EXACTLY on a limiter bound for a structural sixth of
+    // the sub-control surfaces -- measured, 1024 of 6144 at n=8 -- and at such a surface the
+    // limiter has a kink at the evaluation point. A central difference across a kink returns the
+    // average of the two one-sided derivatives, which equals neither, so the reference is invalid
+    // there however right the derivative is. Each node touches many surfaces, so a sixth of the
+    // surfaces contaminates three quarters of the nodes, which is exactly the disagreement this
+    // check reported before the ties were broken. A small deterministic perturbation moves the
+    // state off the degenerate set; it changes nothing about the operator being verified.
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        const uint32_t h = (uint32_t)i * 2246822519u + 374761393u;
+        d.ux[i] += scalar_t(1e-3) * (scalar_t((h >> 5) & 0xffffu) / scalar_t(65535) - scalar_t(0.5));
+        d.uy[i] += scalar_t(1e-3) * (scalar_t((h >> 11) & 0xffffu) / scalar_t(65535) - scalar_t(0.5));
+        d.uz[i] += scalar_t(1e-3) * (scalar_t((h >> 19) & 0xffffu) / scalar_t(65535) - scalar_t(0.5));
+    }
+    std::vector<scalar_t> ux0(d.ux), uy0(d.uy), uz0(d.uz);
+    std::vector<scalar_t> dir((size_t)n * N_FIELDS, scalar_t(0));
+    // A node-varying direction in the velocity components, since the correction is a function of
+    // the velocity and its gradient; a uniform one would be annihilated by the reconstruction.
+    for (ptrdiff_t i = 0; i < n; ++i) {
+        const uint32_t h = (uint32_t)i * 2654435761u;
+        dir[(size_t)i * N_FIELDS + 0] = scalar_t(1) + scalar_t((h >> 8) & 0xffffu) / scalar_t(65535);
+        dir[(size_t)i * N_FIELDS + 1] = scalar_t(0.5) + scalar_t((h >> 16) & 0xffffu) / scalar_t(65535);
+        dir[(size_t)i * N_FIELDS + 2] = scalar_t(-0.25) + scalar_t((h >> 3) & 0xffffu) / scalar_t(65535);
+    }
+
+    std::vector<scalar_t> g, gbuf, rp((size_t)n * N_FIELDS), rm((size_t)n * N_FIELDS);
+    auto residual_at = [&](const scalar_t sgn, std::vector<scalar_t> &out, const scalar_t eps) {
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            d.ux[i] = ux0[(size_t)i] + sgn * eps * dir[(size_t)i * N_FIELDS + 0];
+            d.uy[i] = uy0[(size_t)i] + sgn * eps * dir[(size_t)i * N_FIELDS + 1];
+            d.uz[i] = uz0[(size_t)i] + sgn * eps * dir[(size_t)i * N_FIELDS + 2];
+        }
+        const scalar_t *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
+        cvfem_hex8_assemble_nodal_grads_packed(d, p, iso, srcs, 3, g, gbuf);
+        apply_residual_packed_defcor(d, p, rho, mu, g.data(), limiter, scalar_t(0));
+        // Interleaved into the same node-major order the action writes, so the two are compared
+        // entry by entry rather than through two different layouts.
+        for (ptrdiff_t i = 0; i < n; ++i) {
+            out[(size_t)i * N_FIELDS + 0] = d.rx[(size_t)i];
+            out[(size_t)i * N_FIELDS + 1] = d.ry[(size_t)i];
+            out[(size_t)i * N_FIELDS + 2] = d.rz[(size_t)i];
+            out[(size_t)i * N_FIELDS + 3] = d.rc[(size_t)i];
+        }
+    };
+
+    // Overridable so the check can be swept: a derivative error is eps-independent while a
+    // branch-crossing artefact shrinks with the step, and that is what tells them apart.
+    const char *eps_env = std::getenv("CVFEM_FD_EPS");
+    const scalar_t eps = eps_env ? (scalar_t)std::atof(eps_env) : scalar_t(1e-6);
+    residual_at(scalar_t(+1), rp, eps);
+    residual_at(scalar_t(-1), rm, eps);
+    d.ux = ux0; d.uy = uy0; d.uz = uz0;
+
+    std::vector<scalar_t> fd((size_t)n * N_FIELDS);
+    for (size_t i = 0; i < fd.size(); ++i) fd[i] = (rp[i] - rm[i]) / (scalar_t(2) * eps);
+
+    // The state's gradient at u0, and the direction's, which is the field the lagged action drops.
+    const scalar_t *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
+    std::vector<scalar_t> gu, gv, vbuf;
+    cvfem_hex8_assemble_nodal_grads_packed(d, p, iso, srcs, 3, gu, gbuf);
+    const scalar_t *vsrcs[3] = {dir.data() + 0, dir.data() + 1, dir.data() + 2};
+    const int       vst[3]   = {N_FIELDS, N_FIELDS, N_FIELDS};
+    cvfem_hex8_assemble_nodal_grads_packed(d, p, iso, vsrcs, 3, gv, vbuf, vst);
+
+    std::vector<scalar_t> jv((size_t)n * N_FIELDS), jl((size_t)n * N_FIELDS);
+    apply_jacobian_action_packed(d, p, rho, mu, dir.data(), jv.data(), geom_kind,
+                                 gu.data(), gv.data(), limiter, scalar_t(0));
+    apply_jacobian_action_packed(d, p, rho, mu, dir.data(), jl.data(), geom_kind);
+
+    scalar_t den = 0, num = 0, numl = 0;
+    for (size_t i = 0; i < fd.size(); ++i) {
+        den  = std::max(den, std::fabs(fd[i]));
+        num  = std::max(num, std::fabs(fd[i] - jv[i]));
+        numl = std::max(numl, std::fabs(fd[i] - jl[i]));
+    }
+    // Per field, because a wrong component index and a wrong derivative look the same in a
+    // total and quite different here.
+    {
+        scalar_t pf[N_FIELDS] = {0, 0, 0, 0};
+        for (size_t i = 0; i < fd.size(); ++i)
+            pf[i % N_FIELDS] = std::max(pf[i % N_FIELDS], std::fabs(fd[i] - jv[i]));
+        std::printf("  per-field max |fd-jv|: x %.3e  y %.3e  z %.3e  c %.3e  (max|fd| %.3e)\n",
+                    (double)pf[0], (double)pf[1], (double)pf[2], (double)pf[3], (double)den);
+    }
+    const scalar_t tol = scalar_t(1e-6) * den;
+    ptrdiff_t bad = 0, badl = 0;
+    for (size_t i = 0; i < fd.size(); ++i) {
+        if (std::fabs(fd[i] - jv[i]) > tol) ++bad;
+        if (std::fabs(fd[i] - jl[i]) > tol) ++badl;
+    }
+    frac_bad        = scalar_t(bad) / scalar_t(fd.size());
+    lagged_frac_bad = scalar_t(badl) / scalar_t(fd.size());
+    lagged_rel = den > 0 ? numl / den : numl;
+    return den > 0 ? num / den : num;
 }
 
 static scalar_t max_abs_diff(const scalar_t *const a, const scalar_t *const b, const ptrdiff_t n) {
@@ -326,7 +455,8 @@ int main(int argc, char **argv) {
     std::string csv_path;
     std::string csv_tag    = "run";
     scalar_t    warp       = 0;
-    int         pack_size  = 2048;
+    // 0 means derive it from the machine once the mesh exists; see cvfem_default_pack_size.
+    int         pack_size  = 0;
     int         assemble_diag = 0;
     // Both off by default. The benchmark's job is to isolate the element kernel, and the
     // recorded throughput baselines were measured without either term; turning one on
@@ -338,6 +468,19 @@ int main(int argc, char **argv) {
     // and only on the atomic sum-factored sweep; see the --conv-ho help text.
     int         conv_ho      = 0;
     int         conv_limiter = 0;
+    // The higher-order correction in the JACOBIAN ACTION. Exact by default when --conv-ho is on,
+    // matching --rhie-chow, whose exact form is also the default: both differentiate through a
+    // reconstructed nodal gradient and both pay for it with a pass over the direction. --lagged-ho
+    // drops the correction's derivative, which is the operator an assembled first-order matrix
+    // holds and what this driver computed before the exact form existed.
+    int         lagged_ho    = 0;
+    int         verify_ho_jac = 0;
+    // The nodal gradient reconstruction as an operation in its own right, at nf fields: 1 is the
+    // pressure gradient every Rhie-Chow residual builds, 3 the velocity gradient the exact
+    // higher-order Jacobian action rebuilds on every matvec. It has only ever been timed from
+    // inside those operators -- as frac_jac_action_qgrad -- so neither perf nor the campaign
+    // could see it, and it is now the whole of the exact action's cost.
+    int         nodal_grad   = 0;
     // Lag the Rhie-Chow pressure-gradient sensitivity in the Jacobian action, matching what
     // the assembled matrix encodes. See the --lagged-rc help text.
     int         lagged_rc    = 0;
@@ -431,6 +574,17 @@ int main(int argc, char **argv) {
             rhie_chow = 1;
             // Optional scale, so --rhie-chow 0.5 works and a bare --rhie-chow means 1.
             if (i + 1 < argc && argv[i + 1][0] != '-') rc_scale = (scalar_t)std::atof(argv[++i]);
+        } else if (arg == "--nodal-grad") {
+            nodal_grad = 3;
+            if (i + 1 < argc && argv[i + 1][0] != '-') nodal_grad = std::atoi(argv[++i]);
+            if (nodal_grad != 1 && nodal_grad != 3) {
+                std::fprintf(stderr, "--nodal-grad takes 1 (pressure) or 3 (velocity)\n");
+                return 2;
+            }
+        } else if (arg == "--verify-jac-ho") {
+            verify_ho_jac = 1;
+        } else if (arg == "--lagged-ho") {
+            lagged_ho = 1;
         } else if (arg == "--conv-ho") {
             conv_ho = 1;
             // Optional limiter id, so --conv-ho 2 selects Venkatakrishnan and a bare
@@ -448,6 +602,8 @@ int main(int argc, char **argv) {
             pgrad_per_apply = 1;
         else if (arg == "--qgrad-atomic")
             g_qgrad_atomic = 1;
+        else if (arg == "--qgrad-packed")
+            g_qgrad_packed = 1;
         else if (arg == "--partial-assembly")
             partial_assembly = 1;
         else if (arg == "--live-vectors" && i + 1 < argc)
@@ -467,6 +623,7 @@ int main(int argc, char **argv) {
                     "          [--kernel sumfact|current|fd|sympy|sympy_block|sympy_row|sympy_face|split]\n"
                      "          [--assemble-diag]  block diagonal only, for block-Jacobi\n"
                     "          [--geom affine|isoparam] [--warp EPS] [--pack-size N] [--no-sfc]\n"
+                    "          [--nodal-grad 1|3]\n"
                     "          [--breakdown] [--kernel-only] [--dense-flush]\n"
                     "          [--csv FILE] [--tag NAME]\n"
                     "  --layout NAME  layout used by residual / jac-action / assemble (default atomic)\n"
@@ -679,7 +836,9 @@ int main(int argc, char **argv) {
         if (own_mpi) MPI_Finalize();
         return 1;
     }
-    if ((assemble ? 1 : 0) + (jac_action ? 1 : 0) + (bsr_apply ? 1 : 0) + (assemble_diag ? 1 : 0) > 1) {
+    if ((assemble ? 1 : 0) + (jac_action ? 1 : 0) + (bsr_apply ? 1 : 0) + (assemble_diag ? 1 : 0) +
+                (nodal_grad ? 1 : 0) >
+        1) {
         std::fprintf(stderr,
                      "specify at most one of --assemble, --assemble-diag, --jac-action, --bsr-apply\n");
         if (own_mpi) MPI_Finalize();
@@ -717,7 +876,7 @@ int main(int argc, char **argv) {
     // `split` is assembly-only by construction and `fd` is a Jacobian reference with no
     // residual form; both fall through to the hand-written `current` residual and would be
     // recorded under their own name.
-    const bool residual_op = !(assemble || assemble_diag || jac_action || bsr_apply);
+    const bool residual_op = !(assemble || assemble_diag || jac_action || bsr_apply || nodal_grad);
     if (residual_op && (kernel_kind == KernelKind::Split || kernel_kind == KernelKind::Fd)) {
         std::fprintf(stderr,
                      "--kernel %s has no residual form; it would run and report the "
@@ -940,6 +1099,21 @@ int main(int argc, char **argv) {
         auto sfc = smesh::SFC::create_from_env();
         sfc->reorder(*d.mesh);
     }
+
+    // THE NODAL GRADIENT SWEEP FOLLOWS THE LAYOUT UNDER TEST.
+    //
+    // It used to follow whether a pack EXISTED, and a pack is built whenever --jac-action is on
+    // whatever --layout says -- so an atomic Jacobian-action row ran a PACKED gradient
+    // reconstruction inside an otherwise atomic operator, and the layout comparison was measuring
+    // the same pass on both sides. Measured on the exact higher-order action, the confusion is
+    // worth 3%: an atomic arm reads 17.6 MDOF/s with the packed sweep and 18.2 with its own.
+    // That matters most where the gradient pass is large, which is exactly the exact Rhie-Chow
+    // and exact higher-order actions this benchmark exists to compare.
+    if (layout == "atomic" && !g_qgrad_packed) g_qgrad_atomic = 1;
+
+    // The pack size, if the caller did not name one. Derived here rather than at declaration
+    // because the rule needs the element count and the thread count, and both are known only now.
+    if (pack_size <= 0) pack_size = cvfem_default_pack_size(d.mesh->n_elements(0), threads_active());
 
     PackedData packed;
     // verify_ho belongs here for the same reason every other verify flag does: the higher-order
@@ -1447,6 +1621,53 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (verify_ho_jac) {
+        if (packed.n_packs <= 0) {
+            std::fprintf(stderr, "--verify-jac-ho needs a pack; use --layout packed\n");
+            if (own_mpi) MPI_Finalize();
+            return 2;
+        }
+        scalar_t lag = 0, fbad = 0, fbadl = 0;
+        const scalar_t rel = verify_ho_action_fd(d, packed, rho, mu, conv_limiter, geom_kind, lag,
+                                                 fbad, fbadl);
+        std::printf("verify_jac_ho: limiter %d  exact_rel %.3e (%.4f%% of dofs disagree)  "
+                    "lagged_rel %.3e (%.4f%%)\n",
+                    conv_limiter, (double)rel, 100.0 * (double)fbad, (double)lag,
+                    100.0 * (double)fbadl);
+        // The lagged action differing from the finite difference is the POINT, not a failure, so
+        // only the exact arm is gated. A lagged arm that agreed would mean the correction never
+        // reached the residual and the whole comparison is vacuous, so it is gated from below.
+        // Two standards, because the operators differ. The unlimited arm is differentiable
+        // everywhere, so its max norm must hold. A limited arm is differentiable almost
+        // everywhere, so what must hold is that the exceptions are a vanishing fraction of the
+        // mesh -- the surfaces whose limiter branch the perturbation crosses -- and that the
+        // lagged action is wrong on a far larger share.
+        const scalar_t tol = scalar_t(1e-6);
+        const bool ok = conv_limiter == 0 ? (rel < tol) : (fbad < scalar_t(0.01));
+        if (!ok) {
+            std::fprintf(stderr, "FAIL: exact higher-order action differs from the finite "
+                                 "difference: max %.3e, %.4f%% of dofs (limiter %d)\n",
+                         (double)rel, 100.0 * (double)fbad, conv_limiter);
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
+        if (conv_limiter != 0 && !(fbadl > scalar_t(20) * fbad + scalar_t(0.05))) {
+            std::fprintf(stderr, "FAIL: the lagged action disagrees on %.4f%% of dofs against the "
+                                 "exact one's %.4f%% -- too close to call this a check\n",
+                         100.0 * (double)fbadl, 100.0 * (double)fbad);
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
+        if (!(lag > scalar_t(10) * rel)) {
+            std::fprintf(stderr, "FAIL: the lagged action is as close to the finite difference as "
+                                 "the exact one (%.3e vs %.3e) -- the correction did not reach "
+                                 "the residual, so this comparison tested nothing\n",
+                         (double)lag, (double)rel);
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
+    }
+
     // here rather than inside each layout means --boundary works for all four.
     auto apply_fn = [&]() {
         if (pgrad_per_apply)
@@ -1626,6 +1847,12 @@ int main(int argc, char **argv) {
     // clearing the direction gradient, which is exactly what Hex8Extras keys `with_qg` on.
     if (lagged_rc) { d.qgx.clear(); d.qgy.clear(); d.qgz.clear(); }
     const bool with_qgrad = rhie_chow && jac_action && !lagged_rc;
+    // The exact higher-order action. Packed only for now: the atomic sweep runs a different,
+    // scalar element kernel and carrying the term there is its own change, so the driver refuses
+    // the combination rather than reporting an atomic row that silently ran the lagged operator.
+    const bool with_hograd = conv_ho && jac_action && !lagged_ho;
+    std::vector<scalar_t> vgrad, vgbuf;
+    double                hograd_seconds = 0;
     auto jac_action_fn = [&]() {
         // A Krylov iteration never sees the same direction twice, so neither does this when
         // the live set exists: the rotation is what stops the direction being resident.
@@ -1640,21 +1867,63 @@ int main(int argc, char **argv) {
             // beside the phases of the sweep it precedes rather than only in a stdout line.
             if (g_breakdown) g_phase[PH_QGRAD] += dt_qg;
         }
+        if (with_hograd) {
+            // The direction's nodal velocity gradient, reconstructed from scratch on every
+            // matvec because the direction changes every Krylov iteration. This is the pass the
+            // lagged action does not run, and it is what the exact form costs.
+            //
+            // Read in place: the direction arrives interleaved by node, and the sweep takes a
+            // base pointer and a stride per field, so its three velocity components are three
+            // views of the same array. This used to de-interleave them into scratch first --
+            // three full-length copies inside the timed region on every matvec.
+            const double    t0       = wall_time();
+            const scalar_t *vsrcs[3] = {dir_v + 0, dir_v + 1, dir_v + 2};
+            const int       vst[3]   = {N_FIELDS, N_FIELDS, N_FIELDS};
+            const int       iso      = geom_kind == GeomKind::Isoparam ? 1 : 0;
+            if (packed.n_packs > 0 && !g_qgrad_atomic)
+                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso, vsrcs, 3, vgrad, vgbuf, vst);
+            else
+                cvfem_hex8_assemble_nodal_grads_atomic(d, iso, vsrcs, 3, vgrad, vst);
+            hograd_seconds += wall_time() - t0;
+        }
         if (partial_assembly)
             apply_jacobian_action_packed_pa(d, packed, rho, mu, dir_v, jac_out.data());
         else if (layout == "colored")
             apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
         else if (layout == "packed" || layout == "store")
-            apply_jacobian_action_packed(d, packed, rho, mu, dir_v, jac_out.data(), geom_kind);
+            apply_jacobian_action_packed(d, packed, rho, mu, dir_v, jac_out.data(), geom_kind,
+                                         with_hograd ? ugrad.data() : nullptr,
+                                         with_hograd ? vgrad.data() : nullptr,
+                                         conv_limiter, scalar_t(0));
         else if (geom_kind == GeomKind::Isoparam)
             apply_jacobian_action_atomic_isoparam(d, rho, mu, dir_v, jac_out.data());
         else
-            apply_jacobian_action_atomic(d, rho, mu, dir_v, jac_out.data(), kernel_kind);
+            apply_jacobian_action_atomic(d, rho, mu, dir_v, jac_out.data(), kernel_kind,
+                                         with_hograd ? ugrad.data() : nullptr,
+                                         with_hograd ? vgrad.data() : nullptr,
+                                         conv_limiter, scalar_t(0));
 
         if (boundary)
             apply_boundary_scs_jacobian_action_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0, dir_v,
                                                     jac_out.data());
         apply_transient_action_pass(d, rho, dir_v, jac_out.data());
+    };
+
+    // The reconstruction on its own. The same call the operators make -- bench_nodal_grad for
+    // one field, the fused sweep for three -- so this times the kernel a solver runs rather than
+    // a copy of it, and the layout follows --layout like every other operation here.
+    std::vector<scalar_t> ng_out, ng_buf;
+    auto grad_fn = [&]() {
+        const int iso = geom_kind == GeomKind::Isoparam ? 1 : 0;
+        if (nodal_grad == 1) {
+            bench_nodal_grad(d, packed, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
+        } else {
+            const scalar_t *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
+            if (packed.n_packs > 0 && !g_qgrad_atomic)
+                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso, srcs, 3, ng_out, ng_buf);
+            else
+                cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, 3, ng_out);
+        }
     };
 
     // Block diagonal, for the block-Jacobi preconditioner. Assembles only the 4x4
@@ -1845,6 +2114,8 @@ int main(int argc, char **argv) {
             jac_action_fn();
         else if (bsr_apply)
             bsr_apply_fn();
+        else if (nodal_grad)
+            grad_fn();
         else
             apply_fn();
     }
@@ -1866,6 +2137,8 @@ int main(int argc, char **argv) {
                 jac_action_fn();
             else if (bsr_apply)
                 bsr_apply_fn();
+            else if (nodal_grad)
+                grad_fn();
             else
                 apply_fn();
         }
@@ -1900,7 +2173,13 @@ int main(int argc, char **argv) {
         // last_dir, not jac_dir: under --live-vectors the timed loop rotates the direction,
         // and comparing the packed result against the atomic action on a different vector
         // would fail for a reason that has nothing to do with the staging.
-        apply_jacobian_action_atomic(d, rho, mu, last_dir, jv_ref.data());
+        // The reference carries whatever the timed sweep carried, including the exact
+        // higher-order correction. Comparing a packed sweep that has the term against an atomic
+        // reference that does not is not a layout check -- it reports the term as a defect.
+        apply_jacobian_action_atomic(d, rho, mu, last_dir, jv_ref.data(), KernelKind::Sumfact,
+                                     with_hograd ? ugrad.data() : nullptr,
+                                     with_hograd ? vgrad.data() : nullptr,
+                                     conv_limiter, scalar_t(0));
         // The reference has to carry everything the timed apply carried, or the check
         // reports the boundary closure and the transient term as staging errors. It did:
         // `--jac-action --rhie-chow --boundary --layout packed` failed here at 8.3e-1, and
@@ -1937,9 +2216,12 @@ int main(int argc, char **argv) {
     const double    melems        = double(d.nelements) / seconds_per_call / 1.0e6;
     const double    visit_mdofs   = double(d.nelements) * double(CVFEM_HEX8_N_DOF) / seconds_per_call / 1.0e6;
 
+    // The deferred correction is residual-only and lagged, so it enters the residual's work
+    // model and not the Jacobian's -- which is the same asymmetry the kernels implement.
     const double residual_flops =
-            geom_kind == GeomKind::Isoparam ? CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT
-                                            : CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT;
+            (geom_kind == GeomKind::Isoparam ? CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT
+                                             : CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT)
+            + (conv_ho ? cvfem_hex8_defcor_flops_per_element(conv_limiter) : 0.0);
     const double jac_action_flops =
             geom_kind == GeomKind::Isoparam ? CVFEM_HEX8_ISOPARAM_JAC_ACTION_FLOPS_PER_ELEMENT
                                             : CVFEM_HEX8_JAC_ACTION_FLOPS_PER_ELEMENT;
@@ -2013,6 +2295,7 @@ int main(int argc, char **argv) {
                 : jac_action   ? "jacobian_action"
                 : assemble     ? "jacobian_assemble"
                 : assemble_diag ? "jacobian_block_diagonal"
+                : nodal_grad   ? "nodal_gradient"
                                : "residual");
     std::printf("  layout: %s\n", layout.c_str());
     std::printf("  kernel: %s\n", kernel.c_str());
@@ -2057,7 +2340,17 @@ int main(int argc, char **argv) {
     }
     std::printf("  checksum: %.16e\n", checksum);
     std::printf("  fingerprint: %016llx\n", (unsigned long long)fingerprint);
-    if (!assemble && !jac_action && !bsr_apply) {
+    if (nodal_grad) {
+        // Reported per NODE-COMPONENT as well as per dof, because the two say different things:
+        // MDOF/s keeps the row comparable with every other operator in this benchmark, and the
+        // component rate is what scales with nf and is the quantity the kernel actually produces.
+        std::printf("  nodal_grad_fields: %d\n", nodal_grad);
+        std::printf("  seconds_per_nodal_grad: %.6e\n", seconds_per_call);
+        std::printf("  MDOF/s_nodal_grad: %.3f\n", mdofs);
+        std::printf("  MCOMP/s_nodal_grad: %.3f\n",
+                    double(d.nnodes) * double(3 * nodal_grad) / seconds_per_call / 1.0e6);
+    }
+    if (!assemble && !jac_action && !bsr_apply && !nodal_grad) {
         std::printf("  seconds_per_apply: %.6e\n", seconds_per_call);
         std::printf("  MDOF/s_residual: %.3f\n", mdofs);
         std::printf("  GFLOP/s_model: %.3f\n", elem_apps * residual_flops / seconds / 1.0e9);
@@ -2104,6 +2397,17 @@ int main(int argc, char **argv) {
             std::printf("  frac_jac_action_qgrad: %.4f\n", qgrad_seconds / seconds);
             std::printf("  MDOF/s_jac_action_kernel_only: %.3f\n",
                         double(n_dofs) / (seconds_per_call - per_call) / 1.0e6);
+        }
+        // The same split for the higher-order reconstruction, and it is worth having for the
+        // same reason the Rhie-Chow one is: the exact action costs several times the lagged one,
+        // and without this there is nothing to say how much of that is the reconstruction in
+        // front of the sweep and how much is the correction's own arithmetic inside it. Guessing
+        // from two separate runs' rates is not the same measurement -- it was off by an order of
+        // magnitude when tried.
+        if (with_hograd) {
+            const double per_call = hograd_seconds / double(repeat);
+            std::printf("  seconds_per_jac_action_hograd: %.6e\n", per_call);
+            std::printf("  frac_jac_action_hograd: %.4f\n", hograd_seconds / seconds);
         }
     }
     if (bsr_apply) {

@@ -788,13 +788,28 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
 }
 
 
+// THE EXACT HIGHER-ORDER ACTION is this same sweep with two extra fields staged, so it is this
+// same function with two extra arguments rather than a second copy of two hundred lines.
+//
+//   ugrad  the state's nodal velocity gradient, the field the residual's correction reads;
+//   vgrad  the DIRECTION's, reconstructed by its own pass before every matvec.
+//
+// Both null -- the default -- is the lagged action: the correction is a constant within the
+// Newton step, contributes nothing to J, and this function computes exactly what it computed
+// before the arguments existed. Passing them carries the correction's derivative, which is what
+// makes the action exact for a higher-order residual and is what costs the extra pass.
 static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                        PackedData            &p,
                                                        const scalar_t         rho,
                                                        const scalar_t         mu,
                                                        const scalar_t *const  dir,
                                                        scalar_t *const        jv,
-                                                       const GeomKind         geom_kind) {
+                                                       const GeomKind         geom_kind,
+                                                       const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                       const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
+                                                       const int              limiter = 0,
+                                                       const scalar_t         venkat_c = scalar_t(0)) {
+    const bool with_ho = ugrad != nullptr && vgrad != nullptr;
     // Hoisted out of the face loops -- see Hex8RhieChowPack::coeff. Its own cache key makes
     // this free after the first call, so --warmup absorbs the build and the timed loop
     // measures what the solver's Krylov iterations measure.
@@ -855,6 +870,12 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
             Hex8ResidualPack outp;
             Hex8CoordPack    xyz;
             Hex8RhieChowPack rcp;
+            // The two gradient packs, staged exactly as apply_residual_packed_defcor stages its
+            // one. The limiter and eps^2 live on the state pack because that is where the
+            // correction's own kernel reads them; the direction pack carries only the field.
+            Hex8UGradPack    hop, hovp;
+            hop.limiter  = limiter;
+            hop.venkat_c = venkat_c;
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz);
@@ -912,6 +933,29 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                     }
                     if (with_qg)
                         cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
+                    if (with_ho) {
+                        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                            const ptrdiff_t e = begin + lane;
+                            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                                if (lane >= nlanes) {
+                                    hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
+                                    for (int c = 0; c < 9; ++c) {
+                                        hop.g[a][c][lane]  = scalar_t(0);
+                                        hovp.g[a][c][lane] = scalar_t(0);
+                                    }
+                                    continue;
+                                }
+                                const smesh::idx_t gn = d.elems[a][e];
+                                hop.x[a][lane] = scalar_t(d.points[0][gn]);
+                                hop.y[a][lane] = scalar_t(d.points[1][gn]);
+                                hop.z[a][lane] = scalar_t(d.points[2][gn]);
+                                for (int c = 0; c < 9; ++c) {
+                                    hop.g[a][c][lane]  = ugrad[(ptrdiff_t)gn * 9 + c];
+                                    hovp.g[a][c][lane] = vgrad[(ptrdiff_t)gn * 9 + c];
+                                }
+                            }
+                        }
+                    }
                     cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
                                                               mu,
                                                               cof0,
@@ -929,7 +973,10 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                               outp,
                                                               with_rc ? &rcp : nullptr,
                                                               d.rhie_chow_scale,
-                                                              with_qg);
+                                                              with_qg,
+                                                              scalar_t(0),
+                                                              with_ho ? &hop : nullptr,
+                                                              with_ho ? &hovp : nullptr);
                 }
                 scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
             }
