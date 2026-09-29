@@ -1051,32 +1051,26 @@ def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None,
                       ai, gf))
         out.append(r"\addlegendentry{%s}" % label)
 
-    # Each higher-order path STARTS at that layout's first-order residual point, so it is read as
-    # one operator gaining a term rather than as four unrelated markers: the first step is the
-    # correction being switched on, and the rest is the limiter growing.
-    #
     # COLOUR is the layout, SHAPE is the scheme. The four schemes used to share one marker and be
     # named by two floating labels on the packed path, which left the atomic path's schemes
     # anonymous and the middle two unnamed on both. Now each scheme carries its own shape and its
     # own legend entry, drawn in black there because the shape is what the entry is about.
     #
     # The shapes are deliberately none of the six the first-order points use: the unlimited
-    # higher-order point sits next to its own layout's residual point on the path, and sharing a
-    # shape with it there would be exactly where the confusion lands. Filled, because a hollow
-    # marker already means something else in this figure -- modelled rather than measured traffic.
+    # higher-order point sits beside its own layout's residual point, and sharing a shape with it
+    # there would be exactly where the confusion lands. Filled, because a hollow marker already
+    # means something else in this figure -- modelled rather than measured traffic.
+    #
+    # The schemes are drawn as POINTS, not joined. A line between them would assert a path
+    # through intensities that nothing traverses: they are four separate operators measured
+    # independently, and the ordering among them is a fact about their arithmetic, which the
+    # legend states, not a trajectory.
     HO_MARKS = ["oplus*", "halfsquare*", "halfcircle*", "star"]
     ho_seen = []
     for lay, col in (("packed", "PackA"), ("atomic", "PackD")):
         path = (ho or {}).get(lay)
         if not path:
             continue
-        start = next(((ai, gf) for l, ai, gf, _m in pts if l == "residual, " + lay), None)
-        coords = ([start] if start else []) + [(ai, gf) for _n, ai, gf in path]
-        # The connecting line carries no marker and no legend entry of its own: its colour is the
-        # layout, which the first-order entries already establish, and the caption says what a
-        # dotted path is. Marking it here would draw a fifth shape over the four real ones.
-        out.append(r"\addplot[%s,mark=none,thin,densely dotted,forget plot] coordinates {%s};"
-                   % (col, " ".join("(%.3f,%.1f)" % c for c in coords)))
         for i, (name, ai, gf) in enumerate(path):
             mk = HO_MARKS[i % len(HO_MARKS)]
             out.append(r"\addplot[%s,mark=%s,mark size=2.0pt,only marks,forget plot,"

@@ -984,9 +984,9 @@ recovers the convergence the lagged form loses.
     vendor specification (\SI{\rlSpecBw}{\giga\byte\per\second}, \SI{\rlSpecPeak}{\tflops});
     ridges at \rlRidge{} and \rlSpecRidge{}~FLOP/byte. Markers are first-order upwind --- the
     matrix-free ones \emph{bare} element kernels, the SpMV ones the lagged matrix.
-    A dotted path starts at that layout's first-order residual and adds the higher-order
-    correction, in order of the arithmetic each scheme adds; along those paths the colour is the
-    layout and the marker is the scheme, as named in the legend.
+    The higher-order schemes are the further points in each layout's colour, with the marker
+    naming the scheme as in the legend; they are separate operators, ordered among themselves
+    only by the arithmetic each adds.
     Intensity uses \emph{measured} DRAM traffic; a hollow marker means the compulsory-traffic
     model instead.}
   \label{fig:roofline}
