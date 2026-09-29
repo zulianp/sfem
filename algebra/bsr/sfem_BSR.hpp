@@ -524,6 +524,11 @@ namespace sfem {
     //
     // The row-relative k inside the SpMV row loops is deliberately left narrow: `vals` is already
     // offset by the row start, so that index is bounded by one row's length.
+    //
+    // Measured on Grace, 72 threads, CVFEM HEX8: n=172 and n=176 segfaulted before this and run
+    // after it, and n=192 goes from SIGSEGV to 441 MDOF/s f64 and 888 f32 on a 23.4 GiB matrix.
+    // It costs nothing -- n=160 reads 440.6 before and 440.5 after -- because the widened
+    // multiply is once per row, not once per block.
     // -------------------------------------------------------------------------
     // Host BSR SpMV
     // Portable: fused scale, register y, unrolled 3x3, nnz blocking, software

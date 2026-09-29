@@ -541,29 +541,6 @@ def best(rows, **eq):
     return max((r["_mdof"] for r in sel), default=None)
 
 
-# BSR rows whose scalar index does not fit in 32 bits are not plotted, whatever they contain.
-#
-# The matrix holds block_size^2 scalars per block, and the host SpMV and the assembly reach them
-# through the matrix's own count type, which is int32_t in the default build. Once
-# bsr_nnz * block_entries passes 2^31 the offset wraps. On a CVFEM HEX8 cube the block count is
-# (3n+1)^3, so the first affected size is n = 171: measured, n = 168 runs and n = 172 segfaults.
-#
-# Today those runs crash and are simply missing from the csv, so this filter changes nothing. It
-# is here because a crash is the lucky outcome -- a wrapped offset that happens to land inside the
-# allocation returns a number instead, and a number is what gets plotted. The condition is read
-# from the row rather than hard-coded against n, so it holds for any block size and any mesh.
-def _bsr_index_fits(r):
-    try:
-        nnz = int(r.get("bsr_nnz") or 0)
-    except ValueError:
-        return True
-    if nnz <= 0:
-        return True
-    dofs, nodes = int(r.get("dofs") or 0), int(r.get("nodes") or 0)
-    bs = (dofs // nodes) if nodes else 4
-    return nnz * bs * bs <= 2**31 - 1
-
-
 def fig_throughput(rows, host, op="residual"):
     """F5. Throughput against problem size for the three representations.
 
@@ -590,7 +567,7 @@ def fig_throughput(rows, host, op="residual"):
         for n in sizes:
             v = max((r["_mdof"] for r in rows
                      if r["operation"] == "bsr_apply" and r["bsr_storage"] == store
-                     and r["_n"] == n and _bsr_index_fits(r)), default=None)
+                     and r["_n"] == n), default=None)
             if v:
                 pts.append((n, v))
         if pts:
