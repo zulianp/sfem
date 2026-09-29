@@ -18,23 +18,23 @@
 \node[black!55,font=\tiny,anchor=north east] at (axis cs:62.08,2028.7) {measured 2.31 TFLOP/s};
 \node[black!55,font=\tiny,anchor=south,rotate=26.3] at (axis cs:0.42,239.4) {spec 500 GB/s};
 \node[black!70,font=\tiny,anchor=north,rotate=26.3] at (axis cs:2.20,872.4) {meas.\ 451 GB/s};
-\addplot[PackA,mark=*,mark size=2.1pt,only marks,mark options={draw=PackA,fill=PackA}] coordinates {(3.575,460.8)};
+\addplot[PackA,mark=*,mark size=2.1pt,only marks,mark options={draw=PackA,fill=PackA}] coordinates {(3.575,484.4)};
 \addlegendentry{residual, packed}
-\addplot[PackD,mark=square*,mark size=2.1pt,only marks,mark options={draw=PackD,fill=PackD}] coordinates {(3.223,155.7)};
+\addplot[PackD,mark=square*,mark size=2.1pt,only marks,mark options={draw=PackD,fill=PackD}] coordinates {(3.223,163.0)};
 \addlegendentry{residual, atomic}
-\addplot[PackC,mark=triangle*,mark size=2.1pt,only marks,mark options={draw=PackC,fill=PackC}] coordinates {(3.528,367.1)};
+\addplot[PackC,mark=triangle*,mark size=2.1pt,only marks,mark options={draw=PackC,fill=PackC}] coordinates {(3.528,409.1)};
 \addlegendentry{Jacobian, packed}
-\addplot[PackE,mark=diamond*,mark size=2.1pt,only marks,mark options={draw=PackE,fill=PackE}] coordinates {(3.374,174.5)};
+\addplot[PackE,mark=diamond*,mark size=2.1pt,only marks,mark options={draw=PackE,fill=PackE}] coordinates {(3.374,179.3)};
 \addlegendentry{Jacobian, atomic}
-\addplot[PackB,mark=pentagon*,mark size=2.1pt,only marks,mark options={draw=PackB,fill=white}] coordinates {(0.238,99.0)};
+\addplot[PackB,mark=pentagon*,mark size=2.1pt,only marks,mark options={draw=PackB,fill=white}] coordinates {(0.238,95.8)};
 \addlegendentry{SpMV \texttt{f64}}
-\addplot[PackF,mark=otimes*,mark size=2.1pt,only marks,mark options={draw=PackF,fill=white}] coordinates {(0.454,184.9)};
+\addplot[PackF,mark=otimes*,mark size=2.1pt,only marks,mark options={draw=PackF,fill=white}] coordinates {(0.454,179.8)};
 \addlegendentry{SpMV \texttt{f32}}
-\addplot[PackA,mark=*,mark size=1.5pt,thin,densely dotted] coordinates {(3.575,460.8) (3.276,334.4) (3.607,302.6) (4.930,375.1) (5.757,326.2)};
+\addplot[PackA,mark=*,mark size=1.5pt,thin,densely dotted] coordinates {(3.575,484.4) (3.276,334.4) (3.607,302.6) (4.930,375.1) (5.757,326.2)};
 \addlegendentry{$+$ higher order, packed}
 \node[PackA,font=\tiny,anchor=east] at (axis cs:3.112,334.4) {unlimited};
 \node[PackA,font=\tiny,anchor=west] at (axis cs:6.045,326.2) {Venkatakrishnan};
-\addplot[PackD,mark=*,mark size=1.5pt,thin,densely dotted] coordinates {(3.223,155.7) (3.362,155.2) (3.702,163.4) (5.060,229.8) (5.909,248.7)};
+\addplot[PackD,mark=*,mark size=1.5pt,thin,densely dotted] coordinates {(3.223,163.0) (3.362,155.2) (3.702,163.4) (5.060,229.8) (5.909,248.7)};
 \addlegendentry{$+$ higher order, atomic}
 \end{loglogaxis}
 \end{tikzpicture}
