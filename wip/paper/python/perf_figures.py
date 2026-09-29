@@ -363,12 +363,20 @@ def fig_scaling(series, meta, op="res"):
     higher-order flux, so the figure answers whether the layout's scaling depends on the scheme
     as well as how each layout scales.
     """
+    # The y limits are FIXED rather than left to pgfplots, because the ideal line's label has to be
+    # rotated to the angle that line is actually drawn at, and that angle depends on how many
+    # decades the axis spans. With the limits floating, the rotation could only ever be a guess --
+    # which is what it was: a hard-coded 37 degrees against a line drawn at about 23.
+    H_OVER_W = 0.55
+    ys = [m for pts in series.values() for _t, m in pts]
+    ymin, ymax = (min(ys) * 0.85, max(ys) * 1.2) if ys else (1.0, 10.0)
     out = [PREAMBLE,
            r"\begin{tikzpicture}",
            r"\begin{loglogaxis}[",
-           r"  width=\columnwidth, height=0.55\columnwidth,",
+           r"  width=\columnwidth, height=%.3f\columnwidth," % H_OVER_W,
            r"  xlabel={OpenMP threads}, ylabel={MDOF/s},",
            r"  log basis x=2, xtick={1,2,4,8,18,36,72}, xticklabels={1,2,4,8,18,36,72},",
+           r"  ymin=%.4f, ymax=%.4f," % (ymin, ymax),
            r"  legend pos=north west, legend cell align=left,",
            r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},",
            r"  grid=both, major grid style={black!12}, minor grid style={black!6},",
@@ -385,8 +393,15 @@ def fig_scaling(series, meta, op="res"):
         t0, m0 = base
         out.append(r"\addplot[black!45,dashed,no marks,forget plot] coordinates "
                    r"{(1,%.4f) (72,%.4f)};" % (m0, m0 * 72.0 / t0))
-        out.append(r"\node[black!55,font=\tiny,rotate=37,anchor=south east] "
-                   r"at (axis cs:36,%.1f) {ideal};" % (m0 * 30.0))
+        # ON the line and anchored north, so the label hangs just under it, parallel, instead of
+        # being set below it at a guessed height and rotated up across it. Everything measured
+        # lies ABOVE this line -- it is anchored on the slowest curve at one thread -- so the
+        # space underneath is empty and the label has it to itself.
+        ang = math.degrees(math.atan2(H_OVER_W / math.log10(ymax / ymin),
+                                      1.0 / math.log10(72.0)))
+        xlab = 24.0
+        out.append(r"\node[black!55,font=\tiny,rotate=%.1f,anchor=north,inner sep=2pt] "
+                   r"at (axis cs:%.0f,%.2f) {ideal};" % (ang, xlab, m0 * xlab / t0))
     for lay, o, col, mark, lab in SCALING_SERIES:
         pts = series.get((lay, o))
         if not pts:
