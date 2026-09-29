@@ -120,6 +120,114 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
     }
 }
 
+// THE JACOBIAN ACTION, LANE-BLOCKED, with the atomic scatter. Same reasoning as the residual
+// twin above: cvfem_hex8_ns_upwind_jacobian_action_simd is what packed, coloured and the solver's
+// packed path all call, and the atomic sweep was the only family still walking one element at a
+// time through the scalar kernel. Vectorising it is the difference between measuring the format
+// and measuring the vectorisation.
+//
+// Global gather through d.elems, wide index, untouched element order, per-lane atomic scatter --
+// everything that makes this the standard layout is kept.
+static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData             &d,
+                                                            const scalar_t        rho,
+                                                            const scalar_t        mu,
+                                                            const scalar_t *const dir,
+                                                            scalar_t *const       jv) {
+    cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
+    const Hex8Extras opt(d);
+    const bool       has_qg = opt.with_qg;
+    // The per-surface Rhie-Chow coefficient is hoisted out of the face loops, so it has to be
+    // built before the sweep and staged per lane group -- exactly as the packed Jacobian does.
+    // Omitting the staging leaves rcp.coeff, rcp.scale and rcp.tau untouched and the kernel
+    // returns nan, which is how this was found.
+    if (opt.with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+
+#pragma omp parallel
+    {
+        alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof2[CVFEM_HEX8_VEC_SIZE], cof3[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof4[CVFEM_HEX8_VEC_SIZE], cof5[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof8[CVFEM_HEX8_VEC_SIZE], detv[CVFEM_HEX8_VEC_SIZE];
+        Hex8InputPack    u_pack, du_pack;
+        Hex8ResidualPack outp;
+        Hex8RhieChowPack rcp;
+
+#pragma omp for schedule(static)
+        for (ptrdiff_t e0 = 0; e0 < d.nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
+            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, d.nelements - e0);
+            gather_hex8_adj_soa(d, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+
+            for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                if (lane < nlanes) {
+                    const ptrdiff_t e = e0 + lane;
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        const smesh::idx_t                  g  = d.elems[a][e];
+                        const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
+                        u_pack.ux[a][lane]                     = d.ux[g];
+                        u_pack.uy[a][lane]                     = d.uy[g];
+                        u_pack.uz[a][lane]                     = d.uz[g];
+                        u_pack.p[a][lane]                      = d.p[g];
+                        du_pack.ux[a][lane]                    = dv[0];
+                        du_pack.uy[a][lane]                    = dv[1];
+                        du_pack.uz[a][lane]                    = dv[2];
+                        du_pack.p[a][lane]                     = dv[3];
+                    }
+                } else {
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        u_pack.ux[a][lane] = u_pack.uy[a][lane] = u_pack.uz[a][lane] = u_pack.p[a][lane] = scalar_t(0);
+                        du_pack.ux[a][lane] = du_pack.uy[a][lane] = du_pack.uz[a][lane] = du_pack.p[a][lane] =
+                                scalar_t(0);
+                    }
+                }
+            }
+
+            if (opt.with_rc) {
+                const auto *const px = d.points[0];
+                const auto *const py = d.points[1];
+                const auto *const pz = d.points[2];
+                for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        if (lane < nlanes) {
+                            const smesh::idx_t g = d.elems[a][e0 + lane];
+                            rcp.x[a][lane]       = scalar_t(px[g]);
+                            rcp.y[a][lane]       = scalar_t(py[g]);
+                            rcp.z[a][lane]       = scalar_t(pz[g]);
+                            rcp.pgx[a][lane]     = d.pgx[g];
+                            rcp.pgy[a][lane]     = d.pgy[g];
+                            rcp.pgz[a][lane]     = d.pgz[g];
+                            rcp.qgx[a][lane]     = has_qg ? d.qgx[g] : scalar_t(0);
+                            rcp.qgy[a][lane]     = has_qg ? d.qgy[g] : scalar_t(0);
+                            rcp.qgz[a][lane]     = has_qg ? d.qgz[g] : scalar_t(0);
+                        } else {
+                            rcp.x[a][lane] = rcp.y[a][lane] = rcp.z[a][lane] = scalar_t(0);
+                            rcp.pgx[a][lane] = rcp.pgy[a][lane] = rcp.pgz[a][lane] = scalar_t(0);
+                            rcp.qgx[a][lane] = rcp.qgy[a][lane] = rcp.qgz[a][lane] = scalar_t(0);
+                        }
+                    }
+                }
+            }
+
+            if (opt.with_rc) cvfem_hex8_gather_rc_coeff(d, e0, nlanes, rcp);
+
+            cvfem_hex8_ns_upwind_jacobian_action_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6,
+                                                      cof7, cof8, detv, u_pack, du_pack, outp,
+                                                      opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale, has_qg);
+
+            for (int lane = 0; lane < nlanes; ++lane) {
+                const ptrdiff_t e = e0 + lane;
+                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                    const smesh::idx_t g = d.elems[a][e];
+                    atomic_add(jv, (smesh::idx_t)(g * N_FIELDS + 0), outp.rx[a][lane]);
+                    atomic_add(jv, (smesh::idx_t)(g * N_FIELDS + 1), outp.ry[a][lane]);
+                    atomic_add(jv, (smesh::idx_t)(g * N_FIELDS + 2), outp.rz[a][lane]);
+                    atomic_add(jv, (smesh::idx_t)(g * N_FIELDS + 3), outp.rc[a][lane]);
+                }
+            }
+        }
+    }
+}
+
 static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData             &d,
                                                                 const scalar_t        rho,
                                                                 const scalar_t        mu,
@@ -221,6 +329,12 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
 // The gather reads the GLOBAL arrays through d.elems, so this keeps every property that makes
 // this the standard layout: the wide index, no pack-local staging, no reordering. What it gains
 // is the vector body. That is the point -- it isolates the format from the vectorisation.
+//
+// This IS the atomic residual now; the scalar sweep below survives only as a verification
+// reference, where it is compared against the non-sum-factorised kernel rather than against
+// another layout. Measured at n=128 on Grace, bare and with Rhie-Chow: lane-blocking the atomic
+// sweep alone is worth 1.29x and 1.37x, and what remains between the layouts -- 2.45x and 1.76x
+// -- is the format.
 static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData &d, const scalar_t rho, const scalar_t mu) {
     reset_residual(d);
     const Hex8Extras opt(d);

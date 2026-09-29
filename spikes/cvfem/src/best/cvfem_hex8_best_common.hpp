@@ -345,9 +345,6 @@ static double wall_time() {
 static int g_breakdown = 0;
 static int g_dense_flush = 0;  // --dense-flush: stage ke densely, then flush 64 contiguous blocks
 static int g_kernel_only = 0;  // --kernel-only: element kernel writes to a dense stack buffer (no scatter)
-// --atomic-simd: lane-block the atomic residual sweep. Off by default, so the standard layout
-// keeps the sweep every earlier number in this tree was measured on.
-static int g_atomic_simd = 0;
 static int g_identity_slots[64];
 // PH_QGRAD is not a phase of an element sweep like the others: it is the separate
 // reconstruction pass that the exact Rhie-Chow Jacobian action runs before the sweep, and it
