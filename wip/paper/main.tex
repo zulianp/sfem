@@ -635,19 +635,31 @@ exact one.
 \caption{Jacobian action $\mathcal{J}(u)\,v$}
 \label{alg:jacaction}
 \begin{algorithmic}[1]
-\Require state $u$, direction $v$; the Rhie--Chow term exact or lagged
-\If{Rhie--Chow, exact}
-  \State $g \gets \nabla p(v)$ by Algorithm~\ref{alg:apply}
-         \Comment{the \emph{direction}'s gradient, rebuilt every matvec}
-\ElsIf{Rhie--Chow, lagged}
-  \State $g \gets$ the coefficient built from $u$ \Comment{frozen, no sweep}
+\Require state $u$, direction $v$. Two terms are differentiated or lagged \emph{independently},
+         and both are exact by default
+\If{Rhie--Chow carried and exact}
+  \State $q \gets \nabla p(v)$ by Algorithm~\ref{alg:apply}
+         \Comment{3 components; the \emph{direction}'s pressure gradient, rebuilt every matvec}
+\Else
+  \State $q \gets \varnothing$ \Comment{lagged: the coupling uses the state's gradient alone}
+\EndIf
+\If{higher-order correction carried and exact}
+  \State $g_v \gets \nabla u(v)$ by Algorithm~\ref{alg:apply}
+         \Comment{9 components, read from $v$ in place}
+\Else
+  \State $g_v \gets \varnothing$ \Comment{lagged: the correction is constant in $v$}
 \EndIf
 \State apply Algorithm~\ref{alg:apply}, whose element kernel linearises the first-order
-       convective flux about $u$ in direction $v$, adds the viscous term and any selected
-       boundary and mass terms, and adds the Rhie--Chow coupling from $g$
-\Statex \textbf{The convective scheme does not enter}, because the higher-order correction is
-        applied lagged --- by the choice of \S\ref{sec:setup}, not because $\mathcal{J}$ could
-        not carry it.
+       convective flux about $u$ in direction $v$, adds the viscous term, and adds the
+       Rhie--Chow coupling --- differentiated through $q$ when $q$ is present
+\If{$g_v \neq \varnothing$}
+  \State the same kernel adds the differentiated deferred correction, including the
+         derivative of the limiter, evaluated with $\nabla u(u)$ and $g_v$
+\EndIf
+\State add the boundary closure and the transient term, each an extra sweep
+\Statex Each exact term costs one reconstruction of a \emph{direction} field per matvec, which
+        is why each is switchable: the state's own gradients are hoisted across the Krylov solve,
+        the direction's cannot be. \S\ref{sec:res:hoexact} measures what the second one buys.
 \end{algorithmic}
 \end{algorithm}
 
