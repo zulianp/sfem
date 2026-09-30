@@ -413,8 +413,25 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_limiter_clip_inc_d(const scal
     // Unclipped, the limiter is the identity and so is its derivative. Clipped, the increment is
     // pinned to a bound that is itself one of the two nodal values, so what survives is that
     // bound's derivative minus the base's.
-    if (f < lo) return dlo - dbase;
-    if (f > hi) return dhi - dbase;
+    //
+    // A BOUND COUNTS AS REACHED ONLY WHEN f PASSES IT BY MORE THAN A ROUNDING OF THE DATA, and
+    // that band is what makes this derivative reproducible. Unlike the value above, the three
+    // branches here differ by a FINITE amount, so an ulp of movement in f across a bound changes
+    // the answer by O(1) rather than by an ulp. On a uniform mesh many faces sit exactly on a
+    // bound -- 1024 of 6144 on one measured here -- and f is a dot product that the scalar and
+    // the lane-blocked bodies contract into FMAs differently, so the two disagreed by 3.05e-3 on
+    // the Jacobian action while the residual, whose clip moves the value by an ulp, agreed to the
+    // last bit.
+    //
+    // Inside the band the interior subgradient is returned. That is the choice continuous with
+    // the unclipped branch, it is a valid subgradient where the limiter has no derivative, and
+    // both bodies now return it.
+    const scalar_t scale = std::fabs(hi - lo) + std::fabs(f) + std::fabs(base);
+    // Eight ulp of double precision, wide enough to cover the FMA reassociation of a three-term
+    // dot product and far narrower than any clipping the limiter is meant to do.
+    const scalar_t tol = scale * scalar_t(8) * scalar_t(2.220446049250313e-16);
+    if (f < lo - tol) return dlo - dbase;
+    if (f > hi + tol) return dhi - dbase;
     return dinc;
 }
 
@@ -447,8 +464,23 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_darwish_moukalled_inc_d(const
     const scalar_t db  = dphi_d - dphi_c;
     const scalar_t aa  = a < scalar_t(0) ? -a : a;
     const scalar_t ab  = b < scalar_t(0) ? -b : b;
-    const scalar_t daa = a < scalar_t(0) ? -da : da;
-    const scalar_t dab = b < scalar_t(0) ? -db : db;
+    // THE SAME DEFECT THE CLIP HAD, at a == 0 and b == 0 rather than at a bound. The absolute
+    // value has no derivative at zero, and the two sides of the sign reach dnum with a finite
+    // difference: at a == 0 the result differs by 2*da*b/den between them, and at b == 0 by
+    // 2*a*db/den. An ulp of noise in a dot product then flips an O(1) quantity, which is how the
+    // clip made the Jacobian action layout dependent.
+    //
+    // Inside a rounding band the MINIMUM-NORM subgradient is taken, which is zero. It is the
+    // symmetric element of the subdifferential of the absolute value at zero, so neither side is
+    // preferred, and it is the only choice that does not depend on where an ulp lands.
+    //
+    // Venkatakrishnan beside it needs no such band although it also branches, on inc >= 0: at
+    // inc == 0 its psi is exactly 1 and every term carrying the branch is multiplied by inc, so
+    // the discontinuity cancels and the derivative is continuous there. That was checked rather
+    // than assumed.
+    const scalar_t tol = (aa + ab) * scalar_t(8) * scalar_t(2.220446049250313e-16);
+    const scalar_t daa = aa <= tol ? scalar_t(0) : (a < scalar_t(0) ? -da : da);
+    const scalar_t dab = ab <= tol ? scalar_t(0) : (b < scalar_t(0) ? -db : db);
     const scalar_t den = scalar_t(2) * (aa + ab);
     if (den == scalar_t(0)) return scalar_t(0);
     const scalar_t num  = a * ab + aa * b;
