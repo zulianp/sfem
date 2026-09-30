@@ -10,14 +10,14 @@
   legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},
   tick label style={font=\scriptsize}, label style={font=\scriptsize},
   ymajorgrids, major grid style={black!12}]
-\addplot[draw=PackA, fill=PackA] coordinates {(upwind,2636.0) (unlimited,996.2) (clip,823.7) (Venkat.,562.9) (Darwish--M.,726.3)};
+\addplot[draw=PackA, fill=PackA] coordinates {(upwind,2636.5) (unlimited,1004.2) (clip,836.0) (Venkat.,701.4) (Darwish--M.,735.1)};
 \addlegendentry{packed}
-\addplot[draw=PackD, fill=PackD] coordinates {(upwind,1069.2) (unlimited,651.5) (clip,575.4) (Venkat.,426.8) (Darwish--M.,525.1)};
+\addplot[draw=PackD, fill=PackD] coordinates {(upwind,1082.9) (unlimited,660.1) (clip,580.0) (Venkat.,517.6) (Darwish--M.,531.1)};
 \addlegendentry{atomic}
-\draw[PackE,dashed,thick] ({axis cs:upwind,442.3} -| {rel axis cs:0,0}) -- ({axis cs:upwind,442.3} -| {rel axis cs:1,0});
+\draw[PackE,dashed,thick] ({axis cs:upwind,447.1} -| {rel axis cs:0,0}) -- ({axis cs:upwind,447.1} -| {rel axis cs:1,0});
 \addlegendimage{legend image code/.code={\draw[PackE,dashed,thick] (0cm,0cm) -- (0.45cm,0cm);}}
 \addlegendentry{BSR SpMV \texttt{f64}}
-\draw[PackC,dashed,thick] ({axis cs:upwind,856.1} -| {rel axis cs:0,0}) -- ({axis cs:upwind,856.1} -| {rel axis cs:1,0});
+\draw[PackC,dashed,thick] ({axis cs:upwind,825.6} -| {rel axis cs:0,0}) -- ({axis cs:upwind,825.6} -| {rel axis cs:1,0});
 \addlegendimage{legend image code/.code={\draw[PackC,dashed,thick] (0cm,0cm) -- (0.45cm,0cm);}}
 \addlegendentry{BSR SpMV \texttt{f32}}
 \end{axis}

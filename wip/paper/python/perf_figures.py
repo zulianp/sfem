@@ -1776,7 +1776,7 @@ def build(out_dir, tab_dir):
         mx = parse_kmix(os.path.join(DATA, km[-1]))
         body = table_kmix(mx)
         if body:
-            with open(os.path.join(out_dir, "..", "tables", "kmix.tex"), "w") as fh:
+            with open(os.path.join(tab_dir, "kmix.tex"), "w") as fh:
                 fh.write(body)
             written.append("tables/kmix.tex")
 
