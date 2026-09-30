@@ -2532,6 +2532,37 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_simd(const
 // FLATTEN for the same reason the residual face kernel carries it: with HO on this body calls
 // cvfem_hex8_scs_defcor_jv, and a call inside the `#pragma omp simd` loop stops the whole loop
 // vectorising -- the flux linearisation as well as the correction's.
+//
+// A LANE LOOP PER FACE, AND WHY THE TWELVE ARE NOT FUSED INTO ONE.
+//
+// Each of the eight nodes sits on three of the twelve sub-control surfaces -- one per direction
+// group -- so with a loop per face, a node's eight staged inputs are loaded three times over and
+// its four accumulators are read-modify-written three times. That redundancy is real, and it was
+// the last of the three optimisations left on the list for this kernel. Fusing the twelve faces
+// into one lane loop removes it: the node indices are compile-time constants over straight-line
+// code on local packs nothing else aliases, which is the shape in which the repeats can be
+// forwarded.
+//
+// Measured on Grace, 72 threads, n=128 (8,586,756 dofs), against a residual arm that runs
+// identical code in every binary and so controls for the node:
+//
+//                        per face   fused   fused, accumulating into locals
+//   jac_exact  packed       920.5   720.5 (0.78)   807.8 (0.88)
+//   jac_exact  standard     519.5   444.5 (0.86)   472.4 (0.91)
+//   jac_ho     packed       548.2   429.8 (0.78)   445.6 (0.81)
+//   jac_ho     standard     247.6   219.2 (0.89)   222.7 (0.90)
+//   residual   packed      1414.2  1429.5 (1.01)  1428.8 (1.01)   <- control, flat
+//   residual   standard     807.0   814.1 (1.01)   812.7 (1.01)   <- control, flat
+//
+// Both fused shapes lose, by 9% to 22%. Accumulating into thirty-two lane-private scalars and
+// storing each once -- which removes the ninety-six read-modify-writes by construction rather
+// than by hoping the compiler does it -- recovers some of the loss but does not close it. The
+// reading is that the redundant loads are not what this kernel is short of: they hit L1, and
+// buying them back costs a live set past thirty-two vector registers, so the compiler spills.
+// Spilling is strictly worse than the staged pack it replaces, because the pack is contiguous
+// and prefetchable and the spill slots add stores as well as loads.
+//
+// So the redundancy stays, deliberately. Do not re-derive the fusion from a load count.
 template <int S, int I, int J, bool RC = false, bool QG = false, bool EPS = false, bool HO = false,
           int LIM = 0>
 static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(const scalar_t rho,
