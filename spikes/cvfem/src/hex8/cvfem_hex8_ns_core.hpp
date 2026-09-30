@@ -140,6 +140,10 @@ struct MeshData {
     // because one array for one table is simpler than twelve and it is bit-identical, NOT as an
     // optimisation. Whatever the remaining 4.1x is, it is not this.
     std::vector<scalar_t> rc_coeff;
+    // The coefficient's velocity-sensitivity weight, per surface. Purely geometric plus the two
+    // Rhie-Chow uniforms, so the Jacobian face loop need not recompute three dot products and a
+    // division for it. Same shape and lifetime as rc_coeff.
+    std::vector<scalar_t> rc_w;
     scalar_t              rc_coeff_rho{0}, rc_coeff_mu{0}, rc_coeff_scale{0};
     // The coefficient carries the advecting velocity now, so rho, mu and the scale no
     // longer span everything it depends on. state_stamp is bumped by whoever moves the

@@ -132,6 +132,9 @@ struct Hex8RhieChowPack {
     // function directly. This is the arrangement the semi-structured path has always used
     // (SSMacroGeom::coeff, src/ss/cvfem_sshex8_ns.hpp) -- which is why it never paid this.
     alignas(ALIGN_BYTES) scalar_t coeff[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
+    // The coefficient's velocity-sensitivity weight, tabulated beside it because it is purely
+    // geometric: see cvfem_hex8_build_rc_coeff.
+    alignas(ALIGN_BYTES) scalar_t wdu[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
     // The part of the time scale that belongs to the solve rather than to the element.
     // Only the isoparametric path reads it; the affine path has the finished coefficient in
     // the table above.
@@ -2645,8 +2648,13 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(co
                                                const Hex8UGradPack *const hov = nullptr,
                                                const scalar_t *const SFEM_RESTRICT cenx = nullptr,
                                                const scalar_t *const SFEM_RESTRICT ceny = nullptr,
-                                               const scalar_t *const SFEM_RESTRICT cenz = nullptr) {
-    if constexpr (!RC) (void)rc;
+                                               const scalar_t *const SFEM_RESTRICT cenz = nullptr,
+                                               // The three affine edge vectors, direction-major;
+                                               // see cvfem_hex8_affine_edge_cols.
+                                               const scalar_t *const SFEM_RESTRICT edx = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT edy = nullptr,
+                                               const scalar_t *const SFEM_RESTRICT edz = nullptr) {
+    if constexpr (!RC) { (void)rc; (void)edx; (void)edy; (void)edz; }
     if constexpr (!HO) { (void)ho; (void)hov; (void)cenx; (void)ceny; (void)cenz; }
 #pragma omp simd
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
@@ -2661,9 +2669,11 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(co
                          ((du.ux[I][lane] + du.ux[J][lane]) * ax + (du.uy[I][lane] + du.uy[J][lane]) * ay +
                           (du.uz[I][lane] + du.uz[J][lane]) * az);
         if constexpr (RC) {
-            const scalar_t dx    = rc->x[J][lane] - rc->x[I][lane];
-            const scalar_t dy    = rc->y[J][lane] - rc->y[I][lane];
-            const scalar_t dz    = rc->z[J][lane] - rc->z[I][lane];
+            // Same affine edge vector the residual uses: the four surfaces of a direction group
+            // share one, and S/4 is a compile-time constant, so no coordinate is loaded here.
+            const scalar_t dx    = edx[(S / 4) * CVFEM_HEX8_VEC_SIZE + lane];
+            const scalar_t dy    = edy[(S / 4) * CVFEM_HEX8_VEC_SIZE + lane];
+            const scalar_t dz    = edz[(S / 4) * CVFEM_HEX8_VEC_SIZE + lane];
             const scalar_t coeff = rc->coeff[S][lane];
             const scalar_t corr =
                     (u.p[J][lane] - u.p[I][lane]) -
@@ -2687,9 +2697,9 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(co
                                   half * (rc->qgz[I][lane] + rc->qgz[J][lane]) * dz);
             }
             // The coefficient's own velocity dependence; see cvfem_hex8_rhie_chow_coeff_du.
-            const scalar_t w = cvfem_hex8_rhie_chow_du_weight(rc->scale, ax * ax + ay * ay + az * az,
-                                                              ax * dx + ay * dy + az * dz, dx * dx + dy * dy + dz * dz,
-                                                              rc->tau.u2_scale);
+            // Tabulated, not recomputed: this is three dot products and a division that do not
+            // depend on the state. See cvfem_hex8_build_rc_coeff.
+            const scalar_t w = rc->wdu[S][lane];
             dmdot += cvfem_hex8_rhie_chow_coeff_du(coeff, w) * corr *
                      (adv_x * half * (du.ux[I][lane] + du.ux[J][lane]) + adv_y * half * (du.uy[I][lane] + du.uy[J][lane]) +
                       adv_z * half * (du.uz[I][lane] + du.uz[J][lane]));
@@ -2933,7 +2943,11 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_pa_simd(const scalar_t          
                                                         const Hex8RhieChowPack             *rc,
                                                         const scalar_t *const SFEM_RESTRICT pa,
                                                         const ptrdiff_t                     nelem,
-                                                        Hex8ResidualPack                   &out) {
+                                                        Hex8ResidualPack                   &out,
+                                                        const scalar_t *const SFEM_RESTRICT edx,
+                                                        const scalar_t *const SFEM_RESTRICT edy,
+                                                        const scalar_t *const SFEM_RESTRICT edz) {
+    if constexpr (!(RC && QG)) { (void)edx; (void)edy; (void)edz; }
     if constexpr (!RC) (void)rc;
     // `pa` already points at this group's first element, so these are five contiguous
     // vector loads. Lanes past the end of the mesh read into the next slice and are
@@ -2961,9 +2975,10 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_pa_simd(const scalar_t          
             dmdot += half * (t_kx[lane] * (du.ux[I][lane] + du.ux[J][lane]) + t_ky[lane] * (du.uy[I][lane] + du.uy[J][lane]) +
                              t_kz[lane] * (du.uz[I][lane] + du.uz[J][lane]));
             if constexpr (QG) {
-                const scalar_t dx = rc->x[J][lane] - rc->x[I][lane];
-                const scalar_t dy = rc->y[J][lane] - rc->y[I][lane];
-                const scalar_t dz = rc->z[J][lane] - rc->z[I][lane];
+                // The affine edge vector, as everywhere else on this path.
+                const scalar_t dx = edx[(S / 4) * CVFEM_HEX8_VEC_SIZE + lane];
+                const scalar_t dy = edy[(S / 4) * CVFEM_HEX8_VEC_SIZE + lane];
+                const scalar_t dz = edz[(S / 4) * CVFEM_HEX8_VEC_SIZE + lane];
                 dmdot += coeff * (half * (rc->qgx[I][lane] + rc->qgx[J][lane]) * dx +
                                   half * (rc->qgy[I][lane] + rc->qgy[J][lane]) * dy +
                                   half * (rc->qgz[I][lane] + rc->qgz[J][lane]) * dz);
@@ -3002,19 +3017,22 @@ static SFEM_INLINE void cvfem_hex8_conv_all_jv_pa_simd(const scalar_t           
                                                        const Hex8RhieChowPack             *rc,
                                                        const scalar_t *const SFEM_RESTRICT pa,
                                                        const ptrdiff_t                     nelem,
-                                                       Hex8ResidualPack                   &out) {
-    cvfem_hex8_conv_face_jv_pa_simd<0, 0, 1, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<1, 3, 2, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<2, 4, 5, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<3, 7, 6, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<4, 0, 3, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<5, 1, 2, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<6, 4, 7, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<7, 5, 6, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<8, 0, 4, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<9, 1, 5, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<10, 2, 6, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
-    cvfem_hex8_conv_face_jv_pa_simd<11, 3, 7, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
+                                                       Hex8ResidualPack                   &out,
+                                                       const scalar_t *const SFEM_RESTRICT edx,
+                                                       const scalar_t *const SFEM_RESTRICT edy,
+                                                       const scalar_t *const SFEM_RESTRICT edz) {
+    cvfem_hex8_conv_face_jv_pa_simd<0, 0, 1, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<1, 3, 2, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<2, 4, 5, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<3, 7, 6, RC, QG>(rho, half, Ax0, Ay0, Az0, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<4, 0, 3, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<5, 1, 2, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<6, 4, 7, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<7, 5, 6, RC, QG>(rho, half, Ax1, Ay1, Az1, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<8, 0, 4, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<9, 1, 5, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<10, 2, 6, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_pa_simd<11, 3, 7, RC, QG>(rho, half, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
 }
 
 template <bool RC = false, bool QG = false, bool EPS = false, bool HO = false, int LIM = 0>
@@ -3039,19 +3057,22 @@ static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t              
                                                     const Hex8UGradPack *const          hov = nullptr,
                                                     const scalar_t *const SFEM_RESTRICT cenx = nullptr,
                                                     const scalar_t *const SFEM_RESTRICT ceny = nullptr,
-                                                    const scalar_t *const SFEM_RESTRICT cenz = nullptr) {
-    cvfem_hex8_conv_face_jv_simd<0, 0, 1, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<1, 3, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<2, 4, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<3, 7, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<4, 0, 3, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<5, 1, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<6, 4, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<7, 5, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<8, 0, 4, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<9, 1, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<10, 2, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
-    cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz);
+                                                    const scalar_t *const SFEM_RESTRICT cenz = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT edx = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT edy = nullptr,
+                                                    const scalar_t *const SFEM_RESTRICT edz = nullptr) {
+    cvfem_hex8_conv_face_jv_simd<0, 0, 1, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<1, 3, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<2, 4, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<3, 7, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax0, Ay0, Az0, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<4, 0, 3, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<5, 1, 2, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<6, 4, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<7, 5, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax1, Ay1, Az1, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<8, 0, 4, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<9, 1, 5, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<10, 2, 6, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
+    cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
 }
 
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
@@ -3361,10 +3382,12 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_sumfact_simd(
             scalar_t *const SFEM_RESTRICT g02v, scalar_t *const SFEM_RESTRICT g10v,                          \
             scalar_t *const SFEM_RESTRICT g11v, scalar_t *const SFEM_RESTRICT g12v,                          \
             scalar_t *const SFEM_RESTRICT g20v, scalar_t *const SFEM_RESTRICT g21v,                          \
-            scalar_t *const SFEM_RESTRICT g22v
+            scalar_t *const SFEM_RESTRICT g22v, scalar_t *const SFEM_RESTRICT edx,                            \
+            scalar_t *const SFEM_RESTRICT edy, scalar_t *const SFEM_RESTRICT edz
 
 #define CVFEM_HEX8_ACTION_GEOM_PASS                                                                          \
-    Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v
+    Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, g00v, g01v, g02v, g10v, g11v, g12v, g20v, g21v, g22v,      \
+            edx, edy, edz
 
 // The part of the Jacobian action that touches neither the state nor the stored tangent:
 // the three direction area vectors, and the gradient of the DIRECTION. Note it reads `du`
@@ -3408,6 +3431,18 @@ static SFEM_INLINE void cvfem_hex8_action_geom_simd(const scalar_t              
         Ax2[lane]          = qtr * c6;
         Ay2[lane]          = qtr * c7;
         Az2[lane]          = qtr * c8;
+        // The three affine edge vectors, for the Rhie-Chow term in the face loop: J = adj(adj)/det,
+        // computed here because the cofactors and 1/det are already in registers. See
+        // cvfem_hex8_affine_edge_cols for the identity and the direction-major layout.
+        edx[0 * CVFEM_HEX8_VEC_SIZE + lane] = (c4 * c8 - c5 * c7) * inv;
+        edx[1 * CVFEM_HEX8_VEC_SIZE + lane] = (c2 * c7 - c1 * c8) * inv;
+        edx[2 * CVFEM_HEX8_VEC_SIZE + lane] = (c1 * c5 - c2 * c4) * inv;
+        edy[0 * CVFEM_HEX8_VEC_SIZE + lane] = (-c3 * c8 + c5 * c6) * inv;
+        edy[1 * CVFEM_HEX8_VEC_SIZE + lane] = (c0 * c8 - c2 * c6) * inv;
+        edy[2 * CVFEM_HEX8_VEC_SIZE + lane] = (-c0 * c5 + c2 * c3) * inv;
+        edz[0 * CVFEM_HEX8_VEC_SIZE + lane] = (c3 * c7 - c4 * c6) * inv;
+        edz[1 * CVFEM_HEX8_VEC_SIZE + lane] = (-c0 * c7 + c1 * c6) * inv;
+        edz[2 * CVFEM_HEX8_VEC_SIZE + lane] = (c0 * c4 - c1 * c3) * inv;
 
         const scalar_t ux0 = du.ux[0][lane], ux1 = du.ux[1][lane], ux2 = du.ux[2][lane], ux3 = du.ux[3][lane];
         const scalar_t ux4 = du.ux[4][lane], ux5 = du.ux[5][lane], ux6 = du.ux[6][lane], ux7 = du.ux[7][lane];
@@ -3476,6 +3511,9 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
     alignas(ALIGN_BYTES) scalar_t Ax0[CVFEM_HEX8_VEC_SIZE], Ay0[CVFEM_HEX8_VEC_SIZE], Az0[CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t Ax1[CVFEM_HEX8_VEC_SIZE], Ay1[CVFEM_HEX8_VEC_SIZE], Az1[CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t Ax2[CVFEM_HEX8_VEC_SIZE], Ay2[CVFEM_HEX8_VEC_SIZE], Az2[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t edx[3 * CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t edy[3 * CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t edz[3 * CVFEM_HEX8_VEC_SIZE];
 
     cvfem_hex8_action_geom_simd(qtr, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, du,
                                 CVFEM_HEX8_ACTION_GEOM_PASS);
@@ -3525,7 +3563,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_simd(
 #define CVFEM_HEX8_CONV_ALL_JV_L(RC_, QG_, EPS_, HO_, LIM_)                                     \
     cvfem_hex8_conv_all_jv_simd<RC_, QG_, EPS_, HO_, LIM_>(rho, half, one, Ax0, Ay0, Az0, Ax1,  \
                                                      Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out,   \
-                                                     ueps, ho, hov, cenx, ceny, cenz)
+                                                     ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz)
 #define CVFEM_HEX8_CONV_ALL_JV(RC_, QG_, EPS_, HO_)                                             \
     do {                                                                                        \
         if constexpr (!(HO_)) {                                                                 \
@@ -3601,6 +3639,9 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_pa_simd(
     alignas(ALIGN_BYTES) scalar_t Ax0[CVFEM_HEX8_VEC_SIZE], Ay0[CVFEM_HEX8_VEC_SIZE], Az0[CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t Ax1[CVFEM_HEX8_VEC_SIZE], Ay1[CVFEM_HEX8_VEC_SIZE], Az1[CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t Ax2[CVFEM_HEX8_VEC_SIZE], Ay2[CVFEM_HEX8_VEC_SIZE], Az2[CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t edx[3 * CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t edy[3 * CVFEM_HEX8_VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t edz[3 * CVFEM_HEX8_VEC_SIZE];
 
     cvfem_hex8_action_geom_simd(qtr, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, du,
                                 CVFEM_HEX8_ACTION_GEOM_PASS);
@@ -3619,13 +3660,13 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_pa_simd(
     if (rc && rc_scale != scalar_t(0)) {
         if (has_qg)
             cvfem_hex8_conv_all_jv_pa_simd<true, true>(
-                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
+                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
         else
             cvfem_hex8_conv_all_jv_pa_simd<true, false>(
-                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
+                    rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
     } else {
         cvfem_hex8_conv_all_jv_pa_simd<false, false>(
-                rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out);
+                rho, half, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, du, rc, pa, nelem, out, edx, edy, edz);
     }
 }
 
