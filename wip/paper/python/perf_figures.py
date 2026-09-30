@@ -1409,6 +1409,73 @@ def macros_ngrad(rows):
 
 
 # ---------------------------------------------------------------------------------------------
+# Where the sweep's time goes: the instruction mix and the retirement rate
+# ---------------------------------------------------------------------------------------------
+
+def parse_kmix(path):
+    """Read jobs/kernel_mix.sbatch: {layout: {counter: value}}.
+
+    Lines are `kmix <layout> <key> <value>`, emitted that way so this does not have to guess at
+    perf's output format, which differs between counter groups and between versions.
+    """
+    out = {}
+    for line in open(path):
+        f = line.split()
+        if len(f) == 4 and f[0] == "kmix":
+            try:
+                out.setdefault(f[1], {})[f[2]] = float(f[3])
+            except ValueError:
+                continue
+    return out
+
+
+def table_kmix(mix):
+    """T. Where the residual sweep's time goes, per layout.
+
+    The roofline cannot answer this: both layouts sit well below both roofs, so neither bandwidth
+    nor peak flops is binding and the axis the figure varies is not what separates them. What
+    separates them is here -- how much of the issued instruction stream is arithmetic, and how
+    fast it retires.
+
+    Every row is a share rather than a count, because the two layouts issue different totals and
+    the question is composition, not volume.
+    """
+    if not {"packed", "atomic"} <= set(mix):
+        return ""
+    def pct(lay, key, of="INST_SPEC"):
+        d = mix[lay]
+        return 100.0 * d[key] / d[of] if d.get(of) else float("nan")
+    rows = [
+        (r"vector (SIMD)",                        lambda l: pct(l, "ASE_SPEC")),
+        (r"scalar floating point",                lambda l: pct(l, "VFP_SPEC")),
+        (r"loads",                                lambda l: pct(l, "LD_SPEC")),
+        (r"stores",                               lambda l: pct(l, "ST_SPEC")),
+        (r"integer, mostly addressing",           lambda l: pct(l, "DP_SPEC")),
+    ]
+    out = [PREAMBLE,
+           r"\begin{tabular}{@{}lrr@{}}", r"\toprule",
+           r"& packed & standard \\", r"\midrule",
+           r"\multicolumn{3}{@{}l}{\emph{instruction mix, share of those issued}} \\"]
+    for label, fn in rows:
+        out.append(r"\quad %s & %.1f\%% & %.1f\%% \\" % (label, fn("packed"), fn("atomic")))
+    out.append(r"\midrule")
+    out.append(r"instructions per cycle & %.2f & %.2f \\"
+               % tuple(mix[l]["instructions"] / mix[l]["cycles"] for l in ("packed", "atomic")))
+    out.append(r"back-end stall, share of cycles & %.0f\%% & %.0f\%% \\"
+               % tuple(100.0 * mix[l]["STALL_BACKEND"] / mix[l]["cycles"] for l in ("packed", "atomic")))
+    out.append(r"\quad of which waiting on memory & %.0f\%% & %.0f\%% \\"
+               % tuple(100.0 * mix[l]["STALL_BACKEND_MEM"] / mix[l]["STALL_BACKEND"]
+                       for l in ("packed", "atomic")))
+    out.append(r"\midrule")
+    # The staging is gather, scatter, ghost reduction and zeroing. Dropping it with --kernel-only
+    # says how much of the sweep is the element kernel, which is what the roofline's y-axis counts.
+    out.append(r"element kernel, share of the sweep & %.0f\%% & %.0f\%% \\"
+               % tuple(100.0 * mix[l]["mdof"] / mix[l]["mdof_kernel_only"] for l in ("packed", "atomic")))
+    out += [r"\bottomrule", r"\end{tabular}"]
+    return "\n".join(out) + "\n"
+
+
+# ---------------------------------------------------------------------------------------------
 # The exact higher-order Jacobian action, against the lagged one
 # ---------------------------------------------------------------------------------------------
 
@@ -1703,6 +1770,15 @@ def build(out_dir, tab_dir):
             with open(os.path.join(out_dir, "ngrad_macros.tex"), "w") as fh:
                 fh.write(macros_ngrad(nr))
             written.append("figures/ngrad_macros.tex")
+
+    km = [f for f in sorted(os.listdir(DATA)) if f.startswith("kmix_")] if os.path.isdir(DATA) else []
+    if km:
+        mx = parse_kmix(os.path.join(DATA, km[-1]))
+        body = table_kmix(mx)
+        if body:
+            with open(os.path.join(out_dir, "..", "tables", "kmix.tex"), "w") as fh:
+                fh.write(body)
+            written.append("tables/kmix.tex")
 
     hx = [f for f in sorted(os.listdir(DATA)) if f.startswith("hoexact_")] if os.path.isdir(DATA) else []
     if hx:

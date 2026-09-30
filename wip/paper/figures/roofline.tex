@@ -18,17 +18,17 @@
 \node[black!55,font=\tiny,anchor=north east] at (axis cs:62.08,2028.7) {measured 2.31 TFLOP/s};
 \node[black!55,font=\tiny,anchor=south,rotate=26.3] at (axis cs:0.42,239.4) {spec 500 GB/s};
 \node[black!70,font=\tiny,anchor=north,rotate=26.3] at (axis cs:2.20,872.4) {meas.\ 451 GB/s};
-\addplot[PackA,mark=*,mark size=2.1pt,only marks,mark options={draw=PackA,fill=PackA}] coordinates {(3.575,484.4)};
+\addplot[PackA,mark=*,mark size=2.1pt,only marks,mark options={draw=PackA,fill=PackA}] coordinates {(3.575,491.8)};
 \addlegendentry{residual, packed}
-\addplot[PackD,mark=square*,mark size=2.1pt,only marks,mark options={draw=PackD,fill=PackD}] coordinates {(3.223,163.0)};
+\addplot[PackD,mark=square*,mark size=2.1pt,only marks,mark options={draw=PackD,fill=PackD}] coordinates {(3.223,199.1)};
 \addlegendentry{residual, atomic}
-\addplot[PackC,mark=triangle*,mark size=2.1pt,only marks,mark options={draw=PackC,fill=PackC}] coordinates {(3.528,409.1)};
+\addplot[PackC,mark=triangle*,mark size=2.1pt,only marks,mark options={draw=PackC,fill=PackC}] coordinates {(3.528,413.8)};
 \addlegendentry{Jacobian, packed}
-\addplot[PackE,mark=diamond*,mark size=2.1pt,only marks,mark options={draw=PackE,fill=PackE}] coordinates {(3.374,179.3)};
+\addplot[PackE,mark=diamond*,mark size=2.1pt,only marks,mark options={draw=PackE,fill=PackE}] coordinates {(3.374,203.8)};
 \addlegendentry{Jacobian, atomic}
-\addplot[PackB,mark=pentagon*,mark size=2.1pt,only marks,mark options={draw=PackB,fill=white}] coordinates {(0.238,95.8)};
+\addplot[PackB,mark=pentagon*,mark size=2.1pt,only marks,mark options={draw=PackB,fill=white}] coordinates {(0.238,94.1)};
 \addlegendentry{SpMV \texttt{f64}}
-\addplot[PackF,mark=otimes*,mark size=2.1pt,only marks,mark options={draw=PackF,fill=white}] coordinates {(0.454,179.8)};
+\addplot[PackF,mark=otimes*,mark size=2.1pt,only marks,mark options={draw=PackF,fill=white}] coordinates {(0.454,182.1)};
 \addlegendentry{SpMV \texttt{f32}}
 \addplot[PackA,mark=oplus*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(3.276,346.9)};
 \addplot[PackA,mark=halfsquare*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(3.607,315.8)};
