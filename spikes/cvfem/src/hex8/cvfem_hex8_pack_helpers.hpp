@@ -267,7 +267,7 @@ inline Hex8RcConfig cvfem_hex8_rc_config(const scalar_t rhie_chow_scale, const s
 template <typename MeshT>
 static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar_t mu) {
     if (d.rhie_chow_scale == scalar_t(0)) {
-        for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) d.rc_coeff[s].clear();
+        d.rc_coeff.clear();
         return;
     }
     // Rebuilt only when something it depends on moves. rho and mu do move -- the Reynolds
@@ -275,11 +275,11 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
     // and forgotten, and it must not be rebuilt on every matvec either. The state moves too
     // now that the time scale carries the advecting velocity, which is what state_stamp
     // tracks; it changes once per Newton step, not once per matvec.
-    if (!d.rc_coeff[0].empty() && d.rc_coeff_rho == rho && d.rc_coeff_mu == mu &&
+    if (!d.rc_coeff.empty() && d.rc_coeff_rho == rho && d.rc_coeff_mu == mu &&
         d.rc_coeff_scale == d.rhie_chow_scale && d.rc_coeff_stamp == d.state_stamp &&
-        (ptrdiff_t)d.rc_coeff[0].size() == d.nelements)
+        (ptrdiff_t)d.rc_coeff.size() == d.nelements * CVFEM_HEX8_N_SCS)
         return;
-    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) d.rc_coeff[s].resize((size_t)d.nelements);
+    d.rc_coeff.resize((size_t)d.nelements * CVFEM_HEX8_N_SCS);
     d.rc_coeff_rho   = rho;
     d.rc_coeff_mu    = mu;
     d.rc_coeff_scale = d.rhie_chow_scale;
@@ -330,7 +330,7 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
             const scalar_t dx = scalar_t(px[gj]) - scalar_t(px[gi]);
             const scalar_t dy = scalar_t(py[gj]) - scalar_t(py[gi]);
             const scalar_t dz = scalar_t(pz[gj]) - scalar_t(pz[gi]);
-            d.rc_coeff[s][(size_t)e] = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc_scale, dx, dy, dz,
+            d.rc_coeff[(size_t)e * CVFEM_HEX8_N_SCS + s] = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc_scale, dx, dy, dz,
                                                                        A[q][0], A[q][1], A[q][2], u2, inv_dt_a0);
         }
     }
@@ -408,7 +408,7 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
                 const scalar_t dx    = scalar_t(px[gj]) - scalar_t(px[gi]);
                 const scalar_t dy    = scalar_t(py[gj]) - scalar_t(py[gi]);
                 const scalar_t dz    = scalar_t(pz[gj]) - scalar_t(pz[gi]);
-                const scalar_t coeff = d.rc_coeff[s][(size_t)e];
+                const scalar_t coeff = d.rc_coeff[(size_t)e * CVFEM_HEX8_N_SCS + s];
                 const scalar_t corr  = (d.p[(size_t)gj] - d.p[(size_t)gi]) -
                                       (half * (d.pgx[(size_t)gi] + d.pgx[(size_t)gj]) * dx +
                                        half * (d.pgy[(size_t)gi] + d.pgy[(size_t)gj]) * dy +
@@ -436,7 +436,7 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
                                       (half * (d.pgx[(size_t)gi] + d.pgx[(size_t)gj]) * dx +
                                        half * (d.pgy[(size_t)gi] + d.pgy[(size_t)gj]) * dy +
                                        half * (d.pgz[(size_t)gi] + d.pgz[(size_t)gj]) * dz);
-                const scalar_t coeff = d.rc_coeff[s][(size_t)e];
+                const scalar_t coeff = d.rc_coeff[(size_t)e * CVFEM_HEX8_N_SCS + s];
                 const scalar_t gk    = coeff != scalar_t(0)
                                                ? cvfem_hex8_rhie_chow_coeff_du(
                                                          coeff, cvfem_hex8_rhie_chow_du_weight(
@@ -468,10 +468,16 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_coeff(const MeshT      &d,
                                                    const ptrdiff_t   begin,
                                                    const int         nlanes,
                                                    Hex8RhieChowPack &rc) {
-    for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
-        const scalar_t *const SFEM_RESTRICT src = d.rc_coeff[s].data();
-        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane)
-            rc.coeff[s][lane] = lane < nlanes ? src[begin + lane] : scalar_t(0);
+    // Lane-major out of an element-major table: one element's twelve coefficients are
+    // consecutive, so this walks one stream instead of twelve. Measured neutral, not faster.
+    const scalar_t *const SFEM_RESTRICT src = d.rc_coeff.data();
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        if (lane < nlanes) {
+            const scalar_t *const SFEM_RESTRICT e = src + (ptrdiff_t)(begin + lane) * CVFEM_HEX8_N_SCS;
+            for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) rc.coeff[s][lane] = e[s];
+        } else {
+            for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) rc.coeff[s][lane] = scalar_t(0);
+        }
     }
     // What the coefficient table was built with, for its velocity sensitivity in the face loop.
     const Hex8RcConfig cfg = cvfem_hex8_rc_config_for(d);
