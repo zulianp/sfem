@@ -2734,6 +2734,38 @@ static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                 
     // fuse. An arm run through that path reports whatever the node is doing and nothing about
     // this code.
     //
+    // WHY THIS IS WHERE IT STOPS: the sweep is register-starved, and no loop order fixes that.
+    //
+    // Disassembling the shipping kernel: the vectorised loop of this sweep with Rhie-Chow is 1924
+    // instructions, of which 743 -- 39% -- are spill loads and stores against a 1952-byte frame.
+    // That, and not DRAM or L1, is what holds the operator at 30% of its roofline point while
+    // both roofs read slack; a roofline cannot see spill traffic, counting only DRAM bytes and
+    // flops.
+    //
+    // The cause is the working set, not the layout. One vector iteration holds eight nodes times
+    // four fields = thirty-two accumulators, and each face needs roughly twenty-four more live
+    // values on top of them -- the area vector, both nodes' velocity and pressure, and with
+    // Rhie-Chow the two nodes' coordinates and pressure gradients and the surface coefficient.
+    // That is about fifty-six live vector values against the thirty-two registers AArch64 has, so
+    // the allocator spills whatever order the faces are visited in.
+    //
+    // Three reorderings were built and measured against this shape on Grace at n=128, each with a
+    // jac_exact control that stayed within 0.4%:
+    //
+    //   lane width 64/128/256 bytes    within the 4.3% noise band, no effect
+    //   one vectorised loop per face   0.99 packed -- the shape this replaced
+    //   momentum and continuity split  0.66 packed, 0.78 standard
+    //
+    // The last is the informative one, because it is exactly the lever the spill count suggests:
+    // it takes the accumulators from thirty-two to twenty-four and then eight. It moved neither
+    // the frame (1952 -> 1968 bytes) nor the spill count (1061 -> 1085), because the per-face
+    // inputs alone already exceed what the accumulators leave free; all it added was 20% more
+    // instructions recomputing mdot, whose Rhie-Chow half is the expensive one.
+    //
+    // So the live set, not the loop order, is the binding constraint, and shrinking it means
+    // changing what a face computes rather than when. Do not re-derive a loop reordering from
+    // the spill count.
+    //
     // This is NOT bit-identical to the per-face shape: `out` already holds the viscous term when
     // the faces start, so summing a node's three contributions in a register and adding once
     // reassociates what was three separate additions. The effect is round-off. Measured against
