@@ -1699,6 +1699,8 @@ int main(int argc, char **argv) {
             apply_residual_packed(d, packed, rho, mu, kernel_kind, GeomKind::Affine);
         else if (kernel_uses_sympy_residual(kernel_kind))
             apply_residual_atomic_sympy(d, rho, mu);
+        else if (kernel_kind == KernelKind::Sumfact && conv_ho && !ho_scalar)
+            apply_residual_atomic_sumfact_simd(d, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact && conv_ho)
             apply_residual_atomic_sumfact_defcor(d, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact)
@@ -1903,11 +1905,15 @@ int main(int argc, char **argv) {
             apply_jacobian_action_atomic_isoparam(d, rho, mu, dir_v, jac_out.data());
         // The lane-blocked sweep wherever it applies, for the reason the residual gives: the
         // standard layout is measured at its best or the comparison credits the format with a
-        // vectorisation difference. It carries the first-order flux and Rhie-Chow, exact or
-        // frozen; the higher-order exact action and the generated kernel arrangements are not in
-        // it, so those keep the scalar sweep and the row records which one ran.
-        else if (kernel_kind == KernelKind::Sumfact && !with_hograd)
-            apply_jacobian_action_atomic_simd(d, rho, mu, dir_v, jac_out.data());
+        // vectorisation difference. It carries the first-order flux, Rhie-Chow exact or frozen,
+        // and the EXACT higher-order action -- the SIMD kernel takes ho and hov, which is what
+        // the packed Jacobian passes it. Only the generated kernel arrangements are outside it,
+        // and the recorded row says which one ran.
+        else if (kernel_kind == KernelKind::Sumfact)
+            apply_jacobian_action_atomic_simd(d, rho, mu, dir_v, jac_out.data(),
+                                              with_hograd ? ugrad.data() : nullptr,
+                                              with_hograd ? vgrad.data() : nullptr,
+                                              conv_limiter, scalar_t(0));
         else
             apply_jacobian_action_atomic(d, rho, mu, dir_v, jac_out.data(), kernel_kind,
                                          with_hograd ? ugrad.data() : nullptr,
