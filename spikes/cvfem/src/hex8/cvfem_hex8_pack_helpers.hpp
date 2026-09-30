@@ -268,6 +268,7 @@ template <typename MeshT>
 static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar_t mu) {
     if (d.rhie_chow_scale == scalar_t(0)) {
         d.rc_coeff.clear();
+        d.rc_w.clear();
         return;
     }
     // Rebuilt only when something it depends on moves. rho and mu do move -- the Reynolds
@@ -280,6 +281,7 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
         (ptrdiff_t)d.rc_coeff.size() == d.nelements * CVFEM_HEX8_N_SCS)
         return;
     d.rc_coeff.resize((size_t)d.nelements * CVFEM_HEX8_N_SCS);
+    d.rc_w.resize((size_t)d.nelements * CVFEM_HEX8_N_SCS);
     d.rc_coeff_rho   = rho;
     d.rc_coeff_mu    = mu;
     d.rc_coeff_scale = d.rhie_chow_scale;
@@ -313,6 +315,12 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
         scalar_t adj[9], det, A[3][3];
         load_hex8_adj(d, e, adj, &det);
         cvfem_hex8_dir_areas(adj, A);
+        // The three affine edge vectors, from the same adjugate, so this table and the face loops
+        // that read it use ONE geometry. Differencing node coordinates here while the face uses
+        // the Jacobian column would put the inconsistency back, one level further out.
+        scalar_t ecol[3][3];
+        cvfem_hex8_affine_edge_cols(adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
+                                    ecol[0], ecol[1], ecol[2]);
         for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
             const int i = CVFEM_HEX8_SCS[s].i;
             const int j = CVFEM_HEX8_SCS[s].j;
@@ -327,11 +335,18 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
             const scalar_t vay = scalar_t(0.5) * (vy[gi] + vy[gj]);
             const scalar_t vaz = scalar_t(0.5) * (vz[gi] + vz[gj]);
             const scalar_t u2  = u2_scale * (vax * vax + vay * vay + vaz * vaz);
-            const scalar_t dx = scalar_t(px[gj]) - scalar_t(px[gi]);
-            const scalar_t dy = scalar_t(py[gj]) - scalar_t(py[gi]);
-            const scalar_t dz = scalar_t(pz[gj]) - scalar_t(pz[gi]);
+            const scalar_t dx = ecol[0][q];
+            const scalar_t dy = ecol[1][q];
+            const scalar_t dz = ecol[2][q];
             d.rc_coeff[(size_t)e * CVFEM_HEX8_N_SCS + s] = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc_scale, dx, dy, dz,
                                                                        A[q][0], A[q][1], A[q][2], u2, inv_dt_a0);
+            // The coefficient's velocity-sensitivity weight. It is PURELY geometric plus the two
+            // uniforms -- 4*u2_scale*(A.d)^2 / (d.d * scale^2 * (A.A)^2) -- so the Jacobian face
+            // loop was recomputing three dot products and a DIVISION per sub-control surface for a
+            // number that never varies with the state. Tabulated here, the face reads one value.
+            d.rc_w[(size_t)e * CVFEM_HEX8_N_SCS + s] = cvfem_hex8_rhie_chow_du_weight(
+                    rc_scale, A[q][0] * A[q][0] + A[q][1] * A[q][1] + A[q][2] * A[q][2],
+                    A[q][0] * dx + A[q][1] * dy + A[q][2] * dz, dx * dx + dy * dy + dz * dz, u2_scale);
         }
     }
 }
@@ -390,6 +405,13 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
         scalar_t adj[9], det, A[3][3];
         load_hex8_adj(d, e, adj, &det);
         cvfem_hex8_dir_areas(adj, A);
+        // The same affine edge vector the PA face kernel reads. Building this table from node
+        // coordinates while the kernel used the Jacobian column is what cvfem_pa_tangent_test
+        // caught at 1.374e-05: the stored tangent and the kernel reading it must agree about the
+        // geometry, and on this path the geometry is the Jacobian.
+        scalar_t ecol[3][3];
+        cvfem_hex8_affine_edge_cols(adj[0], adj[1], adj[2], adj[3], adj[4], adj[5], adj[6], adj[7], adj[8], det,
+                                    ecol[0], ecol[1], ecol[2]);
 
         for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
             const int          i  = CVFEM_HEX8_SCS[s].i;
@@ -405,9 +427,9 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
 
             scalar_t mdot = rho * (half * (uxi + uxj) * ax + half * (uyi + uyj) * ay + half * (uzi + uzj) * az);
             if (with_rc) {
-                const scalar_t dx    = scalar_t(px[gj]) - scalar_t(px[gi]);
-                const scalar_t dy    = scalar_t(py[gj]) - scalar_t(py[gi]);
-                const scalar_t dz    = scalar_t(pz[gj]) - scalar_t(pz[gi]);
+                const scalar_t dx    = ecol[0][q];
+                const scalar_t dy    = ecol[1][q];
+                const scalar_t dz    = ecol[2][q];
                 const scalar_t coeff = d.rc_coeff[(size_t)e * CVFEM_HEX8_N_SCS + s];
                 const scalar_t corr  = (d.p[(size_t)gj] - d.p[(size_t)gi]) -
                                       (half * (d.pgx[(size_t)gi] + d.pgx[(size_t)gj]) * dx +
@@ -429,9 +451,9 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
             if (with_rc) {
                 // k = g * corr * ubar: the Rhie-Chow coefficient's velocity dependence, which the
                 // face loop dots with the direction's face-average velocity.
-                const scalar_t dx    = scalar_t(px[gj]) - scalar_t(px[gi]);
-                const scalar_t dy    = scalar_t(py[gj]) - scalar_t(py[gi]);
-                const scalar_t dz    = scalar_t(pz[gj]) - scalar_t(pz[gi]);
+                const scalar_t dx    = ecol[0][q];
+                const scalar_t dy    = ecol[1][q];
+                const scalar_t dz    = ecol[2][q];
                 const scalar_t corr  = (d.p[(size_t)gj] - d.p[(size_t)gi]) -
                                       (half * (d.pgx[(size_t)gi] + d.pgx[(size_t)gj]) * dx +
                                        half * (d.pgy[(size_t)gi] + d.pgy[(size_t)gj]) * dy +
@@ -470,13 +492,21 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_coeff(const MeshT      &d,
                                                    Hex8RhieChowPack &rc) {
     // Lane-major out of an element-major table: one element's twelve coefficients are
     // consecutive, so this walks one stream instead of twelve. Measured neutral, not faster.
-    const scalar_t *const SFEM_RESTRICT src = d.rc_coeff.data();
+    const scalar_t *const SFEM_RESTRICT src  = d.rc_coeff.data();
+    const scalar_t *const SFEM_RESTRICT srcw = d.rc_w.data();
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const scalar_t *const SFEM_RESTRICT e = src + (ptrdiff_t)(begin + lane) * CVFEM_HEX8_N_SCS;
-            for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) rc.coeff[s][lane] = e[s];
+            const scalar_t *const SFEM_RESTRICT w = srcw + (ptrdiff_t)(begin + lane) * CVFEM_HEX8_N_SCS;
+            for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+                rc.coeff[s][lane] = e[s];
+                rc.wdu[s][lane]   = w[s];
+            }
         } else {
-            for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) rc.coeff[s][lane] = scalar_t(0);
+            for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
+                rc.coeff[s][lane] = scalar_t(0);
+                rc.wdu[s][lane]   = scalar_t(0);
+            }
         }
     }
     // What the coefficient table was built with, for its velocity sensitivity in the face loop.
