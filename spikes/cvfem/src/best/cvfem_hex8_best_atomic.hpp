@@ -132,10 +132,15 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                                                             const scalar_t        rho,
                                                             const scalar_t        mu,
                                                             const scalar_t *const dir,
-                                                            scalar_t *const       jv) {
+                                                            scalar_t *const       jv,
+                                                            const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                            const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
+                                                            const int             limiter  = 0,
+                                                            const scalar_t        venkat_c = scalar_t(0)) {
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
     const Hex8Extras opt(d);
-    const bool       has_qg = opt.with_qg;
+    const bool       has_qg  = opt.with_qg;
+    const bool       with_ho = ugrad != nullptr && vgrad != nullptr;
     // The per-surface Rhie-Chow coefficient is hoisted out of the face loops, so it has to be
     // built before the sweep and staged per lane group -- exactly as the packed Jacobian does.
     // Omitting the staging leaves rcp.coeff, rcp.scale and rcp.tau untouched and the kernel
@@ -152,6 +157,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
         Hex8InputPack    u_pack, du_pack;
         Hex8ResidualPack outp;
         Hex8RhieChowPack rcp;
+        Hex8UGradPack    hop, hovp;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e0 = 0; e0 < d.nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
@@ -210,9 +216,39 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
 
             if (opt.with_rc) cvfem_hex8_gather_rc_coeff(d, e0, nlanes, rcp);
 
+            // The state's nodal velocity gradient and the direction's, staged exactly as the
+            // packed Jacobian stages them. Both are needed by the EXACT higher-order action; the
+            // lagged one passes neither and gets the first-order kernel bit for bit.
+            if (with_ho) {
+                for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        if (lane >= nlanes) {
+                            hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
+                            for (int c = 0; c < 9; ++c) {
+                                hop.g[a][c][lane]  = scalar_t(0);
+                                hovp.g[a][c][lane] = scalar_t(0);
+                            }
+                            continue;
+                        }
+                        const smesh::idx_t gn = d.elems[a][e0 + lane];
+                        hop.x[a][lane]        = scalar_t(d.points[0][gn]);
+                        hop.y[a][lane]        = scalar_t(d.points[1][gn]);
+                        hop.z[a][lane]        = scalar_t(d.points[2][gn]);
+                        for (int c = 0; c < 9; ++c) {
+                            hop.g[a][c][lane]  = ugrad[(ptrdiff_t)gn * 9 + c];
+                            hovp.g[a][c][lane] = vgrad[(ptrdiff_t)gn * 9 + c];
+                        }
+                    }
+                }
+                hop.limiter  = limiter;
+                hop.venkat_c = venkat_c;
+            }
+
             cvfem_hex8_ns_upwind_jacobian_action_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6,
                                                       cof7, cof8, detv, u_pack, du_pack, outp,
-                                                      opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale, has_qg);
+                                                      opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale, has_qg,
+                                                      scalar_t(0), with_ho ? &hop : nullptr,
+                                                      with_ho ? &hovp : nullptr);
 
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
@@ -335,9 +371,20 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
 // another layout. Measured at n=128 on Grace, bare and with Rhie-Chow: lane-blocking the atomic
 // sweep alone is worth 1.29x and 1.37x, and what remains between the layouts -- 2.45x and 1.76x
 // -- is the format.
-static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData &d, const scalar_t rho, const scalar_t mu) {
+static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
+                                                             const scalar_t  rho,
+                                                             const scalar_t  mu,
+                                                             const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                             const int       limiter  = 0,
+                                                             const scalar_t  venkat_c = scalar_t(0)) {
     reset_residual(d);
     const Hex8Extras opt(d);
+    // The deferred correction, on the same sweep. The hand-written SIMD kernel takes the
+    // higher-order pack, so the standard layout's higher-order arms vectorise too; the generated
+    // sympy variants are packed-only, which is why this is the hand-written kernel rather than
+    // the one the packed layout runs by default. --ho-scalar still reaches the scalar sweep,
+    // which is required for a non-zero Venkatakrishnan eps squared.
+    const bool with_ho = ugrad != nullptr;
 
     scalar_t *const SFEM_RESTRICT rx = d.rx.data();
     scalar_t *const SFEM_RESTRICT ry = d.ry.data();
@@ -354,6 +401,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData &d, const 
         Hex8InputPack    in;
         Hex8ResidualPack outp;
         Hex8RhieChowPack rcp;
+        Hex8UGradPack    hop;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e0 = 0; e0 < d.nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
@@ -405,9 +453,29 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData &d, const 
                 }
             }
 
+            if (with_ho) {
+                for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        if (lane >= nlanes) {
+                            hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
+                            for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
+                            continue;
+                        }
+                        const smesh::idx_t gn = d.elems[a][e0 + lane];
+                        hop.x[a][lane]        = scalar_t(d.points[0][gn]);
+                        hop.y[a][lane]        = scalar_t(d.points[1][gn]);
+                        hop.z[a][lane]        = scalar_t(d.points[2][gn]);
+                        for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = ugrad[(ptrdiff_t)gn * 9 + c];
+                    }
+                }
+                hop.limiter  = limiter;
+                hop.venkat_c = venkat_c;
+            }
+
             cvfem_hex8_ns_upwind_residual_sumfact_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5,
                                                        cof6, cof7, cof8, detv, in, outp,
-                                                       opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale);
+                                                       opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale,
+                                                       scalar_t(0), with_ho ? &hop : nullptr);
 
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
