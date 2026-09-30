@@ -814,11 +814,15 @@ established separately, by matching nodes on coordinates.
 \end{figure}
 
 \paragraph{Single thread.} The packed and coloured sweeps reach \scalePackedResOne{} and
-\scaleColoredResOne{}~MDOF/s, equal to within one per cent, against \scaleAtomicResOne{} for the
-atomic sweep. This factor of $\scaleResLayoutOne$ is measured where no contention exists, and the two layouts
-that share it are the two that share the pack-local gather and the narrowed index width. The
-advantage is therefore attributable to what the sweep reads, as \S\ref{sec:cost} predicts, rather
-than to contention avoided.
+\scaleColoredResOne{}~MDOF/s, equal to each other, against \scaleAtomicResOne{} for the atomic
+sweep. Two candidate explanations are excluded by construction here. Contention is excluded
+because there is one thread. Vectorisation is excluded because all three sweeps are lane-blocked
+over the same element group and call the same element kernel: the standard layout is measured
+lane-blocked throughout this paper, which is worth saying because it is not how such a sweep is
+usually written, and a scalar baseline would credit the format with a difference that is not the
+format's. What is left is what the two fast layouts share and the third does not --- the
+pack-local gather and the narrowed index width --- so the factor of $\scaleResLayoutOne$ is
+attributable to what the sweep reads, as \S\ref{sec:cost} predicts.
 
 \paragraph{Atomic scaling.} The atomic sweep reaches $\scaleAtomicResSpeedup\times$ on 72 threads,
 an efficiency of \scaleAtomicResEff\%, above the packed layout's \scalePackedResEff\%. Contention
@@ -1053,9 +1057,10 @@ kernel by those factors.
 \paragraph{Like-for-like.} Table~\ref{tab:jacfair} separates two questions
 the figure runs together. Against the operator the matrix encodes, the packed matrix-free action is
 $\jfLaggedVsF\times$ the double-precision SpMV and $\jfLaggedVsS\times$ the single-precision one;
-the atomic sweep is $\jfLaggedAtomicVsF\times$, barely ahead of the matrix at all. So the lagged
-matrix is not far behind a \emph{poorly laid out} matrix-free operator, and the case for matrix-free
-rests on the layout rather than the method alone.
+the atomic sweep is $\jfLaggedAtomicVsF\times$. Both beat the matrix, and the standard layout is
+lane-blocked here like the others, so that margin is the method's rather than an artefact of how
+the baseline was written --- but the layout more than doubles it. The case for matrix-free is
+therefore made twice over, and the larger half of it is the layout.
 
 Carrying the exact term costs $\jfExactCost\times$ on the packed layout, the direction-gradient
 sweep appearing as throughput. Quoting the exact action against the SpMV would report
