@@ -1864,7 +1864,39 @@ int main(int argc, char **argv) {
         // the live set exists: the rotation is what stops the direction being resident.
         const scalar_t *const dir_v = live.empty() ? jac_dir.data() : live[(size_t)(live_k++ % (long)live.size())].data();
         last_dir                    = dir_v;
-        if (with_qgrad) {
+        // BOTH DIRECTION GRADIENTS IN ONE SWEEP when both are wanted. They read different fields
+        // of the SAME array at the same stride -- the direction's three velocity components and
+        // its pressure -- so together they are one four-field sweep instead of a one-field and a
+        // three-field one, and the half of a sweep that does not scale with the field count is
+        // paid once. Each keeps the layout its consumer reads, which is what the per-component
+        // output stride is for. The whole cost lands in the qgrad phase, since it is one pass.
+        if (with_qgrad && with_hograd) {
+            const double    t0      = wall_time();
+            const scalar_t *srcs[4] = {dir_v + 0, dir_v + 1, dir_v + 2, dir_v + 3};
+            const int       st[4]   = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS};
+            const int       iso     = geom_kind == GeomKind::Isoparam ? 1 : 0;
+            vgrad.resize((size_t)d.nnodes * 9);
+            d.qgx.resize((size_t)d.nnodes);
+            d.qgy.resize((size_t)d.nnodes);
+            d.qgz.resize((size_t)d.nnodes);
+            scalar_t *outp[12];
+            ptrdiff_t ostr[12];
+            for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
+            outp[9]  = d.qgx.data(); ostr[9]  = 1;
+            outp[10] = d.qgy.data(); ostr[10] = 1;
+            outp[11] = d.qgz.data(); ostr[11] = 1;
+            if (packed.n_packs > 0 && !g_qgrad_atomic)
+                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso, srcs, st, 4, outp, ostr, vgbuf);
+            else
+                cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, st, 4, outp, ostr);
+            // Charged ONCE, to the higher-order account, because it is one pass. Adding it to
+            // both would make the two fractions sum past the matvec they are fractions of. What
+            // frac_jac_action_hograd then reports on a fused arm is the whole reconstruction,
+            // both gradients, which is the quantity section 7.8 wants anyway.
+            const double dt = wall_time() - t0;
+            hograd_seconds += dt;
+            if (g_breakdown) g_phase[PH_QGRAD] += dt;
+        } else if (with_qgrad) {
             const double t0 = wall_time();
             bench_nodal_grad(d, packed, geom_kind, dir_v + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
             const double dt_qg = wall_time() - t0;
@@ -1873,7 +1905,7 @@ int main(int argc, char **argv) {
             // beside the phases of the sweep it precedes rather than only in a stdout line.
             if (g_breakdown) g_phase[PH_QGRAD] += dt_qg;
         }
-        if (with_hograd) {
+        if (with_hograd && !with_qgrad) {
             // The direction's nodal velocity gradient, reconstructed from scratch on every
             // matvec because the direction changes every Krylov iteration. This is the pass the
             // lagged action does not run, and it is what the exact form costs.
