@@ -270,7 +270,26 @@ def limit_inc(limiter: int, base: sp.Expr, other: sp.Expr, inc: sp.Expr) -> sp.E
         dp  = sp.Piecewise((hi - base, sp.Ge(inc, 0)), (lo - base, True))
         num = dp * dp + 2 * inc * dp
         den = dp * dp + 2 * inc * inc + inc * dp
-        return sp.Piecewise(((num / den) * inc, sp.Ne(den, 0)), (inc, True))
+        # The guard is on `inc`, NOT on `den`, and that is what makes this kernel vectorise.
+        #
+        # `den` contains `dp`, which is a Piecewise. Writing Ne(den, 0) therefore builds a
+        # relational around a Piecewise, and SymPy folds the comparison inside it, so the printer
+        # emits a ternary whose CONDITION is another ternary:
+        #     ((c) ? (...) : (x70 - x76*x80 + x77 != 0)) ? A : B
+        # GCC if-converts the inner conditional into a PHI node and then reports
+        #     not vectorized: relevant stmt not supported: iftmp = _c ? iftmp : iftmp
+        # and abandons the loop. Measured on the emitted object, the Venkatakrishnan kernel held
+        # 6000 instructions and not one NEON register, against 25-30% vector for the other three
+        # limiters, which have no Piecewise in any condition -- limiter 3's guard divides by
+        # 2*(|a|+|b|), an Abs and not a Piecewise, which is exactly why it was unaffected.
+        #
+        # Guarding on `inc` is the same function, not an approximation. Writing den as
+        # (dp + inc/2)^2 + (7/4)*inc^2 shows it is a sum of squares, so den == 0 requires both
+        # dp == 0 and inc == 0; and wherever inc == 0 the guarded branch evaluates to
+        # (num/den)*inc == 0 as well, so the two arms already agree there. Hence den == 0 is
+        # reachable only inside inc == 0, where this returns the same zero the old guard returned
+        # as `inc`. For inc != 0, den >= (7/4)*inc^2 > 0 and the division is safe.
+        return sp.Piecewise(((num / den) * inc, sp.Ne(inc, 0)), (sp.Integer(0), True))
     if limiter == 3:
         a, b = 2 * inc, other - base
         aa, ab = sp.Abs(a), sp.Abs(b)
