@@ -1044,6 +1044,24 @@ element kernel's instruction mix and dependencies, and retain the corresponding 
 format's contribution is to need far less traffic in the first place, not to use the available
 bandwidth better.
 
+\begin{table}[t]
+  \centering
+  \caption{\fostag{} Where the residual sweep's issued instructions go, and how fast they retire,
+    $n=128$ on 72 threads. Both layouts are lane-blocked and call the same element kernel, so the
+    mixes are comparable; written scalar, the standard layout's vector share is
+    \SI{0.1}{\percent} and the table measures the implementation rather than the format.}
+  \label{tab:kmix}
+  \small
+  \inputifready{tables/kmix}{instruction mix, jobs/kernel\_mix.sbatch}
+\end{table}
+
+Table~\ref{tab:kmix} says which. The mixes are similar and the staging is at most
+\SI{2}{\percent} of either sweep, so neither explains the gap; retirement does, at \num{2.92}
+instructions per cycle against \num{1.47} from a back-end stalled \SI{45}{\percent} of cycles
+against \SI{68}{\percent}. That stall is not a wait on memory where it hurts --- \SI{11}{\percent}
+of the standard layout's stall cycles against \SI{29}{\percent} of the packed layout's --- which
+fits the atomic updates serialising, and is outside what the roofline's axes can express.
+
 \paragraph{Measured against specified.} The two roof pairs differ by more than any kernel here can
 recover: the triad attains \rlBwPctSpec\% of specified bandwidth and the \textsc{gemm}
 \rlPeakPctSpec\% of specified peak. Efficiencies above are quoted against the measured roofs, with
