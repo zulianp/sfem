@@ -684,7 +684,7 @@ static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                              
                                              const scalar_t *const SFEM_RESTRICT *srcs,
                                              const int *const                     src_stride,
                                              scalar_t *const *const               outp,
-                                             const ptrdiff_t                      out_stride) {
+                                             const ptrdiff_t *const               out_stride) {
     constexpr int nc = NC;
     constexpr int nf = NC / 3;
     cvfem_hex8_build_grad_weight(d, isoparam);
@@ -694,7 +694,7 @@ static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                              
     // Everything is zeroed because the accumulation below is additive.
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i)
-        for (int c = 0; c < nc; ++c) outp[c][i * out_stride] = scalar_t(0);
+        for (int c = 0; c < nc; ++c) outp[c][i * out_stride[c]] = scalar_t(0);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -740,15 +740,14 @@ static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                              
         }
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const ptrdiff_t o = (ptrdiff_t)id[a] * out_stride;
-            for (int c = 0; c < nc; ++c) CVFEM_ATOMIC_ADD(outp[c][o], g[c]);
+            for (int c = 0; c < nc; ++c) CVFEM_ATOMIC_ADD(outp[c][(ptrdiff_t)id[a] * out_stride[c]], g[c]);
         }
     }
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
         const scalar_t inv = pw[i];
-        for (int c = 0; c < nc; ++c) outp[c][i * out_stride] *= inv;
+        for (int c = 0; c < nc; ++c) outp[c][i * out_stride[c]] *= inv;
     }
 }
 
@@ -769,7 +768,7 @@ static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                        
                                                    const int *const                     src_stride,
                                                    const int                            nf,
                                                    scalar_t *const *const               outp,
-                                                   const ptrdiff_t                      out_stride) {
+                                                   const ptrdiff_t *const               out_stride) {
     switch (nf) {
         case 1: cvfem_hex8_nodal_grads_atomic_nc<3>(d, isoparam, srcs, src_stride, outp, out_stride); break;
         case 2: cvfem_hex8_nodal_grads_atomic_nc<6>(d, isoparam, srcs, src_stride, outp, out_stride); break;
@@ -792,9 +791,10 @@ static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                        
                                                    const int *const                     src_stride = nullptr) {
     const int nc = 3 * nf;
     if ((ptrdiff_t)out.size() < d.nnodes * nc) out.resize((size_t)d.nnodes * nc);
-    scalar_t *outp[12];
-    for (int c = 0; c < nc; ++c) outp[c] = out.data() + c;
-    cvfem_hex8_assemble_nodal_grads_atomic(d, isoparam, srcs, src_stride, nf, outp, nc);
+    scalar_t  *outp[12];
+    ptrdiff_t  ostr[12];
+    for (int c = 0; c < nc; ++c) { outp[c] = out.data() + c; ostr[c] = nc; }
+    cvfem_hex8_assemble_nodal_grads_atomic(d, isoparam, srcs, src_stride, nf, outp, ostr);
 }
 
 // One strided field into three component arrays -- the pressure gradient, and the Krylov
@@ -813,7 +813,8 @@ static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                        
     const scalar_t *const SFEM_RESTRICT srcs[1] = {src};
     const int                           st[1]   = {stride};
     scalar_t                           *outp[3] = {ogx.data(), ogy.data(), ogz.data()};
-    cvfem_hex8_assemble_nodal_grads_atomic(d, isoparam, srcs, st, 1, outp, 1);
+    const ptrdiff_t                     ostr[3] = {1, 1, 1};
+    cvfem_hex8_assemble_nodal_grads_atomic(d, isoparam, srcs, st, 1, outp, ostr);
 }
 
 
@@ -838,7 +839,7 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
                                              const scalar_t *const SFEM_RESTRICT *srcs,
                                              const int *const                     src_stride,
                                              scalar_t *const *const               outp,
-                                             const ptrdiff_t                      out_stride,
+                                             const ptrdiff_t *const               out_stride,
                                              std::vector<scalar_t>               &gbuf) {
     constexpr int nc = NC;
     constexpr int nf = NC / 3;
@@ -851,7 +852,7 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
     if (!owns_all) {
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t i = 0; i < d.nnodes; ++i)
-            for (int c = 0; c < nc; ++c) outp[c][i * out_stride] = scalar_t(0);
+            for (int c = 0; c < nc; ++c) outp[c][i * out_stride[c]] = scalar_t(0);
     }
     // The ghost entries are stored, not accumulated, so growing the buffer is all this needs.
     if ((ptrdiff_t)gbuf.size() < (ptrdiff_t)p.n_ghost_entries * nc)
@@ -964,8 +965,7 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
             // write over the nodal arrays from every matvec.
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                 const scalar_t  wi = w[owned + k];
-                const ptrdiff_t o  = (owned + k) * out_stride;
-                for (int c = 0; c < nc; ++c) outp[c][o] = pack_out[k * nc + c] * wi;
+                for (int c = 0; c < nc; ++c) outp[c][(owned + k) * out_stride[c]] = pack_out[k * nc + c] * wi;
             }
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
                 const scalar_t *const SFEM_RESTRICT o = pack_out + (n_contiguous + k) * nc;
@@ -984,9 +984,8 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
             const ptrdiff_t idx = p.ghost_reduce_idx[j];
             for (int c = 0; c < nc; ++c) s[c] += gb[idx * nc + c];
         }
-        const scalar_t  wd = w[dest];
-        const ptrdiff_t o  = (ptrdiff_t)dest * out_stride;
-        for (int c = 0; c < nc; ++c) outp[c][o] += s[c] * wd;
+        const scalar_t wd = w[dest];
+        for (int c = 0; c < nc; ++c) outp[c][(ptrdiff_t)dest * out_stride[c]] += s[c] * wd;
     }
 }
 
@@ -1008,7 +1007,7 @@ static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                        
                                                    const int *const                     src_stride,
                                                    const int                            nf,
                                                    scalar_t *const *const               outp,
-                                                   const ptrdiff_t                      out_stride,
+                                                   const ptrdiff_t *const               out_stride,
                                                    std::vector<scalar_t>               &gbuf) {
     switch (nf) {
         case 1: cvfem_hex8_nodal_grads_packed_nc<3>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
@@ -1033,9 +1032,10 @@ static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                        
                                                    const int *const                     src_stride = nullptr) {
     const int nc = 3 * nf;
     if ((ptrdiff_t)out.size() < d.nnodes * nc) out.resize((size_t)d.nnodes * nc);
-    scalar_t *outp[12];
-    for (int c = 0; c < nc; ++c) outp[c] = out.data() + c;
-    cvfem_hex8_assemble_nodal_grads_packed(d, p, isoparam, srcs, src_stride, nf, outp, nc, gbuf);
+    scalar_t  *outp[12];
+    ptrdiff_t  ostr[12];
+    for (int c = 0; c < nc; ++c) { outp[c] = out.data() + c; ostr[c] = nc; }
+    cvfem_hex8_assemble_nodal_grads_packed(d, p, isoparam, srcs, src_stride, nf, outp, ostr, gbuf);
 }
 
 // One strided field into three component arrays -- the pressure gradient, and the Krylov
@@ -1056,7 +1056,8 @@ static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                        
     const scalar_t *const SFEM_RESTRICT srcs[1] = {src};
     const int                           st[1]   = {stride};
     scalar_t                           *outp[3] = {ogx.data(), ogy.data(), ogz.data()};
-    cvfem_hex8_assemble_nodal_grads_packed(d, p, isoparam, srcs, st, 1, outp, 1, gbuf);
+    const ptrdiff_t                     ostr[3] = {1, 1, 1};
+    cvfem_hex8_assemble_nodal_grads_packed(d, p, isoparam, srcs, st, 1, outp, ostr, gbuf);
 }
 
 

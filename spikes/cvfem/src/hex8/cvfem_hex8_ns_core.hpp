@@ -1571,21 +1571,55 @@ inline void apply_jacobian_action_accumulate(MeshData &d, const scalar_t rho, co
     // path, and it is what lets cvfem_ns_op_gate compare the assembled operator against the
     // matrix-free action like for like: the assembled Jacobian keeps the frozen form on
     // purpose, so with the exact term on they are *meant* to differ.
-    if (cvfem_hex8_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty()) {
-        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_q_grad");
-        assemble_nodal_grad_strided(d, geom, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
-    } else {
-        d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
-    }
     // The same treatment for the deferred correction, and for the same reason: it reconstructs a
     // nodal VELOCITY gradient, so differentiating it needs the direction's. Nine components rather
     // than three, so this pass costs more than the Rhie-Chow one beside it -- which is why it is
     // switchable. SFEM_HO_EXACT_JAC=0 gives the lagged action, the operator an assembled
     // first-order matrix holds and what this solver applied before the term existed.
-    if (cvfem_hex8_ho_exact_jac() && d.conv_ho && !d.ugrad.empty()) {
+    const bool want_q = cvfem_hex8_rc_exact_jac() && d.rhie_chow_scale != scalar_t(0) && !d.pgx.empty();
+    const bool want_v = cvfem_hex8_ho_exact_jac() && d.conv_ho && !d.ugrad.empty();
+    if (want_q && want_v) {
+        // ONE SWEEP FOR BOTH. They reconstruct different fields of the SAME array with the same
+        // stride -- the direction's three velocity components and its pressure -- so together
+        // they are a four-field sweep rather than a one-field and a three-field one. What that
+        // saves is the half of a sweep that does not depend on the field count: the adjugate
+        // load, the determinant check, the element-node indirection, the pack staging, the memset
+        // and the ghost reduction, all of which were being done twice. Fitting t(nf) = a + b*nf
+        // to the measured one- and three-field sweeps puts that fixed half at 0.40 ms of 2.71 at
+        // n=128, so this is worth about 15% of the reconstruction.
+        //
+        // The two results keep the layouts their consumers read -- nine-per-node for the velocity
+        // gradient, three separate arrays for the pressure one -- which is why the sweep takes a
+        // stride PER COMPONENT rather than one shared stride. It costs nothing in the element
+        // loop: the strides appear only in the write-out and the ghost reduction.
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_qv_grad");
+        d.vgrad.resize((size_t)d.nnodes * 9);
+        d.qgx.resize((size_t)d.nnodes);
+        d.qgy.resize((size_t)d.nnodes);
+        d.qgz.resize((size_t)d.nnodes);
+        const int       iso      = geom == GeomKind::Isoparam ? 1 : 0;
+        const scalar_t *srcs[4]  = {dir + 0, dir + 1, dir + 2, dir + 3};
+        const int       st[4]    = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS};
+        scalar_t       *outp[12];
+        ptrdiff_t       ostr[12];
+        for (int c = 0; c < 9; ++c) { outp[c] = d.vgrad.data() + c; ostr[c] = 9; }
+        outp[9]  = d.qgx.data(); ostr[9]  = 1;
+        outp[10] = d.qgy.data(); ostr[10] = 1;
+        outp[11] = d.qgz.data(); ostr[11] = 1;
+        if (d.packed)
+            cvfem_hex8_assemble_nodal_grads_packed(d, *d.packed, iso, srcs, st, 4, outp, ostr, d.ugrad_ghost);
+        else
+            cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, st, 4, outp, ostr);
+    } else if (want_q) {
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_q_grad");
+        assemble_nodal_grad_strided(d, geom, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
+        d.vgrad.clear();
+    } else if (want_v) {
         SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::assemble_nodal_v_grad");
         assemble_nodal_vel_grad_of(d, geom, dir, d.vgrad);
+        d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
     } else {
+        d.qgx.clear(); d.qgy.clear(); d.qgz.clear();
         d.vgrad.clear();
     }
     if (geom == GeomKind::Isoparam) {
