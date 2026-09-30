@@ -919,7 +919,8 @@ Table~\ref{tab:convho} and Figure~\ref{fig:convho} report all five variants.
 
 \paragraph{Scheme dependence.} The ratio falls monotonically with the arithmetic each scheme adds:
 $\hoFirstLayoutRatio\times$ on first-order upwind, $\hoUnlimLayoutRatio\times$ with the unlimited
-reconstruction, and $\hoDmLayoutRatio\times$ to $\hoVenkLayoutRatio\times$ with a limiter. The
+reconstruction, and $\hoClipLayoutRatio\times$ down to $\hoVenkLayoutRatio\times$ across the three
+limiters. The
 format accelerates what the sweep reads and how it writes; the correction adds arithmetic per
 sub-control surface, which no layout can help with, so its share of the run grows and the ratio
 falls. The completeness ladder of \S\ref{sec:res:ladder} shows the same dependence across
@@ -929,9 +930,10 @@ physical terms.
 $\hoUnlimCostAtomic\times$ and the limiters $\hoClipCostAtomic\times$ to
 $\hoVenkCostAtomic\times$; within the packed layout, $\hoUnlimCostPacked\times$ to
 $\hoVenkCostPacked\times$. The packed factors are larger because the layout has removed more of
-the first-order cost, leaving the arithmetic it does not touch. The limiters separate by less than
-the limited--unlimited gap: all three share the reconstruction and differ only in the function
-applied to the increment.
+the first-order cost, leaving the arithmetic it does not touch. The three limiters land close
+together, $\hoClipCostPacked\times$ to $\hoVenkCostPacked\times$ packed, and the step from the
+unlimited reconstruction to the cheapest of them is about the size of the spread among them: all
+three share the reconstruction and differ only in the function applied to the increment.
 
 \paragraph{On the roofline.} Figure~\ref{fig:roofline} places the same arms against the
 machine, and one expectation does not survive the measurement: the correction is not free of
