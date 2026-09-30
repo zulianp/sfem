@@ -980,9 +980,15 @@ the pressure gradient at \ngPgradPacked{} against \ngPgradAtomic{}~MDOF/s, a fac
 $\ngPgradRatio$, and the three-component velocity gradient at \ngUgradPacked{} against
 \ngUgradAtomic{}, a factor of $\ngUgradRatio$ --- both far above the
 \hoxLayoutLagged$\times$ the element sweeps get. Almost all of a reconstruction is indexed
-traffic, which the layout removes, and almost none is arithmetic, which it cannot touch. That is
-also why the added pass is affordable: \SI{\hoxFracPacked}{\percent} of the packed matvec
-against \SI{\hoxFracAtomic}{\percent} of the atomic one.
+traffic, which the layout removes, and almost none is arithmetic, which it cannot touch. It is
+also where the exact action spends its time: the reconstruction is \SI{\hoxFracPacked}{\percent}
+of the packed matvec against \SI{\hoxFracAtomic}{\percent} of the atomic one. Both direction
+gradients are taken in ONE sweep --- they read different fields of the same array at the same
+stride, so together they are a four-field sweep rather than a one-field and a three-field one ---
+which is why those shares cover both and why they differ so much between the layouts: the fixed
+half of a sweep that fusing saves is \SI{46}{\percent} of a one-field sweep packed and
+\SI{4}{\percent} atomic, the atomic one being dominated by a scatter that scales with the field
+count.
 
 What it buys is Newton steps. The action is verified against a finite difference of the
 higher-order residual with the gradient rebuilt at each perturbed state --- \hoxFdUnlim{} on the
