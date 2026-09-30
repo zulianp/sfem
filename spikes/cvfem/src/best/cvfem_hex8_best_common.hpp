@@ -255,7 +255,11 @@ struct MeshData {
     // element, one per sub-control surface, rebuilt by cvfem_hex8_build_rc_coeff only when
     // rho, mu, the scale or the mesh change. See Hex8RhieChowPack::coeff for why it is not
     // computed where it is used.
-    std::vector<scalar_t> rc_coeff[CVFEM_HEX8_N_SCS];
+    // ONE array, element-major: coefficient s of element e is rc_coeff[e * N_SCS + s]. See the
+    // twin in cvfem_hex8_ns_core.hpp for the measurement -- it was twelve separate arrays, the
+    // twelve-stream explanation for the Rhie-Chow arm's excess DRAM traffic was tested here and
+    // falsified, and this shape is kept for simplicity rather than for speed.
+    std::vector<scalar_t> rc_coeff;
     scalar_t              rc_coeff_rho{0}, rc_coeff_mu{0}, rc_coeff_scale{0};
     // The coefficient carries the advecting velocity now, so rho, mu and the scale no
     // longer span everything it depends on. state_stamp is bumped by whoever moves the

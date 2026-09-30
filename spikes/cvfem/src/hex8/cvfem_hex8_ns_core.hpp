@@ -129,7 +129,17 @@ struct MeshData {
     // element, one per sub-control surface, rebuilt by cvfem_hex8_build_rc_coeff only when
     // rho, mu, the scale or the mesh change. See Hex8RhieChowPack::coeff for why it is not
     // computed where it is used.
-    std::vector<scalar_t> rc_coeff[CVFEM_HEX8_N_SCS];
+    // ONE array, element-major: coefficient s of element e is rc_coeff[e * N_SCS + s]. It was
+    // twelve separate arrays of nelements, so the lane gather opened twelve independent read
+    // streams on top of the ~24 the sweep already has. That was the hypothesis for why the
+    // Rhie-Chow arm moves 4.1x its compulsory DRAM traffic -- 217.5 B/dof measured against 83.4
+    // compulsory, where the bare arm sits at 1.5x -- and the hypothesis is WRONG. Interleaving
+    // predicted a ~130 B/dof drop and delivered 5.5: 217.5 -> 212.0 packed, 211.6 -> 201.3
+    // atomic. The rate moved 8-10% in the same runs, but so did the bare control that never
+    // touches this table, on a different node; that is node variation, not this change. Kept
+    // because one array for one table is simpler than twelve and it is bit-identical, NOT as an
+    // optimisation. Whatever the remaining 4.1x is, it is not this.
+    std::vector<scalar_t> rc_coeff;
     scalar_t              rc_coeff_rho{0}, rc_coeff_mu{0}, rc_coeff_scale{0};
     // The coefficient carries the advecting velocity now, so rho, mu and the scale no
     // longer span everything it depends on. state_stamp is bumped by whoever moves the
