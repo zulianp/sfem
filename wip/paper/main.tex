@@ -381,9 +381,11 @@ the first zone can be written without synchronisation and only the shared tail c
 A pack's elements contribute to nodes it does not own, and those contributions cannot go to the
 global array: another pack owns the row. They are \emph{staged} instead, one slot per pack and
 ghost node, and summed afterwards. Two things make this cheap. The slot is written by its pack
-alone, so staging is a store and not a read-modify-write; and it is the minority path --- at the
-pack size used throughout, the staged entries number \fpGhostPct\% of the node count, and every
-owned row goes straight out.
+alone, so staging is a store and not a read-modify-write; and it is the minority path. On the
+$n=\campN$ cube at the \fpPack-element pack size used throughout, those slots number
+\fpGhostPct\% of the mesh's nodes, and the summation that empties them averages
+\fpGhostPerRow{} terms per destination. Every owned row has gone straight to the global array
+already.
 
 The sum is taken over a \emph{reduction graph}, built by sorting (destination, slot) pairs and
 grouping them (Algorithm~\ref{alg:build}, line~\ref{ln:sort}). Sorted pairs group into one row

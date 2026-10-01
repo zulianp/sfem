@@ -249,8 +249,13 @@ def macros_meshfoot(mf):
         out.append(r"\newcommand{\fp%sPct}{%.0f}"
                    % (k[2:].title().replace("_", ""), 100.0 * t[k]))
     out.append(r"\newcommand{\fpPack}{%d}" % t["pack"])
+    # Two shapes of the same staging cost. The percentage is the buffer's size against the field
+    # it stages for; the terms-per-row says how much summing Phase 2 actually does, which on this
+    # mesh is barely more than a copy.
     out.append(r"\newcommand{\fpGhostPct}{%.0f}"
                % (100.0 * t["ghost_entries"] / float(t["nodes"])))
+    out.append(r"\newcommand{\fpGhostPerRow}{%.1f}"
+               % (t["ghost_entries"] / float(t["ghost_rows"])))
     big = meshfoot_totals(mf, MESHFOOT_PACK_BIG)
     if big:
         out.append(r"\newcommand{\fpPackBig}{%d}" % big["pack"])
