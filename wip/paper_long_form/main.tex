@@ -14,10 +14,13 @@
 %% given, because those are exactly the places where reading the paper's equations and the source
 %% side by side would otherwise mislead.
 %%
-%% No measured number is typed in here. Timings belong to the paper, which generates them from
-%% the measurement files; this document cites them only by reference. What it does carry are
-%% COUNTS -- loads per surface, live values, flops per element -- which are properties of the
-%% written kernel and verifiable by reading it.
+%% No ABSOLUTE timing is typed in here. Throughputs belong to the paper, which generates them from
+%% the measurement files. What this document carries are (a) COUNTS -- loads per surface, live
+%% values, lines of generated kernel -- which are properties of the written kernel, and (b) RATIOS
+%% between alternatives measured against each other in ONE job, which are the evidence for the
+%% selection table of Section 6 and cannot be stated without them. Every ratio names its job id,
+%% because the tree moved under these measurements and a ratio from one state is not comparable
+%% with an absolute from another.
 \documentclass[11pt,a4paper]{article}
 
 \usepackage[margin=1in]{geometry}
@@ -71,7 +74,8 @@ company.
 \input{sections/03-components}
 \input{sections/04-schemes}
 \input{sections/05-microkernels}
-\input{sections/06-jacobian}
-\input{sections/07-reconstruction}
+\input{sections/06-selection}
+\input{sections/07-jacobian}
+\input{sections/08-reconstruction}
 
 \end{document}
