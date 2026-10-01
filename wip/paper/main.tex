@@ -85,13 +85,13 @@
 Performance work on matrix-free operators has concentrated on high-order discretisations, where
 sum factorisation makes the element kernel cheap. Low-order unstructured operators have had less
 of that attention and are commonly taken to be bandwidth-bound and therefore settled. The
-measurements here put them below both roofs and close to neither, and what is left to recover is
-in the data layout rather than in the kernel. The layout's problem is the scatter: every element
+measurements here put them far from both roofs, and what is left to recover is in the data
+layout rather than in the kernel. The layout's problem is the scatter: every element
 contributes to nodes it shares with its neighbours, and that conflict is usually resolved with
 atomics, which fix no summation order and leave the operator not bitwise reproducible; with
 graph colouring, which adds a barrier per colour and reads back the destination it accumulates
-into; or by assembling a sparse matrix, which trades arithmetic for bandwidth and a footprint
-that grows with the stencil.
+into; or by assembling a sparse matrix, which removes the arithmetic but streams a matrix in
+place of the mesh, at a footprint that grows with the stencil.
 
 We present a \emph{packed} mesh format that removes the conflict structurally. Each node is
 owned by exactly one pack of elements and the owned ranges partition the node numbering, so a
@@ -148,9 +148,12 @@ associative, so an operator applied twice to the same input returns two differen
 \emph{Colouring} partitions the elements into conflict-free sets and removes the atomics, at the
 cost of a barrier per colour and of accumulating into the destination, which has to be read
 before it can be added to. \emph{Assembling} a sparse matrix removes
-the problem from the inner loop entirely, but replaces a compute-bound kernel with a
-bandwidth-bound sparse matrix--vector product and a footprint that grows with the stencil rather
-than with the solution.
+the problem from the inner loop entirely, but replaces a kernel that reads a mesh with a product
+that streams a matrix, at a footprint that grows with the stencil rather than with the solution.
+The two are not a compute-bound kernel against a bandwidth-bound one: \S\ref{sec:res:spmv}
+measures the product at \rlSpmvFSixFourPct\% of the bandwidth roof binding at its intensity and
+the matrix-free sweeps at \rlResidualAtomicPct--\rlResidualPackedPct\%, so only the product is
+near a roof at all.
 
 The consequences of non-reproducibility are practical. In the solver used here they appeared as a
 preconditioner that differed between runs: the block-diagonal blocks being inverted were
@@ -536,8 +539,9 @@ Table~\ref{tab:jacfair} reports both forms.
 
 Two consequences follow. The assembled operator is bandwidth-bound at a footprint that fits no
 level of cache, which is why halving the value precision is close to its only lever; and the
-matrix-free operator, reading a hundredfold less, has intensity enough that the element kernel's
-arithmetic is what it must hide. \S\ref{sec:res:spmv} reports whether that happens.
+matrix-free operator, reading a hundredfold less, is not --- its intensity is higher by the same
+factor, and what then limits it is the element kernel rather than the memory system.
+\S\ref{sec:res:spmv} reports how far that leaves it from either roof.
 
 %================================================================================================
 \section{Experimental setup}
