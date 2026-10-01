@@ -5,19 +5,19 @@
 \begin{loglogaxis}[
   width=\columnwidth, height=0.50\columnwidth,
   xlabel={operational intensity [FLOP/byte]}, ylabel={GFLOP/s},
-  xmin=0.15, xmax=64, ymin=20, ymax=9230,
+  xmin=0.18, xmax=13, ymin=20, ymax=9230,
   legend cell align=left, legend columns=3,
   legend style={font=\tiny, draw=none, fill=none, inner sep=1pt,
     at={(0.5,-0.34)}, anchor=north, column sep=6pt},
   grid=both, major grid style={black!12}, minor grid style={black!6},
   tick label style={font=\tiny}, label style={font=\scriptsize},
 ]
-\addplot[black!45,thick,densely dashed,no marks,forget plot] coordinates {(0.150,75.0) (7.100,3550.0) (64.000,3550.0)};
-\node[black!55,font=\tiny,anchor=south east] at (axis cs:62.08,4011.5) {spec 3.55 TFLOP/s};
-\addplot[black,thick,no marks,forget plot] coordinates {(0.150,67.6) (5.116,2305.3) (64.000,2305.3)};
-\node[black!55,font=\tiny,anchor=north east] at (axis cs:62.08,2028.7) {measured 2.31 TFLOP/s};
-\node[black!55,font=\tiny,anchor=south,rotate=26.3] at (axis cs:0.42,239.4) {spec 500 GB/s};
-\node[black!70,font=\tiny,anchor=north,rotate=26.3] at (axis cs:2.20,872.4) {meas.\ 451 GB/s};
+\addplot[black!45,thick,densely dashed,no marks,forget plot] coordinates {(0.176,88.2) (7.100,3550.0) (13.490,3550.0)};
+\node[black!55,font=\tiny,anchor=south east] at (axis cs:13.09,4011.5) {spec 3.55 TFLOP/s};
+\addplot[black,thick,no marks,forget plot] coordinates {(0.176,79.5) (5.116,2305.3) (13.490,2305.3)};
+\node[black!55,font=\tiny,anchor=north east] at (axis cs:13.09,1705.9) {measured 2.31 TFLOP/s};
+\node[black!55,font=\tiny,anchor=south,rotate=19.5] at (axis cs:0.41,231.2) {500 GB/s};
+\node[black!70,font=\tiny,anchor=north,rotate=19.5] at (axis cs:0.86,342.7) {451 GB/s};
 \addplot[PackA,mark=*,mark size=2.1pt,only marks,mark options={draw=PackA,fill=PackA}] coordinates {(3.325,482.5)};
 \addlegendentry{residual, packed}
 \addplot[PackD,mark=square*,mark size=2.1pt,only marks,mark options={draw=PackD,fill=PackD}] coordinates {(3.324,200.3)};
