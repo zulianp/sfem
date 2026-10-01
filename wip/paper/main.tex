@@ -252,10 +252,12 @@ buys locality alone, and the write conflict is still colouring or atomics, their
 being block-coloured. Settgast et al.~\cite{Settgast2023} make the low-order matrix-free case on
 GPUs with the same standard scatter. Wichrowski~\cite{Wichrowski2026} removes the scatter:
 cell-wise storage, continuity closed by face exchanges at statically known offsets, no atomics
-and no colouring, reaching \SI{14.1}{}~GDoF/s at $\mathbb{Q}_1$ on an A100. The offsets are
-static because a macro-block's interior is structured; where it is not, at the interfaces
-between macro-blocks, the method falls back to separate face, line and vertex kernels over
-disjoint sets of degrees of freedom.
+and no colouring, reaching \SI{14.1}{}~GDoF/s of unique degrees of freedom on a $\mathbb{Q}_1$
+Laplace operator on an A100. The offsets are static because a macro-block's interior is
+structured; at the interfaces between macro-blocks the method falls back to separate face, line
+and vertex kernels over disjoint sets of degrees of freedom. And holding the cell-wise vector as
+the primary representation stores a node once per incident element, which at $\mathbb{Q}_1$ is a
+redundancy of about $8\times$ --- the degrees that amortise it are the high ones.
 
 Here ownership is exclusive everywhere, so the unstructured case needs no separate treatment,
 and the remainder closes through a gather built by sorting. Atomics-freedom and reproducibility
