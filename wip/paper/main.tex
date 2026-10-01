@@ -260,9 +260,10 @@ the primary representation stores a node once per incident element, which at $\m
 redundancy of about $8\times$ --- the degrees that amortise it are the high ones.
 
 Here ownership is exclusive everywhere, so the unstructured case needs no separate treatment,
-and the remainder closes through a gather built by sorting. Atomics-freedom and reproducibility
-follow from the layout rather than from a reduction primitive, and the narrowed index traffic of
-pack-local numbering is what pays for them.
+and the remainder closes through a gather built by sorting. The gather is kept, so the vector
+stays the size of the unique degrees of freedom: the index traffic narrows instead of the data
+multiplying. Atomics-freedom and reproducibility follow from the layout rather than from a
+reduction primitive, and that narrowed traffic is what pays for them.
 
 %================================================================================================
 \section{The packed format}
