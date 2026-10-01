@@ -561,12 +561,37 @@ def best(rows, **eq):
     return max((r["_mdof"] for r in sel), default=None)
 
 
-def fig_throughput(rows, host, op="residual"):
+def parse_hosize(path):
+    """Read jobs/ho_size_sweep.sbatch: {(scheme, layout): [(n, MDOF/s), ...]}.
+
+    Columns: n, layout, scheme, MDOF/s, dofs. The scheme tag carries the framing -- `fo_bare`
+    and `ho_bare` are the bare element kernel, `fo` and `ho` the Rhie--Chow operator -- so a
+    caller picks one and cannot mix them by accident.
+    """
+    out = {}
+    for line in open(path):
+        f = line.split()
+        if len(f) != 5 or f[0].startswith("#") or f[0] == "n":
+            continue
+        try:
+            n, lay, sch, mdof = int(f[0]), f[1], f[2], float(f[3])
+        except ValueError:
+            continue
+        out.setdefault((sch, lay), []).append((n, mdof))
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def fig_throughput(rows, host, op="residual", ho=None):
     """F5. Throughput against problem size for the three representations.
 
     The assembled matrix is drawn at both storage precisions because halving the value width is
     essentially the only lever a bandwidth-bound SpMV has, and it is the fairest version of the
     comparison.
+
+    ``ho`` adds the limited higher-order arm of the same bare operator, dashed, in each layout's
+    colour. Every series here is the bare element kernel, including those: a figure carrying one
+    scheme at one completeness and another at a different one invites exactly the comparison it
+    cannot support.
     """
     sizes = sorted({r["_n"] for r in rows})
     series = []
@@ -612,6 +637,21 @@ def fig_throughput(rows, host, op="residual"):
     for col, mark, lab, pts in series:
         out.append(r"\addplot[%s,mark=%s,mark size=1.6pt,thick] coordinates {%s};"
                    % (col, mark, " ".join("(%d,%.3f)" % p for p in pts)))
+        out.append(r"\addlegendentry{%s}" % lab)
+    # The higher-order arm of each layout, dashed and in that layout's colour, so the pairing
+    # reads without a second legend column per layout. An explicit dash pattern rather than
+    # `dashed`, for the reason given in _convho_spmv_lines.
+    for lay, col, mark, lab in (("packed", "PackA", "*", r"packed, Darwish--M."),
+                                ("atomic", "PackD", "square*", r"atomic, Darwish--M.")):
+        pts = (ho or {}).get(("ho_bare", lay))
+        if not pts:
+            continue
+        # Hollow marker for the higher-order arm, as the roofline uses hollow for its own second
+        # meaning: an outlined `*` rather than pgfplots' `o`, whose stroke the dash pattern cuts
+        # into so the legend showed a broken ring.
+        out.append(r"\addplot[%s,mark=%s,mark size=1.6pt,thick,mark options={draw=%s,fill=white,"
+                   r"solid},dash pattern=on 2pt off 2pt] coordinates {%s};"
+                   % (col, mark, col, " ".join("(%d,%.3f)" % p for p in pts)))
         out.append(r"\addlegendentry{%s}" % lab)
     out.append(r"\end{axis}")
     out.append(r"\end{tikzpicture}")
@@ -2064,7 +2104,9 @@ def build(out_dir, tab_dir):
                       % os.path.basename(path))
             spmv_ref = spmv_reference(rows)
             with open(os.path.join(out_dir, "throughput_size.tex"), "w") as fh:
-                fh.write(fig_throughput(rows, host))
+                hs = [f for f in sorted(os.listdir(DATA)) if f.startswith("hosize_")]
+                ho_size = parse_hosize(os.path.join(DATA, hs[-1])) if hs else None
+                fh.write(fig_throughput(rows, host, ho=ho_size))
             with open(os.path.join(out_dir, "campaign_macros.tex"), "w") as fh:
                 fh.write(macros_throughput(rows, host, provisional=prov))
             written += ["figures/throughput_size.tex", "figures/campaign_macros.tex"]

@@ -21,5 +21,9 @@
 \addlegendentry{BSR SpMV \texttt{f64}}
 \addplot[PackC,mark=diamond*,mark size=1.6pt,thick] coordinates {(64,989.295) (96,890.381) (128,836.479) (160,895.823) (192,885.995)};
 \addlegendentry{BSR SpMV \texttt{f32}}
+\addplot[PackA,mark=*,mark size=1.6pt,thick,mark options={draw=PackA,fill=white,solid},dash pattern=on 2pt off 2pt] coordinates {(64,722.793) (96,760.658) (128,739.548) (160,730.384) (192,727.587)};
+\addlegendentry{packed, Darwish--M.}
+\addplot[PackD,mark=square*,mark size=1.6pt,thick,mark options={draw=PackD,fill=white,solid},dash pattern=on 2pt off 2pt] coordinates {(64,544.596) (96,539.054) (128,525.860) (160,519.157) (192,526.184)};
+\addlegendentry{atomic, Darwish--M.}
 \end{axis}
 \end{tikzpicture}
