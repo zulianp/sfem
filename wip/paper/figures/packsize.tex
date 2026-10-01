@@ -11,9 +11,9 @@
   grid=both, major grid style={black!12}, minor grid style={black!6},
   tick label style={font=\tiny}, label style={font=\scriptsize},
 ]
-\addplot[PackC,mark=triangle*,mark size=1.6pt,thick] coordinates {(0.40,505.512) (0.90,926.846) (1.80,978.330) (3.60,1000.965) (7.10,995.709) (14.20,1056.826) (28.40,1067.205)};
+\addplot[PackC,mark=triangle*,mark size=1.6pt,thick] coordinates {(0.40,533.460) (0.90,954.693) (1.80,1014.654) (3.60,1038.835) (7.10,1025.015) (14.20,1107.505) (28.40,1106.787)};
 \addlegendentry{$n=64$}
-\addplot[PackA,mark=*,mark size=1.6pt,thick] coordinates {(3.60,713.938) (7.10,775.744) (14.20,817.140) (28.40,828.121) (56.90,818.217) (113.80,819.336) (227.60,790.656)};
+\addplot[PackA,mark=*,mark size=1.6pt,thick] coordinates {(3.60,793.112) (7.10,849.261) (14.20,895.422) (28.40,914.446) (56.90,904.448) (113.80,878.265) (227.60,836.524)};
 \addlegendentry{$n=128$}
 \draw[black!50,dashed] (axis cs:1,0) -- (axis cs:1,\pgfkeysvalueof{/pgfplots/ymax});
 \node[black!55,font=\scriptsize,anchor=south west,rotate=90] at (axis cs:1,0) {\ one pack per thread};
