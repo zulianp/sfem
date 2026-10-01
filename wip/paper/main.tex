@@ -84,34 +84,28 @@
 \begin{abstract}
 Matrix-free finite element and finite volume operators on unstructured meshes are limited less
 by arithmetic than by the scatter: every element contributes to nodes it shares with its
-neighbours, and on a multicore CPU that contention is usually resolved with atomics, with graph
-colouring, or by abandoning the matrix-free form and assembling a sparse matrix. Atomics make
-the result depend on thread timing, so the operator is not reproducible even against itself.
-Colouring removes the atomics but synchronises once per colour and accumulates into the
-destination, paying a barrier and a read of what it is about to write. Assembly trades
-arithmetic for bandwidth and a footprint that grows with the stencil.
+neighbours. That conflict is usually resolved with atomics, which fix no summation order and
+leave the operator not bitwise reproducible; with graph colouring, which adds a barrier per
+colour and reads back the destination it accumulates into; or by assembling a sparse matrix,
+which trades arithmetic for bandwidth and a footprint that grows with the stencil.
 
-We present a \emph{packed} mesh format that removes the scatter conflict structurally rather
-than by synchronisation. Elements are grouped into packs; each node is owned by exactly one
-pack, and the owned ranges partition the node numbering, so a pack accumulates into a private
-buffer with plain addition and writes its owned rows out without contention. The nodes it
-touches but does not own are staged and closed by a gather that visits each destination exactly
-once. No atomic appears on any path, and the summation order is fixed by stored index arrays
-rather than by thread arrival, so the result is bitwise identical at every thread count.
+We present a \emph{packed} mesh format that removes the conflict structurally. Each node is
+owned by exactly one pack of elements and the owned ranges partition the node numbering, so a
+pack accumulates into a private buffer and writes its owned rows out without contention; the
+nodes it touches but does not own are closed by a gather that visits each destination once. No
+atomic appears on any path, no barrier separates the packs, and the summation order is fixed by
+stored index arrays rather than by thread arrival. The format is thus reproducible where atomics
+are not, free of both costs colouring pays, and reads a mesh where assembly reads a matrix.
 
-We evaluate the format on the operators of a colocated CVFEM incompressible Navier--Stokes
-discretisation --- residual and matrix-free Jacobian action --- on an NVIDIA Grace CPU, against
-an atomic sweep, against a coloured one, and against sparse matrix--vector products with the
-lagged block-sparse matrix. On \campDofs{} degrees of freedom the packed residual reaches
-\campResPacked{}~MDOF/s against \campResAtomic{} for the atomic sweep and \campSpmvF{} for the
-lagged sparse matrix--vector product, while reading \fpImpl{}~bytes of mesh per degree of freedom
-where the product reads \fpMatrixFSixFour{} of matrix. The atomic sweep is not bitwise
-reproducible; the packed one is, at every thread count. Against colouring on the same
-decomposition the two are equal on one thread and \scalePackedResTop{} against
-\scaleColoredResTop{}~MDOF/s on 72. We also report what the advantage is not: most of it is
-present at a single thread, where no contention exists, so the gain comes from what the layout
-reads rather than from the atomics it removes; and the margin falls from $2.96\times$ on a bare
-element kernel to $2.06\times$ once the operator carries the terms a solver actually applies.
+We evaluate it on the residual and matrix-free Jacobian action of a colocated CVFEM
+Navier--Stokes discretisation on an NVIDIA Grace CPU. On \campDofs{} degrees of freedom the
+packed residual reaches \campResPacked{}~MDOF/s against \campSpmvF{} for a sparse
+matrix--vector product with the lagged matrix, reading \fpImpl{}~bytes of mesh per degree of
+freedom where the product reads \fpMatrixFSixFour{} of matrix. The Jacobian action is reported
+in both forms, since they are not the same operator: lagged, it is what the matrix holds, at
+$\jfLaggedVsF\times$ the product; differentiated, what a Newton--Krylov solve applies, it costs
+$\jfExactCost\times$ and is $\jfExactVsF\times$. Most of the advantage is present at one thread,
+so it comes from what the layout reads rather than from the atomics it removes.
 \end{abstract}
 
 \begin{CCSXML}
