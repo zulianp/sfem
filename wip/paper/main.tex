@@ -155,11 +155,16 @@ Both sit on the bandwidth side of the ridge, and what separates them is distance
 \S\ref{sec:res:spmv} measures the product at \rlSpmvFSixFourPct\% of the roof binding at its
 intensity, the matrix-free sweeps at \rlResidualAtomicPct--\rlResidualPackedPct\%.
 
-The consequences of non-reproducibility are practical. In the solver used here they appeared as a
-preconditioner that differed between runs: the block-diagonal blocks being inverted were
-accumulated atomically, so their entries depended on thread arrival order, and a linear solve with
-no multigrid and no other source of variation gave different iteration counts from run to run. Any
-experiment above such an operator must separate a real effect from a different summation order.
+What bitwise reproducibility buys is worth stating, because it is a property of the operator
+rather than a convenience. An operator whose summation order is fixed is a function of its input,
+and three things follow in a parallel environment. A run on many threads can be checked against a
+run on one, so behaviour that appears only under threading is reproduced rather than reasoned
+about. A regression test compares bits, where an operator that reorders has to admit a tolerance
+wide enough to absorb the reordering --- and a tolerance that wide absorbs defects too. And an
+experiment layered above the operator, whether a preconditioner, a scheme comparison or a scaling
+study, measures the change under test alone; inside a Krylov method a perturbation at the last
+bit reaches the iteration count and therefore the runtime, so without a fixed order the thread
+count is a variable of the numerics as well as of the schedule.
 
 We remove the scatter conflict in the data layout rather than resolving it by synchronisation. In
 the \emph{packed} format, elements are grouped into packs, every node is owned by exactly one pack,
