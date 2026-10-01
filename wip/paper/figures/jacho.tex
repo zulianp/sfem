@@ -14,11 +14,11 @@
 \addlegendentry{packed}
 \addplot[draw=PackD, fill=PackD] coordinates {(upwind,967.6) (unlimited,320.3) (clip,268.5) (Venkat.,265.6) (Darwish--M.,257.4)};
 \addlegendentry{atomic}
-\draw[PackE,dashed,thick] ({axis cs:upwind,449.4} -| {rel axis cs:0,0}) -- ({axis cs:upwind,449.4} -| {rel axis cs:1,0});
-\addlegendimage{legend image code/.code={\draw[PackE,dashed,thick] (0cm,0cm) -- (0.45cm,0cm);}}
+\draw[PackE,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,449.4} -| {rel axis cs:0,0}) -- ({axis cs:upwind,449.4} -| {rel axis cs:1,0});
+\addlegendimage{legend image code/.code={\draw[PackE,dash pattern=on 2pt off 2pt,thick] (0pt,0pt) -- (10pt,0pt);}}
 \addlegendentry{SpMV \texttt{f64}}
-\draw[PackC,dashed,thick] ({axis cs:upwind,836.5} -| {rel axis cs:0,0}) -- ({axis cs:upwind,836.5} -| {rel axis cs:1,0});
-\addlegendimage{legend image code/.code={\draw[PackC,dashed,thick] (0cm,0cm) -- (0.45cm,0cm);}}
+\draw[PackC,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,836.5} -| {rel axis cs:0,0}) -- ({axis cs:upwind,836.5} -| {rel axis cs:1,0});
+\addlegendimage{legend image code/.code={\draw[PackC,dash pattern=on 2pt off 2pt,thick] (0pt,0pt) -- (10pt,0pt);}}
 \addlegendentry{SpMV \texttt{f32}}
 \end{axis}
 \end{tikzpicture}

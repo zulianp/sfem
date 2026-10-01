@@ -1441,12 +1441,17 @@ def _convho_spmv_lines(spmv, xref):
         v = (spmv or {}).get(store)
         if not v:
             continue
-        out.append(r"\draw[%s,dashed,thick] ({axis cs:%s,%.1f} -| {rel axis cs:0,0}) -- "
+        # An EXPLICIT dash pattern rather than `dashed`, and a legend image whose length is a
+        # whole number of its periods. With `dashed` (on 3pt off 3pt) the 0.45cm image ended
+        # part-way through a dash and the stub read as a dot, so the key showed a dash-dot line
+        # for a rule drawn dashed. on 2pt off 2pt over 10pt is three dashes and two gaps, exactly.
+        out.append(r"\draw[%s,dash pattern=on 2pt off 2pt,thick] "
+                   r"({axis cs:%s,%.1f} -| {rel axis cs:0,0}) -- "
                    r"({axis cs:%s,%.1f} -| {rel axis cs:1,0});" % (col, xref, v, xref, v))
         # An explicit legend image: the default one for a line-only entry draws a marker box
         # here, which reads as a third kind of thing rather than as the rule it stands for.
-        out.append(r"\addlegendimage{legend image code/.code={\draw[%s,dashed,thick] "
-                   r"(0cm,0cm) -- (0.45cm,0cm);}}" % col)
+        out.append(r"\addlegendimage{legend image code/.code={\draw[%s,dash pattern=on 2pt off "
+                   r"2pt,thick] (0pt,0pt) -- (10pt,0pt);}}" % col)
         out.append(r"\addlegendentry{%s}" % lab)
     return out
 
@@ -1555,7 +1560,10 @@ def macros_kmix(mix):
     def put(name, val, fmt="%.2f"):
         out.append(r"\newcommand{\%s}{%s}" % (name, fmt % val))
 
-    for lay, tag in (("packed", "Packed"), ("atomic", "Atomic")):
+    names = [("packed", "Packed"), ("atomic", "Atomic")]
+    if "packed_ho" in mix and "atomic_ho" in mix:
+        names += [("packed_ho", "PackedHo"), ("atomic_ho", "AtomicHo")]
+    for lay, tag in names:
         m = mix[lay]
         put("kmixIpc" + tag, m["instructions"] / m["cycles"])
         put("kmixStallPct" + tag, 100.0 * m["STALL_BACKEND"] / m["cycles"], "%.0f")
@@ -1563,46 +1571,84 @@ def macros_kmix(mix):
             100.0 * m["STALL_BACKEND_MEM"] / m["STALL_BACKEND"], "%.0f")
         put("kmixScatterPct" + tag,
             abs(100.0 * (m["mdof_kernel_only"] / m["mdof"] - 1.0)), "%.1f")
+    # The reading the higher-order arm was measured for: the throughput ratio between the layouts
+    # and the retirement-rate ratio, on each arm. If retirement is what separates the layouts then
+    # the two must move together as the scheme adds arithmetic, and only a second arm can say so.
+    for sfx, tag in (("", "Fo"), ("_ho", "Ho")):
+        if "packed" + sfx not in mix:
+            continue
+        p_, a_ = mix["packed" + sfx], mix["atomic" + sfx]
+        put("kmixRate" + tag, p_["mdof"] / a_["mdof"])
+        put("kmixIpcRatio" + tag,
+            (p_["instructions"] / p_["cycles"]) / (a_["instructions"] / a_["cycles"]))
+    # How much more the limited scheme issues, per layout. The prose needs both, because the two
+    # grow by different factors and an average would hide that the packed sweep adds more.
+    if "packed_ho" in mix:
+        for lay, tag in (("packed", "Packed"), ("atomic", "Atomic")):
+            put("kmixInstGrowth" + tag,
+                mix[lay + "_ho"]["INST_SPEC"] / mix[lay]["INST_SPEC"], "%.1f")
     return "\n".join(out) + "\n"
 
 
 def table_kmix(mix):
-    """T. Where the residual sweep's time goes, per layout.
+    """T. Where the residual sweep's time goes, per layout and per convective scheme.
 
     The roofline cannot answer this: both layouts sit well below both roofs, so neither bandwidth
     nor peak flops is binding and the axis the figure varies is not what separates them. What
     separates them is here -- how much of the issued instruction stream is arithmetic, and how
     fast it retires.
 
-    Every row is a share rather than a count, because the two layouts issue different totals and
-    the question is composition, not volume.
+    Both convective arms are shown because the throughput gap is not constant across them: it
+    closes as the scheme adds arithmetic (F8), and an instruction mix measured only on first-order
+    upwinding cannot say whether the mechanism it names closes with it. The columns are paired by
+    scheme so the comparison the table is for -- packed against standard -- stays adjacent, and
+    the arms sit side by side for the second reading.
+
+    Every entry is a share rather than a count, because the arms and the layouts issue different
+    totals and the question is composition, not volume.
     """
-    if not {"packed", "atomic"} <= set(mix):
+    arms = [("", "first-order upwind")]
+    if "packed_ho" in mix and "atomic_ho" in mix:
+        arms.append(("_ho", "Darwish--Moukalled"))
+    cols = [l + sfx for sfx, _ in arms for l in ("packed", "atomic")]
+    if not set(cols) <= set(mix):
         return ""
-    def pct(lay, key, of="INST_SPEC"):
-        d = mix[lay]
+
+    def pct(col, key, of="INST_SPEC"):
+        d = mix[col]
         return 100.0 * d[key] / d[of] if d.get(of) else float("nan")
-    rows = [
-        (r"vector (SIMD)",                        lambda l: pct(l, "ASE_SPEC")),
-        (r"scalar floating point",                lambda l: pct(l, "VFP_SPEC")),
-        (r"loads",                                lambda l: pct(l, "LD_SPEC")),
-        (r"stores",                               lambda l: pct(l, "ST_SPEC")),
-        (r"integer, mostly addressing",           lambda l: pct(l, "DP_SPEC")),
-    ]
-    out = [PREAMBLE,
-           r"\begin{tabular}{@{}lrr@{}}", r"\toprule",
-           r"& packed & standard \\", r"\midrule",
-           r"\multicolumn{3}{@{}l}{\emph{instruction mix, share of those issued}} \\"]
-    for label, fn in rows:
-        out.append(r"\quad %s & %.1f\%% & %.1f\%% \\" % (label, fn("packed"), fn("atomic")))
+
+    wide = len(arms) > 1
+    # With four numeric columns the per-cell percent signs no longer fit a single text column, so
+    # the unit moves into the stub, which is where a table of nothing but shares should carry it
+    # anyway. With one arm the old spelling is kept, so the two-column form regenerates unchanged.
+    def row(label, fn, fmt="%.1f"):
+        cell = fmt if wide else fmt + r"\%"
+        return (r"%s & " % label) + " & ".join(cell % fn(c) for c in cols) + r" \\"
+
+    spec = r"@{}l" + "r" * len(cols) + r"@{}"
+    out = [PREAMBLE, r"\begin{tabular}{%s}" % spec, r"\toprule"]
+    if len(arms) > 1:
+        out.append(" & " + " & ".join(r"\multicolumn{2}{c}{%s}" % lab for _, lab in arms) + r" \\")
+        out.append(r"\cmidrule(lr){2-3}\cmidrule(l){4-5}")
+    out.append(" & " + " & ".join("packed & standard" for _ in arms) + r" \\")
     out.append(r"\midrule")
-    out.append(r"instructions per cycle & %.2f & %.2f \\"
-               % tuple(mix[l]["instructions"] / mix[l]["cycles"] for l in ("packed", "atomic")))
-    out.append(r"back-end stall, share of cycles & %.0f\%% & %.0f\%% \\"
-               % tuple(100.0 * mix[l]["STALL_BACKEND"] / mix[l]["cycles"] for l in ("packed", "atomic")))
-    out.append(r"\quad of which waiting on memory & %.0f\%% & %.0f\%% \\"
-               % tuple(100.0 * mix[l]["STALL_BACKEND_MEM"] / mix[l]["STALL_BACKEND"]
-                       for l in ("packed", "atomic")))
+    out.append(r"\multicolumn{%d}{@{}l}{\emph{instruction mix, \%% of those issued}} \\"
+               % (len(cols) + 1))
+    for label, key in ((r"vector (SIMD)", "ASE_SPEC"),
+                       (r"scalar floating point", "VFP_SPEC"),
+                       (r"loads", "LD_SPEC"),
+                       (r"stores", "ST_SPEC"),
+                       (r"integer, mostly addressing", "DP_SPEC")):
+        out.append(row(r"\quad " + label, lambda c, k=key: pct(c, k)))
+    out.append(r"\midrule")
+    out.append(row(r"instructions per cycle",
+                   lambda c: mix[c]["instructions"] / mix[c]["cycles"], r"%.2f"))
+    out.append(row(r"back-end stall, \% of cycles" if wide else r"back-end stall, share of cycles",
+                   lambda c: 100.0 * mix[c]["STALL_BACKEND"] / mix[c]["cycles"], "%.0f"))
+    out.append(row(r"\quad of which waiting on memory",
+                   lambda c: 100.0 * mix[c]["STALL_BACKEND_MEM"] / mix[c]["STALL_BACKEND"],
+                   "%.0f"))
     out.append(r"\midrule")
     # The staging is gather, scatter, ghost reduction and zeroing. Dropping it with --kernel-only
     # says how much of the sweep is the element kernel, which is what the roofline's y-axis counts.
@@ -1613,9 +1659,10 @@ def table_kmix(mix):
     # limit of two separate runs -- the standard layout measured 0.5% FASTER with the scatter than
     # without, which printed as "101%" of the sweep and is simply noise. Reported as a signed
     # delta with one decimal so that a value inside the noise reads as inside the noise.
-    out.append(r"scatter, change in sweep rate when removed & %+.1f\%% & %+.1f\%% \\"
-               % tuple(100.0 * (mix[l]["mdof_kernel_only"] / mix[l]["mdof"] - 1.0)
-                       for l in ("packed", "atomic")))
+    out.append(row(r"scatter removed, \% rate change" if wide
+                   else r"scatter, change in sweep rate when removed",
+                   lambda c: 100.0 * (mix[c]["mdof_kernel_only"] / mix[c]["mdof"] - 1.0),
+                   "%+.1f"))
     out += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(out) + "\n"
 

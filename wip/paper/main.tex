@@ -1063,12 +1063,15 @@ bandwidth better.
 
 \begin{table}[t]
   \centering
-  \caption{\fostag{} Where the residual sweep's issued instructions go, and how fast they retire,
-    $n=128$ on 72 threads. Both layouts are lane-blocked and call the same element kernel, so the
-    mixes are comparable; written scalar, the standard layout's vector share is
-    \SI{0.1}{\percent} and the table measures the implementation rather than the format.}
+  \caption{Where the residual sweep's issued instructions go, and how fast they retire,
+    $n=128$ on 72 threads, for both convective schemes. Both layouts are lane-blocked and call
+    the same element kernel, so the mixes are comparable; written scalar, the standard layout's
+    vector share is \SI{0.1}{\percent} and the table measures the implementation rather than the
+    format.}
   \label{tab:kmix}
-  \small
+  % \footnotesize, not \small: the second convective arm doubles the numeric columns and the
+  % widest row overran the text column by 44pt at \small.
+  \footnotesize
   \inputifready{tables/kmix}{instruction mix, jobs/kernel\_mix.sbatch}
 \end{table}
 
@@ -1080,6 +1083,22 @@ explains the gap; retirement does, at \kmixIpcPacked{} instructions per cycle ag
 \kmixStallMemPctAtomic\% of the standard layout's stall cycles against \kmixStallMemPctPacked\% of
 the packed layout's --- which fits the atomic updates serialising, and is outside what the
 roofline's axes can express.
+
+The second scheme is what tests that reading. Adding the limited correction issues
+$\kmixInstGrowthPacked\times$ and $\kmixInstGrowthAtomic\times$ the instructions and shifts the
+mix the same way on each --- loads and stores take a markedly larger share as the hoisted nodal
+gradient is read, and addressing arithmetic and the vector share give up the room --- so the
+\emph{composition} still does not separate them. Retirement again does,
+and it moves with the throughput: the standard layout's rate rises from \kmixIpcAtomic{} to
+\kmixIpcAtomicHo{} instructions per cycle while the packed layout's rises only from
+\kmixIpcPacked{} to \kmixIpcPackedHo{}, so the retirement ratio falls from
+$\kmixIpcRatioFo\times$ to $\kmixIpcRatioHo\times$ against a throughput ratio that falls from
+$\kmixRateFo\times$ to $\kmixRateHo\times$. The two track each other, which is the evidence that
+retirement is the mechanism and not a correlate of it: arithmetic the scatter cannot serialise
+gives the stalled layout work to issue between its atomic updates, and its stall share falls from
+\kmixStallPctAtomic\% to \kmixStallPctAtomicHo\% while the packed layout's does not move
+(\kmixStallPctPacked\% to \kmixStallPctPackedHo\%). The format's advantage is largest exactly
+where there is least other work to hide the serialisation behind.
 
 \paragraph{Measured against specified.} The two roof pairs differ by more than any kernel here can
 recover: the triad attains \rlBwPctSpec\% of specified bandwidth and the \textsc{gemm}

@@ -29,6 +29,14 @@
 # Two groups rather than one run: Neoverse V2 has six programmable counters, and asking for more
 # multiplexes them, which makes the ratios depend on the sampling rather than on the kernel.
 #
+# Two convective arms, not one. The table's question is whether the layouts' instruction mixes
+# explain the throughput gap, and an answer taken only on first-order upwinding leaves open
+# whether it survives the arithmetic a higher-order scheme adds -- which is exactly where the
+# gap narrows (paper Figure 8). The higher-order arm is Darwish--Moukalled, the same limiter
+# Figures 7 and 8 single out, and it carries the Rhie--Chow coupling like the first-order arm so
+# the two differ in the correction alone. Its key is `<layout>_ho`; the first-order arm keeps the
+# bare `<layout>` key so the data files written before this arm existed still parse.
+#
 # Note the order of the two sub() calls below. perf -x, puts the event in field 3 as
 # `armv8_pmuv3_0/INST_SPEC/`, and stripping the prefix with a greedy `.*/` first consumes the
 # TRAILING slash too and leaves an empty string -- which silently dropped every PMU event while
@@ -48,24 +56,28 @@ PACK=${PACK:-1024}
 echo "### kernel instruction mix, n=$N, 72 threads"
 echo "### host $(hostname)  $(date '+%F %T')"
 
-run_group() {   # layout, perf event list
-    local lay=$1 events=$2
+run_group() {   # layout, perf event list, scheme flags
+    local lay=$1 events=$2 extra=$3
     local layflag="--layout $lay"
     [ "$lay" = "packed" ] && layflag="$layflag --pack-size $PACK"
     srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
       bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                 perf stat -x, -e $events -- \
-                $B --n $N --repeat $REPEAT --warmup 3 $layflag --kernel sumfact --rhie-chow" 2>&1
+                $B --n $N --repeat $REPEAT --warmup 3 $layflag --kernel sumfact --rhie-chow $extra" 2>&1
 }
 
-for lay in packed atomic; do
+for arm in "|" "_ho|--conv-ho 3"; do
+  suffix=${arm%%|*}
+  extra=${arm#*|}
+  for lay in packed atomic; do
+    key="${lay}${suffix}"
     # The throughput, and the kernel-only figure the table reports beside it.
     out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
             bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                       $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
-                      $([ "$lay" = packed ] && echo "--pack-size $PACK") --kernel sumfact --rhie-chow" 2>&1)
+                      $([ "$lay" = packed ] && echo "--pack-size $PACK") --kernel sumfact --rhie-chow $extra" 2>&1)
     mdof=$(printf '%s\n' "$out" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
-    [ -n "$mdof" ] && echo "kmix $lay mdof $mdof"
+    [ -n "$mdof" ] && echo "kmix $key mdof $mdof"
 
     # The same sweep with --kernel-only, which has the element kernel write to a dense stack
     # buffer and skip the scatter entirely. The table reports mdof/mdof_kernel_only as the share
@@ -76,18 +88,19 @@ for lay in packed atomic; do
     outk=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
              bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
                        $B --n $N --repeat $REPEAT --warmup 3 --layout $lay \
-                       $([ "$lay" = packed ] && echo "--pack-size $PACK") --kernel sumfact --rhie-chow --kernel-only" 2>&1)
+                       $([ "$lay" = packed ] && echo "--pack-size $PACK") --kernel sumfact --rhie-chow $extra --kernel-only" 2>&1)
     mdofk=$(printf '%s\n' "$outk" | sed -n 's/^  MDOF\/s: \(.*\)$/\1/p' | head -1)
-    [ -n "$mdofk" ] && echo "kmix $lay mdof_kernel_only $mdofk"
+    [ -n "$mdofk" ] && echo "kmix $key mdof_kernel_only $mdofk"
 
     # Group 1: the instruction mix.
-    printf '%s\n' "$(run_group "$lay" 'armv8_pmuv3_0/INST_SPEC/,armv8_pmuv3_0/ASE_SPEC/,armv8_pmuv3_0/VFP_SPEC/,armv8_pmuv3_0/DP_SPEC/,armv8_pmuv3_0/LD_SPEC/,armv8_pmuv3_0/ST_SPEC/')" \
-      | awk -F, -v l="$lay" '$1 ~ /^[0-9]/ && $3 != "" {
+    printf '%s\n' "$(run_group "$lay" 'armv8_pmuv3_0/INST_SPEC/,armv8_pmuv3_0/ASE_SPEC/,armv8_pmuv3_0/VFP_SPEC/,armv8_pmuv3_0/DP_SPEC/,armv8_pmuv3_0/LD_SPEC/,armv8_pmuv3_0/ST_SPEC/' "$extra")" \
+      | awk -F, -v l="$key" '$1 ~ /^[0-9]/ && $3 != "" {
             k=$3; sub(/\/$/,"",k); sub(/^.*\//,"",k); if (k != "") printf "kmix %s %s %s\n", l, k, $1 }'
 
     # Group 2: cycles, instructions and the stall split.
-    printf '%s\n' "$(run_group "$lay" 'cycles,instructions,armv8_pmuv3_0/STALL_BACKEND/,armv8_pmuv3_0/STALL_BACKEND_MEM/')" \
-      | awk -F, -v l="$lay" '$1 ~ /^[0-9]/ && $3 != "" {
+    printf '%s\n' "$(run_group "$lay" 'cycles,instructions,armv8_pmuv3_0/STALL_BACKEND/,armv8_pmuv3_0/STALL_BACKEND_MEM/' "$extra")" \
+      | awk -F, -v l="$key" '$1 ~ /^[0-9]/ && $3 != "" {
             k=$3; sub(/\/$/,"",k); sub(/^.*\//,"",k); if (k != "") printf "kmix %s %s %s\n", l, k, $1 }'
+  done
 done
 echo "### done"
