@@ -1015,9 +1015,10 @@ to it.
 
 \begin{table}[t]
   \centering
-  \caption{Convective schemes, residual only, at $n=128$. The nodal velocity gradient is hoisted,
-    so the timing is of the flux rather than of the reconstruction feeding it. Each column is that
-    layout's shipped kernel.}
+  \caption{Convective schemes, residual only, at $n=128$, on the \emph{bare} operator: no
+    Rhie--Chow term, so these rates are not comparable with Table~\ref{tab:jacfair}'s, which
+    carry it. The nodal velocity gradient is hoisted, so the timing is of the flux rather than of
+    the reconstruction feeding it. Each column is that layout's shipped kernel.}
   \label{tab:convho}
   \inputifready{tables/convho}{convective scheme arms, jobs/conv\_ho\_bench.sbatch}
 \end{table}
@@ -1036,11 +1037,14 @@ to it.
   \centering
   \inputifready{figures/jacho}{Jacobian scheme arms, jobs/jac\_ho\_bench.sbatch}
   \caption{The same five schemes for the \emph{Jacobian action}, with the correction
-    differentiated --- the \emph{exact} action. The \emph{lagged} action, which is the default,
-    leaves the Jacobian first-order: it reproduces the \texttt{upwind} bar's result to the last
-    bit, at \jachoLaggedPacked{}~MDOF/s packed. Unlike Figure~\ref{fig:convho}, the layout ratio rises
-    before it falls, $\jachoFirstLayoutRatio$ to $\jachoUnlimLayoutRatio$ to
-    $\jachoDmLayoutRatio\times$. Dashed: the same SpMV references.}
+    differentiated --- the \emph{exact} action --- and, as in Table~\ref{tab:convho}, on the bare
+    operator: the Rhie--Chow term is off, which is why the \texttt{upwind} bar stands above
+    Table~\ref{tab:jacfair}'s first-order rows rather than beside them. The \emph{lagged} action,
+    which is the default, leaves the Jacobian first-order: it reproduces the \texttt{upwind}
+    bar's result to the last bit, at \jachoLaggedPacked{}~MDOF/s packed. Unlike
+    Figure~\ref{fig:convho}, the layout ratio rises before it falls,
+    $\jachoFirstLayoutRatio$ to $\jachoUnlimLayoutRatio$ to $\jachoDmLayoutRatio\times$. Dashed:
+    the same SpMV references.}
   \label{fig:jacho}
 \end{figure}
 
