@@ -208,6 +208,19 @@ struct Hex8RhieChowT {
     const T *uy{};
     const T *uz{};
     Hex8RcTau tau{};
+    // The three affine edge vectors, direction-major (ecol[3*c + q] is component c of the edge
+    // of direction group q), and a flag saying they are present. The SCALAR kernels are the
+    // oracle the vectorised ones are verified against, so they must discretise the SAME
+    // operator -- and on the affine path the edge vector is the Jacobian column, not a
+    // difference of node coordinates (cvfem_hex8_affine_edge_cols). Leaving has_ecol false
+    // keeps the coordinate difference, which is what the ISOPARAMETRIC kernels need.
+    //
+    // This was not optional once the vectorised kernels moved: a reference on a different
+    // geometry stops being a reference. It read 2.0e-4 against the packed Jacobian at n=160,
+    // where the correction's near-cancellation amplifies a last-bit geometry difference into a
+    // visible one, while every cube-sized check still passed.
+    T        ecol[9]{};
+    bool     has_ecol{false};
 };
 
 // Every existing host call site names `Hex8RhieChow`, so keep that spelling bound
@@ -263,6 +276,18 @@ static SFEM_INLINE SFEM_HOST_DEVICE const int (&cvfem_hex8_dir_edges_tbl())[3][4
 #else
 static constexpr int CVFEM_HEX8_DIR_EDGES[3][4][2] = CVFEM_HEX8_DIR_EDGES_INIT;
 #endif
+
+// The direction group of the edge (i,j), from the same table that defines the grouping. Used by
+// the scalar kernels, which receive node indices rather than a surface index.
+template <typename T = int>
+static SFEM_INLINE SFEM_HOST_DEVICE int cvfem_hex8_edge_dir(const int i, const int j) {
+    for (int q = 0; q < 3; ++q)
+        for (int e = 0; e < 4; ++e)
+            if ((CVFEM_HEX8_DIR_EDGES[q][e][0] == i && CVFEM_HEX8_DIR_EDGES[q][e][1] == j) ||
+                (CVFEM_HEX8_DIR_EDGES[q][e][0] == j && CVFEM_HEX8_DIR_EDGES[q][e][1] == i))
+                return q;
+    return 0;
+}
 
 #define CVFEM_HEX8_SNET_INIT { \
         {double(1), double(1), double(1)}, \
@@ -907,9 +932,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_mdotc(const sc
                                                        const int j, const scalar_t ax, const scalar_t ay, const scalar_t az,
                                                        const scalar_t p_i, const scalar_t p_j) {
     if (!cvfem_hex8_rhie_chow_active(rc)) return scalar_t(0);
-    const scalar_t dx    = rc.x[j] - rc.x[i];
-    const scalar_t dy    = rc.y[j] - rc.y[i];
-    const scalar_t dz    = rc.z[j] - rc.z[i];
+    const int      q_    = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx    = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy    = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz    = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
     const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az,
                                                            cvfem_hex8_rhie_chow_u2(rc, i, j), rc.tau.inv_dt_a0);
     const scalar_t half  = scalar_t(0.5);
@@ -931,9 +957,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_rhie_chow_kvec(const scalar_
     kx = ky = kz = scalar_t(0);
     if (!rc.ux || coeff == scalar_t(0)) return;
     const scalar_t half  = scalar_t(0.5);
-    const scalar_t dx    = rc.x[j] - rc.x[i];
-    const scalar_t dy    = rc.y[j] - rc.y[i];
-    const scalar_t dz    = rc.z[j] - rc.z[i];
+    const int      q_    = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx    = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy    = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz    = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
     const scalar_t h2    = dx * dx + dy * dy + dz * dz;
     const scalar_t Adotd = ax * dx + ay * dy + az * dz;
     const scalar_t A2    = ax * ax + ay * ay + az * az;
@@ -957,9 +984,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_coeff_corr(con
                                                                             scalar_t &coeff) {
     coeff = scalar_t(0);
     if (!cvfem_hex8_rhie_chow_active(rc)) return scalar_t(0);
-    const scalar_t dx = rc.x[j] - rc.x[i];
-    const scalar_t dy = rc.y[j] - rc.y[i];
-    const scalar_t dz = rc.z[j] - rc.z[i];
+    const int      q_ = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
     coeff             = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az,
                                                         cvfem_hex8_rhie_chow_u2(rc, i, j), rc.tau.inv_dt_a0);
     if (!p) return scalar_t(0);
@@ -978,9 +1006,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_rhie_chow_dmdotc(const s
                                                                         const scalar_t *const vx, const scalar_t *const vy,
                                                                         const scalar_t *const vz) {
     if (coeff == scalar_t(0)) return scalar_t(0);
-    const scalar_t dx    = rc.x[j] - rc.x[i];
-    const scalar_t dy    = rc.y[j] - rc.y[i];
-    const scalar_t dz    = rc.z[j] - rc.z[i];
+    const int      q_    = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx    = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy    = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz    = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
     // Mirror mdotc exactly: corr = (q_j - q_i) - avg(qg_i, qg_j) . d. Dropping the second
     // term -- as this did -- leaves the continuity rows of the Jacobian wrong by ~4%, which
     // caps Newton at a linear rate (contraction 0.675, independent of mesh) instead of
@@ -1770,9 +1799,14 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
                                   // -- silently switching off all upwinding. The driver refuses
                                   // the blend unless this is available rather than relying on
                                   // that not happening.
-                                  rc.x ? rc.x[j] - rc.x[i] : scalar_t(0),
-                                  rc.y ? rc.y[j] - rc.y[i] : scalar_t(0),
-                                  rc.z ? rc.z[j] - rc.z[i] : scalar_t(0),
+                                  // Same edge vector the rest of this path uses: the affine column
+                                  // where it is available, the coordinate difference otherwise.
+                                  rc.has_ecol ? rc.ecol[0 * 3 + cvfem_hex8_edge_dir(i, j)]
+                                              : (rc.x ? rc.x[j] - rc.x[i] : scalar_t(0)),
+                                  rc.has_ecol ? rc.ecol[1 * 3 + cvfem_hex8_edge_dir(i, j)]
+                                              : (rc.y ? rc.y[j] - rc.y[i] : scalar_t(0)),
+                                  rc.has_ecol ? rc.ecol[2 * 3 + cvfem_hex8_edge_dir(i, j)]
+                                              : (rc.z ? rc.z[j] - rc.z[i] : scalar_t(0)),
                                   rho > scalar_t(0) ? mu / rho : mu,
                                   rc.x ? pcfg : Hex8PecletConfig<scalar_t>{});
         // The deferred correction, added to the first-order flux and to nothing else. The
@@ -1988,9 +2022,10 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_jac_rhie_chow_p(const scalar
                                                    scalar_t *const SFEM_RESTRICT         values,
                                                const scalar_t ueps = scalar_t(0)) {
     if (!p || !cvfem_hex8_rhie_chow_active(rc)) return;
-    const scalar_t dx    = rc.x[j] - rc.x[i];
-    const scalar_t dy    = rc.y[j] - rc.y[i];
-    const scalar_t dz    = rc.z[j] - rc.z[i];
+    const int      q_    = rc.has_ecol ? cvfem_hex8_edge_dir(i, j) : 0;
+    const scalar_t dx    = rc.has_ecol ? rc.ecol[0 * 3 + q_] : rc.x[j] - rc.x[i];
+    const scalar_t dy    = rc.has_ecol ? rc.ecol[1 * 3 + q_] : rc.y[j] - rc.y[i];
+    const scalar_t dz    = rc.has_ecol ? rc.ecol[2 * 3 + q_] : rc.z[j] - rc.z[i];
     const scalar_t coeff = cvfem_hex8_rhie_chow_mdot_coeff(rho, mu, rc.scale, dx, dy, dz, ax, ay, az,
                                                            cvfem_hex8_rhie_chow_u2(rc, i, j), rc.tau.inv_dt_a0);
     if (coeff == scalar_t(0)) return;

@@ -902,8 +902,30 @@ struct Hex8ExtraScratch {
                 uy[a]                = d.uy[g];
                 uz[a]                = d.uz[g];
             }
-            rc = Hex8RhieChow{x,       y,  z,  pgx, pgy, pgz, opt.rcfg.scale, nullptr, nullptr,
-                              nullptr, ux, uy, uz,  opt.rcfg.tau};
+            rc = Hex8RhieChow{};
+            rc.x = x; rc.y = y; rc.z = z;
+            rc.pgx = pgx; rc.pgy = pgy; rc.pgz = pgz;
+            rc.scale = opt.rcfg.scale;
+            rc.ux = ux; rc.uy = uy; rc.uz = uz;
+            rc.tau = opt.rcfg.tau;
+            // The affine edge vectors, so this reference discretises the same operator the
+            // vectorised kernels do. Without them the reference differences node coordinates
+            // while the kernel under test takes the Jacobian column, and the two disagree
+            // wherever the mesh is not exactly affine in floating point -- amplified by the
+            // near-cancellation in the Rhie-Chow correction into a visible error.
+            {
+                scalar_t adj_[9], det_;
+                load_hex8_adj(d, e, adj_, &det_);
+                scalar_t ex_[3], ey_[3], ez_[3];
+                cvfem_hex8_affine_edge_cols(adj_[0], adj_[1], adj_[2], adj_[3], adj_[4], adj_[5],
+                                            adj_[6], adj_[7], adj_[8], det_, ex_, ey_, ez_);
+                for (int q_ = 0; q_ < 3; ++q_) {
+                    rc.ecol[0 * 3 + q_] = ex_[q_];
+                    rc.ecol[1 * 3 + q_] = ey_[q_];
+                    rc.ecol[2 * 3 + q_] = ez_[q_];
+                }
+                rc.has_ecol = true;
+            }
             if (opt.with_qg) {
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                     const smesh::idx_t g = d.elems[a][e];
