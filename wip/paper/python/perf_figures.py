@@ -1434,8 +1434,10 @@ def _convho_spmv_lines(spmv, xref):
     edges and only its y from the data, which is what the -| operator does. The legend image is
     added by hand for the same reason."""
     out = []
-    for store, col, lab in (("f64", "PackE", r"BSR SpMV \texttt{f64}"),
-                            ("f32", "PackC", r"BSR SpMV \texttt{f32}")):
+    # "SpMV", not "BSR SpMV": the reference is introduced under its full name in F5 and in the
+    # caption, and these two entries share a crowded legend with the two bar series.
+    for store, col, lab in (("f64", "PackE", r"SpMV \texttt{f64}"),
+                            ("f32", "PackC", r"SpMV \texttt{f32}")):
         v = (spmv or {}).get(store)
         if not v:
             continue

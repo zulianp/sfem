@@ -485,12 +485,11 @@ and a full pass over it disappears from every application.
 
 \begin{table}[t]
   \centering
-  \caption{\fostag{} Stored size per degree of freedom, excluding the solution and result vectors,
-    which are identical for every representation: the assembled matrix carries its values and
-    sparsity pattern, the matrix-free side its mesh. The two mesh rows are measured array by
-    array; the assembled rows follow from the sparsity pattern. The matrix-free side also reads
-    cached affine geometry, \SI{19.5}{\byte} per degree of freedom, which is not a property of the
-    mesh format and is accounted for in the roofline of \S\ref{sec:res:spmv} instead.}
+  \caption{\fostag{} Stored size per degree of freedom, excluding the solution and result
+    vectors, which every representation carries alike. Mesh rows are measured array by array,
+    assembled rows follow from the sparsity pattern. The matrix-free side also reads
+    \SI{19.5}{\byte} of cached affine geometry per degree of freedom, which is not a mesh
+    property and is charged in the roofline of \S\ref{sec:res:spmv} instead.}
   \label{tab:footprint}
   \input{tables/footprint}
 \end{table}
@@ -678,10 +677,10 @@ more of its time in exactly the sweep the packed layout accelerates most.
 
 \begin{table}[t]
   \centering
-  \caption{Sweeps over the mesh per operator application. Amortised sweeps run once per Newton
-    step and are reused across the Krylov solve --- the nodal gradient for the hoisted and
-    higher-order rows, the assembly itself for the matrix. They do not appear per application,
-    but they are not free.}
+  \caption{Sweeps over the mesh per operator application. Amortised sweeps --- the nodal
+    gradient for the hoisted and higher-order rows, the assembly itself for the matrix --- run
+    once per Newton step and are reused across the Krylov solve, so they do not appear here;
+    they are not free.}
   \label{tab:passes}
   \small
   \begin{tabular}{@{}lccc@{}}
@@ -835,14 +834,10 @@ takes it up.
 \begin{figure}[t]
   \centering
   \input{figures/packsize}
-  \caption{Throughput of the \emph{exact} Rhie--Chow Jacobian action --- the two-sweep form,
-    carrying the boundary closure --- against packs per thread, at two problem sizes. Solid:
-    first-order upwinding. Dashed: the same action with the Darwish--Moukalled limiter, roughly
-    \pkszHoWorkFactor$\times$ the work per degree of freedom. The pack size is the knob, but packs
-    per thread is what explains the collapse: the two sizes fail at the same place on this axis
-    while failing at different pack sizes, and the higher-order arm falls at the same place and by
-    the same fraction (\pkszKneeFo{} and \pkszKneeHo{} of the rate before the knee), so the limit
-    is parallel work units and not what the kernel does with them.}
+  \caption{Throughput of the \emph{exact} Rhie--Chow Jacobian action (two-sweep, with the
+    boundary closure) against packs per thread, at two problem sizes. Solid: first-order
+    upwinding. Dashed: the same action with the Darwish--Moukalled limiter. The pack size is the
+    knob; packs per thread is the axis on which the collapse is explained.}
   \label{fig:packsize}
 \end{figure}
 
@@ -858,7 +853,11 @@ At $n=\packLargeN{}$ the ceiling-derived pack leaves $\packLargeCeilPacks{}$ pac
 and gives up $\packLargeCeilLoss\times$ against the best size (Figure~\ref{fig:packsize}). At
 $n=\packSmallN{}$ it leaves $\packSmallCeilPacks{}$ packs, \packSmallCeilPpt{} per thread, and
 throughput falls by $\packSmallCeilLoss\times$. Plotted against packs per thread the two curves
-fail together, identifying parallel granularity rather than cache residency as the mechanism.
+fail together at the same place on this axis while failing at different pack sizes,
+identifying parallel granularity rather than cache residency as the mechanism. Arithmetic does
+not move the knee either: at \pkszHoWorkFactor$\times$ the work per degree of freedom the limited
+higher-order arm falls at the same place, retaining \pkszKneeHo{} of its pre-knee rate against
+\pkszKneeFo{} for first order.
 
 The default therefore derives from the core count, with the index-width ceiling retained as the
 correctness bound it is: the packer targets \packsPerThread{} packs per thread and rounds to a
@@ -909,13 +908,12 @@ to it.
 \begin{figure}[t]
   \centering
   \inputifready{figures/jacho}{Jacobian scheme arms, jobs/jac\_ho\_bench.sbatch}
-  \caption{The same five schemes for the \emph{Jacobian action}, differentiated through the
-    correction. The trend is not Figure~\ref{fig:convho}'s: the ratio \emph{rises} from
-    $\jachoFirstLayoutRatio\times$ on first-order upwind to $\jachoUnlimLayoutRatio\times$ on the
-    unlimited arm before falling to $\jachoDmLayoutRatio\times$, because differentiating the
-    correction adds the direction's nodal gradient reconstruction --- the sweep the format helps
-    most --- while the limiter derivatives add per-surface arithmetic no layout helps. Dashed:
-    the same SpMV references.}
+  \caption{The same five schemes for the \emph{Jacobian action}, with the correction
+    differentiated --- the \emph{exact} action. The \emph{lagged} action, which is the default,
+    leaves the Jacobian first-order: it reproduces the \texttt{upwind} bar's result to the last
+    bit, at \jachoLaggedPacked{}~MDOF/s packed. Unlike Figure~\ref{fig:convho}, the layout ratio rises
+    before it falls, $\jachoFirstLayoutRatio$ to $\jachoUnlimLayoutRatio$ to
+    $\jachoDmLayoutRatio\times$. Dashed: the same SpMV references.}
   \label{fig:jacho}
 \end{figure}
 
@@ -1024,15 +1022,12 @@ recovers the convergence the lagged form loses.
   \centering
   \input{figures/roofline}
   \caption{Two roof pairs: solid measured on the node the points were
-    (\SI{\rlBw}{\giga\byte\per\second} triad, \SI{\rlPeak}{\giga\flops} GEMM), dashed the
-    vendor specification (\SI{\rlSpecBw}{\giga\byte\per\second}, \SI{\rlSpecPeak}{\tflops});
-    ridges at \rlRidge{} and \rlSpecRidge{}~FLOP/byte. Markers are first-order upwind --- the
-    matrix-free ones \emph{bare} element kernels, the SpMV ones the lagged matrix.
-    The higher-order schemes are the further points in each layout's colour, with the marker
-    naming the scheme as in the legend; they are separate operators, ordered among themselves
-    only by the arithmetic each adds.
-    Intensity uses \emph{measured} DRAM traffic; a hollow marker means the compulsory-traffic
-    model instead.}
+    (\SI{\rlBw}{\giga\byte\per\second} triad, \SI{\rlPeak}{\giga\flops} GEMM), dashed the vendor
+    specification (\SI{\rlSpecBw}{\giga\byte\per\second}, \SI{\rlSpecPeak}{\tflops});
+    ridges at \rlRidge{} and \rlSpecRidge{}~FLOP/byte. Matrix-free markers are \emph{bare}
+    first-order element kernels, SpMV markers the lagged matrix; the further points in each
+    layout's colour are the higher-order schemes, named by marker in the legend. Intensity uses
+    \emph{measured} DRAM traffic; a hollow marker means the compulsory-traffic model.}
   \label{fig:roofline}
 \end{figure}
 
