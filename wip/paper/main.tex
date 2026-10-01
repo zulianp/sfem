@@ -100,8 +100,9 @@ are not, free of both costs colouring pays, and reads a mesh where assembly read
 We evaluate it on the residual and matrix-free Jacobian action of a colocated CVFEM
 Navier--Stokes discretisation on an NVIDIA Grace CPU. On \campDofs{} degrees of freedom the
 packed residual reaches \campResPacked{}~MDOF/s against \campSpmvF{} for a sparse
-matrix--vector product with the lagged matrix, reading \fpImpl{}~bytes of mesh per degree of
-freedom where the product reads \fpMatrixFSixFour{} of matrix. The Jacobian action is reported
+matrix--vector product with the lagged matrix. Per degree of freedom the sweep reads
+\fpImpl{}~bytes of mesh; the product reads \fpMatrixFSixFour{}~bytes of matrix. The Jacobian
+action is reported
 in both forms, since they are not the same operator: lagged, it is what the matrix holds, at
 $\jfLaggedVsF\times$ the product; differentiated, what a Newton--Krylov solve applies, it costs
 $\jfExactCost\times$ and is $\jfExactVsF\times$. Most of the advantage is present at one thread,
