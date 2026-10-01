@@ -188,9 +188,12 @@ making the result bitwise identical at every thread count.
         sparse matrix--vector products, reported along a \emph{term-completeness ladder} and
         across convective schemes, so that the quoted margin is the one a solver sees
         (\S\ref{sec:res:throughput}).
-  \item An analysis of pack sizing showing that the index-type ceiling, which is what actually
-        selects the default pack size, chooses a pack far larger than the throughput optimum and
-        leaves fewer parallel work units than the machine has cores (\S\ref{sec:res:packsize}).
+  \item An investigation of pack-size optimality, identifying \emph{packs per thread} as the
+        quantity that sets it: two problem sizes and two convective schemes share a knee on that
+        axis while reaching it at different pack sizes, so the optimum follows the core count
+        rather than the cache or the kernel. The default derives from it, at \packsPerThread{}
+        packs per thread, against the \packSmallCeilPpt{} the index-type ceiling leaves at the
+        smaller size (\S\ref{sec:res:packsize}).
 \end{itemize}
 
 %================================================================================================
