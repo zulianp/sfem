@@ -45,17 +45,20 @@ echo "### ho_unlim_lagged is the lagged action, which carries no correction deri
 echo
 
 printf '%-22s %-8s %10s %10s %10s %10s %14s\n' arm layout MDOF_s dofs elems flops_el checksum
-for arm in "first_order|atomic|--jac-action" \
-           "first_order|packed|--jac-action" \
-           "ho_unlimited|atomic|--jac-action --conv-ho 0" \
-           "ho_unlimited|packed|--jac-action --conv-ho 0" \
-           "ho_unlim_lagged|packed|--jac-action --conv-ho 0 --lagged-ho" \
-           "ho_clip|atomic|--jac-action --conv-ho 1" \
-           "ho_clip|packed|--jac-action --conv-ho 1" \
-           "ho_venkatakrishnan|atomic|--jac-action --conv-ho 2" \
-           "ho_venkatakrishnan|packed|--jac-action --conv-ho 2" \
-           "ho_darwish_moukalled|atomic|--jac-action --conv-ho 3" \
-           "ho_darwish_moukalled|packed|--jac-action --conv-ho 3"; do
+# EVERY arm carries --rhie-chow, exact, so each bar is the same operator as the matching
+# "exact" row of the fair-comparison table and the two can be read against each other. The bare
+# rates this sweep used to report are the completeness ladder's subject, not this figure's.
+for arm in "first_order|atomic|--jac-action --rhie-chow" \
+           "first_order|packed|--jac-action --rhie-chow" \
+           "ho_unlimited|atomic|--jac-action --rhie-chow --conv-ho 0" \
+           "ho_unlimited|packed|--jac-action --rhie-chow --conv-ho 0" \
+           "ho_unlim_lagged|packed|--jac-action --rhie-chow --conv-ho 0 --lagged-ho" \
+           "ho_clip|atomic|--jac-action --rhie-chow --conv-ho 1" \
+           "ho_clip|packed|--jac-action --rhie-chow --conv-ho 1" \
+           "ho_venkatakrishnan|atomic|--jac-action --rhie-chow --conv-ho 2" \
+           "ho_venkatakrishnan|packed|--jac-action --rhie-chow --conv-ho 2" \
+           "ho_darwish_moukalled|atomic|--jac-action --rhie-chow --conv-ho 3" \
+           "ho_darwish_moukalled|packed|--jac-action --rhie-chow --conv-ho 3"; do
     IFS='|' read -r lbl lay extra <<<"$arm"
     best=""; dofs=""; ck=""; elems=""; fpe=""
     # Best of three passes: one pass cannot separate this band -- the residual carries a large

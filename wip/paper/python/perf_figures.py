@@ -955,6 +955,12 @@ def parse_dram(path):
             continue
         if r_hi <= r_lo or dofs <= 0:
             continue
+        # A capture that did not increase with the repeat count did not measure the applies. One
+        # came back with the high-repeat read three orders of magnitude BELOW the low-repeat one,
+        # which would have placed a negative intensity on the roofline without complaint. Rows
+        # from an earlier file survive, because the merge takes files in order.
+        if b_hi <= b_lo:
+            continue
         out[(op, lay)] = (b_hi - b_lo) / float(r_hi - r_lo) / dofs
     return out
 
@@ -1258,7 +1264,10 @@ def macros_roofline_ho(ho, measured_bytes, ho_jac=None):
     out = []
     for lay, tag in (("packed", "Packed"), ("atomic", "Atomic")):
         b = (measured_bytes or {}).get(("residual-ho", lay))
-        fo = (measured_bytes or {}).get(("residual", lay))
+        # The first-order baseline is the Rhie--Chow residual, not the bare one, because the
+        # higher-order arm carries Rhie--Chow too; against the bare arm the ratio would count the
+        # coupling as part of what the correction costs.
+        fo = (measured_bytes or {}).get(("residual_rc", lay))
         if b:
             out.append(r"\newcommand{\hoBytes%s}{%.0f}" % (tag, b))
         if fo:

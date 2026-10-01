@@ -69,23 +69,26 @@ echo "### scalar-vs-scalar isolates the LAYOUT; generated-vs-scalar isolates the
 echo
 
 printf '%-22s %-8s %10s %10s %10s %10s %14s\n' arm layout MDOF_s dofs elems flops_el checksum
-for arm in "first_order|atomic|" \
-           "first_order|packed|" \
-           "ho_unlimited|atomic|--conv-ho 0" \
-           "ho_unlimited|packed|--conv-ho 0" \
-           "ho_unlim_scalar|packed|--conv-ho 0 --ho-scalar" \
-           "ho_unlim_simd|packed|--conv-ho 0 --ho-simd" \
-           "ho_unlim_rc|packed|--conv-ho 0 --rhie-chow" \
-           "ho_unlim_rc_scalar|packed|--conv-ho 0 --rhie-chow --ho-scalar" \
-           "ho_clip|atomic|--conv-ho 1" \
-           "ho_clip|packed|--conv-ho 1" \
-           "ho_clip_scalar|packed|--conv-ho 1 --ho-scalar" \
-           "ho_venkatakrishnan|atomic|--conv-ho 2" \
-           "ho_venkatakrishnan|packed|--conv-ho 2" \
-           "ho_venk_scalar|packed|--conv-ho 2 --ho-scalar" \
-           "ho_darwish_moukalled|atomic|--conv-ho 3" \
-           "ho_darwish_moukalled|packed|--conv-ho 3" \
-           "ho_dm_scalar|packed|--conv-ho 3 --ho-scalar"; do
+# EVERY arm carries --rhie-chow. The sweep used to run the bare operator, which made its rates
+# incomparable with the Jacobian table's -- the same scheme appeared at two rates a third apart
+# and nothing said why. The pressure-velocity coupling is part of the operator a solver applies,
+# so it is on here as it is everywhere else; the bare rates remain in the completeness ladder,
+# which is the table whose subject they are.
+for arm in "first_order|atomic|--rhie-chow" \
+           "first_order|packed|--rhie-chow" \
+           "ho_unlimited|atomic|--rhie-chow --conv-ho 0" \
+           "ho_unlimited|packed|--rhie-chow --conv-ho 0" \
+           "ho_unlim_scalar|packed|--rhie-chow --conv-ho 0 --ho-scalar" \
+           "ho_unlim_simd|packed|--rhie-chow --conv-ho 0 --ho-simd" \
+           "ho_clip|atomic|--rhie-chow --conv-ho 1" \
+           "ho_clip|packed|--rhie-chow --conv-ho 1" \
+           "ho_clip_scalar|packed|--rhie-chow --conv-ho 1 --ho-scalar" \
+           "ho_venkatakrishnan|atomic|--rhie-chow --conv-ho 2" \
+           "ho_venkatakrishnan|packed|--rhie-chow --conv-ho 2" \
+           "ho_venk_scalar|packed|--rhie-chow --conv-ho 2 --ho-scalar" \
+           "ho_darwish_moukalled|atomic|--rhie-chow --conv-ho 3" \
+           "ho_darwish_moukalled|packed|--rhie-chow --conv-ho 3" \
+           "ho_dm_scalar|packed|--rhie-chow --conv-ho 3 --ho-scalar"; do
     IFS='|' read -r lbl lay extra <<<"$arm"
     best=""; dofs=""; ck=""; elems=""; fpe=""
     # Best of three passes: one pass cannot separate this band -- the residual carries a large
