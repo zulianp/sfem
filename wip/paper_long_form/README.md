@@ -17,6 +17,7 @@ that implements it.
 | 2 | geometry: the affine and isoparametric variants, and why the Jacobian determines the affine edge vectors |
 | 3 | components: viscous, convective, upwind split, Rhie–Chow, transient, boundary |
 | 4 | the five convective schemes, each limiter in closed form, and the bound-preservation table |
+| 6 | **the selected kernel per operation and layout**, with function names and the margin over the alternative |
 | 5 | **the micro-kernels**: staging, loop structure, compile-time dispatch, per-scheme generated kernels, what the layout changes |
 | 6 | the Jacobian action: lagged vs exact, the coefficient's velocity sensitivity, limiter subgradients, partial assembly, the three oracles |
 | 7 | the nodal gradient reconstruction, and the optimisations that were measured and rejected |
@@ -29,12 +30,14 @@ Darwish–Moukalled algebra, every limiter derivative — the departure is state
 given. Those are exactly the places where reading the equations and the source side by side would
 otherwise mislead.
 
-**No measured number is typed in.** Timings belong to the paper, which generates them from the
-measurement files under `wip/paper/data`. What this document carries instead are *counts* —
+**No absolute timing is typed in.** Throughputs belong to the paper, which generates them from
+the measurement files under `wip/paper/data`. What this document carries instead are *counts* —
 loads per surface, live values, lines of generated kernel, the bound-preservation percentages —
-which are properties of the written kernel or of an instrumented run, and are verifiable by
-reading the source. If a count here disagrees with the source, the source is right and this is
-stale.
+which are properties of the written kernel or of an instrumented run; and *ratios* between
+alternatives measured against each other in one job, which are the evidence for the selection
+table in section 6 and cannot be stated without them. Each ratio names its job id, because the
+tree moved under these measurements and a ratio from one state is not comparable with an absolute
+from another. If a count here disagrees with the source, the source is right and this is stale.
 
 ## Why the rejected optimisations are in here
 

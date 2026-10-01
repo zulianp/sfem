@@ -1,0 +1,146 @@
+\section{The selected kernel, per operation and layout}
+\label{sec:sel}
+
+This section is the dispatch, stated once. For each operation and each mesh layout it names the
+function that runs, and the margin by which it beat the alternative that was built and measured
+beside it. Ratios are between kernels measured against each other in \emph{one} job, with the job
+id given, because the tree moved under these measurements: a ratio from one state is evidence
+about a choice, an absolute throughput from the same job is not comparable with one from another.
+
+\subsection{The dispatch}
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}llp{0.40\linewidth}@{}}
+\toprule
+operation & layout & kernel that runs \\
+\midrule
+residual, first order & packed
+  & \code{apply\_residual\_packed} $\rightarrow$ \code{cvfem\_hex8\_ns\_upwind\_residual\_sumfact\_simd}
+    $\rightarrow$ \code{cvfem\_hex8\_conv\_all\_simd} \\
+residual, first order & standard
+  & \code{apply\_residual\_atomic\_sumfact\_simd} $\rightarrow$ the same two \\
+\midrule
+residual, higher order & packed
+  & \code{apply\_residual\_packed\_defcor}$(\texttt{sympy=true})$ $\rightarrow$ generated
+    \code{cvfem\_hex8\_ns\_upwind\_sympy\_residual\_defcor\_rc\_lim$L$\_simd} \\
+residual, higher order & standard
+  & \code{apply\_residual\_atomic\_sumfact\_simd} $\rightarrow$ \emph{the same generated kernels},
+    when $\texttt{venkat\_c} = 0$ \\
+\midrule
+Jacobian action & both
+  & \code{cvfem\_hex8\_ns\_upwind\_jacobian\_action\_simd} $\rightarrow$
+    \code{cvfem\_hex8\_conv\_all\_jv\_simd} $\rightarrow$ \code{cvfem\_hex8\_conv\_face\_jv\_simd} \\
+Jacobian, partial assembly & both
+  & \code{cvfem\_hex8\_ns\_upwind\_jacobian\_action\_pa\_simd} $\rightarrow$
+    \code{cvfem\_hex8\_conv\_face\_jv\_pa\_simd} \\
+\midrule
+nodal gradients & packed & \code{cvfem\_hex8\_nodal\_grads\_packed\_nc<NC>} \\
+nodal gradients & standard & \code{cvfem\_hex8\_nodal\_grads\_atomic\_nc<NC>} \\
+\midrule
+matrix assembly (BSR) & both & generated \code{cvfem\_hex8\_ns\_upwind\_sympy\_jacobian\_add\_bsr\_slots} \\
+SpMV & --- & \code{bsr\_spmv\_static\_4x4} (\code{algebra/bsr/sfem\_BSR.hpp}) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two rows deserve emphasis. The higher-order residual runs the \emph{same} generated kernels on
+both layouts --- there is no hand-vectorised second copy of that arithmetic, and the
+\code{venkat\_c} condition is the only thing that diverts the standard layout to the hand-written
+path. And the Jacobian names the same kernel for both layouts, because the layouts differ in how
+the contribution reaches the global vector, not in the arithmetic.
+
+\subsection{The surface-loop shape: opposite answers for residual and Jacobian}
+\label{sec:sel:shape}
+
+The twelve surfaces can be swept as one lane loop or as twelve, and the right choice is
+\emph{not} the same for the two operators. This is the single most counter-intuitive selection in
+the code and the reason both shapes exist.
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}lllrr@{}}
+\toprule
+operator & shape selected & alternative measured & packed & standard \\
+\midrule
+residual   & one fused lane loop, accumulate in registers
+           & one vectorised loop per surface & $1.04$--$1.06$ & $1.04$ \\
+residual   & \emph{(same)}
+           & momentum/continuity in two passes & $0.66$ & $0.78$ \\
+Jacobian   & one vectorised loop per surface
+           & all twelve fused, into the pack & $0.78$ & $0.86$ \\
+Jacobian   & \emph{(same)}
+           & all twelve fused, into lane-private scalars & $0.88$ & $0.91$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Residual rows from jobs \texttt{4953418} and \texttt{4954981}; Jacobian rows from job
+\texttt{4952101}. Every one of these carried a control arm running untouched code, which read
+within $0.4\%$ of unity --- without it the numbers would be unreadable, since node-to-node
+variation on this machine is $4$--$5\%$.
+
+The mechanism is register capacity, and it explains the sign change. Fusing lets a node's three
+surface contributions be summed in a register and stored once, which is worth a few percent on
+the residual. The Jacobian additionally carries the direction pack and the correction's
+derivative, so fusing pushes its live set further past the thirty-two available registers than the
+saved round-trips are worth. The row-split line is the sharpest evidence that the live set rather
+than the schedule is binding: halving the accumulator count is exactly the lever the spill count
+suggests, and it moved neither the spill frame ($1952 \rightarrow 1968$ bytes) nor the spill count
+($1061 \rightarrow 1085$), while adding $20\%$ more instructions to recompute the mass flux.
+
+\subsection{Generated against hand-written, per scheme}
+
+For the higher-order schemes the generated whole-element kernels beat the hand-written lane
+kernel on every arm (job \texttt{4954898}, packed, the \code{\_scalar} suffix naming the
+hand-written path):
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}lll@{}}
+\toprule
+scheme & generated kernel & over hand-written \\
+\midrule
+unlimited, $+$Rhie--Chow & \code{...\_defcor\_rc\_lim0\_simd} & $1.48\times$ \\
+bounded-face clip        & \code{...\_defcor\_lim1\_simd}     & $1.29\times$ \\
+Venkatakrishnan          & \code{...\_defcor\_lim2\_simd}     & $1.27\times$ \\
+Darwish--Moukalled       & \code{...\_defcor\_lim3\_simd}     & $1.20\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The margin is largest on the unlimited arm because that is where whole-element common
+subexpression elimination has the most to share and the least limiter algebra to carry.
+
+Venkatakrishnan's figure is the one to read with the history in mind. Until its guard was moved
+off the denominator (Section~\ref{sec:schemes}) the generated kernel contained \emph{zero} vector
+instructions, and fixing it was worth $1.21\times$ packed and $1.18\times$ standard on its own
+(jobs \texttt{4953817} and \texttt{4954818}) --- which also moved the scheme from slower than
+Darwish--Moukalled to level with it, the ordering its flop count predicts. A table of "best
+kernels" assembled before that fix would have recorded the generated Venkatakrishnan kernel as the
+best available while it was running scalar, which is a caution about what such a table does and
+does not establish: it reports which of the \emph{built} alternatives won, not that the winner is
+good.
+
+\subsection{Where a rejected alternative is still in the tree}
+
+Three selections above have alternatives that remain reachable, deliberately:
+
+\begin{itemize}
+\item The hand-written scalar higher-order path, reached by \code{--ho-scalar}. It is the oracle
+      the generated kernels are verified against
+      (\code{verify\_packed\_ho\_rc\_sympy\_vs\_scalar\_abs}, $\sim 3.5\times10^{-18}$), so it is
+      a reference and not dead code.
+\item The partially assembled Jacobian, selected by the solver rather than by performance: it
+      trades a build for cheaper applies, which pays only because the Jacobian is applied many
+      times at a fixed state.
+\item The coloured layout (\code{cvfem\_hex8\_best\_colored.hpp}), which is neither the packed nor
+      the atomic answer but a third scatter strategy kept for comparison.
+\end{itemize}
+
+\noindent
+The reschedulings of Section~\ref{sec:sel:shape} that lost are \emph{not} in the tree. They are
+recorded as comments with their numbers at the site that rejected them, because each one's static
+argument --- a load count, a spill count, an accumulator count --- stays convincing enough that a
+reader will otherwise rebuild them.
