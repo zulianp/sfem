@@ -1865,6 +1865,8 @@ def macros_hoexact(rates, checks, frac=None):
 JF_NAME = {
     "jac_exact":     "Jacobian action, exact",
     "jac_lagged":    "Jacobian action, lagged",
+    "jac_clip_exact":  "Jacobian action, exact",
+    "jac_clip_lagged": "Jacobian action, lagged",
     "jac_ho_exact":  "Jacobian action, exact",
     "jac_ho_lagged": "Jacobian action, lagged",
     "spmv_f64":      r"SpMV, lagged \texttt{f64}",
@@ -1873,7 +1875,9 @@ JF_NAME = {
 
 # The matrix-free blocks, in table order. The higher-order block is present only when the job ran
 # it, so a data file written before those arms existed still produces the two-row table.
+# Ordered by arithmetic per sub-control surface, as Figures 8 and 9 order their bars.
 JF_BLOCKS = [("first-order upwind", ("jac_exact", "jac_lagged")),
+             ("bounded-face clip", ("jac_clip_exact", "jac_clip_lagged")),
              ("Darwish--Moukalled", ("jac_ho_exact", "jac_ho_lagged"))]
 
 
@@ -1975,6 +1979,10 @@ def macros_jacfair(rows):
         out.append(r"\newcommand{\jfLaggedAtomicVsF}{%.2f}" % (la / f64))
     # The higher-order block, whose point is how much of the matrix-free margin survives an
     # operator the matrix cannot encode at all.
+    # The cheaper limiter, so the prose can bracket what a limiter costs rather than quote one.
+    clip = by.get("jac_clip_exact", {}).get("packed")
+    if clip and f64:
+        out.append(r"\newcommand{\jfClipExactVsF}{%.2f}" % (clip / f64))
     hex_, hlg = (by.get("jac_ho_exact", {}).get("packed"),
                  by.get("jac_ho_lagged", {}).get("packed"))
     if hlg and f64:

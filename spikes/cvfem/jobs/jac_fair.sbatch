@@ -27,6 +27,8 @@
 # make is against an operator the matrix CAN hold, and the higher-order correction is one it
 # cannot hold at any sparsity: differentiating it reaches the direction's nodal velocity
 # gradient, which widens the coupling past the one ring the matrix is built on. So the
+# Two limiters rather than one: the bounded-face clip is the cheapest of them and
+# Darwish--Moukalled among the dearest, so the pair brackets what a limiter costs the action.
 # higher-order arms have no matrix counterpart, and reporting them beside the first-order ones
 # is what shows the size of what the assembled representation gives up -- not a second
 # like-for-like row. The scheme is Darwish--Moukalled, the same one Figures 7 to 9 single out.
@@ -64,6 +66,10 @@ for arm in "jac_exact|packed|--jac-action --rhie-chow" \
            "jac_exact|atomic|--jac-action --rhie-chow" \
            "jac_lagged|packed|--jac-action --rhie-chow --lagged-rc" \
            "jac_lagged|atomic|--jac-action --rhie-chow --lagged-rc" \
+           "jac_clip_exact|packed|--jac-action --rhie-chow --conv-ho 1" \
+           "jac_clip_exact|atomic|--jac-action --rhie-chow --conv-ho 1" \
+           "jac_clip_lagged|packed|--jac-action --rhie-chow --lagged-rc --conv-ho 1" \
+           "jac_clip_lagged|atomic|--jac-action --rhie-chow --lagged-rc --conv-ho 1" \
            "jac_ho_exact|packed|--jac-action --rhie-chow --conv-ho 3" \
            "jac_ho_exact|atomic|--jac-action --rhie-chow --conv-ho 3" \
            "jac_ho_lagged|packed|--jac-action --rhie-chow --lagged-rc --conv-ho 3" \

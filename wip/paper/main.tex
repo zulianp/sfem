@@ -1252,11 +1252,12 @@ kernel by those factors.
 %================================================================================================
 \begin{table}[t]
   \centering
-  \caption{The Jacobian action in both forms and under both convective schemes, each layout
+  \caption{The Jacobian action in both forms and under three convective schemes, each layout
     against the double-precision product with the lagged matrix (the \texttt{f64} row, which the
     ratios divide by and which has no layout of its own). Within each block the lagged row lags
     the Rhie--Chow term and the exact row differentiates it; the higher-order correction stays
-    differentiated in both, since lagging it reproduces the first-order action exactly. Only the
+    differentiated in both, since lagging it reproduces the first-order action exactly. The
+    limiters are the cheapest and among the dearest, so they bracket what one costs. Only the
     first-order lagged row holds the operator the matrix does --- the higher-order rows have no
     matrix counterpart at all.}
   \label{tab:jacfair}
@@ -1276,9 +1277,10 @@ sweep appearing as throughput. Quoting the exact action against the SpMV would r
 $\jfExactVsF\times$ rather than $\jfLaggedVsF\times$, understating the matrix-free side by a quarter
 while appearing to favour it; both are given because they answer different questions.
 
-The higher-order block is where the comparison stops being one. Under Darwish--Moukalled the
-packed action costs $\jfHoCostExact\times$ its first-order self and lands at
-$\jfHoExactVsF\times$ the double-precision SpMV --- below it. Read as a throughput ratio that
+The higher-order blocks are where the comparison stops being one. The packed action lands
+below the double-precision SpMV under both limiters, at $\jfClipExactVsF\times$ for the
+bounded-face clip and $\jfHoExactVsF\times$ for Darwish--Moukalled, the latter costing
+$\jfHoCostExact\times$ its first-order self. Read as a throughput ratio that
 is a loss, and it would be, if the matrix held the same operator. It cannot: the higher-order
 correction differentiates through a nodal reconstruction, so the coupling it induces reaches
 past the one ring the matrix's sparsity is built on, and assembling it would mean a different
