@@ -1,0 +1,108 @@
+\section{The Jacobian action}
+\label{sec:jac}
+
+The solver applies $\partial R/\partial q$ to a direction $v$ without assembling it. Two variants
+exist and they differ in whether the deferred correction and the Rhie--Chow reconstruction are
+differentiated.
+
+\subsection{Lagged and exact}
+
+The \textbf{lagged} action differentiates the first-order operator only: the correction
+$\mathbf{h}_\scs$ contributes nothing, and the Rhie--Chow term is differentiated with the nodal
+pressure gradient held fixed. This is the operator the assembled matrix can represent, because
+including either term widens the pressure coupling past nearest neighbours and breaks the
+one-ring sparsity.
+
+The \textbf{exact} action differentiates both. The costs are asymmetric and worth separating:
+
+\begin{itemize}
+\item Differentiating the Rhie--Chow correction, Eq.~\eqref{eq:corr}, requires the
+      \emph{direction's} nodal pressure gradient, so a reconstruction pass runs per matvec. Its
+      absence is not visible in the residual and does not make any single Newton step fail --- it
+      caps Newton at a linear rate, and only where the continuity rows matter. On a
+      backward-facing step, omitting it put the Jacobian $11.7\%$ away from a finite difference of
+      the residual in the continuity rows while momentum stayed at $0.3\%$.
+\item Differentiating the correction requires the direction's nodal \emph{velocity} gradient ---
+      nine components against the three the pressure term needs --- plus the limiter's own
+      derivative.
+\end{itemize}
+
+Both direction gradients are produced by one reconstruction sweep rather than two, since the pass
+is parameterised by field count (\code{NC}).
+
+\subsection{The coefficient's velocity sensitivity}
+
+$G_\scs$ in Eq.~\eqref{eq:coeff} depends on the state through $|\bar{\uvec}|^2$, so the Jacobian
+must carry $\partial G/\partial\uvec$. Writing $G = K/\sqrt{S}$ with
+$K = \alpha|\Avec|^2/(\Avec\cdot\dvec)$ and $S$ the bracket of Eq.~\eqref{eq:coeff}, the
+derivative along $v$ with face average $\bar{v}$ is
+\begin{equation}
+\delta G \;=\; -\,g\,\bigl(\bar{\uvec}\cdot\bar{v}\bigr),
+\qquad
+g \;=\; \frac{4\,u^2_{\text{scale}}}{h^2}\,\frac{G}{S} \;=\; G^3\,w ,
+\end{equation}
+with $w$ exactly Eq.~\eqref{eq:wdu}. The $G^3 w$ factorisation is the one used because $w$ is pure
+geometry: it can be tabulated with the mesh, leaving the surface loop one multiply. The
+Rhie--Chow mass flux $-G c$ therefore gains $g\,c\,(\bar{\uvec}\cdot\bar{v})$.
+
+\subsection{Limiter derivatives and subgradients}
+\label{sec:jac:subgrad}
+
+The exact action needs $\partial\Lambda/\partial\Delta$, and two of the three limiters are not
+differentiable everywhere. How that is handled is a correctness matter, not a detail.
+
+\paragraph{The clip} is discontinuous in its derivative at both bounds. Naively differentiating
+each branch makes the result depend on which side of the bound an ulp of round-off lands, and
+since the two sides differ by a finite amount, an ulp flips an $O(1)$ quantity. In practice this
+made the Jacobian action \emph{layout dependent}: the packed and standard arms disagreed at
+$3\times10^{-3}$, because FMA contraction differs between them and tipped branches at ties. The
+fix is a rounding band: within a tolerance scaled by the magnitudes involved, the derivative takes
+the value that does not depend on which side the comparison fell.
+
+\paragraph{Darwish--Moukalled} has the same defect at $a=0$ and $b=0$, where the absolute values
+have no derivative. The two one-sided limits differ by $2\,\delta a\,b/\mathrm{den}$ and
+$2\,a\,\delta b/\mathrm{den}$ respectively. Inside a rounding band the implementation takes the
+\emph{minimum-norm subgradient}, which is zero --- the symmetric element of the subdifferential of
+$|\cdot|$ at zero. Neither side is preferred, and it is the only choice independent of where an
+ulp lands.
+
+\paragraph{Venkatakrishnan} branches too, on $\Delta \ge 0$, but needs no band: at $\Delta = 0$ its
+$\psi$ is exactly $1$ and every term carrying the branch is multiplied by $\Delta$, so the
+discontinuity cancels and the derivative is continuous there. This was checked rather than assumed.
+
+\subsection{Partial assembly}
+
+A third variant precomputes the surface quantities that do not depend on the direction and stores
+them, so the apply reads a compressed tangent instead of the state
+(\code{cvfem\_hex8\_build\_pa\_tangent}). Per surface it stores the upwind split, and for the
+Rhie--Chow arms the combined velocity-sensitivity factor $g\,c\,\bar{\uvec}$ as three components.
+The store is sixty scalars per element.
+
+This is where the economics of precomputation invert relative to the residual. The Jacobian is
+applied many times at a \emph{fixed} state, so the build amortises over the Krylov iterations; the
+residual is evaluated once per state, so precomputing for it would mean rebuilding every call.
+That asymmetry is why the Jacobian reads a tabulated $G_\scs$ while the residual recomputes it
+inline, and why the same change --- taking $\dvec$ from the Jacobian --- helped the residual
+substantially and the Jacobian not at all until $w$ was tabulated too.
+
+\subsection{Verification}
+
+Three oracles, each catching a different class of error:
+
+\begin{itemize}
+\item \textbf{Cross-layout}: the packed and standard actions compared node by node, which catches
+      staging and scatter errors. Reads $\sim10^{-16}$.
+\item \textbf{Finite difference of the residual}: catches a missing or wrong term in the
+      linearisation. The exact arm is gated; the lagged arm is gated \emph{from below}, because a
+      lagged action that agreed with the finite difference would mean the correction never reached
+      the residual and the comparison is vacuous.
+\item \textbf{Partially assembled against direct}: catches disagreement between a producer of
+      precomputed data and its consumer. This is the only one of the three that runs on a
+      non-affine mesh, and consequently the only one that can see a geometry inconsistency ---
+      Section~\ref{sec:geom:edges} records it catching one at $1.4\times10^{-5}$ that the other
+      two could not.
+\end{itemize}
+
+A verification must include whichever passes the timed apply included. Comparing an action that
+ran the boundary closure against a reference that did not reports the closure as a staging error,
+which has happened and reads as an $O(1)$ failure.

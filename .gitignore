@@ -122,3 +122,10 @@ dev-debug.log
 workflows/resample/metadata_test_field_t10.yml
 
 
+wip/paper_long_form/*.aux
+wip/paper_long_form/*.log
+wip/paper_long_form/*.out
+wip/paper_long_form/*.toc
+wip/paper_long_form/*.fls
+wip/paper_long_form/*.fdb_latexmk
+wip/paper_long_form/main.pdf
