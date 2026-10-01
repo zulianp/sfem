@@ -18,26 +18,26 @@
 \node[black!55,font=\tiny,anchor=north east] at (axis cs:62.08,2028.7) {measured 2.31 TFLOP/s};
 \node[black!55,font=\tiny,anchor=south,rotate=26.3] at (axis cs:0.42,239.4) {spec 500 GB/s};
 \node[black!70,font=\tiny,anchor=north,rotate=26.3] at (axis cs:2.20,872.4) {meas.\ 451 GB/s};
-\addplot[PackA,mark=*,mark size=2.1pt,only marks,mark options={draw=PackA,fill=PackA}] coordinates {(3.575,489.4)};
+\addplot[PackA,mark=*,mark size=2.1pt,only marks,mark options={draw=PackA,fill=PackA}] coordinates {(3.575,482.5)};
 \addlegendentry{residual, packed}
-\addplot[PackD,mark=square*,mark size=2.1pt,only marks,mark options={draw=PackD,fill=PackD}] coordinates {(3.223,200.4)};
+\addplot[PackD,mark=square*,mark size=2.1pt,only marks,mark options={draw=PackD,fill=PackD}] coordinates {(3.223,200.3)};
 \addlegendentry{residual, atomic}
-\addplot[PackC,mark=triangle*,mark size=2.1pt,only marks,mark options={draw=PackC,fill=PackC}] coordinates {(3.528,405.9)};
+\addplot[PackC,mark=triangle*,mark size=2.1pt,only marks,mark options={draw=PackC,fill=PackC}] coordinates {(3.528,405.8)};
 \addlegendentry{Jacobian, packed}
-\addplot[PackE,mark=diamond*,mark size=2.1pt,only marks,mark options={draw=PackE,fill=PackE}] coordinates {(3.374,204.6)};
+\addplot[PackE,mark=diamond*,mark size=2.1pt,only marks,mark options={draw=PackE,fill=PackE}] coordinates {(3.374,202.6)};
 \addlegendentry{Jacobian, atomic}
-\addplot[PackB,mark=pentagon*,mark size=2.1pt,only marks,mark options={draw=PackB,fill=white}] coordinates {(0.238,95.1)};
+\addplot[PackB,mark=pentagon*,mark size=2.1pt,only marks,mark options={draw=PackB,fill=white}] coordinates {(0.238,95.6)};
 \addlegendentry{SpMV \texttt{f64}}
-\addplot[PackF,mark=otimes*,mark size=2.1pt,only marks,mark options={draw=PackF,fill=white}] coordinates {(0.454,175.6)};
+\addplot[PackF,mark=otimes*,mark size=2.1pt,only marks,mark options={draw=PackF,fill=white}] coordinates {(0.454,177.9)};
 \addlegendentry{SpMV \texttt{f32}}
-\addplot[PackA,mark=oplus*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(3.276,349.7)};
-\addplot[PackA,mark=halfsquare*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(3.607,320.6)};
-\addplot[PackA,mark=halfcircle*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(4.930,385.3)};
-\addplot[PackA,mark=star,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(5.757,429.3)};
-\addplot[PackD,mark=oplus*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackD,fill=PackD}] coordinates {(3.362,229.9)};
-\addplot[PackD,mark=halfsquare*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackD,fill=PackD}] coordinates {(3.702,222.4)};
-\addplot[PackD,mark=halfcircle*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackD,fill=PackD}] coordinates {(5.060,278.4)};
-\addplot[PackD,mark=star,mark size=2.0pt,only marks,forget plot,mark options={draw=PackD,fill=PackD}] coordinates {(5.909,316.8)};
+\addplot[PackA,mark=oplus*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(3.276,354.7)};
+\addplot[PackA,mark=halfsquare*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(3.607,321.1)};
+\addplot[PackA,mark=halfcircle*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(4.930,388.1)};
+\addplot[PackA,mark=star,mark size=2.0pt,only marks,forget plot,mark options={draw=PackA,fill=PackA}] coordinates {(5.757,432.3)};
+\addplot[PackD,mark=oplus*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackD,fill=PackD}] coordinates {(3.362,230.3)};
+\addplot[PackD,mark=halfsquare*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackD,fill=PackD}] coordinates {(3.702,223.1)};
+\addplot[PackD,mark=halfcircle*,mark size=2.0pt,only marks,forget plot,mark options={draw=PackD,fill=PackD}] coordinates {(5.060,275.8)};
+\addplot[PackD,mark=star,mark size=2.0pt,only marks,forget plot,mark options={draw=PackD,fill=PackD}] coordinates {(5.909,318.3)};
 \addlegendimage{black,mark=oplus*,mark size=2.0pt,only marks,mark options={draw=black,fill=black}}
 \addlegendentry{deferred correction, unlimited}
 \addlegendimage{black,mark=halfsquare*,mark size=2.0pt,only marks,mark options={draw=black,fill=black}}
