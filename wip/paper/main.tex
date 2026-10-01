@@ -205,8 +205,10 @@ Modern libraries build on that lineage and make the matrix-free operator the pri
 object~\cite{KronbichlerKormann2012,KronbichlerKormann2019,MFEM2021,libCEED2021,Kolev2021}, as
 do the form compilers that generate the element kernels~\cite{KirbyLogg2006,Firedrake2016}. That
 work is largely concerned with making the kernel fast, and at high order the kernel is what
-there is to make fast. At low order the element kernel is small and the reference element admits
-no sum factorisation, so what is left is the traffic and the scatter around it. This paper is concerned with that --- with what happens on either side of the
+there is to make fast. At low order the kernel is small to begin with: sum factorisation applies
+to a hexahedron and the kernels measured here use it, but its saving grows with the polynomial
+degree, so at degree one it is a constant factor on an already short kernel. What is left is the
+traffic and the scatter around it. This paper is concerned with that --- with what happens on either side of the
 element kernel rather than inside it --- and \S\ref{sec:res:spmv} shows the margin is real, with
 the low-order operators sitting below both roofs and close to neither.
 
