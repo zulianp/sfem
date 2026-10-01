@@ -355,18 +355,22 @@ the first zone can be written without synchronisation and only the shared tail c
 \subsection{Ghost lists and the reduction graph}
 \label{sec:format:ghost}
 
-The nodes a pack touches but does not own are listed per pack in a compressed row structure,
-deduplicated and ordered by first appearance in the node-major sweep of
-Algorithm~\ref{alg:build} (line~\ref{ln:ghost}).
+A pack's elements contribute to nodes it does not own, and those contributions cannot go to the
+global array: another pack owns the row. They are \emph{staged} instead, one slot per pack and
+ghost node, and summed afterwards. Two things make this cheap. The slot is written by its pack
+alone, so staging is a store and not a read-modify-write; and it is the minority path --- at the
+pack size used throughout, the staged entries number \fpGhostPct\% of the node count, and every
+owned row goes straight out.
 
-The contributions staged against those entries are closed by a separate gather, whose graph is
-built by sorting (destination, entry) pairs and grouping them (line~\ref{ln:sort}). Sorting is
-what gives it the two properties the rest of the paper rests on:
+The sum is taken over a \emph{reduction graph}: one row per destination node, listing the slots
+that contribute to it, built by sorting (destination, slot) pairs and grouping them
+(Algorithm~\ref{alg:build}, line~\ref{ln:sort}). Two properties follow, and the rest of the
+paper rests on them:
 \begin{itemize}
-  \item grouping sorted pairs cannot yield two rows with the same destination, so each
-        destination appears in exactly one row, one thread owns it, and no atomic is required;
-  \item within a row the terms are visited in a fixed index order, so the sum is the same
-        sequence of floating-point additions on every run.
+  \item grouping sorted pairs cannot yield two rows with the same destination, so one thread
+        owns each destination and no atomic is required;
+  \item within a row the slots are visited in a stored order, so the sum is the same sequence
+        of floating-point additions on every run.
 \end{itemize}
 
 \subsection{Construction}
@@ -435,10 +439,10 @@ Pass~4 produces the only array the element sweep reads. The construction is line
 connectivity apart from the sort in Pass~5, and runs once per mesh, so its cost is amortised
 over every application that mesh sees (\S\ref{sec:discussion}).
 
-Figure~\ref{fig:reduction} draws both phases over the whole mesh. Phase~1 writes each pack's
-owned rows straight to the global field and stages only its ghost contributions in
-\texttt{ghost\_buf}; Phase~2 empties that buffer, one reduction row per destination, so the
-gather is a single global pass and not a per-neighbour exchange.
+Figure~\ref{fig:reduction} draws both phases over the whole mesh: Phase~1 writes each pack's
+owned rows straight to the global field and stages only its ghost contributions, and Phase~2
+empties the staging buffer one row at a time, so the close is a single global pass rather than
+an exchange between neighbouring packs.
 
 \begin{figure}[t]
   \centering
