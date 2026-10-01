@@ -357,8 +357,7 @@ the first zone can be written without synchronisation and only the shared tail c
 
 The nodes a pack touches but does not own are listed per pack in a compressed row structure,
 deduplicated and ordered by first appearance in the node-major sweep of
-Algorithm~\ref{alg:build} (line~\ref{ln:ghost}). The list is therefore \emph{not} sorted and
-must not be binary-searched.
+Algorithm~\ref{alg:build} (line~\ref{ln:ghost}).
 
 The contributions staged against those entries are closed by a separate gather, whose graph is
 built by sorting (destination, entry) pairs and grouping them (line~\ref{ln:sort}). Sorting is
