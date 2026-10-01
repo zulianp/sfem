@@ -33,7 +33,11 @@
 \renewcommand{\topfraction}{0.92}
 \renewcommand{\bottomfraction}{0.5}
 \renewcommand{\textfraction}{0.06}
-\renewcommand{\floatpagefraction}{0.75}
+% A float at least this fraction of a column may be given a column to itself, with no text
+% beneath it. Algorithm 1 is 0.77 of a column, so at the default 0.5 -- or at 0.75 -- it
+% qualified and left a quarter-column blank under it. Above its height, so it is placed as an
+% ordinary top float and the text flows beneath.
+\renewcommand{\floatpagefraction}{0.90}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 
