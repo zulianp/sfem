@@ -1,0 +1,146 @@
+\section{The micro-kernels}
+\label{sec:mk}
+
+This section describes how the components of Section~\ref{sec:components} are actually evaluated:
+the staging, the loop structure, the compile-time dispatch, and what differs per scheme and per
+layout. All counts below are properties of the written kernel and can be checked by reading it;
+timings belong to the paper.
+
+\subsection{Lane blocking and the packs}
+\label{sec:mk:staging}
+
+Every kernel processes a \emph{lane group} of elements at once. The width is
+\code{CVFEM\_HEX8\_VEC\_SIZE = VEC\_BYTES / sizeof(scalar\_t)}, with \code{VEC\_BYTES} defaulting
+to 128, so sixteen elements in double precision. Element data is staged into lane-major structs,
+indexed \code{[node][lane]} --- or \code{[node][component][lane]} for the gradient packs --- so
+that a fixed node index over varying lane is contiguous and every read in the surface loop is a
+unit-stride vector load rather than a gather:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+pack & contents & read by \\
+\midrule
+\code{Hex8InputPack}    & $u_x,u_y,u_z,p$ per node            & every scheme \\
+\code{Hex8ResidualPack} & the four accumulators per node      & every scheme \\
+\code{Hex8RhieChowPack} & $\nabla p$ per node; $G_\scs$, $w_\scs$ per surface & Rhie--Chow arms \\
+\code{Hex8UGradPack}    & $\nabla\uvec$ (nine components) and coordinates per node & higher-order arms \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{Hex8RhieChowPack} notably does \emph{not} carry node coordinates. It used to, purely to form
+$\dvec$ by differencing; since the affine path takes $\dvec$ from the Jacobian
+(Section~\ref{sec:geom:edges}) those three arrays have no reader, and removing them took 3\,KB of
+stack per lane group and twenty-four indexed gathers per element out of the sweep. The
+isoparametric kernels keep their own \code{Hex8CoordPack}.
+
+\subsection{Loop structure}
+\label{sec:mk:structure}
+
+The residual's twelve surfaces are evaluated in \emph{one} lane loop
+(\code{cvfem\_hex8\_conv\_all\_simd}), with each surface's contribution accumulated into
+thirty-two lane-private scalars --- eight nodes times four rows --- and each stored once at the
+end. The alternative, a vectorised lane loop per surface, writes a node's four accumulators three
+times over, once per direction group, and measured slower.
+
+The binding constraint on this loop is register capacity, and it is worth stating plainly because
+it bounds what any rescheduling can achieve. One vector iteration holds thirty-two accumulators,
+and each surface needs roughly two dozen more live values --- the area vector, both nodes'
+velocity and pressure, and for the Rhie--Chow arms the pressure gradients and the two tabulated
+surface scalars. That is on the order of fifty-six live vector values against the thirty-two
+registers AArch64 provides, so the register allocator spills regardless of the order the surfaces
+are visited in. Measured on the shipping binary, roughly $37\%$ of the convective sweep's
+instructions were spill traffic against a $1952$-byte frame.
+
+Three reschedulings were built and measured against this shape, and the pattern is instructive:
+varying the lane width did nothing (the live set is per vector iteration, not across unrolled
+iterations); fusing the surfaces as described above gained a few percent; and splitting the
+momentum and continuity rows into separate passes --- which halves the accumulator count, exactly
+the lever the spill count suggests --- \emph{lost} a third, because the per-surface inputs already
+exceed what the accumulators leave free and the split only duplicated the mass-flux work. The
+conclusion carried into Section~\ref{sec:geom:edges} is that the live set, not the schedule, is the
+constraint, and that shrinking it means changing what a surface \emph{reads}.
+
+\subsection{Compile-time dispatch}
+
+Everything that is uniform over a sweep is a template parameter, not a runtime argument:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+flag & selects \\
+\midrule
+\code{RC}  & the Rhie--Chow term \\
+\code{QG}  & the direction's pressure-gradient term in the Jacobian \\
+\code{EPS} & the Harten band \\
+\code{HO}  & the deferred correction \\
+\code{LIM} & which limiter, $0..3$ \\
+\code{NC}  & the field count in the reconstruction \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The reason is uniform across the file and was established by measurement rather than taste: a
+sweep-uniform test left inside the vector body costs between $1.8\times$ and $2\times$, because it
+tips the compiler's cost model out of vectorising the loop that contains it. A guard on the
+Rhie--Chow coefficient cost $1.83\times$ this way; a runtime limiter select cost $2\times$. The
+flags are dispatched once, outside the lane loop, by a macro that keeps the long argument list in
+one place --- sixteen hand-written copies of it is where a transposed pack would hide.
+
+\subsection{Per-scheme kernels}
+\label{sec:mk:perscheme}
+
+First-order upwinding runs the hand-written sweep with \code{HO=false}. The four higher-order
+schemes are evaluated by \emph{generated} whole-element kernels, synthesised by
+\code{python/synthesize\_cvfem\_hex8\_ns\_upwind\_sympy.py} and emitted into
+\code{cvfem\_hex8\_ns\_upwind\_sympy\_kernels.hpp}: one per limiter, in two variants each with and
+without Rhie--Chow, and all with a single \code{\#pragma omp simd} lane loop wrapping the entire
+body:
+
+\begin{center}
+\begin{tabular}{@{}llrr@{}}
+\toprule
+scheme & kernel & lines, plain & lines, $+$RC \\
+\midrule
+unlimited          & \code{...\_defcor\_lim0\_simd} &  704 &  880 \\
+bounded-face clip  & \code{...\_defcor\_lim1\_simd} &  798 &  963 \\
+Venkatakrishnan    & \code{...\_defcor\_lim2\_simd} & 2290 & 2427 \\
+Darwish--Moukalled & \code{...\_defcor\_lim3\_simd} & 1487 & 1611 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The size ordering follows the limiter's algebra: the clip is a pair of comparisons, van Leer's
+form has one division, and Venkatakrishnan's rational function with its deactivation term is three
+times the body of either. Common subexpression elimination is applied across the whole element, so
+the twelve surfaces share the centroid and geometry work that twelve separately compiled
+per-surface functions could not.
+
+These kernels contain no \code{if} statements at all --- the limiter logic is entirely ternaries,
+which lower to selects and vectorise. That property is load-bearing and was not free: a ternary
+whose \emph{condition} is itself a ternary does \emph{not} vectorise, because the compiler
+if-converts the inner one into a PHI node and then cannot select over it. Venkatakrishnan's guard
+had that shape (Section~\ref{sec:schemes}), and the kernel issued zero vector instructions until
+the guard was moved onto the increment. The lesson generalises past this one kernel: in generated
+code the property to check is not "is there a lane loop" --- all four always had one --- but
+whether the compiler acted on it, and only a disassembly or a vectoriser report answers that.
+
+\subsection{What the layout changes}
+
+The two layouts differ in how an element's contribution reaches the global vector, not in the
+arithmetic. The \textbf{packed} layout gathers pack-locally, accumulates into pack-local
+indices, and closes through a two-phase deterministic ghost reduction; the \textbf{standard}
+layout scatters with atomics. Consequences worth knowing when reading measurements:
+
+\begin{itemize}
+\item The packed layout is bitwise reproducible by construction. The standard layout is not ---
+      its fingerprint varies run to run with the same binary, because the atomic order varies ---
+      so a fingerprint comparison is only meaningful within the packed layout.
+\item The packed layout spends a larger share of its time in the surface loop, so changes to the
+      per-surface work show up there more strongly, and changes to per-element work (staging,
+      gathers) show up more strongly on the standard layout.
+\item Checksums are near-cancelling sums of order $10^{-14}$ built from terms of order one, so a
+      last-bit difference reads as a large relative change. They are not a usable discriminator;
+      the per-node cross-layout comparisons are.
+\end{itemize}

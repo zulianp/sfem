@@ -1,0 +1,119 @@
+\section{The convective schemes}
+\label{sec:schemes}
+
+The schemes differ only in $\mathbf{h}_\scs$, the higher-order correction in
+Eq.~\eqref{eq:flux}. All five share the mass flux, the upwind split and the pressure term, which
+is why the Jacobian stays first order unless the correction is differentiated
+(Section~\ref{sec:jac}).
+
+\subsection{Deferred correction}
+
+The correction reconstructs the face value from the donor node and its nodal velocity gradient,
+and takes only the \emph{difference} from the first-order upwind value:
+\begin{equation}
+\mathbf{h}_\scs \;=\; \mdot^{+}\,\delta_i \;+\; \mdot^{-}\,\delta_j ,
+\qquad
+\delta_a \;=\; \Lambda\!\left(u_a,\; u_{a'},\; \nabla u_a \cdot (\xvec_\scs^{c} - \xvec_a)\right),
+\label{eq:defcor}
+\end{equation}
+where $\xvec_\scs^{c}$ is the surface centroid, $a'$ is the surface's other node, and $\Lambda$ is
+the limiter. With $\Lambda$ the identity this is unlimited second-order upwinding; the three
+limiters below are the three non-trivial choices of $\Lambda$. Writing it as a difference from
+first order is what makes it \emph{deferred}: the correction enters the residual and is absent
+from the lagged Jacobian, so the linear system keeps the first-order sparsity and the
+higher-order accuracy is recovered through the Newton iteration.
+
+The unlimited increment $\Delta = \nabla u_a \cdot (\xvec^c_\scs - \xvec_a)$ is what each limiter
+acts on, and $[\,\ell, h\,] = [\min(u_a,u_{a'}),\,\max(u_a,u_{a'})]$ is the interval the
+surface's own two nodes span --- a two-node stencil, not a full one-ring.
+
+\subsection{Scheme 0: unlimited}
+
+$\Lambda(\Delta) = \Delta$. The arm every other is measured against, and the solver's default.
+Smooth, differentiable, and does not preserve the bound: a reconstruction can place the face value
+outside the interval its nodes span.
+
+\subsection{Scheme 1: bounded-face clip}
+
+Barth--Jespersen's bound on the two-node stencil
+(\code{cvfem\_limiter\_clip\_inc}):
+\begin{equation}
+\Lambda(\Delta) \;=\; \operatorname{clip}\bigl(u_a + \Delta,\; \ell,\; h\bigr) - u_a .
+\end{equation}
+The face value cannot introduce a new extremum, so the bound holds by construction. It is kept as
+the reference arm rather than recommended: it clips at a smooth extremum too, and its active set
+flips --- an ulp of change in $\Delta$ can move the result by a finite amount, which is exactly
+what makes its derivative delicate (Section~\ref{sec:jac:subgrad}).
+
+\subsection{Scheme 2: Venkatakrishnan}
+
+A smooth limiter (\code{cvfem\_venkata\_inc}). With $D^{+}$ the signed room to the bound in the
+direction of the increment,
+\begin{equation}
+D^{+} = \begin{cases} h - u_a, & \Delta \ge 0\\ \ell - u_a, & \Delta < 0\end{cases}
+\qquad
+\Lambda(\Delta) \;=\; \frac{(D^{+})^2 + 2\Delta D^{+} + \varepsilon^2}
+                          {(D^{+})^2 + 2\Delta^2 + \Delta D^{+} + \varepsilon^2}\;\Delta .
+\label{eq:venkat}
+\end{equation}
+The denominator is a sum of squares, $(D^{+} + \Delta/2)^2 + \tfrac74\Delta^2 + \varepsilon^2$,
+hence positive unless $D^{+}$, $\Delta$ and $\varepsilon$ all vanish --- and there $\Lambda = 0$
+anyway, so the guard can be placed on $\Delta$ rather than on the denominator. That is not a
+cosmetic choice: writing it as a test on the denominator builds a relational around a
+\code{Piecewise}, which the code generator folds into a ternary \emph{inside the condition of
+another ternary}, and GCC then abandons the loop. The generated Venkatakrishnan kernel contained
+zero vector instructions for exactly this reason until the guard was moved.
+
+$\varepsilon^2$ is Venkatakrishnan's deactivation term, dimensional in the square of the solution
+variable. Its purpose is to switch the limiter \emph{off} where the two-node variation is at the
+level of round-off --- along flow-aligned edges in a channel core, where $u_i$ and $u_j$ agree to
+round-off while the true face value legitimately differs from both transversally. Without it the
+bound is decided by round-off there, the limiter clips a correction that was right, and refining
+makes the error worse at $h^{-2}$. $\varepsilon^2 = 0$ recovers the preceding arm bit for bit,
+which makes $K=0$ a genuine zero-severity control rather than an approximation of one.
+
+\subsection{Scheme 3: Darwish--Moukalled}
+
+van Leer's $\psi(r) = (r + |r|)/(1 + |r|)$ in the TVD form, with the limited increment
+$\tfrac12\psi(r)(\phi_D - \phi_C)$. Substituting $r$ and clearing fractions
+(\code{cvfem\_darwish\_moukalled\_inc}) gives
+\begin{equation}
+\Lambda \;=\; \frac{a\,|b| + |a|\,b}{2\,(|a| + |b|)},
+\qquad a = 2\,\nabla\phi_C\cdot\dvec, \quad b = \phi_D - \phi_C ,
+\label{eq:dm}
+\end{equation}
+which is one division rather than three and has no removable singularity: the denominator vanishes
+only when $a$ and $b$ both do, and the numerator vanishes with it. Opposite signs give exactly
+zero, which is $\psi(r<0) = 0$ --- the increment is discarded where the reconstruction and the
+downwind difference disagree about the direction of the gradient. Note that this guard divides by
+$2(|a|+|b|)$, an absolute value and not a \code{Piecewise}, which is why this kernel vectorised
+when Venkatakrishnan's did not.
+
+\subsection{Bound preservation, measured}
+
+The schemes' claims are checked by instrumenting the limiter over a converged solve
+($\sim$2M surface samples), counting how often the unlimited reconstruction leaves the two-node
+interval, how often the limiter alters it, and how often the \emph{limited} value is still
+outside:
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+scheme & outside before & altered & outside after \\
+\midrule
+unlimited (control)        & 60.96\% & \phantom{0}0.00\% & 60.96\% \\
+bounded-face clip          & 61.17\% & 61.17\% & 0.0000\% \\
+Venkatakrishnan, $K=0$     & 61.11\% & 99.29\% & 0.0000\% \\
+Darwish--Moukalled         & 61.13\% & 99.26\% & 0.0000\% \\
+Venkatakrishnan, $K=5$     & 60.98\% & 65.84\% & 60.86\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The last row is the one to read carefully, and it is not a defect. With $\varepsilon^2 > 0$ the
+limiter is deliberately inactive where the variation is at round-off, so it no longer enforces the
+bound there --- "outside after" returns to the unlimited level. That is the trade $\varepsilon^2$
+buys: bound preservation on the edges that matter, in exchange for not clipping the flow-aligned
+ones where the two-node bound is meaningless. The two smooth limiters alter nearly every surface
+($\sim$99\%) while the clip alters only those actually out of bounds, which is the difference
+between a smooth rescaling and an active set.
