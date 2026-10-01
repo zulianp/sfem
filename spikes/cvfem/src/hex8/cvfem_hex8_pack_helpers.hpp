@@ -243,9 +243,15 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
     // and forgotten, and it must not be rebuilt on every matvec either. The state moves too
     // now that the time scale carries the advecting velocity, which is what state_stamp
     // tracks; it changes once per Newton step, not once per matvec.
+    // rc_w is validated BESIDE rc_coeff, not assumed to follow it. The two are filled together
+    // and read together, so a guard that clears this early on the strength of rc_coeff alone
+    // would let the gather read a stale or undersized weight table -- silently, because the
+    // weight only scales a Jacobian term and a wrong value looks like a bad linearisation rather
+    // than like garbage.
     if (!d.rc_coeff.empty() && d.rc_coeff_rho == rho && d.rc_coeff_mu == mu &&
         d.rc_coeff_scale == d.rhie_chow_scale && d.rc_coeff_stamp == d.state_stamp &&
-        (ptrdiff_t)d.rc_coeff.size() == d.nelements * CVFEM_HEX8_N_SCS)
+        (ptrdiff_t)d.rc_coeff.size() == d.nelements * CVFEM_HEX8_N_SCS &&
+        (ptrdiff_t)d.rc_w.size() == d.nelements * CVFEM_HEX8_N_SCS)
         return;
     d.rc_coeff.resize((size_t)d.nelements * CVFEM_HEX8_N_SCS);
     d.rc_w.resize((size_t)d.nelements * CVFEM_HEX8_N_SCS);

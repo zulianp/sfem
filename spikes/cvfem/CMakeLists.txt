@@ -263,6 +263,18 @@ add_test(NAME cvfem_bench_staging
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
 
+# ------------------------------------------------- the geometry gate, on a NON-AFFINE mesh
+#
+# Every other oracle here runs on a uniform cube, where the affine edge vector and the
+# difference of two node coordinates are the same number to the last bit -- so a kernel using
+# one and its reference using the other agree perfectly while discretising different geometries.
+# This gate warps the mesh, which separates them. It was added after exactly that inconsistency
+# reached a campaign undetected and surfaced at n=160 as a 2.0e-4 disagreement; the gate was
+# then checked by reintroducing the bug, which it fails at warp > 0 and passes on the cube.
+add_test(NAME cvfem_warped_geometry
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_warped_geometry.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+
 # --------------------------------------------- the packed macro path is the same operator
 #
 # cvfem_flat_vs_ss_test compares the flat and semi-structured operators by COORDINATE, which
