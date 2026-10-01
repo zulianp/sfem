@@ -1,0 +1,24 @@
+### host nid006564  n=128 repeat=10 passes=3  2026-10-01 15:00:11
+### the JACOBIAN ACTION per convective scheme -- the companion to conv_ho_bench.sbatch
+### ho_unlim_lagged is the lagged action, which carries no correction derivative at all
+
+arm                    layout       MDOF_s       dofs      elems   flops_el       checksum
+first_order            atomic      894.110    8586756    2097152      850.0 -2.2687678287707652e-12
+first_order            packed     1938.577    8586756    2097152      850.0 -2.2687678287707652e-12
+ho_unlimited           atomic      299.017    8586756    2097152     2098.0 -3.3011743295549567e-12
+ho_unlimited           packed      696.642    8586756    2097152     2098.0 -3.3011743295549567e-12
+ho_unlim_lagged        packed     1928.446    8586756    2097152      850.0 -2.2687678287707652e-12
+ho_clip                atomic      249.906    8586756    2097152     2890.0 -3.7761625559318626e-12
+ho_clip                packed      481.443    8586756    2097152     2890.0 -3.7761625559318626e-12
+ho_venkatakrishnan     atomic      244.599    8586756    2097152     5554.0 -2.3566409918353640e-12
+ho_venkatakrishnan     packed      461.057    8586756    2097152     5554.0 -2.2629667914943544e-12
+ho_darwish_moukalled   atomic      241.394    8586756    2097152     4834.0 -2.9867687641703389e-12
+ho_darwish_moukalled   packed      440.517    8586756    2097152     4834.0 -2.9246053820895790e-12
+
+The checksums must DIFFER between first order and each higher-order arm. For the ACTION the
+reason is sharper than for the residual: the correction is deferred, so an action that was
+not differentiated through it is EXACTLY the first-order action -- an identical checksum
+means the exact term never reached the kernel and the row is first order measured twice.
+ho_unlim_lagged is the arm that SHOULD match first_order, and is included as that control.
+
+csv: /ritom/scratch/cscs/zulianp/cvfem_jacho/4963949/jacho.csv

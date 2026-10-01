@@ -76,8 +76,14 @@ echo "# operation  layout  repeat_lo  repeat_hi  bytes_lo        bytes_hi       
 # when it was re-measured the numbers came out 1.5x and 3.7x higher -- not because anything
 # regressed, but because the new run carried Rhie-Chow and the old one evidently did not. Nobody
 # could tell from the file. Labelling the arm is the fix.
+# jac_action-ho is the EXACT higher-order action -- the correction differentiated, which is the
+# arm with no matrix counterpart and the one the roofline needs to place. Its label matches the
+# residual-ho rows captured separately, so python/perf_figures.py keys both the same way. One
+# capture serves all four limiters: they read the same arrays and differ only in arithmetic on
+# values already in registers.
 for arm in "residual|" "residual_rc|--rhie-chow" \
-           "jac_action|--jac-action" "jac_action_rc|--jac-action --rhie-chow"; do
+           "jac_action|--jac-action" "jac_action_rc|--jac-action --rhie-chow" \
+           "jac_action-ho|--jac-action --rhie-chow --conv-ho 3"; do
     IFS='|' read -r op extra <<<"$arm"
     for lay in packed atomic; do
         lo=$(capture "$extra" "$lay" "$LO") || { echo "# MISSING $op $lay lo"; continue; }

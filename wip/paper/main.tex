@@ -1001,6 +1001,17 @@ different share of the two matvecs, as below. The format's advantage survives th
 action and $\hoxLayoutExact\times$ on the exact one. The added pass is itself packed, gathering pack-locally and closing through the same
 ghost graph the operator sweeps use.
 
+\paragraph{Traffic, not arithmetic.} The exact action's schemes are the second set of
+higher-order points in Figure~\ref{fig:roofline}, and they move the opposite way to the
+residual's. Traffic rises by $\hoJacBytesRatioPacked\times$ packed (\foJacBytesPacked{} to
+\hoJacBytesPacked{}~bytes per degree of freedom), because the direction's nodal velocity
+gradient is read on top of the state's, and for the cheap limiters that outruns the arithmetic:
+the unlimited arm sits at \hoJacAiPackedLo{}~FLOP/byte against the first-order action's
+\rlJacobianPackedAi{}, to the \emph{left} of it. Only Venkatakrishnan's derivative carries
+enough arithmetic to pass it, at \hoJacAiPackedHi{}; Darwish--Moukalled's stops just short. The
+residual's correction buys arithmetic at about the price of its traffic; the action's cheap arms
+buy traffic and little else, which is the same statement as the reconstruction's cost below.
+
 \paragraph{The reconstruction.} Timed on its own it is the sweep the format helps \emph{most}:
 the pressure gradient at \ngPgradPacked{} against \ngPgradAtomic{}~MDOF/s, a factor of
 $\ngPgradRatio$, and the three-component velocity gradient at \ngUgradPacked{} against
@@ -1030,10 +1041,10 @@ recovers the convergence the lagged form loses.
   \caption{Two roof pairs: solid measured on the node the points were
     (\SI{\rlBw}{\giga\byte\per\second} triad, \SI{\rlPeak}{\giga\flops} GEMM), dashed the vendor
     specification (\SI{\rlSpecBw}{\giga\byte\per\second}, \SI{\rlSpecPeak}{\tflops});
-    ridges at \rlRidge{} and \rlSpecRidge{}~FLOP/byte. Matrix-free markers are \emph{bare}
-    first-order element kernels, SpMV markers the lagged matrix; the further points in each
-    layout's colour are the higher-order schemes, named by marker in the legend. Intensity uses
-    \emph{measured} DRAM traffic; a hollow marker means the compulsory-traffic model.}
+    ridges at \rlRidge{} and \rlSpecRidge{}~FLOP/byte. The six legend colours are operator and
+    layout together; within each, the round marker is first-order upwinding and the other four
+    are the higher-order schemes, named by marker. Intensity uses \emph{measured} DRAM traffic;
+    a hollow marker means the compulsory-traffic model.}
   \label{fig:roofline}
 \end{figure}
 
@@ -1049,8 +1060,8 @@ two captures differenced across the number of timed applies so that setup and wa
 measured traffic is \rlTrafficRatioLo{} to \rlTrafficRatioHi{} times the compulsory bound, the balance being node
 re-reads at pack boundaries and partial-line writes.
 
-The first-order matrix-free kernels then sit at $\rlResidualAtomicAi{}$--$\rlResidualPackedAi{}$~FLOP/byte and
-the lagged product at $\rlSpmvFSixFourAi{}$, a factor of \rlMfOverSpmvLo--\rlMfOverSpmvHi{} lower: it reads a matrix whose
+The first-order matrix-free kernels then sit at \rlResidualAiSpan{}~FLOP/byte and
+the lagged product at $\rlSpmvFSixFourAi{}$, a factor of \rlMfOverSpmv{} lower: it reads a matrix whose
 size grows with the stencil where the matrix-free kernels read a mesh. Halving the value precision,
 moving the SpMV from $\rlSpmvFSixFourAi{}$ to $\rlSpmvFThreeTwoAi{}$, is close to the lagged
 operator's only lever.

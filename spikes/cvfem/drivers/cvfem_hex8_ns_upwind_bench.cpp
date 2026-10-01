@@ -2271,9 +2271,16 @@ int main(int argc, char **argv) {
             (geom_kind == GeomKind::Isoparam ? CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT
                                              : CVFEM_HEX8_RESIDUAL_FLOPS_PER_ELEMENT)
             + (conv_ho ? cvfem_hex8_defcor_flops_per_element(conv_limiter) : 0.0);
+    // The exact higher-order action differentiates the correction, so its work model has to carry
+    // that derivative; the lagged one does not see the correction at all and keeps the
+    // first-order model. The comment above this block predates the exact action and said the
+    // correction "enters the residual's work model and not the Jacobian's" without qualification,
+    // which left every --conv-ho Jacobian arm reporting a first-order flop count -- and kept those
+    // arms off the roofline, since a point there is placed by this number.
     const double jac_action_flops =
-            geom_kind == GeomKind::Isoparam ? CVFEM_HEX8_ISOPARAM_JAC_ACTION_FLOPS_PER_ELEMENT
-                                            : CVFEM_HEX8_JAC_ACTION_FLOPS_PER_ELEMENT;
+            (geom_kind == GeomKind::Isoparam ? CVFEM_HEX8_ISOPARAM_JAC_ACTION_FLOPS_PER_ELEMENT
+                                             : CVFEM_HEX8_JAC_ACTION_FLOPS_PER_ELEMENT)
+            + ((conv_ho && !lagged_ho) ? cvfem_hex8_defcor_jac_flops_per_element(conv_limiter) : 0.0);
     const double assemble_flops =
             geom_kind == GeomKind::Isoparam ? CVFEM_HEX8_ISOPARAM_ASSEMBLE_FLOPS_PER_ELEMENT
                                             : CVFEM_HEX8_ASSEMBLE_FLOPS_PER_ELEMENT;
