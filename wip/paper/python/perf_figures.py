@@ -740,11 +740,16 @@ def fig_packsize(sweep, meta):
     out = [PREAMBLE,
            r"\begin{tikzpicture}",
            r"\begin{semilogxaxis}[",
-           r"  width=\columnwidth, height=0.55\columnwidth,",
+           r"  width=\columnwidth, height=0.40\columnwidth,",
            r"  xlabel={packs per thread}, ylabel={MDOF/s},",
            r"  log basis x=2, ymin=0,",
-           r"  legend pos=south east, legend cell align=left,",
-           r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},",
+           # Two entries, not four, and across the top rather than inside the axis. With the
+           # higher-order series added, a south-east legend sat directly on the dashed curves:
+           # they are the low ones and they run to the right edge. Only the SIZES are named
+           # here -- solid against dashed is the caption's job, which it was already doing.
+           r"  legend columns=2, legend cell align=left,",
+           r"  legend style={at={(0.5,1.02)}, anchor=south, font=\tiny, draw=none,",
+           r"                fill=none, inner sep=1pt, column sep=6pt},",
            r"  grid=both, major grid style={black!12}, minor grid style={black!6},",
            r"  tick label style={font=\tiny}, label style={font=\scriptsize},",
            r"]"]
@@ -754,7 +759,7 @@ def fig_packsize(sweep, meta):
         pts = sorted((r["ppt"], r["jac"]) for r in sweep[n])
         out.append(r"\addplot[%s,mark=%s,mark size=1.6pt,thick] coordinates {%s};"
                    % (col, mark, " ".join("(%.2f,%.3f)" % p for p in pts)))
-        out.append(r"\addlegendentry{$n=%d$, first order}" % n)
+        out.append(r"\addlegendentry{$n=%d$}" % n)
     # The higher-order arm, dashed so the eye reads it as the same operator with more arithmetic
     # rather than as a third problem size. Drawn after both first-order series so the legend
     # groups by operator, and skipped entirely where the data predates the column.
@@ -764,13 +769,15 @@ def fig_packsize(sweep, meta):
         if not pts:
             continue
         out.append(r"\addplot[%s,mark=%s,mark size=1.4pt,thick,densely dashed,"
-                   r"mark options={solid}] coordinates {%s};"
+                   r"mark options={solid},forget plot] coordinates {%s};"
                    % (col, mark, " ".join("(%.2f,%.3f)" % p for p in pts)))
-        out.append(r"\addlegendentry{$n=%d$, Darwish--M.}" % n)
     # One pack per thread: below this line a core can be left with nothing at all.
     out.append(r"\draw[black!50,dashed] (axis cs:1,0) -- (axis cs:1,\pgfkeysvalueof{/pgfplots/ymax});")
-    out.append(r"\node[black!55,font=\scriptsize,anchor=south west,rotate=90] "
-               r"at (axis cs:1,0) {\ one pack per thread};")
+    # Horizontal, and hung from the top of the rule rather than run up it. Rotated at the axis
+    # floor the label crossed the n=64 curve, which the shorter axis made worse; above the data
+    # on the left there is nothing to collide with, because that is where the collapse is.
+    out.append(r"\node[black!55,font=\tiny,anchor=south west,xshift=1pt,yshift=1pt] "
+               r"at (axis cs:1,0) {one pack per thread};")
     out.append(r"\end{semilogxaxis}")
     out.append(r"\end{tikzpicture}")
     return "\n".join(out) + "\n"
