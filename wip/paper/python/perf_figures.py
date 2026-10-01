@@ -1399,7 +1399,7 @@ def parse_peak(path):
 HO_NAME = {
     "first_order": "first-order upwind",
     "ho_unlimited": "deferred correction, unlimited",
-    "ho_clip": r"${}+{}$ bounded-face clip",
+    "ho_clip": r"${}+{}$ Barth--Jespersen",
     "ho_venkatakrishnan": r"${}+{}$ Venkatakrishnan",
     "ho_darwish_moukalled": r"${}+{}$ Darwish--Moukalled",
 }
@@ -1563,7 +1563,7 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
                          "ho_darwish_moukalled") if a in by]
     if not order:
         return None
-    short = {"first_order": "upwind", "ho_unlimited": "unlimited", "ho_clip": "clip",
+    short = {"first_order": "upwind", "ho_unlimited": "unlimited", "ho_clip": "Barth--J.",
              "ho_venkatakrishnan": "Venkat.", "ho_darwish_moukalled": "Darwish--M."}
     coords = ",".join(short[a] for a in order)
 
@@ -1926,7 +1926,7 @@ JF_NAME = {
 # it, so a data file written before those arms existed still produces the two-row table.
 # Ordered by arithmetic per sub-control surface, as Figures 8 and 9 order their bars.
 JF_BLOCKS = [("first-order upwind", ("jac_exact", "jac_lagged")),
-             ("bounded-face clip", ("jac_clip_exact", "jac_clip_lagged")),
+             ("Barth--Jespersen", ("jac_clip_exact", "jac_clip_lagged")),
              ("Darwish--Moukalled", ("jac_ho_exact", "jac_ho_lagged"))]
 
 

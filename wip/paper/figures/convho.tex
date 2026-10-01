@@ -4,15 +4,15 @@
 \begin{axis}[width=\columnwidth, height=0.44\columnwidth,
   ybar, bar width=7pt, ymin=0, ylabel={MDOF/s},
   legend image code/.code={\draw[#1] (0cm,-0.09cm) rectangle (0.22cm,0.09cm);},
-  symbolic x coords={upwind,unlimited,clip,Venkat.,Darwish--M.}, xtick=data,
+  symbolic x coords={upwind,unlimited,Barth--J.,Venkat.,Darwish--M.}, xtick=data,
   x tick label style={font=\tiny}, enlarge x limits=0.13,
   legend pos=north east, legend cell align=left,
   legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},
   tick label style={font=\scriptsize}, label style={font=\scriptsize},
   ymajorgrids, major grid style={black!12}]
-\addplot[draw=PackA, fill=PackA] coordinates {(upwind,1765.0) (unlimited,740.5) (clip,635.8) (Venkat.,598.0) (Darwish--M.,597.2)};
+\addplot[draw=PackA, fill=PackA] coordinates {(upwind,1765.0) (unlimited,740.5) (Barth--J.,635.8) (Venkat.,598.0) (Darwish--M.,597.2)};
 \addlegendentry{packed}
-\addplot[draw=PackD, fill=PackD] coordinates {(upwind,895.0) (unlimited,560.1) (clip,499.2) (Venkat.,475.3) (Darwish--M.,476.7)};
+\addplot[draw=PackD, fill=PackD] coordinates {(upwind,895.0) (unlimited,560.1) (Barth--J.,499.2) (Venkat.,475.3) (Darwish--M.,476.7)};
 \addlegendentry{atomic}
 \draw[PackE,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,449.4} -| {rel axis cs:0,0}) -- ({axis cs:upwind,449.4} -| {rel axis cs:1,0});
 \addlegendimage{legend image code/.code={\draw[PackE,dash pattern=on 2pt off 2pt,thick] (0pt,0pt) -- (10pt,0pt);}}
