@@ -588,15 +588,11 @@ sub-control-surfaces of the dual mesh. The discretisation itself is not the subj
 paper, but \emph{which} operator is being measured is, so the variants are set out explicitly.
 
 \paragraph{Geometry.} Every rate in this paper is for \textbf{affine} element geometry: one
-Jacobian per element, its adjugate and determinant built once at setup and read from cache by
-every sweep, and reference gradients taken at the element centre. On the structured hexahedral
-meshes measured that is exact. The isoparametric variant --- which rebuilds the Jacobian per
-element from the nodal coordinates and contracts against a shape-function derivative table --- is
-implemented and selectable but is not measured here, and no rate below should be read as applying
-to it. The difference is not uniform across the operators: it falls hardest on the nodal
-reconstruction of \S\ref{sec:res:hoexact}, whose affine form is a cached adjugate and a
-nine-operation face difference, and where the per-element geometry is exactly the work the
-sweep currently amortises over all its fields.
+Jacobian per element, its adjugate and determinant built once at setup, which is exact on the
+structured hexahedral meshes measured. The isoparametric variant is implemented and selectable but
+is not measured here, and no rate below applies to it; the gap is largest on the nodal
+reconstruction of \S\ref{sec:res:hoexact}, where per-element geometry is exactly the work the
+affine sweep amortises over all its fields.
 
 \paragraph{Convective schemes.} Two are measured. The baseline is \textbf{first-order upwinding
 with a hard donor switch}: the face value is taken from whichever side the mass flux comes from,
@@ -607,31 +603,21 @@ The second is a \textbf{deferred-correction higher-order flux}. The face value i
 from the donor node and its nodal velocity gradient,
 $u_{\mathrm{face}} = u_{\mathrm{donor}} + \nabla u_{\mathrm{donor}}\cdot
  (x_{\mathrm{scs}} - x_{\mathrm{donor}})$,
-and only the \emph{difference} from the first-order value is added to the residual. We apply it
-\emph{lagged} one Newton step, which has two consequences. The nodal velocity gradient it reads
-is then an input to the application rather than part of it, exactly as the Rhie--Chow state
-gradient is; and the Jacobian stays first-order. The second is a choice and not a property of
-the method, so it is worth being exact about. A reconstructed face value reaches outside the
-element, so differentiating it widens the stencil from one ring to two --- which is decisive for
-an assembled operator and for the preconditioner built from it, and is not decisive here, where
-a wider stencil costs reads rather than fill-in. Matrix-free, an exact action is available at
-the price of reconstructing the \emph{direction}'s velocity gradient every matvec, as the exact
-Rhie--Chow action already does for the pressure gradient. We build and measure both
-(\S\ref{sec:res:hoexact}); the limiters are differentiated where they are differentiable, which
-for the bounded-face clip means a subgradient at the branch it jumps across. \S\ref{sec:res:convho} reports the cost
-of the flux on that basis, for the unlimited reconstruction and for three limiter arms.
+and only the \emph{difference} from the first-order value is added to the residual. Applied
+\emph{lagged} one Newton step, the gradient it reads becomes an input to the application rather
+than part of it --- as the Rhie--Chow state gradient already is --- and the Jacobian stays
+first-order. That second consequence is a choice, not a property of the method: differentiating a
+reconstructed face value widens the stencil from one ring to two, which is decisive for an
+assembled operator and not here, where a wider stencil costs reads rather than fill-in. We build
+and measure both forms (\S\ref{sec:res:hoexact}), differentiating the limiters where they are
+differentiable and taking a subgradient where they are not.
 
-\paragraph{Operators.} We measure the residual
-$\mathcal{F}(u)$ and the action of its Jacobian $\mathcal{J}(u)\,v$, which are what a
-Newton--Krylov solve applies. The Jacobian action is the \emph{exact} one, and for the
-Rhie--Chow term that is a stronger statement than it sounds. The coupling depends on a
-reconstructed nodal pressure gradient, so differentiating it correctly requires the
-reconstructed gradient \emph{of the direction} $v$, not only of the state $u$. A lagged --- or
-frozen --- Jacobian treats that gradient, and the coefficient built from it, as constant in $v$
-and skips its reconstruction: cheaper per matvec, and inexact. Algorithm~\ref{alg:jacaction}
-is where the two part. We measure the exact form
-throughout, and the driver records which one ran, so a frozen variant cannot be reported as an
-exact one.
+\paragraph{Operators.} We measure the residual $\mathcal{F}(u)$ and the action
+$\mathcal{J}(u)\,v$, which are what a Newton--Krylov solve applies. The action is the
+\emph{exact} one: the Rhie--Chow coupling depends on a reconstructed nodal pressure gradient, so
+differentiating it requires that gradient \emph{of the direction} $v$ and not only of the state,
+which a lagged Jacobian skips. Algorithm~\ref{alg:jacaction} is where the two part. The driver
+records which ran, so a frozen variant cannot be reported as an exact one.
 
 \begin{algorithm}
 \caption{Jacobian action $\mathcal{J}(u)\,v$}
@@ -849,10 +835,14 @@ takes it up.
 \begin{figure}[t]
   \centering
   \input{figures/packsize}
-  \caption{\fostag{} Throughput of the \emph{exact} Rhie--Chow Jacobian action --- the two-sweep form,
-    carrying the boundary closure --- against the number of packs per thread, at two problem
-    sizes. The pack size is the knob, but packs per thread is what explains the collapse: the
-    two sizes fail at the same place on this axis while failing at different pack sizes.}
+  \caption{Throughput of the \emph{exact} Rhie--Chow Jacobian action --- the two-sweep form,
+    carrying the boundary closure --- against packs per thread, at two problem sizes. Solid:
+    first-order upwinding. Dashed: the same action with the Darwish--Moukalled limiter, roughly
+    \pkszHoWorkFactor$\times$ the work per degree of freedom. The pack size is the knob, but packs
+    per thread is what explains the collapse: the two sizes fail at the same place on this axis
+    while failing at different pack sizes, and the higher-order arm falls at the same place and by
+    the same fraction (\pkszKneeFo{} and \pkszKneeHo{} of the rate before the knee), so the limit
+    is parallel work units and not what the kernel does with them.}
   \label{fig:packsize}
 \end{figure}
 

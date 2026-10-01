@@ -102,19 +102,34 @@ run_one() {   # label n pack_size op extra
     [ -n "$LAST_MDOF" ] || LAST_MDOF="-" 
 }
 
+# A THIRD OPERATOR, the higher-order Jacobian action with the Darwish-Moukalled limiter.
+#
+# The first two columns answer whether the collapse is about parallelism, and they do: both sizes
+# fail at the same packs per thread while failing at different pack sizes. What they cannot say is
+# whether an arm with substantially more arithmetic per sub-control surface collapses in the same
+# place. The higher-order action is that arm -- it carries the correction's derivative and the
+# direction's nodal gradient reconstruction on top of everything the first-order action does -- so
+# if the knee moves with arithmetic, this is the column that shows it.
+#
+# Darwish-Moukalled rather than one of the other two limiters: Venkatakrishnan's kernel is the
+# largest and would conflate the question with its own code size, and the clip is the cheapest and
+# least representative of a real higher-order run. Darwish-Moukalled sits between them and is the
+# arm the solver would plausibly use.
 echo "### pack-size sweep, space-filling order"
-printf '%-5s %9s %9s %8s %9s %10s %10s %11s\n' \
-       n pack_req elems/pack n_packs packs/thr mean_nodes res_MDOFs jac_MDOFs
+printf '%-5s %9s %9s %8s %9s %10s %10s %11s %11s\n' \
+       n pack_req elems/pack n_packs packs/thr mean_nodes res_MDOFs jac_MDOFs hodm_MDOFs
 for n in $SIZES; do
   for ps in $PACKS; do
     run_one "sfc_n${n}_p${ps}_res" "$n" "$ps" res
     res=$LAST_MDOF; packs=$LAST_PACKS; mean=$LAST_MEAN; epp=$LAST_EPP
     run_one "sfc_n${n}_p${ps}_jac" "$n" "$ps" jac
     jac=$LAST_MDOF
+    run_one "sfc_n${n}_p${ps}_hodm" "$n" "$ps" jac "--conv-ho 3"
+    hodm=$LAST_MDOF
     # Packs per thread, the quantity that decides whether the socket can be filled at all.
     ppt=$(awk -v p="${packs:-0}" 'BEGIN{ if (p+0>0) printf "%.1f", p/72.0; else print "-" }')
-    printf '%-5s %9s %9s %8s %9s %10s %10s %11s\n' \
-           "$n" "$ps" "${epp:--}" "${packs:--}" "$ppt" "${mean:--}" "${res:--}" "${jac:--}"
+    printf '%-5s %9s %9s %8s %9s %10s %10s %11s %11s\n' \
+           "$n" "$ps" "${epp:--}" "${packs:--}" "$ppt" "${mean:--}" "${res:--}" "${jac:--}" "${hodm:--}"
   done
 done
 
