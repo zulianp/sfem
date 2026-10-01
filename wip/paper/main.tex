@@ -385,16 +385,11 @@ alone, so staging is a store and not a read-modify-write; and it is the minority
 pack size used throughout, the staged entries number \fpGhostPct\% of the node count, and every
 owned row goes straight out.
 
-The sum is taken over a \emph{reduction graph}: one row per destination node, listing the slots
-that contribute to it, built by sorting (destination, slot) pairs and grouping them
-(Algorithm~\ref{alg:build}, line~\ref{ln:sort}). Two properties follow, and the rest of the
-paper rests on them:
-\begin{itemize}
-  \item grouping sorted pairs cannot yield two rows with the same destination, so one thread
-        owns each destination and no atomic is required;
-  \item within a row the slots are visited in a stored order, so the sum is the same sequence
-        of floating-point additions on every run.
-\end{itemize}
+The sum is taken over a \emph{reduction graph}, built by sorting (destination, slot) pairs and
+grouping them (Algorithm~\ref{alg:build}, line~\ref{ln:sort}). Sorted pairs group into one row
+per destination, so one thread owns each destination and no atomic is required, and within a
+row the slots are visited in a stored order, so the sum is the same sequence of floating-point
+additions on every run.
 
 \subsection{Construction}
 \label{sec:format:build}
