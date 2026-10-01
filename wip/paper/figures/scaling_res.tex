@@ -3,17 +3,18 @@
 
 \begin{tikzpicture}
 \begin{loglogaxis}[
-  width=\columnwidth, height=0.550\columnwidth,
+  width=\columnwidth, height=0.400\columnwidth,
   xlabel={OpenMP threads}, ylabel={MDOF/s},
   log basis x=2, xtick={1,2,4,8,18,36,72}, xticklabels={1,2,4,8,18,36,72},
   ymin=5.6100, ymax=1895.6688,
-  legend pos=north west, legend cell align=left,
-  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},
+  legend columns=2, legend cell align=left,
+  legend style={at={(0.5,1.02)}, anchor=south, font=\tiny, draw=none,
+                fill=none, inner sep=1pt, column sep=6pt},
   grid=both, major grid style={black!12}, minor grid style={black!6},
   tick label style={font=\tiny}, label style={font=\scriptsize},
 ]
 \addplot[black!45,dashed,no marks,forget plot] coordinates {(1,6.6000) (72,475.2000)};
-\node[black!55,font=\tiny,rotate=22.0,anchor=north,inner sep=2pt] at (axis cs:24,158.40) {ideal};
+\node[black!55,font=\tiny,rotate=16.4,anchor=north,inner sep=2pt] at (axis cs:24,158.40) {ideal};
 \addplot[PackA,mark=*,mark size=1.4pt,thick] coordinates {(1,26.6080) (2,52.9050) (4,105.0100) (8,207.8470) (18,450.8550) (36,857.5500) (54,1245.6890) (72,1579.7240)};
 \addlegendentry{\texttt{packed}}
 \addplot[PackD,mark=square*,mark size=1.4pt,thick] coordinates {(1,12.6250) (2,25.3880) (4,50.7270) (8,101.2360) (18,225.6190) (36,441.6560) (54,651.0890) (72,851.0340)};
