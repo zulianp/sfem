@@ -367,7 +367,7 @@ def fig_scaling(series, meta, op="res"):
     # rotated to the angle that line is actually drawn at, and that angle depends on how many
     # decades the axis spans. With the limits floating, the rotation could only ever be a guess --
     # which is what it was: a hard-coded 37 degrees against a line drawn at about 23.
-    H_OVER_W = 0.55
+    H_OVER_W = 0.40
     ys = [m for pts in series.values() for _t, m in pts]
     ymin, ymax = (min(ys) * 0.85, max(ys) * 1.2) if ys else (1.0, 10.0)
     out = [PREAMBLE,
@@ -377,8 +377,12 @@ def fig_scaling(series, meta, op="res"):
            r"  xlabel={OpenMP threads}, ylabel={MDOF/s},",
            r"  log basis x=2, xtick={1,2,4,8,18,36,72}, xticklabels={1,2,4,8,18,36,72},",
            r"  ymin=%.4f, ymax=%.4f," % (ymin, ymax),
-           r"  legend pos=north west, legend cell align=left,",
-           r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},",
+           # Above the axis, two columns, for the same reason as the throughput figure: at the
+           # compact aspect the four entries reach across the north-west quadrant and cross the
+           # curves, which on a log-log plot run corner to corner and leave no empty quadrant.
+           r"  legend columns=2, legend cell align=left,",
+           r"  legend style={at={(0.5,1.02)}, anchor=south, font=\tiny, draw=none,",
+           r"                fill=none, inner sep=1pt, column sep=6pt},",
            r"  grid=both, major grid style={black!12}, minor grid style={black!6},",
            r"  tick label style={font=\tiny}, label style={font=\scriptsize},",
            r"]"]
@@ -576,11 +580,16 @@ def fig_throughput(rows, host, op="residual"):
     out = [PREAMBLE,
            r"\begin{tikzpicture}",
            r"\begin{axis}[",
-           r"  width=\columnwidth, height=0.55\columnwidth,",
+           r"  width=\columnwidth, height=0.40\columnwidth,",
            r"  xlabel={cube edge $n$}, ylabel={MDOF/s},",
            r"  xtick={%s}," % ",".join(str(n) for n in sizes),
-           r"  ymin=0, legend pos=north east, legend cell align=left,",
-           r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},",
+           r"  ymin=0,",
+           # Across the top rather than inside the axis: at the compact aspect the north-east
+           # corner is no longer empty -- the SpMV entries sat directly on the atomic and
+           # \texttt{f32} curves, which run flat across the right half.
+           r"  legend columns=2, legend cell align=left,",
+           r"  legend style={at={(0.5,1.02)}, anchor=south, font=\tiny, draw=none,",
+           r"                fill=none, inner sep=1pt, column sep=6pt},",
            r"  grid=both, major grid style={black!12}, minor grid style={black!6},",
            r"  tick label style={font=\tiny}, label style={font=\scriptsize},",
            r"]"]
