@@ -2101,11 +2101,10 @@ def build(out_dir, tab_dir):
             with open(os.path.join(out_dir, "packsize_macros.tex"), "w") as fh:
                 fh.write(macros_packsize(sweep, order, meta))
             written += ["figures/packsize.tex", "figures/packsize_macros.tex"]
-        ordt = table_ordering(order)
-        if ordt:
-            with open(os.path.join(tab_dir, "ordering.tex"), "w") as fh:
-                fh.write(ordt)
-            written.append("tables/ordering.tex")
+        # No ordering table is emitted. Its four rows said what one sentence of
+        # \S\ref{sec:res:ordering} says, from the macros below, and the result is a check that
+        # the precondition holds rather than a quantity the paper reports. table_ordering is kept
+        # because it is how the numbers are read when the check is rerun.
 
     # THE JACOBIAN ACTION, the same five schemes. Same parser and same figure function as the
     # residual above -- jobs/jac_ho_bench.sbatch is derived from conv_ho_bench.sbatch and emits
