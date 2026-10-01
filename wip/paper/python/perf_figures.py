@@ -271,6 +271,7 @@ def table_footprint(rows, mesh=None, n=128):
     best in the table and its worst in the prose.
     """
     at_n = [r for r in rows if r["_n"] == n and r["operation"] == "bsr_apply"]
+    extra = []
     if not at_n:
         return None
     out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrr@{}}", r"\toprule",
@@ -294,9 +295,19 @@ def table_footprint(rows, mesh=None, n=128):
         per = (vals + idx) / b["_dofs"]
         rel = (r"$%.0f\times$" % (per / base)) if base else "---"
         out.append(r"assembled matrix, \texttt{%s} & %.0f & %s \\" % (store, per, rel))
+        # The same two numbers as macros, because the abstract and the conclusion both compare
+        # the mesh a matrix-free sweep reads against the matrix an SpMV reads, and both carried
+        # the comparison as the words "two orders of magnitude" with no quantity attached to it.
+        # Digits spelled out: LaTeX command names may not contain them, so \fpMatrixF64 would
+        # parse as \fpMatrixF followed by the characters "64". _macro_name already owns this
+        # rule for the roofline's labels.
+        tag = _macro_name(store)
+        extra.append(r"\newcommand{\fpMatrix%s}{%.0f}" % (tag, per))
+        if base:
+            extra.append(r"\newcommand{\fpMatrixRatio%s}{%.0f}" % (tag, per / base))
     out.append(r"\bottomrule")
     out.append(r"\end{tabular}")
-    return "\n".join(out) + "\n"
+    return "\n".join(out) + "\n", "\n".join(extra) + "\n" if extra else ""
 
 
 # ---------------------------------------------------------------------------------------------
@@ -660,6 +671,22 @@ def macros_throughput(rows, host, n=128, provisional=False):
     at_n = [r for r in rows if r["_n"] == n]
     dofs = max((r["_dofs"] for r in at_n), default=0)
     out.append(r"\newcommand{\campDofs}{%d}" % dofs)
+    # The colouring's shape, which the text argues from and had been carrying as prose. The
+    # count is set by the decomposition rather than chosen, so it is a property of the mesh and
+    # the pack size and belongs beside them; the spread says the colours are balanced, which is
+    # the condition under which the barrier cost measured here is the barrier's own and not a
+    # straggler's.
+    col = [r for r in at_n if r.get("ran_layout") == "colored" and r.get("n_colors")]
+    if col:
+        try:
+            out.append(r"\newcommand{\campNColors}{%d}"
+                       % max(int(r["n_colors"]) for r in col))
+            lo = min(int(r["packs_per_color_min"]) for r in col)
+            hi = max(int(r["packs_per_color_max"]) for r in col)
+            out.append(r"\newcommand{\campColorPacksLo}{%d}" % lo)
+            out.append(r"\newcommand{\campColorPacksHi}{%d}" % hi)
+        except (KeyError, ValueError):
+            pass
     # The share of the exact-Rhie--Chow Jacobian matvec spent reconstructing the DIRECTION's
     # nodal pressure gradient. This is the second pass of a two-pass operator and the driver
     # times it separately precisely so it cannot be attributed to the element kernel.
@@ -1172,6 +1199,29 @@ def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None, ho_jac=None,
     out.append(r"\end{loglogaxis}")
     out.append(r"\end{tikzpicture}")
     return "\n".join(out) + "\n"
+
+
+def macros_coloring(measured):
+    """What the coloured layout costs in traffic, against the packed one it shares a pack with.
+
+    The two run the same decomposition, the same staging and the same element kernel, and differ
+    only in how the result leaves the pack: colouring accumulates into the global arrays with
+    ``+=`` and so reads the destination back, where the packed layout writes its owned rows and
+    closes the rest through the ghost reduction. The scaling section used to say the two "differ
+    in nothing but the barrier", which was an over-reading of that -- they differ in the scatter
+    too, and this is the measurement that says by how much.
+    """
+    out = []
+    for op, tag in (("residual", "Res"), ("residual_rc", "ResRc"),
+                    ("jac_action", "Jac"), ("jac_action_rc", "JacRc")):
+        p_ = (measured or {}).get((op, "packed"))
+        c_ = (measured or {}).get((op, "colored"))
+        if not p_ or not c_:
+            continue
+        out.append(r"\newcommand{\colBytes%s}{%.0f}" % (tag, c_))
+        out.append(r"\newcommand{\colBytesRatio%s}{%.2f}" % (tag, c_ / p_))
+        out.append(r"\newcommand{\colBytesPct%s}{%.0f}" % (tag, 100.0 * (c_ / p_ - 1.0)))
+    return "\n".join(out) + "\n" if out else ""
 
 
 def macros_traffic_ratio(measured, nelems, nnodes):
@@ -1967,7 +2017,7 @@ def build(out_dir, tab_dir):
             camp_rows_fp = []
         mfp = [f for f in sorted(os.listdir(DATA)) if f.startswith("meshfoot_")]
         mesh = meshfoot_totals(parse_meshfoot(os.path.join(DATA, mfp[-1]))) if mfp else None
-        t_fp = table_footprint(camp_rows_fp, mesh) if camp_rows_fp else None
+        t_fp, fp_extra = (table_footprint(camp_rows_fp, mesh) if camp_rows_fp else (None, ""))
         if t_fp:
             with open(os.path.join(tab_dir, "footprint.tex"), "w") as fh:
                 fh.write(t_fp)
@@ -1976,7 +2026,7 @@ def build(out_dir, tab_dir):
             mm = macros_meshfoot(parse_meshfoot(os.path.join(DATA, mfp[-1])))
             if mm:
                 with open(os.path.join(out_dir, "meshfoot_macros.tex"), "w") as fh:
-                    fh.write(mm)
+                    fh.write(mm + fp_extra)
                 written.append("figures/meshfoot_macros.tex")
         try:
             rows, host = read_campaign(path)
@@ -2151,6 +2201,11 @@ def build(out_dir, tab_dir):
         measured_dram = {}
         for name in dm:
             measured_dram.update(parse_dram(os.path.join(DATA, name)))
+        mc = macros_coloring(measured_dram)
+        if mc:
+            with open(os.path.join(out_dir, "coloring_macros.tex"), "w") as fh:
+                fh.write(PREAMBLE + mc)
+            written.append("figures/coloring_macros.tex")
         if peak and bw:
             pts = roofline_points(rows, n=128, measured_bytes=measured_dram)
             ho_path = roofline_ho_points(convho_rows, measured_dram)

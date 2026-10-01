@@ -43,6 +43,7 @@
 \IfFileExists{figures/jacfair_macros.tex}{\input{figures/jacfair_macros}}{}
 \IfFileExists{figures/hoexact_macros.tex}{\input{figures/hoexact_macros}}{}
 \IfFileExists{figures/ngrad_macros.tex}{\input{figures/ngrad_macros}}{}
+\IfFileExists{figures/coloring_macros.tex}{\input{figures/coloring_macros}}{}
 % Inputs a generated file if it exists, and says so loudly if it does not, so a pending
 % measurement cannot quietly vanish from the paper.
 \newcommand{\inputifready}[2]{%
@@ -83,34 +84,34 @@
 \begin{abstract}
 Matrix-free finite element and finite volume operators on unstructured meshes are limited less
 by arithmetic than by the scatter: every element contributes to nodes it shares with its
-neighbours, and on a multicore CPU that contention is usually resolved with atomics, with
-graph colouring, or by abandoning the matrix-free form and assembling a sparse matrix. Each
-costs something distinct. Atomics make the result depend on thread timing, so the operator is
-not reproducible even against itself. Colouring removes the atomics but pays a barrier per
-colour, which dominates when the reduced object is a vector rather than a matrix. Assembly
-trades arithmetic for bandwidth and a footprint that grows with the stencil.
+neighbours, and on a multicore CPU that contention is usually resolved with atomics, with graph
+colouring, or by abandoning the matrix-free form and assembling a sparse matrix. Atomics make
+the result depend on thread timing, so the operator is not reproducible even against itself.
+Colouring removes the atomics but synchronises once per colour and accumulates into the
+destination, paying a barrier and a read of what it is about to write. Assembly trades
+arithmetic for bandwidth and a footprint that grows with the stencil.
 
 We present a \emph{packed} mesh format that removes the scatter conflict structurally rather
 than by synchronisation. Elements are grouped into packs; each node is owned by exactly one
 pack, and the owned ranges partition the node numbering, so a pack accumulates into a private
-buffer with plain addition and writes its owned rows out without contention. The nodes a pack
-touches but does not own are staged and closed by a gather whose graph is built by sorting, so
-each destination is visited by exactly one row in a fixed order. The consequence is an operator
-application with no atomic on any path and a summation order fixed by index arrays rather than
-by thread arrival, which makes the result bitwise identical at every thread count.
+buffer with plain addition and writes its owned rows out without contention. The nodes it
+touches but does not own are staged and closed by a gather that visits each destination exactly
+once. No atomic appears on any path, and the summation order is fixed by stored index arrays
+rather than by thread arrival, so the result is bitwise identical at every thread count.
 
 We evaluate the format on the operators of a colocated CVFEM incompressible Navier--Stokes
-discretisation --- residual and Jacobian action --- on an NVIDIA Grace CPU, against a standard
-atomic sweep and against sparse matrix--vector products with the lagged block-sparse matrix
-in double and single precision. On \campDofs{} degrees of freedom the packed residual reaches
+discretisation --- residual and matrix-free Jacobian action --- on an NVIDIA Grace CPU, against
+an atomic sweep, against a coloured one, and against sparse matrix--vector products with the
+lagged block-sparse matrix. On \campDofs{} degrees of freedom the packed residual reaches
 \campResPacked{}~MDOF/s against \campResAtomic{} for the atomic sweep and \campSpmvF{} for the
-lagged product, while reading two orders of magnitude less per degree of freedom than the
-matrix does. Measured over repeats and over thread counts, the atomic sweep returns a different
-result every time and the packed one returns the same bits throughout. We also report what the
-advantage is not: most of it is present at a single thread, where no contention exists, so the
-gain comes from what the layout reads rather than from the atomics it removes; and the margin
-falls from $2.96\times$ on a bare element kernel to $2.06\times$ once the operator carries the
-terms a solver actually applies.
+lagged sparse matrix--vector product, while reading \fpImpl{}~bytes of mesh per degree of freedom
+where the product reads \fpMatrixFSixFour{} of matrix. The atomic sweep is not bitwise
+reproducible; the packed one is, at every thread count. Against colouring on the same
+decomposition the two are equal on one thread and \scalePackedResTop{} against
+\scaleColoredResTop{}~MDOF/s on 72. We also report what the advantage is not: most of it is
+present at a single thread, where no contention exists, so the gain comes from what the layout
+reads rather than from the atomics it removes; and the margin falls from $2.96\times$ on a bare
+element kernel to $2.06\times$ once the operator carries the terms a solver actually applies.
 \end{abstract}
 
 \begin{CCSXML}
@@ -146,8 +147,8 @@ are the simplest and impose no structure on the mesh, but they serialise on cont
 more consequentially, they fix no order of summation. Floating-point addition is not
 associative, so an operator applied twice to the same input returns two different answers.
 \emph{Colouring} partitions the elements into conflict-free sets and removes the atomics, at the
-cost of a barrier per colour --- a fixed cost that is repaid when the object being reduced is a
-large matrix and is not repaid when it is a vector. \emph{Assembling} a sparse matrix removes
+cost of a barrier per colour and of accumulating into the destination, which has to be read
+before it can be added to. \emph{Assembling} a sparse matrix removes
 the problem from the inner loop entirely, but replaces a compute-bound kernel with a
 bandwidth-bound sparse matrix--vector product and a footprint that grows with the stencil rather
 than with the solution.
@@ -206,7 +207,7 @@ in where the resolution happens: colouring partitions the \emph{work} so that co
 updates never coincide in time, while the packed format partitions the \emph{data} so that
 conflicting updates do not exist. We measure against colouring throughout, and report that it is
 also atomics-free and, on this operator, also reproducible --- what separates the two is the
-barrier it must pay and this does not.
+synchronisation it must pay and the traffic its accumulation costs.
 
 \paragraph{Locality by spatial ordering.} Reordering an unstructured mesh along a space-filling
 curve is standard practice for locality and for partitioning~\cite{Bader2013,Zumbusch2001}. The
@@ -451,15 +452,17 @@ cost of a barrier between colours. It shares the packed layout's gather and its 
 indexing, and differs from it only in how the result leaves the pack. That makes the pair an
 unusually clean controlled comparison, and \S\ref{sec:res:scaling} uses it as one.
 
-Colouring also fixes a summation order and is, as measured in \S\ref{sec:res:determinism},
-bitwise reproducible here. We note two qualifications rather than claim it as equivalent. The
-order it fixes is a property of the colouring, so reproducibility additionally requires the
-colouring itself to be constructed deterministically --- a property of the construction, not of
-the layout. And the cost of the barriers is paid per application and grows with the thread
-count, whereas the ghost reduction's cost is proportional to the number of shared nodes, which
-is a property of the mesh. Which is preferable therefore depends on how much reduction there is
-to remove: for the vector-valued operators measured here, the barriers cost more than the ghost
-reduction they replace, and \S\ref{sec:res:scaling} shows that gap opening with thread count.
+Colouring is also bitwise reproducible here (\S\ref{sec:res:determinism}), with three
+qualifications. The order it fixes belongs to the colouring, so reproducibility requires the
+colouring to be constructed deterministically --- a property of the construction, not of the
+layout. The number of colours is set by the decomposition rather than chosen (\campNColors{}
+here, balanced to \campColorPacksLo{}--\campColorPacksHi{} packs), so the barrier count per
+application is fixed while the work between barriers shrinks as threads are added. And writing
+into the global arrays means accumulating into them: a node owned by one pack also receives from
+packs in earlier colours, so the destination is read before it is added to, where the packed
+layout's owned rows have a single writer. That is a cost of the scatter rather than of the
+synchronisation, and it is measurable --- \colBytesPctResRc\% more DRAM per degree of freedom on
+the residual, \colBytesPctJac\% on the bare Jacobian action (\S\ref{sec:res:spmv}).
 
 %================================================================================================
 \section{Cost model}
@@ -751,8 +754,9 @@ At the saturating size, \campDofs{} degrees of freedom, the packed residual reac
 \campJacPacked{} against \campJacAtomic{}. Both are bare element kernels, carrying no Rhie--Chow term; the forms that do are in
 Table~\ref{tab:jacfair}. Sparse matrix--vector products with the lagged matrix reach
 \campSpmvF{}~MDOF/s at double precision and \campSpmvS{} at single, consistent with the
-footprint of Table~\ref{tab:footprint}: the lagged product streams two orders of magnitude
-more per degree of freedom.
+footprint of Table~\ref{tab:footprint}: the lagged product streams \fpMatrixFSixFour{}~bytes of
+matrix per degree of freedom where the matrix-free sweeps read \fpImpl{} of mesh,
+$\fpMatrixRatioFSixFour\times$ as much.
 
 \subsection{Term completeness}
 \label{sec:res:ladder}
@@ -781,9 +785,8 @@ on the Jacobian action alike. The packed layout gives a single answer in both sw
 thread count and for both operators.
 
 Colouring is reproducible here as well. Both it and the packed layout avoid atomics and so fix a
-summation order; they differ in throughput (\S\ref{sec:res:throughput}), where the barrier per
-colour is paid against a reduction of vector rather than matrix volume. Two caveats attach to the
-colouring result: its reproducibility depends on the colouring being constructed
+summation order; they differ in throughput (\S\ref{sec:res:throughput}). Two caveats attach to
+the colouring result: its reproducibility depends on the colouring being constructed
 deterministically, which is a property of the construction rather than the layout, and agreement
 over seven runs is evidence rather than proof.
 
@@ -824,9 +827,12 @@ throughout because each thread does more work, not because threads obstruct one 
 contention is the usual argument for removing atomics, it is not what the removal buys here.
 
 \paragraph{Colouring.} Measured on the same sweep but left off the figure, the coloured layout
-starts level with the packed one and ends at \scaleColoredResTop{} against
-\scalePackedResTop{}~MDOF/s, \scaleColoredResEff\% efficiency against \scalePackedResEff\%: the
-two differ in nothing but the barrier per colour, so the gap is what the barrier costs.
+starts level with the packed one --- \scaleColoredResOne{} against \scalePackedResOne{}~MDOF/s ---
+and ends at \scaleColoredResTop{} against \scalePackedResTop{}, \scaleColoredResEff\% efficiency
+against \scalePackedResEff\%. The two run the same packs, staging and element kernel, so the gap
+is entirely in how the result leaves the pack: \campNColors{} barriers per application, which
+cost nothing at one thread, and an accumulation that reads the destination back, which costs
+\colBytesPctResRc\% in traffic at every thread count.
 
 \paragraph{Packed efficiency.} The unit of parallel work is the pack, and there are
 \scalePacks{} of them for 72 threads, \scalePacksPerThread{} each, so static scheduling
@@ -1060,6 +1066,11 @@ two captures differenced across the number of timed applies so that setup and wa
 measured traffic is \rlTrafficRatioLo{} to \rlTrafficRatioHi{} times the compulsory bound, the balance being node
 re-reads at pack boundaries and partial-line writes.
 
+The same captures price the coloured layout's scatter. On the identical decomposition it moves
+\colBytesPctResRc\% more per degree of freedom on the residual, \colBytesPctJac\% on the bare
+Jacobian action and \colBytesPctJacRc\% with the Rhie--Chow term: the cost of accumulating into
+the global arrays rather than writing owned rows.
+
 The first-order matrix-free kernels then sit at \rlResidualAiSpan{}~FLOP/byte and
 the lagged product at $\rlSpmvFSixFourAi{}$, a factor of \rlMfOverSpmv{} lower: it reads a matrix whose
 size grows with the stencil where the matrix-free kernels read a mesh. Halving the value precision,
@@ -1192,9 +1203,10 @@ owned ranges partition the numbering, and closing the remainder with a gather bu
 atomic on any path and a summation order fixed by stored index arrays, so it returns the same
 bits at every thread count.
 
-Measured on the residual and Jacobian action of a colocated CVFEM Navier--Stokes discretisation on
-one Grace socket, the format is faster than a standard atomic sweep and than sparse matrix--vector
-products with the lagged matrix, while reading two orders of magnitude less. The thread sweep
+Measured on the residual and matrix-free Jacobian action of a colocated CVFEM Navier--Stokes
+discretisation on one Grace socket, the format is faster than a standard atomic sweep, than a
+coloured one, and than sparse matrix--vector products with the lagged matrix, whose matrix it
+replaces with a mesh $\fpMatrixRatioFSixFour\times$ smaller per degree of freedom. The thread sweep
 locates the advantage: most of it is present at a single thread, where no contention exists, so it
 comes from what the layout reads rather than what it avoids contending on. The margin depends on the
 operator: across convective schemes it runs from $\hoFirstLayoutRatio\times$ down to
