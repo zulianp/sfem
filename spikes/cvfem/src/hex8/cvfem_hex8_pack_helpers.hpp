@@ -112,9 +112,6 @@ static SFEM_INLINE void gather_hex8_adj_soa(const MeshT               &d,
 // gather needs nothing but raw arrays and was already family-independent; the filler is
 // templated on the two container types the way the rest of this header is.
 static SFEM_INLINE void cvfem_hex8_gather_rc_from_pack(pack_idx_t **const SFEM_RESTRICT     elems,
-                                                       const scalar_t *const SFEM_RESTRICT pack_x,
-                                                       const scalar_t *const SFEM_RESTRICT pack_y,
-                                                       const scalar_t *const SFEM_RESTRICT pack_z,
                                                        const scalar_t *const SFEM_RESTRICT pack_pgx,
                                                        const scalar_t *const SFEM_RESTRICT pack_pgy,
                                                        const scalar_t *const SFEM_RESTRICT pack_pgz,
@@ -126,48 +123,18 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_from_pack(pack_idx_t **const SFEM_R
             const ptrdiff_t e = begin + lane;
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                 const pack_idx_t loc = elems[a][e];
-                rc.x[a][lane]        = pack_x[loc];
-                rc.y[a][lane]        = pack_y[loc];
-                rc.z[a][lane]        = pack_z[loc];
                 rc.pgx[a][lane]      = pack_pgx[loc];
                 rc.pgy[a][lane]      = pack_pgy[loc];
                 rc.pgz[a][lane]      = pack_pgz[loc];
             }
         } else {
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                rc.x[a][lane] = rc.y[a][lane] = rc.z[a][lane] = scalar_t(0);
                 rc.pgx[a][lane] = rc.pgy[a][lane] = rc.pgz[a][lane] = scalar_t(0);
             }
         }
     }
 }
 
-// Coordinates only, for the partially assembled apply. It needs the edge vectors -- the
-// direction's reconstructed gradient is contracted against them -- but not the state's
-// nodal pressure gradient, which is now inside the stored tangent. Three arrays staged
-// instead of six, and half of the 768 doubles the gather above moves per SIMD group.
-static SFEM_INLINE void cvfem_hex8_gather_rc_xyz_from_pack(pack_idx_t **const SFEM_RESTRICT    elems,
-                                                           const scalar_t *const SFEM_RESTRICT pack_x,
-                                                           const scalar_t *const SFEM_RESTRICT pack_y,
-                                                           const scalar_t *const SFEM_RESTRICT pack_z,
-                                                           const ptrdiff_t                     begin,
-                                                           const int                           nlanes,
-                                                           Hex8RhieChowPack                   &rc) {
-    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-        if (lane < nlanes) {
-            const ptrdiff_t e = begin + lane;
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const pack_idx_t loc = elems[a][e];
-                rc.x[a][lane]        = pack_x[loc];
-                rc.y[a][lane]        = pack_y[loc];
-                rc.z[a][lane]        = pack_z[loc];
-            }
-        } else {
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
-                rc.x[a][lane] = rc.y[a][lane] = rc.z[a][lane] = scalar_t(0);
-        }
-    }
-}
 
 // The direction's gradient into the same pack, called straight after the routine above
 // when the Jacobian action needs it. Padding lanes are zeroed here too: they multiply real

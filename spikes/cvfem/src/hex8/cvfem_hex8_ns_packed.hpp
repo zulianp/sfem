@@ -267,7 +267,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedDa
                                                  cof8,
                                                  det);
                 if (with_rc) {
-                    cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz, begin,
+                    cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz, begin,
                                                    nlanes, rcp);
                 }
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(rho,
@@ -431,7 +431,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
                                                         cof8,
                                                         det);
                 if (with_rc) {
-                    cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz, begin,
+                    cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz, begin,
                                                    nlanes, rcp);
                     cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
                 }

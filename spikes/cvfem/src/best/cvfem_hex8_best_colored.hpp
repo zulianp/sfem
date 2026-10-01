@@ -203,7 +203,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                                                    cof8,
                                                    det);
                         if (with_rc)
-                            cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy,
+                            cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy,
                                                            pack_pgz, begin, nlanes, rcp);
                         cvfem_hex8_ns_upwind_residual_sumfact_simd(
                                 rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
@@ -369,7 +369,7 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                                                           cof8,
                                                           det);
                         if (with_rc) {
-                            cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy,
+                            cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy,
                                                            pack_pgz, begin, nlanes, rcp);
                             cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
                         }
