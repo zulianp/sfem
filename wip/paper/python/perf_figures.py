@@ -1039,7 +1039,19 @@ def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None, ho_jac=None,
     entries: what they show is a trajectory, one operator gaining arithmetic at fixed traffic,
     and a path says that where four scattered markers would not.
     """
-    xmin, xmax = 0.15, 64.0
+    # The axis is sized to the DATA, not left at a round decade. A fixed 0.15--64 spent well over
+    # half its width on intensities nothing occupies -- every point lies between the lagged
+    # product and the richest limiter -- and compressed the cluster the figure is actually about
+    # into the middle third. The lower end clears the leftmost point; the upper end clears the
+    # rightmost point AND the vendor ridge, since the caption quotes where both roofs bend and a
+    # roof whose knee is off the axis cannot be read. The margin past each is what keeps a marker
+    # off the frame and leaves the plateau a run for its label.
+    ai_all = [a for _l, a, _g, _m in pts]
+    for fam in (ho, ho_jac):
+        ai_all += [a for path in (fam or {}).values() for _n, a, _g in path]
+    ai_all = ai_all or [0.15, 64.0]
+    xmin = min(ai_all) / 1.35
+    xmax = max(max(ai_all), spec_peak / spec_bw) * 1.9
     # Head room above the vendor plateau, because its label goes above its own line and a
     # tighter ceiling clips the label against the axis frame rather than crossing the roof.
     ymin, ymax = 20.0, max(peak_gflops, spec_peak) * 2.6
@@ -1070,9 +1082,12 @@ def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None, ho_jac=None,
         out.append(r"\addplot[%s,no marks,forget plot] coordinates {%s};" % (style, coords))
         # Set against the right edge and clear of its own line: above it for the upper roof,
         # below it for the lower one, so neither label crosses a roof and neither is clipped.
+        # The lower one hangs further below than the upper one rises, because what it has to
+        # clear is not its own roof but the OTHER roof's sloped segment, which on the tightened
+        # axis passes close above the plateau in the stretch the label occupies.
         out.append(r"\node[black!55,font=\tiny,anchor=%s] at (axis cs:%.2f,%.1f) {%s};"
                    % ("south east" if above else "north east",
-                      xmax * 0.97, peak * (1.13 if above else 0.88), label))
+                      xmax * 0.97, peak * (1.13 if above else 0.74), label))
 
     # Vendor first, so the measured roof is drawn over it.
     roof_plot(spec_bw, spec_peak, "black!45,thick,densely dashed",
@@ -1082,12 +1097,19 @@ def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None, ho_jac=None,
     # The bandwidth labels run ALONG their own sloped segment, at the drawn angle, and at two
     # well-separated intensities: the roofs are only a few per cent apart there, so two labels
     # at one place would sit on top of each other whatever the offset.
+    #
+    # Both positions are MULTIPLES OF xmin rather than fixed intensities. They were fixed, and
+    # when the axis was tightened onto the data the measured label stayed at 2.2 -- which had been
+    # empty on a 0.15--64 axis and is now the middle of the point cluster, so the label ran across
+    # the markers. Tying them to the axis keeps them in its left quarter, which is where the two
+    # roofs are and the points are not.
+    x_spec, x_meas = xmin * 2.3, xmin * 4.9
     out.append(r"\node[black!55,font=\tiny,anchor=south,rotate=%.1f] "
-               r"at (axis cs:%.2f,%.1f) {spec %.0f GB/s};"
-               % (ang, 0.42, 0.42 * spec_bw * 1.14, spec_bw))
+               r"at (axis cs:%.2f,%.1f) {%.0f GB/s};"
+               % (ang, x_spec, x_spec * spec_bw * 1.14, spec_bw))
     out.append(r"\node[black!70,font=\tiny,anchor=north,rotate=%.1f] "
-               r"at (axis cs:%.2f,%.1f) {meas.\ %.0f GB/s};"
-               % (ang, 2.2, 2.2 * bandwidth_gbs * 0.88, bandwidth_gbs))
+               r"at (axis cs:%.2f,%.1f) {%.0f GB/s};"
+               % (ang, x_meas, x_meas * bandwidth_gbs * 0.88, bandwidth_gbs))
 
     marks = ["*", "square*", "triangle*", "diamond*", "pentagon*", "otimes*"]
     cols = ["PackA", "PackD", "PackC", "PackE", "PackB", "PackF"]
@@ -1815,10 +1837,16 @@ def parse_jacfair(path):
 def table_jacfair(rows):
     """Matrix-free against the assembled matrix, with the operators made comparable.
 
-    The exact row is what a Newton--Krylov solve should apply; the lagged row is the operator
-    the assembled matrix can hold, and is the one to compare with the SpMV rows. Reporting only
-    the exact row against the SpMV would understate the matrix-free side, because it would be
-    doing strictly more work than the matrix encodes.
+    The exact rows are what a Newton--Krylov solve should apply; the first-order lagged row is
+    the operator the assembled matrix can hold, and is the one to compare with the SpMV rows.
+    Reporting only an exact row against the SpMV would understate the matrix-free side, because
+    it would be doing strictly more work than the matrix encodes.
+
+    BOTH layouts carry their own ratio against the double-precision product, and the columns are
+    grouped under the layout they belong to. With one ratio column the table left it to the
+    reader to work out which rate it was formed from -- it was the packed one -- and the atomic
+    column stood there with no reference of its own, which is the half of the comparison a reader
+    weighing the format against a matrix most wants.
     """
     if not rows:
         return None
@@ -1827,29 +1855,42 @@ def table_jacfair(rows):
         by.setdefault(op, {})[lay] = v
     blocks = [(lab, [o for o in ops if o in by]) for lab, ops in JF_BLOCKS]
     blocks = [b for b in blocks if b[1]]
-    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrr@{}}", r"\toprule",
-           r"operator & packed & atomic & vs.\ \texttt{f64} \\",
-           r"& \multicolumn{2}{c}{MDOF/s} & \\", r"\midrule"]
     f64 = by.get("spmv_f64", {}).get("none")
+    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrr@{}}", r"\toprule",
+           r"& \multicolumn{2}{c}{packed} & \multicolumn{2}{c}{atomic} \\",
+           r"\cmidrule(lr){2-3}\cmidrule(l){4-5}",
+           r"operator & MDOF/s & vs.\ \texttt{f64} & MDOF/s & vs.\ \texttt{f64} \\",
+           r"\midrule"]
+
+    def cells(op):
+        got = []
+        for lay in ("packed", "atomic"):
+            v = by[op].get(lay)
+            got.append("%.0f" % v if v else "---")
+            got.append((r"$%.2f\times$" % (v / f64)) if v and f64 else "---")
+        return " & ".join(got)
+
     for i, (label, ops) in enumerate(blocks):
         if i:
             out.append(r"\addlinespace")
         # The scheme heads its block rather than being repeated in every row label: the two rows
         # under it differ only in the Rhie--Chow term, which is what the row labels are for.
         if len(blocks) > 1:
-            out.append(r"\multicolumn{4}{@{}l}{\emph{%s}} \\" % label)
+            out.append(r"\multicolumn{5}{@{}l}{\emph{%s}} \\" % label)
         for op in ops:
-            pk, at = by[op].get("packed"), by[op].get("atomic")
-            rel = (r"$%.2f\times$" % (pk / f64)) if pk and f64 else "---"
             pad = r"\quad " if len(blocks) > 1 else ""
-            out.append(r"%s%s & %.0f & %.0f & %s \\" % (pad, JF_NAME[op], pk or 0, at or 0, rel))
+            out.append(r"%s%s & %s \\" % (pad, JF_NAME[op], cells(op)))
     out.append(r"\midrule")
+    # The matrix has no layout, so its rows span ALL FOUR numeric columns as one cell rather than
+    # filling a layout's pair. Spanning only columns 2--3 put the rate under the "packed" heading
+    # and the ratio under "atomic", since the rate and ratio columns alternate -- which read as a
+    # packed measurement and an atomic one rather than as a single number belonging to neither.
     for op in ("spmv_f64", "spmv_f32"):
         v = by.get(op, {}).get("none")
         if v is None:
             continue
-        rel = (r"$%.2f\times$" % (v / f64)) if f64 else "---"
-        out.append(r"%s & \multicolumn{2}{c}{%.0f} & %s \\" % (JF_NAME[op], v, rel))
+        rel = (r", $%.2f\times$" % (v / f64)) if f64 else ""
+        out.append(r"%s & \multicolumn{4}{c}{%.0f%s} \\" % (JF_NAME[op], v, rel))
     out.append(r"\bottomrule")
     out.append(r"\end{tabular}")
     return "\n".join(out) + "\n"

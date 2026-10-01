@@ -1126,8 +1126,9 @@ kernel by those factors.
 %================================================================================================
 \begin{table}[t]
   \centering
-  \caption{The Jacobian action in both forms and under both convective schemes, against
-    sparse matrix--vector products with the lagged matrix. Within each block the lagged row lags
+  \caption{The Jacobian action in both forms and under both convective schemes, each layout
+    against the double-precision product with the lagged matrix (the \texttt{f64} row, which the
+    ratios divide by and which has no layout of its own). Within each block the lagged row lags
     the Rhie--Chow term and the exact row differentiates it; the higher-order correction stays
     differentiated in both, since lagging it reproduces the first-order action exactly. Only the
     first-order lagged row holds the operator the matrix does --- the higher-order rows have no

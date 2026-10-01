@@ -2,20 +2,21 @@
 %% Regenerate with: make figures
 
 \small
-\begin{tabular}{@{}lrrr@{}}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-operator & packed & atomic & vs.\ \texttt{f64} \\
-& \multicolumn{2}{c}{MDOF/s} & \\
+& \multicolumn{2}{c}{packed} & \multicolumn{2}{c}{atomic} \\
+\cmidrule(lr){2-3}\cmidrule(l){4-5}
+operator & MDOF/s & vs.\ \texttt{f64} & MDOF/s & vs.\ \texttt{f64} \\
 \midrule
-\multicolumn{4}{@{}l}{\emph{first-order upwind}} \\
-\quad Jacobian action, exact & 971 & 528 & $2.20\times$ \\
-\quad Jacobian action, lagged & 1267 & 771 & $2.87\times$ \\
+\multicolumn{5}{@{}l}{\emph{first-order upwind}} \\
+\quad Jacobian action, exact & 971 & $2.20\times$ & 528 & $1.20\times$ \\
+\quad Jacobian action, lagged & 1267 & $2.87\times$ & 771 & $1.75\times$ \\
 \addlinespace
-\multicolumn{4}{@{}l}{\emph{Darwish--Moukalled}} \\
-\quad Jacobian action, exact & 387 & 209 & $0.88\times$ \\
-\quad Jacobian action, lagged & 417 & 240 & $0.95\times$ \\
+\multicolumn{5}{@{}l}{\emph{Darwish--Moukalled}} \\
+\quad Jacobian action, exact & 387 & $0.88\times$ & 209 & $0.47\times$ \\
+\quad Jacobian action, lagged & 417 & $0.95\times$ & 240 & $0.54\times$ \\
 \midrule
-SpMV, lagged \texttt{f64} & \multicolumn{2}{c}{441} & $1.00\times$ \\
-SpMV, lagged \texttt{f32} & \multicolumn{2}{c}{857} & $1.94\times$ \\
+SpMV, lagged \texttt{f64} & \multicolumn{4}{c}{441, $1.00\times$} \\
+SpMV, lagged \texttt{f32} & \multicolumn{4}{c}{857, $1.94\times$} \\
 \bottomrule
 \end{tabular}
