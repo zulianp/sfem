@@ -363,7 +363,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
                 gather_hex8_simd_from_pack(p.elems, pack_u, d, begin, nlanes, in,
                                            cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
                 if (with_rc) {
-                    cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx,
+                    cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx,
                                                    pack_pgy, pack_pgz, begin, nlanes, rcp);
                     if (sympy) cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
                 }
@@ -550,7 +550,7 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                                                cof8,
                                                det);
                     if (with_rc) {
-                        cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy,
+                        cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy,
                                                        pack_pgz, begin, nlanes, rcp);
                     }
                     cvfem_hex8_ns_upwind_residual_sumfact_simd(
@@ -927,7 +927,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                       cof8,
                                                       det);
                     if (with_rc) {
-                        cvfem_hex8_gather_rc_from_pack(p.elems, pack_x, pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz,
+                        cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz,
                                                        begin, nlanes, rcp);
                         cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
                     }
@@ -1101,7 +1101,6 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
                                            cof4, cof5, cof6, cof7, cof8, det);
                 if (with_rc) cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
                 if (with_qg) {
-                    cvfem_hex8_gather_rc_xyz_from_pack(p.elems, pack_x, pack_y, pack_z, begin, nlanes, rcp);
                     cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
                 }
                 cvfem_hex8_ns_upwind_jacobian_action_pa_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6,

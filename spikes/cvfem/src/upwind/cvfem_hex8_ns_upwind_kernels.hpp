@@ -92,9 +92,10 @@ struct Hex8UGradPack {
 };
 
 struct Hex8RhieChowPack {
-    alignas(ALIGN_BYTES) scalar_t x[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t y[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t z[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
+    // No node coordinates. Every face on this path takes its edge vector from the element
+    // Jacobian (cvfem_hex8_affine_edge_cols), so the three arrays that used to stage eight nodes'
+    // coordinates per lane group -- 3 KB of stack and twenty-four indexed gathers per element --
+    // have no reader left. The isoparametric kernels keep their own Hex8CoordPack.
     alignas(ALIGN_BYTES) scalar_t pgx[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t pgy[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];
     alignas(ALIGN_BYTES) scalar_t pgz[CVFEM_HEX8_N_NODES][CVFEM_HEX8_VEC_SIZE];

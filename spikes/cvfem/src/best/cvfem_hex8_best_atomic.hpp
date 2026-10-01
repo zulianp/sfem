@@ -196,9 +196,6 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         if (lane < nlanes) {
                             const smesh::idx_t g = d.elems[a][e0 + lane];
-                            rcp.x[a][lane]       = scalar_t(px[g]);
-                            rcp.y[a][lane]       = scalar_t(py[g]);
-                            rcp.z[a][lane]       = scalar_t(pz[g]);
                             rcp.pgx[a][lane]     = d.pgx[g];
                             rcp.pgy[a][lane]     = d.pgy[g];
                             rcp.pgz[a][lane]     = d.pgz[g];
@@ -206,7 +203,6 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                             rcp.qgy[a][lane]     = has_qg ? d.qgy[g] : scalar_t(0);
                             rcp.qgz[a][lane]     = has_qg ? d.qgz[g] : scalar_t(0);
                         } else {
-                            rcp.x[a][lane] = rcp.y[a][lane] = rcp.z[a][lane] = scalar_t(0);
                             rcp.pgx[a][lane] = rcp.pgy[a][lane] = rcp.pgz[a][lane] = scalar_t(0);
                             rcp.qgx[a][lane] = rcp.qgy[a][lane] = rcp.qgz[a][lane] = scalar_t(0);
                         }
@@ -437,16 +433,12 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
                         const ptrdiff_t e = e0 + lane;
                         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                             const smesh::idx_t g = d.elems[a][e];
-                            rcp.x[a][lane]       = scalar_t(px[g]);
-                            rcp.y[a][lane]       = scalar_t(py[g]);
-                            rcp.z[a][lane]       = scalar_t(pz[g]);
                             rcp.pgx[a][lane]     = d.pgx[g];
                             rcp.pgy[a][lane]     = d.pgy[g];
                             rcp.pgz[a][lane]     = d.pgz[g];
                         }
                     } else {
                         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            rcp.x[a][lane] = rcp.y[a][lane] = rcp.z[a][lane] = scalar_t(0);
                             rcp.pgx[a][lane] = rcp.pgy[a][lane] = rcp.pgz[a][lane] = scalar_t(0);
                         }
                     }
