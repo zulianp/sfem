@@ -265,9 +265,9 @@ touch: element $e$ belongs to pack $p = \lfloor e / n_{\mathrm{epp}} \rfloor$
 
 The mesh must be spatially reordered first, by a space-filling curve here, or a pack's elements
 are scattered and the node set they touch is large; \S\ref{sec:res:ordering} measures the cost
-of skipping it. Packing then renumbers the nodes in place, so coordinates, the node-to-node
-graph and any sparsity pattern are built after it, and equivalence against a reference operator
-is checked by matching nodes on coordinates.
+of skipping it. Packing then renumbers the nodes in place, so everything indexed by node is
+built after it --- the coordinates, and the sparsity pattern where a matrix is assembled at all.
+Equivalence against a reference operator is checked by matching nodes on coordinates.
 
 \begin{figure}[t]
   \centering
