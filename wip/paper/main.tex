@@ -1039,10 +1039,10 @@ to it.
 
 The correction adds a reconstruction and, where a limiter is selected, a limiter evaluation at
 every sub-control surface, against a first-order flux of a branch and a multiply. Three limiters
-are measured beside the unlimited reconstruction: the bounded-face clip, which holds the
-reconstructed face value inside the range its two nodes span~\cite{BarthJespersen1989};
-Venkatakrishnan's rational function, which smooths that clip so a steady state can
-converge~\cite{Venkatakrishnan1995}; and the Darwish--Moukalled form, which applies a
+are measured beside the unlimited reconstruction: Barth--Jespersen, which clips the
+reconstructed face value into the range its two nodes span~\cite{BarthJespersen1989};
+Venkatakrishnan, which smooths that clip into a rational function so a steady state can
+converge~\cite{Venkatakrishnan1995}; and Darwish--Moukalled, which applies a
 normalised-variable \textsc{tvd} limiter on an unstructured
 mesh~\cite{DarwishMoukalled2003}. Table~\ref{tab:convho} and Figure~\ref{fig:convho} report all
 five variants.
@@ -1277,8 +1277,8 @@ $\jfExactVsF\times$ rather than $\jfLaggedVsF\times$, understating the matrix-fr
 while appearing to favour it; both are given because they answer different questions.
 
 The higher-order blocks are where the comparison stops being one. The packed action lands
-below the double-precision SpMV under both limiters, at $\jfClipExactVsF\times$ for the
-bounded-face clip and $\jfHoExactVsF\times$ for Darwish--Moukalled, the latter costing
+below the double-precision SpMV under both limiters, at $\jfClipExactVsF\times$ for
+Barth--Jespersen and $\jfHoExactVsF\times$ for Darwish--Moukalled, the latter costing
 $\jfHoCostExact\times$ its first-order self. Read as a throughput ratio that
 is a loss, and it would be, if the matrix held the same operator. It cannot: the higher-order
 correction differentiates through a nodal reconstruction, so the coupling it induces reaches
