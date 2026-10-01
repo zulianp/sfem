@@ -244,13 +244,27 @@ independent of its order, it fixes the order, in the index arrays the layout alr
 two are complementary rather than competing, and the distinction matters for cost, because
 fixing an order is free once the layout has done it.
 
-\paragraph{Prior art.} Grouping elements into blocks with locally numbered
-nodes is not itself novel, and neither is reordering a mesh along a space-filling curve. The
-claim made here is about what follows from making ownership of every node \emph{exclusive to one
-pack} and from closing the remainder with a gather built by sorting: the scatter then needs no
-synchronisation at all, and the summation order becomes a property of the stored index arrays.
-Atomics-freedom and reproducibility are consequences of the layout rather than of a reduction
-primitive, and the narrowed index traffic that comes with pack-local numbering is what pays for
+\paragraph{Prior art.} Grouping elements into blocks with locally numbered nodes is not novel,
+and neither is reordering a mesh along a space-filling curve; what has been attempted with them
+is worth separating from what was achieved. Reguly and Giles~\cite{RegulyGiles2015} block a grid
+into geometrically close elements and renumber their degrees of freedom, and report a GPU
+assembly up to $10\times$ a two-socket 12-core CPU and a matrix-free product up to $2\times$
+global assembly --- but the blocking buys locality only, and the write conflict is still
+resolved by colouring or by atomics on both sides, the CPU baseline being block-coloured.
+Settgast et al.~\cite{Settgast2023} make the case for low-order matrix-free kernels on GPUs,
+where the application's heterogeneity rules high order out, and beat matrix-based products on
+three architectures; the scatter is again the standard one. Wichrowski~\cite{Wichrowski2026}
+does remove it, keeping cell-wise storage as the primary representation and closing continuity
+by a dimensionally-split cascade of face exchanges at statically known offsets --- no
+gather-scatter, no atomics, no colouring --- and reaches \SI{14.1}{} to
+\SI{59.6}{}~GDoF/s on an A100 from $\mathbb{Q}_1$ to $\mathbb{Q}_7$. Those static offsets are
+what the method rests on, and they exist because the topology inside a macro-block is
+structured.
+
+This paper removes the conflict on a mesh where no offset is static, by making ownership of
+every node \emph{exclusive to one pack} and closing the remainder with a gather built by
+sorting. Atomics-freedom and reproducibility then follow from the layout rather than from a
+reduction primitive, and the narrowed index traffic of pack-local numbering is what pays for
 them.
 
 %================================================================================================
