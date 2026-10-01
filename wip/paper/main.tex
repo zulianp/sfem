@@ -25,6 +25,15 @@
 \DeclareSIUnit{\flop}{FLOP}
 \DeclareSIUnit{\flops}{FLOP/s}
 \DeclareSIUnit{\tflops}{TFLOP/s}
+% Float placement: the three figures of \S3 are one argument and belong together on a page, and
+% the class defaults cap a column at two floats and 70% float area. Relaxed enough to let the
+% third join them, not so far that a page can become all float.
+\setcounter{topnumber}{3}
+\setcounter{totalnumber}{4}
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.5}
+\renewcommand{\textfraction}{0.06}
+\renewcommand{\floatpagefraction}{0.75}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
 
@@ -288,7 +297,9 @@ built after it --- the coordinates, and the sparsity pattern where a matrix is a
 
 \begin{figure}[t]
   \centering
-  \resizebox{\columnwidth}{!}{\input{figures/packed_decomposition}}
+  % 0.82 rather than full width: the three figures of this section are one argument and read
+  % together, and at full width only two of them fit a page.
+  \resizebox{0.82\columnwidth}{!}{\input{figures/packed_decomposition}}
   \caption{An unstructured mesh of $\figPackNElems$ elements in $\figPackNPacks$ packs of
     $\figPackElemsPerPack$ after space-filling reordering (top), with $P_\figPackDetachedA$ and
     $P_\figPackDetachedB$ detached (bottom). Element fill is the pack, node colour the
@@ -296,6 +307,7 @@ built after it --- the coordinates, and the sparsity pattern where a matrix is a
     a dashed arc joins it to the node it duplicates. Ghosts of packs not shown have no arc.}
   \label{fig:decomposition}
 \end{figure}
+
 
 \subsection{Node identity}
 \label{sec:format:zones}
@@ -351,6 +363,17 @@ the first zone can be written without synchronisation and only the shared tail c
     $P_2$ nothing shared.}
   \label{fig:idspace}
 \end{figure}
+
+\begin{figure}[t]
+  \centering
+  \resizebox{\columnwidth}{!}{\input{figures/packed_reduction}}
+  \caption{The two phases of an apply (Algorithm~\ref{alg:apply}) over all $\figPackNPacks$
+    packs of Figure~\ref{fig:decomposition}. \texttt{ghost\_buf} cells carry the colour of the
+    pack that staged them; the global field is banded by owner. Of the $\figPackGhostEntries$
+    staged entries in $\figPackReduceRows$ rows, those summing more than one term are drawn.}
+  \label{fig:reduction}
+\end{figure}
+
 
 \subsection{Ghost lists and the reduction graph}
 \label{sec:format:ghost}
@@ -444,15 +467,6 @@ owned rows straight to the global field and stages only its ghost contributions,
 empties the staging buffer one row at a time, so the close is a single global pass rather than
 an exchange between neighbouring packs.
 
-\begin{figure}[t]
-  \centering
-  \resizebox{\columnwidth}{!}{\input{figures/packed_reduction}}
-  \caption{The two phases of an apply (Algorithm~\ref{alg:apply}) over all $\figPackNPacks$
-    packs of Figure~\ref{fig:decomposition}. \texttt{ghost\_buf} cells carry the colour of the
-    pack that staged them; the global field is banded by owner. Of the $\figPackGhostEntries$
-    staged entries in $\figPackReduceRows$ rows, those summing more than one term are drawn.}
-  \label{fig:reduction}
-\end{figure}
 
 %================================================================================================
 \section{Operator application}
