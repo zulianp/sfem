@@ -1192,10 +1192,35 @@ HO_SCALAR_ARM = {
     "ho_venk_scalar": "ho_venkatakrishnan",
     "ho_dm_scalar": "ho_darwish_moukalled",
 }
-HO_EXTRA = ("ho_unlim_simd", "ho_unlim_rc", "ho_unlim_rc_scalar")
+# ho_unlim_lagged belongs to the Jacobian sweep only: it is the lagged action, which should
+# equal the first-order action bit for bit and is carried as that control.
+HO_EXTRA = ("ho_unlim_simd", "ho_unlim_rc", "ho_unlim_rc_scalar", "ho_unlim_lagged")
 
 
 ConvHo = collections.namedtuple("ConvHo", "arm layout mdof dofs elems flops_elem checksum")
+
+
+def macros_jacho(rows):
+    """The quantities the prose cites from the Jacobian's scheme sweep.
+
+    Kept separate from the residual's macros so a reader cannot mistake one figure's numbers for
+    the other's: every name here carries the jacho prefix.
+    """
+    by, loose = _convho_index(rows)
+    out = []
+    names = {"first_order": "First", "ho_unlimited": "Unlim", "ho_clip": "Clip",
+             "ho_venkatakrishnan": "Venk", "ho_darwish_moukalled": "Dm"}
+    for arm, tag in names.items():
+        d = by.get(arm) or {}
+        if d.get("gen"):
+            out.append(r"\newcommand{\jacho%sPacked}{%.0f}" % (tag, d["gen"]))
+        if d.get("atomic"):
+            out.append(r"\newcommand{\jacho%sAtomic}{%.0f}" % (tag, d["atomic"]))
+        if d.get("gen") and d.get("atomic"):
+            out.append(r"\newcommand{\jacho%sLayoutRatio}{%.2f}" % (tag, d["gen"] / d["atomic"]))
+    if loose.get("ho_unlim_lagged"):
+        out.append(r"\newcommand{\jachoLaggedPacked}{%.0f}" % loose["ho_unlim_lagged"])
+    return "\n".join(out) + "\n" if out else ""
 
 
 def parse_convho(path):
@@ -1290,12 +1315,23 @@ def spmv_reference(rows, n=128):
 
 
 def fig_convho(rows, spmv=None):
-    """The same five variants as a figure, so the trend across schemes reads at a glance.
+    """The residual's five variants as a figure. See fig_scheme_bars for the shape."""
+    return fig_scheme_bars(rows, spmv=spmv)
+
+
+def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
+    """The five convective variants as grouped bars, packed against atomic.
+
+    Used for BOTH the residual (fig:convho) and the Jacobian action (fig:jacho), which is why
+    it is parameterised rather than copied: the axis styling, the one-swatch legend fix and the
+    SpMV reference rules then have ONE definition each, so a change to any of them cannot land
+    on one figure and miss the other.
 
     A symbolic x axis rather than a size sweep: the higher-order arms are measured at the
     saturating size only, and plotting them against sizes they were not swept over would invent
     data. The two SpMV rates are drawn across it as reference lines, in the colours F5 gives
-    them, because what the reader wants from a rate is what it beats.
+    them, because what the reader wants from a rate is what it beats -- and for the Jacobian
+    that comparison is the one the fairness argument rests on, so the same rules belong on both.
     """
     if not rows:
         return None
@@ -1315,7 +1351,7 @@ def fig_convho(rows, spmv=None):
     return PREAMBLE + "\n".join([
         r"\begin{tikzpicture}",
         r"\begin{axis}[width=\columnwidth, height=0.44\columnwidth,",
-        r"  ybar, bar width=7pt, ymin=0, ylabel={MDOF/s},",
+        r"  ybar, bar width=7pt, ymin=0, ylabel={%s}," % ylabel,
         # ONE swatch per bar entry. The ybar default draws a pair of bars in the legend, which
         # says nothing here -- each series is one bar per group, not two -- and doubles the width
         # of a legend that also has to hold two dashed reference lines. The SpMV entries below
@@ -1783,6 +1819,33 @@ def build(out_dir, tab_dir):
             with open(os.path.join(tab_dir, "ordering.tex"), "w") as fh:
                 fh.write(ordt)
             written.append("tables/ordering.tex")
+
+    # THE JACOBIAN ACTION, the same five schemes. Same parser and same figure function as the
+    # residual above -- jobs/jac_ho_bench.sbatch is derived from conv_ho_bench.sbatch and emits
+    # the identical column layout, so neither a second parser nor a second plotter is needed.
+    #
+    # The trend is NOT the residual's, which is why the figure is worth its space: the residual's
+    # layout ratio falls monotonically as arithmetic per surface grows, while the action's RISES
+    # at the unlimited arm before falling. Differentiating the correction adds the direction's
+    # nodal gradient reconstruction, which is the sweep the packed format helps most, so it lifts
+    # the ratio; the limiter derivatives then add per-surface arithmetic that no layout helps.
+    jho = ([f for f in sorted(os.listdir(DATA))
+            if f.startswith("jacho_") and f.endswith(".out")] if os.path.isdir(DATA) else [])
+    if jho:
+        jr = parse_convho(os.path.join(DATA, jho[-1]))
+        fgj = fig_scheme_bars(jr, spmv_ref)
+        if fgj:
+            with open(os.path.join(out_dir, "jacho.tex"), "w") as fh:
+                fh.write(fgj)
+            written.append("figures/jacho.tex")
+        # No table for this one. The figure plus the macros the prose cites carry it, and the
+        # paper is over its page limit already -- generating a table nothing inputs would only
+        # leave a reader wondering whether it belongs in the paper.
+        mj = macros_jacho(jr)
+        if mj:
+            with open(os.path.join(out_dir, "jacho_macros.tex"), "w") as fh:
+                fh.write(mj)
+            written.append("figures/jacho_macros.tex")
 
     # Only the .out files: parse_convho reads the whitespace-aligned summary table, not the CSV
     # that sits beside it, and picking the wrong one silently yields an empty table.
