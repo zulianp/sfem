@@ -32,6 +32,7 @@
 \input{figures/roofline_macros}
 \IfFileExists{figures/convho_macros.tex}{\input{figures/convho_macros}}{}
 \IfFileExists{figures/kmix_macros.tex}{\input{figures/kmix_macros}}{}
+\IfFileExists{figures/jacho_macros.tex}{\input{figures/jacho_macros}}{}
 \IfFileExists{figures/meshfoot_macros.tex}{\input{figures/meshfoot_macros}}{}
 \IfFileExists{figures/jacfair_macros.tex}{\input{figures/jacfair_macros}}{}
 \IfFileExists{figures/hoexact_macros.tex}{\input{figures/hoexact_macros}}{}
@@ -914,6 +915,20 @@ to it.
   \label{fig:convho}
 \end{figure}
 
+%================================================================================================
+\begin{figure}[t]
+  \centering
+  \inputifready{figures/jacho}{Jacobian scheme arms, jobs/jac\_ho\_bench.sbatch}
+  \caption{The same five schemes for the \emph{Jacobian action}, differentiated through the
+    correction. The trend is not Figure~\ref{fig:convho}'s: the ratio \emph{rises} from
+    $\jachoFirstLayoutRatio\times$ on first-order upwind to $\jachoUnlimLayoutRatio\times$ on the
+    unlimited arm before falling to $\jachoDmLayoutRatio\times$, because differentiating the
+    correction adds the direction's nodal gradient reconstruction --- the sweep the format helps
+    most --- while the limiter derivatives add per-surface arithmetic no layout helps. Dashed:
+    the same SpMV references.}
+  \label{fig:jacho}
+\end{figure}
+
 The correction adds a reconstruction and, where a limiter is selected, a limiter evaluation at
 every sub-control surface, against a first-order flux of a branch and a multiply.
 Table~\ref{tab:convho} and Figure~\ref{fig:convho} report all five variants.
@@ -935,6 +950,20 @@ the first-order cost, leaving the arithmetic it does not touch. The three limite
 together, $\hoClipCostPacked\times$ to $\hoVenkCostPacked\times$ packed, and the step from the
 unlimited reconstruction to the cheapest of them is about the size of the spread among them: all
 three share the reconstruction and differ only in the function applied to the increment.
+
+\paragraph{The same schemes in the Jacobian.} Figure~\ref{fig:jacho} repeats the sweep for the
+action, which is the operator a Newton--Krylov solve applies once per linear iteration against one
+residual per step. Two things differ from the residual. The absolute cost of differentiating the
+correction is large --- \jachoFirstPacked{} to \jachoUnlimPacked{}~MDOF/s packed on the unlimited
+arm alone, before any limiter --- because the exact action reconstructs the \emph{direction}'s
+nodal velocity gradient on every matvec, nine components against the three the Rhie--Chow term
+already rebuilds. And the format's margin moves the other way: it rises from
+$\jachoFirstLayoutRatio\times$ to $\jachoUnlimLayoutRatio\times$ before the limiters pull it back
+to $\jachoVenkLayoutRatio$--$\jachoClipLayoutRatio\times$, since the added reconstruction is
+itself packed and is the sweep the layout helps most, whereas a limiter derivative is arithmetic
+at a sub-control surface that no layout can help with. The lagged action is the control on all of
+this: at \jachoLaggedPacked{}~MDOF/s it agrees with first-order upwind to the last bit, which is
+what a deferred correction means --- it reaches the residual and not the Jacobian.
 
 \paragraph{On the roofline.} Figure~\ref{fig:roofline} places the same arms against the
 machine, and one expectation does not survive the measurement: the correction is not free of
