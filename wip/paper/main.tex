@@ -82,12 +82,16 @@
 \email{patrick.zulian@usi.ch}
 
 \begin{abstract}
-Matrix-free finite element and finite volume operators on unstructured meshes are limited less
-by arithmetic than by the scatter: every element contributes to nodes it shares with its
-neighbours. That conflict is usually resolved with atomics, which fix no summation order and
-leave the operator not bitwise reproducible; with graph colouring, which adds a barrier per
-colour and reads back the destination it accumulates into; or by assembling a sparse matrix,
-which trades arithmetic for bandwidth and a footprint that grows with the stencil.
+Performance work on matrix-free operators has concentrated on high-order discretisations, where
+sum factorisation makes the element kernel cheap. Low-order unstructured operators have had less
+of that attention and are commonly taken to be bandwidth-bound and therefore settled. The
+measurements here put them below both roofs and close to neither, and what is left to recover is
+in the data layout rather than in the kernel. The layout's problem is the scatter: every element
+contributes to nodes it shares with its neighbours, and that conflict is usually resolved with
+atomics, which fix no summation order and leave the operator not bitwise reproducible; with
+graph colouring, which adds a barrier per colour and reads back the destination it accumulates
+into; or by assembling a sparse matrix, which trades arithmetic for bandwidth and a footprint
+that grows with the stencil.
 
 We present a \emph{packed} mesh format that removes the conflict structurally. Each node is
 owned by exactly one pack of elements and the owned ranges partition the node numbering, so a
@@ -102,11 +106,11 @@ Navier--Stokes discretisation on an NVIDIA Grace CPU. On \campDofs{} degrees of 
 packed residual reaches \campResPacked{}~MDOF/s against \campSpmvF{} for a sparse
 matrix--vector product with the lagged matrix. Per degree of freedom the sweep reads
 \fpImpl{}~bytes of mesh; the product reads \fpMatrixFSixFour{}~bytes of matrix. The Jacobian
-action is reported
-in both forms, since they are not the same operator: lagged, it is what the matrix holds, at
-$\jfLaggedVsF\times$ the product; differentiated, what a Newton--Krylov solve applies, it costs
-$\jfExactCost\times$ and is $\jfExactVsF\times$. Most of the advantage is present at one thread,
-so it comes from what the layout reads rather than from the atomics it removes.
+action is reported in both forms, since they are not the same operator: lagged, it is what the
+matrix holds, at $\jfLaggedVsF\times$ the product; differentiated, what a Newton--Krylov solve
+applies, it costs $\jfExactCost\times$ and is $\jfExactVsF\times$. Most of the advantage is
+present at one thread, where no contention exists, which places it in what the layout reads
+rather than in the atomics it removes.
 \end{abstract}
 
 \begin{CCSXML}
@@ -191,8 +195,12 @@ factorisation makes the element kernel cheap~\cite{Orszag1980,DevilleFischerMund
 Modern libraries build on that lineage and make the matrix-free operator the primary
 object~\cite{KronbichlerKormann2012,KronbichlerKormann2019,MFEM2021,libCEED2021,Kolev2021}, as
 do the form compilers that generate the element kernels~\cite{KirbyLogg2006,Firedrake2016}. That
-work is largely concerned with making the kernel fast. This paper is concerned with what happens
-on either side of it.
+work is largely concerned with making the kernel fast, and at high order the kernel is what
+there is to make fast. At low order it is not: the element kernel is small, the reference
+element admits no sum factorisation to exploit, and what is left is the traffic and the scatter
+around the kernel. This paper is concerned with that --- with what happens on either side of the
+element kernel rather than inside it --- and \S\ref{sec:res:spmv} shows the margin is real, with
+the low-order operators sitting below both roofs and close to neither.
 
 \paragraph{Resolving the scatter.} The conflict between elements sharing a node is classically
 resolved either by atomic updates or by colouring the elements so that no two of a colour share
