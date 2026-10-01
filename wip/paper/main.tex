@@ -13,6 +13,12 @@
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepackage{booktabs}
+% DRAFT across every page. Loaded last among the page-furniture packages so nothing it stacks
+% under can reorder it, and set light enough that a figure or a table under it stays legible.
+\usepackage{draftwatermark}
+\SetWatermarkText{DRAFT}
+\SetWatermarkScale{1.1}
+\SetWatermarkLightness{0.93}
 \usepackage{siunitx}
 \sisetup{group-separator={,},group-minimum-digits=4}
 % siunitx has no FLOP unit; declared once here so rates read as "461 GFLOP/s" everywhere.
@@ -1109,9 +1115,12 @@ kernel by those factors.
 %================================================================================================
 \begin{table}[t]
   \centering
-  \caption{\fostag{} The Jacobian action in both forms, against sparse matrix--vector products with the
-    lagged matrix. The lagged row holds the same operator the matrix does and is the
-    like-for-like comparison; the exact row is what a Newton--Krylov solve should apply.}
+  \caption{The Jacobian action in both forms and under both convective schemes, against
+    sparse matrix--vector products with the lagged matrix. Within each block the lagged row lags
+    the Rhie--Chow term and the exact row differentiates it; the higher-order correction stays
+    differentiated in both, since lagging it reproduces the first-order action exactly. Only the
+    first-order lagged row holds the operator the matrix does --- the higher-order rows have no
+    matrix counterpart at all.}
   \label{tab:jacfair}
   \inputifready{tables/jacfair}{fair Jacobian comparison, jobs/jac\_fair.sbatch}
 \end{table}
@@ -1128,6 +1137,18 @@ Carrying the exact term costs $\jfExactCost\times$ on the packed layout, the dir
 sweep appearing as throughput. Quoting the exact action against the SpMV would report
 $\jfExactVsF\times$ rather than $\jfLaggedVsF\times$, understating the matrix-free side by a quarter
 while appearing to favour it; both are given because they answer different questions.
+
+The higher-order block is where the comparison stops being one. Under Darwish--Moukalled the
+packed action costs $\jfHoCostExact\times$ its first-order self and lands at
+$\jfHoExactVsF\times$ the double-precision SpMV --- below it. Read as a throughput ratio that
+is a loss, and it would be, if the matrix held the same operator. It cannot: the higher-order
+correction differentiates through a nodal reconstruction, so the coupling it induces reaches
+past the one ring the matrix's sparsity is built on, and assembling it would mean a different
+and far larger matrix. The row therefore prices the higher-order scheme against the best the
+assembled representation can offer \emph{at all}, which is a first-order operator, and what it
+says is that the scheme costs about what that representation's whole advantage is worth. A
+solver that wants the higher-order Jacobian has no matrix to fall back on; the question is what
+it costs matrix-free, and Table~\ref{tab:jacfair} answers that in the same units.
 
 \section{Discussion and limitations}
 \label{sec:discussion}

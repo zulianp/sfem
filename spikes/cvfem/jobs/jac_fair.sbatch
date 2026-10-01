@@ -23,6 +23,18 @@
 # operator the matrix holds. Both are reported: the exact action is what a Newton-Krylov solve
 # should apply, the lagged one is what the matrix can offer.
 #
+# Both convective schemes, not only first-order upwinding. The comparison this job exists to
+# make is against an operator the matrix CAN hold, and the higher-order correction is one it
+# cannot hold at any sparsity: differentiating it reaches the direction's nodal velocity
+# gradient, which widens the coupling past the one ring the matrix is built on. So the
+# higher-order arms have no matrix counterpart, and reporting them beside the first-order ones
+# is what shows the size of what the assembled representation gives up -- not a second
+# like-for-like row. The scheme is Darwish--Moukalled, the same one Figures 7 to 9 single out.
+#
+# In the higher-order arms --lagged-rc lags the Rhie--Chow term exactly as it does above; the
+# correction itself stays differentiated, because lagging that instead reproduces the
+# first-order action to the last bit (paper S7.8) and would duplicate the rows above.
+#
 # Best of three passes per arm, for the run-to-run band this benchmark has already been shown
 # to carry.
 
@@ -52,6 +64,10 @@ for arm in "jac_exact|packed|--jac-action --rhie-chow" \
            "jac_exact|atomic|--jac-action --rhie-chow" \
            "jac_lagged|packed|--jac-action --rhie-chow --lagged-rc" \
            "jac_lagged|atomic|--jac-action --rhie-chow --lagged-rc" \
+           "jac_ho_exact|packed|--jac-action --rhie-chow --conv-ho 3" \
+           "jac_ho_exact|atomic|--jac-action --rhie-chow --conv-ho 3" \
+           "jac_ho_lagged|packed|--jac-action --rhie-chow --lagged-rc --conv-ho 3" \
+           "jac_ho_lagged|atomic|--jac-action --rhie-chow --lagged-rc --conv-ho 3" \
            "spmv_f64|none|--bsr-apply --bsr-precision double" \
            "spmv_f32|none|--bsr-apply --bsr-precision single"; do
     IFS='|' read -r lbl lay extra <<<"$arm"
