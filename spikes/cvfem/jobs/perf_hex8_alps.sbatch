@@ -206,6 +206,19 @@ op_flag() {
         # unquoted.
         residual-ho)      printf -- "--conv-ho 0" ;;
         residual-ho-simd) printf -- "--conv-ho 0 --ho-simd" ;;
+        # One arm per limiter, because they are four separately generated kernels and GCC does
+        # not treat them alike: its vectoriser report has defcor_lim0, lim1 and lim3 each
+        # reporting "loop vectorized using 16 byte vectors", and lim2 -- Venkatakrishnan --
+        # reporting none, with "relevant stmt not supported: iftmp = _c ? iftmp : iftmp" and then
+        # "couldn't vectorize loop". The emitted expression nests a ternary inside the condition
+        # of another, so GCC if-converts the inner one to a PHI and cannot select over it.
+        # ASE_SPEC/INST_SPEC across these four arms is what says whether that refusal actually
+        # reaches the instruction mix or whether SLP recovers it -- the throughput alone does not
+        # settle it, lim2's modelled flop rate sitting above lim0's.
+        residual-ho0)     printf -- "--conv-ho 0" ;;
+        residual-ho1)     printf -- "--conv-ho 1" ;;
+        residual-ho2)     printf -- "--conv-ho 2" ;;
+        residual-ho3)     printf -- "--conv-ho 3" ;;
         # The nodal gradient reconstruction on its own, at one field (the pressure gradient every
         # Rhie-Chow residual builds) and three (the velocity gradient the exact higher-order
         # Jacobian action rebuilds per matvec). The counter groups are chosen for exactly the

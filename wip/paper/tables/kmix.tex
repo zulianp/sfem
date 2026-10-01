@@ -6,16 +6,16 @@
 & packed & standard \\
 \midrule
 \multicolumn{3}{@{}l}{\emph{instruction mix, share of those issued}} \\
-\quad vector (SIMD) & 29.1\% & 23.3\% \\
-\quad scalar floating point & 0.9\% & 3.0\% \\
-\quad loads & 29.7\% & 30.3\% \\
-\quad stores & 14.0\% & 12.9\% \\
-\quad integer, mostly addressing & 19.2\% & 25.0\% \\
+\quad vector (SIMD) & 30.0\% & 26.4\% \\
+\quad scalar floating point & 1.2\% & 2.7\% \\
+\quad loads & 31.8\% & 32.5\% \\
+\quad stores & 15.0\% & 14.2\% \\
+\quad integer, mostly addressing & 15.8\% & 19.4\% \\
 \midrule
-instructions per cycle & 2.92 & 1.47 \\
-back-end stall, share of cycles & 45\% & 68\% \\
-\quad of which waiting on memory & 29\% & 11\% \\
+instructions per cycle & 2.86 & 1.67 \\
+back-end stall, share of cycles & 48\% & 64\% \\
+\quad of which waiting on memory & 30\% & 12\% \\
 \midrule
-element kernel, share of the sweep & 98\% & 100\% \\
+scatter, change in sweep rate when removed & +0.3\% & -0.5\% \\
 \bottomrule
 \end{tabular}

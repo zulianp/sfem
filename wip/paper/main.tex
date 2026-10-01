@@ -31,6 +31,7 @@
 \input{figures/packsize_macros}
 \input{figures/roofline_macros}
 \IfFileExists{figures/convho_macros.tex}{\input{figures/convho_macros}}{}
+\IfFileExists{figures/kmix_macros.tex}{\input{figures/kmix_macros}}{}
 \IfFileExists{figures/meshfoot_macros.tex}{\input{figures/meshfoot_macros}}{}
 \IfFileExists{figures/jacfair_macros.tex}{\input{figures/jacfair_macros}}{}
 \IfFileExists{figures/hoexact_macros.tex}{\input{figures/hoexact_macros}}{}
@@ -1025,7 +1026,7 @@ of freedom packed against \SI{7.8}{} flat, so the two layouts do not share an in
 coordinates, which such a model naturally reaches for, are not read by the bare affine kernel at
 all. We therefore place the points using DRAM traffic read from the memory-system counters, with
 two captures differenced across the number of timed applies so that setup and warmup cancel. The
-measured traffic is \num{1.3} to \num{1.5} times the compulsory bound, the balance being node
+measured traffic is \rlTrafficRatioLo{} to \rlTrafficRatioHi{} times the compulsory bound, the balance being node
 re-reads at pack boundaries and partial-line writes.
 
 The first-order matrix-free kernels then sit at $\rlResidualAtomicAi{}$--$\rlResidualPackedAi{}$~FLOP/byte and
@@ -1057,12 +1058,14 @@ bandwidth better.
   \inputifready{tables/kmix}{instruction mix, jobs/kernel\_mix.sbatch}
 \end{table}
 
-Table~\ref{tab:kmix} says which. The mixes are similar and the staging is at most
-\SI{2}{\percent} of either sweep, so neither explains the gap; retirement does, at \num{2.92}
-instructions per cycle against \num{1.47} from a back-end stalled \SI{45}{\percent} of cycles
-against \SI{68}{\percent}. That stall is not a wait on memory where it hurts --- \SI{11}{\percent}
-of the standard layout's stall cycles against \SI{29}{\percent} of the packed layout's --- which
-fits the atomic updates serialising, and is outside what the roofline's axes can express.
+Table~\ref{tab:kmix} says which. The mixes are similar and removing the scatter moves either
+sweep by under \SI{1}{\percent} (\kmixScatterPctPacked\% and \kmixScatterPctAtomic\%), so neither
+explains the gap; retirement does, at \kmixIpcPacked{} instructions per cycle against
+\kmixIpcAtomic{} from a back-end stalled \kmixStallPctPacked\% of cycles against
+\kmixStallPctAtomic\%. That stall is not a wait on memory where it hurts ---
+\kmixStallMemPctAtomic\% of the standard layout's stall cycles against \kmixStallMemPctPacked\% of
+the packed layout's --- which fits the atomic updates serialising, and is outside what the
+roofline's axes can express.
 
 \paragraph{Measured against specified.} The two roof pairs differ by more than any kernel here can
 recover: the triad attains \rlBwPctSpec\% of specified bandwidth and the \textsc{gemm}

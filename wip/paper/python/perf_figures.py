@@ -1081,6 +1081,25 @@ def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None,
     return "\n".join(out) + "\n"
 
 
+def macros_traffic_ratio(measured, nelems, nnodes):
+    """The span of measured DRAM traffic over the compulsory bound, as macros.
+
+    The prose cited this as "1.3 to 1.5 times" in literals. It is a ratio of a measurement to a
+    model, so it moves whenever either does, and nothing connected the literal to the capture it
+    came from.
+    """
+    rs = []
+    for (op, lay), b in (measured or {}).items():
+        if op in ("residual", "jac_action"):
+            c = compulsory_bytes_per_dof(nelems, nnodes, lay)
+            if c:
+                rs.append(b / c)
+    if not rs:
+        return ""
+    return (r"\newcommand{\rlTrafficRatioLo}{%.1f}" "\n"
+            r"\newcommand{\rlTrafficRatioHi}{%.1f}" "\n") % (min(rs), max(rs))
+
+
 def macros_roofline_ho(ho, measured_bytes):
     """What the prose quotes about the higher-order arms' place on the roofline.
 
@@ -1429,6 +1448,32 @@ def parse_kmix(path):
     return out
 
 
+def macros_kmix(mix):
+    """The quantities the prose cites from the instruction mix, as macros.
+
+    main.tex had these typed in -- 2.92 and 1.47 instructions per cycle, the stall shares, the
+    memory fraction -- against a preamble that states nothing in the file is a typed-in number.
+    They were stale the moment the kernel changed, and silently so, because nothing connects a
+    literal in the prose to the measurement it came from.
+    """
+    if not mix or any(l not in mix for l in ("packed", "atomic")):
+        return ""
+    out = []
+
+    def put(name, val, fmt="%.2f"):
+        out.append(r"\newcommand{\%s}{%s}" % (name, fmt % val))
+
+    for lay, tag in (("packed", "Packed"), ("atomic", "Atomic")):
+        m = mix[lay]
+        put("kmixIpc" + tag, m["instructions"] / m["cycles"])
+        put("kmixStallPct" + tag, 100.0 * m["STALL_BACKEND"] / m["cycles"], "%.0f")
+        put("kmixStallMemPct" + tag,
+            100.0 * m["STALL_BACKEND_MEM"] / m["STALL_BACKEND"], "%.0f")
+        put("kmixScatterPct" + tag,
+            abs(100.0 * (m["mdof_kernel_only"] / m["mdof"] - 1.0)), "%.1f")
+    return "\n".join(out) + "\n"
+
+
 def table_kmix(mix):
     """T. Where the residual sweep's time goes, per layout.
 
@@ -1469,8 +1514,16 @@ def table_kmix(mix):
     out.append(r"\midrule")
     # The staging is gather, scatter, ghost reduction and zeroing. Dropping it with --kernel-only
     # says how much of the sweep is the element kernel, which is what the roofline's y-axis counts.
-    out.append(r"element kernel, share of the sweep & %.0f\%% & %.0f\%% \\"
-               % tuple(100.0 * mix[l]["mdof"] / mix[l]["mdof_kernel_only"] for l in ("packed", "atomic")))
+    # What this row actually measures, which is NOT what it used to claim. --kernel-only has the
+    # element kernel write to a dense stack buffer and skip the SCATTER; it does not remove the
+    # gather or the staging. So the ratio is the scatter's share of the sweep, not the element
+    # kernel's, and the label said the latter. It is also small enough to sit at the resolution
+    # limit of two separate runs -- the standard layout measured 0.5% FASTER with the scatter than
+    # without, which printed as "101%" of the sweep and is simply noise. Reported as a signed
+    # delta with one decimal so that a value inside the noise reads as inside the noise.
+    out.append(r"scatter, change in sweep rate when removed & %+.1f\%% & %+.1f\%% \\"
+               % tuple(100.0 * (mix[l]["mdof_kernel_only"] / mix[l]["mdof"] - 1.0)
+                       for l in ("packed", "atomic")))
     out += [r"\bottomrule", r"\end{tabular}"]
     return "\n".join(out) + "\n"
 
@@ -1779,6 +1832,9 @@ def build(out_dir, tab_dir):
             with open(os.path.join(tab_dir, "kmix.tex"), "w") as fh:
                 fh.write(body)
             written.append("tables/kmix.tex")
+            with open(os.path.join(out_dir, "kmix_macros.tex"), "w") as fh:
+                fh.write(macros_kmix(mx))
+            written.append("figures/kmix_macros.tex")
 
     hx = [f for f in sorted(os.listdir(DATA)) if f.startswith("hoexact_")] if os.path.isdir(DATA) else []
     if hx:
@@ -1827,6 +1883,7 @@ def build(out_dir, tab_dir):
                              + "\\newcommand{\\rlPeak}{%.0f}\n" % peak
                              + "\\newcommand{\\rlBw}{%.0f}\n" % bw
                              + "\\newcommand{\\rlRidge}{%.1f}\n" % (peak / bw)
+                             + macros_traffic_ratio(measured_dram, 2097152, 2146689)
                              + macros_roofline_ho(ho_path, measured_dram)
                              + "\\newcommand{\\rlSpecPeak}{%.2f}\n" % (SPEC_PEAK_GFLOPS / 1000.0)
                              + "\\newcommand{\\rlSpecBw}{%.0f}\n" % SPEC_BW_GBS
