@@ -989,19 +989,12 @@ are the ones the format gives when its one parameter is set from the machine.
 \subsection{Spatial ordering}
 \label{sec:res:ordering}
 
-\begin{table}[t]
-  \centering
-  \caption{\fostag{} Element order at fixed pack size, for the residual and the \emph{exact}
-    Rhie--Chow Jacobian action, both carrying the boundary closure.}
-  \label{tab:ordering}
-  \input{tables/ordering}
-\end{table}
-
 A pack is a contiguous range of element indices, so the element order decides which nodes it
-touches. Removing the space-filling pass at fixed pack size grows the mean node set per pack from
-$\ordSfcMean{}$ to $\ordLexMean{}$ and costs $\ordSfcRes{}\to\ordLexRes{}$~MDOF/s on the residual
-and $\ordSfcJac{}\to\ordLexJac{}$ on the Jacobian action (Table~\ref{tab:ordering}). The ordering
-is a precondition of the format, as \S\ref{sec:format} states, rather than an optimisation applied
+touches. Replacing the space-filling pass with a lexicographic order at fixed pack size grows the
+mean node set per pack from $\ordSfcMean{}$ to $\ordLexMean{}$, and costs
+$\ordSfcRes{}\to\ordLexRes{}$~MDOF/s on the residual and $\ordSfcJac{}\to\ordLexJac{}$ on the
+exact Rhie--Chow Jacobian action, both carrying the boundary closure at $n=128$. The ordering is
+a precondition of the format, as \S\ref{sec:format} states, rather than an optimisation applied
 to it.
 
 \subsection{The higher-order convective flux}
@@ -1290,21 +1283,18 @@ it costs matrix-free, and Table~\ref{tab:jacfair} answers that in the same units
 \section{Discussion and limitations}
 \label{sec:discussion}
 
-Two properties qualify what has been shown, and one result should not be read as a shortcoming.
-The spatial ordering is a precondition and not a tuning knob: packs are contiguous element
-ranges, so an unordered mesh gives scattered node sets, and the reordering's setup cost is
-repaid by an operator applied many times per mesh but not by a single evaluation. The
-reproducibility claim is scoped to execution in which one thread owns a pack
-(\S\ref{sec:apply:determinism}); colouring is atomics-free and reproducible too, and what the
-packed layout adds is that it fixes a summation order while also removing the barriers. That the
-margin depends on the operator --- $\hoFirstLayoutRatio\times$ to $\hoDmLayoutRatio\times$
-across convective schemes, \ladderBare{} to \ladderFull{} across physical terms --- is a finding
-rather than a limitation, and it is why the results are reported along both axes instead of as
-one headline number. What is genuinely open is reach: every measurement is from a single Grace
-die, and the operators are those of one discretisation. The mechanisms the format rests on ---
-narrower index traffic, a gather in place of repeated indexed reads, no zeroing pass, no
-atomics --- are specific to neither, and carrying the format to another architecture and to
-discretisations beyond colocated CVFEM Navier--Stokes is what this invites next.
+The spatial ordering is a precondition of the format, and its one-off cost is repaid by an
+operator applied many times per mesh. The reproducibility claim is scoped to execution in which
+one thread owns a pack (\S\ref{sec:apply:determinism}); colouring fixes a summation order as
+well, and what the packed layout adds is that it removes the barriers with it. The margin
+depends on the operator --- $\hoFirstLayoutRatio\times$ to $\hoDmLayoutRatio\times$ across
+convective schemes, \ladderBare{} to \ladderFull{} across physical terms --- which is why the
+results are reported along both axes rather than as one number, and it is the reason to measure
+a format against the operator a solver applies. What is open is reach: one Grace die, and the
+operators of one discretisation. Narrower index traffic, a gather in place of repeated indexed
+reads, no zeroing pass and no atomics are specific to neither, so carrying the format to another
+architecture and to discretisations beyond colocated CVFEM Navier--Stokes is the work this
+invites.
 
 %================================================================================================
 \section{Conclusion}
