@@ -90,8 +90,8 @@ layout rather than in the kernel. The layout's problem is the scatter: every ele
 contributes to nodes it shares with its neighbours, and that conflict is usually resolved with
 atomics, which fix no summation order and leave the operator not bitwise reproducible; with
 graph colouring, which adds a barrier per colour and reads back the destination it accumulates
-into; or by assembling a sparse matrix, which removes the arithmetic but streams a matrix in
-place of the mesh, at a footprint that grows with the stencil.
+into; or by assembling a sparse matrix, which takes the arithmetic out of the inner loop but
+stores a matrix whose footprint grows with the stencil and streams it on every application.
 
 We present a \emph{packed} mesh format that removes the conflict structurally. Each node is
 owned by exactly one pack of elements and the owned ranges partition the node numbering, so a
@@ -99,13 +99,14 @@ pack accumulates into a private buffer and writes its owned rows out without con
 nodes it touches but does not own are closed by a gather that visits each destination once. No
 atomic appears on any path, no barrier separates the packs, and the summation order is fixed by
 stored index arrays rather than by thread arrival. The format is thus reproducible where atomics
-are not, free of both costs colouring pays, and reads a mesh where assembly reads a matrix.
+are not, free of both costs colouring pays, and reads a mesh where the assembled operator stores
+a matrix and streams it.
 
 We evaluate it on the residual and matrix-free Jacobian action of a colocated CVFEM
 Navier--Stokes discretisation on an NVIDIA Grace CPU. On \campDofs{} degrees of freedom the
 packed residual reaches \campResPacked{}~MDOF/s against \campSpmvF{} for a sparse
-matrix--vector product with the lagged matrix. Per degree of freedom the sweep reads
-\fpImpl{}~bytes of mesh; the product reads \fpMatrixFSixFour{}~bytes of matrix. The Jacobian
+matrix--vector product with the lagged matrix. The mesh the sweep reads is \fpImpl{}~bytes per
+degree of freedom; the matrix the product streams is \fpMatrixFSixFour{}. The Jacobian
 action is reported in both forms, since they are not the same operator: lagged, it is what the
 matrix holds, at $\jfLaggedVsF\times$ the product; differentiated, what a Newton--Krylov solve
 applies, it costs $\jfExactCost\times$ and is $\jfExactVsF\times$. Most of the advantage is
