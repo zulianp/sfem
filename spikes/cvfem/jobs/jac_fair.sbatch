@@ -59,7 +59,7 @@ PACK=${PACK:-1024}
 
 echo "### host $(hostname)  n=$N repeat=$REPEAT passes=$PASSES  $(date '+%F %T')"
 echo
-printf '%-26s %-8s %10s %10s %12s\n' operator layout MDOF_s dofs qgrad_frac
+printf '%-26s %-8s %10s %10s %12s %12s\n' operator layout MDOF_s dofs qgrad_frac hograd_frac
 for arm in "jac_exact|packed|--jac-action --rhie-chow" \
            "jac_exact|atomic|--jac-action --rhie-chow" \
            "jac_lagged|packed|--jac-action --rhie-chow --lagged-rc" \
@@ -75,7 +75,7 @@ for arm in "jac_exact|packed|--jac-action --rhie-chow" \
     # silently redirected into a non-existent directory.
     layflag=""; [ "$lay" != "none" ] && layflag="--layout $lay"
     [ -n "$PACK" ] && [ "$lay" = "packed" ] && layflag="$layflag --pack-size $PACK"
-    best=""; dofs=""; qg=""
+    best=""; dofs=""; qg=""; hg=""
     for pass in $(seq 1 "$PASSES"); do
         log=$OUT/${lbl}_${lay}_p${pass}.log
         timeout "${RUN_TIMEOUT:-360}" \
@@ -85,9 +85,17 @@ for arm in "jac_exact|packed|--jac-action --rhie-chow" \
         val() { sed -n "s|^  $1: \(.*\)$|\1|p" "$log" | head -1; }
         v=$(val 'MDOF/s'); [ -n "$v" ] || continue
         best=$(awk -v a="${best:-0}" -v b="$v" 'BEGIN{print (b+0>a+0)?b:a}')
-        dofs=$(val 'dofs'); qg=$(val 'frac_qgrad')
+        # frac_jac_action_qgrad / _hograd, which is what the bench prints. The job read
+        # 'frac_qgrad' -- the CSV's column name, not the stdout line's -- so the column was "-"
+        # for every arm and the reconstruction's share of each matvec was never recorded. The two
+        # together are what says why lagging the Rhie-Chow term buys so much less under a
+        # higher-order scheme: when both direction gradients are needed they are ONE fused
+        # four-field sweep, charged once to hograd, so dropping the pressure one leaves the
+        # sweep's fixed half behind instead of removing it.
+        dofs=$(val 'dofs'); qg=$(val 'frac_jac_action_qgrad'); hg=$(val 'frac_jac_action_hograd')
     done
-    printf '%-26s %-8s %10s %10s %12s\n' "$lbl" "$lay" "${best:--}" "${dofs:--}" "${qg:--}"
+    printf '%-26s %-8s %10s %10s %12s %12s\n' "$lbl" "$lay" "${best:--}" "${dofs:--}" \
+           "${qg:--}" "${hg:--}"
 done
 echo
 echo "jac_exact carries the direction-gradient pass; jac_lagged does not, and is the operator"
