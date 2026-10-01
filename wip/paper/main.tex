@@ -260,21 +260,14 @@ them.
 \subsection{Packs and reordering}
 
 A \emph{pack} is a contiguous range of element indices together with the nodes those elements
-touch. Element $e$ belongs to pack $p = \lfloor e / n_{\mathrm{epp}} \rfloor$, where
-$n_{\mathrm{epp}}$ is the number of elements per pack; the assignment is by element index and
-nothing else.
+touch: element $e$ belongs to pack $p = \lfloor e / n_{\mathrm{epp}} \rfloor$
+(Figure~\ref{fig:decomposition}).
 
-The format carries a precondition rather than an optional optimisation: \emph{the mesh must be
-spatially reordered before packing}. Otherwise a pack's elements are scattered across the domain
-and the set of nodes they touch is large, defeating the locality the format exists to create.
-Meshes here are ordered by a space-filling curve before the packing pass;
-Figure~\ref{fig:decomposition} shows the result, with pack boundaries following the element
-order rather than the geometry.
-
-Packing \emph{renumbers the nodes in place}, so coordinates, the node-to-node graph and any
-sparsity pattern must be built after it, never before. It also makes verification indirect:
-a packed operator and a reference operator have different node numbering, so equivalence is
-checked by matching nodes on coordinates rather than entry by entry.
+The mesh must be spatially reordered first, by a space-filling curve here, or a pack's elements
+are scattered and the node set they touch is large; \S\ref{sec:res:ordering} measures the cost
+of skipping it. Packing then renumbers the nodes in place, so coordinates, the node-to-node
+graph and any sparsity pattern are built after it, and equivalence against a reference operator
+is checked by matching nodes on coordinates.
 
 \begin{figure}[t]
   \centering
