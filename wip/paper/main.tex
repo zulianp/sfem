@@ -851,10 +851,12 @@ term the code path silently dropped.
 \begin{figure}[t]
   \centering
   \input{figures/throughput_size}
-  \caption{\provwarn \fostag{} Residual throughput against problem size for the matrix-free layouts and
-    for sparse matrix--vector products with the lagged matrix at both storage precisions.
-    The smaller sizes show the saturation knee; cross-representation statements are drawn at
-    $n\ge128$.}
+  \caption{\provwarn Residual throughput against problem size for the matrix-free layouts and for
+    sparse matrix--vector products with the lagged matrix at both storage precisions. Solid:
+    first-order upwinding. Dashed: the Darwish--Moukalled flux, which costs each layout about
+    the same factor at every size. All matrix-free series are bare element kernels; the forms
+    carrying the solver's terms are in \S\ref{sec:res:ladder}. The smaller sizes show the
+    saturation knee; cross-representation statements are drawn at $n\ge128$.}
   \label{fig:throughput}
 \end{figure}
 

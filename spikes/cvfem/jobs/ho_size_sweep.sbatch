@@ -46,7 +46,19 @@ for n in $SIZES; do
   for lay in packed atomic; do
     layflag="--layout $lay"
     [ "$lay" = packed ] && layflag="$layflag --pack-size $PACK"
-    for sch in "fo|--rhie-chow" "ho|--rhie-chow --conv-ho 3"; do
+    # BARE=1 drops the coupling, so the same job serves both framings: the bare element kernel,
+    # which is what Figure 5's existing series are, and the Rhie--Chow operator the rest of the
+    # paper reports. Mixing the two in one figure is the mistake this sweep exists to avoid.
+    #
+    # A list of arms cannot come in through the environment: an attempt to pass them as
+    # SCHEMES='fo_bare| ho_bare|--conv-ho\ 3' word-split on the escaped space and produced an arm
+    # literally named "3". A flag, and the arms stay in the file.
+    if [ "${BARE:-0}" = 1 ]; then
+      arms=("fo_bare|" "ho_bare|--conv-ho 3")
+    else
+      arms=("fo|--rhie-chow" "ho|--rhie-chow --conv-ho 3")
+    fi
+    for sch in "${arms[@]}"; do
       IFS='|' read -r tag extra <<<"$sch"
       best=""; dofs=""
       for pass in $(seq 1 "$PASSES"); do
