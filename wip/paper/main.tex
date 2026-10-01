@@ -503,22 +503,21 @@ then a parallel pass over the rows of the reduction graph.
 \end{algorithmic}
 \end{algorithm}
 
-Two details of Phase~1 in Algorithm~\ref{alg:apply} are easy to read past and both are
-consequences of the ownership partition. The owned rows are \emph{assigned} rather than accumulated, because no
-other pack owns them --- which also means the global array never has to be zeroed, so a full
-pass over the output disappears. And the staged ghost values are \emph{stored} rather than
-accumulated, because the staging slot of a given pack and ghost is written by that pack alone.
+Both writes out of Phase~1 are assignments, and the ownership partition is why. The owned rows
+are \emph{assigned} because no other pack owns them, so the global array never has to be zeroed
+and a full pass over the output disappears; the staged values are \emph{stored} because a given
+pack and ghost own that slot between them.
 
-The format also changes how the input is read. A flat element sweep reads each node's input once
-per incident element; the packed sweep reads it once per pack node, which for a hexahedral mesh
-is roughly eight times less, and contiguously for the owned majority.
+The input is read differently too. A flat element sweep reads a node once per incident element,
+the packed sweep once per pack node --- on a hexahedral mesh about an eighth as many reads, and
+contiguous for the owned majority.
 
 \subsection{Reproducibility}
 \label{sec:apply:determinism}
 
 Floating-point addition is not associative, so a reproducible result requires a fixed summation
-order, not a particular one. Three independent properties fix it here, and they fail
-independently:
+order, and any fixed order will do. Three properties fix it here, one per path a contribution
+can take:
 
 \begin{enumerate}
   \item \emph{Within a pack}, one thread walks the pack's elements in increasing index order,
@@ -532,39 +531,34 @@ independently:
 \end{enumerate}
 
 \noindent
-No atomic appears on any of these paths, and the absence is structural: it follows from the
-ownership partition rather than from a choice of synchronisation primitive.
+Every path is atomic-free, and by the ownership partition rather than by a choice of
+synchronisation primitive.
 
-\paragraph{Scope of the claim.} The argument above is about a processor on which a pack is
-processed by a single thread, which is the setting of this paper. It does not transfer
-unchanged to an implementation that splits a pack across many threads and accumulates into a
-shared buffer with atomic addition: the reduction graph would still be deterministic, but the
-in-pack accumulation would not, and the result would not be reproducible. Making such an
-implementation reproducible requires ordering the in-pack accumulation as well --- for instance
-by gathering per node from a pack-local node-to-element adjacency instead of scattering per
-element. We state this because the property is easy to over-claim: it is a consequence of the
-whole execution, not of the format alone.
+\paragraph{Scope of the claim.} The argument holds where one thread owns a pack, which is the
+setting of this paper. Splitting a pack across threads leaves the reduction graph deterministic
+and the in-pack accumulation open, so such an implementation would need its in-pack order fixed
+too --- by gathering per node from a pack-local node-to-element adjacency, for instance, rather
+than scattering per element. The property belongs to the execution together with the format.
 
 \subsection{Alternatives}
 \label{sec:apply:alternatives}
 
 
 
-The packed layout is measured against two alternatives, worth distinguishing carefully because
-they fail in different places.
+The packed layout is measured against two alternatives, which give up different things.
 
 \paragraph{Atomic.} The flat sweep addresses nodes globally and resolves every collision with an
 atomic update. It imposes no structure on the mesh at all, which makes it the natural reference
-implementation, and it needs the output array zeroed first because it accumulates into it. Its
-weakness is not primarily the cost of the atomic instruction --- \S\ref{sec:res:scaling} shows
-it scaling perfectly respectably --- but that it fixes no summation order, so the operator is
-not a function of its input in the bitwise sense.
+implementation, and it needs the output array zeroed first because it accumulates into it. The
+atomic instruction is not what it costs --- \S\ref{sec:res:scaling} shows the sweep scaling
+respectably --- what it costs is the summation order, and with it the operator's bitwise
+identity across runs.
 
 \paragraph{Colouring.} Partitioning the packs so that no two packs of a colour share a node lets
 each colour write to the global arrays directly, with neither atomics nor a reduction, at the
 cost of a barrier between colours. It shares the packed layout's gather and its pack-local
-indexing, and differs from it only in how the result leaves the pack. That makes the pair an
-unusually clean controlled comparison, and \S\ref{sec:res:scaling} uses it as one.
+indexing, and differs from it only in how the result leaves the pack, which is what makes the
+pair a controlled comparison in \S\ref{sec:res:scaling}.
 
 Colouring is also bitwise reproducible here (\S\ref{sec:res:determinism}), with three
 qualifications. The order it fixes belongs to the colouring, so reproducibility requires the
@@ -1015,10 +1009,10 @@ to it.
 
 \begin{table}[t]
   \centering
-  \caption{Convective schemes, residual only, at $n=128$, on the \emph{bare} operator: no
-    Rhie--Chow term, so these rates are not comparable with Table~\ref{tab:jacfair}'s, which
-    carry it. The nodal velocity gradient is hoisted, so the timing is of the flux rather than of
-    the reconstruction feeding it. Each column is that layout's shipped kernel.}
+  \caption{Convective schemes, residual only, at $n=128$, carrying the Rhie--Chow coupling as
+    every other complete-operator measurement here does. The nodal velocity gradient is hoisted,
+    so the timing is of the flux rather than of the reconstruction feeding it. Each column is
+    that layout's shipped kernel.}
   \label{tab:convho}
   \inputifready{tables/convho}{convective scheme arms, jobs/conv\_ho\_bench.sbatch}
 \end{table}
@@ -1037,14 +1031,13 @@ to it.
   \centering
   \inputifready{figures/jacho}{Jacobian scheme arms, jobs/jac\_ho\_bench.sbatch}
   \caption{The same five schemes for the \emph{Jacobian action}, with the correction
-    differentiated --- the \emph{exact} action --- and, as in Table~\ref{tab:convho}, on the bare
-    operator: the Rhie--Chow term is off, which is why the \texttt{upwind} bar stands above
-    Table~\ref{tab:jacfair}'s first-order rows rather than beside them. The \emph{lagged} action,
-    which is the default, leaves the Jacobian first-order: it reproduces the \texttt{upwind}
-    bar's result to the last bit, at \jachoLaggedPacked{}~MDOF/s packed. Unlike
-    Figure~\ref{fig:convho}, the layout ratio rises before it falls,
-    $\jachoFirstLayoutRatio$ to $\jachoUnlimLayoutRatio$ to $\jachoDmLayoutRatio\times$. Dashed:
-    the same SpMV references.}
+    differentiated --- the \emph{exact} action --- and with the Rhie--Chow term differentiated
+    too, so each bar is the operator of the matching \emph{exact} row of
+    Table~\ref{tab:jacfair}. The \emph{lagged} action, which is the default, leaves the Jacobian
+    first-order: it reproduces the \texttt{upwind} bar's result to the last bit, at
+    \jachoLaggedPacked{}~MDOF/s packed. Unlike Figure~\ref{fig:convho}, the layout ratio rises
+    before it falls, $\jachoFirstLayoutRatio$ to $\jachoUnlimLayoutRatio$ to
+    $\jachoDmLayoutRatio\times$. Dashed: the same SpMV references.}
   \label{fig:jacho}
 \end{figure}
 
@@ -1054,7 +1047,7 @@ Table~\ref{tab:convho} and Figure~\ref{fig:convho} report all five variants.
 
 \paragraph{Scheme dependence.} The ratio falls monotonically with the arithmetic each scheme adds:
 $\hoFirstLayoutRatio\times$ on first-order upwind, $\hoUnlimLayoutRatio\times$ with the unlimited
-reconstruction, and $\hoClipLayoutRatio\times$ down to $\hoVenkLayoutRatio\times$ across the three
+reconstruction, and $\hoClipLayoutRatio\times$ down to $\hoDmLayoutRatio\times$ across the three
 limiters. The
 format accelerates what the sweep reads and how it writes; the correction adds arithmetic per
 sub-control surface, which no layout can help with, so its share of the run grows and the ratio
@@ -1063,10 +1056,10 @@ physical terms.
 
 \paragraph{Cost of the correction.} Within the atomic layout the unlimited reconstruction costs
 $\hoUnlimCostAtomic\times$ and the limiters $\hoClipCostAtomic\times$ to
-$\hoVenkCostAtomic\times$; within the packed layout, $\hoUnlimCostPacked\times$ to
-$\hoVenkCostPacked\times$. The packed factors are larger because the layout has removed more of
+$\hoDmCostAtomic\times$; within the packed layout, $\hoUnlimCostPacked\times$ to
+$\hoDmCostPacked\times$. The packed factors are larger because the layout has removed more of
 the first-order cost, leaving the arithmetic it does not touch. The three limiters land close
-together, $\hoClipCostPacked\times$ to $\hoVenkCostPacked\times$ packed, and the step from the
+together, $\hoClipCostPacked\times$ to $\hoDmCostPacked\times$ packed, and the step from the
 unlimited reconstruction to the cheapest of them is about the size of the spread among them: all
 three share the reconstruction and differ only in the function applied to the increment.
 
@@ -1078,23 +1071,23 @@ arm alone, before any limiter --- because the exact action reconstructs the \emp
 nodal velocity gradient on every matvec, nine components against the three the Rhie--Chow term
 already rebuilds. And the format's margin moves the other way: it rises from
 $\jachoFirstLayoutRatio\times$ to $\jachoUnlimLayoutRatio\times$ before the limiters pull it back
-to $\jachoVenkLayoutRatio$--$\jachoClipLayoutRatio\times$, since the added reconstruction is
+to $\jachoDmLayoutRatio$--$\jachoClipLayoutRatio\times$, since the added reconstruction is
 itself packed and is the sweep the layout helps most, whereas a limiter derivative is arithmetic
 at a sub-control surface that no layout can help with. The lagged action is the control on all of
 this: at \jachoLaggedPacked{}~MDOF/s it agrees with first-order upwind to the last bit, which is
 what a deferred correction means --- it reaches the residual and not the Jacobian.
 
 \paragraph{On the roofline.} Figure~\ref{fig:roofline} places the same arms against the
-machine, and one expectation does not survive the measurement: the correction is not free of
-traffic. It reads a nine-component nodal velocity gradient that first-order upwind never
-touches, and the packed sweep stages that field into pack-local order, so measured DRAM traffic
-rises from \foBytesPacked{} to \hoBytesPacked{} bytes per degree of freedom
-($\hoBytesRatioPacked\times$) and the two layouts end within 3\% of each other. The unlimited
-arm therefore buys its arithmetic at about the price of its traffic and sits at
-\hoAiPackedLo{}~FLOP/byte, beside the first-order point at \rlResidualPackedAi{}; only a limiter
-moves the operator right, to \hoAiPackedHi{}, past the measured ridge of \rlRidge{}. No arm
-approaches the roof. The correction changes where an operator sits on the intensity axis, not
-how close it comes to the machine.
+machine, and the correction costs traffic as well as arithmetic. It reads a nine-component nodal
+velocity gradient the first-order flux never touches, and the packed sweep stages that field
+into pack-local order, so measured DRAM traffic rises from \foBytesPacked{} to
+\hoBytesPacked{}~bytes per degree of freedom ($\hoBytesRatioPacked\times$) packed and
+\foBytesAtomic{} to \hoBytesAtomic{} atomic. The traffic outruns the arithmetic at the
+unlimited arm, which sits at \hoAiPackedLo{}~FLOP/byte against the first-order point's
+\rlResidualPackedAi{}, to its left; a limiter carries enough arithmetic to move the operator
+back to the right, reaching \hoAiPackedHi{}, still short of the measured ridge of \rlRidge{}.
+Every arm stays far from the roof, so the correction changes where an operator sits on the
+intensity axis and leaves its distance from the machine where it was.
 
 \paragraph{Inherited properties.} The packed higher-order
 sweep has the same shape as the first-order one: stage the pack's fields, accumulate into a
@@ -1127,15 +1120,15 @@ action and $\hoxLayoutExact\times$ on the exact one. The added pass is itself pa
 ghost graph the operator sweeps use.
 
 \paragraph{Traffic, not arithmetic.} The exact action's schemes are the second set of
-higher-order points in Figure~\ref{fig:roofline}, and they move the opposite way to the
-residual's. Traffic rises by $\hoJacBytesRatioPacked\times$ packed (\foJacBytesPacked{} to
+higher-order points in Figure~\ref{fig:roofline}, and they move as the residual's do. Traffic
+rises by $\hoJacBytesRatioPacked\times$ packed (\foJacBytesPacked{} to
 \hoJacBytesPacked{}~bytes per degree of freedom), because the direction's nodal velocity
-gradient is read on top of the state's, and for the cheap limiters that outruns the arithmetic:
-the unlimited arm sits at \hoJacAiPackedLo{}~FLOP/byte against the first-order action's
-\rlJacobianPackedAi{}, to the \emph{left} of it. Only Venkatakrishnan's derivative carries
-enough arithmetic to pass it, at \hoJacAiPackedHi{}; Darwish--Moukalled's stops just short. The
-residual's correction buys arithmetic at about the price of its traffic; the action's cheap arms
-buy traffic and little else, which is the same statement as the reconstruction's cost below.
+gradient is read on top of the state's, and that outruns the arithmetic until a limiter is
+added: the unlimited arm sits at \hoJacAiPackedLo{}~FLOP/byte against the first-order action's
+\rlJacobianPackedAi{}, to the \emph{left} of it, and Venkatakrishnan's derivative is the one
+that carries enough to pass it, at \hoJacAiPackedHi{}, Darwish--Moukalled's stopping just
+short. In both operators the correction is a traffic change first and an arithmetic change
+second, which is the same statement as the reconstruction's cost below.
 
 \paragraph{The reconstruction.} Timed on its own it is the sweep the format helps \emph{most}:
 the pressure gradient at \ngPgradPacked{} against \ngPgradAtomic{}~MDOF/s, a factor of
@@ -1304,7 +1297,7 @@ repaid by an operator applied many times per mesh but not by a single evaluation
 reproducibility claim is scoped to execution in which one thread owns a pack
 (\S\ref{sec:apply:determinism}); colouring is atomics-free and reproducible too, and what the
 packed layout adds is that it fixes a summation order while also removing the barriers. That the
-margin depends on the operator --- $\hoFirstLayoutRatio\times$ to $\hoVenkLayoutRatio\times$
+margin depends on the operator --- $\hoFirstLayoutRatio\times$ to $\hoDmLayoutRatio\times$
 across convective schemes, \ladderBare{} to \ladderFull{} across physical terms --- is a finding
 rather than a limitation, and it is why the results are reported along both axes instead of as
 one headline number. What is genuinely open is reach: every measurement is from a single Grace
@@ -1331,7 +1324,7 @@ replaces with a mesh $\fpMatrixRatioFSixFour\times$ smaller per degree of freedo
 locates the advantage: most of it is present at a single thread, where no contention exists, so it
 comes from what the layout reads rather than what it avoids contending on. The margin depends on the
 operator: across convective schemes it runs from $\hoFirstLayoutRatio\times$ down to
-$\hoVenkLayoutRatio\times$ as arithmetic per sub-control surface grows, so a format is worth
+$\hoDmLayoutRatio\times$ as arithmetic per sub-control surface grows, so a format is worth
 reporting against the operator a solver applies rather than the cheapest kernel available.
 
 \begin{acks}

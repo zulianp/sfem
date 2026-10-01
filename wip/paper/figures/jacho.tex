@@ -10,9 +10,9 @@
   legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},
   tick label style={font=\scriptsize}, label style={font=\scriptsize},
   ymajorgrids, major grid style={black!12}]
-\addplot[draw=PackA, fill=PackA] coordinates {(upwind,1938.6) (unlimited,696.6) (clip,481.4) (Venkat.,461.1) (Darwish--M.,440.5)};
+\addplot[draw=PackA, fill=PackA] coordinates {(upwind,974.1) (unlimited,561.7) (clip,416.2) (Venkat.,406.4) (Darwish--M.,387.2)};
 \addlegendentry{packed}
-\addplot[draw=PackD, fill=PackD] coordinates {(upwind,894.1) (unlimited,299.0) (clip,249.9) (Venkat.,244.6) (Darwish--M.,241.4)};
+\addplot[draw=PackD, fill=PackD] coordinates {(upwind,541.3) (unlimited,249.6) (clip,217.4) (Venkat.,214.1) (Darwish--M.,209.5)};
 \addlegendentry{atomic}
 \draw[PackE,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,449.4} -| {rel axis cs:0,0}) -- ({axis cs:upwind,449.4} -| {rel axis cs:1,0});
 \addlegendimage{legend image code/.code={\draw[PackE,dash pattern=on 2pt off 2pt,thick] (0pt,0pt) -- (10pt,0pt);}}

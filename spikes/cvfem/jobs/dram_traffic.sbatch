@@ -85,13 +85,21 @@ echo "# operation  layout  repeat_lo  repeat_hi  bytes_lo        bytes_hi       
 # values already in registers.
 for arm in "residual|" "residual_rc|--rhie-chow" \
            "jac_action|--jac-action" "jac_action_rc|--jac-action --rhie-chow" \
-           "jac_action-ho|--jac-action --rhie-chow --conv-ho 3"; do
+           "jac_action-ho|--jac-action --rhie-chow --conv-ho 3" \
+           "residual-ho|--rhie-chow --conv-ho 3"; do
     IFS='|' read -r op extra <<<"$arm"
     # colored as well as packed and atomic: colouring accumulates into the global arrays with
     # += , so it reads the destination back where the packed layout writes its owned rows. That
     # should show as read traffic, and whether it does is the kind of claim that has to be
     # measured rather than argued from the code.
     for lay in packed atomic colored; do
+        # The coloured layout has no higher-order convective path: cvfem_hex8_best_colored.hpp
+        # carries no deferred-correction kernel, so --conv-ho is silently ignored and the arm
+        # measures the first-order operator. Caught by a capture that came back at 86 B/dof
+        # against the packed arm's 175 for what should have been the same work. Skipped rather
+        # than reported, because a row labelled residual-ho that is not higher-order is worse
+        # than no row.
+        case "$op" in *-ho) [ "$lay" = colored ] && continue ;; esac
         lo=$(capture "$extra" "$lay" "$LO") || { echo "# MISSING $op $lay lo"; continue; }
         hi=$(capture "$extra" "$lay" "$HI") || { echo "# MISSING $op $lay hi"; continue; }
         printf '%-12s %-7s %-3s %-3s %-13s %-14s %s\n' \
