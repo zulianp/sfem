@@ -1743,11 +1743,18 @@ def macros_hoexact(rates, checks, frac=None):
 # ---------------------------------------------------------------------------------------------
 
 JF_NAME = {
-    "jac_exact":  "Jacobian action, exact",
-    "jac_lagged": "Jacobian action, lagged",
-    "spmv_f64":   r"SpMV, lagged \texttt{f64}",
-    "spmv_f32":   r"SpMV, lagged \texttt{f32}",
+    "jac_exact":     "Jacobian action, exact",
+    "jac_lagged":    "Jacobian action, lagged",
+    "jac_ho_exact":  "Jacobian action, exact",
+    "jac_ho_lagged": "Jacobian action, lagged",
+    "spmv_f64":      r"SpMV, lagged \texttt{f64}",
+    "spmv_f32":      r"SpMV, lagged \texttt{f32}",
 }
+
+# The matrix-free blocks, in table order. The higher-order block is present only when the job ran
+# it, so a data file written before those arms existed still produces the two-row table.
+JF_BLOCKS = [("first-order upwind", ("jac_exact", "jac_lagged")),
+             ("Darwish--Moukalled", ("jac_ho_exact", "jac_ho_lagged"))]
 
 
 def parse_jacfair(path):
@@ -1775,16 +1782,24 @@ def table_jacfair(rows):
     by = {}
     for op, lay, v in rows:
         by.setdefault(op, {})[lay] = v
+    blocks = [(lab, [o for o in ops if o in by]) for lab, ops in JF_BLOCKS]
+    blocks = [b for b in blocks if b[1]]
     out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrr@{}}", r"\toprule",
            r"operator & packed & atomic & vs.\ \texttt{f64} \\",
            r"& \multicolumn{2}{c}{MDOF/s} & \\", r"\midrule"]
     f64 = by.get("spmv_f64", {}).get("none")
-    for op in ("jac_exact", "jac_lagged"):
-        if op not in by:
-            continue
-        pk, at = by[op].get("packed"), by[op].get("atomic")
-        rel = (r"$%.2f\times$" % (pk / f64)) if pk and f64 else "---"
-        out.append(r"%s & %.0f & %.0f & %s \\" % (JF_NAME[op], pk or 0, at or 0, rel))
+    for i, (label, ops) in enumerate(blocks):
+        if i:
+            out.append(r"\addlinespace")
+        # The scheme heads its block rather than being repeated in every row label: the two rows
+        # under it differ only in the Rhie--Chow term, which is what the row labels are for.
+        if len(blocks) > 1:
+            out.append(r"\multicolumn{4}{@{}l}{\emph{%s}} \\" % label)
+        for op in ops:
+            pk, at = by[op].get("packed"), by[op].get("atomic")
+            rel = (r"$%.2f\times$" % (pk / f64)) if pk and f64 else "---"
+            pad = r"\quad " if len(blocks) > 1 else ""
+            out.append(r"%s%s & %.0f & %.0f & %s \\" % (pad, JF_NAME[op], pk or 0, at or 0, rel))
     out.append(r"\midrule")
     for op in ("spmv_f64", "spmv_f32"):
         v = by.get(op, {}).get("none")
@@ -1819,6 +1834,18 @@ def macros_jacfair(rows):
     la = by.get("jac_lagged", {}).get("atomic")
     if la and f64:
         out.append(r"\newcommand{\jfLaggedAtomicVsF}{%.2f}" % (la / f64))
+    # The higher-order block, whose point is how much of the matrix-free margin survives an
+    # operator the matrix cannot encode at all.
+    hex_, hlg = (by.get("jac_ho_exact", {}).get("packed"),
+                 by.get("jac_ho_lagged", {}).get("packed"))
+    if hlg and f64:
+        out.append(r"\newcommand{\jfHoLaggedVsF}{%.2f}" % (hlg / f64))
+    if hex_ and f64:
+        out.append(r"\newcommand{\jfHoExactVsF}{%.2f}" % (hex_ / f64))
+    if hex_ and hlg:
+        out.append(r"\newcommand{\jfHoExactCost}{%.2f}" % (hlg / hex_))
+    if hex_ and ex:
+        out.append(r"\newcommand{\jfHoCostExact}{%.2f}" % (ex / hex_))
     return "\n".join(out) + "\n"
 
 

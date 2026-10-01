@@ -7,10 +7,15 @@
 operator & packed & atomic & vs.\ \texttt{f64} \\
 & \multicolumn{2}{c}{MDOF/s} & \\
 \midrule
-Jacobian action, exact & 973 & 540 & $2.14\times$ \\
-Jacobian action, lagged & 1286 & 786 & $2.83\times$ \\
+\multicolumn{4}{@{}l}{\emph{first-order upwind}} \\
+\quad Jacobian action, exact & 971 & 528 & $2.20\times$ \\
+\quad Jacobian action, lagged & 1267 & 771 & $2.87\times$ \\
+\addlinespace
+\multicolumn{4}{@{}l}{\emph{Darwish--Moukalled}} \\
+\quad Jacobian action, exact & 387 & 209 & $0.88\times$ \\
+\quad Jacobian action, lagged & 417 & 240 & $0.95\times$ \\
 \midrule
-SpMV, lagged \texttt{f64} & \multicolumn{2}{c}{454} & $1.00\times$ \\
-SpMV, lagged \texttt{f32} & \multicolumn{2}{c}{832} & $1.83\times$ \\
+SpMV, lagged \texttt{f64} & \multicolumn{2}{c}{441} & $1.00\times$ \\
+SpMV, lagged \texttt{f32} & \multicolumn{2}{c}{857} & $1.94\times$ \\
 \bottomrule
 \end{tabular}
