@@ -264,7 +264,7 @@ touch. Element $e$ belongs to pack $p = \lfloor e / n_{\mathrm{epp}} \rfloor$, w
 $n_{\mathrm{epp}}$ is the number of elements per pack; the assignment is by element index and
 nothing else.
 
-The format carries a precondition rather than an optional optimisation: \textbf{the mesh must be
+The format carries a precondition rather than an optional optimisation: \emph{the mesh must be
 spatially reordered before packing}. Otherwise a pack's elements are scattered across the domain
 and the set of nodes they touch is large, defeating the locality the format exists to create.
 Meshes here are ordered by a space-filling curve before the packing pass;
@@ -308,7 +308,7 @@ Because the owned ranges are contiguous and monotone in $p$, the owner of a glob
 recoverable by binary search, which is what lets a conflict graph over packs be built without
 storing one.
 
-The pack-local index is a \textbf{16-bit unsigned integer}. That is the single most consequential
+The pack-local index is a \emph{16-bit unsigned integer}. That is the single most consequential
 choice in the format and it cuts both ways: it halves the index traffic of the element sweep
 against the \SI{32}{\bit} global index a flat sweep must use (\S\ref{sec:cost}), and it caps a
 pack at $2^{16}$ distinct nodes, which is what bounds the pack size and, as
@@ -348,7 +348,7 @@ zone can then be written without synchronisation and only the shared tail cannot
 
 The nodes a pack touches but does not own are listed per pack in a compressed row structure.
 Two properties matter to a reader and one of them is a trap: the list is deduplicated, and it is
-ordered \emph{by first appearance} in a node-major, element-minor sweep --- it is \textbf{not}
+ordered \emph{by first appearance} in a node-major, element-minor sweep --- it is \emph{not}
 sorted, so it must not be binary-searched.
 
 The contributions staged against those entries are closed by a separate gather. Its graph is
@@ -428,13 +428,13 @@ order, not a particular one. Three independent properties fix it here, and they 
 independently:
 
 \begin{enumerate}
-  \item \textbf{Within a pack}, one thread walks the pack's elements in increasing index order,
+  \item \emph{Within a pack}, one thread walks the pack's elements in increasing index order,
         and pack membership is a pure function of the element index. The order in which a node
         receives its contributions from inside the pack is therefore the same on every run and
         at every thread count.
-  \item \textbf{Across packs, for owned nodes}, there is no summation to order at all: the owned
+  \item \emph{Across packs, for owned nodes}, there is no summation to order at all: the owned
         ranges partition the node numbering, so exactly one pack contributes.
-  \item \textbf{Across packs, for shared nodes}, the reduction graph fixes the order, because
+  \item \emph{Across packs, for shared nodes}, the reduction graph fixes the order, because
         each destination is one row and the row's terms are visited in a stored sequence.
 \end{enumerate}
 
@@ -593,7 +593,7 @@ measured on the same node rather than a vendor figure, because it is the bound t
 compiled with \texttt{gcc -O3 -fopenmp -mcmodel=large} over arrays of $80\times10^{6}$ doubles
 --- about \SI{1.9}{\giga\byte} in three arrays, some sixteen times the shared L3, so the triad
 genuinely streams. The FP64 rate is the best of five timed $N=8192$ double-precision \textsc{gemm}
-calls into \textbf{OpenBLAS 0.3.28}, the threaded build the same node resolves for the solver;
+calls into \emph{OpenBLAS 0.3.28}, the threaded build the same node resolves for the solver;
 at that size the operational intensity is of order $10^3$~FLOP/byte, so the kernel is
 unambiguously compute-bound and the figure is a sustained rate rather than a peak. Five
 repetitions agreed to \SI{0.2}{\percent}.
@@ -617,19 +617,19 @@ at each node --- three velocity components and pressure --- and fluxes are integ
 sub-control-surfaces of the dual mesh. The discretisation itself is not the subject of this
 paper, but \emph{which} operator is being measured is, so the variants are set out explicitly.
 
-\paragraph{Geometry.} Every rate in this paper is for \textbf{affine} element geometry: one
+\paragraph{Geometry.} Every rate in this paper is for \emph{affine} element geometry: one
 Jacobian per element, its adjugate and determinant built once at setup, which is exact on the
 structured hexahedral meshes measured. The isoparametric variant is implemented and selectable but
 is not measured here, and no rate below applies to it; the gap is largest on the nodal
 reconstruction of \S\ref{sec:res:hoexact}, where per-element geometry is exactly the work the
 affine sweep amortises over all its fields.
 
-\paragraph{Convective schemes.} Two are measured. The baseline is \textbf{first-order upwinding
+\paragraph{Convective schemes.} Two are measured. The baseline is \emph{first-order upwinding
 with a hard donor switch}: the face value is taken from whichever side the mass flux comes from,
 with no blending band. Every measured figure and table names its scheme in the first words of
 its caption, so which one produced a number is never left to be inferred.
 
-The second is a \textbf{deferred-correction higher-order flux}. The face value is reconstructed
+The second is a \emph{deferred-correction higher-order flux}. The face value is reconstructed
 from the donor node and its nodal velocity gradient,
 $u_{\mathrm{face}} = u_{\mathrm{donor}} + \nabla u_{\mathrm{donor}}\cdot
  (x_{\mathrm{scs}} - x_{\mathrm{donor}})$,
@@ -685,9 +685,9 @@ records which ran, so a frozen variant cannot be reported as an exact one.
 in arithmetic. A node's reconstructed gradient needs contributions from every element incident on
 it, so it must be \emph{complete} before any flux may use it --- a data dependency, not a
 scheduling choice, and why the reconstruction cannot fuse into the flux sweep but is a separate
-pass ending in its own ghost reduction. \textbf{One pass}: the bare element kernel, and the
+pass ending in its own ghost reduction. \emph{One pass}: the bare element kernel, and the
 residual with Rhie--Chow when the state gradient $\nabla p(u)$ is \emph{hoisted}, computed once
-per Newton step and reused across the Krylov solve since $u$ is fixed there. \textbf{Two
+per Newton step and reused across the Krylov solve since $u$ is fixed there. \emph{Two
 passes}: the residual with Rhie--Chow when $\nabla p$ is rebuilt inside every application, and
 the exact Rhie--Chow Jacobian action, which must reconstruct the \emph{direction}'s gradient on
 every matvec because the direction changes every iteration; the driver times that pass

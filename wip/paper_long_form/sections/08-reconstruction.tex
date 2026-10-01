@@ -19,13 +19,13 @@ uses, deliberately, so there is one implementation of the mapping.
 Three properties shape the kernel:
 
 \begin{itemize}
-\item \textbf{The element gradient does not depend on the node.} The same $n_c$-vector is
+\item \emph{The element gradient does not depend on the node.} The same $n_c$-vector is
       broadcast to all eight nodes, so the pass is scatter-dominated: at three fields that is
       seventy-two scalar read-modify-writes per element against roughly sixty-six flops of real
       work.
-\item \textbf{It is a reduction over elements.} Hence the same layout question as the operator:
+\item \emph{It is a reduction over elements.} Hence the same layout question as the operator:
       pack-local accumulation with a deterministic ghost closure, or atomics.
-\item \textbf{The field count is a template parameter} (\code{NC}). A runtime trip count in the
+\item \emph{The field count is a template parameter} (\code{NC}). A runtime trip count in the
       scatter cost measurably, so the single code path is instantiated per field count rather than
       parameterised at runtime.
 \end{itemize}
@@ -51,13 +51,13 @@ source with their numbers, because each is the kind of idea that looks obviously
 count and is wrong in fact:
 
 \begin{itemize}
-\item \textbf{Templating the geometry kind} to hoist the isoparametric branch out of the element
+\item \emph{Templating the geometry kind} to hoist the isoparametric branch out of the element
       loop. Lost; and the first diagnosis of why was also wrong, blaming an OpenMP capture that
       turned out to be innocent.
-\item \textbf{Writing owned rows straight out}, skipping the pack-local buffer for the contiguous
+\item \emph{Writing owned rows straight out}, skipping the pack-local buffer for the contiguous
       owned range. The static argument is sound --- it removes a read-and-write pass over the
       owned majority --- and it measured slower.
-\item \textbf{Lane-blocking the element loop}, which every operator sweep beside it already does.
+\item \emph{Lane-blocking the element loop}, which every operator sweep beside it already does.
       Lost at this pass's arithmetic-to-scatter ratio.
 \end{itemize}
 

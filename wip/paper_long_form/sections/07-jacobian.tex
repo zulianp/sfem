@@ -7,13 +7,13 @@ differentiated.
 
 \subsection{Lagged and exact}
 
-The \textbf{lagged} action differentiates the first-order operator only: the correction
+The \emph{lagged} action differentiates the first-order operator only: the correction
 $\mathbf{h}_\scs$ contributes nothing, and the Rhie--Chow term is differentiated with the nodal
 pressure gradient held fixed. This is the operator the assembled matrix can represent, because
 including either term widens the pressure coupling past nearest neighbours and breaks the
 one-ring sparsity.
 
-The \textbf{exact} action differentiates both. The costs are asymmetric and worth separating:
+The \emph{exact} action differentiates both. The costs are asymmetric and worth separating:
 
 \begin{itemize}
 \item Differentiating the Rhie--Chow correction, Eq.~\eqref{eq:corr}, requires the
@@ -90,13 +90,13 @@ substantially and the Jacobian not at all until $w$ was tabulated too.
 Three oracles, each catching a different class of error:
 
 \begin{itemize}
-\item \textbf{Cross-layout}: the packed and standard actions compared node by node, which catches
+\item \emph{Cross-layout}: the packed and standard actions compared node by node, which catches
       staging and scatter errors. Reads $\sim10^{-16}$.
-\item \textbf{Finite difference of the residual}: catches a missing or wrong term in the
+\item \emph{Finite difference of the residual}: catches a missing or wrong term in the
       linearisation. The exact arm is gated; the lagged arm is gated \emph{from below}, because a
       lagged action that agreed with the finite difference would mean the correction never reached
       the residual and the comparison is vacuous.
-\item \textbf{Partially assembled against direct}: catches disagreement between a producer of
+\item \emph{Partially assembled against direct}: catches disagreement between a producer of
       precomputed data and its consumer. This is the only one of the three that runs on a
       non-affine mesh, and consequently the only one that can see a geometry inconsistency ---
       Section~\ref{sec:geom:edges} records it catching one at $1.4\times10^{-5}$ that the other

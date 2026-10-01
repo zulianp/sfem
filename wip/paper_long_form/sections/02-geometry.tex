@@ -7,11 +7,11 @@ differ in whether they admit that.
 
 \subsection{What each variant commits to}
 
-The \textbf{isoparametric} variant evaluates the geometry where it is needed, so $\Jmat$, its
+The \emph{isoparametric} variant evaluates the geometry where it is needed, so $\Jmat$, its
 adjugate and the surface areas all vary within the element
 (\code{cvfem\_hex8\_geom\_at}, and the \code{\_isoparam} kernels).
 
-The \textbf{affine} variant evaluates $\Jmat$ once, at the reference centre
+The \emph{affine} variant evaluates $\Jmat$ once, at the reference centre
 $\xi = (\tfrac12,\tfrac12,\tfrac12)$, and uses it everywhere
 (\code{cvfem\_hex8\_affine\_adj}). For a parallelepiped this is exact. For a general trilinear
 hexahedron it is an approximation, and it is the \emph{defining} approximation of the variant:
