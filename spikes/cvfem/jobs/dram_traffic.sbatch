@@ -48,7 +48,9 @@ EV='nvidia_scf_pmu_0/cmem_rd_data/,nvidia_scf_pmu_0/cmem_wr_total_bytes/,nvidia_
 capture() {  # op-flags layout repeat -> "bytes dofs"
     local extra=$1 lay=$2 rep=$3
     local layflag="--layout $lay"
-    [ "$lay" = "packed" ] && layflag="$layflag --pack-size $PACK"
+    # The coloured layout is the same pack decomposition, so it takes the same pack size; a
+    # capture at a different one would not be comparable with the packed row beside it.
+    { [ "$lay" = "packed" ] || [ "$lay" = "colored" ]; } && layflag="$layflag --pack-size $PACK"
     local out
     out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
             bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
@@ -85,7 +87,11 @@ for arm in "residual|" "residual_rc|--rhie-chow" \
            "jac_action|--jac-action" "jac_action_rc|--jac-action --rhie-chow" \
            "jac_action-ho|--jac-action --rhie-chow --conv-ho 3"; do
     IFS='|' read -r op extra <<<"$arm"
-    for lay in packed atomic; do
+    # colored as well as packed and atomic: colouring accumulates into the global arrays with
+    # += , so it reads the destination back where the packed layout writes its owned rows. That
+    # should show as read traffic, and whether it does is the kind of claim that has to be
+    # measured rather than argued from the code.
+    for lay in packed atomic colored; do
         lo=$(capture "$extra" "$lay" "$LO") || { echo "# MISSING $op $lay lo"; continue; }
         hi=$(capture "$extra" "$lay" "$HI") || { echo "# MISSING $op $lay hi"; continue; }
         printf '%-12s %-7s %-3s %-3s %-13s %-14s %s\n' \
