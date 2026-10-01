@@ -259,11 +259,17 @@ and vertex kernels over disjoint sets of degrees of freedom. And holding the cel
 the primary representation stores a node once per incident element, which at $\mathbb{Q}_1$ is a
 redundancy of about $8\times$ --- the degrees that amortise it are the high ones.
 
-Here ownership is exclusive everywhere, so the unstructured case needs no separate treatment,
+The two routes leave the same case open. Blocking takes the layout as far as locality and hands
+the conflict back to colouring or atomics; removing the conflict outright has so far needed a
+structured block interior to supply the offsets and a redundant representation that only high
+order amortises. An unstructured mesh at low order offers neither.
+
+That case is this paper's, and exclusive ownership is what takes it: a node belongs to one pack,
+so there is no structured interior to depend on and no interface left over to treat separately,
 and the remainder closes through a gather built by sorting. The gather is kept, so the vector
-stays the size of the unique degrees of freedom: the index traffic narrows instead of the data
-multiplying. Atomics-freedom and reproducibility follow from the layout rather than from a
-reduction primitive, and that narrowed traffic is what pays for them.
+stays the size of the unique degrees of freedom --- the index traffic narrows instead of the
+data multiplying. Atomics-freedom and reproducibility then follow from the layout rather than
+from a reduction primitive, and that narrowed traffic is what pays for them.
 
 %================================================================================================
 \section{The packed format}
