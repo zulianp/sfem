@@ -271,12 +271,10 @@ Meshes here are ordered by a space-filling curve before the packing pass;
 Figure~\ref{fig:decomposition} shows the result, with pack boundaries following the element
 order rather than the geometry.
 
-A second consequence is an ordering constraint on everything built from the mesh. Constructing
-the packed representation \emph{renumbers the nodes in place}, so coordinates, the node-to-node
-graph and any sparsity pattern must be built after packing, never before. This is a property of
-the format rather than an implementation detail, and it is also what makes verification
-awkward: a packed operator and a reference operator cannot be compared entry by entry, because
-their node numbering differs. Equivalence must be checked by matching nodes on coordinates.
+Packing \emph{renumbers the nodes in place}, so coordinates, the node-to-node graph and any
+sparsity pattern must be built after it, never before. It also makes verification indirect:
+a packed operator and a reference operator have different node numbering, so equivalence is
+checked by matching nodes on coordinates rather than entry by entry.
 
 \begin{figure}[t]
   \centering
@@ -304,19 +302,21 @@ as
     \texttt{ghost\_idx}\big[\texttt{ghost\_ptr}[p] + \ell - n_c(p)\big], & \ell \ge n_c(p).
   \end{cases}
 \]
-Because the owned ranges are contiguous and monotone in $p$, the owner of a global index is
+The ranges are contiguous and monotone because Algorithm~\ref{alg:build} numbers the packs in
+order and advances a single cursor by $n_c$ (line~\ref{ln:advance}). An owner is therefore
 recoverable by binary search, which is what lets a conflict graph over packs be built without
 storing one.
 
 The pack-local index is a \emph{16-bit unsigned integer}. That is the single most consequential
 choice in the format and it cuts both ways: it halves the index traffic of the element sweep
 against the \SI{32}{\bit} global index a flat sweep must use (\S\ref{sec:cost}), and it caps a
-pack at $2^{16}$ distinct nodes, which is what bounds the pack size and, as
-\S\ref{sec:res:packsize} shows, is also what the packer wrongly uses to choose one.
+pack at $2^{16}$ distinct nodes. That cap is a correctness bound on the pack size;
+\S\ref{sec:res:packsize} shows what should set it instead.
 
-Within the owned range the indices are ordered \emph{non-shared first, then shared}. With
-$n_s(p)$ the number of a pack's owned nodes that some other pack also touches, the local index
-space splits into three zones (Figure~\ref{fig:idspace}):
+Within the owned range the indices are ordered \emph{non-shared first, then shared}, which is
+what the two cursors of Algorithm~\ref{alg:build} produce (line~\ref{ln:cursors}). With $n_s(p)$
+the number of a pack's owned nodes that some other pack also touches, the local index space
+splits into three zones (Figure~\ref{fig:idspace}):
 \begin{center}
 \begin{tabular}{ll}
 \toprule
@@ -329,10 +329,9 @@ $n_c \le \ell < n_{\mathrm{pack}}$ & ghost: touched, not owned \\
 \end{tabular}
 \end{center}
 
-This split is the least obvious property of the format. On a CPU, where one thread owns a pack,
-the whole flush of the owned range is already contention-free and the distinction is not needed;
-it becomes load-bearing wherever a pack is processed by more than one thread, since the first
-zone can then be written without synchronisation and only the shared tail cannot.
+The split earns nothing on a CPU, where one thread owns a pack and the whole flush of the owned
+range is already contention-free. It is there for the case of several threads to a pack, where
+the first zone can be written without synchronisation and only the shared tail cannot.
 
 \begin{figure}[t]
   \centering
@@ -346,17 +345,17 @@ zone can then be written without synchronisation and only the shared tail cannot
 \subsection{Ghost lists and the reduction graph}
 \label{sec:format:ghost}
 
-The nodes a pack touches but does not own are listed per pack in a compressed row structure.
-Two properties matter to a reader and one of them is a trap: the list is deduplicated, and it is
-ordered \emph{by first appearance} in a node-major, element-minor sweep --- it is \emph{not}
-sorted, so it must not be binary-searched.
+The nodes a pack touches but does not own are listed per pack in a compressed row structure,
+deduplicated and ordered by first appearance in the node-major sweep of
+Algorithm~\ref{alg:build} (line~\ref{ln:ghost}). The list is therefore \emph{not} sorted and
+must not be binary-searched.
 
-The contributions staged against those entries are closed by a separate gather. Its graph is
-built by sorting (destination, entry) pairs and grouping them, which gives it the two properties
-the rest of the paper rests on:
+The contributions staged against those entries are closed by a separate gather, whose graph is
+built by sorting (destination, entry) pairs and grouping them (line~\ref{ln:sort}). Sorting is
+what gives it the two properties the rest of the paper rests on:
 \begin{itemize}
-  \item each destination appears in \emph{exactly one} row, so one thread owns that destination
-        and no atomic is required; and
+  \item grouping sorted pairs cannot yield two rows with the same destination, so each
+        destination appears in exactly one row, one thread owns it, and no atomic is required;
   \item within a row the terms are visited in a fixed index order, so the sum is the same
         sequence of floating-point additions on every run.
 \end{itemize}
@@ -375,7 +374,8 @@ parameter is $n_{\mathrm{epp}}$.
 \Statex \textbf{Pass 1 --- ownership}
 \ForAll{packs $p$ in increasing order}
   \ForAll{nodes $v$ of the elements of $p$}
-    \If{$v$ is unclaimed} \State $\mathrm{owner}[v] \gets p$ \Comment{first touch wins}
+    \If{$v$ is unclaimed} \State $\mathrm{owner}[v] \gets p$ \label{ln:own}
+         \Comment{first touch wins}
     \EndIf
   \EndFor
 \EndFor
@@ -387,54 +387,44 @@ parameter is $n_{\mathrm{epp}}$.
 \Statex \textbf{Pass 3 --- renumbering} \Comment{$\mathrm{next} \gets 0$}
 \ForAll{packs $p$ in increasing order}
   \State $n_c \gets |\{v : \mathrm{owner}[v] = p\}|$, \; $n_s \gets$ how many of those are shared
-  \State $a \gets \mathrm{next}$, \; $b \gets \mathrm{next} + n_c - n_s$
+  \State $a \gets \mathrm{next}$, \; $b \gets \mathrm{next} + n_c - n_s$ \label{ln:cursors}
   \ForAll{nodes $v$ of the elements of $p$, first appearance only}
     \If{$\mathrm{owner}[v] = p$}
       \State $\mathrm{map}[v] \gets b{+}{+}$ \textbf{if} $v$ shared \textbf{else} $a{+}{+}$
     \Else{} \State charge one ghost slot to $p$
     \EndIf
   \EndFor
-  \State $\mathrm{next} \gets \mathrm{next} + n_c$
+  \State $\mathrm{next} \gets \mathrm{next} + n_c$ \label{ln:advance}
 \EndFor
 \Statex \textbf{Pass 4 --- pack-local connectivity}
 \ForAll{packs $p$, nodes $v$ in a node-major sweep of $p$'s elements}
   \If{$\mathrm{owner}[v] = p$}
     \State local id $\gets \mathrm{map}[v] - \texttt{owned\_nodes\_ptr}[p]$
   \Else
-    \State append $\mathrm{map}[v]$ to $p$'s ghost list on first appearance;
+    \State append $\mathrm{map}[v]$ to $p$'s ghost list on first appearance; \label{ln:ghost}
     \Statex \hskip\algorithmicindent\hskip\algorithmicindent
             local id $\gets n_c(p) + (\text{its position there})$
   \EndIf
 \EndFor
 \Statex \textbf{Pass 5 --- reduction graph}
-\State sort the pairs $(\mathrm{map}[v], j)$ over all ghost entries $j$
+\State sort the pairs $(\mathrm{map}[v], j)$ over all ghost entries $j$ \label{ln:sort}
 \State group by destination into \textsc{csr} rows
 \end{algorithmic}
 \end{algorithm}
 
-The passes are worth reading for what each one decides. Pass~1 makes ownership a function of the
-element order alone: the first pack to touch a node keeps it, so a node is claimed by the pack
-holding the lowest-indexed element incident on it. Pass~3 is where the three properties the rest
-of the paper uses are created at once. Running the packs in increasing order and advancing
-$\mathrm{next}$ by $n_c$ makes the owned ranges contiguous and monotone, which is what allows an
-owner to be found by binary search instead of stored. Issuing the shared ids from a second
-cursor $b$ placed $n_c - n_s$ above the first puts the non-shared nodes before the shared ones
-inside each range, which is the zone split of Figure~\ref{fig:idspace}. And assigning on first
-appearance keeps nodes adjacent in the element sweep adjacent in memory.
+Pass~1 makes ownership a function of the element order alone (line~\ref{ln:own}): a node goes to
+the pack holding the lowest-indexed element incident on it, which is the node colouring of
+Figure~\ref{fig:decomposition}. A node outside the packable prefix is claimed by no pack, keeps
+its number and appears only as a ghost, which the format represents at an arbitrary global index
+anyway.
 
-Pass~4 converts the connectivity to pack-local ids, the only array the element sweep reads. Its
-sweep is node-major and the ghost list follows it, which is why that list is in first-appearance
-order and must not be binary-searched. Pass~5 builds the reduction graph by sorting, which is
-what makes each destination appear in exactly one row: grouping sorted pairs cannot produce two
-rows with the same destination.
+Pass~3 creates both orderings of \S\ref{sec:format:zones} in one sweep, and a third that the
+structure does not show: ids are issued on first appearance, so nodes adjacent in the element
+sweep are adjacent in memory.
 
-Nodes outside the packable prefix are never claimed in Pass~1. They keep their numbers and
-appear only as ghosts, which costs nothing because the format already represents a ghost at an
-arbitrary global index.
-
-The whole construction is linear in the connectivity apart from the sort in Pass~5, and it runs
-once per mesh, so its cost is amortised over every application the mesh sees
-(\S\ref{sec:discussion}).
+Pass~4 produces the only array the element sweep reads. The construction is linear in the
+connectivity apart from the sort in Pass~5, and runs once per mesh, so its cost is amortised
+over every application that mesh sees (\S\ref{sec:discussion}).
 
 Figure~\ref{fig:reduction} draws both phases over the whole mesh. Phase~1 writes each pack's
 owned rows straight to the global field and stages only its ghost contributions in
