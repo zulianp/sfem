@@ -230,6 +230,13 @@ ordering: because a pack is a contiguous range of element indices, an unordered 
 whose node sets are large and scattered, and the format's advantage disappears.
 \S\ref{sec:res:ordering} measures what removing the ordering costs.
 
+Graph partitioning addresses the same quantity more directly. Spectral
+bisection~\cite{PothenSimonLiou1990} and the multilevel schemes that followed
+it~\cite{KarypisKumar1998,PellegriniRoman1996} minimise the cut between parts, which is what a
+pack's ghost count is, and renumbering the elements by part makes the parts contiguous ranges and
+so admissible packs. The space-filling curve is used here because one pass yields the ordering
+and the locality together.
+
 \paragraph{Reproducibility.} Reproducible summation obtains a result that does not depend on the
 summation order, through arithmetic --- compensated, extended or exactly-rounded accumulation~\cite{DemmelNguyen2013} ---
 and pays for it at run time. This paper takes the opposite route: it does not make the sum
