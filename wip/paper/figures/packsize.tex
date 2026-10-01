@@ -11,10 +11,14 @@
   grid=both, major grid style={black!12}, minor grid style={black!6},
   tick label style={font=\tiny}, label style={font=\scriptsize},
 ]
-\addplot[PackC,mark=triangle*,mark size=1.6pt,thick] coordinates {(0.40,533.460) (0.90,954.693) (1.80,1014.654) (3.60,1038.835) (7.10,1025.015) (14.20,1107.505) (28.40,1106.787)};
-\addlegendentry{$n=64$}
-\addplot[PackA,mark=*,mark size=1.6pt,thick] coordinates {(3.60,793.112) (7.10,849.261) (14.20,895.422) (28.40,914.446) (56.90,904.448) (113.80,878.265) (227.60,836.524)};
-\addlegendentry{$n=128$}
+\addplot[PackC,mark=triangle*,mark size=1.6pt,thick] coordinates {(0.40,537.901) (0.90,946.884) (1.80,1019.301) (3.60,1046.076) (7.10,1026.317) (14.20,1099.392) (28.40,1109.212)};
+\addlegendentry{$n=64$, first order}
+\addplot[PackA,mark=*,mark size=1.6pt,thick] coordinates {(3.60,797.249) (7.10,852.764) (14.20,911.516) (28.40,913.706) (56.90,895.395) (113.80,856.512) (227.60,824.915)};
+\addlegendentry{$n=128$, first order}
+\addplot[PackC,mark=triangle*,mark size=1.4pt,thick,densely dashed,mark options={solid}] coordinates {(0.40,189.631) (0.90,345.759) (1.80,365.888) (3.60,379.491) (7.10,381.266) (14.20,401.059) (28.40,408.447)};
+\addlegendentry{$n=64$, Darwish--M.}
+\addplot[PackA,mark=*,mark size=1.4pt,thick,densely dashed,mark options={solid}] coordinates {(3.60,327.873) (7.10,348.224) (14.20,373.807) (28.40,383.276) (56.90,383.867) (113.80,372.701) (227.60,359.810)};
+\addlegendentry{$n=128$, Darwish--M.}
 \draw[black!50,dashed] (axis cs:1,0) -- (axis cs:1,\pgfkeysvalueof{/pgfplots/ymax});
 \node[black!55,font=\scriptsize,anchor=south west,rotate=90] at (axis cs:1,0) {\ one pack per thread};
 \end{semilogxaxis}

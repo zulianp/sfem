@@ -708,11 +708,16 @@ def parse_packsize(path):
         if s.startswith("#") or not s:
             continue
         f = s.split()
-        if section == "sweep" and len(f) == 8 and f[0].isdigit():
+        # Eight columns or nine: the ninth is the higher-order Jacobian with Darwish-Moukalled,
+        # added later, and the older files must keep parsing or a regeneration against one of them
+        # would silently drop the whole sweep rather than just the series it lacks.
+        if section == "sweep" and len(f) in (8, 9) and f[0].isdigit():
             try:
-                sweep.setdefault(int(f[0]), []).append({
-                    "pack": int(f[1]), "packs": int(f[3]), "ppt": float(f[4]),
-                    "mean": int(f[5]), "res": float(f[6]), "jac": float(f[7])})
+                row = {"pack": int(f[1]), "packs": int(f[3]), "ppt": float(f[4]),
+                       "mean": int(f[5]), "res": float(f[6]), "jac": float(f[7])}
+                if len(f) == 9 and f[8] != "-":
+                    row["hodm"] = float(f[8])
+                sweep.setdefault(int(f[0]), []).append(row)
             except ValueError:
                 pass
         elif section == "order" and len(f) == 6 and f[0].isdigit():
@@ -749,7 +754,19 @@ def fig_packsize(sweep, meta):
         pts = sorted((r["ppt"], r["jac"]) for r in sweep[n])
         out.append(r"\addplot[%s,mark=%s,mark size=1.6pt,thick] coordinates {%s};"
                    % (col, mark, " ".join("(%.2f,%.3f)" % p for p in pts)))
-        out.append(r"\addlegendentry{$n=%d$}" % n)
+        out.append(r"\addlegendentry{$n=%d$, first order}" % n)
+    # The higher-order arm, dashed so the eye reads it as the same operator with more arithmetic
+    # rather than as a third problem size. Drawn after both first-order series so the legend
+    # groups by operator, and skipped entirely where the data predates the column.
+    for n in sorted(sweep):
+        col, mark = cols.get(n, ("PackE", "square*"))
+        pts = sorted((r["ppt"], r["hodm"]) for r in sweep[n] if "hodm" in r)
+        if not pts:
+            continue
+        out.append(r"\addplot[%s,mark=%s,mark size=1.4pt,thick,densely dashed,"
+                   r"mark options={solid}] coordinates {%s};"
+                   % (col, mark, " ".join("(%.2f,%.3f)" % p for p in pts)))
+        out.append(r"\addlegendentry{$n=%d$, Darwish--M.}" % n)
     # One pack per thread: below this line a core can be left with nothing at all.
     out.append(r"\draw[black!50,dashed] (axis cs:1,0) -- (axis cs:1,\pgfkeysvalueof{/pgfplots/ymax});")
     out.append(r"\node[black!55,font=\scriptsize,anchor=south west,rotate=90] "
@@ -784,6 +801,27 @@ def macros_packsize(sweep, order, meta):
     out = [PREAMBLE]
     out.append(r"\newcommand{\packHost}{%s}" % meta.get("host", "?"))
     out.append(r"\newcommand{\packsPerThread}{%d}" % CVFEM_PACKS_PER_THREAD)
+
+    # The higher-order series, and what it establishes. The knee is at one pack per thread; the
+    # question the series was added to answer is whether an arm with much more arithmetic per
+    # sub-control surface collapses in the SAME place. These macros let the caption say so from
+    # the data rather than from a reading of the plot.
+    knee = {}
+    for n, rows in sweep.items():
+        below = [r for r in rows if r["ppt"] < 1.0 and "hodm" in r]
+        above = [r for r in rows if r["ppt"] >= 1.0 and "hodm" in r]
+        if not below or not above:
+            continue
+        lo = min(below, key=lambda r: r["ppt"])            # the worst point past the knee
+        hi = min(above, key=lambda r: r["ppt"])            # the last point before it
+        knee[n] = (lo["jac"] / hi["jac"], lo["hodm"] / hi["hodm"],
+                   hi["jac"] / hi["hodm"])
+    if knee:
+        n0 = min(knee)
+        fo, ho, work = knee[n0]
+        out.append(r"\newcommand{\pkszKneeFo}{%.0f\%%}" % (100.0 * fo))
+        out.append(r"\newcommand{\pkszKneeHo}{%.0f\%%}" % (100.0 * ho))
+        out.append(r"\newcommand{\pkszHoWorkFactor}{%.1f}" % work)
     for n, rows in sweep.items():
         tag = "Small" if n == min(sweep) else "Large"
         best = max(rows, key=lambda r: r["jac"])
