@@ -208,9 +208,10 @@ work is largely concerned with making the kernel fast, and at high order the ker
 there is to make fast. At low order the kernel is small to begin with: sum factorisation applies
 to a hexahedron and the kernels measured here use it, but its saving grows with the polynomial
 degree, so at degree one it is a constant factor on an already short kernel. What is left is the
-traffic and the scatter around it. This paper is concerned with that --- with what happens on either side of the
-element kernel rather than inside it --- and \S\ref{sec:res:spmv} shows the margin is real, with
-the low-order operators sitting below both roofs and close to neither.
+traffic and the scatter around it. This paper is concerned with those: the gather that stages an
+element's nodal values and the scatter that returns its result, which bracket the kernel in the
+loop body. \S\ref{sec:res:spmv} shows the margin there is real, with the low-order operators
+sitting far from both roofs.
 
 \paragraph{Resolving the scatter.} The conflict between elements sharing a node is classically
 resolved either by atomic updates or by colouring the elements so that no two of a colour share
