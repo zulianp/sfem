@@ -151,10 +151,9 @@ cost of a barrier per colour and of accumulating into the destination, which has
 before it can be added to. \emph{Assembling} a sparse matrix removes
 the problem from the inner loop entirely, but replaces a kernel that reads a mesh with a product
 that streams a matrix, at a footprint that grows with the stencil rather than with the solution.
-The two are not a compute-bound kernel against a bandwidth-bound one: \S\ref{sec:res:spmv}
-measures the product at \rlSpmvFSixFourPct\% of the bandwidth roof binding at its intensity and
-the matrix-free sweeps at \rlResidualAtomicPct--\rlResidualPackedPct\%, so only the product is
-near a roof at all.
+Both sit on the bandwidth side of the ridge, and what separates them is distance from the roof:
+\S\ref{sec:res:spmv} measures the product at \rlSpmvFSixFourPct\% of the roof binding at its
+intensity, the matrix-free sweeps at \rlResidualAtomicPct--\rlResidualPackedPct\%.
 
 The consequences of non-reproducibility are practical. In the solver used here they appeared as a
 preconditioner that differed between runs: the block-diagonal blocks being inverted were
@@ -200,9 +199,8 @@ Modern libraries build on that lineage and make the matrix-free operator the pri
 object~\cite{KronbichlerKormann2012,KronbichlerKormann2019,MFEM2021,libCEED2021,Kolev2021}, as
 do the form compilers that generate the element kernels~\cite{KirbyLogg2006,Firedrake2016}. That
 work is largely concerned with making the kernel fast, and at high order the kernel is what
-there is to make fast. At low order it is not: the element kernel is small, the reference
-element admits no sum factorisation to exploit, and what is left is the traffic and the scatter
-around the kernel. This paper is concerned with that --- with what happens on either side of the
+there is to make fast. At low order the element kernel is small and the reference element admits
+no sum factorisation, so what is left is the traffic and the scatter around it. This paper is concerned with that --- with what happens on either side of the
 element kernel rather than inside it --- and \S\ref{sec:res:spmv} shows the margin is real, with
 the low-order operators sitting below both roofs and close to neither.
 
@@ -540,9 +538,9 @@ Table~\ref{tab:jacfair} reports both forms.
 
 Two consequences follow. The assembled operator is bandwidth-bound at a footprint that fits no
 level of cache, which is why halving the value precision is close to its only lever; and the
-matrix-free operator, reading a hundredfold less, is not --- its intensity is higher by the same
-factor, and what then limits it is the element kernel rather than the memory system.
-\S\ref{sec:res:spmv} reports how far that leaves it from either roof.
+matrix-free operator, reading a hundredfold less, has intensity higher by the same factor and is
+limited by the element kernel instead. \S\ref{sec:res:spmv} reports how far that leaves it from
+either roof.
 
 %================================================================================================
 \section{Experimental setup}
