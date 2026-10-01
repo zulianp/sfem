@@ -244,28 +244,23 @@ independent of its order, it fixes the order, in the index arrays the layout alr
 two are complementary rather than competing, and the distinction matters for cost, because
 fixing an order is free once the layout has done it.
 
-\paragraph{Prior art.} Grouping elements into blocks with locally numbered nodes is not novel,
-and neither is reordering a mesh along a space-filling curve; what has been attempted with them
-is worth separating from what was achieved. Reguly and Giles~\cite{RegulyGiles2015} block a grid
-into geometrically close elements and renumber their degrees of freedom, and report a GPU
-assembly up to $10\times$ a two-socket 12-core CPU and a matrix-free product up to $2\times$
-global assembly --- but the blocking buys locality only, and the write conflict is still
-resolved by colouring or by atomics on both sides, the CPU baseline being block-coloured.
-Settgast et al.~\cite{Settgast2023} make the case for low-order matrix-free kernels on GPUs,
-where the application's heterogeneity rules high order out, and beat matrix-based products on
-three architectures; the scatter is again the standard one. Wichrowski~\cite{Wichrowski2026}
-does remove it, keeping cell-wise storage as the primary representation and closing continuity
-by a dimensionally-split cascade of face exchanges at statically known offsets --- no
-gather-scatter, no atomics, no colouring --- and reaches \SI{14.1}{} to
-\SI{59.6}{}~GDoF/s on an A100 from $\mathbb{Q}_1$ to $\mathbb{Q}_7$. Those static offsets are
-what the method rests on, and they exist because the topology inside a macro-block is
-structured.
+\paragraph{Prior art.} Blocking elements with locally numbered nodes is not novel, nor is
+space-filling reordering; what they achieved is the question. Reguly and
+Giles~\cite{RegulyGiles2015} block a grid into geometrically close elements and renumber their
+degrees of freedom, reaching $10\times$ a two-socket 12-core CPU on a GPU --- but the blocking
+buys locality alone, and the write conflict is still colouring or atomics, their CPU baseline
+being block-coloured. Settgast et al.~\cite{Settgast2023} make the low-order matrix-free case on
+GPUs with the same standard scatter. Wichrowski~\cite{Wichrowski2026} removes the scatter:
+cell-wise storage, continuity closed by face exchanges at statically known offsets, no atomics
+and no colouring, reaching \SI{14.1}{}~GDoF/s at $\mathbb{Q}_1$ on an A100. The offsets are
+static because a macro-block's interior is structured; where it is not, at the interfaces
+between macro-blocks, the method falls back to separate face, line and vertex kernels over
+disjoint sets of degrees of freedom.
 
-This paper removes the conflict on a mesh where no offset is static, by making ownership of
-every node \emph{exclusive to one pack} and closing the remainder with a gather built by
-sorting. Atomics-freedom and reproducibility then follow from the layout rather than from a
-reduction primitive, and the narrowed index traffic of pack-local numbering is what pays for
-them.
+Here ownership is exclusive everywhere, so the unstructured case needs no separate treatment,
+and the remainder closes through a gather built by sorting. Atomics-freedom and reproducibility
+follow from the layout rather than from a reduction primitive, and the narrowed index traffic of
+pack-local numbering is what pays for them.
 
 %================================================================================================
 \section{The packed format}
