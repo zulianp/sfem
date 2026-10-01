@@ -991,8 +991,13 @@ def _roof(ai_lo, ai_hi, bw, peak):
     return [(ai_lo, ai_lo * bw), (ridge, peak), (ai_hi, peak)]
 
 
-def roofline_ho_points(rows, dram_ho, n=128):
+def roofline_ho_points(rows, dram_ho, n=128, dram_key="residual-ho"):
     """The higher-order convective arms, on the same axes as the first-order operators.
+
+    ``dram_key`` names the operator whose DRAM capture places these points -- "residual-ho" for
+    the residual sweep, "jac_action-ho" for the exact higher-order Jacobian action. The two are
+    separate captures because the action reads a second nodal gradient, the direction's, which
+    the residual never touches.
 
     Traffic is measured once per layout and shared by the four schemes. They read the same
     arrays -- the mesh, the fields and the hoisted nodal velocity gradient -- and differ only
@@ -1004,8 +1009,8 @@ def roofline_ho_points(rows, dram_ho, n=128):
     also the order of increasing limiter arithmetic.
     """
     out = {}
-    for lay, key in (("packed", ("residual-ho", "packed")), ("atomic", ("residual-ho", "atomic"))):
-        byts = (dram_ho or {}).get(key)
+    for lay in ("packed", "atomic"):
+        byts = (dram_ho or {}).get((dram_key, lay))
         if not byts:
             continue
         pts = []
@@ -1020,7 +1025,7 @@ def roofline_ho_points(rows, dram_ho, n=128):
     return out
 
 
-def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None,
+def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None, ho_jac=None,
                  spec_bw=SPEC_BW_GBS, spec_peak=SPEC_PEAK_GFLOPS):
     """F8. Measured and vendor roofs together, with the kernels placed on measured traffic.
 
@@ -1111,23 +1116,35 @@ def fig_roofline(pts, bandwidth_gbs, peak_gflops, ho=None,
     # through intensities that nothing traverses: they are four separate operators measured
     # independently, and the ordering among them is a fact about their arithmetic, which the
     # legend states, not a trajectory.
+    # The colours are the SAME four the first-order points use, and they mean the same thing
+    # there: operator and layout together. So the residual's higher-order arms are drawn in the
+    # residual colours and the exact higher-order Jacobian action's in the Jacobian colours, and
+    # a reader who has read the first six legend entries already knows which family a point is in
+    # without the key having to say it again.
     HO_MARKS = ["oplus*", "halfsquare*", "halfcircle*", "star"]
+    # The mark is looked up by SCHEME NAME, not by position in the path. Each path is sorted by
+    # intensity, and the two families happen to sort their four schemes the same way today --
+    # which is exactly the kind of coincidence that breaks silently. Keying on the name means a
+    # shape stands for one scheme in both families whatever the ordering turns out to be.
+    ho_mark = {}
     ho_seen = []
-    for lay, col in (("packed", "PackA"), ("atomic", "PackD")):
-        path = (ho or {}).get(lay)
-        if not path:
-            continue
-        for i, (name, ai, gf) in enumerate(path):
-            mk = HO_MARKS[i % len(HO_MARKS)]
-            out.append(r"\addplot[%s,mark=%s,mark size=2.0pt,only marks,forget plot,"
-                       r"mark options={draw=%s,fill=%s}] coordinates {(%.3f,%.1f)};"
-                       % (col, mk, col, col, ai, gf))
-            if name not in ho_seen:
-                ho_seen.append(name)
+    for family, (cp, ca) in ((ho, ("PackA", "PackD")), (ho_jac, ("PackC", "PackE"))):
+        for lay, col in (("packed", cp), ("atomic", ca)):
+            path = (family or {}).get(lay)
+            if not path:
+                continue
+            for name, ai, gf in path:
+                if name not in ho_mark:
+                    ho_mark[name] = HO_MARKS[len(ho_seen) % len(HO_MARKS)]
+                    ho_seen.append(name)
+                mk = ho_mark[name]
+                out.append(r"\addplot[%s,mark=%s,mark size=2.0pt,only marks,forget plot,"
+                           r"mark options={draw=%s,fill=%s}] coordinates {(%.3f,%.1f)};"
+                           % (col, mk, col, col, ai, gf))
     # One legend entry per SCHEME, once, after the plots so the order reads with the path.
-    for i, name in enumerate(ho_seen):
+    for name in ho_seen:
         out.append(r"\addlegendimage{black,mark=%s,mark size=2.0pt,only marks,"
-                   r"mark options={draw=black,fill=black}}" % HO_MARKS[i % len(HO_MARKS)])
+                   r"mark options={draw=black,fill=black}}" % ho_mark[name])
         out.append(r"\addlegendentry{%s}" % name)
 
     out.append(r"\end{loglogaxis}")
@@ -1154,7 +1171,7 @@ def macros_traffic_ratio(measured, nelems, nnodes):
             r"\newcommand{\rlTrafficRatioHi}{%.1f}" "\n") % (min(rs), max(rs))
 
 
-def macros_roofline_ho(ho, measured_bytes):
+def macros_roofline_ho(ho, measured_bytes, ho_jac=None):
     """What the prose quotes about the higher-order arms' place on the roofline.
 
     The traffic ratio is the number that matters and it is not the expected one: the correction
@@ -1175,7 +1192,34 @@ def macros_roofline_ho(ho, measured_bytes):
         if path:
             out.append(r"\newcommand{\hoAi%sLo}{%.1f}" % (tag, path[0][1]))
             out.append(r"\newcommand{\hoAi%sHi}{%.1f}" % (tag, path[-1][1]))
+        # The same pair for the exact higher-order ACTION, whose traffic is a separate capture:
+        # it reads the direction's nodal velocity gradient as well as the state's.
+        jb = (measured_bytes or {}).get(("jac_action-ho", lay))
+        jf = (measured_bytes or {}).get(("jac_action_rc", lay))
+        if jb:
+            out.append(r"\newcommand{\hoJacBytes%s}{%.0f}" % (tag, jb))
+        if jf:
+            out.append(r"\newcommand{\foJacBytes%s}{%.0f}" % (tag, jf))
+        if jb and jf:
+            out.append(r"\newcommand{\hoJacBytesRatio%s}{%.2f}" % (tag, jb / jf))
+        jpath = (ho_jac or {}).get(lay)
+        if jpath:
+            out.append(r"\newcommand{\hoJacAi%sLo}{%.1f}" % (tag, jpath[0][1]))
+            out.append(r"\newcommand{\hoJacAi%sHi}{%.1f}" % (tag, jpath[-1][1]))
     return "\n".join(out) + "\n" if out else ""
+
+
+def _rl_span(name, lo, hi, fmt="%.1f"):
+    """A span macro that collapses when its ends print the same.
+
+    Two layouts whose intensities round to one figure produced "3.3--3.3 FLOP/byte" and
+    "a factor of 14--14 lower" in the prose, which reads as a mistake rather than as a measured
+    span that happens to be narrow. The decision belongs here, where the formatting is, rather
+    than in the prose, which must not know whether the two ends agreed on this particular run.
+    """
+    a, b = fmt % lo, fmt % hi
+    span = a if a == b else "%s--%s" % (a, b)
+    return "\\newcommand{\\%s}{%s}\n" % (name, span)
 
 
 def _rl_spmv_factor(pts):
@@ -1185,9 +1229,8 @@ def _rl_spmv_factor(pts):
     mf = [a for l, a in ai.items() if l.startswith("residual, ")]
     if not spmv or not mf:
         return ""
-    return ("\\newcommand{\\rlMfOverSpmvLo}{%.0f}\n"
-            "\\newcommand{\\rlMfOverSpmvHi}{%.0f}\n"
-            % (min(mf) / spmv, max(mf) / spmv))
+    return (_rl_span("rlMfOverSpmv", min(mf) / spmv, max(mf) / spmv, "%.0f")
+            + _rl_span("rlResidualAiSpan", min(mf), max(mf)))
 
 
 def _macro_name(label):
@@ -1857,6 +1900,7 @@ def build(out_dir, tab_dir):
     written = []
     spmv_ref = {}
     convho_rows = []
+    jacho_rows = []
 
     det = [f for f in sorted(os.listdir(DATA)) if f.startswith("det_layout_")] if os.path.isdir(DATA) else []
     if det:
@@ -1963,6 +2007,7 @@ def build(out_dir, tab_dir):
             if f.startswith("jacho_") and f.endswith(".out")] if os.path.isdir(DATA) else [])
     if jho:
         jr = parse_convho(os.path.join(DATA, jho[-1]))
+        jacho_rows = jr
         fgj = fig_scheme_bars(jr, spmv_ref)
         if fgj:
             with open(os.path.join(out_dir, "jacho.tex"), "w") as fh:
@@ -2068,16 +2113,18 @@ def build(out_dir, tab_dir):
         if peak and bw:
             pts = roofline_points(rows, n=128, measured_bytes=measured_dram)
             ho_path = roofline_ho_points(convho_rows, measured_dram)
+            ho_jac = roofline_ho_points(jacho_rows, measured_dram,
+                                        dram_key="jac_action-ho")
             if pts:
                 with open(os.path.join(out_dir, "roofline.tex"), "w") as fh:
-                    fh.write(fig_roofline(pts, bw, peak, ho=ho_path))
+                    fh.write(fig_roofline(pts, bw, peak, ho=ho_path, ho_jac=ho_jac))
                 with open(os.path.join(out_dir, "roofline_macros.tex"), "w") as fh:
                     fh.write(PREAMBLE
                              + "\\newcommand{\\rlPeak}{%.0f}\n" % peak
                              + "\\newcommand{\\rlBw}{%.0f}\n" % bw
                              + "\\newcommand{\\rlRidge}{%.1f}\n" % (peak / bw)
                              + macros_traffic_ratio(measured_dram, 2097152, 2146689)
-                             + macros_roofline_ho(ho_path, measured_dram)
+                             + macros_roofline_ho(ho_path, measured_dram, ho_jac)
                              + "\\newcommand{\\rlSpecPeak}{%.2f}\n" % (SPEC_PEAK_GFLOPS / 1000.0)
                              + "\\newcommand{\\rlSpecBw}{%.0f}\n" % SPEC_BW_GBS
                              + "\\newcommand{\\rlSpecRidge}{%.1f}\n"

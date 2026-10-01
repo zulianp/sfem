@@ -74,7 +74,11 @@ for arm in "first_order|atomic|--jac-action" \
         # pass; the roofline multiplies them by the BEST rate, which is the rate this table
         # reports. Reading a GFLOP/s line instead would bind the point to whichever pass it came
         # from and disagree with the MDOF/s beside it.
-        elems=$(val 'elements'); fpe=$(val 'flops_per_element_model')
+        # The JAC_ACTION field, not the residual one. Reading 'flops_per_element_model' here --
+        # which is what this job did, having been derived from conv_ho_bench.sbatch -- matches the
+        # residual's line, which --jac-action does not print, so the column came out "-" for every
+        # arm and the roofline had no higher-order Jacobian points to place.
+        elems=$(val 'elements'); fpe=$(val 'flops_per_element_jac_action_model')
     done
     printf '%-22s %-8s %10s %10s %10s %10s %14s\n' "$lbl" "$lay" "${best:--}" "${dofs:--}" \
            "${elems:--}" "${fpe:--}" "${ck:--}"

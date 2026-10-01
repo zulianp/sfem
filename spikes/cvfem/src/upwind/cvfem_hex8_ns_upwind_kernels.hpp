@@ -458,6 +458,34 @@ static constexpr double cvfem_hex8_defcor_flops_per_element(const int limiter) {
     return 12.0 * (56.0 + 6.0 * L);
 }
 
+// The SAME correction differentiated, which is what the exact higher-order Jacobian action
+// evaluates (cvfem_hex8_scs_defcor_jv). Counted against that kernel line for line, in the same
+// idealised style, and per sub-control surface:
+//
+//   the upwind split (1) + its two weights (4) + the two DERIVATIVE weights, each
+//   0.5*(1 +- sgn)*dmdot (6) + the two node-to-centroid vectors (6), then per velocity
+//   component the two directional derivatives of grad(u) (5 each), the same two of grad(v)
+//   (5 each), the limiter applied to each of the two increments (L each), its derivative
+//   applied to each (L' each) and the four-term flux-weighted combination (7), and finally
+//   the correction added into both nodes' rows (6 over the three components):
+//
+//       per surface = 1 + 4 + 6 + 6 + 3*(10 + 10 + 2L + 2L' + 7) + 6 = 104 + 6(L + L')
+//
+// L is the forward limiter's arithmetic, as above. L' is its derivative's, counted the same
+// way: 9 for the bounded-face clip, whose derivative is a branch on a tolerance it has to form
+// (the forward clip has none); 33 for Venkatakrishnan's quotient rule; 28 for
+// Darwish-Moukalled. Unlimited is 0 for both, and the unlimited arm is therefore 104 per
+// surface against the residual correction's 56 -- the derivative roughly doubles the term,
+// which is what it should do.
+//
+// This is NOT added to the lagged action. There the correction is deferred, the Jacobian never
+// sees it, and the first-order model is exactly right; the caller gates on that.
+static constexpr double cvfem_hex8_defcor_jac_flops_per_element(const int limiter) {
+    const double L  = limiter == 1 ? 2.0 : limiter == 2 ? 15.0 : limiter == 3 ? 10.0 : 0.0;
+    const double Ld = limiter == 1 ? 9.0 : limiter == 2 ? 33.0 : limiter == 3 ? 28.0 : 0.0;
+    return 12.0 * (104.0 + 6.0 * (L + Ld));
+}
+
 // 12 SCS: dN (27) + J (144) + cof/det (33) + A (3) + ∇_ref u (144) + push (55)
 // + traction (24) + convection (36) + scatter (8) = 474 * 12.
 static constexpr double CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT = 5688.0;
