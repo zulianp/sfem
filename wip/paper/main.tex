@@ -716,7 +716,8 @@ with a hard donor switch}: the face value is taken from whichever side the mass 
 with no blending band. Every measured figure and table names its scheme in the first words of
 its caption, so which one produced a number is never left to be inferred.
 
-The second is a \emph{deferred-correction higher-order flux}. The face value is reconstructed
+The second is a \emph{deferred-correction} higher-order flux~\cite{KhoslaRubin1974}. The face
+value is reconstructed
 from the donor node and its nodal velocity gradient,
 $u_{\mathrm{face}} = u_{\mathrm{donor}} + \nabla u_{\mathrm{donor}}\cdot
  (x_{\mathrm{scs}} - x_{\mathrm{donor}})$,
@@ -1037,8 +1038,14 @@ to it.
 \end{figure}
 
 The correction adds a reconstruction and, where a limiter is selected, a limiter evaluation at
-every sub-control surface, against a first-order flux of a branch and a multiply.
-Table~\ref{tab:convho} and Figure~\ref{fig:convho} report all five variants.
+every sub-control surface, against a first-order flux of a branch and a multiply. Three limiters
+are measured beside the unlimited reconstruction: the bounded-face clip, which holds the
+reconstructed face value inside the range its two nodes span~\cite{BarthJespersen1989};
+Venkatakrishnan's rational function, which smooths that clip so a steady state can
+converge~\cite{Venkatakrishnan1995}; and the Darwish--Moukalled form, which applies a
+normalised-variable \textsc{tvd} limiter on an unstructured
+mesh~\cite{DarwishMoukalled2003}. Table~\ref{tab:convho} and Figure~\ref{fig:convho} report all
+five variants.
 
 \paragraph{Scheme dependence.} The ratio falls monotonically with the arithmetic each scheme adds:
 $\hoFirstLayoutRatio\times$ on first-order upwind, $\hoUnlimLayoutRatio\times$ with the unlimited
