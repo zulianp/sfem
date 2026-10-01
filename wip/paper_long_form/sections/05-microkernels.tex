@@ -129,8 +129,8 @@ whether the compiler acted on it, and only a disassembly or a vectoriser report 
 \subsection{What the layout changes}
 
 The two layouts differ in how an element's contribution reaches the global vector, not in the
-arithmetic. The \textbf{packed} layout gathers pack-locally, accumulates into pack-local
-indices, and closes through a two-phase deterministic ghost reduction; the \textbf{standard}
+arithmetic. The \emph{packed} layout gathers pack-locally, accumulates into pack-local
+indices, and closes through a two-phase deterministic ghost reduction; the \emph{standard}
 layout scatters with atomics. Consequences worth knowing when reading measurements:
 
 \begin{itemize}
