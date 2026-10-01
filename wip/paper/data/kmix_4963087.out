@@ -1,0 +1,27 @@
+### kernel instruction mix, n=128, 72 threads
+### host nid006557  2026-10-01 13:34:21
+kmix packed mdof 1748.205
+kmix packed mdof_kernel_only 1752.680
+kmix packed INST_SPEC 50162543964
+kmix packed ASE_SPEC 15072020404
+kmix packed VFP_SPEC 585455988
+kmix packed DP_SPEC 7947601586
+kmix packed LD_SPEC 15952641340
+kmix packed ST_SPEC 7542411252
+kmix packed cycles 17186850570
+kmix packed instructions 49085134753
+kmix packed STALL_BACKEND 8167877218
+kmix packed STALL_BACKEND_MEM 2427837528
+kmix atomic mdof 913.030
+kmix atomic mdof_kernel_only 908.021
+kmix atomic INST_SPEC 53412245767
+kmix atomic ASE_SPEC 14125499882
+kmix atomic VFP_SPEC 1438429007
+kmix atomic DP_SPEC 10339583148
+kmix atomic LD_SPEC 17374160988
+kmix atomic ST_SPEC 7593428790
+kmix atomic cycles 31299784218
+kmix atomic instructions 52360508700
+kmix atomic STALL_BACKEND 19988936961
+kmix atomic STALL_BACKEND_MEM 2328758685
+### done
