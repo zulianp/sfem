@@ -361,6 +361,81 @@ the rest of the paper rests on:
         sequence of floating-point additions on every run.
 \end{itemize}
 
+\subsection{Construction}
+\label{sec:format:build}
+
+Everything above is produced by five sequential passes over the connectivity,
+Algorithm~\ref{alg:build}. The mesh is already spatially reordered when they start, and the only
+parameter is $n_{\mathrm{epp}}$.
+
+\begin{algorithm}
+\caption{Building the packed format from a reordered mesh}
+\label{alg:build}
+\begin{algorithmic}[1]
+\Statex \textbf{Pass 1 --- ownership}
+\ForAll{packs $p$ in increasing order}
+  \ForAll{nodes $v$ of the elements of $p$}
+    \If{$v$ is unclaimed} \State $\mathrm{owner}[v] \gets p$ \Comment{first touch wins}
+    \EndIf
+  \EndFor
+\EndFor
+\Statex \textbf{Pass 2 --- sharing}
+\ForAll{packs $p$, nodes $v$ of the elements of $p$}
+  \If{$\mathrm{owner}[v] \neq p$} \State mark $v$ shared
+  \EndIf
+\EndFor
+\Statex \textbf{Pass 3 --- renumbering} \Comment{$\mathrm{next} \gets 0$}
+\ForAll{packs $p$ in increasing order}
+  \State $n_c \gets |\{v : \mathrm{owner}[v] = p\}|$, \; $n_s \gets$ how many of those are shared
+  \State $a \gets \mathrm{next}$, \; $b \gets \mathrm{next} + n_c - n_s$
+  \ForAll{nodes $v$ of the elements of $p$, first appearance only}
+    \If{$\mathrm{owner}[v] = p$}
+      \State $\mathrm{map}[v] \gets b{+}{+}$ \textbf{if} $v$ shared \textbf{else} $a{+}{+}$
+    \Else{} \State charge one ghost slot to $p$
+    \EndIf
+  \EndFor
+  \State $\mathrm{next} \gets \mathrm{next} + n_c$
+\EndFor
+\Statex \textbf{Pass 4 --- pack-local connectivity}
+\ForAll{packs $p$, nodes $v$ in a node-major sweep of $p$'s elements}
+  \If{$\mathrm{owner}[v] = p$}
+    \State local id $\gets \mathrm{map}[v] - \texttt{owned\_nodes\_ptr}[p]$
+  \Else
+    \State append $\mathrm{map}[v]$ to $p$'s ghost list on first appearance;
+    \Statex \hskip\algorithmicindent\hskip\algorithmicindent
+            local id $\gets n_c(p) + (\text{its position there})$
+  \EndIf
+\EndFor
+\Statex \textbf{Pass 5 --- reduction graph}
+\State sort the pairs $(\mathrm{map}[v], j)$ over all ghost entries $j$
+\State group by destination into \textsc{csr} rows
+\end{algorithmic}
+\end{algorithm}
+
+The passes are worth reading for what each one decides. Pass~1 makes ownership a function of the
+element order alone: the first pack to touch a node keeps it, so a node is claimed by the pack
+holding the lowest-indexed element incident on it. Pass~3 is where the three properties the rest
+of the paper uses are created at once. Running the packs in increasing order and advancing
+$\mathrm{next}$ by $n_c$ makes the owned ranges contiguous and monotone, which is what allows an
+owner to be found by binary search instead of stored. Issuing the shared ids from a second
+cursor $b$ placed $n_c - n_s$ above the first puts the non-shared nodes before the shared ones
+inside each range, which is the zone split of Figure~\ref{fig:idspace}. And assigning on first
+appearance keeps nodes adjacent in the element sweep adjacent in memory.
+
+Pass~4 converts the connectivity to pack-local ids, the only array the element sweep reads. Its
+sweep is node-major and the ghost list follows it, which is why that list is in first-appearance
+order and must not be binary-searched. Pass~5 builds the reduction graph by sorting, which is
+what makes each destination appear in exactly one row: grouping sorted pairs cannot produce two
+rows with the same destination.
+
+Nodes outside the packable prefix are never claimed in Pass~1. They keep their numbers and
+appear only as ghosts, which costs nothing because the format already represents a ghost at an
+arbitrary global index.
+
+The whole construction is linear in the connectivity apart from the sort in Pass~5, and it runs
+once per mesh, so its cost is amortised over every application the mesh sees
+(\S\ref{sec:discussion}).
+
 Figure~\ref{fig:reduction} draws both phases over the whole mesh. Phase~1 writes each pack's
 owned rows straight to the global field and stages only its ghost contributions in
 \texttt{ghost\_buf}; Phase~2 empties that buffer, one reduction row per destination, so the
