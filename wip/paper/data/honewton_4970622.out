@@ -1,0 +1,9 @@
+### preconditioner: bjacobi  linear rtol: 1e-3  n: 32  refine: 1  gmg: 0
+### a row with converged=0 is a floor, not a measurement
+freeze   limiter   jacobian newton_total  converged lin_it_total  t_solve_s
+unfrozen 0         exact             14          1         4502     7.6848
+unfrozen 0         lagged            31          1         8329    12.3763
+unfrozen 2         exact             16          1         4964     9.4176
+unfrozen 2         lagged            89          1        13894    20.8701
+
+logs in /ritom/scratch/cscs/zulianp/cvfem_honewton/4970622
