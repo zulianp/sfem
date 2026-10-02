@@ -6,22 +6,22 @@
   width=\columnwidth, height=0.400\columnwidth,
   xlabel={OpenMP threads}, ylabel={MDOF/s},
   log basis x=2, xtick={1,2,4,8,18,36,72}, xticklabels={1,2,4,8,18,36,72},
-  ymin=5.6100, ymax=1895.6688,
+  ymin=5.6517, ymax=1503.7332,
   legend columns=2, legend cell align=left,
   legend style={at={(0.5,1.02)}, anchor=south, font=\tiny, draw=none,
                 fill=none, inner sep=1pt, column sep=6pt},
   grid=both, major grid style={black!12}, minor grid style={black!6},
   tick label style={font=\tiny}, label style={font=\scriptsize},
 ]
-\addplot[black!45,dashed,no marks,forget plot] coordinates {(1,6.6000) (72,475.2000)};
-\node[black!55,font=\tiny,rotate=16.4,anchor=north,inner sep=2pt] at (axis cs:24,158.40) {ideal};
-\addplot[PackA,mark=*,mark size=1.4pt,thick] coordinates {(1,26.6080) (2,52.9050) (4,105.0100) (8,207.8470) (18,450.8550) (36,857.5500) (54,1245.6890) (72,1579.7240)};
+\addplot[black!45,dashed,no marks,forget plot] coordinates {(1,6.6490) (72,478.7280)};
+\node[black!55,font=\tiny,rotate=17.0,anchor=north,inner sep=2pt] at (axis cs:24,159.58) {ideal};
+\addplot[PackA,mark=*,mark size=1.4pt,thick] coordinates {(1,26.6100) (2,52.7730) (4,105.4340) (8,207.8370) (18,455.3540) (36,867.8130) (54,1245.7070) (72,1253.1110)};
 \addlegendentry{\texttt{packed}}
-\addplot[PackD,mark=square*,mark size=1.4pt,thick] coordinates {(1,12.6250) (2,25.3880) (4,50.7270) (8,101.2360) (18,225.6190) (36,441.6560) (54,651.0890) (72,851.0340)};
+\addplot[PackD,mark=square*,mark size=1.4pt,thick] coordinates {(1,12.6360) (2,25.5270) (4,50.8070) (8,101.4090) (18,226.2670) (36,442.8630) (54,655.1400) (72,849.6680)};
 \addlegendentry{\texttt{atomic}}
-\addplot[PackA,mark=o,mark size=1.4pt,thick] coordinates {(1,8.6050) (2,17.5310) (4,34.8110) (8,69.7030) (18,155.3650) (36,303.2330) (54,446.2280) (72,573.9510)};
+\addplot[PackA,mark=o,mark size=1.4pt,thick] coordinates {(1,8.6430) (2,17.3620) (4,34.7800) (8,69.5490) (18,155.0220) (36,303.1070) (54,445.7940) (72,546.4710)};
 \addlegendentry{\texttt{packed}, higher order}
-\addplot[PackD,mark=square,mark size=1.4pt,thick] coordinates {(1,6.6000) (2,13.4020) (4,27.0280) (8,53.6610) (18,120.2870) (36,235.9860) (54,351.7940) (72,461.2770)};
+\addplot[PackD,mark=square,mark size=1.4pt,thick] coordinates {(1,6.6490) (2,13.4590) (4,26.8960) (8,53.4210) (18,120.5020) (36,237.3870) (54,351.6120) (72,461.5230)};
 \addlegendentry{\texttt{atomic}, higher order}
 \end{loglogaxis}
 \end{tikzpicture}

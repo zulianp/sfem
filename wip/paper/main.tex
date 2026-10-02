@@ -282,7 +282,10 @@ so there is no structured interior to depend on and no interface left over to tr
 and the remainder closes through a gather built by sorting. The gather is kept, so the vector
 stays the size of the unique degrees of freedom --- the index traffic narrows instead of the
 data multiplying. Atomics-freedom and reproducibility then follow from the layout rather than
-from a reduction primitive, and that narrowed traffic is what pays for them.
+from a reduction primitive, and that narrowed traffic is what pays for them. We measure against
+element colouring as well, and \S\ref{sec:res:scaling} reports what it costs: less than its
+usual framing suggests, because a colouring built greedily over a space-filling element order
+leaves a colour's elements strided through the curve rather than scattered.
 
 %================================================================================================
 \section{The packed format}
@@ -559,6 +562,24 @@ each colour write to the global arrays directly, with neither atomics nor a redu
 cost of a barrier between colours. It shares the packed layout's gather and its pack-local
 indexing, and differs from it only in how the result leaves the pack, which is what makes the
 pair a controlled comparison in \S\ref{sec:res:scaling}.
+
+\paragraph{Element colouring.} Colouring the \emph{elements} instead, so that no two of a
+colour share a node, is what the literature means by the term, and it is the baseline the
+packed layout should be measured against rather than only the pack colouring above. Elements are
+renumbered into colour order, which makes a colour a contiguous range, so the sweep is the atomic
+sweep with the element loop bounded one colour at a time and the atomic updates replaced by plain
+addition; the lane blocking, the geometry gather and the element kernel are the same code, and
+what the comparison separates is the scatter and not the kernel. The nodal gradient
+reconstruction follows the same colouring, since it is a scatter over elements like any other
+pass.
+
+Two expectations about it do not survive the measurement, and \S\ref{sec:res:scaling} reports
+both. It is reproducible, across repeats and across thread counts, for the same reason the packed
+layout is: each node takes exactly one contribution per colour, so the colouring fixes the
+summation order --- and the colouring depends on neither the thread count nor a pack size. And
+the locality it is supposed to give up is largely intact, because the colouring is greedy over an
+already space-filling element order, so a colour's elements are strided through the curve rather
+than scattered.
 
 Colouring is also bitwise reproducible here (\S\ref{sec:res:determinism}), with three
 qualifications. The order it fixes belongs to the colouring, so reproducibility requires the
@@ -896,8 +917,11 @@ $\detAtomicresRep$ distinct results and the thread counts $\detAtomicresThr$, on
 on the Jacobian action alike. The packed layout gives a single answer in both sweeps, at every
 thread count and for both operators.
 
-Colouring is reproducible here as well. Both it and the packed layout avoid atomics and so fix a
-summation order; they differ in throughput (\S\ref{sec:res:throughput}). Two caveats attach to
+Both colourings are reproducible here as well, across repeats and across thread counts, as is the
+packed layout; all three avoid atomics and so fix a summation order, and they differ in
+throughput (\S\ref{sec:res:throughput}). The element-coloured layout fixes its order without a
+pack at all: each node takes one contribution per colour, and the colouring depends on neither
+the thread count nor a pack size. Two caveats attach to
 the colouring result: its reproducibility depends on the colouring being constructed
 deterministically, which is a property of the construction rather than the layout, and agreement
 over seven runs is evidence rather than proof.
@@ -938,13 +962,27 @@ on shared nodes does not worsen with thread count at this problem size: the atom
 throughout because each thread does more work, not because threads obstruct one another. Since
 contention is the usual argument for removing atomics, it is not what the removal buys here.
 
-\paragraph{Colouring.} Measured on the same sweep but left off the figure, the coloured layout
-starts level with the packed one --- \scaleColoredResOne{} against \scalePackedResOne{}~MDOF/s ---
-and ends at \scaleColoredResTop{} against \scalePackedResTop{}, \scaleColoredResEff\% efficiency
-against \scalePackedResEff\%. The two run the same packs, staging and element kernel, so the gap
-is entirely in how the result leaves the pack: \campNColors{} barriers per application, which
-cost nothing at one thread, and an accumulation that reads the destination back, which costs
-\colBytesPctResRc\% in traffic at every thread count.
+\paragraph{Colouring, of packs and of elements.} Measured on the same sweep but left off the
+figure. The pack-coloured layout starts level with the packed one --- \scaleColoredResOne{}
+against \scalePackedResOne{}~MDOF/s --- and ends at \scaleColoredResTop{} against
+\scalePackedResTop{}, \scaleColoredResEff\% efficiency against \scalePackedResEff\%. The two run
+the same packs, staging and element kernel, so the gap is entirely in how the result leaves the
+pack: \campNColors{} barriers per application, which cost nothing at one thread, and an
+accumulation that reads the destination back, which costs \colBytesPctResRc\% in traffic at every
+thread count.
+
+Element colouring is the one the literature means, and it costs less than its framing suggests.
+At one thread it reaches \scaleEcolorResOne{}~MDOF/s against the packed layout's
+\scalePackedResOne{} --- the locality a pack-based sweep is credited with is largely intact,
+because the colouring is greedy over an already space-filling element order and a colour's
+elements are therefore strided through the curve rather than scattered. That is \scaleEcolorOfPackedOnePct\% of the packed
+layout's single-thread rate and $\scaleEcolorOverAtomicOne\times$ the atomic sweep's, so most of
+the advantage is the layout rather than the absence of atomics. At 72 threads it reaches
+\scaleEcolorResTop{} against the pack colouring's \scaleColoredResTop{}, and scales better than
+either pack-based layout --- \scaleEcolorResEff\% efficiency against \scalePackedResEff\% and
+\scaleColoredResEff\% --- because it pays no ghost reduction and no pack-local staging, only its
+barriers. The Jacobian action behaves the same way, \scaleEcolorJacTop{}~MDOF/s at
+\scaleEcolorJacEff\% efficiency.
 
 \paragraph{Packed efficiency.} The unit of parallel work is the pack, and there are
 \scalePacks{} of them for 72 threads, \scalePacksPerThread{} each, so static scheduling
