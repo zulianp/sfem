@@ -1177,13 +1177,14 @@ int main(int argc, char **argv) {
     //
     // Renumbering rather than carrying an order array is what lets the sweep stay the atomic
     // sweep: a colour becomes a contiguous element range, so the geometry gather stays a memcpy
-    // and the only differences left are the loop bounds and the plain += .
+    // and the only differences left are the loop bounds and the plain += . The colouring and the
+    // renumbering are smesh's (smesh::ElementColoring); the device path takes the same colouring
+    // in its order-array form instead, since it cannot move its elements.
     ElementColoring ecolors;
     double          ecolor_build_s = 0.0;
     if (layout == "ecolor") {
         const double t_ec = wall_time();
-        ecolors           = cvfem_build_element_coloring(d.nelements, d.nnodes, d.elems);
-        cvfem_apply_element_coloring(ecolors, d.nelements, d.elems);
+        ecolors           = cvfem_build_element_coloring(d.mesh);
         ecolor_build_s = wall_time() - t_ec;
         // The nodal-gradient reconstruction follows the layout too. Leaving it atomic made the
         // Rhie-Chow arm the one nondeterministic part of an otherwise reproducible operator.
