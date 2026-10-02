@@ -852,7 +852,11 @@ static void cvfem_hex8_assemble_nodal_grads_atomic(MeshT                        
         case 2: cvfem_hex8_nodal_grads_atomic_nc<6>(d, isoparam, srcs, src_stride, outp, out_stride); break;
         case 3: cvfem_hex8_nodal_grads_atomic_nc<9>(d, isoparam, srcs, src_stride, outp, out_stride); break;
         case 4: cvfem_hex8_nodal_grads_atomic_nc<12>(d, isoparam, srcs, src_stride, outp, out_stride); break;
-        default: assert(false && "nodal gradient sweep takes 1 to 4 fields"); break;
+        case 5: cvfem_hex8_nodal_grads_atomic_nc<15>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 6: cvfem_hex8_nodal_grads_atomic_nc<18>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 7: cvfem_hex8_nodal_grads_atomic_nc<21>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        case 8: cvfem_hex8_nodal_grads_atomic_nc<24>(d, isoparam, srcs, src_stride, outp, out_stride); break;
+        default: assert(false && "nodal gradient sweep takes 1 to 8 fields"); break;
     }
 }
 
@@ -942,8 +946,13 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
 
 #pragma omp parallel
     {
-        scalar_t *const SFEM_RESTRICT pack_f   = thread_scratch<scalar_t>(7, 4 * (size_t)node_n);
-        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(8, 12 * (size_t)node_n);
+        // SIZED FROM NC, not from the four-field maximum this sweep once had. The arena grows on
+        // demand and never shrinks, so asking for exactly what the instantiation needs costs one
+        // reallocation on the widest caller and nothing afterwards. Hard-coding 4 and 12 made an
+        // eight-field sweep write past both buffers, which showed up as an operator that was no
+        // longer bit-reproducible rather than as a crash.
+        scalar_t *const SFEM_RESTRICT pack_f   = thread_scratch<scalar_t>(7, (size_t)nf * (size_t)node_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(8, (size_t)nc * (size_t)node_n);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
@@ -1092,7 +1101,11 @@ static void cvfem_hex8_assemble_nodal_grads_packed(MeshT                        
         case 2: cvfem_hex8_nodal_grads_packed_nc<6>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
         case 3: cvfem_hex8_nodal_grads_packed_nc<9>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
         case 4: cvfem_hex8_nodal_grads_packed_nc<12>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
-        default: assert(false && "nodal gradient sweep takes 1 to 4 fields"); break;
+        case 5: cvfem_hex8_nodal_grads_packed_nc<15>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 6: cvfem_hex8_nodal_grads_packed_nc<18>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 7: cvfem_hex8_nodal_grads_packed_nc<21>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        case 8: cvfem_hex8_nodal_grads_packed_nc<24>(d, p, isoparam, srcs, src_stride, outp, out_stride, gbuf); break;
+        default: assert(false && "nodal gradient sweep takes 1 to 8 fields"); break;
     }
 }
 
