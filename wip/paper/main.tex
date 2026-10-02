@@ -834,14 +834,13 @@ reconstruction cannot fuse into the flux sweep: it is a separate pass ending in 
 reduction. A state reconstruction is hoisted --- computed once per Newton step and reused across
 the Krylov solve, since $u$ is fixed there --- and a direction reconstruction cannot be, because
 the direction changes every iteration. That is the whole of the difference between $\Jlag$ and
-$\Jex$, and between the two $\Fres$ rows of Table~\ref{tab:passes}.
+$\Jex$ in Table~\ref{tab:passes}.
 
 \begin{figure}[t]
   \centering
   \resizebox{\columnwidth}{!}{\input{figures/scheme_passes}}
-  \caption{What each convective scheme sweeps. A dashed pre-sweep is a hoisted $\Gop$ --- once
-    per Newton step, reused across the Krylov solve --- and rebuilding it inside every
-    application instead is the second row of Table~\ref{tab:passes}.}
+  \caption{What each convective scheme sweeps. A dashed pre-sweep is a hoisted $\Gop$: once per
+    Newton step, reused across the Krylov solve.}
   \label{fig:schemes}
 \end{figure}
 
@@ -861,7 +860,6 @@ $\Jex$, and between the two $\Fres$ rows of Table~\ref{tab:passes}.
     operator & sweeps & reductions & Newton step \\
     \midrule
     $\Fres(u)$                        & 1 & 1 & $\Gop p(u)$ \\
-    $\Fres(u)$, $\Gop p$ per apply    & 2 & 2 & --- \\
     $\Fho(u)$                         & 1 & 1 & $\Gop p(u)$, $\Gop u(u)$ \\
     $\Jlag(u)\,v$                     & 1 & 1 & $\Gop p(u)$ \\
     $\Jex(u)\,v$                      & 2 & 2 & --- \\
@@ -877,13 +875,9 @@ what $\Jhoex$ pays. The assembled matrix performs no element sweep per applicati
 full assembly --- the most expensive sweep here --- once per Newton step, and thereafter streams
 a matrix two orders of magnitude larger than the mesh.
 
-The second row is the configuration in which $\Gop p$ is rebuilt inside every application rather
-than hoisted. It is not an operator a solver applies; it is measured because it is the
-configuration in which the layout's margin is widest (\S\ref{sec:res:ladder}), spending more of
-its time in the sweep the packed layout accelerates most. The driver times that sweep at
-\SI{\campQgradPct}{\percent} of $\Jex$, large enough that attributing the whole application to
-the
-element kernel would misplace a sixth of it.
+The driver times the $\Gop p(v)$ sweep of $\Jex$ separately, at
+\SI{\campQgradPct}{\percent} of the application, large enough that attributing the whole of it to
+the element kernel would misplace a sixth.
 
 \paragraph{The solver's terms.} The Rhie--Chow coupling~\cite{RhieChow1983} is required: a
 colocated discretisation without it admits the checkerboard pressure mode, so every operator a
