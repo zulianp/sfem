@@ -1601,7 +1601,7 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
 
     return PREAMBLE + "\n".join([
         r"\begin{tikzpicture}",
-        r"\begin{axis}[width=\columnwidth, height=0.44\columnwidth,",
+        r"\begin{axis}[width=\columnwidth, height=0.40\columnwidth,",
         r"  ybar, bar width=5pt, ymin=0, ylabel={%s}," % ylabel,
         # ONE swatch per bar entry. The ybar default draws a pair of bars in the legend, which
         # says nothing here -- each series is one bar per group, not two -- and doubles the width
@@ -1610,23 +1610,35 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
         r"  legend image code/.code={\draw[#1] (0cm,-0.09cm) rectangle (0.22cm,0.09cm);},",
         r"  symbolic x coords={%s}, xtick=data," % coords,
         r"  x tick label style={font=\tiny}, enlarge x limits=0.13,",
-        r"  legend pos=north east, legend cell align=left,",
-        r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},",
+        # Above the axis, as every other chart here places its key. Inside the plot it sat in
+        # the north-east corner, which with three bars per group and two reference rules is no
+        # longer empty -- the Darwish--Moukalled group and the f32 rule both reach into it. Five
+        # entries in one row would exceed the column, so three columns: the three layouts on the
+        # first row and the two references on the second, which is also how they group.
+        r"  legend columns=3, legend cell align=left,",
+        r"  legend style={at={(0.5,1.02)}, anchor=south, font=\tiny, draw=none,",
+        r"                fill=none, inner sep=1pt, column sep=6pt},",
         r"  tick label style={font=\scriptsize}, label style={font=\scriptsize},",
         r"  ymajorgrids, major grid style={black!12}]",
         # packed | coloured | atomic, left to right within each group: the two that avoid
         # atomics stand together, so the step from coloured to atomic is the scatter strategy
         # and the step from packed to coloured is the format.
-        r"\addplot[draw=PackA, fill=PackA] coordinates {%s};" % series("gen"),
-        r"\addlegendentry{packed}",
-        r"\addplot[draw=PackB, fill=PackB] coordinates {%s};" % series("ecolor"),
-        r"\addlegendentry{coloured}",
-        r"\addplot[draw=PackD, fill=PackD] coordinates {%s};" % series("atomic"),
-        r"\addlegendentry{atomic}",
-    ] + _convho_spmv_lines(spmv, short[order[0]]) + [
+    ] + _bars(series, "gen", "PackA", "packed")
+      + _bars(series, "ecolor", "PackB", "coloured")
+      + _bars(series, "atomic", "PackD", "atomic")
+      + _convho_spmv_lines(spmv, short[order[0]]) + [
         r"\end{axis}",
         r"\end{tikzpicture}",
     ]) + "\n"
+
+
+def _bars(series, key, colour, label):
+    """One bar series, or nothing when that layout has no rows in the file."""
+    pts = series(key)
+    if not pts:
+        return []
+    return [r"\addplot[draw=%s, fill=%s] coordinates {%s};" % (colour, colour, pts),
+            r"\addlegendentry{%s}" % label]
 
 
 def _convho_spmv_lines(spmv, xref):
