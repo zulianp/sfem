@@ -227,6 +227,23 @@ ok "residual + rc, colored"                    --rhie-chow --layout colored
 ok "residual + rc, store"                      --rhie-chow --layout store
 ok "jac-action + rc, packed"                   --rhie-chow --jac-action --layout packed
 ok "jac-action + rc, colored"                  --rhie-chow --jac-action --layout colored
+# The element-coloured layout is not in same_across_layouts above and must not be: each node
+# takes its contributions one per colour, so the summation order differs from the atomic sweep's
+# and the checksums differ in the last bits by construction. Its gate is the per-node comparison
+# this runs, plus the geometry-consistency check in tests/cvfem_warped_geometry.sh.
+ecolor_ok() { # desc, extra args -- --verify rather than --verify-jac, see the driver's refusal
+    desc="$1"; shift
+    if out=$("$BENCH" --n 8 --repeat 1 --warmup 0 --verify --layout ecolor "$@" 2>&1); then
+        printf '%-62s OK   %s\n' "$desc" \
+            "$(printf '%s\n' "$out" | grep -oE 'verify_ecolor_[a-z_]*: [0-9.e+-]*' | tr '\n' ' ')"
+    else
+        printf '%-62s FAIL\n' "$desc"
+        printf '%s\n' "$out" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+    fi
+}
+ecolor_ok "residual + rc, ecolor"              --rhie-chow
+ecolor_ok "jac-action + rc, ecolor"            --rhie-chow --jac-action
 
 echo "== the transient term, on every operation"
 # tests/cvfem_bench_transient_test pins the term itself against closed forms. What is

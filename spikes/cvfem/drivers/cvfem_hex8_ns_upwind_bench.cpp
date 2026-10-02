@@ -9,6 +9,7 @@
 #include "cvfem_hex8_best_common.hpp"
 #include "cvfem_hex8_best_atomic.hpp"
 #include "cvfem_hex8_best_colored.hpp"
+#include "cvfem_hex8_best_ecolored.hpp"
 #include "cvfem_hex8_best_packed.hpp"
 #include "cvfem_hex8_best_store.hpp"
 
@@ -636,6 +637,14 @@ int main(int argc, char **argv) {
                     "                           --assemble; for residual and --jac-action the\n"
                     "                           color barriers cost more than the ghost reduce\n"
                     "                           they replace, so prefer packed there\n"
+                    "                 ecolor  : ELEMENT colouring -- the flat sweep with the atomics\n"
+                    "                           removed. Elements are coloured so no two of a\n"
+                    "                           colour share a node and renumbered into colour\n"
+                    "                           order, so each colour is a contiguous range and\n"
+                    "                           writes the global arrays with a plain +=\n"
+                    "                           (cvfem_hex8_best_ecolored.hpp). This is the\n"
+                    "                           colouring the literature means; `colored` above\n"
+                    "                           colours PACKS. Residual and --jac-action only\n"
                     "                 store   : packed assembly whose owned rows carry the global\n"
                     "                           pattern and are flushed with one streaming memcpy;\n"
                     "                           every block written once, no zeroing pass\n"
@@ -1068,8 +1077,23 @@ int main(int argc, char **argv) {
         if (own_mpi) MPI_Finalize();
         return 1;
     }
-    if (layout != "packed" && layout != "atomic" && layout != "colored" && layout != "store") {
-        std::fprintf(stderr, "invalid --layout '%s' (expected packed, atomic, colored or store)\n", layout.c_str());
+    if (layout != "packed" && layout != "atomic" && layout != "colored" && layout != "ecolor" &&
+        layout != "store") {
+        std::fprintf(stderr, "invalid --layout '%s' (expected packed, atomic, colored, ecolor or store)\n",
+                     layout.c_str());
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
+    // The pack-based oracles cannot verify this layout, and the combination is refused rather
+    // than silently producing a number. --verify-jac and --verify-ho compare against a PackedMesh
+    // built from the pre-permutation element order, so what they would report is the renumbering,
+    // not a defect: the atomic-vs-packed action came out at 2.4e-04 that way. --verify is the
+    // gate for this layout; it compares against the atomic sweep on the same connectivity and
+    // checks the cached geometry against the permuted connectivity directly.
+    if (layout == "ecolor" && (verify_jac || verify_ho)) {
+        std::fprintf(stderr,
+                     "--layout ecolor renumbers the elements, so the pack-based oracles behind "
+                     "--verify-jac / --verify-ho do not apply; use --verify\n");
         if (own_mpi) MPI_Finalize();
         return 1;
     }
@@ -1109,7 +1133,10 @@ int main(int argc, char **argv) {
     // worth 3%: an atomic arm reads 17.6 MDOF/s with the packed sweep and 18.2 with its own.
     // That matters most where the gradient pass is large, which is exactly the exact Rhie-Chow
     // and exact higher-order actions this benchmark exists to compare.
-    if (layout == "atomic" && !g_qgrad_packed) g_qgrad_atomic = 1;
+    // The element-coloured layout takes the atomic gradient sweep for the same reason, and for
+    // one more: it renumbers the elements, so a pack built from the pre-permutation order would
+    // be describing a different mesh. The atomic sweep walks whatever element order it is given.
+    if ((layout == "atomic" || layout == "ecolor") && !g_qgrad_packed) g_qgrad_atomic = 1;
 
     // The pack size, if the caller did not name one. Derived here rather than at declaration
     // because the rule needs the element count and the thread count, and both are known only now.
@@ -1133,6 +1160,26 @@ int main(int argc, char **argv) {
     d.nelements = d.mesh->n_elements(0);
     d.elems     = d.mesh->elements(0)->data();
     d.points    = d.mesh->points()->data();
+
+    // ELEMENT colouring, and the renumbering that goes with it.
+    //
+    // This must happen HERE: after the connectivity is bound and before anything indexed by
+    // element is derived from it -- the adjugate and determinant arrays, the Rhie-Chow surface
+    // tables, the partially assembled tangent. Permuting the connectivity underneath those is
+    // the producer/consumer mistake this spike has already made three times with the node
+    // numbering, and the cube oracles cannot see it (tests/cvfem_warped_geometry.sh can).
+    //
+    // Renumbering rather than carrying an order array is what lets the sweep stay the atomic
+    // sweep: a colour becomes a contiguous element range, so the geometry gather stays a memcpy
+    // and the only differences left are the loop bounds and the plain += .
+    ElementColoring ecolors;
+    double          ecolor_build_s = 0.0;
+    if (layout == "ecolor") {
+        const double t_ec = wall_time();
+        ecolors           = cvfem_build_element_coloring(d.nelements, d.nnodes, d.elems);
+        cvfem_apply_element_coloring(ecolors, d.nelements, d.elems);
+        ecolor_build_s = wall_time() - t_ec;
+    }
 
     if (mesh_footprint) {
         // Every figure below is an allocation's own nbytes(). Nothing is
@@ -1338,7 +1385,7 @@ int main(int argc, char **argv) {
     // three matrix-free residual sweeps agree with each other. All three run the same
     // sum-factorised kernel with the same per-pack staging; a difference here is a staging
     // bug and nothing else.
-    if (rhie_chow && (verify || verify_jac)) {
+    if (rhie_chow && (verify || verify_jac) && layout != "ecolor") {
         apply_residual_atomic_sumfact(d, rho, mu);
         std::vector<scalar_t> atomic_r;
         pack_residual(d, atomic_r);
@@ -1354,6 +1401,61 @@ int main(int argc, char **argv) {
         std::printf("verify_rc_colored_residual_vs_atomic_abs: %.6e\n", colored_err);
         if (packed_err > 1.0e-10 || colored_err > 1.0e-10) {
             std::fprintf(stderr, "HEX8 Rhie-Chow residual mismatch across layouts\n");
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
+    }
+
+    // The element-coloured sweep against the atomic one, on the same connectivity.
+    //
+    // This cannot join the bitwise checksum gate the other layouts share: each node takes its
+    // contributions one per colour, which is a different summation order from the atomic sweep's,
+    // so the last bits differ by construction. A per-node comparison is the right instrument, and
+    // it is a strong one -- both sweeps run the same element kernel over the same element
+    // numbering, so anything beyond round-off is the scatter.
+    if (layout == "ecolor" && (verify || verify_jac)) {
+        // FIRST, the invariant the element renumbering can break: the cached geometry must
+        // describe the element the connectivity now names. Recompute the adjugate straight from
+        // the permuted connectivity and the coordinates, and compare against the cached array.
+        //
+        // This check exists because the obvious one is blind. Comparing the element-coloured
+        // sweep against the atomic sweep cannot see a permutation applied after the geometry was
+        // cached: both sweeps read the same connectivity and the same cache, so they agree with
+        // each other while both describe a mesh that does not exist. Verified by reintroducing
+        // the mistake -- the sweeps still agreed to 1.7e-18, and only this check moved.
+        scalar_t geom_err = 0;
+        for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+            scalar_t x[8], y[8], z[8], adj[9], det;
+            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                const smesh::idx_t g = d.elems[a][e];
+                x[a]                 = scalar_t(d.points[0][g]);
+                y[a]                 = scalar_t(d.points[1][g]);
+                z[a]                 = scalar_t(d.points[2][g]);
+            }
+            cvfem_hex8_affine_adj(x, y, z, adj, &det);
+            for (int c = 0; c < 9; ++c)
+                geom_err = std::max(geom_err, (scalar_t)std::fabs(adj[c] - d.jacobian_adjugate[c][(size_t)e]));
+            geom_err = std::max(geom_err, (scalar_t)std::fabs(det - d.jacobian_determinant[(size_t)e]));
+        }
+        std::printf("verify_ecolor_geometry_consistent_abs: %.6e\n", geom_err);
+        if (geom_err > 1.0e-12) {
+            std::fprintf(stderr,
+                         "HEX8 element-coloured geometry is stale: the element permutation ran "
+                         "after the adjugate cache was built\n");
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
+
+        apply_residual_atomic_sumfact_simd(d, rho, mu);
+        std::vector<scalar_t> atomic_r;
+        pack_residual(d, atomic_r);
+        apply_residual_ecolored(d, ecolors, rho, mu);
+        std::vector<scalar_t> ecolor_r;
+        pack_residual(d, ecolor_r);
+        const scalar_t err = max_abs_diff(atomic_r.data(), ecolor_r.data(), (ptrdiff_t)atomic_r.size());
+        std::printf("verify_ecolor_residual_vs_atomic_abs: %.6e\n", err);
+        if (err > 1.0e-10) {
+            std::fprintf(stderr, "HEX8 element-coloured residual mismatch against atomic\n");
             if (own_mpi) MPI_Finalize();
             return 1;
         }
@@ -1438,7 +1540,7 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        if (layout == "packed" || verify_jac) {
+        if ((layout == "packed" || verify_jac) && layout != "ecolor") {
             apply_residual_packed(d, packed, rho, mu, KernelKind::Current, GeomKind::Affine);
             std::vector<scalar_t> packed_current_r;
             pack_residual(d, packed_current_r);
@@ -1681,7 +1783,10 @@ int main(int argc, char **argv) {
                 apply_residual_atomic_isoparam_sympy(d, rho, mu);
             else
                 apply_residual_atomic_isoparam(d, rho, mu);
-        } else if (layout == "colored")
+        } else if (layout == "ecolor")
+            apply_residual_ecolored(d, ecolors, rho, mu, conv_ho ? ugrad.data() : nullptr, conv_limiter,
+                                    scalar_t(0));
+        else if (layout == "colored")
             apply_residual_colored(d, packed, colors, rho, mu, kernel_kind, GeomKind::Affine);
         else if ((layout == "packed" || layout == "store") && conv_ho && ho_simd)
             apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
@@ -1926,6 +2031,11 @@ int main(int argc, char **argv) {
         }
         if (partial_assembly)
             apply_jacobian_action_packed_pa(d, packed, rho, mu, dir_v, jac_out.data());
+        else if (layout == "ecolor")
+            apply_jacobian_action_ecolored(d, ecolors, rho, mu, dir_v, jac_out.data(),
+                                           with_hograd ? ugrad.data() : nullptr,
+                                           with_hograd ? vgrad.data() : nullptr,
+                                           conv_limiter, scalar_t(0));
         else if (layout == "colored")
             apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
         else if (layout == "packed" || layout == "store")
@@ -2363,6 +2473,19 @@ int main(int argc, char **argv) {
         std::printf("  n_packs: %td\n", packed.n_packs);
         std::printf("  st_max_local_nnz: %td\n", packed.st_max_local_nnz);
         std::printf("  st_local_matrix_KiB: %.1f\n", double(packed.st_max_local_nnz) * 128.0 / 1024.0);
+    }
+    if (layout == "ecolor") {
+        std::printf("  n_colors: %d\n", ecolors.n_colors);
+        std::printf("  elements_per_color_min_max: %td %td\n", ecolors.min_per_color, ecolors.max_per_color);
+        // Setup, not throughput, but reported because it is where this layout is asymmetric with
+        // the pack colouring beside it: that one colours a couple of thousand packs, this one
+        // walks every element's incident elements through a node-to-element graph.
+        std::printf("  ecolor_build_seconds: %.3f\n", ecolor_build_s);
+        if (ecolors.min_per_color < (ptrdiff_t)threads_active() * CVFEM_HEX8_VEC_SIZE) {
+            std::printf("  WARNING: a colour holds fewer elements (%td) than threads x lanes (%d);\n"
+                        "           its barrier is paid for a partly idle sweep\n",
+                        ecolors.min_per_color, threads_active() * CVFEM_HEX8_VEC_SIZE);
+        }
     }
     if (layout == "colored") {
         std::printf("  pack_size: %d\n", pack_size);

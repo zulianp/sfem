@@ -56,6 +56,20 @@ for warp in 0 0.05 0.2; do
     else
         check "residual packed vs atomic" "$abs" || fail=1
     fi
+
+    # The element-coloured layout renumbers the elements before the adjugate, the determinant and
+    # the Rhie-Chow surface tables are built. If that ordering is ever broken -- the tables built
+    # first and permuted after, or not permuted at all -- the kernel and its inputs describe
+    # different elements, and on a cube that is invisible because the adjugate is the same for
+    # every element. Here it is not.
+    out=$("$BENCH" --n 24 --layout ecolor --kernel sumfact --rhie-chow --warp "$warp" --verify 2>&1)
+    abs=$(printf '%s\n' "$out" | sed -n 's/.*verify_ecolor_residual_vs_atomic_abs: \([0-9.e+-]*\).*/\1/p' | head -1)
+    if [ -z "$abs" ]; then
+        echo "  residual ecolor vs atomic                       (no value)   FAIL"
+        fail=1
+    else
+        check "residual ecolor vs atomic" "$abs" || fail=1
+    fi
 done
 
 if [ "$fail" -ne 0 ]; then
