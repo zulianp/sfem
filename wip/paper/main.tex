@@ -1278,7 +1278,8 @@ against $\Jex$'s \nwtUnlimLaggedSteps{} and \nwtUnlimLaggedLin{} on the unlimite
 \nwtVenkExactSteps{}/\nwtVenkExactLin{} against \nwtVenkLaggedSteps{}/\nwtVenkLaggedLin{} with
 Venkatakrishnan. So the exact action costs $\nwtUnlimPerIt\times$ and $\nwtVenkPerIt\times$ per
 linear iteration and needs $\nwtUnlimLinRatio\times$ and $\nwtVenkLinRatio\times$ fewer of them,
-and solves $\nwtUnlimTimeRatio\times$ and $\nwtVenkTimeRatio\times$ faster. The limiter widens
+and solves in \nwtUnlimExactSec{} against \nwtUnlimLaggedSec{} seconds and \nwtVenkExactSec{}
+against \nwtVenkLaggedSec{} --- $\nwtUnlimTimeRatio\times$ and $\nwtVenkTimeRatio\times$ faster. The limiter widens
 the margin, which is where a deferred correction is weakest. At \nwtRtol{} the Newton step is
 inexact, so the step ratio carries the tolerance's cost as well as the Jacobian's quality; the
 time is the quantity that does not.
