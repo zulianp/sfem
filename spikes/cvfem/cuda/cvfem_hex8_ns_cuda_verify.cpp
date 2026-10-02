@@ -629,11 +629,11 @@ int main(int argc, char **argv) {
     // ---- element-coloured assembly: remove the atomics ------------------------
     std::printf("\n=== element-coloured assembly (no atomics) ===\n");
     {
-        ElementColoring ec = cvfem_build_element_coloring(d.nelements, d.nnodes, d.elems);
+        ElementColoring ec = cvfem_build_element_coloring(d.mesh, /*renumber=*/false);
         std::printf("element colours: %d   elements/colour min=%td max=%td\n",
                     ec.n_colors, ec.min_per_color, ec.max_per_color);
-        if (cvfem_cuda_element_coloring_attach(ctx, ec.n_colors, ec.element_order.data(),
-                                               ec.color_ptr.data()) != 0) {
+        if (cvfem_cuda_element_coloring_attach(ctx, ec.n_colors, ec.element_order,
+                                               ec.color_ptr) != 0) {
             std::printf("element_coloring_attach failed\n"); fail = 1;
         } else {
             std::printf("%-13s %12s %14s %12s %10s\n", "variant", "rel", "s/assemble",

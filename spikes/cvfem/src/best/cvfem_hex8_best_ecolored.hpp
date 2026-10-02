@@ -12,8 +12,8 @@
 // baseline needs, and it is the arm that says how much of the packed format's margin is the
 // layout rather than the absence of atomics.
 //
-// The element numbering is permuted into colour order at setup
-// (cvfem_apply_element_coloring), so a colour is a CONTIGUOUS element range and this file is
+// The element numbering is permuted into colour order at setup, by smesh::ElementColoring with
+// `modify_mesh`, so a colour is a CONTIGUOUS element range and this file is
 // the atomic sweep verbatim apart from the loop bounds and the write-back. That is deliberate:
 // the 16-wide lane blocking, the memcpy geometry gather and the generated micro-kernels are
 // identical, so what the measurement separates is the scatter strategy and not the kernel.
