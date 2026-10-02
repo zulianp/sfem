@@ -1845,7 +1845,7 @@ def table_kmix(mix):
     if len(arms) > 1:
         out.append(" & " + " & ".join(r"\multicolumn{2}{c}{%s}" % lab for _, lab in arms) + r" \\")
         out.append(r"\cmidrule(lr){2-3}\cmidrule(l){4-5}")
-    out.append(" & " + " & ".join("packed & standard" for _ in arms) + r" \\")
+    out.append(" & " + " & ".join("packed & atomic" for _ in arms) + r" \\")
     out.append(r"\midrule")
     out.append(r"\multicolumn{%d}{@{}l}{\emph{instruction mix, \%% of those issued}} \\"
                % (len(cols) + 1))
