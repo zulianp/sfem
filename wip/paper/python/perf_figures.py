@@ -1920,26 +1920,26 @@ def macros_hoexact(rates, checks, frac=None):
 # ---------------------------------------------------------------------------------------------
 
 # The operator symbols of the setup section's Operators paragraph, so a row says which
-# differentiations it carried instead of leaving "exact" to be resolved against the caption. The
-# block heading carries the convective scheme, so the superscript alone distinguishes the
-# higher-order blocks' rows from the first-order block's.
+# differentiations it carried instead of leaving "exact" to be resolved against the caption.
+#
+# EVERY ROW IS FULLY EXACT OR FULLY LAGGED. The job used to lag the Rhie-Chow sensitivity while
+# differentiating the correction, and those mixed arms are gone: the operator is the Jacobian of
+# no residual at all, so the row priced something nobody would apply.
 JF_NAME = {
-    "jac_exact":       r"$\Jex(u)\,v$",
-    "jac_lagged":      r"$\Jlag(u)\,v$",
-    "jac_clip_exact":  r"$\Jhoex(u)\,v$",
-    "jac_clip_lagged": r"$\Jholag(u)\,v$",
-    "jac_ho_exact":    r"$\Jhoex(u)\,v$",
-    "jac_ho_lagged":   r"$\Jholag(u)\,v$",
-    "spmv_f64":        r"SpMV with $\Jlag$, \texttt{f64}",
-    "spmv_f32":        r"SpMV with $\Jlag$, \texttt{f32}",
+    "jac_exact":      r"$\Jex(u)\,v$, first-order upwind",
+    "jac_clip_exact": r"$\Jhoex(u)\,v$, Barth--Jespersen",
+    "jac_ho_exact":   r"$\Jhoex(u)\,v$, Darwish--Moukalled",
+    "jac_lagged":     r"$\Jlag(u)\,v$, any scheme",
+    "spmv_f64":       r"SpMV with $\Jlag$, \texttt{f64}",
+    "spmv_f32":       r"SpMV with $\Jlag$, \texttt{f32}",
 }
 
-# The matrix-free blocks, in table order. The higher-order block is present only when the job ran
-# it, so a data file written before those arms existed still produces the two-row table.
-# Ordered by arithmetic per sub-control surface, as Figures 8 and 9 order their bars.
-JF_BLOCKS = [("first-order upwind", ("jac_exact", "jac_lagged")),
-             ("Barth--Jespersen", ("jac_clip_exact", "jac_clip_lagged")),
-             ("Darwish--Moukalled", ("jac_ho_exact", "jac_ho_lagged"))]
+# The exact arms, ordered by arithmetic per sub-control surface as Figures 8 and 9 order their
+# bars, then the one lagged row. There is one lagged row and not one per scheme because a fully
+# lagged action does not depend on the scheme -- lagging the correction removes it from the action
+# entirely -- which jobs/jac_fair.sbatch checks by fingerprint rather than assuming.
+JF_EXACT = ("jac_exact", "jac_clip_exact", "jac_ho_exact")
+JF_LAGGED = ("jac_lagged",)
 
 
 def parse_jacfair(path):
@@ -1973,8 +1973,6 @@ def table_jacfair(rows):
     by = {}
     for op, lay, v in rows:
         by.setdefault(op, {})[lay] = v
-    blocks = [(lab, [o for o in ops if o in by]) for lab, ops in JF_BLOCKS]
-    blocks = [b for b in blocks if b[1]]
     f64 = by.get("spmv_f64", {}).get("none")
     out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrr@{}}", r"\toprule",
            r"& \multicolumn{2}{c}{packed} & \multicolumn{2}{c}{atomic} \\",
@@ -1990,16 +1988,14 @@ def table_jacfair(rows):
             got.append((r"$%.2f\times$" % (v / f64)) if v and f64 else "---")
         return " & ".join(got)
 
-    for i, (label, ops) in enumerate(blocks):
-        if i:
+    for group in (JF_EXACT, JF_LAGGED):
+        present = [o for o in group if o in by]
+        if not present:
+            continue
+        if group is JF_LAGGED:
             out.append(r"\addlinespace")
-        # The scheme heads its block rather than being repeated in every row label: the two rows
-        # under it differ only in the Rhie--Chow term, which is what the row labels are for.
-        if len(blocks) > 1:
-            out.append(r"\multicolumn{5}{@{}l}{\emph{%s}} \\" % label)
-        for op in ops:
-            pad = r"\quad " if len(blocks) > 1 else ""
-            out.append(r"%s%s & %s \\" % (pad, JF_NAME[op], cells(op)))
+        for op in present:
+            out.append(r"%s & %s \\" % (JF_NAME[op], cells(op)))
     out.append(r"\midrule")
     # The matrix has no layout, so its rows span ALL FOUR numeric columns as one cell rather than
     # filling a layout's pair. Spanning only columns 2--3 put the rate under the "packed" heading
@@ -2044,14 +2040,11 @@ def macros_jacfair(rows):
     clip = by.get("jac_clip_exact", {}).get("packed")
     if clip and f64:
         out.append(r"\newcommand{\jfClipExactVsF}{%.2f}" % (clip / f64))
-    hex_, hlg = (by.get("jac_ho_exact", {}).get("packed"),
-                 by.get("jac_ho_lagged", {}).get("packed"))
-    if hlg and f64:
-        out.append(r"\newcommand{\jfHoLaggedVsF}{%.2f}" % (hlg / f64))
+    # The lagged action is one operator for every scheme, so there is no higher-order lagged rate
+    # to form a ratio against; what prices the higher-order action is its own first-order self.
+    hex_ = by.get("jac_ho_exact", {}).get("packed")
     if hex_ and f64:
         out.append(r"\newcommand{\jfHoExactVsF}{%.2f}" % (hex_ / f64))
-    if hex_ and hlg:
-        out.append(r"\newcommand{\jfHoExactCost}{%.2f}" % (hlg / hex_))
     if hex_ and ex:
         out.append(r"\newcommand{\jfHoCostExact}{%.2f}" % (ex / hex_))
     return "\n".join(out) + "\n"

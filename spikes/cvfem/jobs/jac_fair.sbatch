@@ -19,23 +19,30 @@
 # matrix lags it.
 #
 # So the exact action is doing strictly more work than the matrix encodes, and the bias runs in
-# the matrix's favour. --lagged-rc drops that term from the matrix-free side, giving the same
+# the matrix's favour. Lagging drops that term from the matrix-free side, giving the same
 # operator the matrix holds. Both are reported: the exact action is what a Newton-Krylov solve
 # should apply, the lagged one is what the matrix can offer.
 #
-# Both convective schemes, not only first-order upwinding. The comparison this job exists to
-# make is against an operator the matrix CAN hold, and the higher-order correction is one it
-# cannot hold at any sparsity: differentiating it reaches the direction's nodal velocity
-# gradient, which widens the coupling past the one ring the matrix is built on. So the
-# Two limiters rather than one: the bounded-face clip is the cheapest of them and
-# Darwish--Moukalled among the dearest, so the pair brackets what a limiter costs the action.
-# higher-order arms have no matrix counterpart, and reporting them beside the first-order ones
-# is what shows the size of what the assembled representation gives up -- not a second
-# like-for-like row. The scheme is Darwish--Moukalled, the same one Figures 7 to 9 single out.
+# EVERY ARM IS FULLY EXACT OR FULLY LAGGED, never a mixture. The driver has two independent
+# switches -- --lagged-rc for the Rhie-Chow pressure-gradient sensitivity and --lagged-ho for the
+# deferred correction's velocity-gradient one -- and this job previously lagged the first while
+# differentiating the second, which is an operator nobody would choose: exact in one sensitivity
+# and not the other, the Jacobian of no residual at all.
 #
-# In the higher-order arms --lagged-rc lags the Rhie--Chow term exactly as it does above; the
-# correction itself stays differentiated, because lagging that instead reproduces the
-# first-order action to the last bit (paper S7.8) and would duplicate the rows above.
+# One consequence is worth stating because it shapes the table. A FULLY LAGGED ACTION DOES NOT
+# DEPEND ON THE CONVECTIVE SCHEME: lagging the correction makes it constant in the direction, so
+# it leaves the action entirely, and lagging the Rhie-Chow term removes the only other
+# direction reconstruction there is. What is left is the same
+# operator whatever --conv-ho says. So there is ONE lagged row rather than one per scheme, and
+# jac_lagged_ho_ctl below is the arm that proves it: same flags plus --conv-ho 3, and its
+# fingerprint must equal jac_lagged packed's bit for bit. Measured, not asserted -- if the two
+# ever differ, the lagged action is scheme-dependent and the single row is wrong.
+#
+# The exact arms span the schemes, because that is what the matrix gives up. A higher-order
+# correction is an operator the matrix cannot hold at any sparsity: differentiating it reaches
+# the direction's nodal velocity gradient, which widens the coupling past the one ring the matrix
+# is built on. Two limiters rather than one -- Barth-Jespersen is the cheapest of them and
+# Darwish-Moukalled among the dearest -- so the pair brackets what a limiter costs the action.
 #
 # Best of three passes per arm, for the run-to-run band this benchmark has already been shown
 # to carry.
@@ -62,18 +69,16 @@ PACK=${PACK:-1024}
 echo "### host $(hostname)  n=$N repeat=$REPEAT passes=$PASSES  $(date '+%F %T')"
 echo
 printf '%-26s %-8s %10s %10s %12s %12s\n' operator layout MDOF_s dofs qgrad_frac hograd_frac
+declare -A FP
 for arm in "jac_exact|packed|--jac-action --rhie-chow" \
            "jac_exact|atomic|--jac-action --rhie-chow" \
-           "jac_lagged|packed|--jac-action --rhie-chow --lagged-rc" \
-           "jac_lagged|atomic|--jac-action --rhie-chow --lagged-rc" \
            "jac_clip_exact|packed|--jac-action --rhie-chow --conv-ho 1" \
            "jac_clip_exact|atomic|--jac-action --rhie-chow --conv-ho 1" \
-           "jac_clip_lagged|packed|--jac-action --rhie-chow --lagged-rc --conv-ho 1" \
-           "jac_clip_lagged|atomic|--jac-action --rhie-chow --lagged-rc --conv-ho 1" \
            "jac_ho_exact|packed|--jac-action --rhie-chow --conv-ho 3" \
            "jac_ho_exact|atomic|--jac-action --rhie-chow --conv-ho 3" \
-           "jac_ho_lagged|packed|--jac-action --rhie-chow --lagged-rc --conv-ho 3" \
-           "jac_ho_lagged|atomic|--jac-action --rhie-chow --lagged-rc --conv-ho 3" \
+           "jac_lagged|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho" \
+           "jac_lagged|atomic|--jac-action --rhie-chow --lagged-rc --lagged-ho" \
+           "jac_lagged_ho_ctl|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho --conv-ho 3" \
            "spmv_f64|none|--bsr-apply --bsr-precision double" \
            "spmv_f32|none|--bsr-apply --bsr-precision single"; do
     IFS='|' read -r lbl lay extra <<<"$arm"
@@ -99,11 +104,26 @@ for arm in "jac_exact|packed|--jac-action --rhie-chow" \
         # four-field sweep, charged once to hograd, so dropping the pressure one leaves the
         # sweep's fixed half behind instead of removing it.
         dofs=$(val 'dofs'); qg=$(val 'frac_jac_action_qgrad'); hg=$(val 'frac_jac_action_hograd')
+        # Kept for the scheme-independence check below. Packed only: the atomic sweep fixes no
+        # summation order, so its fingerprint differs run to run and proves nothing either way.
+        [ "$lay" = packed ] && FP[$lbl]=$(grep -am1 'fingerprint:' "$log" | awk '{print $2}')
     done
     printf '%-26s %-8s %10s %10s %12s %12s\n' "$lbl" "$lay" "${best:--}" "${dofs:--}" \
            "${qg:--}" "${hg:--}"
 done
 echo
-echo "jac_exact carries the direction-gradient pass; jac_lagged does not, and is the operator"
+
+# THE TABLE HAS ONE LAGGED ROW, AND THIS IS WHY IT MAY.
+echo -n "fully lagged is scheme-independent: "
+if [ -z "${FP[jac_lagged]:-}" ] || [ -z "${FP[jac_lagged_ho_ctl]:-}" ]; then
+    echo "UNKNOWN (a fingerprint is missing; an arm failed)"
+elif [ "${FP[jac_lagged]}" = "${FP[jac_lagged_ho_ctl]}" ]; then
+    echo "YES, bitwise (${FP[jac_lagged]})"
+else
+    echo "NO -- ${FP[jac_lagged]} vs ${FP[jac_lagged_ho_ctl]}; the single lagged row is WRONG"
+fi
+echo
+echo "The exact arms carry the direction-gradient pass; jac_lagged does not, and is the operator"
 echo "the assembled matrix encodes. Compare spmv_* against jac_lagged for like-for-like."
+echo "jac_lagged_ho_ctl is a control, not a row: it must reproduce jac_lagged packed exactly."
 echo "csv: $CSV"
