@@ -1,0 +1,5 @@
+freeze   limiter   jacobian newton_total  converged lin_it_total
+unfrozen 2         exact             16          1           16
+unfrozen 2         lagged             -          -            -
+
+logs in /ritom/scratch/cscs/zulianp/cvfem_honewton/4969178
