@@ -335,6 +335,7 @@ LAYOUT_STYLE = {
     "packed":  ("PackA", "*"),
     "atomic":  ("PackD", "square*"),
     "colored": ("PackC", "triangle*"),
+    "ecolor":  ("PackE", "diamond*"),
 }
 
 
@@ -466,6 +467,13 @@ def macros_scaling(series, meta):
     ones = {layout: dict(pts).get(1) for (layout, op), pts in series.items() if op == "res"}
     if ones.get("packed") and ones.get("atomic"):
         out.append(r"\newcommand{\scaleResLayoutOne}{%.1f}" % (ones["packed"] / ones["atomic"]))
+    # The same question asked of the element-coloured layout: how much of the single-thread
+    # advantage survives when the packs go but the colouring keeps the element order.
+    if ones.get("ecolor") and ones.get("atomic"):
+        out.append(r"\newcommand{\scaleEcolorOverAtomicOne}{%.2f}" % (ones["ecolor"] / ones["atomic"]))
+    if ones.get("ecolor") and ones.get("packed"):
+        out.append(r"\newcommand{\scaleEcolorOfPackedOnePct}{%.0f}"
+                   % (100.0 * ones["ecolor"] / ones["packed"]))
     return "\n".join(out) + "\n"
 
 
