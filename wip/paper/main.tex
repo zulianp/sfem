@@ -802,13 +802,13 @@ records which one ran.
 \Ensure the form the two switches select: $\Jex$, $\Jlag$, $\Jhoex$ or $\Jholag$
 \If{Rhie--Chow differentiated}
   \State $q \gets \Gop p(v)$ by Algorithm~\ref{alg:apply}
-         \Comment{3 components, rebuilt every application; selects $\Jex$ over $\Jlag$}
+         \Comment{3 components; selects $\Jex$ over $\Jlag$, $\Jhoex$ over $\Jholag$}
 \Else
   \State $q \gets \varnothing$ \Comment{lagged: the coupling reads $\Gop p(u)$ alone}
 \EndIf
 \If{correction carried and differentiated}
   \State $g_v \gets \Gop u(v)$ by Algorithm~\ref{alg:apply}
-         \Comment{9 components, read from $v$ in place; selects $\Jhoex$}
+         \Comment{9 components, in the same sweep as $q$; selects the $\mathrm{ho}$ forms}
 \Else
   \State $g_v \gets \varnothing$ \Comment{lagged: the correction is constant in $v$}
 \EndIf
@@ -865,17 +865,21 @@ $\Jex$ in Table~\ref{tab:passes}.
     $\Fho(u)$                         & 1 & 1 & $\Gop p(u)$, $\Gop u(u)$ \\
     $\Jlag(u)\,v$                     & 1 & 1 & $\Gop p(u)$ \\
     $\Jex(u)\,v$                      & 2 & 2 & --- \\
+    $\Jholag(u)\,v$                   & 2 & 2 & $\Gop p(u)$, $\Gop u(u)$ \\
+    $\Jhoex(u)\,v$                    & 2 & 2 & $\Gop u(u)$ \\
     SpMV with $\Jlag$                 & 0 & 0 & assembly \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 Table~\ref{tab:passes} collects the counts. $\Fho$ is a one-sweep operator because its
-correction is lagged: $\Gop u(u)$ moves into the last column rather than disappearing, and
-differentiating the correction moves $\Gop u(v)$ back into the per-application count, which is
-what $\Jhoex$ pays. The assembled matrix performs no element sweep per application but pays a
-full assembly --- the most expensive sweep here --- once per Newton step, and thereafter streams
-a matrix two orders of magnitude larger than the mesh.
+correction is lagged: $\Gop u(u)$ moves into the last column rather than disappearing.
+Differentiating it moves $\Gop u(v)$ back into the per-application count, which is what the two
+higher-order actions pay --- and $\Jhoex$ pays no more than $\Jholag$, because $\Gop p(v)$ and
+$\Gop u(v)$ read different fields of one array at one stride and are reconstructed in a single
+sweep. The assembled matrix performs no element sweep per application but pays a full assembly
+--- the most expensive sweep here --- once per Newton step, and thereafter streams a matrix two
+orders of magnitude larger than the mesh.
 
 The driver times the $\Gop p(v)$ sweep of $\Jex$ separately, at
 \SI{\campQgradPct}{\percent} of the application, large enough that attributing the whole of it to
@@ -1107,8 +1111,8 @@ to it.
   \inputifready{figures/jacho}{Jacobian scheme arms, jobs/jac\_ho\_bench.sbatch}
   \caption{The same five schemes for $\Jhoex$, matching the $\Jhoex$ rows of
     Table~\ref{tab:jacfair}; the \texttt{upwind} bar is $\Jex$, which has no correction to
-    differentiate. $\Jholag$ reproduces that bar to the last bit, at
-    \jachoLaggedPacked{}~MDOF/s packed. Unlike Figure~\ref{fig:convho}, the layout ratio rises
+    differentiate. Lagging the correction returns $\Jex$ and reproduces that bar to the last
+    bit, at \jachoLaggedPacked{}~MDOF/s packed. Unlike Figure~\ref{fig:convho}, the layout ratio rises
     before it falls, $\jachoFirstLayoutRatio$ to $\jachoUnlimLayoutRatio$ to
     $\jachoDmLayoutRatio\times$. Dashed: the same SpMV references.}
   \label{fig:jacho}
@@ -1152,9 +1156,9 @@ nine components against the three $\Gop p(v)$ that $\Jex$ already rebuilds. And 
 $\jachoFirstLayoutRatio\times$ to $\jachoUnlimLayoutRatio\times$ before the limiters pull it back
 to $\jachoDmLayoutRatio$--$\jachoClipLayoutRatio\times$, since the added reconstruction is
 itself packed and is the sweep the layout helps most, whereas a limiter derivative is arithmetic
-at a sub-control surface that no layout can help with. $\Jholag$ is the control on all of
-this: at \jachoLaggedPacked{}~MDOF/s it agrees with $\Jex$ to the last bit, which is what a
-deferred correction means --- it reaches the residual and not the Jacobian.
+at a sub-control surface that no layout can help with. Lagging the correction is the control
+on all of this: that arm reproduces $\Jex$ to the last bit, at \jachoLaggedPacked{}~MDOF/s,
+which is what a deferred correction means --- it reaches the residual and not the Jacobian.
 
 \paragraph{On the roofline.} Figure~\ref{fig:roofline} places the same arms against the
 machine, and the correction costs traffic as well as arithmetic. It reads a nine-component nodal
@@ -1183,19 +1187,19 @@ cancellation, so a term can be present at every node and absent from the total. 
 \subsection{$\Jhoex$, the exact higher-order Jacobian action}
 \label{sec:res:hoexact}
 
-$\Jholag$ contributes nothing from the correction, so it reproduces $\Jex$
+A lagged correction contributes nothing to the Jacobian, so the action of $\Fho$ is $\Jex$
 (\S\ref{sec:setup}). $\Jhoex$ instead costs one reconstruction $\Gop u(v)$ per operator
 application --- nine components against the three $\Gop p(v)$ that $\Jex$ already rebuilds ---
 and the limiter's own derivative, which is not free: the unlimited arm reaches
 \hoxExactPackedUnlim{}~MDOF/s against Venkatakrishnan's \hoxExactPacked{}, a factor of
 $\hoxLimiterCost$.
 
-$\Jhoex$ costs $\hoxCostPacked\times$ $\Jholag$, \hoxLaggedPacked{} to
+$\Jhoex$ costs $\hoxCostPacked\times$ $\Jex$, \hoxLaggedPacked{} to
 \hoxExactPacked{}~MDOF/s, against $\hoxCostAtomic\times$ on the atomic layout. The two are close
 but not equal, and should not be: the added work is a differentiated flux, whose cost is the same
 arithmetic on either layout, plus the reconstruction, whose cost is not --- it takes a very
 different share of the two applications, as below. The format's advantage survives the addition:
-$\hoxLayoutLagged\times$ on $\Jholag$ and $\hoxLayoutExact\times$ on $\Jhoex$. The added pass is
+$\hoxLayoutLagged\times$ on $\Jex$ and $\hoxLayoutExact\times$ on $\Jhoex$. The added pass is
 itself packed, gathering pack-locally and closing through the same ghost graph the operator
 sweeps use.
 
@@ -1227,8 +1231,8 @@ count.
 
 What it buys is Newton steps. $\Jhoex$ is verified against a finite difference of $\Fho$ with
 $\Gop u$ rebuilt at each perturbed state --- \hoxFdUnlim{} on the unlimited arm, against
-$\Jholag$'s \num{6e-2} --- and on the lid-driven cavity it recovers the convergence $\Jholag$
-loses.
+$\Jex$'s \num{6e-2} --- and on the lid-driven cavity it recovers the convergence $\Jex$ loses on
+$\Fho$.
 
 \subsection{Against the lagged matrix}
 \label{sec:res:spmv}
