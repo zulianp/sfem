@@ -68,6 +68,17 @@
 % budget does not permit a sentence on each, and a tag always in the same place is
 % easier to scan than prose. Format figures carry no scheme and stay untagged.
 \newcommand{\fostag}{\emph{First-order upwind.}}
+% The operators, named once here and used everywhere. The subscript is the Rhie--Chow term and
+% the superscript the deferred correction, so a symbol says exactly which differentiations the
+% measured operator carried. Defined in the preamble because the generated tables are \input and
+% must spell the operators the same way the text does.
+\newcommand{\Gop}{\mathcal{G}}
+\newcommand{\Fres}{\mathcal{F}}
+\newcommand{\Fho}{\mathcal{F}^{\mathrm{ho}}}
+\newcommand{\Jlag}{\mathcal{J}_{\mathrm{lagged}}}
+\newcommand{\Jex}{\mathcal{J}_{\mathrm{exact}}}
+\newcommand{\Jholag}{\mathcal{J}^{\mathrm{ho}}_{\mathrm{lagged}}}
+\newcommand{\Jhoex}{\mathcal{J}^{\mathrm{ho}}_{\mathrm{exact}}}
 \newcommand{\provwarn}{\ifnum\campProvisional=1 \textbf{[PROVISIONAL: pipeline-validation data from \campHost, not this paper's campaign]} \fi}
 
 \begin{document}
@@ -642,7 +653,8 @@ reads it (\fpWorkingPct{}\% without it); and the reduction graph's two offset ar
 while indexing under a million entries, so narrowing them --- which their own lengths permit
 with three orders of magnitude to spare --- saves \fpReduceSaving{} more and reaches
 \fpFloorPct{}\%, or \fpFloorBigPct{}\% at \fpPackBig{} elements per pack where ghosts are
-proportionally fewer. The table reports the implemented figure; the floor is named, not quoted.
+proportionally fewer. Neither narrowing is applied, so Table~\ref{tab:footprint} carries
+\fpImpl{}~B/dof and the two figures above it are what the format would reach.
 Coordinates are byte-identical in both and excluded; with them the ratio is \fpImplPtsPct{}\%.
 
 The sharper contrast is with assembly. A sparse matrix--vector product does little arithmetic per
@@ -657,8 +669,9 @@ Jacobian differentiates through the nodal gradient reconstruction, so it needs t
 gradient of the \emph{direction}, and putting that into a matrix would couple pressures beyond
 nearest neighbours and destroy the one-ring sparsity the matrix is built on. The matrix therefore
 \emph{lags} that term, so a matrix-free action carrying it does strictly more work than the
-matrix encodes and comparing the two as one operator flatters the matrix.
-Table~\ref{tab:jacfair} reports both forms.
+matrix encodes, and comparing the two as one operator overstates the \textsc{bsr} matrix's
+effectiveness. The two forms are $\Jex$ and $\Jlag$ of \S\ref{sec:setup}, and
+Table~\ref{tab:jacfair} reports both; only $\Jlag$ is what the matrix holds.
 
 Two consequences follow. The assembled operator is bandwidth-bound at a footprint that fits no
 level of cache, which is why halving the value precision is close to its only lever; and the
@@ -692,8 +705,8 @@ either roof.
 \end{table}
 
 Every measurement in this paper was taken on the Grace CPU die of an NVIDIA GH200 Grace Hopper
-Superchip (Table~\ref{tab:platform}), at 72 OpenMP threads with threads bound to cores, unless
-a thread count is the independent variable. The memory bandwidth quoted is a STREAM triad
+Superchip (Table~\ref{tab:platform}), at 72 OpenMP threads with threads bound to cores,
+except in the thread sweep of Figure~\ref{fig:scaling}. The memory bandwidth quoted is a STREAM triad
 measured on the same node rather than a vendor figure, because it is the bound the roofline of
 \S\ref{sec:res:spmv} is drawn against and the two must come from the same machine.
 
@@ -732,34 +745,55 @@ is not measured here, and no rate below applies to it; the gap is largest on the
 reconstruction of \S\ref{sec:res:hoexact}, where per-element geometry is exactly the work the
 affine sweep amortises over all its fields.
 
-\paragraph{Convective schemes.} Two are measured. The baseline is \emph{first-order upwinding
-with a hard donor switch}: the face value is taken from whichever side the mass flux comes from,
-with no blending band. Every measured figure and table names its scheme in the first words of
-its caption, so which one produced a number is never left to be inferred.
+\paragraph{Convective schemes, reconstruction, and the exact Jacobian.} The baseline flux is
+\emph{first-order upwinding with a hard donor switch}: the face value is taken from whichever
+side the mass flux comes from, with no blending band.
 
-The second is a \emph{deferred-correction} higher-order flux~\cite{KhoslaRubin1974}. The face
-value is reconstructed
-from the donor node and its nodal velocity gradient,
+The higher-order flux is a \emph{deferred correction}~\cite{KhoslaRubin1974}. The face value is
+reconstructed from the donor node and its nodal velocity gradient,
 $u_{\mathrm{face}} = u_{\mathrm{donor}} + \nabla u_{\mathrm{donor}}\cdot
  (x_{\mathrm{scs}} - x_{\mathrm{donor}})$,
-and only the \emph{difference} from the first-order value is added to the residual. Applied
-\emph{lagged} one Newton step, the gradient it reads becomes an input to the application rather
-than part of it --- as the Rhie--Chow state gradient already is --- and the Jacobian stays
-first-order. That second consequence is a choice, not a property of the method: differentiating a
-reconstructed face value widens the stencil from one ring to two, which is decisive for an
-assembled operator and not here, where a wider stencil costs reads rather than fill-in. We build
-and measure both forms (\S\ref{sec:res:hoexact}), differentiating the limiters where they are
-differentiable and taking a subgradient where they are not.
+and only the \emph{difference} from the first-order value enters the residual. Four variants are
+built: the unlimited reconstruction and three limiters, Barth--Jespersen, Venkatakrishnan and
+Darwish--Moukalled.
 
-\paragraph{Operators.} We measure the residual $\mathcal{F}(u)$ and the action
-$\mathcal{J}(u)\,v$, which are what a Newton--Krylov solve applies. The action is the
-\emph{exact} one: the Rhie--Chow coupling depends on a reconstructed nodal pressure gradient, so
-differentiating it requires that gradient \emph{of the direction} $v$ and not only of the state,
-which a lagged Jacobian skips. Algorithm~\ref{alg:jacaction} is where the two part. The driver
-records which ran, so a frozen variant cannot be reported as an exact one.
+The nodal gradient the reconstruction reads is a separate pass over the mesh. It is assembled
+from the element gradients incident on a node and completed by a ghost reduction, and it is the
+same pass that supplies the Rhie--Chow coupling its pressure gradient.
+
+Both the correction and the coupling can be differentiated or held fixed, independently. Held
+fixed --- \emph{lagged} one Newton step --- the gradient is an input to the application rather
+than part of it. Differentiated, the Jacobian action needs the reconstructed gradient of the
+\emph{direction} and not only of the state, which is one further pass per matvec. All four
+combinations are implemented and measured (\S\ref{sec:res:hoexact}); the limiters are
+differentiated where they are differentiable and a subgradient is taken where they are not.
+
+\paragraph{Operators.} The names below are used throughout, in the tables and figures as well as
+the text. The subscript is the Rhie--Chow term and the superscript the deferred correction, so a
+symbol states which differentiations the measured operator carried.
+
+$\Gop p(u)$ and $\Gop u(u)$ are the nodal reconstructions of the pressure gradient (3
+components) and the velocity gradient (9) at the state $u$, and $\Gop p(v)$, $\Gop u(v)$ the
+same reconstructions of a Krylov direction $v$. Each is one element sweep and one ghost
+reduction.
+
+$\Fres(u)$ is the residual with first-order upwinding and $\Fho(u)$ the residual with the
+deferred correction. Both carry the Rhie--Chow coupling and so read $\Gop p(u)$; $\Fho$ reads
+$\Gop u(u)$ as well.
+
+$\Jlag(u)\,v$ and $\Jex(u)\,v$ are the Jacobian action with the coupling lagged and
+differentiated: the lagged form evaluates it with $\Gop p(u)$, the exact form differentiates
+through the reconstruction and rebuilds $\Gop p(v)$ on every matvec. $\Jholag(u)\,v$ and
+$\Jhoex(u)\,v$ add the differentiated correction, including the derivative of the limiter, and
+rebuild $\Gop u(v)$ with it. Lagging the correction instead reproduces $\Jlag$ and $\Jex$ to the
+last bit, which is why there is no fourth pair.
+
+The assembled matrix holds $\Jlag$ alone, for the sparsity reason of
+\S\ref{sec:cost}. Algorithm~\ref{alg:jacaction} is where the forms part, and the driver
+records which one ran.
 
 \begin{algorithm}
-\caption{Jacobian action $\mathcal{J}(u)\,v$}
+\caption{Jacobian action: $\Jlag$, $\Jex$, $\Jholag$, $\Jhoex$}
 \label{alg:jacaction}
 \begin{algorithmic}[1]
 \Require state $u$, direction $v$. Two terms are differentiated or lagged \emph{independently},
@@ -790,65 +824,70 @@ records which ran, so a frozen variant cannot be reported as an exact one.
 \end{algorithmic}
 \end{algorithm}
 
-\paragraph{Pass structure.} Here the operators differ structurally rather than
-in arithmetic. A node's reconstructed gradient needs contributions from every element incident on
-it, so it must be \emph{complete} before any flux may use it --- a data dependency, not a
-scheduling choice, and why the reconstruction cannot fuse into the flux sweep but is a separate
-pass ending in its own ghost reduction. \emph{One pass}: the bare element kernel, and the
-residual with Rhie--Chow when the state gradient $\nabla p(u)$ is \emph{hoisted}, computed once
-per Newton step and reused across the Krylov solve since $u$ is fixed there. \emph{Two
-passes}: the residual with Rhie--Chow when $\nabla p$ is rebuilt inside every application, and
-the exact Rhie--Chow Jacobian action, which must reconstruct the \emph{direction}'s gradient on
-every matvec because the direction changes every iteration; the driver times that pass
-separately at \SI{\campQgradPct}{\percent} of the exact matvec, large enough that attributing the
-whole matvec to the element kernel would misplace a sixth of it. The distinction explains two
-results below: why hoisting the state gradient is worth as much as it is, and why the layout's
-margin is widest on the per-apply gradient configuration of \S\ref{sec:res:ladder}, which spends
-more of its time in exactly the sweep the packed layout accelerates most.
+\paragraph{Pass structure.} The operators above differ structurally and not only in arithmetic.
+A node's reconstructed gradient needs contributions from every element incident on it, so $\Gop$
+must be \emph{complete} before any flux may use it. That is a data dependency, so the
+reconstruction cannot fuse into the flux sweep: it is a separate pass ending in its own ghost
+reduction. A state reconstruction is hoisted --- computed once per Newton step and reused across
+the Krylov solve, since $u$ is fixed there --- and a direction reconstruction cannot be, because
+the direction changes every iteration. That is the whole of the difference between $\Jlag$ and
+$\Jex$, and between the two $\Fres$ rows of Table~\ref{tab:passes}.
 
 \begin{figure}[t]
   \centering
   \resizebox{\columnwidth}{!}{\input{figures/scheme_passes}}
-  \caption{What each convective scheme sweeps. A dashed pre-sweep is amortised --- once per
-    Newton step, reused across the Krylov solve --- and rebuilding it inside every application
-    instead is the per-apply row of Table~\ref{tab:passes}.}
+  \caption{What each convective scheme sweeps. A dashed pre-sweep is a hoisted $\Gop$ --- once
+    per Newton step, reused across the Krylov solve --- and rebuilding it inside every
+    application instead is the second row of Table~\ref{tab:passes}.}
   \label{fig:schemes}
 \end{figure}
 
 \begin{table}[t]
   \centering
-  \caption{Sweeps over the mesh per operator application. Amortised sweeps --- the nodal
-    gradient for the hoisted and higher-order rows, the assembly itself for the matrix --- run
-    once per Newton step and are reused across the Krylov solve, so they do not appear here;
-    they are not free.}
+  \caption{What each operator sweeps, per application. The last column is what the operator
+    reads but does not rebuild: a state reconstruction is computed once per Newton step and read
+    by the residual and by every matvec in that step, and the matrix is assembled once per
+    Newton step. Those are the dominant costs of their rows and are measured separately
+    (\S\ref{sec:res:hoexact}, \S\ref{sec:res:spmv}).}
   \label{tab:passes}
   \small
-  \begin{tabular}{@{}lccc@{}}
+  \begin{tabular}{@{}lccl@{}}
     \toprule
-    & element & ghost & amortised \\
-    operator & sweeps & reductions & sweeps \\
+    & element & ghost & once per \\
+    operator & sweeps & reductions & Newton step \\
     \midrule
-    residual, bare                 & 1 & 1 & 0 \\
-    residual, $\nabla p$ hoisted   & 1 & 1 & 1 \\
-    residual, $\nabla p$ per apply & 2 & 2 & 0 \\
-    residual, higher-order flux    & 1 & 1 & 1 \\
-    Jacobian action, lagged RC     & 1 & 1 & 0 \\
-    Jacobian action, exact RC      & 2 & 2 & 0 \\
-    SpMV, lagged matrix            & 0 & 0 & 1 \\
+    $\Fres(u)$                        & 1 & 1 & $\Gop p(u)$ \\
+    $\Fres(u)$, $\Gop p$ per apply    & 2 & 2 & --- \\
+    $\Fho(u)$                         & 1 & 1 & $\Gop p(u)$, $\Gop u(u)$ \\
+    $\Jlag(u)\,v$                     & 1 & 1 & $\Gop p(u)$ \\
+    $\Jex(u)\,v$                      & 2 & 2 & --- \\
+    SpMV with $\Jlag$                 & 0 & 0 & assembly \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:passes} collects the counts. Two rows warrant comment. The higher-order flux is a
-one-sweep operator only because its correction is lagged: the velocity gradient it reads moves into
-the amortised column rather than disappearing. The assembled matrix performs no element sweep per
-application, but pays a full assembly --- the most expensive sweep in the table --- once per Newton
-step, and thereafter streams a matrix two orders of magnitude larger than the mesh.
+Table~\ref{tab:passes} collects the counts. $\Fho$ is a one-sweep operator because its
+correction is lagged: $\Gop u(u)$ moves into the last column rather than disappearing, and
+differentiating the correction moves $\Gop u(v)$ back into the per-application count, which is
+what $\Jhoex$ pays. The assembled matrix performs no element sweep per application but pays a
+full assembly --- the most expensive sweep here --- once per Newton step, and thereafter streams
+a matrix two orders of magnitude larger than the mesh.
 
-\paragraph{Optional terms.} The Rhie--Chow coupling~\cite{RhieChow1983}, which colocation
-requires in order to suppress the checkerboard mode, the boundary closure over boundary
-sub-control-surfaces, and the transient mass term are each switchable, and are what the
-completeness ladder of \S\ref{sec:res:ladder} adds one at a time.
+The second row is the configuration in which $\Gop p$ is rebuilt inside every application rather
+than hoisted. It is not an operator a solver applies; it is measured because it is the
+configuration in which the layout's margin is widest (\S\ref{sec:res:ladder}), spending more of
+its time in the sweep the packed layout accelerates most. The driver times that sweep at
+\SI{\campQgradPct}{\percent} of $\Jex$, large enough that attributing the whole matvec to the
+element kernel would misplace a sixth of it.
+
+\paragraph{The solver's terms.} The Rhie--Chow coupling~\cite{RhieChow1983} is required: a
+colocated discretisation without it admits the checkerboard pressure mode, so every operator a
+solver applies carries it, and $\Fres$, $\Fho$ and all four Jacobian forms above are defined with
+it. The boundary closure over boundary sub-control-surfaces and the transient mass term are
+likewise part of the operator the solver applies. All three are nonetheless \emph{switchable} in
+the code, which is what makes the completeness ladder of \S\ref{sec:res:ladder} possible: it adds
+them one at a time to attribute cost to each. The bare element kernel at the bottom of that
+ladder is a measurement configuration and not an operator.
 
 \paragraph{Problem sizes.} Sizes run from $n=64$ to $n=192$ on a cube, \SI{1.1e6}{} to
 \SI{2.9e7}{} degrees of freedom. The smaller sizes make the saturation knee visible rather than
@@ -884,8 +923,9 @@ term the code path silently dropped.
 
 At the saturating size, \campDofs{} degrees of freedom, the packed residual reaches
 \campResPacked{}~MDOF/s against \campResAtomic{} for the atomic sweep, and the Jacobian action
-\campJacPacked{} against \campJacAtomic{}. Both are bare element kernels, carrying no Rhie--Chow term; the forms that do are in
-Table~\ref{tab:jacfair}. Sparse matrix--vector products with the lagged matrix reach
+\campJacPacked{} against \campJacAtomic{}. Both are bare element kernels, carrying no
+Rhie--Chow term, so neither is $\Fres$ or $\Jlag$; those are in
+Table~\ref{tab:jacfair}. Sparse matrix--vector products with $\Jlag$ reach
 \campSpmvF{}~MDOF/s at double precision and \campSpmvS{} at single, consistent with the
 footprint of Table~\ref{tab:footprint}: the lagged product streams \fpMatrixFSixFour{}~bytes of
 matrix per degree of freedom where the matrix-free sweeps read \fpImpl{} of mesh,
@@ -996,9 +1036,9 @@ takes it up.
 \begin{figure}[t]
   \centering
   \input{figures/packsize}
-  \caption{Throughput of the \emph{exact} Rhie--Chow Jacobian action (two-sweep, with the
-    boundary closure) against packs per thread, at two problem sizes. Solid: first-order
-    upwinding. Dashed: the same action with the Darwish--Moukalled limiter. The pack size is the
+  \caption{Throughput of $\Jex$ with the boundary closure against packs per thread, at two
+    problem sizes. Solid: first-order upwinding. Dashed: $\Jhoex$ with the Darwish--Moukalled
+    limiter. The pack size is the
     knob; packs per thread is the axis on which the collapse is explained.}
   \label{fig:packsize}
 \end{figure}
@@ -1033,8 +1073,8 @@ are the ones the format gives when its one parameter is set from the machine.
 A pack is a contiguous range of element indices, so the element order decides which nodes it
 touches. Replacing the space-filling pass with a lexicographic order at fixed pack size grows the
 mean node set per pack from $\ordSfcMean{}$ to $\ordLexMean{}$, and costs
-$\ordSfcRes{}\to\ordLexRes{}$~MDOF/s on the residual and $\ordSfcJac{}\to\ordLexJac{}$ on the
-exact Rhie--Chow Jacobian action, both carrying the boundary closure at $n=128$. The ordering is
+$\ordSfcRes{}\to\ordLexRes{}$~MDOF/s on the residual and $\ordSfcJac{}\to\ordLexJac{}$ on
+$\Jex$, both carrying the boundary closure at $n=128$. The ordering is
 a precondition of the format, as \S\ref{sec:format} states, rather than an optimisation applied
 to it.
 
@@ -1064,11 +1104,9 @@ to it.
 \begin{figure}[t]
   \centering
   \inputifready{figures/jacho}{Jacobian scheme arms, jobs/jac\_ho\_bench.sbatch}
-  \caption{The same five schemes for the \emph{Jacobian action}, with the correction
-    differentiated --- the \emph{exact} action --- and with the Rhie--Chow term differentiated
-    too, so each bar is the operator of the matching \emph{exact} row of
-    Table~\ref{tab:jacfair}. The \emph{lagged} action, which is the default, leaves the Jacobian
-    first-order: it reproduces the \texttt{upwind} bar's result to the last bit, at
+  \caption{The same five schemes for $\Jhoex$, matching the $\Jhoex$ rows of
+    Table~\ref{tab:jacfair}; the \texttt{upwind} bar is $\Jex$, which has no correction to
+    differentiate. $\Jholag$ reproduces that bar to the last bit, at
     \jachoLaggedPacked{}~MDOF/s packed. Unlike Figure~\ref{fig:convho}, the layout ratio rises
     before it falls, $\jachoFirstLayoutRatio$ to $\jachoUnlimLayoutRatio$ to
     $\jachoDmLayoutRatio\times$. Dashed: the same SpMV references.}
@@ -1107,9 +1145,8 @@ three share the reconstruction and differ only in the function applied to the in
 action, which is the operator a Newton--Krylov solve applies once per linear iteration against one
 residual per step. Two things differ from the residual. The absolute cost of differentiating the
 correction is large --- \jachoFirstPacked{} to \jachoUnlimPacked{}~MDOF/s packed on the unlimited
-arm alone, before any limiter --- because the exact action reconstructs the \emph{direction}'s
-nodal velocity gradient on every matvec, nine components against the three the Rhie--Chow term
-already rebuilds. And the format's margin moves the other way: it rises from
+arm alone, before any limiter --- because $\Jhoex$ reconstructs $\Gop u(v)$ on every matvec,
+nine components against the three $\Gop p(v)$ that $\Jex$ already rebuilds. And the format's margin moves the other way: it rises from
 $\jachoFirstLayoutRatio\times$ to $\jachoUnlimLayoutRatio\times$ before the limiters pull it back
 to $\jachoDmLayoutRatio$--$\jachoClipLayoutRatio\times$, since the added reconstruction is
 itself packed and is the sweep the layout helps most, whereas a limiter derivative is arithmetic
@@ -1141,7 +1178,7 @@ than by checksum: the residual of this state sums to order \num{1e-14} and is al
 cancellation, so a term can be present at every node and absent from the total. They agree to
 \num{2e-17} on every arm, with and without the Rhie--Chow coupling.
 
-\subsection{The exact higher-order Jacobian action}
+\subsection{$\Jhoex$, the exact higher-order Jacobian action}
 \label{sec:res:hoexact}
 
 The correction is applied lagged, so it contributes nothing to the Jacobian and the action of a
@@ -1159,12 +1196,12 @@ different share of the two matvecs, as below. The format's advantage survives th
 action and $\hoxLayoutExact\times$ on the exact one. The added pass is itself packed, gathering pack-locally and closing through the same
 ghost graph the operator sweeps use.
 
-\paragraph{Traffic, not arithmetic.} The exact action's schemes are the second set of
+\paragraph{Traffic, not arithmetic.} The $\Jhoex$ schemes are the second set of
 higher-order points in Figure~\ref{fig:roofline}, and they move as the residual's do. Traffic
 rises by $\hoJacBytesRatioPacked\times$ packed (\foJacBytesPacked{} to
-\hoJacBytesPacked{}~bytes per degree of freedom), because the direction's nodal velocity
-gradient is read on top of the state's, and that outruns the arithmetic until a limiter is
-added: the unlimited arm sits at \hoJacAiPackedLo{}~FLOP/byte against the first-order action's
+\hoJacBytesPacked{}~bytes per degree of freedom), because $\Gop u(v)$ is read on top of
+$\Gop u(u)$, and that outruns the arithmetic until a limiter is
+added: the unlimited arm sits at \hoJacAiPackedLo{}~FLOP/byte against $\Jex$'s
 \rlJacobianPackedAi{}, to the \emph{left} of it, and Venkatakrishnan's derivative is the one
 that carries enough to pass it, at \hoJacAiPackedHi{}, Darwish--Moukalled's stopping just
 short. In both operators the correction is a traffic change first and an arithmetic change
@@ -1176,7 +1213,7 @@ $\ngPgradRatio$, and the three-component velocity gradient at \ngUgradPacked{} a
 \ngUgradAtomic{}, a factor of $\ngUgradRatio$ --- both far above the
 \hoxLayoutLagged$\times$ the element sweeps get. Almost all of a reconstruction is indexed
 traffic, which the layout removes, and almost none is arithmetic, which it cannot touch. It is
-also where the exact action spends its time: the reconstruction is \SI{\hoxFracPacked}{\percent}
+also where $\Jhoex$ spends its time: the reconstruction is \SI{\hoxFracPacked}{\percent}
 of the packed matvec against \SI{\hoxFracAtomic}{\percent} of the atomic one. Both direction
 gradients are taken in ONE sweep --- they read different fields of the same array at the same
 stride, so together they are a four-field sweep rather than a one-field and a three-field one ---
@@ -1219,8 +1256,8 @@ measured traffic is \rlTrafficRatioLo{} to \rlTrafficRatioHi{} times the compuls
 re-reads at pack boundaries and partial-line writes.
 
 The same captures price the coloured layout's scatter. On the identical decomposition it moves
-\colBytesPctResRc\% more per degree of freedom on the residual, \colBytesPctJac\% on the bare
-Jacobian action and \colBytesPctJacRc\% with the Rhie--Chow term: the cost of accumulating into
+\colBytesPctResRc\% more per degree of freedom on $\Fres$, \colBytesPctJac\% on the bare
+Jacobian element kernel and \colBytesPctJacRc\% on $\Jlag$: the cost of accumulating into
 the global arrays rather than writing owned rows.
 
 The first-order matrix-free kernels then sit at \rlResidualAiSpan{}~FLOP/byte and
@@ -1289,14 +1326,11 @@ kernel by those factors.
 %================================================================================================
 \begin{table}[t]
   \centering
-  \caption{The Jacobian action in both forms and under three convective schemes, each layout
-    against the double-precision product with the lagged matrix (the \texttt{f64} row, which the
-    ratios divide by and which has no layout of its own). Within each block the lagged row lags
-    the Rhie--Chow term and the exact row differentiates it; the higher-order correction stays
-    differentiated in both, since lagging it reproduces the first-order action exactly. The
-    limiters are the cheapest and among the dearest, so they bracket what one costs. Only the
-    first-order lagged row holds the operator the matrix does --- the higher-order rows have no
-    matrix counterpart at all.}
+  \caption{The Jacobian action in all four forms under three convective schemes, each layout
+    against the double-precision product (the \texttt{f64} row, which the ratios divide by and
+    which has no layout of its own). The limiters are the cheapest and among the dearest, so
+    they bracket what one costs. Only $\Jlag$ is an operator the matrix can hold; the
+    higher-order rows have no matrix counterpart at all.}
   \label{tab:jacfair}
   \inputifready{tables/jacfair}{fair Jacobian comparison, jobs/jac\_fair.sbatch}
 \end{table}
