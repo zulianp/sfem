@@ -2499,8 +2499,12 @@ int main(int argc, char **argv) {
     // replaced made the result depend on thread arrival, and survives only as SFEM_BND_ATOMIC);
     // the transient term is a pure node loop with no scatter at all. Neither can be hybrid.
     {
-        const char *qg = (layout == "ecolor")  ? "element-coloured"
-                         : g_qgrad_atomic      ? "atomic"
+        // Every row names a LAYOUT, in the spelling --layout takes, so the comparison a reader
+        // makes is row against row. Naming the same implementation two ways -- "ecolor" on one
+        // line and "element-coloured" on the next -- reads as two implementations and hides
+        // exactly the disagreement this block exists to show.
+        const char *qg = (layout == "ecolor")   ? "ecolor"
+                         : g_qgrad_atomic       ? "atomic"
                          : (packed.n_packs > 0) ? "packed"
                                                 : "atomic";
         std::printf("  pipeline_element_sweep: %s\n", layout.c_str());
