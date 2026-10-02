@@ -326,9 +326,9 @@ def table_footprint(rows, mesh=None, n=128):
 # limited deferred correction, so the pair says whether the scaling depends on the scheme.
 SCALING_SERIES = (
     ("packed", "res",   "PackA", "*",       r"\texttt{packed}"),
-    ("atomic", "res",   "PackD", "square*", r"\texttt{atomic}"),
+    ("atomic", "res",   "PackD", "square*", r"\texttt{standard}"),
     ("packed", "resho", "PackA", "o",       r"\texttt{packed}, higher order"),
-    ("atomic", "resho", "PackD", "square",  r"\texttt{atomic}, higher order"),
+    ("atomic", "resho", "PackD", "square",  r"\texttt{standard}, higher order"),
 )
 
 LAYOUT_STYLE = {
@@ -604,7 +604,7 @@ def fig_throughput(rows, host, op="residual", ho=None):
     sizes = sorted({r["_n"] for r in rows})
     series = []
     for layout, col, mark, lab in (("packed", "PackA", "*", r"packed"),
-                                   ("atomic", "PackD", "square*", r"atomic")):
+                                   ("atomic", "PackD", "square*", r"standard")):
         pts = []
         for n in sizes:
             v = max((r["_mdof"] for r in rows
@@ -650,7 +650,7 @@ def fig_throughput(rows, host, op="residual", ho=None):
     # reads without a second legend column per layout. An explicit dash pattern rather than
     # `dashed`, for the reason given in _convho_spmv_lines.
     for lay, col, mark, lab in (("packed", "PackA", "*", r"packed, Darwish--M."),
-                                ("atomic", "PackD", "square*", r"atomic, Darwish--M.")):
+                                ("atomic", "PackD", "square*", r"standard, Darwish--M.")):
         pts = (ho or {}).get(("ho_bare", lay))
         if not pts:
             continue
@@ -694,7 +694,7 @@ def table_ladder(rows, op="residual", n=128):
     out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
            r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\",
            r"\cmidrule(lr){2-4}\cmidrule(l){5-6}",
-           r"terms carried & packed & col. & atomic & col. & atomic \\",
+           r"terms carried & packed & col. & standard & col. & standard \\",
            r"\midrule"]
     any_row = False
     for label, sel in LADDER:
@@ -1528,7 +1528,7 @@ def table_convho(rows):
     out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
            r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\",
            r"\cmidrule(lr){2-4}\cmidrule(l){5-6}",
-           r"convective scheme & packed & col. & atomic & col. & atomic \\",
+           r"convective scheme & packed & col. & standard & col. & standard \\",
            r"\midrule"]
     for arm in ("first_order", "ho_unlimited", "ho_clip", "ho_venkatakrishnan",
                 "ho_darwish_moukalled"):
@@ -1625,7 +1625,7 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
         # and the step from packed to coloured is the format.
     ] + _bars(series, "gen", "PackA", "packed")
       + _bars(series, "ecolor", "PackB", "coloured")
-      + _bars(series, "atomic", "PackD", "atomic")
+      + _bars(series, "atomic", "PackD", "standard")
       + _convho_spmv_lines(spmv, short[order[0]]) + [
         r"\end{axis}",
         r"\end{tikzpicture}",
@@ -1845,7 +1845,7 @@ def table_kmix(mix):
     if len(arms) > 1:
         out.append(" & " + " & ".join(r"\multicolumn{2}{c}{%s}" % lab for _, lab in arms) + r" \\")
         out.append(r"\cmidrule(lr){2-3}\cmidrule(l){4-5}")
-    out.append(" & " + " & ".join("packed & atomic" for _ in arms) + r" \\")
+    out.append(" & " + " & ".join("packed & standard" for _ in arms) + r" \\")
     out.append(r"\midrule")
     out.append(r"\multicolumn{%d}{@{}l}{\emph{instruction mix, \%% of those issued}} \\"
                % (len(cols) + 1))
@@ -2017,7 +2017,7 @@ def table_jacfair(rows):
     out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrrrr@{}}", r"\toprule",
            r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{3}{c}{vs.\ \texttt{f64}} \\",
            r"\cmidrule(lr){2-4}\cmidrule(l){5-7}",
-           r"operator & packed & col. & atomic & packed & col. & atomic \\",
+           r"operator & packed & col. & standard & packed & col. & standard \\",
            r"\midrule"]
 
     def cells(op):

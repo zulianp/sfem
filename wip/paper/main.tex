@@ -968,9 +968,10 @@ well. Table~\ref{tab:ladder} adds them one at a time.
 \begin{table}[t]
   \centering
   \caption{\provwarn \fostag{} Throughput as solver terms are added, residual at $n=\campN$, on
-    the three matrix-free layouts. \emph{col.} is the element-coloured layout; the two ratios
-    separate what the format is worth beyond removing the atomics (packed over coloured) from
-    what the two together are worth (packed over atomic).}
+    the three matrix-free layouts. \emph{col.} and \emph{standard} both read the standard mesh
+    and differ in the scatter, an element colouring against atomics; so packed over \emph{col.}
+    is what the format is worth beyond removing the atomics, and packed over \emph{standard}
+    what the two together are worth.}
   \label{tab:ladder}
   \input{tables/ladder}
 \end{table}
@@ -1116,8 +1117,9 @@ to it.
   \caption{Convective schemes, residual only, at $n=128$, carrying the Rhie--Chow coupling as
     every other complete-operator measurement here does. The nodal velocity gradient is hoisted,
     so the timing is of the flux rather than of the reconstruction feeding it. Each column is
-    that layout's shipped kernel, \emph{col.} being the element-coloured one; the two ratios
-    separate the format from the scatter strategy, as in Table~\ref{tab:ladder}.}
+    that layout's shipped kernel. \emph{col.} and \emph{standard} both read the standard mesh
+    and differ in the scatter, so the two ratios separate the format from the scatter strategy,
+    as in Table~\ref{tab:ladder}.}
   \label{tab:convho}
   \inputifready{tables/convho}{convective scheme arms, jobs/conv\_ho\_bench.sbatch}
 \end{table}
@@ -1315,7 +1317,7 @@ bandwidth better.
   \centering
   \caption{Where the residual sweep's issued instructions go, and how fast they retire,
     $n=128$ on 72 threads, for both convective schemes. Both layouts are lane-blocked and call
-    the same element kernel, so the mixes are comparable; written scalar, the atomic layout's
+    the same element kernel, so the mixes are comparable; written scalar, the standard layout's
     vector share is \SI{0.1}{\percent} and the table measures the implementation rather than the
     format.}
   \label{tab:kmix}
@@ -1362,7 +1364,8 @@ kernel by those factors.
   \caption{The Jacobian action, each form fully exact or fully lagged, on the three matrix-free
     layouts against the double-precision product (the \texttt{f64} row, which the ratios divide
     by and which has no layout of its own). \emph{col.} is the \emph{element}-coloured layout,
-    not the pack colouring. $\Jlag$ is one row because deferred correction leaves the implicit
+    not the pack colouring; it reads the standard mesh as \emph{standard} does and differs from
+    it in the scatter alone. $\Jlag$ is one row because deferred correction leaves the implicit
     operator scheme-independent by construction: the first-order row \emph{is} the lagged action,
     and a control at every limiter reproduces its result bit for bit. It is also the only form the
     matrix can hold; the $\Jhoex$ rows have no matrix counterpart at all. The limiters are the

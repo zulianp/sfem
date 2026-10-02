@@ -14,7 +14,7 @@
 \addplot[draw=PackA, fill=PackA] coordinates {(upwind,1765.0) (unlimited,740.5) (Barth--J.,635.8) (Venkat.,598.0) (Darwish--M.,597.2)};
 \addlegendentry{packed}
 \addplot[draw=PackD, fill=PackD] coordinates {(upwind,895.0) (unlimited,560.1) (Barth--J.,499.2) (Venkat.,475.3) (Darwish--M.,476.7)};
-\addlegendentry{atomic}
+\addlegendentry{standard}
 \draw[PackE,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,449.4} -| {rel axis cs:0,0}) -- ({axis cs:upwind,449.4} -| {rel axis cs:1,0});
 \addlegendimage{legend image code/.code={\draw[PackE,dash pattern=on 2pt off 2pt,thick] (0pt,0pt) -- (10pt,0pt);}}
 \addlegendentry{SpMV \texttt{f64}}
