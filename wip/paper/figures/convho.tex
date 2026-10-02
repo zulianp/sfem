@@ -11,9 +11,11 @@
                 fill=none, inner sep=1pt, column sep=6pt},
   tick label style={font=\scriptsize}, label style={font=\scriptsize},
   ymajorgrids, major grid style={black!12}]
-\addplot[draw=PackA, fill=PackA] coordinates {(upwind,1765.0) (unlimited,740.5) (Barth--J.,635.8) (Venkat.,598.0) (Darwish--M.,597.2)};
+\addplot[draw=PackA, fill=PackA] coordinates {(upwind,1770.1) (unlimited,739.5) (Barth--J.,637.1) (Venkat.,597.1) (Darwish--M.,597.8)};
 \addlegendentry{packed}
-\addplot[draw=PackD, fill=PackD] coordinates {(upwind,895.0) (unlimited,560.1) (Barth--J.,499.2) (Venkat.,475.3) (Darwish--M.,476.7)};
+\addplot[draw=PackB, fill=PackB] coordinates {(upwind,1182.3) (unlimited,551.9) (Barth--J.,501.2) (Venkat.,483.0) (Darwish--M.,485.8)};
+\addlegendentry{coloured}
+\addplot[draw=PackD, fill=PackD] coordinates {(upwind,909.4) (unlimited,561.9) (Barth--J.,501.3) (Venkat.,477.3) (Darwish--M.,476.7)};
 \addlegendentry{standard}
 \draw[PackE,dash pattern=on 2pt off 2pt,thick] ({axis cs:upwind,449.4} -| {rel axis cs:0,0}) -- ({axis cs:upwind,449.4} -| {rel axis cs:1,0});
 \addlegendimage{legend image code/.code={\draw[PackE,dash pattern=on 2pt off 2pt,thick] (0pt,0pt) -- (10pt,0pt);}}

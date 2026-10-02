@@ -8,13 +8,13 @@
 \cmidrule(lr){2-4}\cmidrule(l){5-7}
 operator & packed & col. & standard & packed & col. & standard \\
 \midrule
-$\Jex(u)\,v$, first-order upwind & 861 & --- & 335 & $1.92\times$ & --- & $0.75\times$ \\
-$\Jhoex(u)\,v$, Barth--Jespersen & 355 & --- & 133 & $0.79\times$ & --- & $0.30\times$ \\
-$\Jhoex(u)\,v$, Darwish--Moukalled & 335 & --- & 129 & $0.75\times$ & --- & $0.29\times$ \\
+$\Jex(u)\,v$, first-order upwind & 920 & 472 & 355 & $2.09\times$ & $1.07\times$ & $0.81\times$ \\
+$\Jhoex(u)\,v$, Barth--Jespersen & 376 & 143 & 141 & $0.86\times$ & $0.33\times$ & $0.32\times$ \\
+$\Jhoex(u)\,v$, Darwish--Moukalled & 353 & 142 & 137 & $0.80\times$ & $0.32\times$ & $0.31\times$ \\
 \addlinespace
-$\Jlag(u)\,v$, any of these & 1201 & --- & 730 & $2.67\times$ & --- & $1.63\times$ \\
+$\Jlag(u)\,v$, any of these & 1231 & 867 & 763 & $2.80\times$ & $1.97\times$ & $1.73\times$ \\
 \midrule
-SpMV with $\Jlag$, \texttt{f64} & \multicolumn{6}{c}{449, $1.00\times$} \\
-SpMV with $\Jlag$, \texttt{f32} & \multicolumn{6}{c}{830, $1.85\times$} \\
+SpMV with $\Jlag$, \texttt{f64} & \multicolumn{6}{c}{440, $1.00\times$} \\
+SpMV with $\Jlag$, \texttt{f32} & \multicolumn{6}{c}{859, $1.95\times$} \\
 \bottomrule
 \end{tabular}
