@@ -846,12 +846,12 @@ $\Jex$ in Table~\ref{tab:passes}.
 
 \begin{table}[t]
   \centering
-  \caption{What each operator sweeps, per application. The last column is what the operator
-    reads but does not rebuild: a state reconstruction is computed once per Newton step and read
-    by the residual and by every operator application in that step, and the matrix is
-    assembled once per
-    Newton step. Those are the dominant costs of their rows and are measured separately
-    (\S\ref{sec:res:hoexact}, \S\ref{sec:res:spmv}).}
+  \caption{What each operator sweeps, per application. $\Gop$ heads the table because the rows
+    below are counted in units of it, and its count is per sweep whatever number of fields it
+    carries. The last column is what the operator reads but does not rebuild: a state
+    reconstruction, computed once per Newton step and read by every application in that step, or
+    the assembly. Both are measured on their own (\S\ref{sec:res:hoexact},
+    \S\ref{sec:res:spmv}).}
   \label{tab:passes}
   \small
   \begin{tabular}{@{}lccl@{}}
@@ -859,6 +859,8 @@ $\Jex$ in Table~\ref{tab:passes}.
     & element & ghost & once per \\
     operator & sweeps & reductions & Newton step \\
     \midrule
+    $\Gop$                            & 1 & 1 & --- \\
+    \addlinespace
     $\Fres(u)$                        & 1 & 1 & $\Gop p(u)$ \\
     $\Fho(u)$                         & 1 & 1 & $\Gop p(u)$, $\Gop u(u)$ \\
     $\Jlag(u)\,v$                     & 1 & 1 & $\Gop p(u)$ \\
