@@ -77,7 +77,6 @@
 \newcommand{\Fho}{\mathcal{F}^{\mathrm{ho}}}
 \newcommand{\Jlag}{\mathcal{J}_{\mathrm{lagged}}}
 \newcommand{\Jex}{\mathcal{J}_{\mathrm{exact}}}
-\newcommand{\Jholag}{\mathcal{J}^{\mathrm{ho}}_{\mathrm{lagged}}}
 \newcommand{\Jhoex}{\mathcal{J}^{\mathrm{ho}}_{\mathrm{exact}}}
 \newcommand{\provwarn}{\ifnum\campProvisional=1 \textbf{[PROVISIONAL: pipeline-validation data from \campHost, not this paper's campaign]} \fi}
 
@@ -783,55 +782,58 @@ $\Fres(u)$ is the residual with first-order upwinding and $\Fho(u)$ the residual
 deferred correction. Both carry the Rhie--Chow coupling and so read $\Gop p(u)$; $\Fho$ reads
 $\Gop u(u)$ as well.
 
-$\Jlag(u)\,v$ and $\Jex(u)\,v$ are the Jacobian action with the coupling lagged and
-differentiated: the lagged form evaluates it with $\Gop p(u)$, the exact form differentiates
-through the reconstruction and rebuilds $\Gop p(v)$ on every application. $\Jholag(u)\,v$ and
-$\Jhoex(u)\,v$ add the differentiated correction, including the derivative of the limiter, and
-rebuild $\Gop u(v)$ with it.
+Three Jacobian actions are measured, each either fully exact or fully lagged. $\Jex(u)\,v$ is
+the exact Jacobian of $\Fres$: it differentiates the coupling through the reconstruction and so
+rebuilds $\Gop p(v)$ on every application. $\Jhoex(u)\,v$ is the exact Jacobian of $\Fho$, adding
+the differentiated correction and the derivative of the limiter, and rebuilding $\Gop u(v)$ with
+it --- in the same sweep as $\Gop p(v)$, since the two read different fields of one array at one
+stride. $\Jlag(u)\,v$ lags both: it evaluates the coupling with $\Gop p(u)$, drops its
+sensitivity, and rebuilds nothing.
 
-\emph{Exact} is relative to a residual. $\Jex$ is the exact Jacobian of $\Fres$ and $\Jhoex$ that
-of $\Fho$; $\Jlag$ and $\Jholag$ drop the pressure-gradient sensitivity and are the exact Jacobian
-of neither. Lagging the velocity gradient is therefore not a cheaper exact operator but an
-inconsistent linearisation of $\Fho$: the correction becomes constant in $v$, so what is left
-reproduces $\Jex$ or $\Jlag$ to the last bit. That is why there is no fourth pair, and it is what
-\S\ref{sec:res:hoexact} prices --- against a finite difference of $\Fho$, $\Jhoex$ agrees to
-\hoxFdUnlim{} and the lagged correction is wrong by \num{6e-2}.
+Two things follow from the fact that a convective scheme reaches the action only through $\Gop$.
+$\Jlag$ does not depend on the scheme at all, because lagging the correction makes it constant in
+$v$ and removes $\Gop u$ from the action entirely --- which is why there is one lagged operator
+and not one per scheme. And lagging the velocity gradient alone is not a cheaper exact operator
+but an inconsistent linearisation of $\Fho$: what is left reproduces $\Jex$ to the last bit, and
+against a finite difference of $\Fho$, $\Jhoex$ agrees to \hoxFdUnlim{} where it is wrong by
+\num{6e-2} (\S\ref{sec:res:hoexact}).
+
+The mixed combinations --- one sensitivity differentiated and the other lagged --- are the exact
+Jacobian of no residual, and are not measured.
 
 The assembled matrix holds $\Jlag$ alone, for the sparsity reason of
 \S\ref{sec:cost}. Algorithm~\ref{alg:jacaction} is where the forms part, and the driver
 records which one ran.
 
 \begin{algorithm}
-\caption{Jacobian action: $\Jlag$, $\Jex$, $\Jholag$, $\Jhoex$}
+\caption{Jacobian action: $\Jex$, $\Jhoex$ and $\Jlag$}
 \label{alg:jacaction}
 \begin{algorithmic}[1]
-\Require state $u$, direction $v$; the Rhie--Chow term and the deferred correction are each
-         differentiated or lagged, \emph{independently}, and both are exact by default
-\Ensure the form the two switches select: $\Jex$, $\Jlag$, $\Jhoex$ or $\Jholag$
-\If{Rhie--Chow differentiated}
-  \State $q \gets \Gop p(v)$ by Algorithm~\ref{alg:apply}
-         \Comment{3 components; selects $\Jex$ over $\Jlag$, $\Jhoex$ over $\Jholag$}
+\Require state $u$, direction $v$; $\Gop p(u)$, and $\Gop u(u)$ when the correction is carried,
+         both hoisted from the Newton step. Exact by default
+\Ensure $\Jex(u)\,v$, or $\Jhoex(u)\,v$ when the correction is carried; $\Jlag(u)\,v$ when lagged
+\If{exact}
+  \State $q, g_v \gets \Gop p(v)$, and $\Gop u(v)$ if the correction is carried
+         \Comment{\emph{one} sweep of Algorithm~\ref{alg:apply}: $3$ fields, or $4$ at the same
+                  stride}
 \Else
-  \State $q \gets \varnothing$ \Comment{lagged: the coupling reads $\Gop p(u)$ alone}
-\EndIf
-\If{correction carried and differentiated}
-  \State $g_v \gets \Gop u(v)$ by Algorithm~\ref{alg:apply}
-         \Comment{9 components, in the same sweep as $q$; selects the $\mathrm{ho}$ forms}
-\Else
-  \State $g_v \gets \varnothing$ \Comment{lagged: the correction is constant in $v$}
+  \State $q, g_v \gets \varnothing$
+         \Comment{lagged: no direction reconstruction, so no dependence on the scheme}
 \EndIf
 \State apply Algorithm~\ref{alg:apply}, whose element kernel linearises the first-order
        convective flux about $u$ in direction $v$, adds the viscous term, and adds the
-       Rhie--Chow coupling --- differentiated through $q$ when $q$ is present
+       Rhie--Chow coupling, read from $\Gop p(u)$ and differentiated through $q$ when $q$ is
+       present
 \If{$g_v \neq \varnothing$}
   \State the same kernel adds the differentiated deferred correction, including the
          derivative of the limiter, evaluated with $\Gop u(u)$ and $g_v$
 \EndIf
 \State add the boundary closure and the transient term, each an extra sweep
-\Statex Each differentiated term costs one reconstruction of a \emph{direction} field per
-        operator application, which is why each is switchable: $\Gop p(u)$ and $\Gop u(u)$ are
-        hoisted across the Krylov solve, $\Gop p(v)$ and $\Gop u(v)$ cannot be.
-        \S\ref{sec:res:hoexact} measures what the second one buys.
+\Statex The exact forms cost one reconstruction of the \emph{direction} per operator application,
+        and that is the whole of what they cost: $\Gop p(u)$ and $\Gop u(u)$ are hoisted across
+        the Krylov solve because $u$ is fixed there, while $\Gop p(v)$ and $\Gop u(v)$ change
+        every iteration and cannot be. \S\ref{sec:res:hoexact} measures what the second pair
+        buys.
 \end{algorithmic}
 \end{algorithm}
 
@@ -872,22 +874,23 @@ $\Jex$ in Table~\ref{tab:passes}.
     $\Fres(u)$                        & 1 & 1 & $\Gop p(u)$ \\
     $\Fho(u)$                         & 1 & 1 & $\Gop p(u)$, $\Gop u(u)$ \\
     $\Jlag(u)\,v$                     & 1 & 1 & $\Gop p(u)$ \\
-    $\Jex(u)\,v$                      & 2 & 2 & --- \\
-    $\Jholag(u)\,v$                   & 2 & 2 & $\Gop p(u)$, $\Gop u(u)$ \\
-    $\Jhoex(u)\,v$                    & 2 & 2 & $\Gop u(u)$ \\
+    $\Jex(u)\,v$                      & 2 & 2 & $\Gop p(u)$ \\
+    $\Jhoex(u)\,v$                    & 2 & 2 & $\Gop p(u)$, $\Gop u(u)$ \\
     SpMV with $\Jlag$                 & 0 & 0 & assembly \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:passes} collects the counts. $\Fho$ is a one-sweep operator because its
-correction is lagged: $\Gop u(u)$ moves into the last column rather than disappearing.
-Differentiating it moves $\Gop u(v)$ back into the per-application count, which is what the two
-higher-order actions pay --- and $\Jhoex$ pays no more than $\Jholag$, because $\Gop p(v)$ and
-$\Gop u(v)$ read different fields of one array at one stride and are reconstructed in a single
-sweep. The assembled matrix performs no element sweep per application but pays a full assembly
---- the most expensive sweep here --- once per Newton step, and thereafter streams a matrix two
-orders of magnitude larger than the mesh.
+Table~\ref{tab:passes} collects the counts. Every form carrying Rhie--Chow reads $\Gop p(u)$,
+because the coupling itself is a function of the state's pressure gradient; what the exact forms
+add is its \emph{sensitivity}, and that is the second element sweep. $\Jhoex$ costs no more
+sweeps than $\Jex$ despite rebuilding two direction gradients: $\Gop p(v)$ and $\Gop u(v)$ read
+different fields of one array at one stride, so they are a single four-field sweep rather than a
+one-field and a three-field one. $\Fho$ stays at one sweep because its correction is lagged,
+which moves $\Gop u(u)$ into the last column rather than making it disappear. The assembled
+matrix performs no element sweep per application but pays a full assembly --- the most expensive
+sweep here --- once per Newton step, and thereafter streams a matrix two orders of magnitude
+larger than the mesh.
 
 The driver times the $\Gop p(v)$ sweep of $\Jex$ separately, at
 \SI{\campQgradPct}{\percent} of the application, large enough that attributing the whole of it to
@@ -1340,11 +1343,12 @@ kernel by those factors.
 %================================================================================================
 \begin{table}[t]
   \centering
-  \caption{The Jacobian action in all four forms under three convective schemes, each layout
-    against the double-precision product (the \texttt{f64} row, which the ratios divide by and
-    which has no layout of its own). The limiters are the cheapest and among the dearest, so
-    they bracket what one costs. Only $\Jlag$ is an operator the matrix can hold; the
-    higher-order rows have no matrix counterpart at all.}
+  \caption{The Jacobian action, each form fully exact or fully lagged, against the
+    double-precision product (the \texttt{f64} row, which the ratios divide by and which has no
+    layout of its own). $\Jlag$ is one row because it does not depend on the convective scheme,
+    checked by fingerprint rather than assumed, and it is the only form the matrix can hold; the
+    $\Jhoex$ rows have no matrix counterpart at all. The limiters are the cheapest and among the
+    dearest, so they bracket what one costs.}
   \label{tab:jacfair}
   \inputifready{tables/jacfair}{fair Jacobian comparison, jobs/jac\_fair.sbatch}
 \end{table}
@@ -1362,7 +1366,7 @@ appearing as throughput. Quoting $\Jex$ against the SpMV would report $\jfExactV
 than $\jfLaggedVsF\times$, understating the matrix-free side by a quarter while appearing to
 favour it; both are given because they answer different questions.
 
-The higher-order blocks are where the comparison stops being one. Packed $\Jhoex$ lands
+The $\Jhoex$ rows are where the comparison stops being one. Packed $\Jhoex$ lands
 below the double-precision SpMV under both limiters, at $\jfClipExactVsF\times$ for
 Barth--Jespersen and $\jfHoExactVsF\times$ for Darwish--Moukalled, the latter costing
 $\jfHoCostExact\times$ its first-order self. Read as a throughput ratio that
