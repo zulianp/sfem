@@ -748,13 +748,16 @@ affine sweep amortises over all its fields.
 \emph{first-order upwinding with a hard donor switch}: the face value is taken from whichever
 side the mass flux comes from, with no blending band.
 
-The higher-order flux is a \emph{deferred correction}~\cite{KhoslaRubin1974}. The face value is
-reconstructed from the donor node and its nodal velocity gradient,
+The higher-order flux is a \emph{deferred
+correction}~\cite{KhoslaRubin1974,XuePhanThienTanner2002}. The face value is reconstructed from
+the donor node and its nodal velocity gradient,
 $u_{\mathrm{face}} = u_{\mathrm{donor}} + \nabla u_{\mathrm{donor}}\cdot
  (x_{\mathrm{scs}} - x_{\mathrm{donor}})$,
-and only the \emph{difference} from the first-order value enters the residual. Four variants are
-built: the unlimited reconstruction and three limiters, Barth--Jespersen, Venkatakrishnan and
-Darwish--Moukalled.
+and the scheme adds its \emph{difference} from the first-order value. The first-order flux is
+carried implicitly and that difference explicitly, which is the method's point: the implicit
+operator stays the diagonally dominant first-order one, and stays the same whichever
+higher-order scheme is chosen. Four variants are built: the unlimited reconstruction and three
+limiters, Barth--Jespersen, Venkatakrishnan and Darwish--Moukalled.
 
 The nodal gradient the reconstruction reads is a separate pass over the mesh. It is assembled
 from the element gradients incident on a node and completed by a ghost reduction, and it is the
@@ -790,11 +793,9 @@ it --- in the same sweep as $\Gop p(v)$, since the two read different fields of 
 stride. $\Jlag(u)\,v$ lags both: it evaluates the coupling with $\Gop p(u)$, drops its
 sensitivity, and rebuilds nothing.
 
-$\Jlag$ is the deferred correction's standard implicit treatment: the correction is an explicit
-source, so it contributes nothing to the implicit operator~\cite{KhoslaRubin1974}. That is the
-method's purpose and not an economy --- the implicit operator stays the first-order upwind one,
-diagonally dominant and identical for every scheme, which is why a single matrix serves them all
-and why $\Jlag$ is one operator rather than one per scheme. The price is that it is an
+$\Jlag$ is what that implicit treatment gives: the correction is an explicit source, so it
+contributes nothing to the operator, which is why a single matrix serves every scheme and why
+$\Jlag$ is one operator rather than one per scheme. The price is that it is an
 inconsistent linearisation of $\Fho$: against a finite difference of $\Fho$, $\Jhoex$ agrees to
 \hoxFdUnlim{} where $\Jlag$ is wrong by \num{6e-2} (\S\ref{sec:res:hoexact}), so $\Jhoex$ is what
 a solve must apply to converge on the higher-order residual. Between them sits a partially
