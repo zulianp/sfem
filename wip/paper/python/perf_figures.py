@@ -335,7 +335,7 @@ LAYOUT_STYLE = {
     "packed":  ("PackA", "*"),
     "atomic":  ("PackD", "square*"),
     "colored": ("PackC", "triangle*"),
-    "ecolor":  ("PackE", "diamond*"),
+    "ecolor":  ("PackB", "diamond*"),
 }
 
 
@@ -691,18 +691,25 @@ def ladder_ratios(rows, op="residual", n=128):
 
 def table_ladder(rows, op="residual", n=128):
     at_n = [r for r in rows if r["_n"] == n and r["operation"] == op]
-    out = [PREAMBLE, r"\begin{tabular}{lrrr}", r"\toprule",
-           r"terms carried & packed & atomic & ratio \\",
-           r"& \multicolumn{2}{c}{MDOF/s} & \\",
+    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
+           r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\",
+           r"\cmidrule(lr){2-4}\cmidrule(l){5-6}",
+           r"terms carried & packed & col. & atomic & col. & atomic \\",
            r"\midrule"]
     any_row = False
     for label, sel in LADDER:
         p = best(at_n, ran_layout="packed", **sel)
         a = best(at_n, ran_layout="atomic", **sel)
+        e = best(at_n, ran_layout="ecolor", **sel)
         if p is None or a is None:
             continue
         any_row = True
-        out.append(r"%s & %.0f & %.0f & $%.2f\times$ \\" % (label, p, a, p / a))
+        # The coloured column is allowed to be missing a row without dropping the row: the
+        # element-coloured layout was added to this sweep later than the other two, so an
+        # archived campaign file still produces the table it always did.
+        out.append(r"%s & %.0f & %s & %.0f & %s & $%.2f\times$ \\"
+                   % (label, p, ("%.0f" % e) if e else "---", a,
+                      (r"$%.2f\times$" % (p / e)) if e else "---", p / a))
     out.append(r"\bottomrule")
     out.append(r"\end{tabular}")
     return "\n".join(out) + "\n" if any_row else None
@@ -1469,7 +1476,7 @@ def parse_convho(path):
         f = line.split()
         if not f or f[0] not in known or len(f) not in (5, 7):
             continue
-        if f[1] not in ("atomic", "packed") or f[2] == "-":
+        if f[1] not in ("atomic", "packed", "ecolor") or f[2] == "-":
             continue
         try:
             if len(f) == 5:
@@ -1483,15 +1490,20 @@ def parse_convho(path):
     return out
 
 
+# The layout a row belongs to, as the index keys it. "gen" rather than "packed" is historical:
+# the packed column is that layout's generated kernel.
+_CONVHO_LAY = {"packed": "gen", "atomic": "atomic", "ecolor": "ecolor"}
+
+
 def _convho_index(rows):
-    """{scheme: {"gen":x, "hand":x, "atomic":x}} plus the loose arms, by name."""
+    """{scheme: {"gen":x, "hand":x, "atomic":x, "ecolor":x}} plus the loose arms, by name."""
     by = {}
     loose = {}
     for arm, lay, mdof, _dofs, _e, _fp, _ck in rows:
         if arm in HO_SCALAR_ARM and lay == "packed":
             by.setdefault(HO_SCALAR_ARM[arm], {})["hand"] = mdof
-        elif arm in HO_NAME:
-            by.setdefault(arm, {})["gen" if lay == "packed" else "atomic"] = mdof
+        elif arm in HO_NAME and lay in _CONVHO_LAY:
+            by.setdefault(arm, {})[_CONVHO_LAY[lay]] = mdof
         elif arm in HO_EXTRA and lay == "packed":
             loose[arm] = mdof
     return by, loose
@@ -1513,17 +1525,25 @@ def table_convho(rows):
     if not rows:
         return None
     by, _loose = _convho_index(rows)
-    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrr@{}}", r"\toprule",
-           r"convective scheme & packed & atomic & ratio \\",
-           r"& \multicolumn{2}{c}{MDOF/s} & \\", r"\midrule"]
+    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
+           r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\",
+           r"\cmidrule(lr){2-4}\cmidrule(l){5-6}",
+           r"convective scheme & packed & col. & atomic & col. & atomic \\",
+           r"\midrule"]
     for arm in ("first_order", "ho_unlimited", "ho_clip", "ho_venkatakrishnan",
                 "ho_darwish_moukalled"):
         d = by.get(arm)
         if not d:
             continue
-        pk, at = d.get("gen"), d.get("atomic")
-        ratio = (r"$%.2f\times$" % (pk / at)) if (pk and at) else "---"
-        out.append(r"%s & %s & %s & %s \\" % (HO_NAME[arm], _fmt0(pk), _fmt0(at), ratio))
+        pk, ec, at = d.get("gen"), d.get("ecolor"), d.get("atomic")
+        # Two ratios, because the element-coloured layout is the more informative baseline: it
+        # removes the atomics without the packed format's staging, so packed-over-coloured is
+        # what the format is worth beyond the scatter strategy, and packed-over-atomic is the
+        # headline both together are worth.
+        r_ec = (r"$%.2f\times$" % (pk / ec)) if (pk and ec) else "---"
+        r_at = (r"$%.2f\times$" % (pk / at)) if (pk and at) else "---"
+        out.append(r"%s & %s & %s & %s & %s & %s \\"
+                   % (HO_NAME[arm], _fmt0(pk), _fmt0(ec), _fmt0(at), r_ec, r_at))
     out.append(r"\bottomrule")
     out.append(r"\end{tabular}")
     return "\n".join(out) + "\n"
@@ -1582,7 +1602,7 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
     return PREAMBLE + "\n".join([
         r"\begin{tikzpicture}",
         r"\begin{axis}[width=\columnwidth, height=0.44\columnwidth,",
-        r"  ybar, bar width=7pt, ymin=0, ylabel={%s}," % ylabel,
+        r"  ybar, bar width=5pt, ymin=0, ylabel={%s}," % ylabel,
         # ONE swatch per bar entry. The ybar default draws a pair of bars in the legend, which
         # says nothing here -- each series is one bar per group, not two -- and doubles the width
         # of a legend that also has to hold two dashed reference lines. The SpMV entries below
@@ -1594,8 +1614,13 @@ def fig_scheme_bars(rows, spmv=None, ylabel="MDOF/s"):
         r"  legend style={font=\tiny, draw=none, fill=none, inner sep=1pt},",
         r"  tick label style={font=\scriptsize}, label style={font=\scriptsize},",
         r"  ymajorgrids, major grid style={black!12}]",
+        # packed | coloured | atomic, left to right within each group: the two that avoid
+        # atomics stand together, so the step from coloured to atomic is the scatter strategy
+        # and the step from packed to coloured is the format.
         r"\addplot[draw=PackA, fill=PackA] coordinates {%s};" % series("gen"),
         r"\addlegendentry{packed}",
+        r"\addplot[draw=PackB, fill=PackB] coordinates {%s};" % series("ecolor"),
+        r"\addlegendentry{coloured}",
         r"\addplot[draw=PackD, fill=PackD] coordinates {%s};" % series("atomic"),
         r"\addlegendentry{atomic}",
     ] + _convho_spmv_lines(spmv, short[order[0]]) + [
@@ -1974,19 +1999,22 @@ def table_jacfair(rows):
     for op, lay, v in rows:
         by.setdefault(op, {})[lay] = v
     f64 = by.get("spmv_f64", {}).get("none")
-    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrr@{}}", r"\toprule",
-           r"& \multicolumn{2}{c}{packed} & \multicolumn{2}{c}{atomic} \\",
-           r"\cmidrule(lr){2-3}\cmidrule(l){4-5}",
-           r"operator & MDOF/s & vs.\ \texttt{f64} & MDOF/s & vs.\ \texttt{f64} \\",
+    # Three layouts, grouped by quantity rather than by layout: rates together and ratios
+    # together, so a reader comparing two layouts reads along a row instead of hopping over the
+    # ratio between them. Ordered packed | coloured | atomic throughout the paper.
+    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrrrr@{}}", r"\toprule",
+           r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{3}{c}{vs.\ \texttt{f64}} \\",
+           r"\cmidrule(lr){2-4}\cmidrule(l){5-7}",
+           r"operator & packed & col. & atomic & packed & col. & atomic \\",
            r"\midrule"]
 
     def cells(op):
-        got = []
-        for lay in ("packed", "atomic"):
+        rates, ratios = [], []
+        for lay in ("packed", "ecolor", "atomic"):
             v = by[op].get(lay)
-            got.append("%.0f" % v if v else "---")
-            got.append((r"$%.2f\times$" % (v / f64)) if v and f64 else "---")
-        return " & ".join(got)
+            rates.append("%.0f" % v if v else "---")
+            ratios.append((r"$%.2f\times$" % (v / f64)) if v and f64 else "---")
+        return " & ".join(rates + ratios)
 
     for group in (JF_EXACT, JF_LAGGED):
         present = [o for o in group if o in by]
@@ -2006,7 +2034,7 @@ def table_jacfair(rows):
         if v is None:
             continue
         rel = (r", $%.2f\times$" % (v / f64)) if f64 else ""
-        out.append(r"%s & \multicolumn{4}{c}{%.0f%s} \\" % (JF_NAME[op], v, rel))
+        out.append(r"%s & \multicolumn{6}{c}{%.0f%s} \\" % (JF_NAME[op], v, rel))
     out.append(r"\bottomrule")
     out.append(r"\end{tabular}")
     return "\n".join(out) + "\n"

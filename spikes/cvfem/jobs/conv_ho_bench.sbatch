@@ -76,18 +76,23 @@ printf '%-22s %-8s %10s %10s %10s %10s %14s\n' arm layout MDOF_s dofs elems flop
 # which is the table whose subject they are.
 for arm in "first_order|atomic|--rhie-chow" \
            "first_order|packed|--rhie-chow" \
+           "first_order|ecolor|--rhie-chow" \
            "ho_unlimited|atomic|--rhie-chow --conv-ho 0" \
            "ho_unlimited|packed|--rhie-chow --conv-ho 0" \
+           "ho_unlimited|ecolor|--rhie-chow --conv-ho 0" \
            "ho_unlim_scalar|packed|--rhie-chow --conv-ho 0 --ho-scalar" \
            "ho_unlim_simd|packed|--rhie-chow --conv-ho 0 --ho-simd" \
            "ho_clip|atomic|--rhie-chow --conv-ho 1" \
            "ho_clip|packed|--rhie-chow --conv-ho 1" \
+           "ho_clip|ecolor|--rhie-chow --conv-ho 1" \
            "ho_clip_scalar|packed|--rhie-chow --conv-ho 1 --ho-scalar" \
            "ho_venkatakrishnan|atomic|--rhie-chow --conv-ho 2" \
            "ho_venkatakrishnan|packed|--rhie-chow --conv-ho 2" \
+           "ho_venkatakrishnan|ecolor|--rhie-chow --conv-ho 2" \
            "ho_venk_scalar|packed|--rhie-chow --conv-ho 2 --ho-scalar" \
            "ho_darwish_moukalled|atomic|--rhie-chow --conv-ho 3" \
            "ho_darwish_moukalled|packed|--rhie-chow --conv-ho 3" \
+           "ho_darwish_moukalled|ecolor|--rhie-chow --conv-ho 3" \
            "ho_dm_scalar|packed|--rhie-chow --conv-ho 3 --ho-scalar"; do
     IFS='|' read -r lbl lay extra <<<"$arm"
     best=""; dofs=""; ck=""; elems=""; fpe=""

@@ -45,10 +45,18 @@ N=${N:-16}
 # malformed line and printed its usage. Every row of the table came back empty.
 COMMON="SFEM_CASE=cavity SFEM_N=$N SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=direct SFEM_ENABLE_OUTPUT=0 SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_CONV_HO=1"
 
+# The three axes are overridable so a missing slice can be re-run without a second copy of this
+# job. The full 2x2x2 does not fit the debug partition's 29 minutes -- the first run of this
+# reached arm six of eight and was cancelled mid-solve, leaving the limited-and-unfrozen pair
+# unmeasured, which is the pair the question is actually about. Run it as LIMS=2 FRS=0.
+LIMS=${LIMS:-"0 2"}
+FRS=${FRS:-"1 0"}
+EXS=${EXS:-"1 0"}
+
 printf '%-8s %-9s %-8s %11s %10s %12s\n' freeze limiter jacobian newton_total converged lin_it_total
-for lim in 0 2; do
-for fr in 1 0; do
-for ex in 1 0; do
+for lim in $LIMS; do
+for fr in $FRS; do
+for ex in $EXS; do
     tag=lim${lim}_fr${fr}_ex${ex}
     log=$OUT/$tag.log
     timeout "${RUN_TIMEOUT:-900}" \
