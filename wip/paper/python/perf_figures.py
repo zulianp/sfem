@@ -1929,7 +1929,7 @@ JF_NAME = {
     "jac_exact":      r"$\Jex(u)\,v$, first-order upwind",
     "jac_clip_exact": r"$\Jhoex(u)\,v$, Barth--Jespersen",
     "jac_ho_exact":   r"$\Jhoex(u)\,v$, Darwish--Moukalled",
-    "jac_lagged":     r"$\Jlag(u)\,v$, any scheme",
+    "jac_lagged":     r"$\Jlag(u)\,v$, any of these",
     "spmv_f64":       r"SpMV with $\Jlag$, \texttt{f64}",
     "spmv_f32":       r"SpMV with $\Jlag$, \texttt{f32}",
 }

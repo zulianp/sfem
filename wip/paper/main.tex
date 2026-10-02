@@ -1351,9 +1351,10 @@ kernel by those factors.
   \centering
   \caption{The Jacobian action, each form fully exact or fully lagged, against the
     double-precision product (the \texttt{f64} row, which the ratios divide by and which has no
-    layout of its own). $\Jlag$ is one row because it does not depend on the convective scheme:
-    lagging the correction leaves the scheme no route into the action, and a control at every
-    limiter reproduces the first-order lagged result bit for bit. It is also the only form the
+    layout of its own). $\Jlag$ is one row because these schemes reach the action only through
+    the correction's derivative, so lagging it leaves them no route in: the first-order row
+    \emph{is} the lagged action, and a control at every limiter reproduces its result bit for
+    bit. It is also the only form the
     matrix can hold; the $\Jhoex$ rows have no matrix counterpart at all. The limiters are the
     cheapest and among the dearest, so they bracket what one costs.}
   \label{tab:jacfair}
