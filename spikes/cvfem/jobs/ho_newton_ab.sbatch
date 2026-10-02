@@ -51,7 +51,21 @@ PRECOND=${PRECOND:-bjacobi}
 # Pinned, not inherited: an iteration count means nothing without the tolerance it was reached at,
 # and this is the driver's default today rather than a choice this job made.
 LRTOL=${LRTOL:-1e-3}
-COMMON="SFEM_CASE=cavity SFEM_N=$N SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=$PRECOND SFEM_LSOLVE_RTOL=$LRTOL SFEM_ENABLE_OUTPUT=0 SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_CONV_HO=1"
+
+# THE MESH AND THE PRECONDITIONER SCALE TOGETHER, so both are parameters.
+#
+# Block-Jacobi is h-dependent on this saddle-point system: at 19,652 dof the worst step took 406
+# iterations, and at 1,098,500 dof every step hit the 1000 cap and no arm converged, which makes
+# every number a floor and inverts the comparison -- the worse Jacobian looks better for having
+# failed in fewer Newton steps. Above roughly 10^5 dof the preconditioner has to be multigrid.
+#
+# REFINE=1 is the flat mesh with SFEM_GMG=0; REFINE>1 is semi-structured, where the hierarchy
+# exists and GMG=1 selects it. The two are different discretisation paths, so a ratio must come
+# from arms that share one.
+REFINE=${REFINE:-1}
+GMG=${GMG:-0}
+MG_EXTRA=${MG_EXTRA:-}
+COMMON="SFEM_CASE=cavity SFEM_N=$N SFEM_FGMRES=1 SFEM_GMG=$GMG SFEM_PRECOND=$PRECOND SFEM_LSOLVE_RTOL=$LRTOL SFEM_ENABLE_OUTPUT=0 SFEM_ELEMENT_REFINE_LEVEL=$REFINE SFEM_CONV_HO=1 $MG_EXTRA"
 
 # The three axes are overridable so a missing slice can be re-run without a second copy of this
 # job. The full 2x2x2 does not fit the debug partition's 29 minutes -- the first run of this
@@ -61,7 +75,10 @@ LIMS=${LIMS:-"0 2"}
 FRS=${FRS:-"1 0"}
 EXS=${EXS:-"1 0"}
 
-echo "### preconditioner: $PRECOND  linear rtol: $LRTOL"
+echo "### preconditioner: $PRECOND  linear rtol: $LRTOL  n: $N  refine: $REFINE  gmg: $GMG"
+# A capped solve is not a result, and the table cannot show that on its own: converged=0 is the
+# column to read, and lin_it_total is then newton_total times the cap.
+echo "### a row with converged=0 is a floor, not a measurement"
 printf '%-8s %-9s %-8s %11s %10s %12s %10s\n' freeze limiter jacobian newton_total converged lin_it_total t_solve_s
 for lim in $LIMS; do
 for fr in $FRS; do

@@ -1688,7 +1688,12 @@ def parse_honewton(path):
             # "### preconditioner: bjacobi  linear rtol: 1e-3"
             pc = line.split(":")[1].split()[0].strip()
             if "rtol:" in line:
-                rtol = line.split("rtol:")[1].strip()
+                rtol = line.split("rtol:")[1].split()[0].strip()
+            if " n: " in line:
+                # HEX8, four fields per node, so the cube's size fixes the problem size and the
+                # paper does not have to be told it separately.
+                n = int(line.split(" n: ")[1].split()[0])
+                out["ndof"] = (n + 1) ** 3 * 4
             continue
         f = line.split()
         if len(f) < 7 or f[0] not in ("frozen", "unfrozen") or f[2] not in ("exact", "lagged"):
@@ -1717,6 +1722,8 @@ def macros_honewton(runs):
     for r in runs:
         merged.update(r)
     out = [PREAMBLE]
+    if merged.get("ndof"):
+        out.append(r"\newcommand{\nwtDof}{%d}" % merged["ndof"])
     if merged.get("rtol"):
         # An iteration count without its tolerance is not a measurement, so the two are one macro
         # pair and the prose cannot quote the counts without it.
