@@ -43,7 +43,12 @@ N=${N:-16}
 # newline inside it splits that command in two: the first half became `env <assignments>` with no
 # command, which prints the environment and exits 0, and the driver in the second half got a
 # malformed line and printed its usage. Every row of the table came back empty.
-COMMON="SFEM_CASE=cavity SFEM_N=$N SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=direct SFEM_ENABLE_OUTPUT=0 SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_CONV_HO=1"
+# Block-Jacobi, and a parameter so the row can say which preconditioner it was measured under.
+# This job ran under SFEM_PRECOND=direct once: that is an exact inverse of the operator, so every
+# solve took one iteration and 98.6% of the time was the factorisation, and neither the operator's
+# cost nor the conditioning it produces was measurable.
+PRECOND=${PRECOND:-bjacobi}
+COMMON="SFEM_CASE=cavity SFEM_N=$N SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=$PRECOND SFEM_ENABLE_OUTPUT=0 SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_CONV_HO=1"
 
 # The three axes are overridable so a missing slice can be re-run without a second copy of this
 # job. The full 2x2x2 does not fit the debug partition's 29 minutes -- the first run of this
@@ -53,7 +58,8 @@ LIMS=${LIMS:-"0 2"}
 FRS=${FRS:-"1 0"}
 EXS=${EXS:-"1 0"}
 
-printf '%-8s %-9s %-8s %11s %10s %12s\n' freeze limiter jacobian newton_total converged lin_it_total
+echo "### preconditioner: $PRECOND"
+printf '%-8s %-9s %-8s %11s %10s %12s %10s\n' freeze limiter jacobian newton_total converged lin_it_total t_solve_s
 for lim in $LIMS; do
 for fr in $FRS; do
 for ex in $EXS; do
@@ -67,9 +73,15 @@ for ex in $EXS; do
     nt=$(sed -n 's/.*newton_total: \([0-9]*\).*/\1/p' "$log" | tail -1)
     cv=$(sed -n 's/.*newton_converged: \([0-9]*\).*/\1/p' "$log" | tail -1)
     li=$(sed -n 's/.*lin_it_total: \([0-9]*\).*/\1/p' "$log" | tail -1)
-    printf '%-8s %-9s %-8s %11s %10s %12s\n' \
+    # The Krylov solve's own seconds, which is the number the steps and the iterations exist to
+    # explain: the exact action trades more cost per linear iteration for fewer of them, and only
+    # this says which way the trade went. t_precond and t_operator are in the log beside it;
+    # under a direct preconditioner t_solve is a rounding error on t_precond, which is why that
+    # configuration cannot answer the question at all.
+    ts=$(sed -n 's/.*t_solve: \([0-9.]*\) s.*/\1/p' "$log" | tail -1)
+    printf '%-8s %-9s %-8s %11s %10s %12s %10s\n' \
            "$([ "$fr" = 1 ] && echo frozen || echo unfrozen)" "$lim" \
-           "$([ "$ex" = 1 ] && echo exact || echo lagged)" "${nt:--}" "${cv:--}" "${li:--}"
+           "$([ "$ex" = 1 ] && echo exact || echo lagged)" "${nt:--}" "${cv:--}" "${li:--}" "${ts:--}"
 done
 done
 done
