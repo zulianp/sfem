@@ -1682,10 +1682,13 @@ def parse_honewton(path):
     exactly that reason, and one arm of the first run was killed by its per-arm timeout at 80
     steps and would otherwise have read as an 80-step result.
     """
-    out, pc = {}, None
+    out, pc, rtol = {}, None, None
     for line in open(path):
         if line.startswith("### preconditioner:"):
-            pc = line.split(":")[1].strip()
+            # "### preconditioner: bjacobi  linear rtol: 1e-3"
+            pc = line.split(":")[1].split()[0].strip()
+            if "rtol:" in line:
+                rtol = line.split("rtol:")[1].strip()
             continue
         f = line.split()
         if len(f) < 7 or f[0] not in ("frozen", "unfrozen") or f[2] not in ("exact", "lagged"):
@@ -1699,6 +1702,8 @@ def parse_honewton(path):
         # reads, and are dropped rather than averaged in.
         if conv == 1 and pc == "bjacobi":
             out[(f[1], f[0], f[2])] = (steps, lin, sec)
+    if rtol:
+        out["rtol"] = rtol
     return out
 
 
@@ -1712,6 +1717,10 @@ def macros_honewton(runs):
     for r in runs:
         merged.update(r)
     out = [PREAMBLE]
+    if merged.get("rtol"):
+        # An iteration count without its tolerance is not a measurement, so the two are one macro
+        # pair and the prose cannot quote the counts without it.
+        out.append(r"\newcommand{\nwtRtol}{%s}" % merged["rtol"])
     for lim, tag in (("0", "Unlim"), ("2", "Venk")):
         ex = merged.get((lim, "unfrozen", "exact"))
         lg = merged.get((lim, "unfrozen", "lagged"))

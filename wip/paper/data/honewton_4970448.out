@@ -1,8 +1,0 @@
-### preconditioner: bjacobi
-freeze   limiter   jacobian newton_total  converged lin_it_total  t_solve_s
-unfrozen 0         exact             16          1         2319     2.4511
-unfrozen 0         lagged            35          1         4100     3.4747
-unfrozen 2         exact             17          1         2643     3.2760
-unfrozen 2         lagged            92          1         7195     6.2989
-
-logs in /ritom/scratch/cscs/zulianp/cvfem_honewton/4970448

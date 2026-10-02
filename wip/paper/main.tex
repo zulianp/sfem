@@ -1267,16 +1267,21 @@ count. That is also why the atomic $\Jhoex$ is so nearly all reconstruction: its
 field count where the packed one does not.
 
 What it buys is time to solution, and the deferred correction is slower rather than broken: both
-converge to the same solution, since the fixed point is where $\Fho$ vanishes either way. On the
-lid-driven cavity at $\mathrm{Re}=100$ over five continuation stages, \textsc{fgmres} with
-block-Jacobi, $\Jhoex$ takes \nwtUnlimExactSteps{} Newton steps and \nwtUnlimExactLin{} linear
-iterations against $\Jex$'s \nwtUnlimLaggedSteps{} and \nwtUnlimLaggedLin{} on the unlimited
-correction, and \nwtVenkExactSteps{}/\nwtVenkExactLin{} against
-\nwtVenkLaggedSteps{}/\nwtVenkLaggedLin{} with Venkatakrishnan. The exact action costs
-$\nwtUnlimPerIt\times$ and $\nwtVenkPerIt\times$ per linear iteration and needs
-$\nwtUnlimLinRatio\times$ and $\nwtVenkLinRatio\times$ fewer of them, so it solves
-$\nwtUnlimTimeRatio\times$ and $\nwtVenkTimeRatio\times$ faster. The limiter widens the margin,
-which is where a deferred correction is weakest.
+converge to the same solution, since the fixed point is where $\Fho$ vanishes either way. The
+case is the three-dimensional lid-driven cavity at \SI{19652}{} degrees of freedom, a zero-mean
+pressure gauge and a Reynolds continuation through $1, 4, 16, 64, 100$; the solver is
+\textsc{fgmres} preconditioned by block-Jacobi, each linear system solved to a relative residual
+of \nwtRtol{}, and the counts below are totals over the five stages.
+
+$\Jhoex$ takes \nwtUnlimExactSteps{} Newton steps and \nwtUnlimExactLin{} linear iterations
+against $\Jex$'s \nwtUnlimLaggedSteps{} and \nwtUnlimLaggedLin{} on the unlimited correction, and
+\nwtVenkExactSteps{}/\nwtVenkExactLin{} against \nwtVenkLaggedSteps{}/\nwtVenkLaggedLin{} with
+Venkatakrishnan. So the exact action costs $\nwtUnlimPerIt\times$ and $\nwtVenkPerIt\times$ per
+linear iteration and needs $\nwtUnlimLinRatio\times$ and $\nwtVenkLinRatio\times$ fewer of them,
+and solves $\nwtUnlimTimeRatio\times$ and $\nwtVenkTimeRatio\times$ faster. The limiter widens
+the margin, which is where a deferred correction is weakest. At \nwtRtol{} the Newton step is
+inexact, so the step ratio carries the tolerance's cost as well as the Jacobian's quality; the
+time is the quantity that does not.
 
 \subsection{Against the lagged matrix}
 \label{sec:res:spmv}
