@@ -1674,6 +1674,50 @@ def _fmt0(v):
     return "---" if not v else ("%.0f" % v)
 
 
+def parse_honewton(path):
+    """Read jobs/ho_newton_ab.sbatch's table: what the exact correction buys the Newton loop.
+
+    {(limiter, freeze, jacobian): steps} for the CONVERGED rows only. A row that did not
+    converge is a floor and not a step count -- the job prints the flag beside every row for
+    exactly that reason, and one arm of the first run was killed by its per-arm timeout at 80
+    steps and would otherwise have read as an 80-step result.
+    """
+    out = {}
+    for line in open(path):
+        f = line.split()
+        if len(f) < 5 or f[0] not in ("frozen", "unfrozen") or f[2] not in ("exact", "lagged"):
+            continue
+        try:
+            steps, conv = int(f[3]), int(f[4])
+        except ValueError:
+            continue
+        if conv == 1:
+            out[(f[1], f[0], f[2])] = steps
+    return out
+
+
+def macros_honewton(runs):
+    """The unfrozen rows, which are the ones where the correction is active.
+
+    Several files, because the full 2x2x2 does not fit one debug allocation and the slices were
+    run separately; later files win, so a re-run of one arm replaces it without replacing the rest.
+    """
+    merged = {}
+    for r in runs:
+        merged.update(r)
+    out = [PREAMBLE]
+    for lim, tag in (("0", "Unlim"), ("2", "Venk")):
+        ex = merged.get((lim, "unfrozen", "exact"))
+        lg = merged.get((lim, "unfrozen", "lagged"))
+        if ex:
+            out.append(r"\newcommand{\nwt%sExact}{%d}" % (tag, ex))
+        if lg:
+            out.append(r"\newcommand{\nwt%sLagged}{%d}" % (tag, lg))
+        if ex and lg:
+            out.append(r"\newcommand{\nwt%sRatio}{%.1f}" % (tag, lg / ex))
+    return "\n".join(out) + "\n"
+
+
 def macros_convho(rows):
     """The figures the prose quotes: each variant's two layouts and the ratio between them."""
     by, _loose = _convho_index(rows)
@@ -2270,6 +2314,14 @@ def build(out_dir, tab_dir):
             with open(os.path.join(out_dir, "ngrad_macros.tex"), "w") as fh:
                 fh.write(macros_ngrad(nr))
             written.append("figures/ngrad_macros.tex")
+
+    nw = [f for f in sorted(os.listdir(DATA)) if f.startswith("honewton_")] if os.path.isdir(DATA) else []
+    if nw:
+        runs = [parse_honewton(os.path.join(DATA, f)) for f in nw]
+        if any(runs):
+            with open(os.path.join(out_dir, "honewton_macros.tex"), "w") as fh:
+                fh.write(macros_honewton(runs))
+            written.append("figures/honewton_macros.tex")
 
     km = [f for f in sorted(os.listdir(DATA)) if f.startswith("kmix_")] if os.path.isdir(DATA) else []
     if km:
