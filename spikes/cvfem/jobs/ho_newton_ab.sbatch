@@ -48,7 +48,10 @@ N=${N:-16}
 # solve took one iteration and 98.6% of the time was the factorisation, and neither the operator's
 # cost nor the conditioning it produces was measurable.
 PRECOND=${PRECOND:-bjacobi}
-COMMON="SFEM_CASE=cavity SFEM_N=$N SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=$PRECOND SFEM_ENABLE_OUTPUT=0 SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_CONV_HO=1"
+# Pinned, not inherited: an iteration count means nothing without the tolerance it was reached at,
+# and this is the driver's default today rather than a choice this job made.
+LRTOL=${LRTOL:-1e-3}
+COMMON="SFEM_CASE=cavity SFEM_N=$N SFEM_FGMRES=1 SFEM_GMG=0 SFEM_PRECOND=$PRECOND SFEM_LSOLVE_RTOL=$LRTOL SFEM_ENABLE_OUTPUT=0 SFEM_ELEMENT_REFINE_LEVEL=1 SFEM_CONV_HO=1"
 
 # The three axes are overridable so a missing slice can be re-run without a second copy of this
 # job. The full 2x2x2 does not fit the debug partition's 29 minutes -- the first run of this
@@ -58,7 +61,7 @@ LIMS=${LIMS:-"0 2"}
 FRS=${FRS:-"1 0"}
 EXS=${EXS:-"1 0"}
 
-echo "### preconditioner: $PRECOND"
+echo "### preconditioner: $PRECOND  linear rtol: $LRTOL"
 printf '%-8s %-9s %-8s %11s %10s %12s %10s\n' freeze limiter jacobian newton_total converged lin_it_total t_solve_s
 for lim in $LIMS; do
 for fr in $FRS; do
