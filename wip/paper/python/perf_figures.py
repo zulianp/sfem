@@ -740,7 +740,7 @@ def macros_throughput(rows, host, n=128, provisional=False):
             out.append(r"\newcommand{\campColorPacksHi}{%d}" % hi)
         except (KeyError, ValueError):
             pass
-    # The share of the exact-Rhie--Chow Jacobian matvec spent reconstructing the DIRECTION's
+    # The share of the exact-Rhie--Chow Jacobian application spent reconstructing the DIRECTION's
     # nodal pressure gradient. This is the second pass of a two-pass operator and the driver
     # times it separately precisely so it cannot be attributed to the element kernel.
     qg = [r for r in at_n if r["operation"] == "jac_action" and r.get("exact_rc") == "1"
@@ -1863,7 +1863,7 @@ def parse_hoexact(path):
                 rates[f[0]] = float(f[1])
             except ValueError:
                 pass
-            # The reconstruction's share of the matvec it sits in, recorded by the driver from
+            # The reconstruction's share of the operator application it sits in, recorded by the driver from
             # the same pass that gave the rate. Older tables have three columns and no share.
             if len(f) == 4 and f[3] != "-":
                 try:
@@ -1905,7 +1905,7 @@ def macros_hoexact(rates, checks, frac=None):
         out.append(r"\newcommand{\hoxExactPackedUnlim}{%.0f}" % rates["jac_ho_exact_packed_unlim"])
         out.append(r"\newcommand{\hoxLimiterCost}{%.2f}"
                    % (rates["jac_ho_exact_packed_unlim"] / rates["jac_ho_exact_packed"]))
-    # What share of the matvec the added reconstruction is, on each layout. The prose used to
+    # What share of the operator application the added reconstruction is, on each layout. The prose used to
     # carry these two as typed percentages; they move with the kernel, so they are generated.
     for name, key in (("FracPacked", "jac_ho_exact_packed"), ("FracAtomic", "jac_ho_exact_atomic")):
         if frac and key in frac:

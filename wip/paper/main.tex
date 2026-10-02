@@ -764,7 +764,8 @@ same pass that supplies the Rhie--Chow coupling its pressure gradient.
 Both the correction and the coupling can be differentiated or held fixed, independently. Held
 fixed --- \emph{lagged} one Newton step --- the gradient is an input to the application rather
 than part of it. Differentiated, the Jacobian action needs the reconstructed gradient of the
-\emph{direction} and not only of the state, which is one further pass per matvec. All four
+\emph{direction} and not only of the state, which is one further pass per operator
+application. All four
 combinations are implemented and measured (\S\ref{sec:res:hoexact}); the limiters are
 differentiated where they are differentiable and a subgradient is taken where they are not.
 
@@ -783,7 +784,7 @@ $\Gop u(u)$ as well.
 
 $\Jlag(u)\,v$ and $\Jex(u)\,v$ are the Jacobian action with the coupling lagged and
 differentiated: the lagged form evaluates it with $\Gop p(u)$, the exact form differentiates
-through the reconstruction and rebuilds $\Gop p(v)$ on every matvec. $\Jholag(u)\,v$ and
+through the reconstruction and rebuilds $\Gop p(v)$ on every application. $\Jholag(u)\,v$ and
 $\Jhoex(u)\,v$ add the differentiated correction, including the derivative of the limiter, and
 rebuild $\Gop u(v)$ with it. Lagging the correction instead reproduces $\Jlag$ and $\Jex$ to the
 last bit, which is why there is no fourth pair.
@@ -800,7 +801,7 @@ records which one ran.
          and both are exact by default
 \If{Rhie--Chow carried and exact}
   \State $q \gets \nabla p(v)$ by Algorithm~\ref{alg:apply}
-         \Comment{3 components; the \emph{direction}'s pressure gradient, rebuilt every matvec}
+         \Comment{3 components; the \emph{direction}'s pressure gradient, rebuilt every application}
 \Else
   \State $q \gets \varnothing$ \Comment{lagged: the coupling uses the state's gradient alone}
 \EndIf
@@ -818,7 +819,8 @@ records which one ran.
          derivative of the limiter, evaluated with $\nabla u(u)$ and $g_v$
 \EndIf
 \State add the boundary closure and the transient term, each an extra sweep
-\Statex Each exact term costs one reconstruction of a \emph{direction} field per matvec, which
+\Statex Each exact term costs one reconstruction of a \emph{direction} field per operator
+        application, which
         is why each is switchable: the state's own gradients are hoisted across the Krylov solve,
         the direction's cannot be. \S\ref{sec:res:hoexact} measures what the second one buys.
 \end{algorithmic}
@@ -846,7 +848,8 @@ $\Jex$, and between the two $\Fres$ rows of Table~\ref{tab:passes}.
   \centering
   \caption{What each operator sweeps, per application. The last column is what the operator
     reads but does not rebuild: a state reconstruction is computed once per Newton step and read
-    by the residual and by every matvec in that step, and the matrix is assembled once per
+    by the residual and by every operator application in that step, and the matrix is
+    assembled once per
     Newton step. Those are the dominant costs of their rows and are measured separately
     (\S\ref{sec:res:hoexact}, \S\ref{sec:res:spmv}).}
   \label{tab:passes}
@@ -877,7 +880,8 @@ The second row is the configuration in which $\Gop p$ is rebuilt inside every ap
 than hoisted. It is not an operator a solver applies; it is measured because it is the
 configuration in which the layout's margin is widest (\S\ref{sec:res:ladder}), spending more of
 its time in the sweep the packed layout accelerates most. The driver times that sweep at
-\SI{\campQgradPct}{\percent} of $\Jex$, large enough that attributing the whole matvec to the
+\SI{\campQgradPct}{\percent} of $\Jex$, large enough that attributing the whole application to
+the
 element kernel would misplace a sixth of it.
 
 \paragraph{The solver's terms.} The Rhie--Chow coupling~\cite{RhieChow1983} is required: a
@@ -1145,7 +1149,8 @@ three share the reconstruction and differ only in the function applied to the in
 action, which is the operator a Newton--Krylov solve applies once per linear iteration against one
 residual per step. Two things differ from the residual. The absolute cost of differentiating the
 correction is large --- \jachoFirstPacked{} to \jachoUnlimPacked{}~MDOF/s packed on the unlimited
-arm alone, before any limiter --- because $\Jhoex$ reconstructs $\Gop u(v)$ on every matvec,
+arm alone, before any limiter --- because $\Jhoex$ reconstructs $\Gop u(v)$ on every
+application,
 nine components against the three $\Gop p(v)$ that $\Jex$ already rebuilds. And the format's margin moves the other way: it rises from
 $\jachoFirstLayoutRatio\times$ to $\jachoUnlimLayoutRatio\times$ before the limiters pull it back
 to $\jachoDmLayoutRatio$--$\jachoClipLayoutRatio\times$, since the added reconstruction is
@@ -1183,7 +1188,8 @@ cancellation, so a term can be present at every node and absent from the total. 
 
 The correction is applied lagged, so it contributes nothing to the Jacobian and the action of a
 higher-order residual is the first-order action (\S\ref{sec:setup}). Differentiating it instead
-costs one reconstruction of the \emph{direction}'s nodal velocity gradient per matvec --- nine
+costs one reconstruction of the \emph{direction}'s nodal velocity gradient per operator
+application --- nine
 components against the three the exact Rhie--Chow action already rebuilds --- and the limiter's
 own derivative, which is not free: the unlimited arm reaches \hoxExactPackedUnlim{}~MDOF/s
 against Venkatakrishnan's \hoxExactPacked{}, a factor of $\hoxLimiterCost$.
@@ -1192,7 +1198,7 @@ The exact form costs $\hoxCostPacked\times$ the lagged one, \hoxLaggedPacked{} t
 \hoxExactPacked{}~MDOF/s, against $\hoxCostAtomic\times$ on the atomic layout. The two are close
 but not equal, and should not be: the added work is a differentiated flux, whose cost is the same
 arithmetic on either layout, plus the reconstruction, whose cost is not --- it takes a very
-different share of the two matvecs, as below. The format's advantage survives the addition: $\hoxLayoutLagged\times$ on the lagged
+different share of the two applications, as below. The format's advantage survives the addition: $\hoxLayoutLagged\times$ on the lagged
 action and $\hoxLayoutExact\times$ on the exact one. The added pass is itself packed, gathering pack-locally and closing through the same
 ghost graph the operator sweeps use.
 
@@ -1214,7 +1220,7 @@ $\ngPgradRatio$, and the three-component velocity gradient at \ngUgradPacked{} a
 \hoxLayoutLagged$\times$ the element sweeps get. Almost all of a reconstruction is indexed
 traffic, which the layout removes, and almost none is arithmetic, which it cannot touch. It is
 also where $\Jhoex$ spends its time: the reconstruction is \SI{\hoxFracPacked}{\percent}
-of the packed matvec against \SI{\hoxFracAtomic}{\percent} of the atomic one. Both direction
+of the packed application against \SI{\hoxFracAtomic}{\percent} of the atomic one. Both direction
 gradients are taken in ONE sweep --- they read different fields of the same array at the same
 stride, so together they are a four-field sweep rather than a one-field and a three-field one ---
 which is why those shares cover both and why they differ so much between the layouts: the fixed
