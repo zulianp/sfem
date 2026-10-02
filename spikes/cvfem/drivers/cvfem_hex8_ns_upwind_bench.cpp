@@ -1997,38 +1997,77 @@ int main(int argc, char **argv) {
         // three-field one, and the half of a sweep that does not scale with the field count is
         // paid once. Each keeps the layout its consumer reads, which is what the per-component
         // output stride is for. The whole cost lands in the qgrad phase, since it is one pass.
+        // THE EXACT ACTION RECONSTRUCTS THE STATE'S GRADIENTS TOO, ON EVERY APPLICATION.
+        //
+        // It used to rebuild only the direction's and read the state's from a cache filled once
+        // at setup, which makes the operator exact in its sensitivities and frozen in the fields
+        // those sensitivities are evaluated at -- and makes the measured rate exclude two full
+        // element sweeps the operator needs. An exact application is self-contained: it
+        // evaluates every reconstruction it reads. The frozen-state form is the LAGGED one, and
+        // it keeps the cache.
+        //
+        // All of it is ONE sweep, which is the only reason this is affordable. The sweep takes a
+        // base pointer and a stride per field, so the direction's four interleaved fields and
+        // the state's four contiguous ones go in together: eight fields on the higher-order arm,
+        // two on the first-order one. Outputs run three per field in field order, which is what
+        // fixes the index arithmetic below.
+        const int iso_ng = geom_kind == GeomKind::Isoparam ? 1 : 0;
         if (with_qgrad && with_hograd) {
             const double    t0      = wall_time();
-            const scalar_t *srcs[4] = {dir_v + 0, dir_v + 1, dir_v + 2, dir_v + 3};
-            const int       st[4]   = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS};
-            const int       iso     = geom_kind == GeomKind::Isoparam ? 1 : 0;
+            const scalar_t *srcs[8] = {dir_v + 0,     dir_v + 1,     dir_v + 2,     dir_v + 3,
+                                       d.ux.data(),   d.uy.data(),   d.uz.data(),   d.p.data()};
+            const int       st[8]   = {N_FIELDS, N_FIELDS, N_FIELDS, N_FIELDS, 1, 1, 1, 1};
             vgrad.resize((size_t)d.nnodes * 9);
+            ugrad.resize((size_t)d.nnodes * 9);
             d.qgx.resize((size_t)d.nnodes);
             d.qgy.resize((size_t)d.nnodes);
             d.qgz.resize((size_t)d.nnodes);
-            scalar_t *outp[12];
-            ptrdiff_t ostr[12];
+            d.pgx.resize((size_t)d.nnodes);
+            d.pgy.resize((size_t)d.nnodes);
+            d.pgz.resize((size_t)d.nnodes);
+            scalar_t *outp[24];
+            ptrdiff_t ostr[24];
             for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
             outp[9]  = d.qgx.data(); ostr[9]  = 1;
             outp[10] = d.qgy.data(); ostr[10] = 1;
             outp[11] = d.qgz.data(); ostr[11] = 1;
+            for (int c = 0; c < 9; ++c) { outp[12 + c] = ugrad.data() + c; ostr[12 + c] = 9; }
+            outp[21] = d.pgx.data(); ostr[21] = 1;
+            outp[22] = d.pgy.data(); ostr[22] = 1;
+            outp[23] = d.pgz.data(); ostr[23] = 1;
             if (packed.n_packs > 0 && !g_qgrad_atomic)
-                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso, srcs, st, 4, outp, ostr, vgbuf);
+                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 8, outp, ostr, vgbuf);
             else
-                cvfem_hex8_assemble_nodal_grads_atomic(d, iso, srcs, st, 4, outp, ostr);
+                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 8, outp, ostr);
             // Charged ONCE, to the higher-order account, because it is one pass. Adding it to
-            // both would make the two fractions sum past the matvec they are fractions of. What
-            // frac_jac_action_hograd then reports on a fused arm is the whole reconstruction,
-            // both gradients, which is the quantity section 7.8 wants anyway.
+            // both would make the two fractions sum past the application they are fractions of.
+            // What frac_jac_action_hograd then reports on a fused arm is the whole
+            // reconstruction -- all four gradients -- which is the quantity section 7.8 wants.
             const double dt = wall_time() - t0;
             hograd_seconds += dt;
             if (g_breakdown) g_phase[PH_QGRAD] += dt;
         } else if (with_qgrad) {
-            const double t0 = wall_time();
-            bench_nodal_grad(d, packed, geom_kind, dir_v + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
+            // First-order exact: the coupling's sensitivity needs the direction's pressure
+            // gradient, and the coupling itself the state's. Two fields, one sweep.
+            const double    t0      = wall_time();
+            const scalar_t *srcs[2] = {dir_v + 3, d.p.data()};
+            const int       st[2]   = {N_FIELDS, 1};
+            d.qgx.resize((size_t)d.nnodes);
+            d.qgy.resize((size_t)d.nnodes);
+            d.qgz.resize((size_t)d.nnodes);
+            d.pgx.resize((size_t)d.nnodes);
+            d.pgy.resize((size_t)d.nnodes);
+            d.pgz.resize((size_t)d.nnodes);
+            scalar_t *outp[6] = {d.qgx.data(), d.qgy.data(), d.qgz.data(),
+                                 d.pgx.data(), d.pgy.data(), d.pgz.data()};
+            ptrdiff_t ostr[6] = {1, 1, 1, 1, 1, 1};
+            if (packed.n_packs > 0 && !g_qgrad_atomic)
+                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, srcs, st, 2, outp, ostr, vgbuf);
+            else
+                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, srcs, st, 2, outp, ostr);
             const double dt_qg = wall_time() - t0;
             qgrad_seconds += dt_qg;
-            // Also into the phase table, so the pass that dominates this matvec appears
+            // Also into the phase table, so the pass that dominates this application appears
             // beside the phases of the sweep it precedes rather than only in a stdout line.
             if (g_breakdown) g_phase[PH_QGRAD] += dt_qg;
         }
@@ -2041,14 +2080,23 @@ int main(int argc, char **argv) {
             // base pointer and a stride per field, so its three velocity components are three
             // views of the same array. This used to de-interleave them into scratch first --
             // three full-length copies inside the timed region on every matvec.
+            // The state's velocity gradient goes in with it, for the reason above: six fields,
+            // one sweep. The Rhie--Chow term is lagged on this arm, so its state pressure
+            // gradient stays cached -- that is what lagging it means.
             const double    t0       = wall_time();
-            const scalar_t *vsrcs[3] = {dir_v + 0, dir_v + 1, dir_v + 2};
-            const int       vst[3]   = {N_FIELDS, N_FIELDS, N_FIELDS};
-            const int       iso      = geom_kind == GeomKind::Isoparam ? 1 : 0;
+            const scalar_t *vsrcs[6] = {dir_v + 0,   dir_v + 1,   dir_v + 2,
+                                        d.ux.data(), d.uy.data(), d.uz.data()};
+            const int       vst[6]   = {N_FIELDS, N_FIELDS, N_FIELDS, 1, 1, 1};
+            vgrad.resize((size_t)d.nnodes * 9);
+            ugrad.resize((size_t)d.nnodes * 9);
+            scalar_t *outp[18];
+            ptrdiff_t ostr[18];
+            for (int c = 0; c < 9; ++c) { outp[c] = vgrad.data() + c; ostr[c] = 9; }
+            for (int c = 0; c < 9; ++c) { outp[9 + c] = ugrad.data() + c; ostr[9 + c] = 9; }
             if (packed.n_packs > 0 && !g_qgrad_atomic)
-                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso, vsrcs, 3, vgrad, vgbuf, vst);
+                cvfem_hex8_assemble_nodal_grads_packed(d, packed, iso_ng, vsrcs, vst, 6, outp, ostr, vgbuf);
             else
-                cvfem_hex8_assemble_nodal_grads_atomic(d, iso, vsrcs, 3, vgrad, vst);
+                cvfem_hex8_assemble_nodal_grads_atomic(d, iso_ng, vsrcs, vst, 6, outp, ostr);
             hograd_seconds += wall_time() - t0;
         }
         if (partial_assembly)
