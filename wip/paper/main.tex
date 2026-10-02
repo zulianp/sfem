@@ -770,8 +770,9 @@ combinations are implemented and measured (\S\ref{sec:res:hoexact}); the limiter
 differentiated where they are differentiable and a subgradient is taken where they are not.
 
 \paragraph{Operators.} The names below are used throughout, in the tables and figures as well as
-the text. The subscript is the Rhie--Chow term and the superscript the deferred correction, so a
-symbol states which differentiations the measured operator carried.
+the text. The subscript is the Rhie--Chow term, whose sensitivity is to the pressure gradient,
+and the superscript the deferred correction, whose sensitivity is to the velocity gradient. The
+two are independent, so a symbol states which differentiations the measured operator carried.
 
 $\Gop p(u)$ and $\Gop u(u)$ are the nodal reconstructions of the pressure gradient (3
 components) and the velocity gradient (9) at the state $u$, and $\Gop p(v)$, $\Gop u(v)$ the
@@ -786,8 +787,15 @@ $\Jlag(u)\,v$ and $\Jex(u)\,v$ are the Jacobian action with the coupling lagged 
 differentiated: the lagged form evaluates it with $\Gop p(u)$, the exact form differentiates
 through the reconstruction and rebuilds $\Gop p(v)$ on every application. $\Jholag(u)\,v$ and
 $\Jhoex(u)\,v$ add the differentiated correction, including the derivative of the limiter, and
-rebuild $\Gop u(v)$ with it. Lagging the correction instead reproduces $\Jlag$ and $\Jex$ to the
-last bit, which is why there is no fourth pair.
+rebuild $\Gop u(v)$ with it.
+
+\emph{Exact} is relative to a residual. $\Jex$ is the exact Jacobian of $\Fres$ and $\Jhoex$ that
+of $\Fho$; $\Jlag$ and $\Jholag$ drop the pressure-gradient sensitivity and are the exact Jacobian
+of neither. Lagging the velocity gradient is therefore not a cheaper exact operator but an
+inconsistent linearisation of $\Fho$: the correction becomes constant in $v$, so what is left
+reproduces $\Jex$ or $\Jlag$ to the last bit. That is why there is no fourth pair, and it is what
+\S\ref{sec:res:hoexact} prices --- against a finite difference of $\Fho$, $\Jhoex$ agrees to
+\hoxFdUnlim{} and the lagged correction is wrong by \num{6e-2}.
 
 The assembled matrix holds $\Jlag$ alone, for the sparsity reason of
 \S\ref{sec:cost}. Algorithm~\ref{alg:jacaction} is where the forms part, and the driver
@@ -1229,10 +1237,9 @@ half of a sweep that fusing saves is \SI{46}{\percent} of a one-field sweep pack
 \SI{4}{\percent} atomic, the atomic one being dominated by a scatter that scales with the field
 count.
 
-What it buys is Newton steps. $\Jhoex$ is verified against a finite difference of $\Fho$ with
-$\Gop u$ rebuilt at each perturbed state --- \hoxFdUnlim{} on the unlimited arm, against
-$\Jex$'s \num{6e-2} --- and on the lid-driven cavity it recovers the convergence $\Jex$ loses on
-$\Fho$.
+What it buys is Newton steps. The finite difference of $\Fho$ that separates the two
+(\S\ref{sec:setup}) rebuilds $\Gop u$ at each perturbed state, and on the lid-driven cavity
+$\Jhoex$ recovers the convergence $\Jex$ loses on $\Fho$.
 
 \subsection{Against the lagged matrix}
 \label{sec:res:spmv}
