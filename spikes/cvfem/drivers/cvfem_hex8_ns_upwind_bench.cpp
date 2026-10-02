@@ -1188,6 +1188,18 @@ int main(int argc, char **argv) {
         // The nodal-gradient reconstruction follows the layout too. Leaving it atomic made the
         // Rhie-Chow arm the one nondeterministic part of an otherwise reproducible operator.
         cvfem_hex8_set_qgrad_ecolors(&ecolors);
+        // NO HYBRID PIPELINE. Every pass of an operator application must belong to the layout
+        // under test, and the one that can silently stop doing so is this one: the gradient
+        // sweep picks its scatter from a pointer rather than from the dispatch, so a new call
+        // site or a caller outside this file would fall back to atomics and produce an
+        // element-coloured element sweep feeding on an atomically reduced gradient. Checked
+        // here, where the pointer is set, rather than trusted.
+        if (cvfem_hex8_qgrad_ecolors() != &ecolors || ecolors.n_colors <= 0) {
+            std::fprintf(stderr, "element-coloured layout could not claim the nodal-gradient "
+                                 "sweep; refusing to run a hybrid pipeline\n");
+            if (own_mpi) MPI_Finalize();
+            return 1;
+        }
     }
 
     if (mesh_footprint) {
@@ -2477,6 +2489,25 @@ int main(int argc, char **argv) {
     std::printf("  geom: %s\n", geom.c_str());
     std::printf("  warp: %.6e\n", warp);
     std::printf("  OpenMP_threads: %d\n", threads_active());
+    // THE PIPELINE, pass by pass, because "which layout ran" is not one answer but four and a
+    // hybrid is a correctness question rather than a performance one. An element sweep from one
+    // layout feeding on a gradient reduced by another is not that layout's operator, and it
+    // would show up only as a reproducibility result nobody could explain.
+    //
+    // Two of the four passes belong to no layout and that is a property, not an omission. The
+    // boundary closure gathers per owned node rather than scattering (the atomic scatter it
+    // replaced made the result depend on thread arrival, and survives only as SFEM_BND_ATOMIC);
+    // the transient term is a pure node loop with no scatter at all. Neither can be hybrid.
+    {
+        const char *qg = (layout == "ecolor")  ? "element-coloured"
+                         : g_qgrad_atomic      ? "atomic"
+                         : (packed.n_packs > 0) ? "packed"
+                                                : "atomic";
+        std::printf("  pipeline_element_sweep: %s\n", layout.c_str());
+        std::printf("  pipeline_nodal_gradient: %s\n", qg);
+        std::printf("  pipeline_boundary: %s\n", cvfem_env_flag("SFEM_BND_ATOMIC") ? "atomic scatter" : "node gather");
+        std::printf("  pipeline_transient: node loop\n");
+    }
     if (layout == "store") {
         std::printf("  pack_size: %d\n", pack_size);
         std::printf("  n_packs: %td\n", packed.n_packs);
