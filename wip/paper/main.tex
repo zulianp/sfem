@@ -1266,14 +1266,17 @@ fixed half of a sweep that fusing saves is \SI{46}{\percent} of a one-field swee
 count. That is also why the atomic $\Jhoex$ is so nearly all reconstruction: its sweep pays the
 field count where the packed one does not.
 
-What it buys is Newton steps, and it is a rate rather than a failure: the deferred correction
-converges to the same solution, since the fixed point is where $\Fho$ vanishes either way. On the
-lid-driven cavity at $\mathrm{Re}=100$ over five continuation stages, $\Jhoex$ takes
-\nwtUnlimExact{} steps against $\Jex$'s \nwtUnlimLagged{} on the unlimited correction, and
-\nwtVenkExact{} against \nwtVenkLagged{} with Venkatakrishnan --- $\nwtUnlimRatio\times$ and
-$\nwtVenkRatio\times$, both converged. The limiter is what makes the exact action worth its
-$\hoxCostPacked\times$ per application: at one application per step the first trade is close and
-the second is not.
+What it buys is time to solution, and the deferred correction is slower rather than broken: both
+converge to the same solution, since the fixed point is where $\Fho$ vanishes either way. On the
+lid-driven cavity at $\mathrm{Re}=100$ over five continuation stages, \textsc{fgmres} with
+block-Jacobi, $\Jhoex$ takes \nwtUnlimExactSteps{} Newton steps and \nwtUnlimExactLin{} linear
+iterations against $\Jex$'s \nwtUnlimLaggedSteps{} and \nwtUnlimLaggedLin{} on the unlimited
+correction, and \nwtVenkExactSteps{}/\nwtVenkExactLin{} against
+\nwtVenkLaggedSteps{}/\nwtVenkLaggedLin{} with Venkatakrishnan. The exact action costs
+$\nwtUnlimPerIt\times$ and $\nwtVenkPerIt\times$ per linear iteration and needs
+$\nwtUnlimLinRatio\times$ and $\nwtVenkLinRatio\times$ fewer of them, so it solves
+$\nwtUnlimTimeRatio\times$ and $\nwtVenkTimeRatio\times$ faster. The limiter widens the margin,
+which is where a deferred correction is weakest.
 
 \subsection{Against the lagged matrix}
 \label{sec:res:spmv}

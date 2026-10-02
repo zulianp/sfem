@@ -1,7 +1,0 @@
-freeze   limiter   jacobian newton_total  converged lin_it_total
-frozen   0         exact             13          1           13
-frozen   0         lagged            13          1           13
-unfrozen 0         exact             13          1           13
-unfrozen 0         lagged            35          1           35
-frozen   2         exact             13          1           13
-frozen   2         lagged            13          1           13
