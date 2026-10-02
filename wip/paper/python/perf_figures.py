@@ -1730,6 +1730,9 @@ def macros_honewton(runs):
             src = ex if name == "Exact" else lg
             out.append(r"\newcommand{\nwt%s%sSteps}{%d}" % (tag, name, src[0]))
             out.append(r"\newcommand{\nwt%s%sLin}{%d}" % (tag, name, src[1]))
+            # The Krylov solve's seconds. A ratio says which way the trade went; the absolute
+            # anchors it, and the problem size is stated with it in the prose.
+            out.append(r"\newcommand{\nwt%s%sSec}{%.2f}" % (tag, name, src[2]))
         out.append(r"\newcommand{\nwt%sStepRatio}{%.1f}" % (tag, lg[0] / ex[0]))
         out.append(r"\newcommand{\nwt%sLinRatio}{%.2f}" % (tag, lg[1] / ex[1]))
         out.append(r"\newcommand{\nwt%sTimeRatio}{%.2f}" % (tag, lg[2] / ex[2]))
