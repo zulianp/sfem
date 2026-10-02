@@ -19,6 +19,8 @@
 // header's 546 lines, 83 (15%) were duplicated, 68 (12%) are Rhie-Chow staging the
 // benchmark has no use for, and 370 (68%) genuinely differ.
 
+#include "cvfem_element_coloring.hpp"
+
 template <typename MeshT>
 static SFEM_INLINE void load_hex8_adj(const MeshT &d, const ptrdiff_t e, scalar_t adj[9], scalar_t *det) {
     for (int c = 0; c < 9; ++c) adj[c] = d.jacobian_adjugate[c][(size_t)e];
@@ -704,6 +706,73 @@ static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                              
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i)
         for (int c = 0; c < nc; ++c) outp[c][i * out_stride[c]] = scalar_t(0);
+
+    // The reconstruction follows the layout under test, as every other auxiliary pass does.
+    //
+    // Under the element-coloured layout this sweep's atomics were the one remaining source of
+    // nondeterminism in an otherwise reproducible operator: the element sweep was bitwise
+    // identical across runs and the Rhie-Chow arm was not, because the gradient it reads was
+    // accumulated in thread-arrival order. The elements are already renumbered into colour
+    // order, so the colour ranges are contiguous and the scatter is conflict-free without them.
+    const ElementColoring *const ec = cvfem_hex8_qgrad_ecolors();
+    if (ec != nullptr && ec->n_colors > 0) {
+#pragma omp parallel
+        {
+            for (int color = 0; color < ec->n_colors; ++color) {
+#pragma omp for schedule(static)
+                for (ptrdiff_t e = ec->color_ptr[(size_t)color]; e < ec->color_ptr[(size_t)color + 1]; ++e) {
+                    smesh::idx_t id[CVFEM_HEX8_N_NODES];
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) id[a] = d.elems[a][e];
+                scalar_t adj[9], det, dN[CVFEM_HEX8_N_NODES][3];
+                if (isoparam) {
+                    const auto *const px = d.points[0];
+                    const auto *const py = d.points[1];
+                    const auto *const pz = d.points[2];
+                    scalar_t x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        x[a] = scalar_t(px[id[a]]);
+                        y[a] = scalar_t(py[id[a]]);
+                        z[a] = scalar_t(pz[id[a]]);
+                    }
+                    cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
+                    cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
+                } else {
+                    load_hex8_adj(d, e, adj, &det);
+                }
+                if (std::fabs(det) < scalar_t(1e-30)) continue;
+                const scalar_t sgn = det > scalar_t(0) ? scalar_t(1) : scalar_t(-1);
+
+                scalar_t g[nc];
+                for (int r = 0; r < nf; ++r) {
+                    const ptrdiff_t st = src_stride ? (ptrdiff_t)src_stride[r] : (ptrdiff_t)1;
+                    scalar_t        f[CVFEM_HEX8_N_NODES];
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) f[a] = srcs[r][(ptrdiff_t)id[a] * st];
+                    scalar_t dr, ds, dt;
+                    if (isoparam) {
+                        dr = ds = dt = 0;
+                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                            dr += f[a] * dN[a][0];
+                            ds += f[a] * dN[a][1];
+                            dt += f[a] * dN[a][2];
+                        }
+                    } else {
+                        cvfem_hex8_face_diff(f, dr, ds, dt);
+                    }
+                    cvfem_hex8_pushforward(adj, sgn, dr, ds, dt, g[r * 3 + 0], g[r * 3 + 1], g[r * 3 + 2]);
+                }
+
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
+                        for (int c = 0; c < nc; ++c) outp[c][(ptrdiff_t)id[a] * out_stride[c]] += g[c];
+                }
+            }
+        }
+#pragma omp parallel for schedule(static)
+        for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+            const scalar_t inv = pw[i];
+            for (int c = 0; c < nc; ++c) outp[c][i * out_stride[c]] *= inv;
+        }
+        return;
+    }
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {

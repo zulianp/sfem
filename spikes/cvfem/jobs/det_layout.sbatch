@@ -77,7 +77,7 @@ run_fp() {
 distinct() { printf '%s\n' "$@" | sort -u | grep -avc '^-$' ; }
 
 printf '%-9s %-5s %-28s %-28s\n' layout op "A: repeats @${FIXED_THREADS}t" "B: across threads"
-for layout in atomic packed colored; do
+for layout in atomic packed colored ecolor; do
 for op in res jac; do
     fps_a=()
     for i in $(seq 1 "$REPEATS"); do
