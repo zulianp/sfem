@@ -34,9 +34,16 @@
 # it leaves the action entirely, and lagging the Rhie-Chow term removes the only other
 # direction reconstruction there is. What is left is the same
 # operator whatever --conv-ho says. So there is ONE lagged row rather than one per scheme, and
-# jac_lagged_ho_ctl below is the arm that proves it: same flags plus --conv-ho 3, and its
-# fingerprint must equal jac_lagged packed's bit for bit. Measured, not asserted -- if the two
-# ever differ, the lagged action is scheme-dependent and the single row is wrong.
+# The controls below are what prove it: the same flags plus --conv-ho at EVERY limiter, each of
+# whose fingerprints must equal jac_lagged packed's bit for bit. One limiter is not enough for a
+# row that claims "any scheme", even though the code argument covers all of them -- the apply
+# call passes `with_ho ? &hop : nullptr` and the limiter id lives on hop, so with the correction
+# lagged the scheme has no route into the kernel at all (src/best/cvfem_hex8_best_packed.hpp,
+# apply_jacobian_action_packed; the atomic and element-coloured twins do the same). Measured
+# anyway, because that is a claim about five configurations and the table makes it about five.
+#
+# Packed only, necessarily: the atomic sweep fixes no summation order, so it has no fingerprint
+# to compare and the structural argument is all there is for its column.
 #
 # The exact arms span the schemes, because that is what the matrix gives up. A higher-order
 # correction is an operator the matrix cannot hold at any sparsity: differentiating it reaches
@@ -78,7 +85,10 @@ for arm in "jac_exact|packed|--jac-action --rhie-chow" \
            "jac_ho_exact|atomic|--jac-action --rhie-chow --conv-ho 3" \
            "jac_lagged|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho" \
            "jac_lagged|atomic|--jac-action --rhie-chow --lagged-rc --lagged-ho" \
-           "jac_lagged_ho_ctl|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho --conv-ho 3" \
+           "jac_lagged_ctl_unlim|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho --conv-ho 0" \
+           "jac_lagged_ctl_clip|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho --conv-ho 1" \
+           "jac_lagged_ctl_venk|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho --conv-ho 2" \
+           "jac_lagged_ctl_dm|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho --conv-ho 3" \
            "spmv_f64|none|--bsr-apply --bsr-precision double" \
            "spmv_f32|none|--bsr-apply --bsr-precision single"; do
     IFS='|' read -r lbl lay extra <<<"$arm"
@@ -114,16 +124,25 @@ done
 echo
 
 # THE TABLE HAS ONE LAGGED ROW, AND THIS IS WHY IT MAY.
-echo -n "fully lagged is scheme-independent: "
-if [ -z "${FP[jac_lagged]:-}" ] || [ -z "${FP[jac_lagged_ho_ctl]:-}" ]; then
-    echo "UNKNOWN (a fingerprint is missing; an arm failed)"
-elif [ "${FP[jac_lagged]}" = "${FP[jac_lagged_ho_ctl]}" ]; then
-    echo "YES, bitwise (${FP[jac_lagged]})"
+ref=${FP[jac_lagged]:-}
+verdict=YES
+if [ -z "$ref" ]; then
+    verdict="UNKNOWN (the reference arm produced no fingerprint)"
 else
-    echo "NO -- ${FP[jac_lagged]} vs ${FP[jac_lagged_ho_ctl]}; the single lagged row is WRONG"
+    for c in unlim clip venk dm; do
+        got=${FP[jac_lagged_ctl_$c]:-}
+        if [ -z "$got" ]; then
+            verdict="UNKNOWN (control $c produced no fingerprint)"
+        elif [ "$got" != "$ref" ]; then
+            verdict="NO -- control $c gave $got against $ref; the single lagged row is WRONG"
+        fi
+        printf '  control %-6s %s %s\n' "$c" "${got:--}" \
+               "$([ "$got" = "$ref" ] && echo match || echo DIFFERS)"
+    done
 fi
+echo "fully lagged is scheme-independent across every limiter: $verdict${ref:+ ($ref)}"
 echo
 echo "The exact arms carry the direction-gradient pass; jac_lagged does not, and is the operator"
 echo "the assembled matrix encodes. Compare spmv_* against jac_lagged for like-for-like."
-echo "jac_lagged_ho_ctl is a control, not a row: it must reproduce jac_lagged packed exactly."
+echo "jac_lagged_ctl_* are controls, not rows: each must reproduce jac_lagged packed exactly."
 echo "csv: $CSV"
