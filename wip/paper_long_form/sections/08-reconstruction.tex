@@ -1,11 +1,14 @@
 \section{The nodal gradient reconstruction}
 \label{sec:recon}
 
-Rhie--Chow needs a nodal pressure gradient, and the exact higher-order Jacobian needs a nodal
-velocity gradient --- the state's for the residual's correction, the direction's for its
-derivative. One pass produces all of them
+One pass produces every nodal gradient the operator needs
 (\code{cvfem\_hex8\_nodal\_grads\_packed\_nc} and its atomic twin in
-\code{src/hex8/cvfem\_hex8\_pack\_helpers.hpp}).
+\code{src/hex8/cvfem\_hex8\_pack\_helpers.hpp}). Which ones those are, per operator, is the table
+of Section~\ref{sec:schemes:needs}; in summary, Rhie--Chow needs the state's pressure gradient in
+every form and the direction's when it is differentiated, the higher-order residual needs the
+state's velocity gradient, and the exact higher-order action needs both velocity gradients ---
+the state's for term (a) of Eq.~\eqref{eq:defcor-jv} and the direction's for term (b). The
+deferred-correction action needs no velocity gradient at all.
 
 \subsection{What it computes}
 
@@ -30,15 +33,26 @@ Three properties shape the kernel:
       parameterised at runtime.
 \end{itemize}
 
-\subsection{One path, two field counts}
+\subsection{One path, every field count}
 
-The pass is used at $n_c = 1$ (the pressure gradient, in every Rhie--Chow residual) and $n_c = 3$
-(the velocity gradient, per matvec in the exact higher-order Jacobian). These were once two
-separate implementations, and unifying them removed more than duplication: the multi-field path
-could not read strided input, which was the only reason the exact action de-interleaved the
-direction's three velocity components into scratch on every matvec. Output is described by a
-per-component pointer and stride, input by a stride, so the single kernel reads the interleaved
-direction in place.
+The pass is instantiated for one to eight fields and the combinations that occur are set by the
+table of Section~\ref{sec:schemes:needs}: one field for the pressure gradient in a Rhie--Chow
+residual, three for the velocity gradient in a higher-order one, two for $\Jex$ (the direction's
+pressure gradient and the state's), six for the velocity pair, and eight for $\Jhoex$, which
+reconstructs all four of $\Gop u(v)$, $\Gop p(v)$, $\Gop u(u)$ and $\Gop p(u)$ in a single sweep.
+
+That the widest case is one sweep and not four is what makes the exact action affordable, and it
+is why input is described by a base pointer and a stride per field: the direction arrives
+interleaved by node with stride $4$ and the state's fields are contiguous, so both go in
+together without a de-interleaving copy. These were once two separate implementations at
+$n_c \in \{1,3\}$, and unifying them removed more than duplication --- the multi-field path could
+not read strided input, which was the only reason the exact action de-interleaved the direction's
+three velocity components into scratch on every application.
+
+The two per-thread staging buffers are sized from the instantiation's field count. They were
+once fixed at the four-field maximum the pass then had, which an eight-field sweep overran; it did
+not crash, it made the operator stop being bit-reproducible, which is the failure mode to expect
+from a scratch overrun in a sweep whose output is a reduction.
 
 The unification measured $+10\%$ on the packed layout and $+27\%$ on the standard one at both field
 counts. Performance neutrality at $n_c = 1$ was the gate that had to be cleared before anything

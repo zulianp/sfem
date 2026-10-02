@@ -30,6 +30,8 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage{xcolor}
 \usepackage{listings}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 
 \lstset{basicstyle=\ttfamily\footnotesize,columns=fullflexible,keepspaces=true,
         breaklines=true,frame=single,framesep=4pt,rulecolor=\color{black!25},
@@ -45,6 +47,12 @@
 \newcommand{\adj}{\operatorname{adj}}
 \newcommand{\mdot}{\dot{m}}
 \newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\Gop}{\mathcal{G}}                     % the nodal gradient reconstruction
+\newcommand{\Fres}{\mathcal{F}}
+\newcommand{\Fho}{\mathcal{F}^{\mathrm{ho}}}
+\newcommand{\Jlag}{\mathcal{J}_{\mathrm{lagged}}}
+\newcommand{\Jex}{\mathcal{J}_{\mathrm{exact}}}
+\newcommand{\Jhoex}{\mathcal{J}^{\mathrm{ho}}_{\mathrm{exact}}}
 
 \title{The CVFEM HEX8 Navier--Stokes operator\\
        \large Components, closed forms, and the micro-kernel for each scheme}
@@ -77,5 +85,10 @@ company.
 \input{sections/06-selection}
 \input{sections/07-jacobian}
 \input{sections/08-reconstruction}
+
+% The paper's bibliography, not a second copy of it: this document cites the few methods it
+% attributes, and those entries already exist next door.
+\bibliographystyle{plain}
+\bibliography{../paper/refs}
 
 \end{document}
