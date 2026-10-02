@@ -790,15 +790,17 @@ it --- in the same sweep as $\Gop p(v)$, since the two read different fields of 
 stride. $\Jlag(u)\,v$ lags both: it evaluates the coupling with $\Gop p(u)$, drops its
 sensitivity, and rebuilds nothing.
 
-$\Jlag$ drops the correction's derivative \emph{entirely}, and that is more than freezing a
-gradient. The derivative has two parts: the mass-flux sensitivity times the correction's limited
-increment, which needs only $\Gop u(u)$, and the increment's own derivative, which needs
-$\Gop u(v)$. Freezing $\Gop u$ would keep the first. Dropping both is what leaves the convective
-scheme no route into the action and makes one lagged operator serve every scheme --- a property
-of this approximation, not of lagging --- and it is an inconsistent linearisation of $\Fho$:
-against a finite difference of $\Fho$, $\Jhoex$ agrees to \hoxFdUnlim{} where it is wrong by
-\num{6e-2} (\S\ref{sec:res:hoexact}). The operator between the two, which keeps the frozen-gradient
-term and drops the direction's, is not built.
+$\Jlag$ is the deferred correction's standard implicit treatment: the correction is an explicit
+source, so it contributes nothing to the implicit operator~\cite{KhoslaRubin1974}. That is the
+method's purpose and not an economy --- the implicit operator stays the first-order upwind one,
+diagonally dominant and identical for every scheme, which is why a single matrix serves them all
+and why $\Jlag$ is one operator rather than one per scheme. The price is that it is an
+inconsistent linearisation of $\Fho$: against a finite difference of $\Fho$, $\Jhoex$ agrees to
+\hoxFdUnlim{} where $\Jlag$ is wrong by \num{6e-2} (\S\ref{sec:res:hoexact}), so $\Jhoex$ is what
+a solve must apply to converge on the higher-order residual. Between them sits a partially
+implicit treatment: the correction's derivative splits into the mass-flux sensitivity times the
+increment at $\Gop u(u)$, which needs no direction reconstruction, and the increment's own
+derivative at $\Gop u(v)$, which does, and keeping only the first is neither form measured here.
 
 The mixed combinations --- one sensitivity differentiated and the other lagged --- are the exact
 Jacobian of no residual, and are not measured.
@@ -820,7 +822,7 @@ records which one ran.
                   stride}
 \Else
   \State $q, g_v \gets \varnothing$
-         \Comment{lagged: the correction's derivative is dropped, not just frozen}
+         \Comment{lagged: the correction stays an explicit source, as deferred correction intends}
 \EndIf
 \State apply Algorithm~\ref{alg:apply}, whose element kernel linearises the first-order
        convective flux about $u$ in direction $v$, adds the viscous term, and adds the
@@ -1206,7 +1208,7 @@ cancellation, so a term can be present at every node and absent from the total. 
 \subsection{$\Jhoex$, the exact higher-order Jacobian action}
 \label{sec:res:hoexact}
 
-With the correction's derivative dropped, the action of $\Fho$ is $\Jex$ (\S\ref{sec:setup}).
+With the correction left an explicit source, the action of $\Fho$ is $\Jex$ (\S\ref{sec:setup}).
 $\Jhoex$ instead costs one reconstruction $\Gop u(v)$ per operator
 application --- nine components against the three $\Gop p(v)$ that $\Jex$ already rebuilds ---
 and the limiter's own derivative, which is not free: the unlimited arm reaches
@@ -1354,9 +1356,9 @@ kernel by those factors.
   \centering
   \caption{The Jacobian action, each form fully exact or fully lagged, against the
     double-precision product (the \texttt{f64} row, which the ratios divide by and which has no
-    layout of its own). $\Jlag$ is one row because it drops the correction's derivative outright,
-    which leaves the scheme no route into the action: the first-order row \emph{is} the lagged
-    action, and a control at every limiter reproduces its result bit for bit. It is also the only form the
+    layout of its own). $\Jlag$ is one row because deferred correction leaves the implicit
+    operator scheme-independent by construction: the first-order row \emph{is} the lagged action,
+    and a control at every limiter reproduces its result bit for bit. It is also the only form the
     matrix can hold; the $\Jhoex$ rows have no matrix counterpart at all. The limiters are the
     cheapest and among the dearest, so they bracket what one costs.}
   \label{tab:jacfair}
