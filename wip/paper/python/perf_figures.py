@@ -1919,15 +1919,19 @@ def macros_hoexact(rates, checks, frac=None):
 # The like-for-like Jacobian comparison against the assembled matrix
 # ---------------------------------------------------------------------------------------------
 
+# The operator symbols of the setup section's Operators paragraph, so a row says which
+# differentiations it carried instead of leaving "exact" to be resolved against the caption. The
+# block heading carries the convective scheme, so the superscript alone distinguishes the
+# higher-order blocks' rows from the first-order block's.
 JF_NAME = {
-    "jac_exact":     "Jacobian action, exact",
-    "jac_lagged":    "Jacobian action, lagged",
-    "jac_clip_exact":  "Jacobian action, exact",
-    "jac_clip_lagged": "Jacobian action, lagged",
-    "jac_ho_exact":  "Jacobian action, exact",
-    "jac_ho_lagged": "Jacobian action, lagged",
-    "spmv_f64":      r"SpMV, lagged \texttt{f64}",
-    "spmv_f32":      r"SpMV, lagged \texttt{f32}",
+    "jac_exact":       r"$\Jex(u)\,v$",
+    "jac_lagged":      r"$\Jlag(u)\,v$",
+    "jac_clip_exact":  r"$\Jhoex(u)\,v$",
+    "jac_clip_lagged": r"$\Jholag(u)\,v$",
+    "jac_ho_exact":    r"$\Jhoex(u)\,v$",
+    "jac_ho_lagged":   r"$\Jholag(u)\,v$",
+    "spmv_f64":        r"SpMV with $\Jlag$, \texttt{f64}",
+    "spmv_f32":        r"SpMV with $\Jlag$, \texttt{f32}",
 }
 
 # The matrix-free blocks, in table order. The higher-order block is present only when the job ran

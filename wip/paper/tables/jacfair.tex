@@ -9,18 +9,18 @@
 operator & MDOF/s & vs.\ \texttt{f64} & MDOF/s & vs.\ \texttt{f64} \\
 \midrule
 \multicolumn{5}{@{}l}{\emph{first-order upwind}} \\
-\quad Jacobian action, exact & 977 & $1.99\times$ & 539 & $1.10\times$ \\
-\quad Jacobian action, lagged & 1289 & $2.62\times$ & 780 & $1.59\times$ \\
+\quad $\Jex(u)\,v$ & 977 & $1.99\times$ & 539 & $1.10\times$ \\
+\quad $\Jlag(u)\,v$ & 1289 & $2.62\times$ & 780 & $1.59\times$ \\
 \addlinespace
 \multicolumn{5}{@{}l}{\emph{Barth--Jespersen}} \\
-\quad Jacobian action, exact & 429 & $0.87\times$ & 220 & $0.45\times$ \\
-\quad Jacobian action, lagged & 467 & $0.95\times$ & 256 & $0.52\times$ \\
+\quad $\Jhoex(u)\,v$ & 429 & $0.87\times$ & 220 & $0.45\times$ \\
+\quad $\Jholag(u)\,v$ & 467 & $0.95\times$ & 256 & $0.52\times$ \\
 \addlinespace
 \multicolumn{5}{@{}l}{\emph{Darwish--Moukalled}} \\
-\quad Jacobian action, exact & 394 & $0.80\times$ & 211 & $0.43\times$ \\
-\quad Jacobian action, lagged & 428 & $0.87\times$ & 243 & $0.50\times$ \\
+\quad $\Jhoex(u)\,v$ & 394 & $0.80\times$ & 211 & $0.43\times$ \\
+\quad $\Jholag(u)\,v$ & 428 & $0.87\times$ & 243 & $0.50\times$ \\
 \midrule
-SpMV, lagged \texttt{f64} & \multicolumn{4}{c}{491, $1.00\times$} \\
-SpMV, lagged \texttt{f32} & \multicolumn{4}{c}{857, $1.74\times$} \\
+SpMV with $\Jlag$, \texttt{f64} & \multicolumn{4}{c}{491, $1.00\times$} \\
+SpMV with $\Jlag$, \texttt{f32} & \multicolumn{4}{c}{857, $1.74\times$} \\
 \bottomrule
 \end{tabular}
