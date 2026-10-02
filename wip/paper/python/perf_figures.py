@@ -691,7 +691,7 @@ def ladder_ratios(rows, op="residual", n=128):
 
 def table_ladder(rows, op="residual", n=128):
     at_n = [r for r in rows if r["_n"] == n and r["operation"] == op]
-    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
+    out = [PREAMBLE, r"\footnotesize", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
            r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\",
            r"\cmidrule(lr){2-4}\cmidrule(l){5-6}",
            r"terms carried & packed & col. & standard & col. & standard \\",
@@ -1525,7 +1525,7 @@ def table_convho(rows):
     if not rows:
         return None
     by, _loose = _convho_index(rows)
-    out = [PREAMBLE, r"\small", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
+    out = [PREAMBLE, r"\footnotesize", r"\begin{tabular}{@{}lrrrrr@{}}", r"\toprule",
            r"& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\",
            r"\cmidrule(lr){2-4}\cmidrule(l){5-6}",
            r"convective scheme & packed & col. & standard & col. & standard \\",
@@ -1688,6 +1688,16 @@ def macros_convho(rows):
             out.append(r"\newcommand{\ho%sAtomic}{%.0f}" % (tag, at))
         if pk and at:
             out.append(r"\newcommand{\ho%sLayoutRatio}{%.2f}" % (tag, pk / at))
+        # The COLOURING's own margin over the standard sweep, which is the scatter strategy with
+        # the format held out of it. The paper reads this against the ratio above: the two answer
+        # different halves of what the packed layout is worth.
+        ec = d.get("ecolor")
+        if ec:
+            out.append(r"\newcommand{\ho%sColoured}{%.0f}" % (tag, ec))
+        if ec and at:
+            out.append(r"\newcommand{\ho%sColOverStd}{%.2f}" % (tag, ec / at))
+        if pk and ec:
+            out.append(r"\newcommand{\ho%sPackedOverCol}{%.2f}" % (tag, pk / ec))
     # What the correction costs against first order WITHIN one layout, so the format is not in the
     # comparison and what is left is the scheme's own arithmetic.
     for lay, suffix in (("gen", "Packed"), ("atomic", "Atomic")):
