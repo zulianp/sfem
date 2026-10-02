@@ -49,6 +49,14 @@ OUT=${OUT:-$SCRATCH/cvfem_det_layout/${SLURM_JOB_ID:-manual}}
 mkdir -p "$OUT"
 
 N=${N:-100}
+# The pack size is PINNED. Left to the library default it is derived from the thread count, so
+# question B below was handing each thread count a different decomposition and reporting the
+# difference as irreproducibility: packed and colored came out 4 distinct / 4 runs, which is a
+# property of the sweep's own parameters and not of the layout. The claim is that a FIXED
+# decomposition gives the same bits at any thread count, and this is what makes the job ask it.
+# The element-coloured layout takes no pack -- its decomposition is the colouring, which depends
+# on neither the thread count nor the pack size.
+PACK=${PACK:-1024}
 REPEATS=${REPEATS:-3}
 THREAD_LIST=${THREAD_LIST:-"1 8 36 72"}
 FIXED_THREADS=${FIXED_THREADS:-72}
@@ -63,6 +71,7 @@ run_fp() {
     local lbl=$1 threads=$2 layout=$3 op=$4
     local log=$OUT/${lbl}.log
     local flags="--layout $layout --rhie-chow --boundary"
+    { [ "$layout" != atomic ] && [ "$layout" != ecolor ]; } && flags="$flags --pack-size $PACK"
     [ "$op" = jac ] && flags="$flags --jac-action"
     timeout "${RUN_TIMEOUT:-240}" \
       srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
