@@ -790,13 +790,15 @@ it --- in the same sweep as $\Gop p(v)$, since the two read different fields of 
 stride. $\Jlag(u)\,v$ lags both: it evaluates the coupling with $\Gop p(u)$, drops its
 sensitivity, and rebuilds nothing.
 
-Two things follow from the fact that a convective scheme reaches the action only through $\Gop$.
-$\Jlag$ does not depend on the scheme at all, because lagging the correction makes it constant in
-$v$ and removes $\Gop u$ from the action entirely --- which is why there is one lagged operator
-and not one per scheme. And lagging the velocity gradient alone is not a cheaper exact operator
-but an inconsistent linearisation of $\Fho$: what is left reproduces $\Jex$ to the last bit, and
+$\Jlag$ drops the correction's derivative \emph{entirely}, and that is more than freezing a
+gradient. The derivative has two parts: the mass-flux sensitivity times the correction's limited
+increment, which needs only $\Gop u(u)$, and the increment's own derivative, which needs
+$\Gop u(v)$. Freezing $\Gop u$ would keep the first. Dropping both is what leaves the convective
+scheme no route into the action and makes one lagged operator serve every scheme --- a property
+of this approximation, not of lagging --- and it is an inconsistent linearisation of $\Fho$:
 against a finite difference of $\Fho$, $\Jhoex$ agrees to \hoxFdUnlim{} where it is wrong by
-\num{6e-2} (\S\ref{sec:res:hoexact}).
+\num{6e-2} (\S\ref{sec:res:hoexact}). The operator between the two, which keeps the frozen-gradient
+term and drops the direction's, is not built.
 
 The mixed combinations --- one sensitivity differentiated and the other lagged --- are the exact
 Jacobian of no residual, and are not measured.
@@ -818,15 +820,16 @@ records which one ran.
                   stride}
 \Else
   \State $q, g_v \gets \varnothing$
-         \Comment{lagged: no direction reconstruction, so no dependence on the scheme}
+         \Comment{lagged: the correction's derivative is dropped, not just frozen}
 \EndIf
 \State apply Algorithm~\ref{alg:apply}, whose element kernel linearises the first-order
        convective flux about $u$ in direction $v$, adds the viscous term, and adds the
        Rhie--Chow coupling, read from $\Gop p(u)$ and differentiated through $q$ when $q$ is
        present
 \If{$g_v \neq \varnothing$}
-  \State the same kernel adds the differentiated deferred correction, including the
-         derivative of the limiter, evaluated with $\Gop u(u)$ and $g_v$
+  \State the same kernel adds the differentiated deferred correction: the mass-flux sensitivity
+         times the limited increment at $\Gop u(u)$, plus the increment's own derivative --- the
+         limiter's included --- at $g_v$
 \EndIf
 \State add the boundary closure and the transient term, each an extra sweep
 \Statex The exact forms cost one reconstruction of the \emph{direction} per operator application,
@@ -1203,8 +1206,8 @@ cancellation, so a term can be present at every node and absent from the total. 
 \subsection{$\Jhoex$, the exact higher-order Jacobian action}
 \label{sec:res:hoexact}
 
-A lagged correction contributes nothing to the Jacobian, so the action of $\Fho$ is $\Jex$
-(\S\ref{sec:setup}). $\Jhoex$ instead costs one reconstruction $\Gop u(v)$ per operator
+With the correction's derivative dropped, the action of $\Fho$ is $\Jex$ (\S\ref{sec:setup}).
+$\Jhoex$ instead costs one reconstruction $\Gop u(v)$ per operator
 application --- nine components against the three $\Gop p(v)$ that $\Jex$ already rebuilds ---
 and the limiter's own derivative, which is not free: the unlimited arm reaches
 \hoxExactPackedUnlim{}~MDOF/s against Venkatakrishnan's \hoxExactPacked{}, a factor of
@@ -1351,10 +1354,9 @@ kernel by those factors.
   \centering
   \caption{The Jacobian action, each form fully exact or fully lagged, against the
     double-precision product (the \texttt{f64} row, which the ratios divide by and which has no
-    layout of its own). $\Jlag$ is one row because these schemes reach the action only through
-    the correction's derivative, so lagging it leaves them no route in: the first-order row
-    \emph{is} the lagged action, and a control at every limiter reproduces its result bit for
-    bit. It is also the only form the
+    layout of its own). $\Jlag$ is one row because it drops the correction's derivative outright,
+    which leaves the scheme no route into the action: the first-order row \emph{is} the lagged
+    action, and a control at every limiter reproduces its result bit for bit. It is also the only form the
     matrix can hold; the $\Jhoex$ rows have no matrix counterpart at all. The limiters are the
     cheapest and among the dearest, so they bracket what one costs.}
   \label{tab:jacfair}
