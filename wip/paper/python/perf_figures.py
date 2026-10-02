@@ -1682,17 +1682,23 @@ def parse_honewton(path):
     exactly that reason, and one arm of the first run was killed by its per-arm timeout at 80
     steps and would otherwise have read as an 80-step result.
     """
-    out = {}
+    out, pc = {}, None
     for line in open(path):
+        if line.startswith("### preconditioner:"):
+            pc = line.split(":")[1].strip()
+            continue
         f = line.split()
-        if len(f) < 5 or f[0] not in ("frozen", "unfrozen") or f[2] not in ("exact", "lagged"):
+        if len(f) < 7 or f[0] not in ("frozen", "unfrozen") or f[2] not in ("exact", "lagged"):
             continue
         try:
-            steps, conv = int(f[3]), int(f[4])
+            steps, conv, lin, sec = int(f[3]), int(f[4]), int(f[5]), float(f[6])
         except ValueError:
             continue
-        if conv == 1:
-            out[(f[1], f[0], f[2])] = steps
+        # A direct solve is an exact inverse of the operator, so under it every solve takes one
+        # iteration and the time is the factorisation's: those rows measure neither quantity this
+        # reads, and are dropped rather than averaged in.
+        if conv == 1 and pc == "bjacobi":
+            out[(f[1], f[0], f[2])] = (steps, lin, sec)
     return out
 
 
@@ -1709,12 +1715,18 @@ def macros_honewton(runs):
     for lim, tag in (("0", "Unlim"), ("2", "Venk")):
         ex = merged.get((lim, "unfrozen", "exact"))
         lg = merged.get((lim, "unfrozen", "lagged"))
-        if ex:
-            out.append(r"\newcommand{\nwt%sExact}{%d}" % (tag, ex))
-        if lg:
-            out.append(r"\newcommand{\nwt%sLagged}{%d}" % (tag, lg))
-        if ex and lg:
-            out.append(r"\newcommand{\nwt%sRatio}{%.1f}" % (tag, lg / ex))
+        if not (ex and lg):
+            continue
+        for name, i in (("Exact", 0), ("Lagged", 1)):
+            src = ex if name == "Exact" else lg
+            out.append(r"\newcommand{\nwt%s%sSteps}{%d}" % (tag, name, src[0]))
+            out.append(r"\newcommand{\nwt%s%sLin}{%d}" % (tag, name, src[1]))
+        out.append(r"\newcommand{\nwt%sStepRatio}{%.1f}" % (tag, lg[0] / ex[0]))
+        out.append(r"\newcommand{\nwt%sLinRatio}{%.2f}" % (tag, lg[1] / ex[1]))
+        out.append(r"\newcommand{\nwt%sTimeRatio}{%.2f}" % (tag, lg[2] / ex[2]))
+        # What one linear iteration costs, which is the other half of the trade.
+        out.append(r"\newcommand{\nwt%sPerIt}{%.2f}"
+                   % (tag, (ex[2] / ex[1]) / (lg[2] / lg[1])))
     return "\n".join(out) + "\n"
 
 
