@@ -272,6 +272,89 @@ would keep \textbf{(a)} and drop the direction's increment with \textbf{(b)} ---
 and the $\dot{\delta}$ half of line 6 --- which costs no reconstruction of the direction at all;
 it is not built here.
 
+\subsection{The Newton loop}
+\label{sec:schemes:newton}
+
+The two algorithms above are inner kernels. What places them, and what decides which
+reconstruction runs where, is the outer iteration
+(\code{drivers/cvfem\_hex8\_ns\_steady.cpp}, over \code{apply\_residual} and
+\code{apply\_jacobian\_action\_accumulate} in \code{src/hex8/cvfem\_hex8\_ns\_core.hpp}).
+
+\begin{algorithm}[H]
+\caption{Newton--Krylov with the higher-order scheme}
+\label{alg:newton}
+\begin{algorithmic}[1]
+\Require $u^0$ satisfying the Dirichlet data; tolerances $\tau_{\text{nl}}$, $\tau_{\text{lin}}$
+\For{$k = 0, 1, 2, \dots$}
+  \Statex \textbf{\emph{once per Newton step --- the state is new}}
+  \State $\Gop p(u^k),\; \Gop u(u^k) \gets$ \emph{one} fused four-field reconstruction of
+         $(p, u_x, u_y, u_z)$ at $u^k$
+         \Comment{\code{GradSet::Both}; three fields of it exist only because the scheme is
+                  higher order}
+  \State $r^k \gets \Fho(u^k)$: the element sweep, whose flux is Eq.~\eqref{eq:flux} with
+         $\mathbf{h}_\scs$ from Algorithm~1 reading $\Gop u(u^k)$
+  \State $r^k \gets r^k + \text{boundary closure} + \text{transient}$, then apply the Dirichlet
+         rows
+  \If{$\|r^k\| \le \tau_{\text{nl}}$} \textbf{stop} \EndIf
+  \Statex \textbf{\emph{the linear solve --- $u^k$ is fixed throughout, so its gradients are not
+          rebuilt}}
+  \State solve $\mathcal{J}(u^k)\,s = -r^k$ by FGMRES to relative tolerance $\tau_{\text{lin}}$:
+  \ForAll{applications of $\mathcal{J}$, on a Krylov direction $v$}
+    \If{exact Rhie--Chow \textbf{and} exact correction}
+      \State $\Gop u(v),\; \Gop p(v) \gets$ \emph{one} fused four-field reconstruction of $v$
+             \Comment{$\Jhoex$; $9 + 3$ components}
+    \ElsIf{exact Rhie--Chow}
+      \State $\Gop p(v) \gets$ one-field reconstruction \Comment{$\Jex$}
+    \ElsIf{exact correction}
+      \State $\Gop u(v) \gets$ three-field reconstruction
+    \Else
+      \State nothing reconstructed \Comment{$\Jlag$: the deferred correction}
+    \EndIf
+    \State $\mathcal{J}v \gets$ the element sweep: the first-order linearisation; plus the
+           Rhie--Chow terms of Section~\ref{sec:jac:asym}, which read $\Gop p(u^k)$ always and
+           $\Gop p(v)$ when exact; plus, when the correction is exact, \textbf{(a)} and
+           \textbf{(b)} of Algorithm~2 reading $\Gop u(u^k)$ and $\Gop u(v)$
+    \State $\mathcal{J}v \gets \mathcal{J}v + \text{boundary} + \text{transient}$, Dirichlet rows
+  \EndFor
+  \State $u^{k+1} \gets u^k + \theta s$, with $\theta \le 1$ capping $\|s\|_\infty$
+  \State re-apply the Dirichlet data to $u^{k+1}$
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Four things in that loop are the whole of the answer to where a velocity gradient is needed, and
+each is a consequence of the structure rather than a choice made at the call site.
+
+\paragraph{$\Gop u(u^k)$ is built on line 3 and read twice.} The residual reads it to form
+$\mathbf{h}_\scs$, and --- if the correction is differentiated --- so does term \textbf{(a)} of
+every Jacobian application in the linear solve. It is not rebuilt there, because $u^k$ does not
+change inside the solve: hoisting it is exact, not an approximation. This is also why the fused
+four-field sweep on line 3 is worth having: at first order that line is a one-field pressure
+sweep, and the higher-order scheme turns it into four fields for the price of one pass.
+
+\paragraph{The correction is applied at $u^k$, not at $u^{k-1}$.} ``Deferred'' here refers to the
+implicit operator, not to the residual: line 3 reconstructs at the current iterate, so
+$\Fho(u^k)$ is the higher-order residual at $u^k$ and the converged solution is the higher-order
+one. What is deferred to the next iteration is the \emph{correction's share of the update}, since
+the operator that computed $s$ did not know about it.
+
+\paragraph{The exact correction has a precondition the loop supplies.} The Jacobian enables its
+higher-order term only when $\Gop u(u^k)$ already exists --- in the source,
+\code{want\_v} tests \code{!d.ugrad.empty()} alongside the switch. Line 3 is what fills it, so the
+exact action is available because the residual ran first at this state. An application reached
+without that residual silently gets the lagged action instead.
+
+\paragraph{Only $\Gop u(v)$ is per-application, and only for $\Jhoex$.} It is the one
+reconstruction that cannot be hoisted anywhere, because the direction changes every Krylov
+iteration. $\Jlag$ needs none; $\Jex$ needs the three components of $\Gop p(v)$; $\Jhoex$ needs
+those plus the nine of $\Gop u(v)$, in one sweep rather than two.
+
+\paragraph{A note on what the benchmark measures.} The performance paper's exact arms rebuild
+$\Gop p(u)$ and $\Gop u(u)$ inside \emph{every} application rather than hoisting them as line 3
+does, so a reported rate for $\Jex$ or $\Jhoex$ is the cost of a self-contained application and
+does not credit the hoist. The solver's own cost per Krylov iteration is lower by those two
+reconstructions, amortised over the iterations of one linear solve.
+
 \subsection{Bound preservation, measured}
 
 The schemes' claims are checked by instrumenting the limiter over a converged solve
