@@ -8,13 +8,13 @@
 \cmidrule(lr){2-3}\cmidrule(l){4-5}
 operator & MDOF/s & vs.\ \texttt{f64} & MDOF/s & vs.\ \texttt{f64} \\
 \midrule
-$\Jex(u)\,v$, first-order upwind & 966 & $2.19\times$ & 533 & $1.21\times$ \\
-$\Jhoex(u)\,v$, Barth--Jespersen & 424 & $0.96\times$ & 219 & $0.50\times$ \\
-$\Jhoex(u)\,v$, Darwish--Moukalled & 391 & $0.89\times$ & 210 & $0.48\times$ \\
+$\Jex(u)\,v$, first-order upwind & 862 & $1.95\times$ & 334 & $0.76\times$ \\
+$\Jhoex(u)\,v$, Barth--Jespersen & 344 & $0.78\times$ & 132 & $0.30\times$ \\
+$\Jhoex(u)\,v$, Darwish--Moukalled & 333 & $0.75\times$ & 129 & $0.29\times$ \\
 \addlinespace
-$\Jlag(u)\,v$, any scheme & 1287 & $2.92\times$ & 787 & $1.79\times$ \\
+$\Jlag(u)\,v$, any scheme & 1195 & $2.71\times$ & 735 & $1.66\times$ \\
 \midrule
-SpMV with $\Jlag$, \texttt{f64} & \multicolumn{4}{c}{440, $1.00\times$} \\
-SpMV with $\Jlag$, \texttt{f32} & \multicolumn{4}{c}{861, $1.95\times$} \\
+SpMV with $\Jlag$, \texttt{f64} & \multicolumn{4}{c}{442, $1.00\times$} \\
+SpMV with $\Jlag$, \texttt{f32} & \multicolumn{4}{c}{852, $1.93\times$} \\
 \bottomrule
 \end{tabular}

@@ -874,27 +874,32 @@ $\Jex$ in Table~\ref{tab:passes}.
     $\Fres(u)$                        & 1 & 1 & $\Gop p(u)$ \\
     $\Fho(u)$                         & 1 & 1 & $\Gop p(u)$, $\Gop u(u)$ \\
     $\Jlag(u)\,v$                     & 1 & 1 & $\Gop p(u)$ \\
-    $\Jex(u)\,v$                      & 2 & 2 & $\Gop p(u)$ \\
-    $\Jhoex(u)\,v$                    & 2 & 2 & $\Gop p(u)$, $\Gop u(u)$ \\
+    $\Jex(u)\,v$                      & 2 & 2 & --- \\
+    $\Jhoex(u)\,v$                    & 2 & 2 & --- \\
     SpMV with $\Jlag$                 & 0 & 0 & assembly \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:passes} collects the counts. Every form carrying Rhie--Chow reads $\Gop p(u)$,
-because the coupling itself is a function of the state's pressure gradient; what the exact forms
-add is its \emph{sensitivity}, and that is the second element sweep. $\Jhoex$ costs no more
-sweeps than $\Jex$ despite rebuilding two direction gradients: $\Gop p(v)$ and $\Gop u(v)$ read
-different fields of one array at one stride, so they are a single four-field sweep rather than a
-one-field and a three-field one. $\Fho$ stays at one sweep because its correction is lagged,
-which moves $\Gop u(u)$ into the last column rather than making it disappear. The assembled
-matrix performs no element sweep per application but pays a full assembly --- the most expensive
-sweep here --- once per Newton step, and thereafter streams a matrix two orders of magnitude
-larger than the mesh.
+Table~\ref{tab:passes} collects the counts. The exact actions hoist \emph{nothing}, and that is
+what makes them exact applications rather than exact sensitivities evaluated at frozen fields: an
+operator that reads a reconstruction evaluates it. $\Jex$ rebuilds $\Gop p(v)$ and $\Gop p(u)$,
+$\Jhoex$ rebuilds those two and $\Gop u(v)$, $\Gop u(u)$ as well, and each is one sweep rather
+than two or four because the sweep takes a base pointer and a stride per field: the direction's
+interleaved fields and the state's contiguous ones go in together, two fields on $\Jex$ and eight
+on $\Jhoex$. $\Jlag$ is the form that keeps the cache, which is what lagging means, so it reads
+$\Gop p(u)$ without rebuilding it. $\Fho$ likewise stays at one sweep because its correction is
+lagged, which moves $\Gop u(u)$ into the last column rather than making it disappear. The
+assembled matrix performs no element sweep per application but pays a full assembly --- the most
+expensive sweep here --- once per Newton step, and thereafter streams a matrix two orders of
+magnitude larger than the mesh.
 
-The driver times the $\Gop p(v)$ sweep of $\Jex$ separately, at
-\SI{\campQgradPct}{\percent} of the application, large enough that attributing the whole of it to
-the element kernel would misplace a sixth.
+That the reconstruction is one sweep is what makes the exact forms affordable, and it is most of
+what they cost: \S\ref{sec:res:hoexact} measures it at \SI{\hoxFracPacked}{\percent} of the
+packed $\Jhoex$ and \SI{\hoxFracAtomic}{\percent} of the atomic one.
+
+The driver times that sweep separately, so its share of the application appears beside the
+element kernel's rather than folded into it.
 
 \paragraph{The solver's terms.} The Rhie--Chow coupling~\cite{RhieChow1983} is required: a
 colocated discretisation without it admits the checkerboard pressure mode, so every operator a
@@ -1232,13 +1237,14 @@ $\ngPgradRatio$, and the three-component velocity gradient at \ngUgradPacked{} a
 \hoxLayoutLagged$\times$ the element sweeps get. Almost all of a reconstruction is indexed
 traffic, which the layout removes, and almost none is arithmetic, which it cannot touch. It is
 also where $\Jhoex$ spends its time: the reconstruction is \SI{\hoxFracPacked}{\percent}
-of the packed application against \SI{\hoxFracAtomic}{\percent} of the atomic one. Both direction
-gradients are taken in ONE sweep --- they read different fields of the same array at the same
+of the packed application against \SI{\hoxFracAtomic}{\percent} of the atomic one --- on the
+atomic layout it is almost the whole operator. All four gradients are taken in ONE sweep --- they read different fields of the same array at the same
 stride, so together they are a four-field sweep rather than a one-field and a three-field one ---
-which is why those shares cover both and why they differ so much between the layouts: the fixed
-half of a sweep that fusing saves is \SI{46}{\percent} of a one-field sweep packed and
+which is why those shares cover all four and why they differ so much between the layouts: the
+fixed half of a sweep that fusing saves is \SI{46}{\percent} of a one-field sweep packed and
 \SI{4}{\percent} atomic, the atomic one being dominated by a scatter that scales with the field
-count.
+count. That is also why the atomic $\Jhoex$ is so nearly all reconstruction: its sweep pays the
+field count where the packed one does not.
 
 What it buys is Newton steps. The finite difference of $\Fho$ that separates the two
 (\S\ref{sec:setup}) rebuilds $\Gop u$ at each perturbed state, and on the lid-driven cavity
@@ -1361,10 +1367,10 @@ lane-blocked here like the others, so that margin is the method's rather than an
 the baseline was written --- but the layout more than doubles it. The case for matrix-free is
 therefore made twice over, and the larger half of it is the layout.
 
-$\Jex$ costs $\jfExactCost\times$ $\Jlag$ on the packed layout, the $\Gop p(v)$ sweep
+$\Jex$ costs $\jfExactCost\times$ $\Jlag$ on the packed layout, its reconstruction sweep
 appearing as throughput. Quoting $\Jex$ against the SpMV would report $\jfExactVsF\times$ rather
-than $\jfLaggedVsF\times$, understating the matrix-free side by a quarter while appearing to
-favour it; both are given because they answer different questions.
+than $\jfLaggedVsF\times$, understating the matrix-free side by more than a quarter while
+appearing to favour it; both are given because they answer different questions.
 
 The $\Jhoex$ rows are where the comparison stops being one. Packed $\Jhoex$ lands
 below the double-precision SpMV under both limiters, at $\jfClipExactVsF\times$ for
