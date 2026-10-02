@@ -300,13 +300,14 @@ reconstruction runs where, is the outer iteration
           rebuilt}}
   \State solve $\mathcal{J}(u^k)\,s = -r^k$ by FGMRES to relative tolerance $\tau_{\text{lin}}$:
   \ForAll{applications of $\mathcal{J}$, on a Krylov direction $v$}
-    \If{exact Rhie--Chow \textbf{and} exact correction}
+    \If{the correction is differentiated \textbf{and} the coupling is}
       \State $\Gop u(v),\; \Gop p(v) \gets$ \emph{one} fused four-field reconstruction of $v$
              \Comment{$\Jhoex$; $9 + 3$ components}
-    \ElsIf{exact Rhie--Chow}
-      \State $\Gop p(v) \gets$ one-field reconstruction \Comment{$\Jex$}
-    \ElsIf{exact correction}
+    \ElsIf{the correction is differentiated \textbf{and} there is no coupling}
       \State $\Gop u(v) \gets$ three-field reconstruction
+             \Comment{exact for a problem without Rhie--Chow}
+    \ElsIf{the coupling is differentiated}
+      \State $\Gop p(v) \gets$ one-field reconstruction \Comment{$\Jex$}
     \Else
       \State nothing reconstructed \Comment{$\Jlag$: the deferred correction}
     \EndIf
@@ -348,6 +349,26 @@ without that residual silently gets the lagged action instead.
 reconstruction that cannot be hoisted anywhere, because the direction changes every Krylov
 iteration. $\Jlag$ needs none; $\Jex$ needs the three components of $\Gop p(v)$; $\Jhoex$ needs
 those plus the nine of $\Gop u(v)$, in one sweep rather than two.
+
+\paragraph{The third branch means \emph{absent}, not lagged.} Its condition in the source is
+one test, \code{want\_q = rc\_exact\_jac() \&\& rhie\_chow\_scale != 0 \&\& !pgx.empty()}, which
+is false both when the coupling is lagged and when there is no coupling at all. Those are not the
+same operator. With no coupling, the exact correction is the exact Jacobian of the residual being
+solved, and that is a configuration worth having: a prescribed-velocity transport problem has no
+pressure--velocity coupling to begin with --- Smith--Hutton, the benchmark for whether a
+convective scheme is bounded, is exactly one --- and it is also the configuration the
+higher-order Jacobian is \emph{verified} in, which is why the agreement quoted in
+Section~\ref{sec:jac:asym} is meaningful.
+
+With the coupling present but lagged, differentiating the correction gives an operator that is
+exact in one reconstruction and frozen in the other, and no residual has it as its Jacobian. The
+driver refuses that combination up front rather than letting the branch serve both, so only the
+absent case reaches line 11. The three remaining combinations are all operators somebody applies:
+both differentiated is $\Jhoex$; both lagged is $\Jlag$; and the coupling differentiated with the
+correction lagged is $\Jex$, which is deferred correction as published, since the correction is
+\emph{meant} to stay an explicit source. Note that this is a different question from the
+partially implicit treatment of Section~\ref{sec:jac:asym}, which splits the correction's own
+derivative rather than mixing it with the coupling's.
 
 \paragraph{A note on what the benchmark measures.} The performance paper's exact arms rebuild
 $\Gop p(u)$ and $\Gop u(u)$ inside \emph{every} application rather than hoisting them as line 3

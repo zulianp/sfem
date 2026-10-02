@@ -967,7 +967,10 @@ well. Table~\ref{tab:ladder} adds them one at a time.
 
 \begin{table}[t]
   \centering
-  \caption{\provwarn \fostag{} Throughput as solver terms are added, residual at $n=\campN$.}
+  \caption{\provwarn \fostag{} Throughput as solver terms are added, residual at $n=\campN$, on
+    the three matrix-free layouts. \emph{col.} is the element-coloured layout; the two ratios
+    separate what the format is worth beyond removing the atomics (packed over coloured) from
+    what the two together are worth (packed over atomic).}
   \label{tab:ladder}
   \input{tables/ladder}
 \end{table}
@@ -1113,7 +1116,8 @@ to it.
   \caption{Convective schemes, residual only, at $n=128$, carrying the Rhie--Chow coupling as
     every other complete-operator measurement here does. The nodal velocity gradient is hoisted,
     so the timing is of the flux rather than of the reconstruction feeding it. Each column is
-    that layout's shipped kernel.}
+    that layout's shipped kernel, \emph{col.} being the element-coloured one; the two ratios
+    separate the format from the scatter strategy, as in Table~\ref{tab:ladder}.}
   \label{tab:convho}
   \inputifready{tables/convho}{convective scheme arms, jobs/conv\_ho\_bench.sbatch}
 \end{table}
@@ -1353,18 +1357,19 @@ the specified pair drawn for reference; quoting against the specification would 
 kernel by those factors.
 
 %================================================================================================
-\begin{table}[t]
+\begin{table*}[t]
   \centering
-  \caption{The Jacobian action, each form fully exact or fully lagged, against the
-    double-precision product (the \texttt{f64} row, which the ratios divide by and which has no
-    layout of its own). $\Jlag$ is one row because deferred correction leaves the implicit
+  \caption{The Jacobian action, each form fully exact or fully lagged, on the three matrix-free
+    layouts against the double-precision product (the \texttt{f64} row, which the ratios divide
+    by and which has no layout of its own). \emph{col.} is the \emph{element}-coloured layout,
+    not the pack colouring. $\Jlag$ is one row because deferred correction leaves the implicit
     operator scheme-independent by construction: the first-order row \emph{is} the lagged action,
     and a control at every limiter reproduces its result bit for bit. It is also the only form the
     matrix can hold; the $\Jhoex$ rows have no matrix counterpart at all. The limiters are the
     cheapest and among the dearest, so they bracket what one costs.}
   \label{tab:jacfair}
   \inputifready{tables/jacfair}{fair Jacobian comparison, jobs/jac\_fair.sbatch}
-\end{table}
+\end{table*}
 
 \paragraph{Like-for-like.} Table~\ref{tab:jacfair} separates two questions
 the figure runs together. Against the operator the matrix encodes, the packed matrix-free action is

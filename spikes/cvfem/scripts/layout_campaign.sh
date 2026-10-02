@@ -97,8 +97,10 @@ esac
 CONFIGS=(
     # -- the bare element kernel, both layouts ------------------------------------------
     "residual_bare|residual|packed|sumfact|"
+    "residual_bare|residual|ecolor|sumfact|"
     "residual_bare|residual|atomic|sumfact|"
     "jac_bare|jac_action|packed|sumfact|"
+    "jac_bare|jac_action|ecolor|sumfact|"
     "jac_bare|jac_action|atomic|sumfact|"
 
     # -- the one micro-kernel comparison that is a real tie and not one call site twice ----
@@ -136,20 +138,25 @@ CONFIGS=(
     # boundary closure, then the transient term: each row adds one term to the row above
     # it, so a difference between adjacent rows is that term's cost.
     "residual_rc|residual|packed|sumfact|--rhie-chow"
+    "residual_rc|residual|ecolor|sumfact|--rhie-chow"
     "residual_rc|residual|atomic|sumfact|--rhie-chow"
     "residual_rc_bnd|residual|packed|sumfact|--rhie-chow --boundary"
+    "residual_rc_bnd|residual|ecolor|sumfact|--rhie-chow --boundary"
     "residual_rc_bnd|residual|atomic|sumfact|--rhie-chow --boundary"
     # --transient takes the timestep. Its value does not change the cost -- the term adds
     # the same mass contribution whatever dt is -- so any non-zero one measures it.
     "residual_rc_bnd_dt|residual|packed|sumfact|--rhie-chow --boundary --transient 1e-2"
+    "residual_rc_bnd_dt|residual|ecolor|sumfact|--rhie-chow --boundary --transient 1e-2"
     "residual_rc_bnd_dt|residual|atomic|sumfact|--rhie-chow --boundary --transient 1e-2"
     # The nodal pressure gradient rebuilt inside every apply instead of hoisted out of the
     # Krylov solve. A full element sweep either way, so it is a stage in its own right.
     "residual_rc_perapply|residual|packed|sumfact|--rhie-chow --pgrad-per-apply"
     "residual_rc_perapply|residual|atomic|sumfact|--rhie-chow --pgrad-per-apply"
     "jac_rc|jac_action|packed|sumfact|--rhie-chow"
+    "jac_rc|jac_action|ecolor|sumfact|--rhie-chow"
     "jac_rc|jac_action|atomic|sumfact|--rhie-chow"
     "jac_rc_bnd|jac_action|packed|sumfact|--rhie-chow --boundary"
+    "jac_rc_bnd|jac_action|ecolor|sumfact|--rhie-chow --boundary"
     "jac_rc_bnd|jac_action|atomic|sumfact|--rhie-chow --boundary"
 
     # -- assembly, where the layout ranking is not the one above ------------------------

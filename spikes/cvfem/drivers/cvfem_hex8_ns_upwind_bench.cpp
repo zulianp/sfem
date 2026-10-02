@@ -819,6 +819,33 @@ int main(int argc, char **argv) {
         if (own_mpi) MPI_Finalize();
         return 1;
     }
+    // THE ONE MIXED FORM THAT IS THE JACOBIAN OF NO RESIDUAL.
+    //
+    // The two sensitivities are switchable independently, which is right: three of the four
+    // combinations are operators somebody applies. Both exact is the exact Jacobian of the
+    // higher-order residual; both lagged is deferred correction, the standard treatment, whose
+    // implicit operator is the first-order one; and the Rhie-Chow term exact with the correction
+    // lagged IS deferred correction as published, since the correction is meant to stay an
+    // explicit source.
+    //
+    // The fourth is not. Lagging the pressure-gradient sensitivity while differentiating the
+    // correction is exact in one reconstruction and frozen in the other, which no residual has
+    // as its Jacobian, so a rate measured for it prices an operator with no use. Refused rather
+    // than ignored, because the two flags read as independent and nothing else would say so.
+    //
+    // Note what this does NOT refuse: --conv-ho with no --rhie-chow at all. There the coupling is
+    // absent rather than lagged, so the exact correction is the exact Jacobian of the residual
+    // being solved -- which is what jobs/ho_exact_jac.sbatch verifies against a finite
+    // difference, and what a prescribed-velocity transport problem such as Smith-Hutton wants.
+    if (jac_action && rhie_chow && lagged_rc && conv_ho && !lagged_ho) {
+        std::fprintf(stderr,
+                     "--lagged-rc with an exact higher-order correction is the Jacobian of no "
+                     "residual: it lags the pressure-gradient sensitivity and differentiates the "
+                     "velocity-gradient one. Add --lagged-ho for the deferred-correction action, "
+                     "or drop --lagged-rc for the exact one\n");
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
     // Refused rather than ignored: the working set only means something for an operation
     // that a Krylov method actually repeats, and silently dropping it would report a
     // warm-cache number under a flag that asked for a cold one.

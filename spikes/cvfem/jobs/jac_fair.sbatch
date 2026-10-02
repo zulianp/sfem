@@ -79,12 +79,16 @@ printf '%-26s %-8s %10s %10s %12s %12s\n' operator layout MDOF_s dofs qgrad_frac
 declare -A FP
 for arm in "jac_exact|packed|--jac-action --rhie-chow" \
            "jac_exact|atomic|--jac-action --rhie-chow" \
+           "jac_exact|ecolor|--jac-action --rhie-chow" \
            "jac_clip_exact|packed|--jac-action --rhie-chow --conv-ho 1" \
            "jac_clip_exact|atomic|--jac-action --rhie-chow --conv-ho 1" \
+           "jac_clip_exact|ecolor|--jac-action --rhie-chow --conv-ho 1" \
            "jac_ho_exact|packed|--jac-action --rhie-chow --conv-ho 3" \
            "jac_ho_exact|atomic|--jac-action --rhie-chow --conv-ho 3" \
+           "jac_ho_exact|ecolor|--jac-action --rhie-chow --conv-ho 3" \
            "jac_lagged|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho" \
            "jac_lagged|atomic|--jac-action --rhie-chow --lagged-rc --lagged-ho" \
+           "jac_lagged|ecolor|--jac-action --rhie-chow --lagged-rc --lagged-ho" \
            "jac_lagged_ctl_unlim|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho --conv-ho 0" \
            "jac_lagged_ctl_clip|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho --conv-ho 1" \
            "jac_lagged_ctl_venk|packed|--jac-action --rhie-chow --lagged-rc --lagged-ho --conv-ho 2" \

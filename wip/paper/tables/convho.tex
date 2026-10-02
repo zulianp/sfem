@@ -2,15 +2,16 @@
 %% Regenerate with: make figures
 
 \small
-\begin{tabular}{@{}lrrr@{}}
+\begin{tabular}{@{}lrrrrr@{}}
 \toprule
-convective scheme & packed & atomic & ratio \\
-& \multicolumn{2}{c}{MDOF/s} & \\
+& \multicolumn{3}{c}{MDOF/s} & \multicolumn{2}{c}{packed vs.} \\
+\cmidrule(lr){2-4}\cmidrule(l){5-6}
+convective scheme & packed & col. & atomic & col. & atomic \\
 \midrule
-first-order upwind & 1765 & 895 & $1.97\times$ \\
-deferred correction, unlimited & 741 & 560 & $1.32\times$ \\
-${}+{}$ Barth--Jespersen & 636 & 499 & $1.27\times$ \\
-${}+{}$ Venkatakrishnan & 598 & 475 & $1.26\times$ \\
-${}+{}$ Darwish--Moukalled & 597 & 477 & $1.25\times$ \\
+first-order upwind & 1765 & --- & 895 & --- & $1.97\times$ \\
+deferred correction, unlimited & 741 & --- & 560 & --- & $1.32\times$ \\
+${}+{}$ Barth--Jespersen & 636 & --- & 499 & --- & $1.27\times$ \\
+${}+{}$ Venkatakrishnan & 598 & --- & 475 & --- & $1.26\times$ \\
+${}+{}$ Darwish--Moukalled & 597 & --- & 477 & --- & $1.25\times$ \\
 \bottomrule
 \end{tabular}
