@@ -51,6 +51,7 @@ capture() {  # op-flags layout repeat -> "bytes dofs"
     # The coloured layout is the same pack decomposition, so it takes the same pack size; a
     # capture at a different one would not be comparable with the packed row beside it.
     { [ "$lay" = "packed" ] || [ "$lay" = "colored" ]; } && layflag="$layflag --pack-size $PACK"
+    # ecolor takes no pack: it renumbers the elements instead.
     local out
     out=$(srun -u --ntasks=1 --cpus-per-task=72 --uenv="$CVFEM_UENV" --view="$CVFEM_VIEW" \
             bash -lc "cd $PWD && OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores \
@@ -92,7 +93,7 @@ for arm in "residual|" "residual_rc|--rhie-chow" \
     # += , so it reads the destination back where the packed layout writes its owned rows. That
     # should show as read traffic, and whether it does is the kind of claim that has to be
     # measured rather than argued from the code.
-    for lay in packed atomic colored; do
+    for lay in packed atomic colored ecolor; do
         # The coloured layout has no higher-order convective path: cvfem_hex8_best_colored.hpp
         # carries no deferred-correction kernel, so --conv-ho is silently ignored and the arm
         # measures the first-order operator. Caught by a capture that came back at 86 B/dof

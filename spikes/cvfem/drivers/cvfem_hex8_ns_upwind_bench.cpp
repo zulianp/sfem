@@ -1149,8 +1149,14 @@ int main(int argc, char **argv) {
     // place and report perfect agreement. That is exactly what it did until this was added -- a
     // deliberately broken SIMD kernel still measured 0.0 -- and it is the same artefact
     // docs/kernel_prose/30_layout_margin.md records for a throughput row.
-    if (layout == "packed" || layout == "colored" || layout == "store" || verify || verify_jac || jac_action ||
-        bsr_apply || mesh_footprint || verify_ho)
+    // Never for the element-coloured layout. It uses no pack, and building one is not harmless:
+    // make_packed renumbers the NODES, and the pack size it chooses follows the thread count, so
+    // a --jac-action run came out with a different fingerprint at every thread count purely from
+    // a decomposition it never reads. The layout's own decomposition -- the colouring -- depends
+    // on neither.
+    if (layout != "ecolor" &&
+        (layout == "packed" || layout == "colored" || layout == "store" || verify || verify_jac ||
+         jac_action || bsr_apply || mesh_footprint || verify_ho))
         packed = make_packed(d.mesh, pack_size);
     PackColoring colors;
     if (layout == "colored" || verify || verify_jac)
@@ -1179,6 +1185,9 @@ int main(int argc, char **argv) {
         ecolors           = cvfem_build_element_coloring(d.nelements, d.nnodes, d.elems);
         cvfem_apply_element_coloring(ecolors, d.nelements, d.elems);
         ecolor_build_s = wall_time() - t_ec;
+        // The nodal-gradient reconstruction follows the layout too. Leaving it atomic made the
+        // Rhie-Chow arm the one nondeterministic part of an otherwise reproducible operator.
+        cvfem_hex8_set_qgrad_ecolors(&ecolors);
     }
 
     if (mesh_footprint) {

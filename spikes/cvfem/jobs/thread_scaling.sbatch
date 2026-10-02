@@ -113,10 +113,10 @@ echo
 for arm in "packed|res" "atomic|res" \
            "packed|resho" "atomic|resho" \
            "packed|jac" "atomic|jac" \
-           "colored|res"; do
+           "colored|res" "ecolor|res" "ecolor|jac"; do
     IFS='|' read -r layout op <<<"$arm"
     flags="--layout $layout --rhie-chow --boundary"
-    [ "$layout" != atomic ] && flags="$flags --pack-size $PACK"
+    { [ "$layout" != atomic ] && [ "$layout" != ecolor ]; } && flags="$flags --pack-size $PACK"
     [ "$op" = jac ] && flags="$flags --jac-action"
     [ "$op" = resho ] && flags="$flags --conv-ho 3"
     for t in $THREADS; do

@@ -128,4 +128,22 @@ static void cvfem_apply_element_coloring(const ElementColoring &ec, const ptrdif
     }
 }
 
+// The colouring the nodal-gradient sweep should follow, or null for the atomic scatter.
+//
+// Set by whoever selects the layout, read by cvfem_hex8_nodal_grads_atomic_nc. It exists because
+// the reconstruction is a scatter over elements like any other pass, and leaving it atomic under
+// an element-coloured operator left the only nondeterminism in an otherwise reproducible sweep:
+// the element kernel was bitwise identical across runs and the Rhie-Chow arm was not, because the
+// gradient it reads had been accumulated in thread-arrival order.
+//
+// Translation-unit local, like the other sweep-selection flags in the benchmark driver: the one
+// unit that sets it is the one that instantiates the sweep, and every other sees the null default
+// and the atomic path.
+static inline const ElementColoring *&cvfem_hex8_qgrad_ecolors_ref() {
+    static const ElementColoring *p = nullptr;
+    return p;
+}
+static inline const ElementColoring *cvfem_hex8_qgrad_ecolors() { return cvfem_hex8_qgrad_ecolors_ref(); }
+static inline void cvfem_hex8_set_qgrad_ecolors(const ElementColoring *p) { cvfem_hex8_qgrad_ecolors_ref() = p; }
+
 #endif  // CVFEM_ELEMENT_COLORING_HPP
