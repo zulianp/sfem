@@ -124,29 +124,35 @@ static SFEM_INLINE void cvfem_hex8_gather_action_simd_from_pack(pack_idx_t **con
     }
 }
 
-static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const PackedData &p,
-                                                    const MeshData   &d,
+// Takes the arrays, not the staging objects, for the reason its bench twin does: it is called
+// from inside the pack sweeps, and naming PackedData or MeshData here is what makes
+// src/kernels/ depend on them.
+static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+                                                    const scalar_t *const SFEM_RESTRICT  ux,
+                                                    const scalar_t *const SFEM_RESTRICT  uy,
+                                                    const scalar_t *const SFEM_RESTRICT  uz,
+                                                    const scalar_t *const SFEM_RESTRICT  pr,
                                                     const ptrdiff_t   pack,
                                                     const ptrdiff_t   n_contiguous,
                                                     const ptrdiff_t   n_ghost,
                                                     const idx_t *const SFEM_RESTRICT ghosts,
                                                     scalar_t *const SFEM_RESTRICT pack_u) {
-    const ptrdiff_t owned = p.owned_nodes_ptr[pack];
+    const ptrdiff_t owned = owned_nodes_ptr[pack];
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
         scalar_t *const SFEM_RESTRICT dst = pack_u + k * N_FIELDS;
         const ptrdiff_t               g   = owned + k;
-        dst[0]                            = d.ux[g];
-        dst[1]                            = d.uy[g];
-        dst[2]                            = d.uz[g];
-        dst[3]                            = d.p[g];
+        dst[0]                            = ux[g];
+        dst[1]                            = uy[g];
+        dst[2]                            = uz[g];
+        dst[3]                            = pr[g];
     }
     for (ptrdiff_t k = 0; k < n_ghost; ++k) {
         scalar_t *const SFEM_RESTRICT dst = pack_u + (n_contiguous + k) * N_FIELDS;
         const idx_t            g   = ghosts[k];
-        dst[0]                            = d.ux[g];
-        dst[1]                            = d.uy[g];
-        dst[2]                            = d.uz[g];
-        dst[3]                            = d.p[g];
+        dst[0]                            = ux[g];
+        dst[1]                            = uy[g];
+        dst[2]                            = uz[g];
+        dst[3]                            = pr[g];
     }
 }
 
@@ -314,7 +320,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
-            cvfem_hex8_fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            cvfem_hex8_fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz);
@@ -453,7 +459,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
-            cvfem_hex8_fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            cvfem_hex8_fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
                 scalar_t *const SFEM_RESTRICT dstd = pack_dir + k * N_FIELDS;
                 const ptrdiff_t               g    = owned + k;

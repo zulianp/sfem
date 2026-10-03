@@ -191,12 +191,12 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
-            fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x,
                                                pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz);
             else
-                fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
 
             // THE SIMD HIGHER-ORDER PATH IS CORRECT AND SLOWER, which is why this sweep runs
             // the scalar kernel. The 2.5e-05 discrepancy this comment used to record was real
@@ -348,12 +348,12 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
-            fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x,
                                                pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz);
             else
-                fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
 
             alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
                     cof2[CVFEM_HEX8_VEC_SIZE], cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
@@ -559,13 +559,13 @@ static SFEM_NOINLINE void apply_residual_packed_range(
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
 
-            fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
                                                pack_z, pack_pgx, pack_pgy, pack_pgz);
 
             if constexpr (ISO) {
-                fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
                 Hex8InputPack    in;
                 Hex8CoordPack    xyz;
                 Hex8ResidualPack outp;
@@ -761,12 +761,12 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
             std::memset(local_vals_pack, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
 
-            fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz);
             if constexpr (ISO)
-                fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
 
             for (ptrdiff_t e = e_start; e < e_end; ++e) {
@@ -970,8 +970,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
 
-            fill_pack_fields(p, d, pack, n_contiguous, n_ghost, ghosts, pack_u);
-            fill_pack_interleaved(p, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
+            fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
+            fill_pack_interleaved(p.owned_nodes_ptr, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
 
             Hex8InputPack    u_pack;
             Hex8InputPack    du_pack;
@@ -990,7 +990,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
             if (with_qg)
                 cvfem_hex8_fill_pack_qgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
             if constexpr (ISO)
-                fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
 
             for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
@@ -1222,9 +1222,9 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
 
-            fill_pack_interleaved(p, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
+            fill_pack_interleaved(p.owned_nodes_ptr, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
             if (with_qg) {
-                fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
                 cvfem_hex8_fill_pack_qgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
             }
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }

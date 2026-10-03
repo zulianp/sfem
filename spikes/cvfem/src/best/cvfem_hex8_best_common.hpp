@@ -1038,8 +1038,11 @@ static SFEM_INLINE void gather_hex8_action_simd_from_pack(pack_idx_t **const SFE
     }
 }
 
-static SFEM_INLINE void fill_pack_xyz(const PackedData                  &p,
-                                      const MeshData                    &d,
+// Takes the arrays, not the staging objects: it is called from inside the pack sweeps, and a
+// PackedData or MeshData parameter here is a staging dependency in src/kernels/, which DESIGN.md
+// does not allow there.
+static SFEM_INLINE void fill_pack_xyz(const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+                                      geom_t **const SFEM_RESTRICT       points,
                                       const ptrdiff_t                    pack,
                                       const ptrdiff_t                    n_contiguous,
                                       const ptrdiff_t                    n_ghost,
@@ -1047,10 +1050,10 @@ static SFEM_INLINE void fill_pack_xyz(const PackedData                  &p,
                                       scalar_t *const SFEM_RESTRICT      pack_x,
                                       scalar_t *const SFEM_RESTRICT      pack_y,
                                       scalar_t *const SFEM_RESTRICT      pack_z) {
-    const auto *const px    = d.points[0];
-    const auto *const py    = d.points[1];
-    const auto *const pz    = d.points[2];
-    const ptrdiff_t   owned = p.owned_nodes_ptr[pack];
+    const auto *const px    = points[0];
+    const auto *const py    = points[1];
+    const auto *const pz    = points[2];
+    const ptrdiff_t   owned = owned_nodes_ptr[pack];
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
         const ptrdiff_t g = owned + k;
         pack_x[k]         = scalar_t(px[g]);
@@ -1165,18 +1168,20 @@ static SFEM_INLINE void gather_hex8_coords_from_pack(pack_idx_t **const SFEM_RES
 // element kernels through pack-local ids turns four scattered global reads per
 // node into one contiguous read, which is why the packed and colored layouts both
 // stage through this buffer rather than gathering from d.ux/uy/uz/p directly.
-static SFEM_INLINE void fill_pack_fields(const PackedData                       &p,
-                                         const MeshData                         &d,
+// Takes the arrays, not the staging objects: it is called from inside the pack sweeps, and a
+// PackedData or MeshData parameter here is a staging dependency in src/kernels/, which DESIGN.md
+// does not allow there.
+static SFEM_INLINE void fill_pack_fields(const ptrdiff_t *const SFEM_RESTRICT    owned_nodes_ptr,
+                                         const scalar_t *const SFEM_RESTRICT     ux,
+                                         const scalar_t *const SFEM_RESTRICT     uy,
+                                         const scalar_t *const SFEM_RESTRICT     uz,
+                                         const scalar_t *const SFEM_RESTRICT     pr,
                                          const ptrdiff_t                         pack,
                                          const ptrdiff_t                         n_contiguous,
                                          const ptrdiff_t                         n_ghost,
                                          const smesh::idx_t *const SFEM_RESTRICT ghosts,
                                          scalar_t *const SFEM_RESTRICT           pack_u) {
-    const scalar_t *const SFEM_RESTRICT ux    = d.ux.data();
-    const scalar_t *const SFEM_RESTRICT uy    = d.uy.data();
-    const scalar_t *const SFEM_RESTRICT uz    = d.uz.data();
-    const scalar_t *const SFEM_RESTRICT pr    = d.p.data();
-    const ptrdiff_t                     owned = p.owned_nodes_ptr[pack];
+    const ptrdiff_t                     owned = owned_nodes_ptr[pack];
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
         scalar_t *const SFEM_RESTRICT dst = pack_u + k * N_FIELDS;
         const ptrdiff_t               g   = owned + k;
@@ -1196,14 +1201,17 @@ static SFEM_INLINE void fill_pack_fields(const PackedData                       
 }
 
 // Same, for an already-interleaved global vector (a Krylov direction).
-static SFEM_INLINE void fill_pack_interleaved(const PackedData                       &p,
+// Takes the arrays, not the staging objects: it is called from inside the pack sweeps, and a
+// PackedData or MeshData parameter here is a staging dependency in src/kernels/, which DESIGN.md
+// does not allow there.
+static SFEM_INLINE void fill_pack_interleaved(const ptrdiff_t *const SFEM_RESTRICT    owned_nodes_ptr,
                                               const ptrdiff_t                         pack,
                                               const ptrdiff_t                         n_contiguous,
                                               const ptrdiff_t                         n_ghost,
                                               const smesh::idx_t *const SFEM_RESTRICT ghosts,
                                               const scalar_t *const SFEM_RESTRICT     src,
                                               scalar_t *const SFEM_RESTRICT           pack_v) {
-    const ptrdiff_t owned = p.owned_nodes_ptr[pack];
+    const ptrdiff_t owned = owned_nodes_ptr[pack];
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
         std::memcpy(pack_v + k * N_FIELDS, src + (owned + k) * N_FIELDS, N_FIELDS * sizeof(scalar_t));
     }
