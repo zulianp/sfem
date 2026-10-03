@@ -10,7 +10,7 @@
 // Both paths run in one process on one mesh, so the only admissible difference is the
 // order of floating-point accumulation in the parallel scatter.
 
-#include "op/cvfem_hex8_ns_op.hpp"
+#include "frontend/op/cvfem_hex8_ns_op.hpp"
 
 // The gate needs the reference path too, so unlike a driver it includes the core
 // deliberately. Anything that only wants the operator includes the header above alone.

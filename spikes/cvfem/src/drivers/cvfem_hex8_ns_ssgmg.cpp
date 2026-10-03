@@ -11,12 +11,12 @@
 // this directory. No MeshData, no BSR4, no kernels. That is the point of the split -- a
 // driver states the problem and the operator stays opaque.
 
-#include "op/cvfem_hex8_ns_op.hpp"
+#include "frontend/op/cvfem_hex8_ns_op.hpp"
 #include "diag/cvfem_flow_diagnostics.hpp"
 #include "core/cvfem_fgmres.hpp"
 #include "core/cvfem_parallel.hpp"
 #include "ss/cvfem_ss_transfer.hpp"
-#include "ss/cvfem_ss_galerkin_api.hpp"
+#include "frontend/galerkin/cvfem_ss_galerkin_api.hpp"
 
 #include "sfem_CRS_X_BSR.hpp"
 #include "cases/cvfem_ns_channel_case.hpp"

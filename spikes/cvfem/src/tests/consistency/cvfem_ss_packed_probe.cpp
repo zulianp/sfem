@@ -25,7 +25,7 @@
 // nodes. At level 8 a macro-element carries 729 nodes, which caps a pack at 89 macro-elements.
 
 #include "hex8/cvfem_hex8_ns_core.hpp"
-#include "op/cvfem_hex8_ns_op.hpp"
+#include "frontend/op/cvfem_hex8_ns_op.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"

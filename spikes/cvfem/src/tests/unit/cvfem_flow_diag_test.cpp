@@ -21,7 +21,7 @@
 // verification matrix beside the other cases that need a driver run.
 
 #include "diag/cvfem_flow_diagnostics.hpp"
-#include "op/cvfem_hex8_ns_op.hpp"
+#include "frontend/op/cvfem_hex8_ns_op.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"

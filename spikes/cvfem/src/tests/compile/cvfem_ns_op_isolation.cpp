@@ -13,7 +13,7 @@
 //    scope; here it is float, and the operator is unaffected because its interface is
 //    real_t throughout.
 
-#include "op/cvfem_hex8_ns_op.hpp"
+#include "frontend/op/cvfem_hex8_ns_op.hpp"
 
 // The benchmark family, included alongside the operator on purpose.
 #include "best/cvfem_hex8_best_common.hpp"
