@@ -69,6 +69,9 @@ include(CVFEMCMakeFunctions)
 # Recursive, so a new directory is picked up by existing. The guard below is about shape,
 # not about membership.
 file(GLOB_RECURSE CVFEM_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+# src/drivers and src/tests are under src/ but are not library sources: each of those files
+# carries a main(). They are globbed separately below.
+list(FILTER CVFEM_SOURCES EXCLUDE REGEX "/src/(drivers|tests)/")
 file(GLOB_RECURSE CVFEM_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp")
 set(CVFEM_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
@@ -112,7 +115,7 @@ cvfem_target_defaults(cvfem_ns_op)
 # Most link SFEM directly; the ones below go through the Op library.
 set(CVFEM_OP_DRIVERS cvfem_hex8_ns_ssgmg cvfem_ns_apply_bench cvfem_sshex8_bench)
 
-file(GLOB CVFEM_DRIVERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/drivers/*.cpp")
+file(GLOB_RECURSE CVFEM_DRIVERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/drivers/*.cpp")
 foreach(DRIVER ${CVFEM_DRIVERS})
     get_filename_component(DRIVER_NAME ${DRIVER} NAME_WE)
     add_executable(${DRIVER_NAME} ${DRIVER})
@@ -161,8 +164,11 @@ set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACRO
 #                          benchmark's layout family. Failure mode is a build error.
 #   tests_lshape_check     the L-shape generator's element and node counts against their
 #                          closed forms.
-file(GLOB CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
-list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_guard_selftest.cpp)
+# Recursive: the tests are grouped by TYPE in subfolders now. Target and ctest names stay
+# NAME_WE, so the suite's names are unchanged by the move and a run before and after is
+# comparable entry by entry.
+file(GLOB_RECURSE CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/*.cpp")
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/build/cvfem_guard_selftest.cpp)
 
 set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test cvfem_flow_diag_test cvfem_ss_packed_probe cvfem_operator_consistency_test)
 foreach(TEST_SOURCE ${CVFEM_TESTS})
@@ -215,7 +221,7 @@ endif()
 # and the ones it kept shut stay shut, and both halves live in the driver's own oracles rather
 # than in a reimplementation -- so this drives the driver. n=8, a couple of seconds.
 add_test(NAME cvfem_bench_staging
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_bench_staging.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
 
 # ------------------------------------------------- the geometry gate, on a NON-AFFINE mesh
@@ -227,7 +233,7 @@ add_test(NAME cvfem_bench_staging
 # reached a campaign undetected and surfaced at n=160 as a 2.0e-4 disagreement; the gate was
 # then checked by reintroducing the bug, which it fails at warp > 0 and passes on the cube.
 add_test(NAME cvfem_warped_geometry
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_warped_geometry.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_warped_geometry.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
 
 # --------------------------------------------- the packed macro path is the same operator
@@ -263,7 +269,7 @@ set_tests_properties(cvfem_flat_vs_ss_packed PROPERTIES ENVIRONMENT "SFEM_SS_PAC
 # because nothing else in this suite sets SFEM_CONV_HO: without it the entire higher-order
 # convection path, and the branch its default now takes, sit outside the local gate.
 add_test(NAME cvfem_conv_freeze
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_conv_freeze_test.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_conv_freeze_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
 # 600, not 300, because this test gained a fourth solver arm: the LAGGED Jacobian, which is the
 # point of the assertion it feeds -- it must cost Newton steps, and it does, 35 against 13, which
@@ -277,14 +283,14 @@ set_tests_properties(cvfem_conv_freeze PROPERTIES TIMEOUT 600)
 # that mistook its own step index for the absolute one drives the diaphragm at the wrong
 # phase and the identity reports it.
 add_test(NAME cvfem_restart
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_restart_test.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/regression/cvfem_restart_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
 
 # A step that will not converge is either the end of the run or a smaller step, never a step
 # that is quietly accepted. Both policies are driven against one forced failure, because the
 # thing worth testing is that they disagree in exactly the intended way.
 add_test(NAME cvfem_cutback
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_cutback_test.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_cutback_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
 
 # The transient multigrid/Vanka path, which nothing else exercised: cvfem_restart and
@@ -297,7 +303,7 @@ add_test(NAME cvfem_cutback
 # 36 s there against 1 s for multigrid; at N=8 the same arm costs 689 s, the dense coarse
 # factorisation being cubic in a problem that grew 8x under refinement.
 add_test(NAME cvfem_mg_transient
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_mg_transient_test.sh
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_mg_transient_test.sh
                  $<TARGET_FILE:cvfem_hex8_ns_ssgmg>)
 set_tests_properties(cvfem_mg_transient PROPERTIES TIMEOUT 300)
 
@@ -358,7 +364,7 @@ if(CVFEM_PYTHON)
                     RESULT_VARIABLE _cvfem_no_numpy OUTPUT_QUIET ERROR_QUIET)
     if(_cvfem_no_numpy EQUAL 0)
         add_test(NAME cvfem_richardson
-                 COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_richardson_test.sh
+                 COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_richardson_test.sh
                          $<TARGET_FILE:cvfem_hex8_ns_ssgmg> ${CVFEM_PYTHON})
         set_tests_properties(cvfem_richardson PROPERTIES TIMEOUT 900 LABELS slow)
         message(STATUS "cvfem: temporal-order gate enabled (${CVFEM_PYTHON})")
@@ -384,7 +390,7 @@ endif()
 # wiring is live.
 if(MPIEXEC_EXECUTABLE)
     add_test(NAME cvfem_mpi_guard
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_mpi_guard_test.sh
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_mpi_guard_test.sh
                      $<TARGET_FILE:cvfem_hex8_ns_ssgmg>
                      ${MPIEXEC_EXECUTABLE}
                      $<TARGET_FILE:cvfem_sshex8_bench>)
@@ -403,7 +409,7 @@ if(MPIEXEC_EXECUTABLE)
     # addition does not associate, so a partitioned sum need not match a sequential one bit for
     # bit even when both are right.
     add_test(NAME cvfem_distributed_setup
-             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/cvfem_distributed_setup_test.sh
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_distributed_setup_test.sh
                      $<TARGET_FILE:cvfem_hex8_ns_ssgmg>
                      ${MPIEXEC_EXECUTABLE})
     set_tests_properties(cvfem_distributed_setup PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
@@ -419,7 +425,7 @@ endif()
 # drivers/cvfem_hex8_ns_steady.cpp's std::isfinite() checks into a constant `true`. See
 # the -fno-finite-math-only comment in cmake/CVFEMCMakeFunctions.cmake. Run it in CI; it
 # takes microseconds.
-add_executable(cvfem_guard_selftest tests/cvfem_guard_selftest.cpp)
+add_executable(cvfem_guard_selftest src/tests/build/cvfem_guard_selftest.cpp)
 target_compile_options(cvfem_guard_selftest PRIVATE ${_cvfem_perf_opts})
 target_include_directories(cvfem_guard_selftest PRIVATE ${CVFEM_INCLUDE_DIRS})
 add_test(NAME cvfem_guard_selftest COMMAND cvfem_guard_selftest)

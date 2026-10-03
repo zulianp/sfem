@@ -40,7 +40,7 @@ set -euo pipefail
 # under sbatch: Slurm copies the batch script to /var/spool/slurmd/job<id>/, so the
 # BASH_SOURCE candidate is only live when the script is run directly. SCRIPT_DIR keeps
 # its name below: everything downstream uses it as the spike root.
-_cvfem_probe=drivers/cvfem_hex8_ns_upwind_bench.cpp
+_cvfem_probe=src/drivers/cvfem_hex8_ns_upwind_bench.cpp
 SCRIPT_DIR=""
 for _cand in "${SLURM_SUBMIT_DIR:-}" "${SLURM_SUBMIT_DIR:-}/.." "${CVFEM_DIR:-}" \
              "$(dirname "${BASH_SOURCE[0]}")/.."; do
