@@ -171,7 +171,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
         // Coordinates always, and the pressure gradient when Rhie-Chow is on: the same
         // six-array slot the first-order SIMD path uses, so no new scratch shape appears.
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p));
+                thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p.max_actual_nodes_per_pack) : packed_xyz_n(p.max_actual_nodes_per_pack));
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x   = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y   = pack_xyz + xyz_n;
@@ -328,7 +328,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         // Coordinates always, and the pressure gradient when Rhie-Chow is on: the same
         // six-array slot the first-order SIMD path uses, so no new scratch shape appears.
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p));
+                thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p.max_actual_nodes_per_pack) : packed_xyz_n(p.max_actual_nodes_per_pack));
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x   = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y   = pack_xyz + xyz_n;
@@ -536,7 +536,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
                 (ISO || with_rc)
-                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
+                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p.max_actual_nodes_per_pack) : packed_xyz_n(p.max_actual_nodes_per_pack))
                         : nullptr;
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
@@ -735,7 +735,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
         scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
                 (ISO || with_rc)
-                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
+                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p.max_actual_nodes_per_pack) : packed_xyz_n(p.max_actual_nodes_per_pack))
                         : nullptr;
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
@@ -950,7 +950,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
         scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(p)) : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(p.max_actual_nodes_per_pack)) : nullptr;
         scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
         scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;
@@ -1133,7 +1133,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
     // frozen-gradient one the assembled matrix keeps.
     const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
     const bool   with_qg   = with_rc && !d.qgx.empty();
-    const size_t slot3_n   = with_rc ? packed_rc_n(p) : packed_xyz_n(p);
+    const size_t slot3_n   = with_rc ? packed_rc_n(p.max_actual_nodes_per_pack) : packed_xyz_n(p.max_actual_nodes_per_pack);
 
 
 #pragma omp parallel
@@ -1197,12 +1197,12 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         // Three arrays in slot 3, not six: the nodal pressure gradient is inside the store.
-        scalar_t *const SFEM_RESTRICT pack_xyz = with_qg ? thread_scratch<scalar_t>(3, packed_xyz_n(p)) : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_xyz = with_qg ? thread_scratch<scalar_t>(3, packed_xyz_n(p.max_actual_nodes_per_pack)) : nullptr;
         const ptrdiff_t               xyz_n    = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x   = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y   = pack_xyz ? pack_xyz + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_z   = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(p)) : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(p.max_actual_nodes_per_pack)) : nullptr;
         scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
         scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;

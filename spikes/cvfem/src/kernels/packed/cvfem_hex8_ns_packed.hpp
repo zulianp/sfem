@@ -395,7 +395,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
 static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_packed");
     const size_t scratch_n = packed_scratch_n(p);
-    const size_t rc_n      = packed_rc_n(p);
+    const size_t rc_n      = packed_rc_n(p.max_actual_nodes_per_pack);
     const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
 
 
@@ -593,8 +593,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
     }
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_packed");
     const size_t scratch_n = packed_scratch_n(p);
-    const size_t rc_n      = packed_rc_n(p);
-    const size_t qg_n      = packed_qg_n(p);
+    const size_t rc_n      = packed_rc_n(p.max_actual_nodes_per_pack);
+    const size_t qg_n      = packed_qg_n(p.max_actual_nodes_per_pack);
     const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
     // The Rhie-Chow term differentiates through the nodal pressure-gradient reconstruction.
     // apply_jacobian_action_accumulate reconstructs the direction's gradient into d.qg

@@ -175,21 +175,24 @@ static SFEM_INLINE size_t packed_scratch_n(const PackedData &p) {
     return (size_t)N_FIELDS * (size_t)n;
 }
 
-static SFEM_INLINE size_t packed_xyz_n(const PackedData &p) {
-    const ptrdiff_t n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+// THEY TAKE THE COUNT, NOT THE STAGING OBJECT. DESIGN.md requires src/kernels/ to name no
+// library, and these are called from inside the pack sweeps -- so a PackedData parameter here is
+// a PackedData dependency there. The count is the only thing any of them reads.
+static SFEM_INLINE size_t packed_xyz_n(const ptrdiff_t max_actual_nodes_per_pack) {
+    const ptrdiff_t n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
     return 3 * (size_t)n;
 }
 
-static SFEM_INLINE size_t packed_rc_n(const PackedData &p) {
-    const ptrdiff_t n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+static SFEM_INLINE size_t packed_rc_n(const ptrdiff_t max_actual_nodes_per_pack) {
+    const ptrdiff_t n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
     return 6 * (size_t)n;
 }
 
 // The direction's reconstructed pressure gradient, staged only by the Jacobian action.
 // Kept out of packed_rc_n so the residual, which never reads it, allocates exactly what it
 // did before.
-static SFEM_INLINE size_t packed_qg_n(const PackedData &p) {
-    const ptrdiff_t n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+static SFEM_INLINE size_t packed_qg_n(const ptrdiff_t max_actual_nodes_per_pack) {
+    const ptrdiff_t n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
     return 3 * (size_t)n;
 }
 

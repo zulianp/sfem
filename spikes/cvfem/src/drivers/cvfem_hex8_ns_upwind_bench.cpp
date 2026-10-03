@@ -1433,8 +1433,8 @@ int main(int argc, char **argv) {
             // direction gradient. Touched here so the first timed call does not pay for the
             // allocation.
             if (geom_kind == GeomKind::Isoparam || verify || verify_ho || rhie_chow)
-                (void)thread_scratch<scalar_t>(3, rhie_chow ? packed_rc_n(packed) : packed_xyz_n(packed));
-            if (rhie_chow && jac_action) (void)thread_scratch<scalar_t>(4, packed_qg_n(packed));
+                (void)thread_scratch<scalar_t>(3, rhie_chow ? packed_rc_n(packed.max_actual_nodes_per_pack) : packed_xyz_n(packed.max_actual_nodes_per_pack));
+            if (rhie_chow && jac_action) (void)thread_scratch<scalar_t>(4, packed_qg_n(packed.max_actual_nodes_per_pack));
         }
     }
 
