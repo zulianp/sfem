@@ -12,6 +12,7 @@
 // and cvfem_hex8_best_store.hpp.
 
 #include "best/cvfem_hex8_best_common.hpp"
+#include "kernels/cvfem_range.hpp"
 
 static void build_pack_local_crs(PackedData               &p,
                                  const ptrdiff_t           nelements,
@@ -144,23 +145,27 @@ static void build_pack_local_crs(PackedData               &p,
 // `ugrad` is nine interleaved components per node and is hoisted, as the solver lags the
 // correction one Newton step. The reconstruction also needs the element's node coordinates, so
 // the pack stages its coordinates whenever the correction is on, exactly as Rhie-Chow does.
-static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
-                                                       PackedData     &p,
-                                                       const scalar_t  rho,
-                                                       const scalar_t  mu,
-                                                       const scalar_t *const SFEM_RESTRICT ugrad,
-                                                       const int       limiter,
-                                                       const scalar_t  venkat_c) {
-    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
-    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
-    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
-    scalar_t *const SFEM_RESTRICT rc = d.rc.data();
-    const size_t                  scratch_n = packed_scratch_n(p);
-    const Hex8Extras              opt(d);
-    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
-
-#pragma omp parallel
-    {
+// The pack sweep, driven by a range. The `#pragma omp parallel` is in the launcher below; see
+// kernels/cvfem_range.hpp for why DESIGN.md wants it there. The packs of a range touch only
+// nodes this part owns -- that is what the packed layout is for -- so the parts need no
+// synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+// launcher, which is the second and independent parallel loop.
+static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
+        const cvfem_range packs,
+        MeshData &d,
+        PackedData &p,
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT ugrad,
+        const int limiter,
+        const scalar_t venkat_c,
+        scalar_t *const SFEM_RESTRICT rx,
+        scalar_t *const SFEM_RESTRICT ry,
+        scalar_t *const SFEM_RESTRICT rz,
+        scalar_t *const SFEM_RESTRICT rc,
+        const size_t scratch_n,
+        const Hex8Extras & opt,
+        const int with_rc) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         // Coordinates always, and the pressure gradient when Rhie-Chow is on: the same
@@ -174,8 +179,8 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
         scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
@@ -258,8 +263,29 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
                 gx[ghost_off + k] = out[0]; gy[ghost_off + k] = out[1];
                 gz[ghost_off + k] = out[2]; gc[ghost_off + k] = out[3];
             }
-        }
     }
+}
+
+
+static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
+                                                       PackedData     &p,
+                                                       const scalar_t  rho,
+                                                       const scalar_t  mu,
+                                                       const scalar_t *const SFEM_RESTRICT ugrad,
+                                                       const int       limiter,
+                                                       const scalar_t  venkat_c) {
+    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
+    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
+    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
+    scalar_t *const SFEM_RESTRICT rc = d.rc.data();
+    const size_t                  scratch_n = packed_scratch_n(p);
+    const Hex8Extras              opt(d);
+    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+
+
+#pragma omp parallel
+    apply_residual_packed_defcor_scalar_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d, p, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, opt, with_rc);
 
     scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
@@ -276,46 +302,27 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
     }
 }
 
-static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
-                                                       PackedData     &p,
-                                                       const scalar_t  rho,
-                                                       const scalar_t  mu,
-                                                       const scalar_t *const SFEM_RESTRICT ugrad,
-                                                       const int       limiter,
-                                                       const scalar_t  venkat_c,
-                                                       // Run the GENERATED lane-blocked kernel
-                                                       // instead of the hand-written one. Same
-                                                       // sweep, same staging, same scatter -- only
-                                                       // the kernel differs, which is what makes
-                                                       // the comparison a kernel comparison.
-                                                       const bool      sympy = false) {
-    // Every limiter arm is generated now, with and without Rhie-Chow -- eight kernels. What is NOT
-    // generated is Venkatakrishnan's eps^2 term: it is venkat_c * h^3, so carrying it would put a
-    // square root at every sub-control surface, and every caller in the tree passes zero. Refused
-    // rather than silently dropped, because a row that names a term it did not compute is worse
-    // than a row that does not exist.
-    if (sympy && venkat_c != scalar_t(0)) {
-        std::fprintf(stderr,
-                     "the generated higher-order kernels carry eps^2 = 0; a non-zero venkat_c "
-                     "needs the hand-written kernel (--ho-scalar)\n");
-        std::abort();
-    }
-    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
-    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
-    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
-    scalar_t *const SFEM_RESTRICT rc = d.rc.data();
-    const size_t                  scratch_n = packed_scratch_n(p);
-    const Hex8Extras              opt(d);
-    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
-
-    // The generated Rhie-Chow kernel reads the coefficient out of the staged table instead of
-    // rebuilding it per surface, so the table has to exist. It is cached on the state stamp, so
-    // this is a no-op after the first call for a given state. The hand-written kernel computes the
-    // coefficient inline and needs none of it, which is why this is conditional.
-    if (sympy && with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
-
-#pragma omp parallel
-    {
+// The pack sweep, driven by a range. The `#pragma omp parallel` is in the launcher below; see
+// kernels/cvfem_range.hpp for why DESIGN.md wants it there. The packs of a range touch only
+// nodes this part owns -- that is what the packed layout is for -- so the parts need no
+// synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+// launcher, which is the second and independent parallel loop.
+static SFEM_NOINLINE void apply_residual_packed_defcor_range(
+        const cvfem_range packs,
+        MeshData &d,
+        PackedData &p,
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT ugrad,
+        const int limiter,
+        const scalar_t venkat_c,
+        const bool sympy,
+        scalar_t *const SFEM_RESTRICT rx,
+        scalar_t *const SFEM_RESTRICT ry,
+        scalar_t *const SFEM_RESTRICT rz,
+        scalar_t *const SFEM_RESTRICT rc,
+        const size_t scratch_n,
+        const int with_rc) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         // Coordinates always, and the pressure gradient when Rhie-Chow is on: the same
@@ -329,8 +336,8 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
         scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
@@ -438,8 +445,52 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
                 gx[ghost_off + k] = out[0]; gy[ghost_off + k] = out[1];
                 gz[ghost_off + k] = out[2]; gc[ghost_off + k] = out[3];
             }
-        }
     }
+}
+
+
+static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
+                                                       PackedData     &p,
+                                                       const scalar_t  rho,
+                                                       const scalar_t  mu,
+                                                       const scalar_t *const SFEM_RESTRICT ugrad,
+                                                       const int       limiter,
+                                                       const scalar_t  venkat_c,
+                                                       // Run the GENERATED lane-blocked kernel
+                                                       // instead of the hand-written one. Same
+                                                       // sweep, same staging, same scatter -- only
+                                                       // the kernel differs, which is what makes
+                                                       // the comparison a kernel comparison.
+                                                       const bool      sympy = false) {
+    // Every limiter arm is generated now, with and without Rhie-Chow -- eight kernels. What is NOT
+    // generated is Venkatakrishnan's eps^2 term: it is venkat_c * h^3, so carrying it would put a
+    // square root at every sub-control surface, and every caller in the tree passes zero. Refused
+    // rather than silently dropped, because a row that names a term it did not compute is worse
+    // than a row that does not exist.
+    if (sympy && venkat_c != scalar_t(0)) {
+        std::fprintf(stderr,
+                     "the generated higher-order kernels carry eps^2 = 0; a non-zero venkat_c "
+                     "needs the hand-written kernel (--ho-scalar)\n");
+        std::abort();
+    }
+    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
+    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
+    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
+    scalar_t *const SFEM_RESTRICT rc = d.rc.data();
+    const size_t                  scratch_n = packed_scratch_n(p);
+    const Hex8Extras              opt(d);
+    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+
+    // The generated Rhie-Chow kernel reads the coefficient out of the staged table instead of
+    // rebuilding it per surface, so the table has to exist. It is cached on the state stamp, so
+    // this is a no-op after the first call for a given state. The hand-written kernel computes the
+    // coefficient inline and needs none of it, which is why this is conditional.
+    if (sympy && with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+
+
+#pragma omp parallel
+    apply_residual_packed_defcor_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d, p, rho, mu, ugrad, limiter, venkat_c, sympy, rx, ry, rz, rc, scratch_n, with_rc);
 
     scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
@@ -462,29 +513,25 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
 // inside the sweep. It also left the geometry undecided at the point where it matters -- the
 // lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
 // the vectorisation gate now refuses outright. The caller picks the instantiation.
+// The pack sweep, driven by a range. The `#pragma omp parallel` is in the launcher below; see
+// kernels/cvfem_range.hpp for why DESIGN.md wants it there. The packs of a range touch only
+// nodes this part owns -- that is what the packed layout is for -- so the parts need no
+// synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+// launcher, which is the second and independent parallel loop.
 template <bool ISO>
-static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
-                                                PackedData      &p,
-                                                const scalar_t   rho,
-                                                const scalar_t   mu,
-                                                const KernelKind kernel_kind) {
-    const scalar_t *const SFEM_RESTRICT ux = d.ux.data();
-    const scalar_t *const SFEM_RESTRICT uy = d.uy.data();
-    const scalar_t *const SFEM_RESTRICT uz = d.uz.data();
-    const scalar_t *const SFEM_RESTRICT pr = d.p.data();
-    scalar_t *const SFEM_RESTRICT       rx = d.rx.data();
-    scalar_t *const SFEM_RESTRICT       ry = d.ry.data();
-    scalar_t *const SFEM_RESTRICT       rz = d.rz.data();
-    scalar_t *const SFEM_RESTRICT       rc = d.rc.data();
-    const size_t                        scratch_n = packed_scratch_n(p);
-    // Rhie-Chow needs the coordinates and the nodal gradient staged per pack, six arrays
-    // rather than three, so slot 3 is sized for six when it is on. This is the solver's
-    // own arrangement (packed_rc_n, cvfem_hex8_ns_packed.hpp) and the constant already
-    // lives in the shared cvfem_hex8_pack_common.hpp.
-    const int                           with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
-
-#pragma omp parallel
-    {
+static SFEM_NOINLINE void apply_residual_packed_range(
+        const cvfem_range packs,
+        MeshData &d,
+        PackedData &p,
+        const scalar_t rho,
+        const scalar_t mu,
+        const KernelKind kernel_kind,
+        scalar_t *const SFEM_RESTRICT rx,
+        scalar_t *const SFEM_RESTRICT ry,
+        scalar_t *const SFEM_RESTRICT rz,
+        scalar_t *const SFEM_RESTRICT rc,
+        const size_t scratch_n,
+        const int with_rc) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
@@ -499,8 +546,8 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
         scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
@@ -612,8 +659,35 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                 gz[ghost_off + k]                       = out[2];
                 gc[ghost_off + k]                       = out[3];
             }
-        }
     }
+}
+
+
+template <bool ISO>
+static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
+                                                PackedData      &p,
+                                                const scalar_t   rho,
+                                                const scalar_t   mu,
+                                                const KernelKind kernel_kind) {
+    const scalar_t *const SFEM_RESTRICT ux = d.ux.data();
+    const scalar_t *const SFEM_RESTRICT uy = d.uy.data();
+    const scalar_t *const SFEM_RESTRICT uz = d.uz.data();
+    const scalar_t *const SFEM_RESTRICT pr = d.p.data();
+    scalar_t *const SFEM_RESTRICT       rx = d.rx.data();
+    scalar_t *const SFEM_RESTRICT       ry = d.ry.data();
+    scalar_t *const SFEM_RESTRICT       rz = d.rz.data();
+    scalar_t *const SFEM_RESTRICT       rc = d.rc.data();
+    const size_t                        scratch_n = packed_scratch_n(p);
+    // Rhie-Chow needs the coordinates and the nodal gradient staged per pack, six arrays
+    // rather than three, so slot 3 is sized for six when it is on. This is the solver's
+    // own arrangement (packed_rc_n, cvfem_hex8_ns_packed.hpp) and the constant already
+    // lives in the shared cvfem_hex8_pack_common.hpp.
+    const int                           with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+
+
+#pragma omp parallel
+    apply_residual_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d, p, rho, mu, kernel_kind, rx, ry, rz, rc, scratch_n, with_rc);
 
     scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
@@ -637,26 +711,23 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
 // inside the sweep. It also left the geometry undecided at the point where it matters -- the
 // lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
 // the vectorisation gate now refuses outright. The caller picks the instantiation.
+// The pack sweep, driven by a range. The `#pragma omp parallel` is in the launcher below; see
+// kernels/cvfem_range.hpp for why DESIGN.md wants it there. The packs of a range touch only
+// nodes this part owns -- that is what the packed layout is for -- so the parts need no
+// synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+// launcher, which is the second and independent parallel loop.
 template <bool ISO>
-static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
-                                                   PackedData      &p,
-                                                   BSR4            &b,
-                                                   const scalar_t   rho,
-                                                   const scalar_t   mu,
-                                                   const KernelKind kernel_kind) {
-    zero_bsr4(b);
-
-    const size_t u_n   = packed_scratch_n(p);
-    const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
-    // This sweep is scalar per element, not SIMD over a pack, so Rhie-Chow enters through
-    // the same Hex8RhieChow the atomic assembly builds -- the only difference is that the
-    // coordinates and the nodal gradient are read out of the pack rather than out of the
-    // mesh. Both hand-written kernels below take the term; the generated ones and the
-    // finite-difference reference do not, which the driver refuses rather than measures.
-    const int    with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
-
-#pragma omp parallel
-    {
+static SFEM_NOINLINE void assemble_jacobian_packed_range(
+        const cvfem_range packs,
+        MeshData &d,
+        PackedData &p,
+        BSR4 &b,
+        const scalar_t rho,
+        const scalar_t mu,
+        const KernelKind kernel_kind,
+        const size_t u_n,
+        const size_t bsr_n,
+        const int with_rc) {
         PhaseAcc acc;
         alignas(ALIGN_BYTES) scalar_t dense_ke[64 * 16];
         std::memset(dense_ke, 0, sizeof(dense_ke));
@@ -674,8 +745,8 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
         scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
@@ -777,9 +848,33 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                             (size_t)(end - begin) * 16 * sizeof(scalar_t));
             }
             if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
-        }
-        acc.flush();
     }
+        acc.flush();
+}
+
+
+template <bool ISO>
+static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
+                                                   PackedData      &p,
+                                                   BSR4            &b,
+                                                   const scalar_t   rho,
+                                                   const scalar_t   mu,
+                                                   const KernelKind kernel_kind) {
+    zero_bsr4(b);
+
+    const size_t u_n   = packed_scratch_n(p);
+    const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
+    // This sweep is scalar per element, not SIMD over a pack, so Rhie-Chow enters through
+    // the same Hex8RhieChow the atomic assembly builds -- the only difference is that the
+    // coordinates and the nodal gradient are read out of the pack rather than out of the
+    // mesh. Both hand-written kernels below take the term; the generated ones and the
+    // finite-difference reference do not, which the driver refuses rather than measures.
+    const int    with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+
+
+#pragma omp parallel
+    assemble_jacobian_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d, p, b, rho, mu, kernel_kind, u_n, bsr_n, with_rc);
 
     const double _tg = phase_now();
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
@@ -816,34 +911,29 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
 // inside the sweep. It also left the geometry undecided at the point where it matters -- the
 // lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
 // the vectorisation gate now refuses outright. The caller picks the instantiation.
+// The pack sweep, driven by a range. The `#pragma omp parallel` is in the launcher below; see
+// kernels/cvfem_range.hpp for why DESIGN.md wants it there. The packs of a range touch only
+// nodes this part owns -- that is what the packed layout is for -- so the parts need no
+// synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+// launcher, which is the second and independent parallel loop.
 template <bool ISO>
-static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
-                                                       PackedData            &p,
-                                                       const scalar_t         rho,
-                                                       const scalar_t         mu,
-                                                       const scalar_t *const  dir,
-                                                       scalar_t *const        jv,
-                                                       const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
-                                                       const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
-                                                       const int              limiter = 0,
-                                                       const scalar_t         venkat_c = scalar_t(0)) {
-    const bool with_ho = ugrad != nullptr && vgrad != nullptr;
-    // Hoisted out of the face loops -- see Hex8RhieChowPack::coeff. Its own cache key makes
-    // this free after the first call, so --warmup absorbs the build and the timed loop
-    // measures what the solver's Krylov iterations measure.
-    cvfem_hex8_build_rc_coeff(d, rho, mu);
-    const size_t scratch_n = packed_scratch_n(p);
-    // Rhie-Chow staged per pack, exactly as apply_residual_packed does it and exactly as
-    // the solver's own packed Jacobian does (cvfem_hex8_ns_packed.hpp). Slot 3 grows from
-    // three arrays to six when it is on, and slot 4 carries the direction's reconstructed
-    // gradient -- the term that makes this the *exact* Rhie-Chow Jacobian rather than the
-    // frozen-gradient one the assembled matrix keeps.
-    const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
-    const bool   with_qg   = with_rc && !d.qgx.empty();
-    const size_t slot3_n   = with_rc ? packed_rc_n(p) : packed_xyz_n(p);
-
-#pragma omp parallel
-    {
+static SFEM_NOINLINE void apply_jacobian_action_packed_range(
+        const cvfem_range packs,
+        MeshData &d,
+        PackedData &p,
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const dir,
+        scalar_t *const jv,
+        const scalar_t *const SFEM_RESTRICT ugrad,
+        const scalar_t *const SFEM_RESTRICT vgrad,
+        const int limiter,
+        const scalar_t venkat_c,
+        const bool with_ho,
+        const size_t scratch_n,
+        const int with_rc,
+        const bool with_qg,
+        const size_t slot3_n) {
         // The breakdown covered packed assembly and the colored matvec but not this one --
         // the operator the solver's Krylov loop actually applies. Without it nothing here
         // could be attributed to a phase.
@@ -865,8 +955,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
         scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
@@ -1014,9 +1104,41 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                 gc[ghost_off + k]                       = out[3];
             }
             if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
-        }
-        acc.flush();
     }
+        acc.flush();
+}
+
+
+template <bool ISO>
+static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
+                                                       PackedData            &p,
+                                                       const scalar_t         rho,
+                                                       const scalar_t         mu,
+                                                       const scalar_t *const  dir,
+                                                       scalar_t *const        jv,
+                                                       const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                       const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
+                                                       const int              limiter = 0,
+                                                       const scalar_t         venkat_c = scalar_t(0)) {
+    const bool with_ho = ugrad != nullptr && vgrad != nullptr;
+    // Hoisted out of the face loops -- see Hex8RhieChowPack::coeff. Its own cache key makes
+    // this free after the first call, so --warmup absorbs the build and the timed loop
+    // measures what the solver's Krylov iterations measure.
+    cvfem_hex8_build_rc_coeff(d, rho, mu);
+    const size_t scratch_n = packed_scratch_n(p);
+    // Rhie-Chow staged per pack, exactly as apply_residual_packed does it and exactly as
+    // the solver's own packed Jacobian does (cvfem_hex8_ns_packed.hpp). Slot 3 grows from
+    // three arrays to six when it is on, and slot 4 carries the direction's reconstructed
+    // gradient -- the term that makes this the *exact* Rhie-Chow Jacobian rather than the
+    // frozen-gradient one the assembled matrix keeps.
+    const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+    const bool   with_qg   = with_rc && !d.qgx.empty();
+    const size_t slot3_n   = with_rc ? packed_rc_n(p) : packed_xyz_n(p);
+
+
+#pragma omp parallel
+    apply_jacobian_action_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d, p, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, with_rc, with_qg, slot3_n);
 
     const double _tg = phase_now();
 #pragma omp parallel for schedule(static)
@@ -1055,18 +1177,22 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
 // centre, which is not what the isoparametric kernels evaluate -- they build an area vector
 // per sub-control surface from a trilinear Jacobian. The driver refuses the combination
 // rather than measuring a store that describes a different operator.
-static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &d,
-                                                          PackedData           &p,
-                                                          const scalar_t        rho,
-                                                          const scalar_t        mu,
-                                                          const scalar_t *const dir,
-                                                          scalar_t *const       jv) {
-    const size_t scratch_n = packed_scratch_n(p);
-    const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
-    const bool   with_qg   = with_rc && !d.qgx.empty();
-
-#pragma omp parallel
-    {
+// The pack sweep, driven by a range. The `#pragma omp parallel` is in the launcher below; see
+// kernels/cvfem_range.hpp for why DESIGN.md wants it there. The packs of a range touch only
+// nodes this part owns -- that is what the packed layout is for -- so the parts need no
+// synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+// launcher, which is the second and independent parallel loop.
+static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
+        const cvfem_range packs,
+        MeshData &d,
+        PackedData &p,
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const dir,
+        scalar_t *const jv,
+        const size_t scratch_n,
+        const int with_rc,
+        const bool with_qg) {
         PhaseAcc                      acc;
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
@@ -1081,8 +1207,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
         scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
         scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
@@ -1142,9 +1268,25 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
                 gc[ghost_off + k]                       = out[3];
             }
             if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
-        }
-        acc.flush();
     }
+        acc.flush();
+}
+
+
+static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &d,
+                                                          PackedData           &p,
+                                                          const scalar_t        rho,
+                                                          const scalar_t        mu,
+                                                          const scalar_t *const dir,
+                                                          scalar_t *const       jv) {
+    const size_t scratch_n = packed_scratch_n(p);
+    const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+    const bool   with_qg   = with_rc && !d.qgx.empty();
+
+
+#pragma omp parallel
+    apply_jacobian_action_packed_pa_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d, p, rho, mu, dir, jv, scratch_n, with_rc, with_qg);
 
     const double _tg = phase_now();
 #pragma omp parallel for schedule(static)
