@@ -194,7 +194,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
 
             fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
-                cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
+                cvfem_hex8_fill_pack_xyz_pgrad(p.owned_nodes_ptr, d.points, d.pgx.data(), d.pgy.data(), d.pgz.data(), !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0), pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz);
             if constexpr (ISO)
                 fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);

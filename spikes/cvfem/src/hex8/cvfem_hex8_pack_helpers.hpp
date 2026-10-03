@@ -509,9 +509,16 @@ static SFEM_INLINE void cvfem_hex8_scatter_simd_to_pack(pack_idx_t **const SFEM_
     scatter_hex8_simd_to_pack(elems, pack_out, begin, nlanes, out);
 }
 
-template <typename PackT, typename MeshT>
-static SFEM_INLINE void cvfem_hex8_fill_pack_xyz_pgrad(const PackT                       &p,
-                                                       const MeshT                       &d,
+// Takes the arrays and the flag, not the staging objects, for the reason the gathers above do:
+// called from inside the pack sweeps, a PackT or MeshT parameter here is what keeps
+// src/kernels/ dependent on the staging layer. with_pg is resolved by the caller, where the
+// Rhie-Chow decision already lives.
+static SFEM_INLINE void cvfem_hex8_fill_pack_xyz_pgrad(const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+                                                       geom_t **const SFEM_RESTRICT       points,
+                                                       const scalar_t *const SFEM_RESTRICT pgx,
+                                                       const scalar_t *const SFEM_RESTRICT pgy,
+                                                       const scalar_t *const SFEM_RESTRICT pgz,
+                                                       const int                          with_pg,
                                                        const ptrdiff_t                    pack,
                                                        const ptrdiff_t                    n_contiguous,
                                                        const ptrdiff_t                    n_ghost,
@@ -522,37 +529,41 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_xyz_pgrad(const PackT              
                                                        scalar_t *const SFEM_RESTRICT      pack_pgx,
                                                        scalar_t *const SFEM_RESTRICT      pack_pgy,
                                                        scalar_t *const SFEM_RESTRICT      pack_pgz) {
-    const auto *const px    = d.points[0];
-    const auto *const py    = d.points[1];
-    const auto *const pz    = d.points[2];
-    const ptrdiff_t   owned = p.owned_nodes_ptr[pack];
-    const int         with_pg = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+    const auto *const px    = points[0];
+    const auto *const py    = points[1];
+    const auto *const pz    = points[2];
+    const ptrdiff_t   owned = owned_nodes_ptr[pack];
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
         const ptrdiff_t g = owned + k;
         pack_x[k]         = scalar_t(px[g]);
         pack_y[k]         = scalar_t(py[g]);
         pack_z[k]         = scalar_t(pz[g]);
-        pack_pgx[k]       = with_pg ? d.pgx[(size_t)g] : scalar_t(0);
-        pack_pgy[k]       = with_pg ? d.pgy[(size_t)g] : scalar_t(0);
-        pack_pgz[k]       = with_pg ? d.pgz[(size_t)g] : scalar_t(0);
+        pack_pgx[k]       = with_pg ? pgx[(size_t)g] : scalar_t(0);
+        pack_pgy[k]       = with_pg ? pgy[(size_t)g] : scalar_t(0);
+        pack_pgz[k]       = with_pg ? pgz[(size_t)g] : scalar_t(0);
     }
     for (ptrdiff_t k = 0; k < n_ghost; ++k) {
         const smesh::idx_t g         = ghosts[k];
         pack_x[n_contiguous + k]     = scalar_t(px[g]);
         pack_y[n_contiguous + k]     = scalar_t(py[g]);
         pack_z[n_contiguous + k]     = scalar_t(pz[g]);
-        pack_pgx[n_contiguous + k]   = with_pg ? d.pgx[(size_t)g] : scalar_t(0);
-        pack_pgy[n_contiguous + k]   = with_pg ? d.pgy[(size_t)g] : scalar_t(0);
-        pack_pgz[n_contiguous + k]   = with_pg ? d.pgz[(size_t)g] : scalar_t(0);
+        pack_pgx[n_contiguous + k]   = with_pg ? pgx[(size_t)g] : scalar_t(0);
+        pack_pgy[n_contiguous + k]   = with_pg ? pgy[(size_t)g] : scalar_t(0);
+        pack_pgz[n_contiguous + k]   = with_pg ? pgz[(size_t)g] : scalar_t(0);
     }
 }
 
 // The same staging for the DIRECTION's reconstructed gradient, which only the Jacobian
 // action needs. Separate from the routine above rather than another pair of arguments on
 // it: the residual and the benchmark call that one and have nothing to put here.
-template <typename PackT, typename MeshT>
-static SFEM_INLINE void cvfem_hex8_fill_pack_qgrad(const PackT                       &p,
-                                                   const MeshT                       &d,
+// Takes the arrays and the flag, not the staging objects, for the reason the gathers above do:
+// called from inside the pack sweeps, a PackT or MeshT parameter here is what keeps
+// src/kernels/ dependent on the staging layer.
+
+static SFEM_INLINE void cvfem_hex8_fill_pack_qgrad(const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+                                                   const scalar_t *const SFEM_RESTRICT qgx,
+                                                   const scalar_t *const SFEM_RESTRICT qgy,
+                                                   const scalar_t *const SFEM_RESTRICT qgz,
                                                    const ptrdiff_t                    pack,
                                                    const ptrdiff_t                    n_contiguous,
                                                    const ptrdiff_t                    n_ghost,
@@ -560,18 +571,18 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_qgrad(const PackT                  
                                                    scalar_t *const SFEM_RESTRICT      pack_qgx,
                                                    scalar_t *const SFEM_RESTRICT      pack_qgy,
                                                    scalar_t *const SFEM_RESTRICT      pack_qgz) {
-    const ptrdiff_t owned = p.owned_nodes_ptr[pack];
+    const ptrdiff_t owned = owned_nodes_ptr[pack];
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
         const ptrdiff_t g = owned + k;
-        pack_qgx[k]       = d.qgx[(size_t)g];
-        pack_qgy[k]       = d.qgy[(size_t)g];
-        pack_qgz[k]       = d.qgz[(size_t)g];
+        pack_qgx[k]       = qgx[(size_t)g];
+        pack_qgy[k]       = qgy[(size_t)g];
+        pack_qgz[k]       = qgz[(size_t)g];
     }
     for (ptrdiff_t k = 0; k < n_ghost; ++k) {
         const smesh::idx_t g       = ghosts[k];
-        pack_qgx[n_contiguous + k] = d.qgx[(size_t)g];
-        pack_qgy[n_contiguous + k] = d.qgy[(size_t)g];
-        pack_qgz[n_contiguous + k] = d.qgz[(size_t)g];
+        pack_qgx[n_contiguous + k] = qgx[(size_t)g];
+        pack_qgy[n_contiguous + k] = qgy[(size_t)g];
+        pack_qgz[n_contiguous + k] = qgz[(size_t)g];
     }
 }
 

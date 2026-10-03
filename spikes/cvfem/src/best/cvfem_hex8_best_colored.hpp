@@ -156,7 +156,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                 std::memset(pack_out, 0, (size_t)(n_contiguous + n_ghost) * (size_t)N_FIELDS * sizeof(scalar_t));
                 fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
                 if (with_rc)
-                    cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
+                    cvfem_hex8_fill_pack_xyz_pgrad(p.owned_nodes_ptr, d.points, d.pgx.data(), d.pgy.data(), d.pgz.data(), !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0), pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
                                                    pack_z, pack_pgx, pack_pgy, pack_pgz);
                 if (geom_kind == GeomKind::Isoparam)
                     fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
@@ -314,10 +314,10 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                 fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
                 fill_pack_interleaved(p.owned_nodes_ptr, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
                 if (with_rc)
-                    cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
+                    cvfem_hex8_fill_pack_xyz_pgrad(p.owned_nodes_ptr, d.points, d.pgx.data(), d.pgy.data(), d.pgz.data(), !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0), pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
                                                    pack_z, pack_pgx, pack_pgy, pack_pgz);
                 if (with_qg)
-                    cvfem_hex8_fill_pack_qgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy,
+                    cvfem_hex8_fill_pack_qgrad(p.owned_nodes_ptr, d.qgx.data(), d.qgy.data(), d.qgz.data(), pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy,
                                                pack_qgz);
                 if (geom_kind == GeomKind::Isoparam)
                     fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
