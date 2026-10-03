@@ -154,16 +154,27 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const PackedData &p,
 // every packed sweep -- the rows a pack does not own -- so DESIGN.md's threading rule applies to
 // it as much as to the element pass, and it needs its own entry point rather than riding on the
 // sweep's.
+//
+// IT TAKES ONLY WHAT IT READS, which is the other half of DESIGN.md's rule for this directory:
+// "the signatures of the functions are lean-and-mean only arguments that are acually used are
+// passed". PackedData is a staging object -- it owns std::vectors and a shared_ptr<smesh::Mesh> --
+// so naming it in a kernel signature is what keeps src/kernels/ dependent on a library. These
+// four arrays and one count are the whole of what the reduction reads; the launcher resolves them.
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa_range(const cvfem_range rows,
-        PackedData &p, scalar_t *const fields[N_FIELDS]) {
+        const idx_t *const SFEM_RESTRICT     ghost_reduce_dest,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const ptrdiff_t                      n_ghost_entries,
+        const scalar_t *const SFEM_RESTRICT  ghost_buf,
+        scalar_t *const fields[N_FIELDS]) {
     for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
-        const idx_t dest  = p.ghost_reduce_dest[row];
-        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
-        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        const idx_t dest  = ghost_reduce_dest[row];
+        const ptrdiff_t    begin = ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = ghost_reduce_ptr[row + 1];
         for (int f = 0; f < N_FIELDS; ++f) {
-            const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + f * p.n_ghost_entries;
+            const scalar_t *const SFEM_RESTRICT ghost = ghost_buf + f * n_ghost_entries;
             scalar_t                            sum   = 0;
-            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
+            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[ghost_reduce_idx[j]];
             fields[f][dest] += sum;
         }
     }
@@ -174,7 +185,8 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa(PackedData &p, scalar_t *con
 #pragma omp parallel
     cvfem_hex8_ghost_reduce_soa_range(cvfem_range_split(0, p.n_ghost_reduce_rows, 1,
                                    cvfem_thread_index(), cvfem_n_threads()),
-            p, fields);
+            p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx,
+            p.n_ghost_entries, p.ghost_buf.data(), fields);
 }
 
 // The same reduction at an arbitrary width, for destinations that carry more than the four
@@ -187,20 +199,29 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa(PackedData &p, scalar_t *con
 // every packed sweep -- the rows a pack does not own -- so DESIGN.md's threading rule applies to
 // it as much as to the element pass, and it needs its own entry point rather than riding on the
 // sweep's.
+//
+// IT TAKES ONLY WHAT IT READS, which is the other half of DESIGN.md's rule for this directory:
+// "the signatures of the functions are lean-and-mean only arguments that are acually used are
+// passed". PackedData is a staging object -- it owns std::vectors and a shared_ptr<smesh::Mesh> --
+// so naming it in a kernel signature is what keeps src/kernels/ dependent on a library. These
+// four arrays and one count are the whole of what the reduction reads; the launcher resolves them.
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide_range(const cvfem_range rows,
-        PackedData                         &p,
+        const idx_t *const SFEM_RESTRICT     ghost_reduce_dest,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const ptrdiff_t                      n_ghost_entries,
         const scalar_t *const SFEM_RESTRICT buf,
         const int                           width,
         scalar_t *const SFEM_RESTRICT       dst) {
     for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
-        const idx_t dest  = p.ghost_reduce_dest[row];
-        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
-        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        const idx_t dest  = ghost_reduce_dest[row];
+        const ptrdiff_t    begin = ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = ghost_reduce_ptr[row + 1];
         scalar_t *const    out   = dst + (ptrdiff_t)dest * width;
         for (int f = 0; f < width; ++f) {
-            const scalar_t *const SFEM_RESTRICT ghost = buf + (ptrdiff_t)f * p.n_ghost_entries;
+            const scalar_t *const SFEM_RESTRICT ghost = buf + (ptrdiff_t)f * n_ghost_entries;
             scalar_t                            sum   = 0;
-            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
+            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[ghost_reduce_idx[j]];
             out[f] += sum;
         }
     }
@@ -214,24 +235,36 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide(PackedData                 
 #pragma omp parallel
     cvfem_hex8_ghost_reduce_wide_range(cvfem_range_split(0, p.n_ghost_reduce_rows, 1,
                                    cvfem_thread_index(), cvfem_n_threads()),
-            p, buf, width, dst);
+            p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx,
+            p.n_ghost_entries, buf, width, dst);
 }
 
 // The ghost reduction, driven by a range. It is the second and independent parallel loop of
 // every packed sweep -- the rows a pack does not own -- so DESIGN.md's threading rule applies to
 // it as much as to the element pass, and it needs its own entry point rather than riding on the
 // sweep's.
+//
+// IT TAKES ONLY WHAT IT READS, which is the other half of DESIGN.md's rule for this directory:
+// "the signatures of the functions are lean-and-mean only arguments that are acually used are
+// passed". PackedData is a staging object -- it owns std::vectors and a shared_ptr<smesh::Mesh> --
+// so naming it in a kernel signature is what keeps src/kernels/ dependent on a library. These
+// four arrays and one count are the whole of what the reduction reads; the launcher resolves them.
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved_range(const cvfem_range rows,
-        PackedData &p, scalar_t *const SFEM_RESTRICT jv) {
+        const idx_t *const SFEM_RESTRICT     ghost_reduce_dest,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const ptrdiff_t                      n_ghost_entries,
+        const scalar_t *const SFEM_RESTRICT  ghost_buf,
+        scalar_t *const SFEM_RESTRICT jv) {
     for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
-        const idx_t dest  = p.ghost_reduce_dest[row];
-        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
-        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
+        const idx_t dest  = ghost_reduce_dest[row];
+        const ptrdiff_t    begin = ghost_reduce_ptr[row];
+        const ptrdiff_t    end   = ghost_reduce_ptr[row + 1];
         scalar_t *const    out   = jv + (ptrdiff_t)dest * N_FIELDS;
         for (int f = 0; f < N_FIELDS; ++f) {
-            const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + f * p.n_ghost_entries;
+            const scalar_t *const SFEM_RESTRICT ghost = ghost_buf + f * n_ghost_entries;
             scalar_t                            sum   = 0;
-            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
+            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[ghost_reduce_idx[j]];
             out[f] += sum;
         }
     }
@@ -242,7 +275,8 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved(PackedData &p, scala
 #pragma omp parallel
     cvfem_hex8_ghost_reduce_interleaved_range(cvfem_range_split(0, p.n_ghost_reduce_rows, 1,
                                    cvfem_thread_index(), cvfem_n_threads()),
-            p, jv);
+            p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx,
+            p.n_ghost_entries, p.ghost_buf.data(), jv);
 }
 
 // The pack sweep, driven by a range; the `#pragma omp parallel` is in the launcher below. See
