@@ -42,7 +42,7 @@
 // sfem::count_t / sfem::idx_t come from cvfem_ss_galerkin_api.hpp, which the only
 // translation unit including this header includes first. sfem_base.h is not on the
 // include path of every install (it is not on alps).
-#include "cvfem_sshex8_ns.hpp"
+#include "ss/cvfem_sshex8_ns.hpp"
 
 #include "smesh_env.hpp"
 

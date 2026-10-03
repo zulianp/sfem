@@ -22,8 +22,8 @@
 //     condition every BDF scheme satisfies, and a direct check that the coefficients were
 //     not transcribed wrongly.
 
-#include "cvfem_hex8_best_common.hpp"
-#include "cvfem_hex8_best_atomic.hpp"
+#include "best/cvfem_hex8_best_common.hpp"
+#include "best/cvfem_hex8_best_atomic.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"

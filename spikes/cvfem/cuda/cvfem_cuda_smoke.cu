@@ -16,7 +16,7 @@ using scalar_t = double;
 #define SFEM_RESTRICT __restrict__
 #endif
 
-#include "cvfem_hex8_ns_upwind_kernels.hpp"
+#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
 
 #include "cvfem_cuda_smoke.hpp"
 

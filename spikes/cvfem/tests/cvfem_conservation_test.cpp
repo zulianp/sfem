@@ -21,7 +21,7 @@
 
 #include "smesh_types.hpp"
 
-#include "cvfem_portability.hpp"
+#include "core/cvfem_portability.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -30,8 +30,8 @@
 using scalar_t = double;
 static constexpr int N_FIELDS = 4;
 
-#include "cvfem_hex8_ns_upwind_kernels.hpp"
-#include "cvfem_hex8_boundary_scs.hpp"
+#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "hex8/cvfem_hex8_boundary_scs.hpp"
 
 static int g_failures = 0;
 

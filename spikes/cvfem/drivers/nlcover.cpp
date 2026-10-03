@@ -6,8 +6,8 @@
 #include <cstring>
 #include <vector>
 #include <mpi.h>
-#include "cvfem_hex8_best_common.hpp"
-#include "cvfem_hex8_best_atomic.hpp"
+#include "best/cvfem_hex8_best_common.hpp"
+#include "best/cvfem_hex8_best_atomic.hpp"
 
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);

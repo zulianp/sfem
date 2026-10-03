@@ -8,7 +8,7 @@
 // operator keeps them to itself and exposes an sfem-typed surface. This header is that
 // surface for the Galerkin path -- sfem and standard types only, no CVFEM kernel headers.
 
-#include "cvfem_hex8_ns_op.hpp"
+#include "op/cvfem_hex8_ns_op.hpp"
 
 #include "sfem_BSR.hpp"
 #include "sfem_Function.hpp"

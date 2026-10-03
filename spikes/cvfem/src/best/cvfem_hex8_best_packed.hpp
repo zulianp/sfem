@@ -11,7 +11,7 @@
 // trip through it costs more than it saves; see cvfem_hex8_best_colored.hpp
 // and cvfem_hex8_best_store.hpp.
 
-#include "cvfem_hex8_best_common.hpp"
+#include "best/cvfem_hex8_best_common.hpp"
 
 static void build_pack_local_crs(PackedData               &p,
                                  const ptrdiff_t           nelements,

@@ -16,10 +16,10 @@
 
 // PackedData and the pack helpers live in the shared header; this file used to
 // carry a divergent trimmed copy of them.
-#include "cvfem_hex8_pack_common.hpp"
+#include "hex8/cvfem_hex8_pack_common.hpp"
 
 // After the kernel headers, which steady.cpp includes before this file.
-#include "cvfem_hex8_pack_helpers.hpp"
+#include "hex8/cvfem_hex8_pack_helpers.hpp"
 
 
 

@@ -63,10 +63,10 @@ using scalar_t = double;
 
 static constexpr int N_FIELDS = 4;
 
-#include "cvfem_portability.hpp"
+#include "core/cvfem_portability.hpp"
 
-#include "cvfem_hex8_ns_upwind_kernels.hpp"
-#include "cvfem_pack_coloring.hpp"
+#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "core/cvfem_pack_coloring.hpp"
 
 enum class GeomKind { Affine, Isoparam };
 enum class FlowCase { Poiseuille, Couette };
@@ -241,9 +241,9 @@ struct MeshData {
     scalar_t upwind_eps{0};
 };
 
-#include "cvfem_hex8_ns_packed.hpp"
-#include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
-#include "cvfem_hex8_boundary_scs.hpp"
+#include "hex8/cvfem_hex8_ns_packed.hpp"
+#include "upwind/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "hex8/cvfem_hex8_boundary_scs.hpp"
 
 // The Rhie-Chow time-scale configuration for this mesh's solve. Declared here and defined
 // below, next to the BDF coefficients it reads: the element sweeps that need it all sit

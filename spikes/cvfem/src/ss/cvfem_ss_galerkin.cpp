@@ -2,9 +2,9 @@
 // CVFEM element headers, which define file-scope names a driver also defines, stay out of
 // the driver's compilation.
 
-#include "cvfem_ss_galerkin_api.hpp"
+#include "ss/cvfem_ss_galerkin_api.hpp"
 
-#include "cvfem_ss_galerkin.hpp"
+#include "ss/cvfem_ss_galerkin.hpp"
 
 #include "smesh_buffer.hpp"
 #include "smesh_exchange.hpp"

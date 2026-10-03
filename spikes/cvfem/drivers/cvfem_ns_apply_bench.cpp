@@ -13,8 +13,8 @@
 //
 // Includes only the operator and the channel case: no MeshData, no kernels, no BSR4.
 
-#include "cvfem_hex8_ns_op.hpp"
-#include "cvfem_ns_channel_case.hpp"
+#include "op/cvfem_hex8_ns_op.hpp"
+#include "cases/cvfem_ns_channel_case.hpp"
 
 #include "sfem_API.hpp"
 #include "sfem_Function.hpp"

@@ -12,7 +12,7 @@
 // because it never had a second rank would be worse than no test. The multi-rank side is
 // exercised by smesh's own distributed tests and, once the driver is parallel, by the 1-vs-4
 // comparisons the plan calls for.
-#include "cvfem_parallel.hpp"
+#include "core/cvfem_parallel.hpp"
 
 #include "sfem_context.hpp"
 

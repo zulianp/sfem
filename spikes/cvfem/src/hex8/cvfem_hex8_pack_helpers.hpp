@@ -19,7 +19,7 @@
 // header's 546 lines, 83 (15%) were duplicated, 68 (12%) are Rhie-Chow staging the
 // benchmark has no use for, and 370 (68%) genuinely differ.
 
-#include "cvfem_element_coloring.hpp"
+#include "core/cvfem_element_coloring.hpp"
 
 template <typename MeshT>
 static SFEM_INLINE void load_hex8_adj(const MeshT &d, const ptrdiff_t e, scalar_t adj[9], scalar_t *det) {

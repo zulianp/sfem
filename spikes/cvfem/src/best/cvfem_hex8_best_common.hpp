@@ -68,22 +68,22 @@ using scalar_t = double;
 
 static constexpr int N_FIELDS = 4;
 
-#include "cvfem_portability.hpp"
+#include "core/cvfem_portability.hpp"
 
 // Needs scalar_t and N_FIELDS above.
-#include "cvfem_hex8_pack_common.hpp"
+#include "hex8/cvfem_hex8_pack_common.hpp"
 
-#include "cvfem_hex8_ns_upwind_kernels.hpp"
-#include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "upwind/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 
 // The boundary sub-control-surface terms, for --boundary. The benchmark closes no control
 // volumes by default and this header contributes nothing unless a face mask is supplied,
 // so including it costs an unused function per kernel and nothing at run time. It also
 // supplies cvfem_hex8_grad_scalar, which the nodal pressure gradient below needs, so it
 // must precede cvfem_hex8_pack_helpers.hpp.
-#include "cvfem_hex8_boundary_scs.hpp"
+#include "hex8/cvfem_hex8_boundary_scs.hpp"
 
-#include "cvfem_hex8_pack_helpers.hpp"
+#include "hex8/cvfem_hex8_pack_helpers.hpp"
 
 // The rowwise and facewise CSE arrangements lost the saturated evaluation (see
 // subpar/README.md) and were moved to subpar/. Building with -DCVFEM_ENABLE_SUBPAR puts

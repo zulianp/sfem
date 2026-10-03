@@ -6,7 +6,7 @@
 // and no scratch, which makes it the simplest and the reference for correctness,
 // but assembly pays ~1024 atomic read-modify-writes per element.
 
-#include "cvfem_hex8_best_common.hpp"
+#include "best/cvfem_hex8_best_common.hpp"
 
 // The two gradient arguments carry the exact higher-order action, as on the packed sweep; both
 // null is the lagged one. The atomic path exists here so the layouts can be compared on the same

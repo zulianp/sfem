@@ -15,7 +15,7 @@
 // attributed to the operator and not to a solver, and reports it per field so the term is
 // identifiable. Keyed by node COORDINATE: the two meshes number their nodes differently.
 
-#include "cvfem_hex8_ns_op.hpp"
+#include "op/cvfem_hex8_ns_op.hpp"
 
 #include "sfem_Function.hpp"
 #include "sfem_context.hpp"

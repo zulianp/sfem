@@ -12,9 +12,9 @@
 // change it only on the faces named, and does a mistake in the naming stop the run instead
 // of being absorbed.
 
-#include "cvfem_hex8_ns_core.hpp"
+#include "hex8/cvfem_hex8_ns_core.hpp"
 
-#include "cvfem_hex8_ns_op.hpp"
+#include "op/cvfem_hex8_ns_op.hpp"
 #include "sfem_Function.hpp"
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"

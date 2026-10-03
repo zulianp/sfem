@@ -54,82 +54,37 @@ option(CVFEM_ENABLE_CUDA "Build the CVFEM HEX8 CUDA targets" OFF)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(CVFEMCMakeFunctions)
 
-# ---------------------------------------------------------------------- modules
-# Every cvfem header is included by bare filename, never by path, so each module
-# directory goes on the include path. This mirrors the SFEM_MODULES / scan_directories
-# loop in SFEM's own top-level CMakeLists.txt, and reuses its function where the SFEM
-# source tree is reachable -- the spike already compiles against ../../algebra.
-# src/upwind holds the convective SCHEME -- the hand-written and generated upwind kernels
-# for both elements -- because that is the part a different flux replaces, and collecting it
-# is what makes the limiter work a substitution rather than a search. src/tet4 and
-# src/generated held nothing else and are gone: an element family that is one header, and a
-# directory named after how its contents were produced rather than what they compute.
-# src/best holds the surviving operator implementations -- the layouts the benchmark drives.
-# It is header-only ON PURPOSE: the same glob feeds CVFEM_SOURCES into add_library(cvfem_ns_op),
-# so a .cpp here would drag the whole benchmark family into the one target that must not see
-# it, and the two families define thirteen of the same names.
-# src/venkata holds the slope limiters the deferred-correction flux selects between. They
-# are separated from src/upwind because the scheme and the limiter vary independently: the
-# same reconstruction runs under every arm, and an arm has to be replaceable without
-# touching the kernel that calls it.
-set(CVFEM_MODULES src/core src/hex8 src/upwind src/venkata src/best src/ss src/op src/cases src/diag)
-
-set(_sfem_cmake_functions ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/SFEMCMakeFunctions.cmake)
-if(EXISTS ${_sfem_cmake_functions})
-    include(${_sfem_cmake_functions})
-    foreach(MODULE ${CVFEM_MODULES})
-        scan_directories(${CMAKE_CURRENT_SOURCE_DIR}/${MODULE} "."
-                         CVFEM_INCLUDE_DIRS CVFEM_HEADERS CVFEM_SOURCES)
-    endforeach()
-else()
-    # Detached copy of the spike: same result without the SFEM source tree.
-    foreach(MODULE ${CVFEM_MODULES})
-        file(GLOB _mod_sources CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.cpp")
-        file(GLOB _mod_headers CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${MODULE}/*.hpp")
-        list(APPEND CVFEM_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/${MODULE})
-        list(APPEND CVFEM_SOURCES ${_mod_sources})
-        list(APPEND CVFEM_HEADERS ${_mod_headers})
-    endforeach()
-endif()
-
-# ------------------------------------------------------- the two ways a file goes missing
+# ----------------------------------------------------------------------- the source tree
+# ONE include root, and every cvfem header is included BY PATH relative to it:
 #
-# Neither glob above is recursive and neither is an error when it matches nothing, so both
-# of these failures are SILENT. They cost real time to find, because the symptom is an
-# undefined symbol or a kernel that mysteriously did not change, a long way from the cause.
+#     #include "kernels/packed/affine/residual.hpp"
 #
-# 1. A directory added under src/ and not listed in CVFEM_MODULES is never globbed and never
-#    put on the include path. Its headers do not exist as far as the build is concerned.
-#    This is the trap that makes src/hex8/best/ a bad idea: a subfolder of a listed module
-#    is not scanned either, so the files vanish just as quietly.
-# 2. Every module directory goes FLAT onto one include path, so two headers sharing a
-#    basename are one header as far as `#include "x.hpp"` is concerned, and which of them
-#    wins is the order the directories happen to appear in. That is a coin toss that
-#    reproduces perfectly on one machine and differently on another.
-file(GLOB _cvfem_src_dirs LIST_DIRECTORIES true "${CMAKE_CURRENT_SOURCE_DIR}/src/*")
-foreach(_dir ${_cvfem_src_dirs})
-    if(IS_DIRECTORY ${_dir})
-        file(RELATIVE_PATH _rel ${CMAKE_CURRENT_SOURCE_DIR} ${_dir})
-        list(FIND CVFEM_MODULES ${_rel} _found)
-        if(_found EQUAL -1)
-            message(FATAL_ERROR
-                "${_rel} exists but is not in CVFEM_MODULES, so nothing in it is compiled "
-                "or reachable by #include. Add it to the CVFEM_MODULES list above.")
-        endif()
-    endif()
-endforeach()
+# not by bare filename. That is the whole of what lets src/ have a shape. The previous
+# arrangement put each module directory flat onto the include path, which bought bare
+# filenames at two prices: a directory not named in a hand-maintained list was invisible to
+# the build, and two headers sharing a basename were one header, with the winner decided by
+# directory order. Both failures were silent, which is why there were two FATAL_ERROR guards
+# here to catch them. Neither is needed once the path is part of the include.
+#
+# Recursive, so a new directory is picked up by existing. The guard below is about shape,
+# not about membership.
+file(GLOB_RECURSE CVFEM_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
+file(GLOB_RECURSE CVFEM_HEADERS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp")
+set(CVFEM_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-set(_cvfem_seen_names "")
-foreach(_hdr ${CVFEM_HEADERS})
-    get_filename_component(_name ${_hdr} NAME)
-    list(FIND _cvfem_seen_names ${_name} _dup)
-    if(NOT _dup EQUAL -1)
+# WHAT MAY COMPILE INTO THE OP LIBRARY. Every .cpp the glob finds lands in
+# add_library(cvfem_ns_op) below, so a translation unit under src/kernels/ would drag a whole
+# kernel family into the one target that must not see it -- and the two operator families
+# define sixteen of the same names with different physics. src/kernels/ is header-only, and
+# this is what says so loudly rather than at link time.
+foreach(_src ${CVFEM_SOURCES})
+    file(RELATIVE_PATH _rel ${CMAKE_CURRENT_SOURCE_DIR} ${_src})
+    if(_rel MATCHES "^src/kernels/")
         message(FATAL_ERROR
-            "two modules both provide a header named '${_name}'. The module directories "
-            "share one flat include path, so which one an #include resolves to is decided "
-            "by directory order. Rename one of them.")
+            "${_rel} is a translation unit under src/kernels/, which is header-only. Every "
+            ".cpp under src/ is compiled into cvfem_ns_op; a kernel .cpp would put a kernel "
+            "family into the operator library. Make it a header, or put it in src/frontend/.")
     endif()
-    list(APPEND _cvfem_seen_names ${_name})
 endforeach()
 
 # The SFEM source tree, for the two headers that are reached in place rather than through

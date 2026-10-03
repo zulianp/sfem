@@ -47,7 +47,7 @@
 // row count of the prolongation restricted to a cell (one corner interpolates from 1 coarse
 // node, three from 2, three from 4, one from 8: 1+6+12+8 = 27).
 
-#include "cvfem_sshex8_ns.hpp"
+#include "ss/cvfem_sshex8_ns.hpp"
 
 #include "sfem_Function.hpp"
 #include "smesh_sshex8.hpp"

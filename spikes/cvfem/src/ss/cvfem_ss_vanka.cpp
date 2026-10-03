@@ -2,9 +2,9 @@
 // Separate translation unit for the same reason the operator has one: the CVFEM element
 // headers define file-scope names a driver also defines.
 
-#include "cvfem_ss_galerkin_api.hpp"
+#include "ss/cvfem_ss_galerkin_api.hpp"
 
-#include "cvfem_ss_vanka.hpp"
+#include "ss/cvfem_ss_vanka.hpp"
 
 #include <cmath>
 #include <cstdio>

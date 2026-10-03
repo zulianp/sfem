@@ -25,7 +25,7 @@
 
 #include "smesh_types.hpp"
 
-#include "cvfem_portability.hpp"
+#include "core/cvfem_portability.hpp"
 
 #include <cmath>
 #include <cstdio>
@@ -34,8 +34,8 @@
 using scalar_t = double;
 static constexpr int N_FIELDS = 4;
 
-#include "cvfem_hex8_ns_upwind_kernels.hpp"
-#include "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "upwind/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 #ifdef CVFEM_ENABLE_SUBPAR
 // The arrangements this file checks are quarantined, so they are emitted here rather
 // than into the main header. Including both is what lets the test compare a retired

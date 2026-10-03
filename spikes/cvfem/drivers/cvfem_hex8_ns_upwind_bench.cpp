@@ -6,12 +6,12 @@
 #include <cstdint>
 #include <cstring>
 
-#include "cvfem_hex8_best_common.hpp"
-#include "cvfem_hex8_best_atomic.hpp"
-#include "cvfem_hex8_best_colored.hpp"
-#include "cvfem_hex8_best_ecolored.hpp"
-#include "cvfem_hex8_best_packed.hpp"
-#include "cvfem_hex8_best_store.hpp"
+#include "best/cvfem_hex8_best_common.hpp"
+#include "best/cvfem_hex8_best_atomic.hpp"
+#include "best/cvfem_hex8_best_colored.hpp"
+#include "best/cvfem_hex8_best_ecolored.hpp"
+#include "best/cvfem_hex8_best_packed.hpp"
+#include "best/cvfem_hex8_best_store.hpp"
 
 // Consumes the churn's reduction under --live-vectors so the compiler cannot delete the
 // memory traffic that option exists to create.

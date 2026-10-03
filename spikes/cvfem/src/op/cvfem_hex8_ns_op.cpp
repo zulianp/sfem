@@ -1,10 +1,10 @@
-#include "cvfem_hex8_ns_op.hpp"
+#include "op/cvfem_hex8_ns_op.hpp"
 
 #include "smesh_sideset.hpp"
 
 // The core is included here and nowhere a driver can see it. See the note in the header.
-#include "cvfem_hex8_ns_core.hpp"
-#include "cvfem_sshex8_ns.hpp"
+#include "hex8/cvfem_hex8_ns_core.hpp"
+#include "ss/cvfem_sshex8_ns.hpp"
 
 #include "smesh_mesh.hpp"
 

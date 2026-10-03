@@ -1,4 +1,4 @@
-#include "cvfem_hex8_ns_core.hpp"
+#include "hex8/cvfem_hex8_ns_core.hpp"
 
 int main(int argc, char **argv) {
     // initialize_serial, not initialize: this driver's solve is not distributed, and under a

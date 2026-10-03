@@ -10,7 +10,7 @@
 // Not self-contained: the includer must already provide scalar_t, SFEM_RESTRICT and the
 // CVFEM HEX8 volume kernels (cvfem_hex8_grad_sumfact, cvfem_hex8_dir_areas, ...).
 
-#include "cvfem_portability.hpp"
+#include "core/cvfem_portability.hpp"
 
 #include <algorithm>
 #include <cstdint>

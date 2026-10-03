@@ -24,8 +24,8 @@
 // contribution per colour, in colour order, so the summation order is fixed by the colouring:
 // reproducible as long as the colouring is, which it is for a fixed mesh and element order.
 
-#include "cvfem_element_coloring.hpp"
-#include "cvfem_hex8_best_atomic.hpp"
+#include "core/cvfem_element_coloring.hpp"
+#include "best/cvfem_hex8_best_atomic.hpp"
 
 static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
                                                   const ElementColoring &ec,

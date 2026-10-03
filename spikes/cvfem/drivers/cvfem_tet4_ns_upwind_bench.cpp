@@ -52,7 +52,7 @@ static constexpr int N_FIELDS    = 4;
 static constexpr int N_ACTION_BASE_FIELDS = 4;
 static constexpr int ALIGN_BYTES = 64;
 
-#include "cvfem_tet4_ns_upwind_kernels.hpp"
+#include "upwind/cvfem_tet4_ns_upwind_kernels.hpp"
 
 enum class KernelKind {
     Current,

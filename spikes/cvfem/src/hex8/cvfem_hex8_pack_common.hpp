@@ -29,7 +29,7 @@
 #include "smesh_mesh.hpp"
 #include "smesh_packed_mesh.hpp"
 
-#include "cvfem_portability.hpp"
+#include "core/cvfem_portability.hpp"
 
 using pack_idx_t = uint16_t;
 

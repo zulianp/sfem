@@ -8,7 +8,7 @@
 //
 // Not self-contained: the includer must already provide SFEM_RESTRICT and
 // CVFEM_HEX8_N_DOF. Accumulation goes through CVFEM_ATOMIC_ADD.
-#include "cvfem_portability.hpp"
+#include "core/cvfem_portability.hpp"
 
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,

@@ -10,11 +10,11 @@
 // benchmark layouts fight over. So it is safe to include next to either family, or next
 // to cvfem_hex8_ns_op.hpp alone.
 
-#include "cvfem_ns_mms_case.hpp"
+#include "cases/cvfem_ns_mms_case.hpp"
 
 #include <cmath>
 
-#include "cvfem_ns_smith_hutton_case.hpp"
+#include "cases/cvfem_ns_smith_hutton_case.hpp"
 #include <limits>
 #include <string>
 

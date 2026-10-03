@@ -9,12 +9,12 @@
 // Sizes and levels are both swept. T1 and T2 each produced a wrong conclusion from
 // numbers taken below saturation, so nothing here is measured at a single point.
 
-#include "cvfem_sshex8_ns.hpp"
+#include "ss/cvfem_sshex8_ns.hpp"
 
 #ifdef CVFEM_ENABLE_SUBPAR_EM
 #include "cvfem_sshex8_em.hpp"
 #endif
-#include "cvfem_ns_channel_case.hpp"
+#include "cases/cvfem_ns_channel_case.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_env.hpp"

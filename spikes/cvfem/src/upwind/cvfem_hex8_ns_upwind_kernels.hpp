@@ -2,7 +2,7 @@
 #define CVFEM_HEX8_NS_UPWIND_KERNELS_HPP
 
 #include <cmath>
-#include "cvfem_venkata_limiter.hpp"
+#include "venkata/cvfem_venkata_limiter.hpp"
 #include <cstddef>
 #include <cstring>
 #include <cstdint>
@@ -27,7 +27,7 @@
 #define ALIGN_BYTES 64
 #endif
 
-#include "cvfem_portability.hpp"
+#include "core/cvfem_portability.hpp"
 
 static constexpr int CVFEM_HEX8_N_FIELDS = 4;
 static constexpr int CVFEM_HEX8_N_NODES  = 8;

@@ -17,11 +17,11 @@
 
 #include <mpi.h>
 
-#include "cvfem_hex8_best_common.hpp"
-#include "cvfem_hex8_best_atomic.hpp"
-#include "cvfem_pack_coloring.hpp"
-#include "cvfem_hex8_boundary_scs.hpp"
-#include "cvfem_element_coloring.hpp"
+#include "best/cvfem_hex8_best_common.hpp"
+#include "best/cvfem_hex8_best_atomic.hpp"
+#include "core/cvfem_pack_coloring.hpp"
+#include "hex8/cvfem_hex8_boundary_scs.hpp"
+#include "core/cvfem_element_coloring.hpp"
 
 #include "cvfem_hex8_ns_cuda.hpp"
 

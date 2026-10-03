@@ -13,11 +13,11 @@
 //    scope; here it is float, and the operator is unaffected because its interface is
 //    real_t throughout.
 
-#include "cvfem_hex8_ns_op.hpp"
+#include "op/cvfem_hex8_ns_op.hpp"
 
 // The benchmark family, included alongside the operator on purpose.
-#include "cvfem_hex8_best_common.hpp"
-#include "cvfem_hex8_best_atomic.hpp"
+#include "best/cvfem_hex8_best_common.hpp"
+#include "best/cvfem_hex8_best_atomic.hpp"
 
 namespace check_no_core_leak {
     // Each of these would clash with cvfem_hex8_ns_core.hpp if the operator header

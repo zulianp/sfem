@@ -69,11 +69,11 @@
 // SFEM_RC_EXACT_JAC is a process-wide static, so it cannot be swept in-process; CMake
 // registers this binary twice, once per setting, the way cvfem_flat_vs_ss_packed is.
 
-#include "cvfem_hex8_ns_op.hpp"
+#include "op/cvfem_hex8_ns_op.hpp"
 
-#include "cvfem_hex8_ns_core.hpp"
-#include "cvfem_sshex8_ns.hpp"
-#include "cvfem_ss_galerkin.hpp"
+#include "hex8/cvfem_hex8_ns_core.hpp"
+#include "ss/cvfem_sshex8_ns.hpp"
+#include "ss/cvfem_ss_galerkin.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"
