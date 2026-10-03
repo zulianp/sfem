@@ -169,6 +169,7 @@ set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACRO
 # comparable entry by entry.
 file(GLOB_RECURSE CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/*.cpp")
 list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_guard_selftest.cpp)
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_vectorization_gate.cpp)
 
 set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test cvfem_flow_diag_test cvfem_ss_packed_probe cvfem_operator_consistency_test)
 foreach(TEST_SOURCE ${CVFEM_TESTS})
@@ -490,4 +491,78 @@ if(CVFEM_ENABLE_CUDA)
         cuda/cvfem_hex8_ns_cuda_verify.cpp
         cuda/cvfem_hex8_ns_cuda.cu)
     cvfem_cuda_target(cvfem_hex8_ns_cuda_verify)
+endif()
+
+# ------------------------------------------------------------------- the vectorisation gate
+#
+# DESIGN.md requires the build to fail when a lane loop does not vectorise. It has to be the
+# BUILD rather than a test, because a kernel that quietly went scalar still produces the right
+# answers -- every oracle in this suite stays green through it, which is exactly how the one
+# this gate found survived. The measured cost of that one was the entire vectorisation of the
+# higher-order residual: zero vector FP instructions against 937 scalar ones.
+#
+# WHY IT INSPECTS OBJECTS RATHER THAN READING COMPILER REMARKS is argued at length in
+# src/tests/compile/cvfem_check_vectorization.py. The short of it: a lane loop runs
+# CVFEM_HEX8_VEC_SIZE iterations, a compile-time constant, so it is unrolled and vectorised by
+# the SLP pass -- the loop vectoriser never engages and -Rpass-missed=loop-vectorize is silent
+# whether the result is vector or scalar. -Werror=pass-failed would be a gate that cannot fire.
+#
+# ONE OBJECT PER KERNEL, and that is not fastidiousness. With three wrappers in one translation
+# unit the compiler tail-merged them into a single shared body reached by three entry stubs, and
+# a scalar kernel would have hidden behind its neighbours' vector instructions.
+set(CVFEM_VEC_GATE_KERNELS
+    1  residual_first_order        # the kernel the standing performance gate measures
+    2  residual_rhie_chow          # the same, with the coupling this discretisation always runs
+    3  residual_higher_order       # the deferred correction, entered through the sweep
+    10 lane_defcor_unlimited       # the lane kernel itself, one limiter per object, which is
+    11 lane_defcor_clip            # the resolution that caught the limiter-stats atomic --
+    12 lane_defcor_venkatakrishnan # entering through the sweep showed 17% and read as merely
+    13 lane_defcor_darwish_moukalled)  # poor, where the lane kernels showed a flat zero.
+
+# Kernels that emit no vector arithmetic. Empty, and the gate enforces that it stays empty:
+# every kernel above must show vector instructions or the build stops. An entry here would be
+# compiled, measured and reported like any other -- never skipped -- and the check also fails if
+# a listed kernel starts vectorising, so the list cannot outlive the problem it records.
+set(CVFEM_VEC_GATE_KNOWN_SCALAR "")
+
+find_program(CVFEM_VEC_GATE_PYTHON NAMES python3 python)
+if(CVFEM_VEC_GATE_PYTHON)
+    set(_vec_gate_objs "")
+    list(LENGTH CVFEM_VEC_GATE_KERNELS _vec_gate_n)
+    math(EXPR _vec_gate_last "${_vec_gate_n} / 2 - 1")
+    foreach(_i RANGE ${_vec_gate_last})
+        math(EXPR _ki "${_i} * 2")
+        math(EXPR _ni "${_i} * 2 + 1")
+        list(GET CVFEM_VEC_GATE_KERNELS ${_ki} _kid)
+        list(GET CVFEM_VEC_GATE_KERNELS ${_ni} _kname)
+        set(_tgt cvfem_vecgate_${_kname})
+        add_library(${_tgt} OBJECT
+                    ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_vectorization_gate.cpp)
+        # The real flags, through the same interface every kernel target uses. A gate compiled
+        # with anything else would be measuring a build nobody ships.
+        target_include_directories(${_tgt} PRIVATE ${CVFEM_INCLUDE_DIRS})
+        target_compile_definitions(${_tgt} PRIVATE CVFEM_VEC_GATE_KERNEL=${_kid})
+        target_compile_options(${_tgt} PRIVATE ${_cvfem_perf_opts})
+        # OpenMP for the `#pragma omp simd` the lane loops carry. Without it the pragma is
+        # ignored and the gate would be measuring a different loop from the one that ships.
+        if(OpenMP_CXX_FOUND)
+            target_link_libraries(${_tgt} PRIVATE OpenMP::OpenMP_CXX)
+        endif()
+        list(APPEND _vec_gate_objs "${_kname}=$<TARGET_OBJECTS:${_tgt}>")
+    endforeach()
+
+    set(_vec_gate_exempt "")
+    foreach(_x ${CVFEM_VEC_GATE_KNOWN_SCALAR})
+        list(APPEND _vec_gate_exempt --expect-scalar ${_x})
+    endforeach()
+
+    # ALL, so it runs on a plain `make` and a scalar kernel cannot reach a commit. CMAKE_OBJDUMP
+    # is passed rather than assumed: the Apple toolchain's objdump and the uenv's binutils are
+    # different programs and the script falls back through both.
+    add_custom_target(cvfem_vectorization_gate ALL
+        COMMAND ${CVFEM_VEC_GATE_PYTHON}
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_check_vectorization.py
+                --objdump "${CMAKE_OBJDUMP}" ${_vec_gate_exempt} ${_vec_gate_objs}
+        COMMENT "checking that the lane-blocked kernels emit vector arithmetic"
+        VERBATIM)
 endif()

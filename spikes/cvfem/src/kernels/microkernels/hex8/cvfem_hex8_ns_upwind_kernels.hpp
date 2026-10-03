@@ -1296,7 +1296,23 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_centroids(
 // `off` stays a runtime argument rather than being folded into the base pointers: an invariant
 // base plus a lane-varying index is the form a vectoriser recognises as unit-stride, where a
 // lane-varying pointer invites it to emit a gather.
-template <int STRIDE, int LIM, typename scalar_t>
+//
+// STATS IS A TEMPLATE PARAMETER, AND THE FLATTEN ABOVE IS NOT ENOUGH WITHOUT IT. The note on
+// cvfem_hex8_conv_face_lane records that an out-of-line call to this function left the whole lane
+// loop scalar, and flatten was added to force the call site open. It does force it open, and the
+// loop was still scalar afterwards: cvfem_limiter_record updates its counters under
+// `#pragma omp atomic`, and an atomic inside a `#pragma omp simd` body is a barrier no amount of
+// inlining removes. Measured on the emitted object, the higher-order lane kernel held zero vector
+// FP instructions against 937 scalar ones -- for every limiter including the unlimited arm, which
+// records just as the others do -- while the first-order kernel beside it was 384 vector against
+// one scalar. A diagnostic nobody had switched on was costing the correction its vectorisation.
+//
+// So the sink is selected at compile time, not by the runtime `stats != nullptr` the SIMD path was
+// passing. That is the same correction the band and the HO flag above already carry, for the same
+// stated reason -- a sweep-uniform test inside the vectorised body -- and this call site is the
+// one that was missed. The scalar sweep instantiates STATS=true and keeps the diagnostic
+// unchanged; the lane-blocked sweep instantiates STATS=false and the atomics are not emitted.
+template <int STRIDE, int LIM, bool STATS, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *const SFEM_RESTRICT g,
                                                                const scalar_t *const SFEM_RESTRICT xe,
                                                                const scalar_t *const SFEM_RESTRICT ye,
@@ -1483,8 +1499,12 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
         // Recorded for EVERY arm including limiter 0, because the count that matters is how
         // often the unlimited reconstruction leaves the bound -- that is a property of the
         // case, not of the arm, and it is what says whether a case can test a limiter at all.
-        cvfem_limiter_record(stats, a, inc_i, oi, lo, hi);
-        cvfem_limiter_record(stats, b, inc_j, oj, lo, hi);
+        if constexpr (STATS) {
+            cvfem_limiter_record(stats, a, inc_i, oi, lo, hi);
+            cvfem_limiter_record(stats, b, inc_j, oj, lo, hi);
+        } else {
+            (void)stats;
+        }
     };
 
     scalar_t ii, jj;
@@ -1851,7 +1871,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
             // sweep-uniform choice belongs. This is the scalar sweep, so the switch costs a
             // predictable branch per surface rather than one inside a lane loop.
 #define CVFEM_HEX8_SCS_DEFCOR_ARM(LIM_)                                                         \
-    cvfem_hex8_scs_defcor<1, LIM_>(ugrad8, xe, ye, ze, ux, uy, uz, s, i, j, mdot, ueps,         \
+    cvfem_hex8_scs_defcor<1, LIM_, true>(ugrad8, xe, ye, ze, ux, uy, uz, s, i, j, mdot, ueps,   \
                                    venkat_c, stats, /*off=*/0, cenx[s], ceny[s], cenz[s],       \
                                    dfx, dfy, dfz)
             switch (limiter) {
@@ -2657,7 +2677,7 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_lane(const
     // shape of guard that cost 1.83x here once already.
     scalar_t hx = scalar_t(0), hy = scalar_t(0), hz = scalar_t(0);
     if constexpr (HO) {
-        cvfem_hex8_scs_defcor<CVFEM_HEX8_VEC_SIZE, LIM>(
+        cvfem_hex8_scs_defcor<CVFEM_HEX8_VEC_SIZE, LIM, false>(
                 &ho->g[0][0][0], &ho->x[0][0], &ho->y[0][0], &ho->z[0][0],
                 &in.ux[0][0], &in.uy[0][0], &in.uz[0][0],
                 S, I, J, mdot, EPS ? ueps : scalar_t(0), ho->venkat_c,
