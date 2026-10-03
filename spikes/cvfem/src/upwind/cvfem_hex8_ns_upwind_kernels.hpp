@@ -1183,25 +1183,33 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_hex8_peclet_eta(const Hex8Pec
     return scalar_t(0.5) * (scalar_t(1) + std::tanh((pe - c.trans) / c.width));
 }
 
-template <typename scalar_t>
+template <bool EPS = true, typename scalar_t>
 // Forced inline rather than left to SFEM_INLINE, which the SFEM headers define as plain inline
 // before this file's own definition can take effect. Left to the heuristic, GCC outlined it as a
 // .constprop clone once the packed Jacobian face loops grew by the Rhie-Chow coefficient's velocity
 // term, and a call in the loop body stopped 3 of the 36 face loops vectorising: 6 points of the
 // packed Rhie-Chow Jacobian action on Grace.
+// EPS IS A TEMPLATE PARAMETER, and the alternative was relying on the optimiser. The two SIMD
+// callers used to hand this a literal `EPS ? ueps : 0` so that the band test would constant-fold
+// out of the lane loop, which worked and left the whole band arithmetic in the source of a
+// kernel that never runs it. `if constexpr` says the same thing structurally: with EPS false
+// there is no band, no reciprocal and nothing to fold. The default is true, so every scalar call
+// site that passes a runtime ueps is unchanged.
 static SFEM_INLINE __attribute__((always_inline)) SFEM_HOST_DEVICE void cvfem_upwind_abs(const scalar_t m, const scalar_t eps,
                                                           scalar_t &absm, scalar_t &dabs) {
     const scalar_t am = m > scalar_t(0) ? m : -m;
-    if (eps > scalar_t(0) && am < eps) {
-        const scalar_t ie2 = scalar_t(1) / (eps * eps);
-        absm = m * m * (scalar_t(2) * eps - am) * ie2;
-        // d|m|_e/dm, odd in m and zero at the origin.
-        const scalar_t d = (scalar_t(4) * eps * am - scalar_t(3) * m * m) * ie2;
-        dabs = m > scalar_t(0) ? d : -d;
-    } else {
-        absm = am;
-        dabs = m > scalar_t(0) ? scalar_t(1) : (m < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+    if constexpr (EPS) {
+        if (eps > scalar_t(0) && am < eps) {
+            const scalar_t ie2 = scalar_t(1) / (eps * eps);
+            absm = m * m * (scalar_t(2) * eps - am) * ie2;
+            // d|m|_e/dm, odd in m and zero at the origin.
+            const scalar_t d = (scalar_t(4) * eps * am - scalar_t(3) * m * m) * ie2;
+            dabs = m > scalar_t(0) ? d : -d;
+            return;
+        }
     }
+    absm = am;
+    dabs = m > scalar_t(0) ? scalar_t(1) : (m < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
 }
 
 // --------------------------------------------------- deferred-correction convection
@@ -2626,7 +2634,7 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_lane(const
     // this loop keeps vectorising. A runtime zero would leave the compare in the
     // SIMD body, which is the shape of guard that cost 1.83x here when the
     // Rhie-Chow coefficient carried one -- see Hex8RhieChowPack::coeff.
-    cvfem_upwind_abs(mdot, EPS ? ueps : scalar_t(0), amdot, sgn);
+    cvfem_upwind_abs<EPS>(mdot, ueps, amdot, sgn);
     const scalar_t mpos = half * (mdot + amdot);
     const scalar_t mneg = half * (mdot - amdot);
     const scalar_t pmid = half * (in.p[I][lane] + in.p[J][lane]);
@@ -2781,7 +2789,7 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(co
         // this loop keeps vectorising. A runtime zero would leave the compare in the
         // SIMD body, which is the shape of guard that cost 1.83x here when the
         // Rhie-Chow coefficient carried one -- see Hex8RhieChowPack::coeff.
-        cvfem_upwind_abs(mdot, EPS ? ueps : scalar_t(0), amdot, sgn);
+        cvfem_upwind_abs<EPS>(mdot, ueps, amdot, sgn);
         const scalar_t mpos  = half * (mdot + amdot);
         const scalar_t mneg  = half * (mdot - amdot);
         const scalar_t d_pos = half * (one + sgn);
