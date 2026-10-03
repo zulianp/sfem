@@ -1674,81 +1674,6 @@ def _fmt0(v):
     return "---" if not v else ("%.0f" % v)
 
 
-def parse_honewton(path):
-    """Read jobs/ho_newton_ab.sbatch's table: what the exact correction buys the Newton loop.
-
-    {(limiter, freeze, jacobian): steps} for the CONVERGED rows only. A row that did not
-    converge is a floor and not a step count -- the job prints the flag beside every row for
-    exactly that reason, and one arm of the first run was killed by its per-arm timeout at 80
-    steps and would otherwise have read as an 80-step result.
-    """
-    out, pc, rtol = {}, None, None
-    for line in open(path):
-        if line.startswith("### preconditioner:"):
-            # "### preconditioner: bjacobi  linear rtol: 1e-3"
-            pc = line.split(":")[1].split()[0].strip()
-            if "rtol:" in line:
-                rtol = line.split("rtol:")[1].split()[0].strip()
-            if " n: " in line:
-                # HEX8, four fields per node, so the cube's size fixes the problem size and the
-                # paper does not have to be told it separately.
-                n = int(line.split(" n: ")[1].split()[0])
-                out["ndof"] = (n + 1) ** 3 * 4
-            continue
-        f = line.split()
-        if len(f) < 7 or f[0] not in ("frozen", "unfrozen") or f[2] not in ("exact", "lagged"):
-            continue
-        try:
-            steps, conv, lin, sec = int(f[3]), int(f[4]), int(f[5]), float(f[6])
-        except ValueError:
-            continue
-        # A direct solve is an exact inverse of the operator, so under it every solve takes one
-        # iteration and the time is the factorisation's: those rows measure neither quantity this
-        # reads, and are dropped rather than averaged in.
-        if conv == 1 and pc == "bjacobi":
-            out[(f[1], f[0], f[2])] = (steps, lin, sec)
-    if rtol:
-        out["rtol"] = rtol
-    return out
-
-
-def macros_honewton(runs):
-    """The unfrozen rows, which are the ones where the correction is active.
-
-    Several files, because the full 2x2x2 does not fit one debug allocation and the slices were
-    run separately; later files win, so a re-run of one arm replaces it without replacing the rest.
-    """
-    merged = {}
-    for r in runs:
-        merged.update(r)
-    out = [PREAMBLE]
-    if merged.get("ndof"):
-        out.append(r"\newcommand{\nwtDof}{%d}" % merged["ndof"])
-    if merged.get("rtol"):
-        # An iteration count without its tolerance is not a measurement, so the two are one macro
-        # pair and the prose cannot quote the counts without it.
-        out.append(r"\newcommand{\nwtRtol}{%s}" % merged["rtol"])
-    for lim, tag in (("0", "Unlim"), ("2", "Venk")):
-        ex = merged.get((lim, "unfrozen", "exact"))
-        lg = merged.get((lim, "unfrozen", "lagged"))
-        if not (ex and lg):
-            continue
-        for name, i in (("Exact", 0), ("Lagged", 1)):
-            src = ex if name == "Exact" else lg
-            out.append(r"\newcommand{\nwt%s%sSteps}{%d}" % (tag, name, src[0]))
-            out.append(r"\newcommand{\nwt%s%sLin}{%d}" % (tag, name, src[1]))
-            # The Krylov solve's seconds. A ratio says which way the trade went; the absolute
-            # anchors it, and the problem size is stated with it in the prose.
-            out.append(r"\newcommand{\nwt%s%sSec}{%.2f}" % (tag, name, src[2]))
-        out.append(r"\newcommand{\nwt%sStepRatio}{%.1f}" % (tag, lg[0] / ex[0]))
-        out.append(r"\newcommand{\nwt%sLinRatio}{%.2f}" % (tag, lg[1] / ex[1]))
-        out.append(r"\newcommand{\nwt%sTimeRatio}{%.2f}" % (tag, lg[2] / ex[2]))
-        # What one linear iteration costs, which is the other half of the trade.
-        out.append(r"\newcommand{\nwt%sPerIt}{%.2f}"
-                   % (tag, (ex[2] / ex[1]) / (lg[2] / lg[1])))
-    return "\n".join(out) + "\n"
-
-
 def macros_convho(rows):
     """The figures the prose quotes: each variant's two layouts and the ratio between them."""
     by, _loose = _convho_index(rows)
@@ -2345,14 +2270,6 @@ def build(out_dir, tab_dir):
             with open(os.path.join(out_dir, "ngrad_macros.tex"), "w") as fh:
                 fh.write(macros_ngrad(nr))
             written.append("figures/ngrad_macros.tex")
-
-    nw = [f for f in sorted(os.listdir(DATA)) if f.startswith("honewton_")] if os.path.isdir(DATA) else []
-    if nw:
-        runs = [parse_honewton(os.path.join(DATA, f)) for f in nw]
-        if any(runs):
-            with open(os.path.join(out_dir, "honewton_macros.tex"), "w") as fh:
-                fh.write(macros_honewton(runs))
-            written.append("figures/honewton_macros.tex")
 
     km = [f for f in sorted(os.listdir(DATA)) if f.startswith("kmix_")] if os.path.isdir(DATA) else []
     if km:

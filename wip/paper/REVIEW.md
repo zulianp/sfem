@@ -1,0 +1,6 @@
+- We need the pseudo code for the Jacobian action operator (include the case for exact/lagged 1st order high-order with conditions)
+- Figure 5 must have the most accurate HO as well, remove colored
+- Discussion and limitation is too pedantic and schematic, reduce the paragrah structure to one parapgrah and make it more concise.  "Ordering is a precondition." is not really an issue so one sentence is enough. Operator dependence is not really a limitation is more of a feature and it should not be casted in a negative light, Pack-size default is  a dumb limitation: tune it instead and use the optimal pack-size for the operators. One node, one architecture is a definitely a limitation and so is the scope of the operators we have studied (CVFEM and NSE), but this is motivating future work and should be framed that way
+- The oeprator graph of the schemes (first order, rhie-chow, and HO) should be visualized in a small picture
+- When referring to SpMV "assembled" should be replaced by "lagged"
+- Table 5. Remove it an summarize it in the text (the numbers are not relevant here, it is just for us to verify)
