@@ -136,6 +136,48 @@ CVFEM_VEC_GATE_ENTRY(const scalar_t rho,
                                                                            edz);
 }
 
+// 20..24 -- THE JACOBIAN ACTION'S LANE SWEEP, which the gate had no row for and which the build
+// has been warning about all along. Apple clang emits 72 instances of
+// "loop not vectorized: the optimizer was unable to perform the requested transformation"
+// [-Wpass-failed=transform-warning] against cvfem_hex8_conv_all_jv_simd on every build, and
+// because it is a warning rather than an error nobody had to look. 20 is the first-order action;
+// 21..24 bind each limiter, since the deferred correction's directional derivative is where the
+// residual's twin went scalar.
+#elif CVFEM_VEC_GATE_KERNEL >= 20 && CVFEM_VEC_GATE_KERNEL <= 24
+CVFEM_VEC_GATE_ENTRY(const scalar_t rho,
+                     const scalar_t                      half,
+                     const scalar_t                      one,
+                     const scalar_t *const SFEM_RESTRICT Ax0,
+                     const scalar_t *const SFEM_RESTRICT Ay0,
+                     const scalar_t *const SFEM_RESTRICT Az0,
+                     const scalar_t *const SFEM_RESTRICT Ax1,
+                     const scalar_t *const SFEM_RESTRICT Ay1,
+                     const scalar_t *const SFEM_RESTRICT Az1,
+                     const scalar_t *const SFEM_RESTRICT Ax2,
+                     const scalar_t *const SFEM_RESTRICT Ay2,
+                     const scalar_t *const SFEM_RESTRICT Az2,
+                     const Hex8InputPack                &u,
+                     const Hex8InputPack                &du,
+                     const Hex8RhieChowPack             *rc,
+                     Hex8ResidualPack                   &out,
+                     const scalar_t                      ueps,
+                     const Hex8UGradPack *const          ho,
+                     const Hex8UGradPack *const          hov,
+                     const scalar_t *const SFEM_RESTRICT cenx,
+                     const scalar_t *const SFEM_RESTRICT ceny,
+                     const scalar_t *const SFEM_RESTRICT cenz,
+                     const scalar_t *const SFEM_RESTRICT edx,
+                     const scalar_t *const SFEM_RESTRICT edy,
+                     const scalar_t *const SFEM_RESTRICT edz) {
+    cvfem_hex8_conv_all_jv_simd<true,
+                                false,
+                                false,
+                                (CVFEM_VEC_GATE_KERNEL > 20),
+                                (CVFEM_VEC_GATE_KERNEL > 20 ? CVFEM_VEC_GATE_KERNEL - 21 : 0)>(
+            rho, half, one, Ax0, Ay0, Az0, Ax1, Ay1, Az1, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho,
+            hov, cenx, ceny, cenz, edx, edy, edz);
+}
+
 #else
 #error "unknown CVFEM_VEC_GATE_KERNEL"
 #endif

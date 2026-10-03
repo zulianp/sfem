@@ -2825,7 +2825,17 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(co
 }
 
 template <bool RC = false, bool EPS = false, bool HO = false, int LIM = 0>
-static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                      rho,
+// FLATTEN HERE TOO, BECAUSE THE ONE ON THE FACE KERNEL IS NOT ENOUGH ON GCC. flatten forces a
+// function's own callees open; it does not stop that function from being outlined by ITS caller,
+// and this is the caller that owns the lane loop. Measured on Grace with gcc 13.3,
+// -fopt-info-vec-missed reports a call to "cvfem_hex8_conv_face_lane.isra" from inside the
+// `#pragma omp simd` loop below -- an IPA-SRA clone, made in spite of always_inline -- together
+// with "couldn't vectorize loop" and "control flow in loop". The result was a higher-order lane
+// kernel with ZERO vector instructions and 1506 scalar FP ones, against a first-order kernel in
+// the same object that was 100% vector; the sweep around it ran 12% vector, and the higher-order
+// residual's throughput sat at 567-766 MDOF/s against 2604 for first order. Apple clang inlines
+// it either way, which is why this needed the Grace build to see at all.
+static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_all_simd(const scalar_t rho,
                                                  const scalar_t                      mu,
                                                  const scalar_t                      rc_scale,
                                                  const scalar_t                      half,
@@ -3111,7 +3121,13 @@ static SFEM_INLINE void cvfem_hex8_conv_all_jv_pa_simd(const scalar_t           
 }
 
 template <bool RC = false, bool QG = false, bool EPS = false, bool HO = false, int LIM = 0>
-static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
+// FLATTEN, for the reason cvfem_hex8_conv_all_simd carries it: the face kernel's own flatten does
+// not stop this function -- the one that owns the lane loop -- from outlining it. Apple clang had
+// been saying so on every build, 72 times, as "loop not vectorized: the optimizer was unable to
+// perform the requested transformation" against this line, and because -Wpass-failed is a warning
+// rather than an error the message had no consequence. The gate gave it one: the Venkatakrishnan
+// and Darwish-Moukalled arms of the directional derivative emitted ZERO vector instructions.
+static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_all_jv_simd(const scalar_t rho,
                                                     const scalar_t                      half,
                                                     const scalar_t                      one,
                                                     const scalar_t *const SFEM_RESTRICT Ax0,

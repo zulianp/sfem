@@ -123,6 +123,14 @@ CONFIGS=(
     "residual_packed_ho_clip|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 1"
     "residual_packed_ho_venk|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 2"
     "residual_packed_ho_dm|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 3"
+    # The higher-order JACOBIAN ACTION, which is what the Krylov loop evaluates when the
+    # correction is exact. Its lane sweep is the one the build had been warning about 72 times
+    # per compile, and the vectorisation gate found two of its arms emitting nothing at all under
+    # clang. Two limiters rather than four: these are the slowest rows in the gate, and
+    # unlimited against Venkatakrishnan spans the range -- the cheapest arm and the one with the
+    # most arithmetic per face.
+    "jac_action_packed_ho_unlim|jac_action|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 0"
+    "jac_action_packed_ho_venk|jac_action|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 2"
 )
 
 op_flag() {

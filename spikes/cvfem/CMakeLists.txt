@@ -517,13 +517,32 @@ set(CVFEM_VEC_GATE_KERNELS
     10 lane_defcor_unlimited       # the lane kernel itself, one limiter per object, which is
     11 lane_defcor_clip            # the resolution that caught the limiter-stats atomic --
     12 lane_defcor_venkatakrishnan # entering through the sweep showed 17% and read as merely
-    13 lane_defcor_darwish_moukalled)  # poor, where the lane kernels showed a flat zero.
+    13 lane_defcor_darwish_moukalled  # poor, where the lane kernels showed a flat zero.
+    20 jv_lane_first_order         # the Jacobian action's lane sweep, which the gate had no row
+    21 jv_lane_defcor_unlimited    # for while clang warned about it 72 times a build
+    22 jv_lane_defcor_clip
+    23 jv_lane_defcor_venkatakrishnan
+    24 jv_lane_defcor_darwish_moukalled)
 
-# Kernels that emit no vector arithmetic. Empty, and the gate enforces that it stays empty:
-# every kernel above must show vector instructions or the build stops. An entry here would be
-# compiled, measured and reported like any other -- never skipped -- and the check also fails if
-# a listed kernel starts vectorising, so the list cannot outlive the problem it records.
+# Kernels that emit no vector arithmetic, and the list is SCOPED TO THE COMPILER because the
+# shortfall is. On gcc 13.3 on the Grace nodes -- the only machine whose throughput decides
+# anything here -- all twelve kernels above come out 99-100% vector and this list is empty, so
+# that build enforces every one of them. Apple clang gives up inlining the two largest Jacobian
+# arms: the directional derivative of the deferred correction runs to roughly 19,000 instructions
+# per lane body with a limiter on, the lambda inside cvfem_hex8_scs_defcor_jv survives as a call
+# at kernels.hpp:1609 ("call instruction cannot be vectorized"), and the lane loop then goes
+# scalar. gcc inlines the same body and vectorises it.
+#
+# Listing them unconditionally would have weakened the gate on the machine that matters to suit
+# the laptop. An entry here is still compiled, measured and reported on every build -- never
+# skipped -- and the check fails if a listed kernel starts vectorising, so the list cannot
+# outlive the problem.
 set(CVFEM_VEC_GATE_KNOWN_SCALAR "")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    list(APPEND CVFEM_VEC_GATE_KNOWN_SCALAR
+         jv_lane_defcor_venkatakrishnan
+         jv_lane_defcor_darwish_moukalled)
+endif()
 
 find_program(CVFEM_VEC_GATE_PYTHON NAMES python3 python)
 if(CVFEM_VEC_GATE_PYTHON)
@@ -549,6 +568,7 @@ if(CVFEM_VEC_GATE_PYTHON)
             target_link_libraries(${_tgt} PRIVATE OpenMP::OpenMP_CXX)
         endif()
         list(APPEND _vec_gate_objs "${_kname}=$<TARGET_OBJECTS:${_tgt}>")
+        list(APPEND _vec_gate_tgts ${_tgt})
     endforeach()
 
     set(_vec_gate_exempt "")
@@ -565,4 +585,10 @@ if(CVFEM_VEC_GATE_PYTHON)
                 --objdump "${CMAKE_OBJDUMP}" ${_vec_gate_exempt} ${_vec_gate_objs}
         COMMENT "checking that the lane-blocked kernels emit vector arithmetic"
         VERBATIM)
+    # $<TARGET_OBJECTS:> does NOT create a dependency on the target that produces them, so
+    # without this the check runs against objects that may not exist yet. It read as a pass on a
+    # plain `make all`, where the object libraries happened to be built first, and failed only
+    # when the gate was built as a named target on its own -- which is how it was found. The
+    # script treating an unreadable object as a failure rather than a skip is what surfaced it.
+    add_dependencies(cvfem_vectorization_gate ${_vec_gate_tgts})
 endif()

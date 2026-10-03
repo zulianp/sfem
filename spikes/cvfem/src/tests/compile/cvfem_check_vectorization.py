@@ -26,15 +26,57 @@ import re
 import subprocess
 import sys
 
-# AArch64 writes NEON as fmla.2d / fadd.4s; x86 as vfmadd213pd %zmm.., and its scalar forms are
-# the ...sd/...ss suffixes. Both families are matched so the gate means the same thing on the
-# Grace nodes that decide performance and on the laptop that compiles.
-VEC_FP = re.compile(r"\b(?:f[a-z]+|[a-z]+)\.[0-9]+[dsh]\b" r"|\bv[a-z]+p[ds]\b")
-SCALAR_FP = re.compile(
-    r"\b(?:fmul|fadd|fsub|fmadd|fmsub|fnmadd|fnmsub|fmla|fmls|fdiv|fsqrt|fabs|fmax|fmin|fneg)"
-    r"\s+[dsh][0-9]"
-    r"|\bv?(?:mul|add|sub|div|sqrt|max|min)s[ds]\b"
+# COUNTING IS PER INSTRUCTION LINE, AND THE ASSEMBLER SYNTAX IS NOT ASSUMED. The first version
+# of this matched LLVM's Apple-style mnemonic suffix -- "fmla.2d v2, v0, v3" -- and read a flat
+# zero for every kernel on the Grace nodes, where GNU objdump writes the same instruction as
+# "fmla v2.2d, v0.2d, v3.2d" with the lane suffix on the REGISTERS. A gate that reports no vector
+# arithmetic on the machine whose performance is the point is worse than no gate, so the forms are
+# enumerated explicitly and anything unrecognised counts as neither.
+#
+#   AArch64, GNU:    fmla  v2.2d, v0.2d, v3.2d        NEON lanes on the operands
+#   AArch64, LLVM:   fmla.2d v2, v0, v3               lanes on the mnemonic
+#   AArch64, SVE:    fmla  z1.d, p0/m, z2.d, z3.d     scalable, predicated
+#   x86-64:          vfmadd213pd %zmm1, %zmm2, %zmm3  packed suffix on the mnemonic
+#
+# Scalar floating point is the counterpart: a d/s/h register on AArch64, an ...sd/...ss mnemonic
+# on x86. It is reported for context and never enforced.
+INSN = re.compile(r"^\s*[0-9a-f]+:\s+(?:[0-9a-f]{2,8}\s+)*\t?\s*([a-z][a-z0-9._]*)\s*(.*)$")
+
+# NEON/SVE vector registers carrying a lane specifier, in either operand or mnemonic position.
+VEC_OPERAND = re.compile(r"\b[vz][0-9]+\.(?:[0-9]+)?[bhsdq]\b")
+VEC_MNEMONIC = re.compile(r"^[a-z][a-z0-9]*\.[0-9]+[bhsdq]$")
+# x86 packed: the p[sd] suffix distinguishes packed from the scalar s[sd] forms.
+VEC_X86 = re.compile(r"^v?[a-z][a-z0-9]*p[sd]$")
+VEC_X86_REG = re.compile(r"%[xyz]mm[0-9]+")
+
+FP_MNEMONIC = frozenset(
+    "fmul fadd fsub fdiv fsqrt fabs fmax fmin fneg fmadd fmsub fnmadd fnmsub fmla fmls "
+    "fcmp fccmp fcsel fmaxnm fminnm frinta frintm frintp frintz fcvt scvtf ucvtf".split()
 )
+SCALAR_REG = re.compile(r"\b[dsh][0-9]+\b")
+SCALAR_X86 = re.compile(r"^v?[a-z][a-z0-9]*s[sd]$")
+
+
+def classify(text):
+    """Return (instruction count, vector FP count, scalar FP count) for a disassembly."""
+    insns = vec = sca = 0
+    for ln in text.splitlines():
+        m = INSN.match(ln)
+        if not m:
+            continue
+        mnemonic, operands = m.group(1), m.group(2)
+        insns += 1
+        if (
+            VEC_OPERAND.search(operands)
+            or VEC_MNEMONIC.match(mnemonic)
+            or (VEC_X86.match(mnemonic) and VEC_X86_REG.search(operands))
+        ):
+            vec += 1
+        elif mnemonic in FP_MNEMONIC and SCALAR_REG.search(operands):
+            sca += 1
+        elif SCALAR_X86.match(mnemonic) and VEC_X86_REG.search(operands):
+            sca += 1
+    return insns, vec, sca
 
 
 def disassemble(obj, objdump):
@@ -72,9 +114,12 @@ def main():
         if text is None:
             unreadable.append(name)
             continue
-        insns = sum(1 for ln in text.splitlines() if re.match(r"\s+[0-9a-f]+:\s", ln))
-        vec = len(VEC_FP.findall(text))
-        sca = len(SCALAR_FP.findall(text))
+        insns, vec, sca = classify(text)
+        # A disassembly this parser recognised no instructions in means the output format is not
+        # one of the four above, not that the kernel is empty. Saying so beats reporting zeros.
+        if insns == 0:
+            unreadable.append(name)
+            continue
         rows.append((name, insns, vec, sca))
         if vec == 0 and name not in expect_scalar:
             failed.append(name)
