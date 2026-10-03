@@ -57,7 +57,6 @@
 \IfFileExists{figures/hoexact_macros.tex}{\input{figures/hoexact_macros}}{}
 \IfFileExists{figures/ngrad_macros.tex}{\input{figures/ngrad_macros}}{}
 \IfFileExists{figures/coloring_macros.tex}{\input{figures/coloring_macros}}{}
-\IfFileExists{figures/honewton_macros.tex}{\input{figures/honewton_macros}}{}
 % Inputs a generated file if it exists, and says so loudly if it does not, so a pending
 % measurement cannot quietly vanish from the paper.
 \newcommand{\inputifready}[2]{%
@@ -1266,26 +1265,9 @@ fixed half of a sweep that fusing saves is \SI{46}{\percent} of a one-field swee
 count. That is also why the atomic $\Jhoex$ is so nearly all reconstruction: its sweep pays the
 field count where the packed one does not.
 
-What it buys is time to solution, and the deferred correction is slower rather than broken: both
-converge to the same solution, since the fixed point is where $\Fho$ vanishes either way. The
-case is the three-dimensional lid-driven cavity at \SI{\nwtDof}{} degrees of freedom, a zero-mean
-pressure gauge and a Reynolds continuation through $1, 4, 16, 64, 100$; the solver is
-\textsc{fgmres} preconditioned by block-Jacobi, each linear system solved to a relative residual
-of \nwtRtol{}, and the counts below are totals over the five stages.
-
-$\Jhoex$ takes \nwtUnlimExactSteps{} Newton steps and \nwtUnlimExactLin{} linear iterations
-against $\Jex$'s \nwtUnlimLaggedSteps{} and \nwtUnlimLaggedLin{} on the unlimited correction, and
-\nwtVenkExactSteps{}/\nwtVenkExactLin{} against \nwtVenkLaggedSteps{}/\nwtVenkLaggedLin{} with
-Venkatakrishnan. So the exact action costs $\nwtUnlimPerIt\times$ and $\nwtVenkPerIt\times$ per
-linear iteration and needs $\nwtUnlimLinRatio\times$ and $\nwtVenkLinRatio\times$ fewer of them,
-and solves in \nwtUnlimExactSec{} against \nwtUnlimLaggedSec{} seconds and \nwtVenkExactSec{}
-against \nwtVenkLaggedSec{} --- $\nwtUnlimTimeRatio\times$ and $\nwtVenkTimeRatio\times$ faster. The limiter widens
-the margin, which is where a deferred correction is weakest. At \nwtRtol{} the Newton step is
-inexact, so the step ratio carries the tolerance's cost as well as the Jacobian's quality; the
-time is the quantity that does not. The size is set by the preconditioner rather than by the
-operator: block-Jacobi is $h$-dependent on this saddle-point system and stops converging within
-any reasonable iteration cap above roughly \SI{e5}{} degrees of freedom, so a larger case needs a
-scalable preconditioner and is left to the multigrid work this spike carries elsewhere.
+$\Jhoex$ is the derivative it claims to be: against a finite difference of $\Fho$ with $\Gop u$
+rebuilt at each perturbed state it agrees to \hoxFdUnlim{} on the unlimited arm, where the
+deferred correction's action differs by \num{6e-2}.
 
 \subsection{Against the lagged matrix}
 \label{sec:res:spmv}
