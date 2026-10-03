@@ -140,35 +140,6 @@ inline Hex8LimiterStats &cvfem_limiter_stats_object() {
     return s;
 }
 
-inline void cvfem_limiter_stats_report() {
-    const Hex8LimiterStats &s = cvfem_limiter_stats_object();
-    if (s.n_samples == 0) return;
-    const double out = 100.0 * (double)s.n_outside / (double)s.n_samples;
-    const double chg = 100.0 * (double)s.n_changed / (double)s.n_samples;
-    std::fprintf(stderr,
-                 "limiter_stats: samples %ld  outside_bound %ld (%.4f%%)  changed %ld (%.4f%%)  "
-                 "still_out %ld (%.4f%%)  max_excess %.6g\n",
-                 s.n_samples, s.n_outside, out, s.n_changed, chg, s.n_still_out,
-                 100.0 * (double)s.n_still_out / (double)s.n_samples, s.max_excess);
-    if (s.n_outside == 0)
-        std::fprintf(stderr,
-                     "limiter_stats: the reconstruction never left the bound, so THIS CASE "
-                     "CANNOT TEST A LIMITER -- any comparison of limited against unlimited on "
-                     "it is a comparison of two schemes that did the same thing.\n");
-}
-
-// Returns the sink when the diagnostic is on, nullptr otherwise. Called from the residual's
-// serial env-reading block, so the lazy initialisation below is not racing.
-inline Hex8LimiterStats *cvfem_limiter_stats_sink() {
-    static int on = -1;
-    if (on < 0) {
-        const char *e = std::getenv("SFEM_LIMITER_STATS");
-        on = (e && *e && *e != '0') ? 1 : 0;
-        if (on) std::atexit(cvfem_limiter_stats_report);
-    }
-    return on ? &cvfem_limiter_stats_object() : nullptr;
-}
-
 // The bound-preserving clip (Barth-Jespersen's bound on a two-node stencil).
 //
 // The reconstructed face value is confined to the range the edge's own two nodes span, so

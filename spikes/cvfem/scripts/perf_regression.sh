@@ -111,6 +111,18 @@ CONFIGS=(
     # that cost the exact Rhie-Chow term half its speed would not have shown up anywhere.
     "jac_action_packed_rc|jac_action|packed|sumfact|128|5|12|--rhie-chow"
     "jac_action_packed_rc_bnd|jac_action|packed|sumfact|128|5|12|--rhie-chow --boundary"
+    # THE HIGHER-ORDER RESIDUAL, one row per limiter, and the gate had nothing like it. Every
+    # row above runs the first-order convective flux, so the deferred correction -- the most
+    # expensive kernel the solver evaluates and the one with the most arithmetic per face --
+    # was outside the gate entirely. That is not a hypothetical gap: the limiter-stats sink
+    # left all four arms emitting zero vector instructions, the vectorization gate found it on
+    # the emitted object, and nothing here would have. Each arm is listed separately because
+    # they are different kernels -- LIM is a template parameter -- and because the one that has
+    # gone scalar before is Venkatakrishnan, which an average over the four would hide.
+    "residual_packed_ho_unlim|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 0"
+    "residual_packed_ho_clip|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 1"
+    "residual_packed_ho_venk|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 2"
+    "residual_packed_ho_dm|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 3"
 )
 
 op_flag() {

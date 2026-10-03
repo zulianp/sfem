@@ -1136,31 +1136,6 @@ struct Hex8PecletConfig {
     scalar_t width{1};   // tanh: transition width
 };
 
-template <typename scalar_t>
-inline Hex8PecletConfig<scalar_t> cvfem_hex8_peclet_config() {
-    // std::getenv and a function-local static, for the reason cvfem_hex8_rc_config gives:
-    // the benchmark shares this header and has no Env to read through, and the value must be
-    // read once rather than per face.
-    static const Hex8PecletConfig<scalar_t> c = [] {
-        Hex8PecletConfig<scalar_t> k;
-        const char *const f = std::getenv("SFEM_PECLET_BLEND");
-        if (!f || f[0] == '0' || f[0] == '\0') return k;            // off, eta = 1
-        if (f[0] == 'c') k.form = 1;                                 // "classic"
-        else if (f[0] == 't') k.form = 2;                            // "tanh"
-        else return k;
-        const char *const g = std::getenv("SFEM_PECLET_GAMMA");
-        const char *const t = std::getenv("SFEM_PECLET_TRANS");
-        const char *const w = std::getenv("SFEM_PECLET_WIDTH");
-        // Nalu's velocity defaults, so asking for the tanh form without saying more gives the
-        // scheme the reference implementation actually runs rather than a neutral one.
-        k.gamma = g ? (scalar_t)std::atof(g) : scalar_t(1);
-        k.trans = t ? (scalar_t)std::atof(t) : scalar_t(50000);
-        k.width = w ? (scalar_t)std::atof(w) : scalar_t(200);
-        if (k.width <= scalar_t(0)) k.width = scalar_t(1);
-        return k;
-    }();
-    return c;
-}
 
 // eta from the cell Peclet number. pe_num is 0.5 (u_i + u_j) . (x_j - x_i), the velocity
 // averaged across the face dotted with the node separation, and nu is the kinematic
