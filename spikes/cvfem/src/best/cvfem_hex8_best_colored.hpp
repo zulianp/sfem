@@ -371,7 +371,7 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                         if (with_rc) {
                             cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy,
                                                            pack_pgz, begin, nlanes, rcp);
-                            cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
+                            cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), begin, nlanes, rcp);
                         }
                         if (with_qg)
                             cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);

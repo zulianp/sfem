@@ -372,7 +372,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                 if (with_rc) {
                     cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx,
                                                    pack_pgy, pack_pgz, begin, nlanes, rcp);
-                    if (sympy) cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
+                    if (sympy) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), begin, nlanes, rcp);
                 }
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     const ptrdiff_t e = begin + lane;
@@ -1037,7 +1037,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
                     if (with_rc) {
                         cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz,
                                                        begin, nlanes, rcp);
-                        cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
+                        cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), begin, nlanes, rcp);
                     }
                     if (with_qg)
                         cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
@@ -1243,7 +1243,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
                 alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
                 gather_hex8_simd_from_pack(p.elems, pack_dir, d, begin, nlanes, du_pack, cof0, cof1, cof2, cof3,
                                            cof4, cof5, cof6, cof7, cof8, det);
-                if (with_rc) cvfem_hex8_gather_rc_coeff(d, begin, nlanes, rcp);
+                if (with_rc) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), begin, nlanes, rcp);
                 if (with_qg) {
                     cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
                 }

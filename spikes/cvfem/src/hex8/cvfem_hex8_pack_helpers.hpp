@@ -181,6 +181,14 @@ struct Hex8RcConfig {
     scalar_t  scale{0};
 };
 
+// Declared here, beside the type it returns, because the pack sweeps resolve the configuration at
+// their call sites now: cvfem_hex8_gather_rc_coeff below takes a Hex8RcConfig rather than a mesh,
+// so that it names no staging type and the sweeps in src/kernels/ that call it need not either.
+// It was a template before, which hid the ordering -- the call inside it resolved at instantiation.
+// MeshData is declared by whichever family header is in use; both provide it.
+struct MeshData;
+inline Hex8RcConfig cvfem_hex8_rc_config_for(const MeshData &d);
+
 
 inline Hex8RcConfig cvfem_hex8_rc_config(const scalar_t rhie_chow_scale, const scalar_t a0_over_dt) {
     // std::getenv rather than smesh::Env, because the benchmark shares this header and is
@@ -460,15 +468,18 @@ static SFEM_INLINE double cvfem_hex8_pa_bytes_per_dof(const MeshT &d) {
 }
 
 // The SoA gather for the above, straight into the pack the face loops read.
-template <typename MeshT>
-static SFEM_INLINE void cvfem_hex8_gather_rc_coeff(const MeshT      &d,
+//
+// It takes the two tables rather than the mesh, because it is called from inside five pack
+// sweeps and a MeshT parameter here is a staging dependency in src/kernels/, which DESIGN.md
+// does not allow there. They are the only things it read.
+static SFEM_INLINE void cvfem_hex8_gather_rc_coeff(const scalar_t *const SFEM_RESTRICT src,
+                                                   const scalar_t *const SFEM_RESTRICT srcw,
+                                                   const Hex8RcConfig &cfg,
                                                    const ptrdiff_t   begin,
                                                    const int         nlanes,
                                                    Hex8RhieChowPack &rc) {
     // Lane-major out of an element-major table: one element's twelve coefficients are
     // consecutive, so this walks one stream instead of twelve. Measured neutral, not faster.
-    const scalar_t *const SFEM_RESTRICT src  = d.rc_coeff.data();
-    const scalar_t *const SFEM_RESTRICT srcw = d.rc_w.data();
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const scalar_t *const SFEM_RESTRICT e = src + (ptrdiff_t)(begin + lane) * CVFEM_HEX8_N_SCS;
@@ -485,7 +496,7 @@ static SFEM_INLINE void cvfem_hex8_gather_rc_coeff(const MeshT      &d,
         }
     }
     // What the coefficient table was built with, for its velocity sensitivity in the face loop.
-    const Hex8RcConfig cfg = cvfem_hex8_rc_config_for(d);
+    // Resolved by the caller: this function no longer sees a mesh.
     rc.scale               = cfg.scale;
     rc.tau                 = cfg.tau;
 }

@@ -261,7 +261,6 @@ struct MeshData {
 // The Rhie-Chow time-scale configuration for this mesh's solve. Declared here and defined
 // below, next to the BDF coefficients it reads: the element sweeps that need it all sit
 // above those.
-inline Hex8RcConfig cvfem_hex8_rc_config_for(const MeshData &d);
 
 // SFEM_RC_EXACT_JAC, read once. Shared by the Jacobian action and by assemble_block_diag, so
 // the operator and the preconditioner built beside it cannot end up differentiating different

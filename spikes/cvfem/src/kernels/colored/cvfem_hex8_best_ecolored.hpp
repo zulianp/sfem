@@ -326,7 +326,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                 }
             }
 
-            if (opt.with_rc) cvfem_hex8_gather_rc_coeff(d, e0, nlanes, rcp);
+            if (opt.with_rc) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), e0, nlanes, rcp);
 
             // The state's nodal velocity gradient and the direction's, staged exactly as the
             // packed Jacobian stages them. Both are needed by the EXACT higher-order action; the
