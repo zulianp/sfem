@@ -364,8 +364,8 @@ namespace cvfem_ss {
                             // different, singular one. The visible symptom is not a wrong
                             // answer but no answer: the fine Krylov solve performs zero
                             // iterations.
-                            boundary_scs_add_jacobian<false>(
-                                    rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
+                            boundary_scs_add_jacobian<false, false>(
+                                    rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
                                     d.macro_face_mask.empty()
                                             ? -1
                                             : sscvfem_micro_face_mask((int)d.macro_face_mask[(size_t)e], L, xi, yi, zi),

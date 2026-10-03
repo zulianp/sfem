@@ -66,7 +66,7 @@ static void residual_of(const State &s, const int fmask, const int nmask, scalar
     }
     cvfem_hex8_affine_adj(s.x, s.y, s.z, adj, &det);
     std::memset(r, 0, sizeof(scalar_t) * CVFEM_HEX8_N_DOF);
-    boundary_scs_add_residual(RHO, MU, 0, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, p, r, fmask, nmask, g_bd);
+    boundary_scs_add_residual<false>(RHO, MU, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, p, r, fmask, nmask, g_bd);
 }
 
 // The assembled boundary Jacobian as a dense 8x8 block matrix, via identity slots.
@@ -81,7 +81,7 @@ static void assembled_of(const State &s, const int fmask, const int nmask, std::
     static smesh::count_t slots[64];
     for (int k = 0; k < 64; ++k) slots[k] = (smesh::count_t)k;
     values.assign(64 * 16, scalar_t(0));
-    boundary_scs_add_jacobian<false>(RHO, MU, 0, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, slots,
+    boundary_scs_add_jacobian<false, false>(RHO, MU, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, slots,
                                      values.data(), fmask, nmask, g_bd);
 }
 
@@ -164,7 +164,7 @@ int main() {
         for (const int nmask : {0, 0x3F}) {
             scalar_t jv[CVFEM_HEX8_N_DOF];
             std::memset(jv, 0, sizeof(jv));
-            boundary_scs_add_jacobian_action(RHO, MU, 0, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, vx, vy, vz,
+            boundary_scs_add_jacobian_action<false>(RHO, MU, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, vx, vy, vz,
                                              q, jv, 0x3F, nmask, g_bd);
             // The same directional derivative by finite difference on the residual.
             State sp = s, sm = s;
@@ -287,7 +287,7 @@ int main() {
         }
         cvfem_hex8_affine_adj(s.x, s.y, s.z, adj, &det);
         std::memset(jv, 0, sizeof(jv));
-        boundary_scs_add_jacobian_action(RHO, MU, 0, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, vx, vy, vz, q,
+        boundary_scs_add_jacobian_action<false>(RHO, MU, adj, det, L, L, L, s.x, s.y, s.z, ux, uy, uz, vx, vy, vz, q,
                                          jv, 0x3F, 0, g_bd);
         State sp = s, sm = s;
         const scalar_t h = 1e-6;

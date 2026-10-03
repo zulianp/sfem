@@ -947,7 +947,11 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) load_hex8_adj(d, e, adj, &det);
-        boundary_scs_add_jacobian<true>(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz,
+        if (isoparam)
+            boundary_scs_add_jacobian<true, true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz,
+                                        x, y, z, ux, uy, uz, sl, values, fmask, 0);
+        else
+            boundary_scs_add_jacobian<true, false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz,
                                         x, y, z, ux, uy, uz, sl, values, fmask, 0);
         (void)p;
     }

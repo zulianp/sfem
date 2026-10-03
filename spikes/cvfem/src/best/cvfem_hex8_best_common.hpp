@@ -602,8 +602,12 @@ static SFEM_NOINLINE void apply_boundary_scs_residual_pass(MeshData &d, const sc
         std::memset(r, 0, sizeof(r));
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) load_hex8_adj(d, e, adj, &det);
-        boundary_scs_add_residual(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
-                                  ux, uy, uz, p, r, fmask, 0);
+        if (isoparam)
+            boundary_scs_add_residual<true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                            ux, uy, uz, p, r, fmask, 0);
+        else
+            boundary_scs_add_residual<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                             ux, uy, uz, p, r, fmask, 0);
         cvfem_hex8_bnd_commit(d, i, e, r, bnd_atomic, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     }
     if (!bnd_atomic) cvfem_hex8_bnd_gather_soa(d, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
@@ -641,8 +645,12 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
         std::memset(r, 0, sizeof(r));
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) load_hex8_adj(d, e, adj, &det);
-        boundary_scs_add_jacobian_action(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
-                                         ux, uy, uz, vx, vy, vz, q, r, fmask, 0);
+        if (isoparam)
+            boundary_scs_add_jacobian_action<true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                                   ux, uy, uz, vx, vy, vz, q, r, fmask, 0);
+        else
+            boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                                    ux, uy, uz, vx, vy, vz, q, r, fmask, 0);
         cvfem_hex8_bnd_commit_interleaved(d, i, e, r, bnd_atomic, jv);
     }
     if (!bnd_atomic) cvfem_hex8_bnd_gather_interleaved(d, jv);
@@ -690,8 +698,12 @@ static SFEM_NOINLINE void assemble_boundary_scs_jacobian_pass(MeshData      &d,
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
                 for (int bn = 0; bn < CVFEM_HEX8_N_NODES; ++bn)
                     found[a * 8 + bn] = find_bsr_slot(b.rowptr, b.colidx, d.elems[a][e], d.elems[bn][e]);
-        boundary_scs_add_jacobian<true>(rho, mu, isoparam, isoparam ? nullptr : adj, det, d.Lx, d.Ly, d.Lz,
-                                        x, y, z, ux, uy, uz, esl, values, fmask, 0);
+        if (isoparam)
+            boundary_scs_add_jacobian<true, true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz,
+                                                  x, y, z, ux, uy, uz, esl, values, fmask, 0);
+        else
+            boundary_scs_add_jacobian<true, false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz,
+                                                   x, y, z, ux, uy, uz, esl, values, fmask, 0);
         (void)p;
     }
 }

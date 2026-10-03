@@ -1193,7 +1193,7 @@ int main(int argc, char **argv) {
         }
         scalar_t adj_e[9], det_e;
         load_hex8_adj(d, e, adj_e, &det_e);
-        boundary_scs_add_residual(rho, mu, 0, adj_e, det_e, Lx, Ly, Lz,
+        boundary_scs_add_residual<false>(rho, mu, adj_e, det_e, Lx, Ly, Lz,
                                   ex, ey, ez, eu, ev_, ew, ep, re);
         for (int a = 0; a < 8; ++a) {
             const auto g = d.elems[a][e];
@@ -1247,7 +1247,7 @@ int main(int argc, char **argv) {
             }
             scalar_t adj_e[9], det_e;
             load_hex8_adj(d, e, adj_e, &det_e);
-            boundary_scs_add_jacobian_action(rho, mu, 0, adj_e, det_e, Lx, Ly, Lz,
+            boundary_scs_add_jacobian_action<false>(rho, mu, adj_e, det_e, Lx, Ly, Lz,
                                              ex, ey, ez, eu, ev_, ew, gx, gy, gz, gq, re);
             for (int a = 0; a < 8; ++a) {
                 const auto g = d.elems[a][e];
@@ -1278,7 +1278,7 @@ int main(int argc, char **argv) {
                 }
                 scalar_t adj_e[9], det_e;
                 load_hex8_adj(d, e, adj_e, &det_e);
-                boundary_scs_add_jacobian<true>(rho, mu, 0, adj_e, det_e, Lx, Ly, Lz,
+                boundary_scs_add_jacobian<true, false>(rho, mu, adj_e, det_e, Lx, Ly, Lz,
                                                 ex, ey, ez, eu, ev_, ew,
                                                 bsr.element_slots.data() + (size_t)e * 64, hv);
             }

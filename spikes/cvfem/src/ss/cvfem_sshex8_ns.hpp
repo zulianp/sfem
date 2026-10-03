@@ -1220,7 +1220,7 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(SSMeshData &d, const scalar_t rho,
                     sscvfem_micro_geom(gx, gy, gz, adj, &det);
                     cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
                                                         rc, p, d.upwind_eps);
-                    boundary_scs_add_jacobian_action(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+                    boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                                      vx, vy, vz, q, r);
 
                     for (int a = 0; a < 8; ++a)
@@ -1331,7 +1331,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(SSMeshData &d, const scalar_
                         sscvfem_micro_geom(gx, gy, gz, adj, &det);
                         cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
                                                         rc, p, d.upwind_eps);
-                        boundary_scs_add_jacobian_action(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+                        boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                                          vx, vy, vz, q, r);
 
                         // Accumulate locally: no atomic, no contention, contiguous.
@@ -1480,7 +1480,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
                                               nullptr, ux, uy, uz,  rcfg.tau};
                         cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, gadj, gdet, ux, uy, uz, vx, vy, vz, q, r,
                                                              rc, p, d.upwind_eps);
-                        boundary_scs_add_jacobian_action(rho, mu, 0, gadj, gdet, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+                        boundary_scs_add_jacobian_action<false>(rho, mu, gadj, gdet, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                                          vx, vy, vz, q, r);
 
                         for (int a = 0; a < 8; ++a) {
@@ -1834,7 +1834,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
                         sscvfem_action_hoisted(rho, mu, mg, ux, uy, uz, vx, vy, vz, q, p, pgx, pgy, pgz,
                                                has_qg ? qgx : nullptr, has_qg ? qgy : nullptr,
                                                has_qg ? qgz : nullptr, r, d.upwind_eps);
-                        boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                        boundary_scs_add_jacobian_action<false>(rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                          ux, uy, uz, vx, vy, vz, q, r,
                                                          d.macro_face_mask.empty()
                                                           ? -1
@@ -2346,7 +2346,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                         if constexpr (no_masking) {
                             scalar_t rb[CVFEM_HEX8_N_DOF];
                             for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) rb[k] = scalar_t(0);
-                            boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                            boundary_scs_add_jacobian_action<false>(rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                              ux, uy, uz, vx, vy, vz, q, rb,
                                                              d.macro_face_mask.empty()
                                                                      ? -1
@@ -2368,7 +2368,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                             scalar_t rb[CVFEM_HEX8_N_DOF];
                             if constexpr (uu || pu) {
                                 for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) rb[k] = scalar_t(0);
-                                boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                boundary_scs_add_jacobian_action<false>(rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                                  ux, uy, uz, vx, vy, vz, zero8, rb,
                                                              d.macro_face_mask.empty()
                                                                      ? -1
@@ -2388,7 +2388,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
                             }
                             if constexpr (up || pp) {
                                 for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) rb[k] = scalar_t(0);
-                                boundary_scs_add_jacobian_action(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                boundary_scs_add_jacobian_action<false>(rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                                  ux, uy, uz, zero8, zero8, zero8, q, rb,
                                                              d.macro_face_mask.empty()
                                                                      ? -1
@@ -2690,7 +2690,7 @@ inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t r
                                                          (const scalar_t *)nullptr,
                                                          (const scalar_t *)nullptr, 0, scalar_t(0),
                                                          nullptr, d.conv_peclet);
-                    boundary_scs_add_residual(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
+                    boundary_scs_add_residual<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
                     for (int a = 0; a < 8; ++a)
                         for (int c = 0; c < N_FIELDS; ++c)
                             atomic_add(res + (ptrdiff_t)g[a] * N_FIELDS + c, 0, r[a * 4 + c]);
@@ -2950,7 +2950,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
                                                              ho ? z : nullptr, d.conv_limiter,
                                                              d.conv_venkat_c, d.limiter_stats,
                                                              d.conv_peclet);
-                        boundary_scs_add_residual(rho, mu, 0, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                        boundary_scs_add_residual<false>(rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                   ux, uy, uz, p, r,
                                                   d.macro_face_mask.empty()
                                                           ? -1
@@ -3074,7 +3074,7 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(gx, gy, gz, adj, &det);
                     cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, out, rc, p);
-                    boundary_scs_add_jacobian<true>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, out);
+                    boundary_scs_add_jacobian<true, false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, out);
                 }
             }
         }
@@ -3142,7 +3142,7 @@ static SFEM_INLINE void sscvfem_block_diag_cell(const SSMeshData &d, const scala
     const Hex8RhieChow rc{rx,      ry,  rz,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                           nullptr, ux,  uy,  uz,  rcfg.tau};
     cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, adj, det, ux, uy, uz, sl, lout, rc, p);
-    boundary_scs_add_jacobian<false>(rho, mu, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, lout,
+    boundary_scs_add_jacobian<false, false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, lout,
                                      d.macro_face_mask.empty()
                                              ? -1
                                              : sscvfem_micro_face_mask((int)d.macro_face_mask[(size_t)e], L,

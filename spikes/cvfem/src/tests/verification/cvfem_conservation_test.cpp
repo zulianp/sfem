@@ -93,7 +93,7 @@ int main() {
     {
         scalar_t r[CVFEM_HEX8_N_DOF];
         std::memset(r, 0, sizeof(r));
-        boundary_scs_add_residual(RHO, MU, 0, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r, 0x3F, 0);
+        boundary_scs_add_residual<false>(RHO, MU, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r, 0x3F, 0);
         check_close(sum_continuity(r), RHO * DIV_U, 1e-13, "closed boundary carries div(u) * V");
     }
 
@@ -102,7 +102,7 @@ int main() {
     {
         scalar_t r[CVFEM_HEX8_N_DOF];
         cvfem_hex8_ns_upwind_residual_sumfact(RHO, MU, adj, det, ux, uy, uz, p, r);
-        boundary_scs_add_residual(RHO, MU, 0, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r, 0x3F, 0);
+        boundary_scs_add_residual<false>(RHO, MU, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r, 0x3F, 0);
         check_close(sum_continuity(r), RHO * DIV_U, 1e-13, "interior + boundary balances");
     }
 
@@ -121,7 +121,7 @@ int main() {
         }
         scalar_t r[CVFEM_HEX8_N_DOF];
         cvfem_hex8_ns_upwind_residual_sumfact(RHO, MU, adj, det, dx, dy, dz, dp, r);
-        boundary_scs_add_residual(RHO, MU, 0, adj, det, 1.0, 1.0, 1.0, x, y, z, dx, dy, dz, dp, r, 0x3F, 0);
+        boundary_scs_add_residual<false>(RHO, MU, adj, det, 1.0, 1.0, 1.0, x, y, z, dx, dy, dz, dp, r, 0x3F, 0);
         check_close(sum_continuity(r), 0.0, 1e-14, "a divergence-free field closes to zero");
     }
 
@@ -132,12 +132,12 @@ int main() {
     {
         scalar_t r[CVFEM_HEX8_N_DOF];
         cvfem_hex8_ns_upwind_residual_sumfact(RHO, MU, adj, det, ux, uy, uz, p, r);
-        boundary_scs_add_residual(RHO, MU, 0, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r, 0x3F, 0x02);
+        boundary_scs_add_residual<false>(RHO, MU, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r, 0x3F, 0x02);
         check_close(sum_continuity(r), RHO * DIV_U, 1e-13, "a do-nothing face keeps its true flux");
 
         scalar_t r_all[CVFEM_HEX8_N_DOF];
         cvfem_hex8_ns_upwind_residual_sumfact(RHO, MU, adj, det, ux, uy, uz, p, r_all);
-        boundary_scs_add_residual(RHO, MU, 0, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r_all, 0x3F, 0x3F);
+        boundary_scs_add_residual<false>(RHO, MU, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r_all, 0x3F, 0x3F);
         check_close(sum_continuity(r_all), RHO * DIV_U, 1e-13, "all faces do-nothing keeps the balance");
     }
 

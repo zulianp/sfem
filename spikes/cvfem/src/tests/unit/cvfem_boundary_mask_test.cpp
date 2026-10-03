@@ -87,7 +87,7 @@ static void boundary_residual(const int fmask, const int nmask, scalar_t *r) {
     }
     cvfem_hex8_affine_adj(x, y, z, adj, &det);
     std::memset(r, 0, sizeof(scalar_t) * CVFEM_HEX8_N_DOF);
-    boundary_scs_add_residual(1.0, 0.01, 0, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r, fmask, nmask);
+    boundary_scs_add_residual<false>(1.0, 0.01, adj, det, 1.0, 1.0, 1.0, x, y, z, ux, uy, uz, p, r, fmask, nmask);
 }
 
 int main() {

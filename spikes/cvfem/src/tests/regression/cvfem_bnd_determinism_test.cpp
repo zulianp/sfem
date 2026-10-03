@@ -130,7 +130,7 @@ static std::vector<scalar_t> serial_reference(Run &r) {
         std::memset(r_e, 0, sizeof(r_e));
         scalar_t adj[9], det = scalar_t(0);
         cvfem_hex8_load_adj(d, e, adj, &det);
-        boundary_scs_add_jacobian_action(RHO, MU, 0, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+        boundary_scs_add_jacobian_action<false>(RHO, MU, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
                                          vx, vy, vz, q, r_e, fmask,
                                          d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {

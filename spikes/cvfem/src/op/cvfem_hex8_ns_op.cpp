@@ -791,7 +791,7 @@ namespace sfem {
                             det = hdet;
                         }
                         for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) re[k] = 0;
-                        boundary_scs_add_residual((scalar_t)rho, (scalar_t)mu, 0, adj, det, d.Lx,
+                        boundary_scs_add_residual<false>((scalar_t)rho, (scalar_t)mu, adj, det, d.Lx,
                                                   d.Ly, d.Lz, xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
                         // Same weighting as the flat path: the continuity row a boundary
                         // node receives IS its mass flux through this surface, so a nodal
@@ -876,8 +876,12 @@ namespace sfem {
             const int iso = to_geom_kind(geom) == GeomKind::Isoparam ? 1 : 0;
             if (!iso) cvfem_hex8_affine_adj(xe, ye, ze, adj, &det);
             for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) re[k] = 0;
-            boundary_scs_add_residual((scalar_t)rho, (scalar_t)mu, iso, adj, det, d.Lx, d.Ly, d.Lz,
-                                      xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
+            if (iso)
+                boundary_scs_add_residual<true>((scalar_t)rho, (scalar_t)mu, adj, det, d.Lx, d.Ly, d.Lz,
+                                                xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
+            else
+                boundary_scs_add_residual<false>((scalar_t)rho, (scalar_t)mu, adj, det, d.Lx, d.Ly, d.Lz,
+                                                 xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
             // The continuity row a boundary node receives IS its mass flux through this
             // surface, so a nodal weight applied here integrates w * (rho u.n) over exactly
             // the sub-control surfaces the residual used -- which is what makes an energy

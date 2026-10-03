@@ -421,8 +421,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void hex8_visc_jac_row(const scalar_t mu, co
     }
 }
 
-template <typename scalar_t>
-static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_t rho, const scalar_t mu, const int isoparam, const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+template <bool ISO, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_t rho, const scalar_t mu, const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                   const scalar_t Lx, const scalar_t Ly, const scalar_t Lz,
                                                   const scalar_t *const SFEM_RESTRICT x, const scalar_t *const SFEM_RESTRICT y,
                                                   const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
@@ -437,7 +437,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
     const int have_traction =
             bd.tmask != 0 && (bd.tx != scalar_t(0) || bd.ty != scalar_t(0) || bd.tz != scalar_t(0));
     scalar_t A[3][3];
-    if (!isoparam) {
+    if constexpr (!ISO) {
         if (std::fabs(det) < scalar_t(1e-30)) return;
         cvfem_hex8_grad_sumfact(adj, det, ux, uy, uz, grad_el);
         cvfem_hex8_dir_areas(adj, A);
@@ -457,7 +457,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
         for (int k = 0; k < 4; ++k) {
             const int i = CVFEM_HEX8_BFACE_NODES[f][k];
             scalar_t  ax, ay, az, grad[9];
-            if (isoparam) {
+            if constexpr (ISO) {
                 scalar_t dN[CVFEM_HEX8_N_NODES][3];
                 cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
                 scalar_t adj[9], det;
@@ -519,8 +519,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_residual(const scalar_
     }
 }
 
-template <bool Atomic, typename Slot, typename scalar_t>
-static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_t rho, const scalar_t mu, const int isoparam, const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
+template <bool Atomic, bool ISO, typename Slot, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_t rho, const scalar_t mu, const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
                                                  const scalar_t Lx, const scalar_t Ly, const scalar_t Lz,
                                                  const scalar_t *const SFEM_RESTRICT x, const scalar_t *const SFEM_RESTRICT y,
                                                  const scalar_t *const SFEM_RESTRICT z, const scalar_t *const SFEM_RESTRICT ux,
@@ -531,7 +531,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
                                                   const Hex8BoundaryDataT<scalar_t> &bd = {}) {
     scalar_t A[3][3];
     scalar_t w_el[CVFEM_HEX8_N_NODES][3];
-    if (!isoparam) {
+    if constexpr (!ISO) {
         if (std::fabs(det) < scalar_t(1e-30)) return;
         cvfem_hex8_dir_areas(adj, A);
         const scalar_t inv_det = scalar_t(1) / det;
@@ -556,7 +556,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
             const int i = CVFEM_HEX8_BFACE_NODES[f][k];
             scalar_t  ax, ay, az;
             scalar_t  w[CVFEM_HEX8_N_NODES][3];
-            if (isoparam) {
+            if constexpr (ISO) {
                 scalar_t dN[CVFEM_HEX8_N_NODES][3];
                 cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
                 scalar_t adj[9], det;
@@ -657,8 +657,8 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian(const scalar_
     }
 }
 
-template <typename scalar_t>
-static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const scalar_t rho, const scalar_t mu, const int isoparam,
+template <bool ISO, typename scalar_t>
+static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const scalar_t rho, const scalar_t mu,
                                                          const scalar_t *const SFEM_RESTRICT adj, const scalar_t det, const scalar_t Lx, const scalar_t Ly,
                                                          const scalar_t Lz, const scalar_t *const SFEM_RESTRICT x,
                                                          const scalar_t *const SFEM_RESTRICT y, const scalar_t *const SFEM_RESTRICT z,
@@ -671,7 +671,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const 
                                                   const Hex8BoundaryDataT<scalar_t> &bd = {}) {
     scalar_t dgrad_el[9];
     scalar_t A[3][3];
-    if (!isoparam) {
+    if constexpr (!ISO) {
         if (std::fabs(det) < scalar_t(1e-30)) return;
         cvfem_hex8_grad_sumfact(adj, det, vx, vy, vz, dgrad_el);
         cvfem_hex8_dir_areas(adj, A);
@@ -691,7 +691,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void boundary_scs_add_jacobian_action(const 
         for (int k = 0; k < 4; ++k) {
             const int i = CVFEM_HEX8_BFACE_NODES[f][k];
             scalar_t  ax, ay, az, dgrad[9];
-            if (isoparam) {
+            if constexpr (ISO) {
                 scalar_t dN[CVFEM_HEX8_N_NODES][3];
                 cvfem_hex8_dn_ref(CVFEM_HEX8_BFACE_XI[f][k][0], CVFEM_HEX8_BFACE_XI[f][k][1], CVFEM_HEX8_BFACE_XI[f][k][2], dN);
                 scalar_t adj[9], det;

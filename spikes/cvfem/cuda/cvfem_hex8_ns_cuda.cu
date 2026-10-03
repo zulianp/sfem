@@ -1421,17 +1421,17 @@ __global__ void cvfem_hex8_boundary_kernel(
 
         if (OP == BOUNDARY_ASSEMBLE) {
             // Accumulates straight into the global BSR through CVFEM_ATOMIC_ADD.
-            boundary_scs_add_jacobian<true>(rho, mu, 0, adj_e, det[e], Lx, Ly, Lz,
+            boundary_scs_add_jacobian<true, false>(rho, mu, adj_e, det[e], Lx, Ly, Lz,
                                             x, y, z, ux, uy, uz, &slots[e * 64], values);
         } else {
             double re[CVFEM_HEX8_N_DOF];
 #pragma unroll
             for (int i = 0; i < CVFEM_HEX8_N_DOF; ++i) re[i] = 0.0;
             if (OP == BOUNDARY_RESIDUAL)
-                boundary_scs_add_residual(rho, mu, 0, adj_e, det[e], Lx, Ly, Lz,
+                boundary_scs_add_residual<false>(rho, mu, adj_e, det[e], Lx, Ly, Lz,
                                           x, y, z, ux, uy, uz, pe, re);
             else
-                boundary_scs_add_jacobian_action(rho, mu, 0, adj_e, det[e], Lx, Ly, Lz,
+                boundary_scs_add_jacobian_action<false>(rho, mu, adj_e, det[e], Lx, Ly, Lz,
                                                  x, y, z, ux, uy, uz, vx, vy, vz, q, re);
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                 double *const dst = &r[(ptrdiff_t)ev[a] * CVFEM_CUDA_NF];
