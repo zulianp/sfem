@@ -11,7 +11,7 @@
 #include <cstdio>
 #include <vector>
 
-#include "venkata/cvfem_venkata_limiter.hpp"
+#include "kernels/microkernels/limiters/cvfem_venkata_limiter.hpp"
 
 using scalar_t = double;
 

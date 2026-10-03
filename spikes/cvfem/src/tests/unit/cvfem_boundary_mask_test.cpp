@@ -30,7 +30,7 @@
 using scalar_t = double;
 static constexpr int N_FIELDS = 4;
 
-#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
 #include "hex8/cvfem_hex8_boundary_scs.hpp"
 
 // The macro-to-micro projection lives in the semi-structured header, which pulls in far

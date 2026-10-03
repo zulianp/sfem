@@ -2,7 +2,7 @@
 #define CVFEM_HEX8_NS_UPWIND_KERNELS_HPP
 
 #include <cmath>
-#include "venkata/cvfem_venkata_limiter.hpp"
+#include "kernels/microkernels/limiters/cvfem_venkata_limiter.hpp"
 #include <cstddef>
 #include <cstring>
 #include <cstdint>

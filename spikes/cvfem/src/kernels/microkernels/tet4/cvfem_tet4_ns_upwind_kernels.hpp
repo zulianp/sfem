@@ -892,6 +892,6 @@ static SFEM_INLINE void tet4_local_slots_to_bsr4_vec_lane(const int *const SFEM_
     }
 }
 
-#include "upwind/cvfem_tet4_ns_upwind_sympy_kernels.hpp"
+#include "kernels/microkernels/tet4/generated/cvfem_tet4_ns_upwind_sympy_kernels.hpp"
 
 #endif

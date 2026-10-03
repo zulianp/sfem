@@ -43,7 +43,7 @@ static constexpr int VEC_SIZE = VEC_BYTES / int(sizeof(scalar_t));
 static_assert(VEC_SIZE >= 1, "invalid vector size");
 static constexpr int ALIGN_BYTES = 64;
 
-#include "upwind/cvfem_tet4_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/tet4/cvfem_tet4_ns_upwind_kernels.hpp"
 
 template <typename T>
 struct AlignedBuffer {

@@ -65,7 +65,7 @@ static constexpr int N_FIELDS = 4;
 
 #include "core/cvfem_portability.hpp"
 
-#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
 #include "core/cvfem_pack_coloring.hpp"
 
 enum class GeomKind { Affine, Isoparam };
@@ -242,7 +242,7 @@ struct MeshData {
 };
 
 #include "hex8/cvfem_hex8_ns_packed.hpp"
-#include "upwind/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 #include "hex8/cvfem_hex8_boundary_scs.hpp"
 
 // The Rhie-Chow time-scale configuration for this mesh's solve. Declared here and defined

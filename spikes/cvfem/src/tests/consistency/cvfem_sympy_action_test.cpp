@@ -34,8 +34,8 @@
 using scalar_t = double;
 static constexpr int N_FIELDS = 4;
 
-#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
-#include "upwind/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 #ifdef CVFEM_ENABLE_SUBPAR
 // The arrangements this file checks are quarantined, so they are emitted here rather
 // than into the main header. Including both is what lets the test compare a retired

@@ -26,7 +26,7 @@ HERE = Path(__file__).resolve().parent
 # python/ -> spike root. The emitted headers live with the sources they are
 # compiled into, not beside the generator that writes them.
 SPIKE_ROOT = HERE.parent
-OUT = SPIKE_ROOT / "src" / "upwind" / "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+OUT = SPIKE_ROOT / "src" / "kernels" / "microkernels" / "hex8" / "generated" / "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 
 N_NODE = 8
 N_DOF = N_NODE * N_FIELD

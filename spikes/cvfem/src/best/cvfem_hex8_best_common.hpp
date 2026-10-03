@@ -73,8 +73,8 @@ static constexpr int N_FIELDS = 4;
 // Needs scalar_t and N_FIELDS above.
 #include "hex8/cvfem_hex8_pack_common.hpp"
 
-#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
-#include "upwind/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 
 // The boundary sub-control-surface terms, for --boundary. The benchmark closes no control
 // volumes by default and this header contributes nothing unless a face mask is supplied,

@@ -22,10 +22,10 @@ using scalar_t = double;
 #define SFEM_RESTRICT __restrict__
 #endif
 
-#include "upwind/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
 
 namespace smesh { using count_t = int32_t; }
-#include "upwind/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 #ifdef CVFEM_ENABLE_SUBPAR
 #include "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
 #endif
