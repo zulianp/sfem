@@ -129,7 +129,7 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const PackedData &p,
                                                     const ptrdiff_t   pack,
                                                     const ptrdiff_t   n_contiguous,
                                                     const ptrdiff_t   n_ghost,
-                                                    const smesh::idx_t *const SFEM_RESTRICT ghosts,
+                                                    const idx_t *const SFEM_RESTRICT ghosts,
                                                     scalar_t *const SFEM_RESTRICT pack_u) {
     const ptrdiff_t owned = p.owned_nodes_ptr[pack];
     for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
@@ -142,7 +142,7 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const PackedData &p,
     }
     for (ptrdiff_t k = 0; k < n_ghost; ++k) {
         scalar_t *const SFEM_RESTRICT dst = pack_u + (n_contiguous + k) * N_FIELDS;
-        const smesh::idx_t            g   = ghosts[k];
+        const idx_t            g   = ghosts[k];
         dst[0]                            = d.ux[g];
         dst[1]                            = d.uy[g];
         dst[2]                            = d.uz[g];
@@ -157,7 +157,7 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const PackedData &p,
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa_range(const cvfem_range rows,
         PackedData &p, scalar_t *const fields[N_FIELDS]) {
     for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
         for (int f = 0; f < N_FIELDS; ++f) {
@@ -193,7 +193,7 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide_range(const cvfem_range row
         const int                           width,
         scalar_t *const SFEM_RESTRICT       dst) {
     for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
         scalar_t *const    out   = dst + (ptrdiff_t)dest * width;
@@ -224,7 +224,7 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide(PackedData                 
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved_range(const cvfem_range rows,
         PackedData &p, scalar_t *const SFEM_RESTRICT jv) {
     for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
         scalar_t *const    out   = jv + (ptrdiff_t)dest * N_FIELDS;
@@ -276,7 +276,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
             const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
             const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
@@ -415,7 +415,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
             const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
             const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
@@ -430,7 +430,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
             }
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
                 scalar_t *const SFEM_RESTRICT dstd = pack_dir + (n_contiguous + k) * N_FIELDS;
-                const smesh::idx_t            g    = ghosts[k];
+                const idx_t            g    = ghosts[k];
                 dstd[0]                            = dir[(ptrdiff_t)g * N_FIELDS + 0];
                 dstd[1]                            = dir[(ptrdiff_t)g * N_FIELDS + 1];
                 dstd[2]                            = dir[(ptrdiff_t)g * N_FIELDS + 2];
@@ -491,7 +491,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
                                 }
                                 continue;
                             }
-                            const smesh::idx_t gn = d.elems[a][e];
+                            const idx_t gn = d.elems[a][e];
                             hop.x[a][lane] = scalar_t(d.points[0][gn]);
                             hop.y[a][lane] = scalar_t(d.points[1][gn]);
                             hop.z[a][lane] = scalar_t(d.points[2][gn]);

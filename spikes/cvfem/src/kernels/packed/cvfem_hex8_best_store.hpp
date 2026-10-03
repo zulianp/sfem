@@ -15,8 +15,8 @@
 // a pack ends in one memcpy that writes every one of those blocks exactly once.
 static void build_pack_store_crs(PackedData           &p,
                                  const ptrdiff_t       nelements,
-                                 const smesh::count_t *rowptr_g,
-                                 const smesh::idx_t   *colidx_g) {
+                                 const count_t *rowptr_g,
+                                 const idx_t   *colidx_g) {
     p.st_rowptr.resize((size_t)p.n_packs);
     p.st_owned_nnz.assign((size_t)p.n_packs, 0);
     p.st_local_nnz.assign((size_t)p.n_packs, 0);
@@ -78,9 +78,9 @@ static void build_pack_store_crs(PackedData           &p,
                 const pack_idx_t local_row = p.elems[a][e];
                 const int        row_begin = rowptr[(size_t)local_row];
                 if ((ptrdiff_t)local_row < n_contiguous) {
-                    const smesh::idx_t grow = (smesh::idx_t)(owned + (ptrdiff_t)local_row);
+                    const idx_t grow = (idx_t)(owned + (ptrdiff_t)local_row);
                     for (int bnode = 0; bnode < CVFEM_HEX8_N_NODES; ++bnode) {
-                        const smesh::idx_t gcolb =
+                        const idx_t gcolb =
                                 pack_local_to_global(p, pack, n_contiguous, p.elems[bnode][e]);
                         slots[a * 8 + bnode] =
                                 row_begin + (int)(find_bsr_slot(rowptr_g, colidx_g, grow, gcolb) - rowptr_g[grow]);
@@ -125,9 +125,9 @@ static void build_pack_store_crs(PackedData           &p,
             const int          begin   = rowptr[(size_t)local_i];
             const int          end     = rowptr[(size_t)local_i + 1];
             const ptrdiff_t    dest    = p.st_ghost_ptr[(size_t)ghost_off + (size_t)k];
-            const smesh::idx_t grow    = p.ghost_idx[(size_t)ghost_off + (size_t)k];
+            const idx_t grow    = p.ghost_idx[(size_t)ghost_off + (size_t)k];
             for (int t = 0; t < end - begin; ++t) {
-                const smesh::idx_t gcolb =
+                const idx_t gcolb =
                         pack_local_to_global(p, pack, n_contiguous, gcol[(size_t)(begin - owned_nnz + t)]);
                 p.st_ghost_slot[(size_t)dest + (size_t)t] = find_bsr_slot(rowptr_g, colidx_g, grow, gcolb);
             }
@@ -184,7 +184,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
             const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
-            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const int                               owned_nnz    = p.st_owned_nnz[(size_t)pack];
             const int                               local_nnz    = p.st_local_nnz[(size_t)pack];
 

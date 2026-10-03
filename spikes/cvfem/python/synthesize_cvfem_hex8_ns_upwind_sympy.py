@@ -1091,7 +1091,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
                                                                           const scalar_t *const SFEM_RESTRICT ux,
                                                                           const scalar_t *const SFEM_RESTRICT uy,
                                                                           const scalar_t *const SFEM_RESTRICT uz,
-                                                                          const smesh::count_t *const SFEM_RESTRICT slots,
+                                                                          const count_t *const SFEM_RESTRICT slots,
                                                                           scalar_t *const SFEM_RESTRICT values) {{
 {geom_locals()}
 {input_locals(include_pressure=False)}
@@ -1106,7 +1106,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
                                                                                     const scalar_t *const SFEM_RESTRICT ux,
                                                                                     const scalar_t *const SFEM_RESTRICT uy,
                                                                                     const scalar_t *const SFEM_RESTRICT uz,
-                                                                                    const smesh::count_t *const SFEM_RESTRICT slots,
+                                                                                    const count_t *const SFEM_RESTRICT slots,
                                                                                     scalar_t *const SFEM_RESTRICT values) {{
 {geom_locals()}
 {input_locals(include_pressure=False)}
@@ -1121,7 +1121,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
                                                                                   const scalar_t *const SFEM_RESTRICT ux,
                                                                                   const scalar_t *const SFEM_RESTRICT uy,
                                                                                   const scalar_t *const SFEM_RESTRICT uz,
-                                                                                  const smesh::count_t *const SFEM_RESTRICT slots,
+                                                                                  const count_t *const SFEM_RESTRICT slots,
                                                                                   scalar_t *const SFEM_RESTRICT values) {{
 {geom_locals()}
 {input_locals(include_pressure=False)}
@@ -1136,7 +1136,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
                                                                                    const scalar_t *const SFEM_RESTRICT ux,
                                                                                    const scalar_t *const SFEM_RESTRICT uy,
                                                                                    const scalar_t *const SFEM_RESTRICT uz,
-                                                                                   const smesh::count_t *const SFEM_RESTRICT slots,
+                                                                                   const count_t *const SFEM_RESTRICT slots,
                                                                                    scalar_t *const SFEM_RESTRICT values) {{
 {geom_locals()}
 {input_locals(include_pressure=False)}

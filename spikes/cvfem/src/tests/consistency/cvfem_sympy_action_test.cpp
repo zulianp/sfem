@@ -32,6 +32,12 @@
 #include <cstring>
 
 using scalar_t = double;
+// The index types the kernel headers name, on the same contract as scalar_t above: src/kernels/
+// spells them unqualified so that it depends on no library, and whoever includes it supplies the
+// alias. This test includes those headers directly rather than through a family header, so it
+// supplies them itself.
+using idx_t   = smesh::idx_t;
+using count_t = smesh::count_t;
 static constexpr int N_FIELDS = 4;
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"

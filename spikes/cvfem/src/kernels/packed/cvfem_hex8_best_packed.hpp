@@ -16,8 +16,8 @@
 
 static void build_pack_local_crs(PackedData               &p,
                                  const ptrdiff_t           nelements,
-                                 const smesh::count_t     *rowptr_g,
-                                 const smesh::idx_t       *colidx_g) {
+                                 const count_t     *rowptr_g,
+                                 const idx_t       *colidx_g) {
     p.local_rowptr.resize((size_t)p.n_packs);
     p.local_colidx.resize((size_t)p.n_packs);
     p.local_global_slot.resize((size_t)p.n_packs);
@@ -59,11 +59,11 @@ static void build_pack_local_crs(PackedData               &p,
         auto &global_slots = p.local_global_slot[(size_t)pack];
         global_slots.resize(colidx.size());
         for (ptrdiff_t i = 0; i < n_pack_nodes; ++i) {
-            const smesh::idx_t grow  = pack_local_to_global(p, pack, n_contiguous, (pack_idx_t)i);
+            const idx_t grow  = pack_local_to_global(p, pack, n_contiguous, (pack_idx_t)i);
             const int          begin = rowptr[(size_t)i];
             const int          end   = rowptr[(size_t)i + 1];
             for (int t = begin; t < end; ++t) {
-                const smesh::idx_t gcol = pack_local_to_global(p, pack, n_contiguous, colidx[(size_t)t]);
+                const idx_t gcol = pack_local_to_global(p, pack, n_contiguous, colidx[(size_t)t]);
                 global_slots[(size_t)t] = find_bsr_slot(rowptr_g, colidx_g, grow, gcol);
             }
         }
@@ -116,9 +116,9 @@ static void build_pack_local_crs(PackedData               &p,
             const int       begin   = rowptr[(size_t)local_i];
             const int       end     = rowptr[(size_t)local_i + 1];
             const ptrdiff_t dest    = p.ghost_mat_ptr[(size_t)ghost_off + (size_t)k];
-            const smesh::idx_t grow = p.ghost_idx[(size_t)ghost_off + (size_t)k];
+            const idx_t grow = p.ghost_idx[(size_t)ghost_off + (size_t)k];
             for (int t = 0; t < end - begin; ++t) {
-                const smesh::idx_t gcol = pack_local_to_global(p, pack, n_contiguous, colidx[(size_t)begin + t]);
+                const idx_t gcol = pack_local_to_global(p, pack, n_contiguous, colidx[(size_t)begin + t]);
                 p.ghost_mat_slot[(size_t)dest + (size_t)t] = find_bsr_slot(rowptr_g, colidx_g, grow, gcol);
             }
         }
@@ -187,7 +187,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
             const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
             const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
@@ -227,7 +227,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
                 // atomic check at 2.9e-03, which is what that check is for.
                 scalar_t xe[8], ye[8], ze[8];
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const smesh::idx_t g = d.elems[a][e];
+                    const idx_t g = d.elems[a][e];
                     xe[a] = scalar_t(d.points[0][g]);
                     ye[a] = scalar_t(d.points[1][g]);
                     ze[a] = scalar_t(d.points[2][g]);
@@ -290,7 +290,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
     scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
         for (int f = 0; f < N_FIELDS; ++f) {
@@ -344,7 +344,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
             const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
             const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
@@ -382,7 +382,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                             for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
                             continue;
                         }
-                        const smesh::idx_t g = d.elems[a][e];
+                        const idx_t g = d.elems[a][e];
                         hop.x[a][lane] = scalar_t(d.points[0][g]);
                         hop.y[a][lane] = scalar_t(d.points[1][g]);
                         hop.z[a][lane] = scalar_t(d.points[2][g]);
@@ -495,7 +495,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
     scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
         for (int f = 0; f < N_FIELDS; ++f) {
@@ -554,7 +554,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
             const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
             const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
@@ -692,7 +692,7 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
     scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
         for (int f = 0; f < N_FIELDS; ++f) {
@@ -752,7 +752,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
             const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
-            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const auto                             &lrowptr      = p.local_rowptr[(size_t)pack];
             const auto                             &lslots       = p.local_global_slot[(size_t)pack];
             const int                               local_nnz    = lrowptr.empty() ? 0 : lrowptr.back();
@@ -963,7 +963,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
             const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
             const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = p.ghost_ptr[pack];
 
             double _t = phase_now();
@@ -1053,7 +1053,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
                                     }
                                     continue;
                                 }
-                                const smesh::idx_t gn = d.elems[a][e];
+                                const idx_t gn = d.elems[a][e];
                                 hop.x[a][lane] = scalar_t(d.points[0][gn]);
                                 hop.y[a][lane] = scalar_t(d.points[1][gn]);
                                 hop.z[a][lane] = scalar_t(d.points[2][gn]);
@@ -1143,7 +1143,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
     const double _tg = phase_now();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
         scalar_t *const    out   = jv + (ptrdiff_t)dest * N_FIELDS;
@@ -1215,7 +1215,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
             const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts    = &p.ghost_idx[p.ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts    = &p.ghost_idx[p.ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off = p.ghost_ptr[pack];
 
             double _t = phase_now();
@@ -1291,7 +1291,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
     const double _tg = phase_now();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
+        const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
         scalar_t *const    out   = jv + (ptrdiff_t)dest * N_FIELDS;

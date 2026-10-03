@@ -34,7 +34,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
         gather_element_fields(d, e, ux, uy, uz, p);
         if (with_ho) {
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const smesh::idx_t gn = d.elems[a][e];
+                const idx_t gn = d.elems[a][e];
                 xe[a] = scalar_t(d.points[0][gn]);
                 ye[a] = scalar_t(d.points[1][gn]);
                 ze[a] = scalar_t(d.points[2][gn]);
@@ -45,7 +45,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
             }
         }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g         = d.elems[a][e];
+            const idx_t g         = d.elems[a][e];
             const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
             vx[a]                            = dv[0];
             vy[a]                            = dv[1];
@@ -111,7 +111,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
 #undef CVFEM_HEX8_JV_BARE
         }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
+            const idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 1, 0, r[a * 4 + 1]);
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 2, 0, r[a * 4 + 2]);
@@ -168,7 +168,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                 if (lane < nlanes) {
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const smesh::idx_t                  g  = d.elems[a][e];
+                        const idx_t                  g  = d.elems[a][e];
                         const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
                         u_pack.ux[a][lane]                     = d.ux[g];
                         u_pack.uy[a][lane]                     = d.uy[g];
@@ -195,7 +195,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         if (lane < nlanes) {
-                            const smesh::idx_t g = d.elems[a][e0 + lane];
+                            const idx_t g = d.elems[a][e0 + lane];
                             rcp.pgx[a][lane]     = d.pgx[g];
                             rcp.pgy[a][lane]     = d.pgy[g];
                             rcp.pgz[a][lane]     = d.pgz[g];
@@ -226,7 +226,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                             }
                             continue;
                         }
-                        const smesh::idx_t gn = d.elems[a][e0 + lane];
+                        const idx_t gn = d.elems[a][e0 + lane];
                         hop.x[a][lane]        = scalar_t(d.points[0][gn]);
                         hop.y[a][lane]        = scalar_t(d.points[1][gn]);
                         hop.z[a][lane]        = scalar_t(d.points[2][gn]);
@@ -249,11 +249,11 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const smesh::idx_t g = d.elems[a][e];
-                    atomic_add(jv, (smesh::idx_t)(g * N_FIELDS + 0), outp.rx[a][lane]);
-                    atomic_add(jv, (smesh::idx_t)(g * N_FIELDS + 1), outp.ry[a][lane]);
-                    atomic_add(jv, (smesh::idx_t)(g * N_FIELDS + 2), outp.rz[a][lane]);
-                    atomic_add(jv, (smesh::idx_t)(g * N_FIELDS + 3), outp.rc[a][lane]);
+                    const idx_t g = d.elems[a][e];
+                    atomic_add(jv, (idx_t)(g * N_FIELDS + 0), outp.rx[a][lane]);
+                    atomic_add(jv, (idx_t)(g * N_FIELDS + 1), outp.ry[a][lane]);
+                    atomic_add(jv, (idx_t)(g * N_FIELDS + 2), outp.rz[a][lane]);
+                    atomic_add(jv, (idx_t)(g * N_FIELDS + 3), outp.rc[a][lane]);
                 }
             }
         }
@@ -276,7 +276,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
         if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
         gather_element_fields(d, e, ux, uy, uz, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t                  g  = d.elems[a][e];
+            const idx_t                  g  = d.elems[a][e];
             const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
             vx[a]                                  = dv[0];
             vy[a]                                  = dv[1];
@@ -286,7 +286,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
         cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, vx, vy, vz, q, r,
                                                       ex.rc, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
+            const idx_t g = d.elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 1, 0, r[a * 4 + 1]);
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 2, 0, r[a * 4 + 2]);
@@ -312,7 +312,7 @@ static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho,
         cvfem_hex8_ns_upwind_residual(rho, mu, adj, det, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
+            const idx_t g = d.elems[a][e];
             atomic_add(d.rx.data(), g, r[a * 4 + 0]);
             atomic_add(d.ry.data(), g, r[a * 4 + 1]);
             atomic_add(d.rz.data(), g, r[a * 4 + 2]);
@@ -336,7 +336,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, ex.rc);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
+            const idx_t g = d.elems[a][e];
             atomic_add(d.rx.data(), g, r[a * 4 + 0]);
             atomic_add(d.ry.data(), g, r[a * 4 + 1]);
             atomic_add(d.rz.data(), g, r[a * 4 + 2]);
@@ -408,7 +408,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
                 if (lane < nlanes) {
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const smesh::idx_t g = d.elems[a][e];
+                        const idx_t g = d.elems[a][e];
                         in.ux[a][lane]       = d.ux[g];
                         in.uy[a][lane]       = d.uy[g];
                         in.uz[a][lane]       = d.uz[g];
@@ -432,7 +432,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
                     if (lane < nlanes) {
                         const ptrdiff_t e = e0 + lane;
                         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            const smesh::idx_t g = d.elems[a][e];
+                            const idx_t g = d.elems[a][e];
                             rcp.pgx[a][lane]     = d.pgx[g];
                             rcp.pgy[a][lane]     = d.pgy[g];
                             rcp.pgz[a][lane]     = d.pgz[g];
@@ -453,7 +453,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
                             for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
                             continue;
                         }
-                        const smesh::idx_t gn = d.elems[a][e0 + lane];
+                        const idx_t gn = d.elems[a][e0 + lane];
                         hop.x[a][lane]        = scalar_t(d.points[0][gn]);
                         hop.y[a][lane]        = scalar_t(d.points[1][gn]);
                         hop.z[a][lane]        = scalar_t(d.points[2][gn]);
@@ -512,7 +512,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const smesh::idx_t g = d.elems[a][e];
+                    const idx_t g = d.elems[a][e];
                     atomic_add(rx, g, outp.rx[a][lane]);
                     atomic_add(ry, g, outp.ry[a][lane]);
                     atomic_add(rz, g, outp.rz[a][lane]);
@@ -561,7 +561,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d
         // velocity gradients; both are gathered per element, like the fields above.
         scalar_t xe[8], ye[8], ze[8], g8[72];
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
+            const idx_t g = d.elems[a][e];
             xe[a] = scalar_t(d.points[0][g]);
             ye[a] = scalar_t(d.points[1][g]);
             ze[a] = scalar_t(d.points[2][g]);
@@ -573,7 +573,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d
                                               limiter, venkat_c, nullptr);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
+            const idx_t g = d.elems[a][e];
             atomic_add(d.rx.data(), g, r[a * 4 + 0]);
             atomic_add(d.ry.data(), g, r[a * 4 + 1]);
             atomic_add(d.rz.data(), g, r[a * 4 + 2]);
@@ -596,7 +596,7 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
         cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, p, r, ex.rc);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
+            const idx_t g = d.elems[a][e];
             atomic_add(d.rx.data(), g, r[a * 4 + 0]);
             atomic_add(d.ry.data(), g, r[a * 4 + 1]);
             atomic_add(d.rz.data(), g, r[a * 4 + 2]);
@@ -617,7 +617,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sympy(MeshData &d, const scalar_
         cvfem_hex8_ns_upwind_sympy_residual(rho, mu, adj, det, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
+            const idx_t g = d.elems[a][e];
             atomic_add(d.rx.data(), g, r[a * 4 + 0]);
             atomic_add(d.ry.data(), g, r[a * 4 + 1]);
             atomic_add(d.rz.data(), g, r[a * 4 + 2]);
@@ -629,7 +629,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sympy(MeshData &d, const scalar_
 static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots = b.element_slots.empty() ? nullptr : b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots = b.element_slots.empty() ? nullptr : b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -640,9 +640,9 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, cons
         cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, adj, det, ux, uy, uz, p, ke);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t row = d.elems[a][e];
+            const idx_t row = d.elems[a][e];
             for (int bnode = 0; bnode < CVFEM_HEX8_N_NODES; ++bnode) {
-                const smesh::count_t slot =
+                const count_t slot =
                         slots ? slots[(size_t)e * 64 + a * 8 + bnode] : find_bsr_slot(b.rowptr, b.colidx, row, d.elems[bnode][e]);
                 scalar_t *const      blk  = values + (ptrdiff_t)slot * 16;
                 for (int rf = 0; rf < 4; ++rf) {
@@ -668,7 +668,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
                                                                const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots =
+    const count_t *const SFEM_RESTRICT slots =
             b.element_slots.empty() ? nullptr : b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
@@ -680,9 +680,9 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
         cvfem_hex8_ns_upwind_jacobian_fd_isoparam(rho, mu, x, y, z, ux, uy, uz, p, ke);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t row = d.elems[a][e];
+            const idx_t row = d.elems[a][e];
             for (int bnode = 0; bnode < CVFEM_HEX8_N_NODES; ++bnode) {
-                const smesh::count_t slot =
+                const count_t slot =
                         slots ? slots[(size_t)e * 64 + a * 8 + bnode]
                               : find_bsr_slot(b.rowptr, b.colidx, row, d.elems[bnode][e]);
                 scalar_t *const blk = values + (ptrdiff_t)slot * 16;
@@ -698,7 +698,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
 static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -713,7 +713,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(MeshData &d, BSR4 &b, c
 static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_block(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -729,7 +729,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_block(MeshData &d, BSR4
 static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_row(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -745,7 +745,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_row(MeshData &d, BSR4 &
 static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -771,7 +771,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_linear(MeshData             &
                                                           std::vector<scalar_t> &linear) {
     linear.assign((size_t)b.nnz * 16, scalar_t(0));
     scalar_t *const SFEM_RESTRICT             values = linear.data();
-    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -788,7 +788,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
                                                              const scalar_t               mu,
                                                              const std::vector<scalar_t> &linear) {
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
     // Restore the constant part. A streaming copy, in place of the scattered
     // accumulation it replaces.
@@ -815,7 +815,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
 static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT                 values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT     slots  = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT     slots  = b.element_slots.data();
     const Hex8Extras                              opt(d);
 
 #pragma omp parallel for schedule(static)
@@ -843,7 +843,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
 static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
     const Hex8Extras                          opt(d);
 
 #pragma omp parallel for schedule(static)
@@ -875,7 +875,7 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam_sympy(MeshData      &d,
         gather_element_fields(d, e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_sympy_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const smesh::idx_t g = d.elems[a][e];
+            const idx_t g = d.elems[a][e];
             atomic_add(d.rx.data(), g, r[a * 4 + 0]);
             atomic_add(d.ry.data(), g, r[a * 4 + 1]);
             atomic_add(d.rz.data(), g, r[a * 4 + 2]);
@@ -890,7 +890,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(MeshData      
                                                                   const scalar_t mu) {
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -958,7 +958,7 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &
 }
 // The -1 masking stays valid with Rhie-Chow and the boundary closure on, because both go
 // through the same guarded accessor the interior kernel uses. It is a `ptrdiff_t` array
-// deliberately: -1 has to be negative, and smesh::count_t's signedness is a build option
+// deliberately: -1 has to be negative, and count_t's signedness is a build option
 // (SMESH_COUNT_TYPE), so an unsigned build would turn every dropped write into an
 // out-of-bounds one. boundary_scs_add_jacobian is templated on the slot type for exactly
 // this reason. The solver's assemble_block_diag cannot use the trick at all -- it runs the
@@ -1027,7 +1027,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_linear_isoparam(MeshData     
                                                                    std::vector<scalar_t> &linear) {
     linear.assign((size_t)b.nnz * 16, scalar_t(0));
     scalar_t *const SFEM_RESTRICT             values = linear.data();
-    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -1044,7 +1044,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear_isoparam(
         MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu,
         const std::vector<scalar_t> &linear) {
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
-    const smesh::count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
+    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
     // Restore the constant part, then add only what the velocity changes.
     std::memcpy(values, linear.data(), linear.size() * sizeof(scalar_t));

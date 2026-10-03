@@ -65,6 +65,17 @@
 #endif
 
 using scalar_t = double;
+// THE INDEX TYPES THE KERNELS NAME, declared here for the same reason scalar_t above is.
+//
+// DESIGN.md requires src/kernels/ to be "header only self-contained code with templated types"
+// and to carry no library dependency. Those headers spelled smesh::idx_t and smesh::count_t,
+// which named a library and a namespace; they now name idx_t and count_t unqualified, exactly as
+// they have always named scalar_t, and the family header that includes them supplies the alias.
+// That is what lets the vectorisation gate compile the lane kernels against nothing but the
+// standard library, and it is what will let a caller with a different index width instantiate
+// them without editing them.
+using idx_t   = smesh::idx_t;
+using count_t = smesh::count_t;
 
 static constexpr int N_FIELDS = 4;
 

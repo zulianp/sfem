@@ -81,7 +81,7 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
                 if (lane < nlanes) {
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const smesh::idx_t g = d.elems[a][e];
+                        const idx_t g = d.elems[a][e];
                         in.ux[a][lane]       = d.ux[g];
                         in.uy[a][lane]       = d.uy[g];
                         in.uz[a][lane]       = d.uz[g];
@@ -105,7 +105,7 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
                     if (lane < nlanes) {
                         const ptrdiff_t e = e0 + lane;
                         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            const smesh::idx_t g = d.elems[a][e];
+                            const idx_t g = d.elems[a][e];
                             rcp.pgx[a][lane]     = d.pgx[g];
                             rcp.pgy[a][lane]     = d.pgy[g];
                             rcp.pgz[a][lane]     = d.pgz[g];
@@ -126,7 +126,7 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
                             for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
                             continue;
                         }
-                        const smesh::idx_t gn = d.elems[a][e0 + lane];
+                        const idx_t gn = d.elems[a][e0 + lane];
                         hop.x[a][lane]        = scalar_t(d.points[0][gn]);
                         hop.y[a][lane]        = scalar_t(d.points[1][gn]);
                         hop.z[a][lane]        = scalar_t(d.points[2][gn]);
@@ -185,7 +185,7 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const smesh::idx_t g = d.elems[a][e];
+                    const idx_t g = d.elems[a][e];
                     rx[g] += outp.rx[a][lane];
                     ry[g] += outp.ry[a][lane];
                     rz[g] += outp.rz[a][lane];
@@ -284,7 +284,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                 if (lane < nlanes) {
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const smesh::idx_t                  g  = d.elems[a][e];
+                        const idx_t                  g  = d.elems[a][e];
                         const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
                         u_pack.ux[a][lane]                     = d.ux[g];
                         u_pack.uy[a][lane]                     = d.uy[g];
@@ -311,7 +311,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         if (lane < nlanes) {
-                            const smesh::idx_t g = d.elems[a][e0 + lane];
+                            const idx_t g = d.elems[a][e0 + lane];
                             rcp.pgx[a][lane]     = d.pgx[g];
                             rcp.pgy[a][lane]     = d.pgy[g];
                             rcp.pgz[a][lane]     = d.pgz[g];
@@ -342,7 +342,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                             }
                             continue;
                         }
-                        const smesh::idx_t gn = d.elems[a][e0 + lane];
+                        const idx_t gn = d.elems[a][e0 + lane];
                         hop.x[a][lane]        = scalar_t(d.points[0][gn]);
                         hop.y[a][lane]        = scalar_t(d.points[1][gn]);
                         hop.z[a][lane]        = scalar_t(d.points[2][gn]);
@@ -365,7 +365,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const smesh::idx_t g = d.elems[a][e];
+                    const idx_t g = d.elems[a][e];
                     jv[g * N_FIELDS + 0] += outp.rx[a][lane];
                     jv[g * N_FIELDS + 1] += outp.ry[a][lane];
                     jv[g * N_FIELDS + 2] += outp.rz[a][lane];
