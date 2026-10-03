@@ -456,12 +456,18 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
     }
 }
 
+// ISO IS A TEMPLATE PARAMETER, NOT A RUNTIME ENUM. DESIGN.md asks for the affine and the
+// isoparametric kernels to be "logically separated (now they are mixed in with enum and
+// booleans)", and this was the enum: GeomKind arrived as an argument and was tested per pack,
+// inside the sweep. It also left the geometry undecided at the point where it matters -- the
+// lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
+// the vectorisation gate now refuses outright. The caller picks the instantiation.
+template <bool ISO>
 static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                                                 PackedData      &p,
                                                 const scalar_t   rho,
                                                 const scalar_t   mu,
-                                                const KernelKind kernel_kind,
-                                                const GeomKind   geom_kind) {
+                                                const KernelKind kernel_kind) {
     const scalar_t *const SFEM_RESTRICT ux = d.ux.data();
     const scalar_t *const SFEM_RESTRICT uy = d.uy.data();
     const scalar_t *const SFEM_RESTRICT uz = d.uz.data();
@@ -482,7 +488,7 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                (geom_kind == GeomKind::Isoparam || with_rc)
+                (ISO || with_rc)
                         ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
                         : nullptr;
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
@@ -511,7 +517,7 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                 cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
                                                pack_z, pack_pgx, pack_pgy, pack_pgz);
 
-            if (geom_kind == GeomKind::Isoparam) {
+            if constexpr (ISO) {
                 fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
                 Hex8InputPack    in;
                 Hex8CoordPack    xyz;
@@ -625,13 +631,19 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
 }
 
 
+// ISO IS A TEMPLATE PARAMETER, NOT A RUNTIME ENUM. DESIGN.md asks for the affine and the
+// isoparametric kernels to be "logically separated (now they are mixed in with enum and
+// booleans)", and this was the enum: GeomKind arrived as an argument and was tested per pack,
+// inside the sweep. It also left the geometry undecided at the point where it matters -- the
+// lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
+// the vectorisation gate now refuses outright. The caller picks the instantiation.
+template <bool ISO>
 static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                                                    PackedData      &p,
                                                    BSR4            &b,
                                                    const scalar_t   rho,
                                                    const scalar_t   mu,
-                                                   const KernelKind kernel_kind,
-                                                   const GeomKind   geom_kind) {
+                                                   const KernelKind kernel_kind) {
     zero_bsr4(b);
 
     const size_t u_n   = packed_scratch_n(p);
@@ -651,7 +663,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
         scalar_t *const SFEM_RESTRICT pack_u          = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                (geom_kind == GeomKind::Isoparam || with_rc)
+                (ISO || with_rc)
                         ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
                         : nullptr;
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
@@ -682,7 +694,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz);
-            if (geom_kind == GeomKind::Isoparam)
+            if constexpr (ISO)
                 fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
 
@@ -700,7 +712,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                         g_kernel_only ? g_identity_slots : p.local_element_slot.data() + (size_t)e * 64;
                 scalar_t *const SFEM_RESTRICT local_vals = g_kernel_only ? dense_ke : local_vals_pack;
                 scalar_t adj[9], det;
-                if (geom_kind != GeomKind::Isoparam) load_hex8_adj(d, e, adj, &det);
+                if constexpr (!ISO) load_hex8_adj(d, e, adj, &det);
                 // The coordinates and the nodal gradient come out of the pack; the
                 // Hex8RhieChow points at these locals, so they must outlive the call, which
                 // they do.
@@ -714,7 +726,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                                       nullptr, nullptr, nullptr, ux_e, uy_e, uz_e, rcfg.tau};
                 }
                 const scalar_t *const rc_p = with_rc ? p_e : nullptr;
-                if (geom_kind == GeomKind::Isoparam) {
+                if constexpr (ISO) {
                     scalar_t x[8], y[8], z[8];
                     gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, x, y, z);
                     if (kernel_kind == KernelKind::Fd) {
@@ -798,13 +810,19 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
 // Newton step, contributes nothing to J, and this function computes exactly what it computed
 // before the arguments existed. Passing them carries the correction's derivative, which is what
 // makes the action exact for a higher-order residual and is what costs the extra pass.
+// ISO IS A TEMPLATE PARAMETER, NOT A RUNTIME ENUM. DESIGN.md asks for the affine and the
+// isoparametric kernels to be "logically separated (now they are mixed in with enum and
+// booleans)", and this was the enum: GeomKind arrived as an argument and was tested per pack,
+// inside the sweep. It also left the geometry undecided at the point where it matters -- the
+// lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
+// the vectorisation gate now refuses outright. The caller picks the instantiation.
+template <bool ISO>
 static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                        PackedData            &p,
                                                        const scalar_t         rho,
                                                        const scalar_t         mu,
                                                        const scalar_t *const  dir,
                                                        scalar_t *const        jv,
-                                                       const GeomKind         geom_kind,
                                                        const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
                                                        const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
                                                        const int              limiter = 0,
@@ -834,7 +852,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
-                (geom_kind == GeomKind::Isoparam || with_rc) ? thread_scratch<scalar_t>(3, slot3_n) : nullptr;
+                (ISO || with_rc) ? thread_scratch<scalar_t>(3, slot3_n) : nullptr;
         const ptrdiff_t xyz_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
         scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
         scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
@@ -881,13 +899,13 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                pack_pgx, pack_pgy, pack_pgz);
             if (with_qg)
                 cvfem_hex8_fill_pack_qgrad(p, d, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
-            if (geom_kind == GeomKind::Isoparam)
+            if constexpr (ISO)
                 fill_pack_xyz(p, d, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
 
             for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                 const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
-                if (geom_kind == GeomKind::Isoparam) {
+                if constexpr (ISO) {
                     gather_hex8_isoparam_action_simd_from_pack(p.elems,
                                                                pack_u,
                                                                pack_dir,

@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
     std::vector<scalar_t> jv_direct((size_t)d.nnodes * N_FIELDS, 0);
     std::vector<scalar_t> jv_pa((size_t)d.nnodes * N_FIELDS, 0);
 
-    apply_jacobian_action_packed(d, packed, rho, mu, dir.data(), jv_direct.data(), GeomKind::Affine);
+    apply_jacobian_action_packed<false>(d, packed, rho, mu, dir.data(), jv_direct.data());
 
     cvfem_hex8_build_pa_tangent(d, rho, mu, scalar_t(0));
     apply_jacobian_action_packed_pa(d, packed, rho, mu, dir.data(), jv_pa.data());

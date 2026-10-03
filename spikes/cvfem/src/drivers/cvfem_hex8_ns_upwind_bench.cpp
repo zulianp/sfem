@@ -83,6 +83,17 @@ static void bench_nodal_grad(MeshData &d, PackedData &p, const GeomKind geom_kin
 // truncation of a one-sided one. Returns max|fd - jv| / max|fd|, and prints the lagged action
 // against the same reference beside it, because the number that matters to a solver is not
 // whether the exact action is right but how wrong the lagged one is.
+// The geometry is a template parameter of the packed kernels now rather than a GeomKind they
+// test per pack, so the runtime choice is resolved here. One dispatcher rather than a branch at
+// each call site: --geom is a user-level option and this is the front end.
+template <class... Args>
+static void apply_jacobian_action_packed_geom(const GeomKind g, Args &&...args) {
+    if (g == GeomKind::Isoparam)
+        apply_jacobian_action_packed<true>(std::forward<Args>(args)...);
+    else
+        apply_jacobian_action_packed<false>(std::forward<Args>(args)...);
+}
+
 static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu,
                                     const int limiter, const GeomKind geom_kind, scalar_t &lagged_rel,
                                     // The fraction of degrees of freedom where the two disagree by
@@ -162,9 +173,9 @@ static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t r
     cvfem_hex8_assemble_nodal_grads_packed(d, p, iso, vsrcs, 3, gv, vbuf, vst);
 
     std::vector<scalar_t> jv((size_t)n * N_FIELDS), jl((size_t)n * N_FIELDS);
-    apply_jacobian_action_packed(d, p, rho, mu, dir.data(), jv.data(), geom_kind,
+    apply_jacobian_action_packed_geom(geom_kind, d, p, rho, mu, dir.data(), jv.data(),
                                  gu.data(), gv.data(), limiter, scalar_t(0));
-    apply_jacobian_action_packed(d, p, rho, mu, dir.data(), jl.data(), geom_kind);
+    apply_jacobian_action_packed_geom(geom_kind, d, p, rho, mu, dir.data(), jl.data());
 
     scalar_t den = 0, num = 0, numl = 0;
     for (size_t i = 0; i < fd.size(); ++i) {
@@ -1438,7 +1449,7 @@ int main(int argc, char **argv) {
         apply_residual_atomic_sumfact(d, rho, mu);
         std::vector<scalar_t> atomic_r;
         pack_residual(d, atomic_r);
-        apply_residual_packed(d, packed, rho, mu, KernelKind::Sumfact, GeomKind::Affine);
+        apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Sumfact);
         std::vector<scalar_t> packed_r;
         pack_residual(d, packed_r);
         apply_residual_colored(d, packed, colors, rho, mu, KernelKind::Sumfact, GeomKind::Affine);
@@ -1590,7 +1601,7 @@ int main(int argc, char **argv) {
         }
 
         if ((layout == "packed" || verify_jac) && layout != "ecolor") {
-            apply_residual_packed(d, packed, rho, mu, KernelKind::Current, GeomKind::Affine);
+            apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Current);
             std::vector<scalar_t> packed_current_r;
             pack_residual(d, packed_current_r);
             const scalar_t packed_err =
@@ -1602,7 +1613,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            apply_residual_packed(d, packed, rho, mu, KernelKind::Sumfact, GeomKind::Affine);
+            apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Sumfact);
             std::vector<scalar_t> packed_sumfact_r;
             pack_residual(d, packed_sumfact_r);
             const scalar_t packed_sf_err =
@@ -1614,7 +1625,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            apply_residual_packed(d, packed, rho, mu, KernelKind::Sumfact, GeomKind::Isoparam);
+            apply_residual_packed<true>(d, packed, rho, mu, KernelKind::Sumfact);
             std::vector<scalar_t> packed_iso_r;
             pack_residual(d, packed_iso_r);
             const scalar_t packed_iso_err =
@@ -1739,7 +1750,7 @@ int main(int argc, char **argv) {
         }
 
         if (layout == "packed")
-            apply_residual_packed(d, packed, rho, mu, KernelKind::Sympy, GeomKind::Affine);
+            apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Sympy);
         else
             apply_residual_atomic_sympy(d, rho, mu);
         std::vector<scalar_t> sympy_r;
@@ -1827,7 +1838,7 @@ int main(int argc, char **argv) {
             if (layout == "colored")
                 apply_residual_colored(d, packed, colors, rho, mu, kernel_kind, GeomKind::Isoparam);
             else if (layout == "packed" || layout == "store")
-                apply_residual_packed(d, packed, rho, mu, kernel_kind, GeomKind::Isoparam);
+                apply_residual_packed<true>(d, packed, rho, mu, kernel_kind);
             else if (kernel_kind == KernelKind::Sympy)
                 apply_residual_atomic_isoparam_sympy(d, rho, mu);
             else
@@ -1850,7 +1861,7 @@ int main(int argc, char **argv) {
         else if ((layout == "packed" || layout == "store") && conv_ho)
             apply_residual_packed_defcor_scalar(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (layout == "packed" || layout == "store")
-            apply_residual_packed(d, packed, rho, mu, kernel_kind, GeomKind::Affine);
+            apply_residual_packed<false>(d, packed, rho, mu, kernel_kind);
         else if (kernel_uses_sympy_residual(kernel_kind))
             apply_residual_atomic_sympy(d, rho, mu);
         else if (kernel_kind == KernelKind::Sumfact && conv_ho && !ho_scalar)
@@ -1872,11 +1883,11 @@ int main(int argc, char **argv) {
     auto jac_fn = [&]() {
         if (geom_kind == GeomKind::Isoparam) {
             if (layout == "store")
-                assemble_jacobian_store(d, packed, bsr, rho, mu, kernel_kind, GeomKind::Isoparam);
+                assemble_jacobian_store<true>(d, packed, bsr, rho, mu, kernel_kind);
             else if (layout == "colored")
                 assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, kernel_kind, GeomKind::Isoparam);
             else if (layout == "packed")
-                assemble_jacobian_packed(d, packed, bsr, rho, mu, kernel_kind, GeomKind::Isoparam);
+                assemble_jacobian_packed<true>(d, packed, bsr, rho, mu, kernel_kind);
             else if (kernel_kind == KernelKind::Split)
                 assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear);
             else if (kernel_kind == KernelKind::Sympy)
@@ -1888,11 +1899,11 @@ int main(int argc, char **argv) {
                 // rejected during validation, so this is not a fallback.
                 assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
         } else if (layout == "store") {
-            assemble_jacobian_store(d, packed, bsr, rho, mu, kernel_kind, GeomKind::Affine);
+            assemble_jacobian_store<false>(d, packed, bsr, rho, mu, kernel_kind);
         } else if (layout == "colored") {
             assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, kernel_kind, GeomKind::Affine);
         } else if (layout == "packed") {
-            assemble_jacobian_packed(d, packed, bsr, rho, mu, kernel_kind, GeomKind::Affine);
+            assemble_jacobian_packed<false>(d, packed, bsr, rho, mu, kernel_kind);
         } else if (kernel_kind == KernelKind::Sumfact)
             assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
         else if (kernel_kind == KernelKind::Sympy)
@@ -2136,7 +2147,7 @@ int main(int argc, char **argv) {
         else if (layout == "colored")
             apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
         else if (layout == "packed" || layout == "store")
-            apply_jacobian_action_packed(d, packed, rho, mu, dir_v, jac_out.data(), geom_kind,
+            apply_jacobian_action_packed_geom(geom_kind, d, packed, rho, mu, dir_v, jac_out.data(),
                                          with_hograd ? ugrad.data() : nullptr,
                                          with_hograd ? vgrad.data() : nullptr,
                                          conv_limiter, scalar_t(0));
@@ -2240,7 +2251,7 @@ int main(int argc, char **argv) {
         if (rhie_chow)
             bench_nodal_grad(d, packed, geom_kind, jac_dir.data() + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
         if (vs_matrix) bsr4_spmv(bsr, d.nnodes, jac_dir.data(), jv_spmv.data());
-        apply_jacobian_action_packed(d, packed, rho, mu, jac_dir.data(), jv_mf.data(), geom_kind);
+        apply_jacobian_action_packed_geom(geom_kind, d, packed, rho, mu, jac_dir.data(), jv_mf.data());
         if (geom_kind == GeomKind::Isoparam)
             apply_jacobian_action_atomic_isoparam(d, rho, mu, jac_dir.data(), jv_mf_atomic.data());
         else
