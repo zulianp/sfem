@@ -25,49 +25,56 @@
 // reproducible as long as the colouring is, which it is for a fixed mesh and element order.
 
 #include "core/cvfem_element_coloring.hpp"
+#include "kernels/cvfem_range.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 
-static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
-                                                  const ElementColoring &ec,
-                                                  const scalar_t  rho,
-                                                             const scalar_t  mu,
-                                                             const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
-                                                             const int       limiter  = 0,
-                                                             const scalar_t  venkat_c = scalar_t(0)) {
-    reset_residual(d);
-    const Hex8Extras opt(d);
-    // The deferred correction, on the same sweep. The hand-written SIMD kernel takes the
-    // higher-order pack, so the standard layout's higher-order arms vectorise too; the generated
-    // sympy variants are packed-only, which is why this is the hand-written kernel rather than
-    // the one the packed layout runs by default. --ho-scalar still reaches the scalar sweep,
-    // which is required for a non-zero Venkatakrishnan eps squared.
-    const bool with_ho = ugrad != nullptr;
-
-    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
-    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
-    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
-    scalar_t *const SFEM_RESTRICT rc_out = d.rc.data();
-
-#pragma omp parallel
-    {
-        alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE];
-        alignas(ALIGN_BYTES) scalar_t cof2[CVFEM_HEX8_VEC_SIZE], cof3[CVFEM_HEX8_VEC_SIZE];
-        alignas(ALIGN_BYTES) scalar_t cof4[CVFEM_HEX8_VEC_SIZE], cof5[CVFEM_HEX8_VEC_SIZE];
-        alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE];
-        alignas(ALIGN_BYTES) scalar_t cof8[CVFEM_HEX8_VEC_SIZE], detv[CVFEM_HEX8_VEC_SIZE];
-        Hex8InputPack    in;
-        Hex8ResidualPack outp;
-        Hex8RhieChowPack rcp;
-        Hex8UGradPack    hop;
-
-        for (int color = 0; color < ec.n_colors; ++color) {
-            const ptrdiff_t c_begin = ec.color_ptr[(size_t)color];
-            const ptrdiff_t c_end   = ec.color_ptr[(size_t)color + 1];
-            // The implicit barrier at the end of this `for` is the whole synchronisation: no two
-            // elements of a colour share a node, so every write below is conflict-free.
-#pragma omp for schedule(static)
-        for (ptrdiff_t e0 = c_begin; e0 < c_end; e0 += CVFEM_HEX8_VEC_SIZE) {
-            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, c_end - e0);
+// THE THREADING IS OUTSIDE THE KERNEL, AND THE KERNEL TAKES A RANGE.
+//
+// DESIGN.md: the threading model is abstract outside the function and what arrives is a range,
+// so that a thread library other than OpenMP can drive these sweeps. Each kernel below is now a
+// plain loop over one cvfem_range of elements, and the `#pragma omp parallel` lives in the
+// launcher beneath it.
+//
+// THE COLOUR BARRIER IS THE REASON THIS IS NOT A SUBSTITUTION. The synchronisation between
+// colours used to BE the implicit barrier at the end of `#pragma omp for`; with the loop gone
+// that barrier has to be written. The launcher therefore keeps the colour loop, hands each thread
+// its own slice of the colour through cvfem_range_split, and barriers once per colour. The split
+// is group-aligned and reproduces schedule(static) over the same strided loop, so the work per
+// thread is what it was.
+//
+// The scratch comes in as arguments rather than being declared inside the kernel, which is what
+// DESIGN.md's "only arguments that are actually used" asks for and what removes the hidden
+// per-thread state: the launcher owns one set per thread, in its parallel region, and passes it.
+static SFEM_NOINLINE void apply_residual_ecolored_range(
+        const cvfem_range r,
+        MeshData         &d,
+        const scalar_t    rho,
+        const scalar_t    mu,
+        const scalar_t *const SFEM_RESTRICT ugrad,
+        const int         limiter,
+        const scalar_t    venkat_c,
+        const Hex8Extras &opt,
+        const bool        with_ho,
+        scalar_t *const SFEM_RESTRICT rx,
+        scalar_t *const SFEM_RESTRICT ry,
+        scalar_t *const SFEM_RESTRICT rz,
+        scalar_t *const SFEM_RESTRICT rc_out,
+        scalar_t *const SFEM_RESTRICT cof0,
+        scalar_t *const SFEM_RESTRICT cof1,
+        scalar_t *const SFEM_RESTRICT cof2,
+        scalar_t *const SFEM_RESTRICT cof3,
+        scalar_t *const SFEM_RESTRICT cof4,
+        scalar_t *const SFEM_RESTRICT cof5,
+        scalar_t *const SFEM_RESTRICT cof6,
+        scalar_t *const SFEM_RESTRICT cof7,
+        scalar_t *const SFEM_RESTRICT cof8,
+        scalar_t *const SFEM_RESTRICT detv,
+        Hex8InputPack    &in,
+        Hex8ResidualPack &outp,
+        Hex8RhieChowPack &rcp,
+        Hex8UGradPack    &hop) {
+    for (ptrdiff_t e0 = r.begin; e0 < r.end; e0 += CVFEM_HEX8_VEC_SIZE) {
+            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, r.end - e0);
             gather_hex8_adj_soa(d, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
@@ -185,31 +192,29 @@ static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
                     rc_out[g] += outp.rc[a][lane];
                 }
             }
-        }
-        }
     }
 }
 
-static SFEM_NOINLINE void apply_jacobian_action_ecolored(MeshData              &d,
-                                                         const ElementColoring &ec,
-                                                         const scalar_t        rho,
-                                                            const scalar_t        mu,
-                                                            const scalar_t *const dir,
-                                                            scalar_t *const       jv,
-                                                            const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
-                                                            const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
-                                                            const int             limiter  = 0,
-                                                            const scalar_t        venkat_c = scalar_t(0)) {
-    cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
+static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
+                                                  const ElementColoring &ec,
+                                                  const scalar_t  rho,
+                                                  const scalar_t  mu,
+                                                  const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                  const int       limiter  = 0,
+                                                  const scalar_t  venkat_c = scalar_t(0)) {
+    reset_residual(d);
     const Hex8Extras opt(d);
-    const bool       has_qg  = opt.with_qg;
-    const bool       with_ho = ugrad != nullptr && vgrad != nullptr;
-    // The per-surface Rhie-Chow coefficient is hoisted out of the face loops, so it has to be
-    // built before the sweep and staged per lane group -- exactly as the packed Jacobian does.
-    // Omitting the staging leaves rcp.coeff, rcp.scale and rcp.tau untouched and the kernel
-    // returns nan, which is how this was found.
-    if (opt.with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+    // The deferred correction, on the same sweep. The hand-written SIMD kernel takes the
+    // higher-order pack, so the standard layout's higher-order arms vectorise too; the generated
+    // sympy variants are packed-only, which is why this is the hand-written kernel rather than
+    // the one the packed layout runs by default. --ho-scalar still reaches the scalar sweep,
+    // which is required for a non-zero Venkatakrishnan eps squared.
+    const bool with_ho = ugrad != nullptr;
 
+    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
+    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
+    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
+    scalar_t *const SFEM_RESTRICT rc_out = d.rc.data();
 #pragma omp parallel
     {
         alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE];
@@ -217,19 +222,62 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored(MeshData              &
         alignas(ALIGN_BYTES) scalar_t cof4[CVFEM_HEX8_VEC_SIZE], cof5[CVFEM_HEX8_VEC_SIZE];
         alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE];
         alignas(ALIGN_BYTES) scalar_t cof8[CVFEM_HEX8_VEC_SIZE], detv[CVFEM_HEX8_VEC_SIZE];
-        Hex8InputPack    u_pack, du_pack;
+        Hex8InputPack    in;
         Hex8ResidualPack outp;
         Hex8RhieChowPack rcp;
-        Hex8UGradPack    hop, hovp;
+        Hex8UGradPack    hop;
+        const int n_parts = cvfem_n_threads();
+        const int part    = cvfem_thread_index();
 
         for (int color = 0; color < ec.n_colors; ++color) {
-            const ptrdiff_t c_begin = ec.color_ptr[(size_t)color];
-            const ptrdiff_t c_end   = ec.color_ptr[(size_t)color + 1];
-            // The implicit barrier at the end of this `for` is the whole synchronisation: no two
-            // elements of a colour share a node, so every write below is conflict-free.
-#pragma omp for schedule(static)
-        for (ptrdiff_t e0 = c_begin; e0 < c_end; e0 += CVFEM_HEX8_VEC_SIZE) {
-            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, c_end - e0);
+            apply_residual_ecolored_range(
+                    cvfem_range_split(ec.color_ptr[(size_t)color],
+                                      ec.color_ptr[(size_t)color + 1],
+                                      CVFEM_HEX8_VEC_SIZE, part, n_parts),
+                    d, rho, mu, ugrad, limiter, venkat_c, opt, with_ho, rx, ry, rz, rc_out,
+                    cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in, outp, rcp, hop);
+            // No two elements of a colour share a node, so the slices above need no
+            // synchronisation between them. The next colour does: this is the barrier that used
+            // to be the implicit one at the end of `#pragma omp for`.
+            cvfem_thread_barrier();
+        }
+    }
+}
+
+// The Jacobian action, split the same way and for the same reasons. See
+// apply_residual_ecolored_range above.
+static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
+        const cvfem_range r,
+        MeshData         &d,
+        const scalar_t    rho,
+        const scalar_t    mu,
+        const scalar_t *const dir,
+        scalar_t *const       jv,
+        const scalar_t *const SFEM_RESTRICT ugrad,
+        const scalar_t *const SFEM_RESTRICT vgrad,
+        const int         limiter,
+        const scalar_t    venkat_c,
+        const Hex8Extras &opt,
+        const bool        has_qg,
+        const bool        with_ho,
+        scalar_t *const SFEM_RESTRICT cof0,
+        scalar_t *const SFEM_RESTRICT cof1,
+        scalar_t *const SFEM_RESTRICT cof2,
+        scalar_t *const SFEM_RESTRICT cof3,
+        scalar_t *const SFEM_RESTRICT cof4,
+        scalar_t *const SFEM_RESTRICT cof5,
+        scalar_t *const SFEM_RESTRICT cof6,
+        scalar_t *const SFEM_RESTRICT cof7,
+        scalar_t *const SFEM_RESTRICT cof8,
+        scalar_t *const SFEM_RESTRICT detv,
+        Hex8InputPack    &u_pack,
+        Hex8InputPack    &du_pack,
+        Hex8ResidualPack &outp,
+        Hex8RhieChowPack &rcp,
+        Hex8UGradPack    &hop,
+        Hex8UGradPack    &hovp) {
+    for (ptrdiff_t e0 = r.begin; e0 < r.end; e0 += CVFEM_HEX8_VEC_SIZE) {
+            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, r.end - e0);
             gather_hex8_adj_soa(d, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
@@ -324,7 +372,51 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored(MeshData              &
                     jv[g * N_FIELDS + 3] += outp.rc[a][lane];
                 }
             }
-        }
+    }
+}
+
+static SFEM_NOINLINE void apply_jacobian_action_ecolored(MeshData              &d,
+                                                         const ElementColoring &ec,
+                                                         const scalar_t        rho,
+                                                         const scalar_t        mu,
+                                                         const scalar_t *const dir,
+                                                         scalar_t *const       jv,
+                                                         const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                         const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
+                                                         const int             limiter  = 0,
+                                                         const scalar_t        venkat_c = scalar_t(0)) {
+    cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
+    const Hex8Extras opt(d);
+    const bool       has_qg  = opt.with_qg;
+    const bool       with_ho = ugrad != nullptr && vgrad != nullptr;
+    // The per-surface Rhie-Chow coefficient is hoisted out of the face loops, so it has to be
+    // built before the sweep and staged per lane group -- exactly as the packed Jacobian does.
+    // Omitting the staging leaves rcp.coeff, rcp.scale and rcp.tau untouched and the kernel
+    // returns nan, which is how this was found.
+    if (opt.with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+#pragma omp parallel
+    {
+        alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof2[CVFEM_HEX8_VEC_SIZE], cof3[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof4[CVFEM_HEX8_VEC_SIZE], cof5[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE];
+        alignas(ALIGN_BYTES) scalar_t cof8[CVFEM_HEX8_VEC_SIZE], detv[CVFEM_HEX8_VEC_SIZE];
+        Hex8InputPack    u_pack, du_pack;
+        Hex8ResidualPack outp;
+        Hex8RhieChowPack rcp;
+        Hex8UGradPack    hop, hovp;
+        const int n_parts = cvfem_n_threads();
+        const int part    = cvfem_thread_index();
+
+        for (int color = 0; color < ec.n_colors; ++color) {
+            apply_jacobian_action_ecolored_range(
+                    cvfem_range_split(ec.color_ptr[(size_t)color],
+                                      ec.color_ptr[(size_t)color + 1],
+                                      CVFEM_HEX8_VEC_SIZE, part, n_parts),
+                    d, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, opt, has_qg, with_ho,
+                    cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv,
+                    u_pack, du_pack, outp, rcp, hop, hovp);
+            cvfem_thread_barrier();
         }
     }
 }
