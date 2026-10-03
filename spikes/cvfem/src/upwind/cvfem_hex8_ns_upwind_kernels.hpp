@@ -1288,7 +1288,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_centroids(
 // `off` stays a runtime argument rather than being folded into the base pointers: an invariant
 // base plus a lane-varying index is the form a vectoriser recognises as unit-stride, where a
 // lane-varying pointer invites it to emit a gather.
-template <int STRIDE, typename scalar_t>
+template <int STRIDE, int LIM, typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *const SFEM_RESTRICT g,
                                                                const scalar_t *const SFEM_RESTRICT xe,
                                                                const scalar_t *const SFEM_RESTRICT ye,
@@ -1296,7 +1296,6 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
                                                                const scalar_t *const SFEM_RESTRICT ux,
                                                                const scalar_t *const SFEM_RESTRICT uy,
                                                                const scalar_t *const SFEM_RESTRICT uz,
-                                                               const int limiter,
                                                                const int s, const int i, const int j,
                                                                const scalar_t mdot, const scalar_t ueps,
                                                                const scalar_t venkat_c,
@@ -1340,7 +1339,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
     // vector and the length costs one square root -- and only when the arm that uses it is
     // selected with a non-zero K, so the default path pays nothing.
     scalar_t veps2 = scalar_t(0);
-    if (limiter == 2 && venkat_c != scalar_t(0)) {
+    if constexpr (LIM == 2) if (venkat_c != scalar_t(0)) {
         const scalar_t ex = dix - djx, ey = diy - djy, ez = diz - djz;
         const scalar_t h  = std::sqrt(ex * ex + ey * ey + ez * ez);
         veps2             = venkat_c * h * h * h;
@@ -1463,17 +1462,15 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_scs_defcor(const scalar_t *c
         const scalar_t a  = at(u, i), b = at(u, j);
         const scalar_t lo = a < b ? a : b;
         const scalar_t hi = a < b ? b : a;
-        if (limiter >= 1 && limiter <= 3) {
-            if (limiter == 3) {
-                oi = cvfem_darwish_moukalled_inc(a, b, inc_i);
-                oj = cvfem_darwish_moukalled_inc(b, a, inc_j);
-            } else if (limiter == 1) {
-                oi = cvfem_limiter_clip_inc(a, inc_i, lo, hi);
-                oj = cvfem_limiter_clip_inc(b, inc_j, lo, hi);
-            } else {
-                oi = cvfem_venkata_inc(a, inc_i, lo, hi, veps2);
-                oj = cvfem_venkata_inc(b, inc_j, lo, hi, veps2);
-            }
+        if constexpr (LIM == 3) {
+            oi = cvfem_darwish_moukalled_inc(a, b, inc_i);
+            oj = cvfem_darwish_moukalled_inc(b, a, inc_j);
+        } else if constexpr (LIM == 1) {
+            oi = cvfem_limiter_clip_inc(a, inc_i, lo, hi);
+            oj = cvfem_limiter_clip_inc(b, inc_j, lo, hi);
+        } else if constexpr (LIM == 2) {
+            oi = cvfem_venkata_inc(a, inc_i, lo, hi, veps2);
+            oj = cvfem_venkata_inc(b, inc_j, lo, hi, veps2);
         }
         // Recorded for EVERY arm including limiter 0, because the count that matters is how
         // often the unlimited reconstruction leaves the bound -- that is a property of the
@@ -1841,10 +1838,21 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_residual_sumfact(c
         // Jacobian below is untouched by design; see cvfem_hex8_scs_defcor.
         if (ugrad8) {
             scalar_t dfx, dfy, dfz;
-            // (STRIDE=1, off=0): the flat per-element arrays this scalar sweep holds.
-            cvfem_hex8_scs_defcor<1>(ugrad8, xe, ye, ze, ux, uy, uz, limiter, s, i, j, mdot, ueps,
-                                     venkat_c, stats, /*off=*/0, cenx[s], ceny[s], cenz[s],
-                                     dfx, dfy, dfz);
+            // (STRIDE=1, off=0): the flat per-element arrays this scalar sweep holds. The arm
+            // is a template argument on the leaf now, so the switch is here -- which is where a
+            // sweep-uniform choice belongs. This is the scalar sweep, so the switch costs a
+            // predictable branch per surface rather than one inside a lane loop.
+#define CVFEM_HEX8_SCS_DEFCOR_ARM(LIM_)                                                         \
+    cvfem_hex8_scs_defcor<1, LIM_>(ugrad8, xe, ye, ze, ux, uy, uz, s, i, j, mdot, ueps,         \
+                                   venkat_c, stats, /*off=*/0, cenx[s], ceny[s], cenz[s],       \
+                                   dfx, dfy, dfz)
+            switch (limiter) {
+                case 1: CVFEM_HEX8_SCS_DEFCOR_ARM(1); break;
+                case 2: CVFEM_HEX8_SCS_DEFCOR_ARM(2); break;
+                case 3: CVFEM_HEX8_SCS_DEFCOR_ARM(3); break;
+                default: CVFEM_HEX8_SCS_DEFCOR_ARM(0); break;
+            }
+#undef CVFEM_HEX8_SCS_DEFCOR_ARM
             fx += dfx;
             fy += dfy;
             fz += dfz;
@@ -2544,7 +2552,7 @@ static SFEM_INLINE void cvfem_hex8_visc_dir_simd(const scalar_t                 
 // One face of the convective residual, for ONE lane. The lane loop lives in the caller so that
 // all twelve faces can share it, which is what cvfem_hex8_conv_all_simd does and why it is worth
 // +4%. The Jacobian's face kernel is split the same way and reached the opposite answer.
-template <int I, int J, int S, bool RC = false, bool EPS = false, bool HO = false>
+template <int I, int J, int S, bool RC = false, bool EPS = false, bool HO = false, int LIM = 0>
 static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_lane(const int lane,
                                                   const scalar_t rho,
                                                   const scalar_t                      mu,
@@ -2641,10 +2649,10 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_lane(const
     // shape of guard that cost 1.83x here once already.
     scalar_t hx = scalar_t(0), hy = scalar_t(0), hz = scalar_t(0);
     if constexpr (HO) {
-        cvfem_hex8_scs_defcor<CVFEM_HEX8_VEC_SIZE>(
+        cvfem_hex8_scs_defcor<CVFEM_HEX8_VEC_SIZE, LIM>(
                 &ho->g[0][0][0], &ho->x[0][0], &ho->y[0][0], &ho->z[0][0],
                 &in.ux[0][0], &in.uy[0][0], &in.uz[0][0],
-                ho->limiter, S, I, J, mdot, EPS ? ueps : scalar_t(0), ho->venkat_c,
+                S, I, J, mdot, EPS ? ueps : scalar_t(0), ho->venkat_c,
                 (Hex8LimiterStats *)nullptr, /*off=*/lane,
                 cenx[S * CVFEM_HEX8_VEC_SIZE + lane], ceny[S * CVFEM_HEX8_VEC_SIZE + lane],
                 cenz[S * CVFEM_HEX8_VEC_SIZE + lane], hx, hy, hz);
@@ -2813,7 +2821,7 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_face_jv_simd(co
     }
 }
 
-template <bool RC = false, bool EPS = false, bool HO = false>
+template <bool RC = false, bool EPS = false, bool HO = false, int LIM = 0>
 static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                      rho,
                                                  const scalar_t                      mu,
                                                  const scalar_t                      rc_scale,
@@ -2915,40 +2923,40 @@ static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                 
         for (int nd = 0; nd < CVFEM_HEX8_N_NODES; ++nd) { ax[nd] = scalar_t(0); ay[nd] = scalar_t(0); az[nd] = scalar_t(0); ac[nd] = scalar_t(0); }
         scalar_t fx, fy, fz, dm;
 
-        cvfem_hex8_conv_face_lane<0, 1, 0, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<0, 1, 0, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[0] += fx; ay[0] += fy; az[0] += fz; ac[0] += dm;
         ax[1] -= fx; ay[1] -= fy; az[1] -= fz; ac[1] -= dm;
-        cvfem_hex8_conv_face_lane<3, 2, 1, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<3, 2, 1, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[3] += fx; ay[3] += fy; az[3] += fz; ac[3] += dm;
         ax[2] -= fx; ay[2] -= fy; az[2] -= fz; ac[2] -= dm;
-        cvfem_hex8_conv_face_lane<4, 5, 2, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<4, 5, 2, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[4] += fx; ay[4] += fy; az[4] += fz; ac[4] += dm;
         ax[5] -= fx; ay[5] -= fy; az[5] -= fz; ac[5] -= dm;
-        cvfem_hex8_conv_face_lane<7, 6, 3, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<7, 6, 3, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax0, Ay0, Az0, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[7] += fx; ay[7] += fy; az[7] += fz; ac[7] += dm;
         ax[6] -= fx; ay[6] -= fy; az[6] -= fz; ac[6] -= dm;
-        cvfem_hex8_conv_face_lane<0, 3, 4, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<0, 3, 4, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[0] += fx; ay[0] += fy; az[0] += fz; ac[0] += dm;
         ax[3] -= fx; ay[3] -= fy; az[3] -= fz; ac[3] -= dm;
-        cvfem_hex8_conv_face_lane<1, 2, 5, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<1, 2, 5, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[1] += fx; ay[1] += fy; az[1] += fz; ac[1] += dm;
         ax[2] -= fx; ay[2] -= fy; az[2] -= fz; ac[2] -= dm;
-        cvfem_hex8_conv_face_lane<4, 7, 6, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<4, 7, 6, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[4] += fx; ay[4] += fy; az[4] += fz; ac[4] += dm;
         ax[7] -= fx; ay[7] -= fy; az[7] -= fz; ac[7] -= dm;
-        cvfem_hex8_conv_face_lane<5, 6, 7, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<5, 6, 7, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax1, Ay1, Az1, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[5] += fx; ay[5] += fy; az[5] += fz; ac[5] += dm;
         ax[6] -= fx; ay[6] -= fy; az[6] -= fz; ac[6] -= dm;
-        cvfem_hex8_conv_face_lane<0, 4, 8, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<0, 4, 8, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[0] += fx; ay[0] += fy; az[0] += fz; ac[0] += dm;
         ax[4] -= fx; ay[4] -= fy; az[4] -= fz; ac[4] -= dm;
-        cvfem_hex8_conv_face_lane<1, 5, 9, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<1, 5, 9, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[1] += fx; ay[1] += fy; az[1] += fz; ac[1] += dm;
         ax[5] -= fx; ay[5] -= fy; az[5] -= fz; ac[5] -= dm;
-        cvfem_hex8_conv_face_lane<2, 6, 10, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<2, 6, 10, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[2] += fx; ay[2] += fy; az[2] += fz; ac[2] += dm;
         ax[6] -= fx; ay[6] -= fy; az[6] -= fz; ac[6] -= dm;
-        cvfem_hex8_conv_face_lane<3, 7, 11, RC, EPS, HO>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
+        cvfem_hex8_conv_face_lane<3, 7, 11, RC, EPS, HO, LIM>(lane, rho, mu, rc_scale, half, Ax2, Ay2, Az2, in, rc, fx, fy, fz, dm, ueps, ho, cenx, ceny, cenz, edx, edy, edz);
         ax[3] += fx; ay[3] += fy; az[3] += fz; ac[3] += dm;
         ax[7] -= fx; ay[7] -= fy; az[7] -= fz; ac[7] -= dm;
         for (int nd = 0; nd < CVFEM_HEX8_N_NODES; ++nd) {
@@ -2971,7 +2979,7 @@ static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                 
                                                  const scalar_t *const SFEM_RESTRICT Az2,
                                                  const Hex8InputPack                &in,
                                                  Hex8ResidualPack                   &out) {
-    cvfem_hex8_conv_all_simd<false>(rho,
+    cvfem_hex8_conv_all_simd<false, false, false, 0>(rho,
                                     scalar_t(0),
                                     scalar_t(0),
                                     half,
@@ -3413,27 +3421,46 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_sumfact_simd(
                                                           lane, cenx, ceny, cenz);
         }
     }
-#define CVFEM_HEX8_CONV_ALL(RC_, EPS_, HO_)                                                     \
-    cvfem_hex8_conv_all_simd<RC_, EPS_, HO_>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1, Ay1,  \
-                                             Az1, Ax2, Ay2, Az2, in, rc, out, ueps, ho, cenx,   \
-                                             ceny, cenz, edx, edy, edz)
+#define CVFEM_HEX8_CONV_ALL(RC_, EPS_, HO_, LIM_)                                                \
+    cvfem_hex8_conv_all_simd<RC_, EPS_, HO_, LIM_>(rho, mu, rc_scale, half, Ax0, Ay0, Az0, Ax1,  \
+                                             Ay1, Az1, Ax2, Ay2, Az2, in, rc, out, ueps, ho,     \
+                                             cenx, ceny, cenz, edx, edy, edz)
+// THE LIMITER ARM IS A TEMPLATE ARGUMENT, which is the whole point of this ladder. Its
+// Jacobian twin already did this and records the measurement: a runtime arm inside the
+// surface loop is worth 2x against a compiled one, because the branch sits inside the lane
+// loop and the arms have different register footprints.
+//
+// Only the HO leaves take it. The four first-order leaves never reach a limiter, so they are
+// one instantiation each and the space is 4 + 4*4 rather than 8*4.
+// do/while(0) so the expansion is one statement: it sits in the arms of the if/else ladder
+// below, where a bare braced switch plus the call site's semicolon leaves the else dangling.
+#define CVFEM_HEX8_CONV_ALL_LIM(RC_, EPS_)                                                       \
+    do {                                                                                         \
+        switch (ho->limiter) {                                                                   \
+            case 1: CVFEM_HEX8_CONV_ALL(RC_, EPS_, true, 1); break;                              \
+            case 2: CVFEM_HEX8_CONV_ALL(RC_, EPS_, true, 2); break;                              \
+            case 3: CVFEM_HEX8_CONV_ALL(RC_, EPS_, true, 3); break;                              \
+            default: CVFEM_HEX8_CONV_ALL(RC_, EPS_, true, 0); break;                             \
+        }                                                                                        \
+    } while (0)
     if (rc_on) {
         if (eps_on) {
-            if (ho_on) CVFEM_HEX8_CONV_ALL(true, true, true);
-            else       CVFEM_HEX8_CONV_ALL(true, true, false);
+            if (ho_on) CVFEM_HEX8_CONV_ALL_LIM(true, true);
+            else       CVFEM_HEX8_CONV_ALL(true, true, false, 0);
         } else {
-            if (ho_on) CVFEM_HEX8_CONV_ALL(true, false, true);
-            else       CVFEM_HEX8_CONV_ALL(true, false, false);
+            if (ho_on) CVFEM_HEX8_CONV_ALL_LIM(true, false);
+            else       CVFEM_HEX8_CONV_ALL(true, false, false, 0);
         }
     } else {
         if (eps_on) {
-            if (ho_on) CVFEM_HEX8_CONV_ALL(false, true, true);
-            else       CVFEM_HEX8_CONV_ALL(false, true, false);
+            if (ho_on) CVFEM_HEX8_CONV_ALL_LIM(false, true);
+            else       CVFEM_HEX8_CONV_ALL(false, true, false, 0);
         } else {
-            if (ho_on) CVFEM_HEX8_CONV_ALL(false, false, true);
-            else       CVFEM_HEX8_CONV_ALL(false, false, false);
+            if (ho_on) CVFEM_HEX8_CONV_ALL_LIM(false, false);
+            else       CVFEM_HEX8_CONV_ALL(false, false, false, 0);
         }
     }
+#undef CVFEM_HEX8_CONV_ALL_LIM
 #undef CVFEM_HEX8_CONV_ALL
 }
 
