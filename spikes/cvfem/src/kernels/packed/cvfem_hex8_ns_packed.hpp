@@ -2,6 +2,7 @@
 #define CVFEM_HEX8_NS_PACKED_HPP
 
 #include "smesh_packed_mesh.hpp"
+#include "kernels/cvfem_range.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -149,9 +150,13 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const PackedData &p,
     }
 }
 
-static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa(PackedData &p, scalar_t *const fields[N_FIELDS]) {
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+// The ghost reduction, driven by a range. It is the second and independent parallel loop of
+// every packed sweep -- the rows a pack does not own -- so DESIGN.md's threading rule applies to
+// it as much as to the element pass, and it needs its own entry point rather than riding on the
+// sweep's.
+static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa_range(const cvfem_range rows,
+        PackedData &p, scalar_t *const fields[N_FIELDS]) {
+    for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
         const smesh::idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
@@ -164,18 +169,30 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa(PackedData &p, scalar_t *con
     }
 }
 
+
+static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa(PackedData &p, scalar_t *const fields[N_FIELDS]) {
+#pragma omp parallel
+    cvfem_hex8_ghost_reduce_soa_range(cvfem_range_split(0, p.n_ghost_reduce_rows, 1,
+                                   cvfem_thread_index(), cvfem_n_threads()),
+            p, fields);
+}
+
 // The same reduction at an arbitrary width, for destinations that carry more than the four
 // fields per node -- the 4x4 block diagonal is sixteen. Separate rather than a template
 // parameter on the one above, because that one is on the matvec's hot path and is compiled
 // for exactly one width; this one runs once per Newton step.
 //
 // `buf` is field-major, n_ghost_entries apart, which is the layout the packs write.
-static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide(PackedData                         &p,
-                                                     const scalar_t *const SFEM_RESTRICT buf,
-                                                     const int                           width,
-                                                     scalar_t *const SFEM_RESTRICT       dst) {
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+// The ghost reduction, driven by a range. It is the second and independent parallel loop of
+// every packed sweep -- the rows a pack does not own -- so DESIGN.md's threading rule applies to
+// it as much as to the element pass, and it needs its own entry point rather than riding on the
+// sweep's.
+static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide_range(const cvfem_range rows,
+        PackedData                         &p,
+        const scalar_t *const SFEM_RESTRICT buf,
+        const int                           width,
+        scalar_t *const SFEM_RESTRICT       dst) {
+    for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
         const smesh::idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
@@ -189,9 +206,24 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide(PackedData                 
     }
 }
 
-static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved(PackedData &p, scalar_t *const SFEM_RESTRICT jv) {
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
+
+static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide(PackedData                         &p,
+        const scalar_t *const SFEM_RESTRICT buf,
+        const int                           width,
+        scalar_t *const SFEM_RESTRICT       dst) {
+#pragma omp parallel
+    cvfem_hex8_ghost_reduce_wide_range(cvfem_range_split(0, p.n_ghost_reduce_rows, 1,
+                                   cvfem_thread_index(), cvfem_n_threads()),
+            p, buf, width, dst);
+}
+
+// The ghost reduction, driven by a range. It is the second and independent parallel loop of
+// every packed sweep -- the rows a pack does not own -- so DESIGN.md's threading rule applies to
+// it as much as to the element pass, and it needs its own entry point rather than riding on the
+// sweep's.
+static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved_range(const cvfem_range rows,
+        PackedData &p, scalar_t *const SFEM_RESTRICT jv) {
+    for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
         const smesh::idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
@@ -205,14 +237,26 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved(PackedData &p, scala
     }
 }
 
-static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu) {
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_packed");
-    const size_t scratch_n = packed_scratch_n(p);
-    const size_t rc_n      = packed_rc_n(p);
-    const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
 
+static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved(PackedData &p, scalar_t *const SFEM_RESTRICT jv) {
 #pragma omp parallel
-    {
+    cvfem_hex8_ghost_reduce_interleaved_range(cvfem_range_split(0, p.n_ghost_reduce_rows, 1,
+                                   cvfem_thread_index(), cvfem_n_threads()),
+            p, jv);
+}
+
+// The pack sweep, driven by a range; the `#pragma omp parallel` is in the launcher below. See
+// kernels/cvfem_range.hpp. A pack writes only the nodes it owns, so the parts need no
+// synchronisation and the shared ghost rows are reduced afterwards.
+static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
+        const cvfem_range packs,
+        MeshData &d,
+        PackedData &p,
+        const scalar_t rho,
+        const scalar_t mu,
+        const size_t scratch_n,
+        const size_t rc_n,
+        const int with_rc) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_rc  = thread_scratch<scalar_t>(3, rc_n);
@@ -224,8 +268,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedDa
         scalar_t *const SFEM_RESTRICT pack_pgy = pack_rc + 4 * nmax;
         scalar_t *const SFEM_RESTRICT pack_pgz = pack_rc + 5 * nmax;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
@@ -310,44 +354,43 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedDa
                 gz[ghost_off + k]                       = out[2];
                 gc[ghost_off + k]                       = out[3];
             }
-        }
     }
+}
+
+
+static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu) {
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_packed");
+    const size_t scratch_n = packed_scratch_n(p);
+    const size_t rc_n      = packed_rc_n(p);
+    const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
+
+
+#pragma omp parallel
+    cvfem_hex8_apply_residual_packed_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d, p, rho, mu, scratch_n, rc_n, with_rc);
+
 
     scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
     cvfem_hex8_ghost_reduce_soa(p, fields);
 }
 
-static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData                    &d,
-                                                                  PackedData                  &p,
-                                                                  const scalar_t               rho,
-                                                                  const scalar_t               mu,
-                                                                  const scalar_t *const SFEM_RESTRICT dir,
-                                                                  scalar_t *const SFEM_RESTRICT       jv) {
-    {
-        // Hoisted out of the face loops -- see Hex8RhieChowPack::coeff. Guarded by its own
-        // cache key, so this is a handful of comparisons on every call but the first after
-        // rho, mu or the scale move; the Reynolds continuation moves mu between stages,
-        // which is why it lives here and not in initialize().
-        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_rc_coeff");
-        cvfem_hex8_build_rc_coeff(d, rho, mu);
-    }
-    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_packed");
-    const size_t scratch_n = packed_scratch_n(p);
-    const size_t rc_n      = packed_rc_n(p);
-    const size_t qg_n      = packed_qg_n(p);
-    const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
-    // The Rhie-Chow term differentiates through the nodal pressure-gradient reconstruction.
-    // apply_jacobian_action_accumulate reconstructs the direction's gradient into d.qg
-    // before calling this, or clears it, so a non-empty d.qgx is exactly the signal that the
-    // exact form is wanted. Without this the packed Jacobian is the frozen-pg one while the
-    // residual is not, and Newton is capped at a linear rate.
-    const bool   with_qg   = with_rc && !d.qgx.empty();
-    // The exact higher-order action, signalled the same way: a non-empty d.vgrad means
-    // apply_jacobian_action_accumulate reconstructed the direction's velocity gradient for it.
-    const bool   with_ho   = d.conv_ho != 0 && !d.ugrad.empty() && !d.vgrad.empty();
-
-#pragma omp parallel
-    {
+// The pack sweep, driven by a range; the `#pragma omp parallel` is in the launcher below. See
+// kernels/cvfem_range.hpp. A pack writes only the nodes it owns, so the parts need no
+// synchronisation and the shared ghost rows are reduced afterwards.
+static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
+        const cvfem_range packs,
+        MeshData &d,
+        PackedData &p,
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT dir,
+        scalar_t *const SFEM_RESTRICT jv,
+        const size_t scratch_n,
+        const size_t rc_n,
+        const size_t qg_n,
+        const int with_rc,
+        const bool with_qg,
+        const bool with_ho) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
@@ -364,8 +407,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
         scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + nmax : nullptr;
         scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * nmax : nullptr;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
@@ -496,8 +539,44 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
                 gz[ghost_off + k]                       = out[2];
                 gc[ghost_off + k]                       = out[3];
             }
-        }
     }
+}
+
+
+static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData                    &d,
+                                                                  PackedData                  &p,
+                                                                  const scalar_t               rho,
+                                                                  const scalar_t               mu,
+                                                                  const scalar_t *const SFEM_RESTRICT dir,
+                                                                  scalar_t *const SFEM_RESTRICT       jv) {
+    {
+        // Hoisted out of the face loops -- see Hex8RhieChowPack::coeff. Guarded by its own
+        // cache key, so this is a handful of comparisons on every call but the first after
+        // rho, mu or the scale move; the Reynolds continuation moves mu between stages,
+        // which is why it lives here and not in initialize().
+        SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::build_rc_coeff");
+        cvfem_hex8_build_rc_coeff(d, rho, mu);
+    }
+    SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_packed");
+    const size_t scratch_n = packed_scratch_n(p);
+    const size_t rc_n      = packed_rc_n(p);
+    const size_t qg_n      = packed_qg_n(p);
+    const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
+    // The Rhie-Chow term differentiates through the nodal pressure-gradient reconstruction.
+    // apply_jacobian_action_accumulate reconstructs the direction's gradient into d.qg
+    // before calling this, or clears it, so a non-empty d.qgx is exactly the signal that the
+    // exact form is wanted. Without this the packed Jacobian is the frozen-pg one while the
+    // residual is not, and Newton is capped at a linear rate.
+    const bool   with_qg   = with_rc && !d.qgx.empty();
+    // The exact higher-order action, signalled the same way: a non-empty d.vgrad means
+    // apply_jacobian_action_accumulate reconstructed the direction's velocity gradient for it.
+    const bool   with_ho   = d.conv_ho != 0 && !d.ugrad.empty() && !d.vgrad.empty();
+
+
+#pragma omp parallel
+    cvfem_hex8_apply_jacobian_action_packed_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d, p, rho, mu, dir, jv, scratch_n, rc_n, qg_n, with_rc, with_qg, with_ho);
+
 
     cvfem_hex8_ghost_reduce_interleaved(p, jv);
 }

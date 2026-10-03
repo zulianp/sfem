@@ -8,6 +8,7 @@
 // read-modify-write. Only the ghost rows still need a reduction.
 
 #include "best/cvfem_hex8_best_common.hpp"
+#include "kernels/cvfem_range.hpp"
 
 // Build the "store" layout. Owned rows of a pack map 1:1 onto the contiguous
 // global slice [rowptr_g[owned], rowptr_g[owned + n_contiguous]), so assembling
@@ -145,41 +146,39 @@ static void build_pack_store_crs(PackedData           &p,
 // inside the sweep. It also left the geometry undecided at the point where it matters -- the
 // lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
 // the vectorisation gate now refuses outright. The caller picks the instantiation.
+// THE STORE SWEEP KEEPS ITS DYNAMIC SCHEDULE, which is why its range is one pack and its
+// scratch arrives as arguments. The other pack sweeps take an equal static slice, because
+// cvfem_range_split reproduces `schedule(static)` exactly; this one was written with
+// `schedule(dynamic, 1)` -- it writes each matrix entry once rather than accumulating, so packs
+// differ in how much work they carry and the balancing matters. A static split would have been a
+// silent change to how the work is shared, so the launcher keeps the dynamic `omp for` and hands
+// this kernel one pack at a time.
+//
+// The consequence is that the scratch cannot move in here: acquired per call it would be
+// re-acquired once per pack rather than once per thread. It stays in the launcher's parallel
+// region and is passed, which is what DESIGN.md's "only arguments that are actually used" asks
+// for and what leaves no hidden per-thread state in the kernel.
 template <bool ISO>
-static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
-                                                  PackedData      &p,
-                                                  BSR4            &b,
-                                                  const scalar_t   rho,
-                                                  const scalar_t   mu,
-                                                  const KernelKind kernel_kind) {
-    const size_t u_n   = packed_scratch_n(p);
-    const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.st_max_local_nnz, 1);
-
-    scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
-    // As in assemble_jacobian_packed: this sweep is scalar per element, so Rhie-Chow enters
-    // through a Hex8RhieChow built from pack data. Only the two hand-written kernels take
-    // it; the generated ones are refused with the term rather than measured without it.
-    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
-
-#pragma omp parallel
-    {
-        PhaseAcc                      acc;
-        scalar_t *const SFEM_RESTRICT pack_u     = thread_scratch<scalar_t>(0, u_n);
-        scalar_t *const SFEM_RESTRICT local_vals = thread_scratch<scalar_t>(2, bsr_n);
-        scalar_t *const SFEM_RESTRICT pack_xyz =
-                (ISO || with_rc)
-                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
-                        : nullptr;
-        const ptrdiff_t               xyz_n  = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
-        scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
-        scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
-
-#pragma omp for schedule(dynamic, 1)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+static SFEM_NOINLINE void assemble_jacobian_store_range(
+        const cvfem_range packs,
+        MeshData        &d,
+        PackedData      &p,
+        BSR4            &b,
+        const scalar_t   rho,
+        const scalar_t   mu,
+        const KernelKind kernel_kind,
+        scalar_t *const SFEM_RESTRICT gvalues,
+        const int                     with_rc,
+        PhaseAcc                     &acc,
+        scalar_t *const SFEM_RESTRICT pack_u,
+        scalar_t *const SFEM_RESTRICT local_vals,
+        scalar_t *const SFEM_RESTRICT pack_x,
+        scalar_t *const SFEM_RESTRICT pack_y,
+        scalar_t *const SFEM_RESTRICT pack_z,
+        scalar_t *const SFEM_RESTRICT pack_pgx,
+        scalar_t *const SFEM_RESTRICT pack_pgy,
+        scalar_t *const SFEM_RESTRICT pack_pgz) {
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
@@ -283,9 +282,53 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
                             (size_t)n * 16 * sizeof(scalar_t));
             }
             if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
-        }
+    }
+}
+
+
+template <bool ISO>
+static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
+                                                  PackedData      &p,
+                                                  BSR4            &b,
+                                                  const scalar_t   rho,
+                                                  const scalar_t   mu,
+                                                  const KernelKind kernel_kind) {
+    const size_t u_n   = packed_scratch_n(p);
+    const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.st_max_local_nnz, 1);
+
+    scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
+    // As in assemble_jacobian_packed: this sweep is scalar per element, so Rhie-Chow enters
+    // through a Hex8RhieChow built from pack data. Only the two hand-written kernels take
+    // it; the generated ones are refused with the term rather than measured without it.
+    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+
+
+#pragma omp parallel
+    {
+        PhaseAcc                      acc;
+        scalar_t *const SFEM_RESTRICT pack_u     = thread_scratch<scalar_t>(0, u_n);
+        scalar_t *const SFEM_RESTRICT local_vals = thread_scratch<scalar_t>(2, bsr_n);
+        scalar_t *const SFEM_RESTRICT pack_xyz =
+                (ISO || with_rc)
+                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p) : packed_xyz_n(p))
+                        : nullptr;
+        const ptrdiff_t               xyz_n  = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+        scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
+        scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
+        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
+
+#pragma omp for schedule(dynamic, 1)
+        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack)
+            assemble_jacobian_store_range<ISO>(cvfem_range{pack, pack + 1},
+                                               d, p, b, rho, mu, kernel_kind, gvalues, with_rc,
+                                               acc, pack_u, local_vals, pack_x, pack_y, pack_z,
+                                               pack_pgx, pack_pgy, pack_pgz);
         acc.flush();
     }
+
 
     const double _tg = phase_now();
 #pragma omp parallel for schedule(static)
