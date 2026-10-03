@@ -168,7 +168,7 @@ set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACRO
 # NAME_WE, so the suite's names are unchanged by the move and a run before and after is
 # comparable entry by entry.
 file(GLOB_RECURSE CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/*.cpp")
-list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/build/cvfem_guard_selftest.cpp)
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_guard_selftest.cpp)
 
 set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test cvfem_flow_diag_test cvfem_ss_packed_probe cvfem_operator_consistency_test)
 foreach(TEST_SOURCE ${CVFEM_TESTS})
@@ -425,7 +425,7 @@ endif()
 # drivers/cvfem_hex8_ns_steady.cpp's std::isfinite() checks into a constant `true`. See
 # the -fno-finite-math-only comment in cmake/CVFEMCMakeFunctions.cmake. Run it in CI; it
 # takes microseconds.
-add_executable(cvfem_guard_selftest src/tests/build/cvfem_guard_selftest.cpp)
+add_executable(cvfem_guard_selftest src/tests/compile/cvfem_guard_selftest.cpp)
 target_compile_options(cvfem_guard_selftest PRIVATE ${_cvfem_perf_opts})
 target_include_directories(cvfem_guard_selftest PRIVATE ${CVFEM_INCLUDE_DIRS})
 add_test(NAME cvfem_guard_selftest COMMAND cvfem_guard_selftest)
