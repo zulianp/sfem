@@ -24,7 +24,7 @@
 //     make the two paths disagree about the same operator.
 
 #include "best/cvfem_hex8_best_common.hpp"
-#include "best/cvfem_hex8_best_atomic.hpp"
+#include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"

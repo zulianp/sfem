@@ -25,7 +25,7 @@
 // reproducible as long as the colouring is, which it is for a fixed mesh and element order.
 
 #include "core/cvfem_element_coloring.hpp"
-#include "best/cvfem_hex8_best_atomic.hpp"
+#include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 
 static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
                                                   const ElementColoring &ec,

@@ -241,7 +241,7 @@ struct MeshData {
     scalar_t upwind_eps{0};
 };
 
-#include "hex8/cvfem_hex8_ns_packed.hpp"
+#include "kernels/packed/cvfem_hex8_ns_packed.hpp"
 #include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 #include "hex8/cvfem_hex8_boundary_scs.hpp"
 

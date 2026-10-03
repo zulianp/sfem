@@ -7,7 +7,7 @@
 #include <vector>
 #include <mpi.h>
 #include "best/cvfem_hex8_best_common.hpp"
-#include "best/cvfem_hex8_best_atomic.hpp"
+#include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);

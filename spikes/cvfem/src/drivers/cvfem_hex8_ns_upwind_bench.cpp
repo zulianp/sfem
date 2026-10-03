@@ -7,11 +7,11 @@
 #include <cstring>
 
 #include "best/cvfem_hex8_best_common.hpp"
-#include "best/cvfem_hex8_best_atomic.hpp"
+#include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 #include "best/cvfem_hex8_best_colored.hpp"
-#include "best/cvfem_hex8_best_ecolored.hpp"
-#include "best/cvfem_hex8_best_packed.hpp"
-#include "best/cvfem_hex8_best_store.hpp"
+#include "kernels/colored/cvfem_hex8_best_ecolored.hpp"
+#include "kernels/packed/cvfem_hex8_best_packed.hpp"
+#include "kernels/packed/cvfem_hex8_best_store.hpp"
 
 // Consumes the churn's reduction under --live-vectors so the compiler cannot delete the
 // memory traffic that option exists to create.
