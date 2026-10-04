@@ -10,6 +10,7 @@
 // Not self-contained: the includer must already provide scalar_t, SFEM_RESTRICT and the
 // CVFEM HEX8 volume kernels (cvfem_hex8_grad_sumfact, cvfem_hex8_dir_areas, ...).
 
+#include "kernels/cvfem_range.hpp"
 #include "kernels/microkernels/hex8/affine/cvfem_hex8_affine_geometry.hpp"
 #include "kernels/cvfem_portability.hpp"
 
@@ -221,56 +222,50 @@ static SFEM_INLINE void cvfem_hex8_bnd_commit_interleaved(MeshT &d, const ptrdif
         CVFEM_ATOMIC_ADD(jv[g + 3], r[a * 4 + 3]);
     }
 }
-
-// Sum the staged contributions into the node arrays, one node per iteration.
+// THE TABLES, NOT THE MESH, AND A RANGE, NOT A PARALLEL REGION.
 //
-// Each iteration owns its destination outright and reads its slots in the order the map
-// lists them, so the result does not depend on the thread count or on which thread got
-// which node -- which is the whole point. The sum is accumulated in locals and added to
-// the destination once, because the interior sweep has already written there.
-template <typename MeshT>
-static void cvfem_hex8_bnd_gather_soa(MeshT &d, scalar_t *const SFEM_RESTRICT fx, scalar_t *const SFEM_RESTRICT fy,
-                                      scalar_t *const SFEM_RESTRICT fz, scalar_t *const SFEM_RESTRICT fc) {
-    const ptrdiff_t                     n     = (ptrdiff_t)d.bnd_gather_dest.size();
-    const scalar_t *const SFEM_RESTRICT stage = d.bnd_r.data();
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t k = 0; k < n; ++k) {
-        scalar_t sx = scalar_t(0), sy = scalar_t(0), sz = scalar_t(0), sc = scalar_t(0);
-        for (ptrdiff_t j = d.bnd_gather_ptr[(size_t)k]; j < d.bnd_gather_ptr[(size_t)k + 1]; ++j) {
-            const scalar_t *const SFEM_RESTRICT v = stage + (ptrdiff_t)d.bnd_gather_slot[(size_t)j] * 4;
-            sx += v[0];
-            sy += v[1];
-            sz += v[2];
-            sc += v[3];
+// `MeshT &d` was a staging object reached through a template parameter so as not to name which
+// family's -- the same dodge cvfem_hex8_build_bnd_gather used before it moved to the front end.
+// And this is an atomics-free kernel by construction: the gather map exists precisely so the
+// boundary closure does not scatter with atomics, which is what DESIGN.md's threading rule is
+// about. So it takes what it reads and the range it is to cover.
+template <int W>
+static SFEM_INLINE void cvfem_hex8_bnd_gather_w(
+        const cvfem_range r,
+        const idx_t *const SFEM_RESTRICT     gather_dest,
+        const ptrdiff_t *const SFEM_RESTRICT gather_ptr,
+        const int32_t *const SFEM_RESTRICT   gather_slot,
+        const scalar_t *const SFEM_RESTRICT  stage,
+        scalar_t *const                      dst[W]) {
+    for (ptrdiff_t k = r.begin; k < r.end; ++k) {
+        scalar_t acc[W] = {0};
+        for (ptrdiff_t j = gather_ptr[(size_t)k]; j < gather_ptr[(size_t)k + 1]; ++j) {
+            const scalar_t *const SFEM_RESTRICT v = stage + (ptrdiff_t)gather_slot[(size_t)j] * W;
+            for (int c = 0; c < W; ++c) acc[c] += v[c];
         }
-        const idx_t g = d.bnd_gather_dest[(size_t)k];
-        fx[g] += sx;
-        fy[g] += sy;
-        fz[g] += sz;
-        fc[g] += sc;
+        const idx_t g = gather_dest[(size_t)k];
+        for (int c = 0; c < W; ++c) dst[c][g] += acc[c];
     }
 }
 
-// The same, for a destination that interleaves the four fields per node.
-template <typename MeshT>
-static void cvfem_hex8_bnd_gather_interleaved(MeshT &d, scalar_t *const SFEM_RESTRICT jv) {
-    const ptrdiff_t                     n     = (ptrdiff_t)d.bnd_gather_dest.size();
-    const scalar_t *const SFEM_RESTRICT stage = d.bnd_r.data();
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t k = 0; k < n; ++k) {
-        scalar_t s0 = scalar_t(0), s1 = scalar_t(0), s2 = scalar_t(0), s3 = scalar_t(0);
-        for (ptrdiff_t j = d.bnd_gather_ptr[(size_t)k]; j < d.bnd_gather_ptr[(size_t)k + 1]; ++j) {
-            const scalar_t *const SFEM_RESTRICT v = stage + (ptrdiff_t)d.bnd_gather_slot[(size_t)j] * 4;
-            s0 += v[0];
-            s1 += v[1];
-            s2 += v[2];
-            s3 += v[3];
+// The same gather into a destination that INTERLEAVES the four fields per node. Separate rather
+// than a flag, because the addressing is the difference and it is in the inner loop.
+static SFEM_INLINE void cvfem_hex8_bnd_gather_interleaved_range(
+        const cvfem_range r,
+        const idx_t *const SFEM_RESTRICT     gather_dest,
+        const ptrdiff_t *const SFEM_RESTRICT gather_ptr,
+        const int32_t *const SFEM_RESTRICT   gather_slot,
+        const scalar_t *const SFEM_RESTRICT  stage,
+        scalar_t *const SFEM_RESTRICT        jv) {
+    for (ptrdiff_t k = r.begin; k < r.end; ++k) {
+        scalar_t acc[CVFEM_HEX8_N_FIELDS] = {0};
+        for (ptrdiff_t j = gather_ptr[(size_t)k]; j < gather_ptr[(size_t)k + 1]; ++j) {
+            const scalar_t *const SFEM_RESTRICT v =
+                    stage + (ptrdiff_t)gather_slot[(size_t)j] * CVFEM_HEX8_N_FIELDS;
+            for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) acc[c] += v[c];
         }
-        const ptrdiff_t g = (ptrdiff_t)d.bnd_gather_dest[(size_t)k] * 4;
-        jv[g + 0] += s0;
-        jv[g + 1] += s1;
-        jv[g + 2] += s2;
-        jv[g + 3] += s3;
+        scalar_t *const out = jv + (ptrdiff_t)gather_dest[(size_t)k] * CVFEM_HEX8_N_FIELDS;
+        for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) out[c] += acc[c];
     }
 }
 

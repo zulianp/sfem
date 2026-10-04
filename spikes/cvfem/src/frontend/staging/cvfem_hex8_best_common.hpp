@@ -570,7 +570,7 @@ static SFEM_NOINLINE void apply_boundary_scs_residual_pass(MeshData &d, const sc
                                              ux, uy, uz, p, r, fmask, 0);
         cvfem_hex8_bnd_commit(d, i, e, r, bnd_atomic, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     }
-    if (!bnd_atomic) cvfem_hex8_bnd_gather_soa(d, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
+    if (!bnd_atomic) cvfem_hex8_drain_boundary_soa(d, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 }
 
 static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, const scalar_t rho, const scalar_t mu,
@@ -613,7 +613,7 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
                                                     ux, uy, uz, vx, vy, vz, q, r, fmask, 0);
         cvfem_hex8_bnd_commit_interleaved(d, i, e, r, bnd_atomic, jv);
     }
-    if (!bnd_atomic) cvfem_hex8_bnd_gather_interleaved(d, jv);
+    if (!bnd_atomic) cvfem_hex8_drain_boundary_interleaved(d, jv);
 }
 
 // The assembled counterpart of the two passes above, and it exists for the same reason

@@ -678,7 +678,7 @@ inline SFEM_NOINLINE void apply_boundary_scs_residual(MeshData &d, const scalar_
                                   d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         cvfem_hex8_bnd_commit(d, i, e, r, bnd_atomic, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     }
-    if (!bnd_atomic) cvfem_hex8_bnd_gather_soa(d, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
+    if (!bnd_atomic) cvfem_hex8_drain_boundary_soa(d, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 }
 
 inline SFEM_NOINLINE void apply_boundary_scs_jacobian_action(MeshData &d, const scalar_t rho, const scalar_t mu,
@@ -721,7 +721,7 @@ inline SFEM_NOINLINE void apply_boundary_scs_jacobian_action(MeshData &d, const 
                                          d.natural_mask.empty() ? 0 : (int)d.natural_mask[(size_t)e], hex8_bd(d, e));
         cvfem_hex8_bnd_commit_interleaved(d, i, e, r, bnd_atomic, jv);
     }
-    if (!bnd_atomic) cvfem_hex8_bnd_gather_interleaved(d, jv);
+    if (!bnd_atomic) cvfem_hex8_drain_boundary_interleaved(d, jv);
 }
 
 inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu) {

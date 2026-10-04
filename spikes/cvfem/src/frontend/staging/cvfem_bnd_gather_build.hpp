@@ -13,6 +13,7 @@
 // relies on its includer having brought them in, so this header brings them in itself
 // rather than depending on where it is included from.
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/cvfem_range.hpp"
 #include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 
 #include <algorithm>
@@ -71,4 +72,35 @@ static void cvfem_hex8_build_bnd_gather(MeshT &d) {
     d.bnd_r.assign((size_t)n_bnd * CVFEM_HEX8_N_DOF, scalar_t(0));
     d.bnd_gather_n_bnd = n_bnd;
     d.bnd_gather_valid = true;
+}
+
+// ------------------------------------------------- driving the gather
+//
+// The gather kernels take their tables and a range; this is where the parallel region and the
+// split live, and the only place. One helper per destination layout, templated on the staging
+// object the way the builder above is, so both operator families reach it.
+template <typename MeshT>
+static void cvfem_hex8_drain_boundary_soa(MeshT &d, scalar_t *const SFEM_RESTRICT fx,
+                                          scalar_t *const SFEM_RESTRICT fy,
+                                          scalar_t *const SFEM_RESTRICT fz,
+                                          scalar_t *const SFEM_RESTRICT fc) {
+    const ptrdiff_t n = (ptrdiff_t)d.bnd_gather_dest.size();
+    if (n <= 0) return;
+    scalar_t *const dst[CVFEM_HEX8_N_FIELDS] = {fx, fy, fz, fc};
+#pragma omp parallel
+    cvfem_hex8_bnd_gather_w<CVFEM_HEX8_N_FIELDS>(
+            cvfem_range_split(0, n, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.bnd_gather_dest.data(), d.bnd_gather_ptr.data(), d.bnd_gather_slot.data(),
+            d.bnd_r.data(), dst);
+}
+
+template <typename MeshT>
+static void cvfem_hex8_drain_boundary_interleaved(MeshT &d, scalar_t *const SFEM_RESTRICT jv) {
+    const ptrdiff_t n = (ptrdiff_t)d.bnd_gather_dest.size();
+    if (n <= 0) return;
+#pragma omp parallel
+    cvfem_hex8_bnd_gather_interleaved_range(
+            cvfem_range_split(0, n, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.bnd_gather_dest.data(), d.bnd_gather_ptr.data(), d.bnd_gather_slot.data(),
+            d.bnd_r.data(), jv);
 }
