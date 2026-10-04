@@ -19,7 +19,7 @@
 //     difference rather than against the formula it was derived from.
 //   * Pressure has no time derivative and must not acquire one.
 
-#include "hex8/cvfem_hex8_ns_core.hpp"
+#include "frontend/op/cvfem_hex8_ns_core.hpp"
 
 #include "sfem_context.hpp"
 

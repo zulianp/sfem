@@ -26,7 +26,7 @@
 // chosen at compile time and is identical on every call, so it costs nothing here: what
 // determinism requires is a fixed order, not a particular one.
 
-#include "hex8/cvfem_hex8_ns_core.hpp"
+#include "frontend/op/cvfem_hex8_ns_core.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"

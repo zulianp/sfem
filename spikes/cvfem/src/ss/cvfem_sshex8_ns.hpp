@@ -28,7 +28,7 @@
 // The element kernels are reused verbatim from cvfem_hex8_ns_core.hpp. Nothing about the
 // physics is reimplemented here, which is what makes the comparison meaningful.
 
-#include "hex8/cvfem_hex8_ns_core.hpp"
+#include "frontend/op/cvfem_hex8_ns_core.hpp"
 
 #include "packed_elements.hpp"   // packed_elements_matmul_nonsym: BLAS gemm, loop fallback
 #include "smesh_exchange.hpp"    // the nodal reconstruction is completed across ranks

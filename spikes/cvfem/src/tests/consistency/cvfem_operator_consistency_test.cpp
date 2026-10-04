@@ -71,7 +71,7 @@
 
 #include "frontend/op/cvfem_hex8_ns_op.hpp"
 
-#include "hex8/cvfem_hex8_ns_core.hpp"
+#include "frontend/op/cvfem_hex8_ns_core.hpp"
 #include "ss/cvfem_sshex8_ns.hpp"
 #include "frontend/galerkin/cvfem_ss_galerkin.hpp"
 

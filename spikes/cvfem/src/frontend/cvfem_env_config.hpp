@@ -8,7 +8,7 @@
 // the front-end". These two resolvers were on the wrong side of it -- they read the environment
 // from inside src/kernels/, which is also required to carry no library dependencies. Neither was
 // ever called from a kernel: both are called once per solve, from the residual's serial setup in
-// src/hex8/cvfem_hex8_ns_core.hpp and src/ss/cvfem_sshex8_ns.hpp, which is what makes this a
+// src/frontend/op/cvfem_hex8_ns_core.hpp and src/ss/cvfem_sshex8_ns.hpp, which is what makes this a
 // relocation rather than a change of behaviour.
 //
 // The value TYPES stay in the kernel headers, because a kernel consumes them: Hex8PecletConfig is

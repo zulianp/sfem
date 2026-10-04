@@ -14,7 +14,7 @@
 
 // The gate needs the reference path too, so unlike a driver it includes the core
 // deliberately. Anything that only wants the operator includes the header above alone.
-#include "hex8/cvfem_hex8_ns_core.hpp"
+#include "frontend/op/cvfem_hex8_ns_core.hpp"
 
 #include "sfem_context.hpp"
 

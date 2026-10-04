@@ -15,7 +15,7 @@
 // flux through the domain and is renumbering-invariant; the per-node worst case says
 // whether a disagreement is everywhere or on a handful of faces.
 
-#include "hex8/cvfem_hex8_ns_core.hpp"
+#include "frontend/op/cvfem_hex8_ns_core.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"
