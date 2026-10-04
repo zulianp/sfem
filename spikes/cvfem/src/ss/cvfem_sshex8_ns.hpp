@@ -1125,13 +1125,18 @@ inline void sscvfem_nodal_grad_scatter_range(
 
 #pragma omp parallel
     {
-        std::vector<scalar_t>     lp((size_t)nxe);
-        std::vector<smesh::idx_t> lg((size_t)nxe);
-        std::vector<scalar_t>     lacc((size_t)nxe * NG);
+        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
+        // shared between them because only one is live inside a parallel region and
+        // they all want the same macro-element size.
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe * NG));
+        scalar_t *const SFEM_RESTRICT lp = _arena5;
+        scalar_t *const SFEM_RESTRICT lacc = _arena5 + ((size_t)nxe);
+        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
+        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = e_begin; e < e_end; ++e) {
-            if (slot) std::fill(lacc.begin(), lacc.end(), scalar_t(0));
+            if (slot) std::fill(lacc, lacc + ((size_t)nxe * NG), scalar_t(0));
             // Only the field. The coordinates used to be gathered for every node of the
             // macro-element -- three arrays of (L+1)^3 -- to feed a geometry computation that
             // is the same for all of them.
@@ -1186,7 +1191,7 @@ inline void sscvfem_nodal_grad_scatter_range(
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
                             if (slot) {
-                                scalar_t *const acc = lacc.data() + (size_t)l * NG;
+                                scalar_t *const acc = lacc + (size_t)l * NG;
                                 acc[0] += gx;
                                 acc[1] += gy;
                                 acc[2] += gz;
@@ -1203,7 +1208,7 @@ inline void sscvfem_nodal_grad_scatter_range(
 
             if (slot) {
                 scalar_t *dst[NG] = {ogx, ogy, ogz};
-                sscvfem_scatter_element_soa_w<NG>(slot, const_cast<scalar_t *>(stage), nxe, e, lg.data(), lacc.data(), dst);
+                sscvfem_scatter_element_soa_w<NG>(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lacc, dst);
             }
         }
     }
@@ -1362,12 +1367,27 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
 #pragma omp parallel
     {
         // One allocation per thread for the whole sweep, not per macro-element.
-        std::vector<smesh::idx_t> lg((size_t)nxe);
-        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
-        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
-        std::vector<scalar_t>     lvx((size_t)nxe), lvy((size_t)nxe), lvz((size_t)nxe), lq((size_t)nxe);
-        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
-        std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
+        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
+        // shared between them because only one is live inside a parallel region and
+        // they all want the same macro-element size.
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT lx = _arena5;
+        scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lux = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lp = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lq = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
+        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
@@ -1390,7 +1410,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
                 lpgy[(size_t)a]      = pgy_src[(size_t)g];
                 lpgz[(size_t)a]      = pgz_src[(size_t)g];
             }
-            std::fill(lout.begin(), lout.end(), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
 
             // The geometry every micro cell of this macro element uses, as the hoisted
             // variants use it; see sscvfem_hoisted_cell. Real positions stay per cell.
@@ -1510,12 +1530,27 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
 
 #pragma omp parallel
     {
-        std::vector<smesh::idx_t> lg((size_t)nxe);
-        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
-        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
-        std::vector<scalar_t>     lvx((size_t)nxe), lvy((size_t)nxe), lvz((size_t)nxe), lq((size_t)nxe);
-        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
-        std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
+        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
+        // shared between them because only one is live inside a parallel region and
+        // they all want the same macro-element size.
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT lx = _arena5;
+        scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lux = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lp = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lq = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
+        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
@@ -1537,7 +1572,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
                 lpgy[(size_t)a]      = pgy_src[(size_t)g];
                 lpgz[(size_t)a]      = pgz_src[(size_t)g];
             }
-            std::fill(lout.begin(), lout.end(), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
 
             // Once per macro-element, from its first micro-element.
             // Micro-cell 0's corners, hoisted: the geometry AND the coordinates the
@@ -1905,16 +1940,33 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
 
 #pragma omp parallel
     {
-        std::vector<smesh::idx_t> lg((size_t)nxe);
-        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
-        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
-        std::vector<scalar_t>     lvx((size_t)nxe), lvy((size_t)nxe), lvz((size_t)nxe), lq((size_t)nxe);
-        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
-        // Direction gradient, gathered the same way. Empty when Rhie-Chow is off.
+        // Whether the direction's pressure gradient is there at all. Above the scratch because
+        // the scratch is sized from it.
         const bool                has_qg = qgx_src;
-        std::vector<scalar_t>     lqgx((size_t)(has_qg ? nxe : 0)), lqgy((size_t)(has_qg ? nxe : 0)),
-                                  lqgz((size_t)(has_qg ? nxe : 0));
-        std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
+        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
+        // shared between them because only one is live inside a parallel region and
+        // they all want the same macro-element size.
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT lx = _arena5;
+        scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lux = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lp = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lq = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lqgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lqgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0));
+        scalar_t *const SFEM_RESTRICT lqgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
+        scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
+        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
+        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
@@ -1941,7 +1993,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
                     lqgz[(size_t)a] = qgz_src[(size_t)g];
                 }
             }
-            std::fill(lout.begin(), lout.end(), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
 
             // Per macro element, and the curved branch below reads the same one: a call per
             // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
@@ -2024,7 +2076,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
             }
 
             if (slot)
-                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg.data(), lout.data(), jv);
+                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lout, jv);
             else
                 for (int a = 0; a < nxe; ++a) {
                     const smesh::idx_t g = lg[(size_t)a];
@@ -2388,18 +2440,32 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
 
 #pragma omp parallel
     {
-        std::vector<smesh::idx_t> lg((size_t)nxe);
-        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
-        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
-        std::vector<scalar_t>     lvx((size_t)nxe), lvy((size_t)nxe), lvz((size_t)nxe), lq((size_t)nxe);
-        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
-        // The direction's reconstructed gradient, staged exactly as the hoisted apply stages
-        // it, and only for a pressure-column block -- for A_uu and B the term is absent by
         // construction, so this gather is skipped along with the rest of the pressure work.
         const bool                has_qg = (up || pp) && qgx_src;
-        std::vector<scalar_t>     lqgx((size_t)(has_qg ? nxe : 0)), lqgy((size_t)(has_qg ? nxe : 0)),
-                                  lqgz((size_t)(has_qg ? nxe : 0));
-        std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
+        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
+        // shared between them because only one is live inside a parallel region and
+        // they all want the same macro-element size.
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT lx = _arena5;
+        scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lux = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lp = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lvz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lq = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lqgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lqgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0));
+        scalar_t *const SFEM_RESTRICT lqgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
+        scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
+        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
+        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
@@ -2452,18 +2518,18 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
             // Anything not gathered must still read as zero, since the element kernels and
             // the boundary term take all of them regardless.
             if constexpr (!need_state_p) {
-                std::fill(lp.begin(), lp.end(), scalar_t(0));
-                std::fill(lpgx.begin(), lpgx.end(), scalar_t(0));
-                std::fill(lpgy.begin(), lpgy.end(), scalar_t(0));
-                std::fill(lpgz.begin(), lpgz.end(), scalar_t(0));
+                std::fill(lp, lp + ((size_t)nxe), scalar_t(0));
+                std::fill(lpgx, lpgx + ((size_t)nxe), scalar_t(0));
+                std::fill(lpgy, lpgy + ((size_t)nxe), scalar_t(0));
+                std::fill(lpgz, lpgz + ((size_t)nxe), scalar_t(0));
             }
             if constexpr (!need_dir_v) {
-                std::fill(lvx.begin(), lvx.end(), scalar_t(0));
-                std::fill(lvy.begin(), lvy.end(), scalar_t(0));
-                std::fill(lvz.begin(), lvz.end(), scalar_t(0));
+                std::fill(lvx, lvx + ((size_t)nxe), scalar_t(0));
+                std::fill(lvy, lvy + ((size_t)nxe), scalar_t(0));
+                std::fill(lvz, lvz + ((size_t)nxe), scalar_t(0));
             }
-            if constexpr (!need_dir_q) std::fill(lq.begin(), lq.end(), scalar_t(0));
-            std::fill(lout.begin(), lout.end(), scalar_t(0));
+            if constexpr (!need_dir_q) std::fill(lq, lq + ((size_t)nxe), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
 
             // Per macro element, and the curved branch below reads the same one: a call per
             // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
@@ -2628,7 +2694,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
             // the saving the component-wise atomics bought no longer applies once the
             // scatter is a plain write.
             if (slot)
-                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg.data(), lout.data(), jv);
+                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lout, jv);
             else
                 for (int a = 0; a < nxe; ++a) {
                     const smesh::idx_t g = lg[(size_t)a];
@@ -3047,14 +3113,24 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
 
 #pragma omp parallel
     {
-        std::vector<smesh::idx_t> lg((size_t)nxe);
-        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
-        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
-        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
-        // Nine per node when the correction is on, empty otherwise -- one allocation that
-        // costs nothing to a run that has not asked for it.
-        std::vector<scalar_t>     lug(conv_ho ? (size_t)nxe * 9 : 0);
-        std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
+        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
+        // shared between them because only one is live inside a parallel region and
+        // they all want the same macro-element size.
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + (conv_ho ? (size_t)nxe * 9 : 0) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT lx = _arena5;
+        scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lux = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lp = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lug = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + (conv_ho ? (size_t)nxe * 9 : 0);
+        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
+        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
@@ -3071,10 +3147,10 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
                 lpgx[(size_t)a]      = pgx_src[(size_t)g];
                 lpgy[(size_t)a]      = pgy_src[(size_t)g];
                 lpgz[(size_t)a]      = pgz_src[(size_t)g];
-                if (!lug.empty())
+                if (conv_ho)
                     for (int k = 0; k < 9; ++k) lug[(size_t)a * 9 + (size_t)k] = ugrad_f[(size_t)g * 9 + (size_t)k];
             }
-            std::fill(lout.begin(), lout.end(), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
 
             // Per macro element, and the curved branch below reads the same one: a call per
             // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
@@ -3122,7 +3198,7 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
                             pgx[a]      = lpgx[(size_t)l];
                             pgy[a]      = lpgy[(size_t)l];
                             pgz[a]      = lpgz[(size_t)l];
-                            if (!lug.empty())
+                            if (conv_ho)
                                 for (int k = 0; k < 9; ++k) g8[a * 9 + k] = lug[(size_t)l * 9 + (size_t)k];
                         }
                         // A curved macro element: this cell's own geometry, not the hoisted one.
@@ -3139,7 +3215,7 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
                         // so a correction that existed only on the flat mesh could not be used
                         // for anything at scale. Null when off, which is the arithmetic this
                         // call did before.
-                        const bool ho = !lug.empty();
+                        const bool ho = conv_ho != 0;
                         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, mg.adj, mg.det, ux, uy, uz, p, r,
                                                              rc, upwind_eps,
                                                              ho ? g8 : nullptr,
@@ -3168,7 +3244,7 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
             }
 
             if (slot)
-                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg.data(), lout.data(), res);
+                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lout, res);
             else
                 for (int a = 0; a < nxe; ++a) {
                     const smesh::idx_t g = lg[(size_t)a];
@@ -3605,11 +3681,23 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
 
 #pragma omp parallel
     {
-        std::vector<smesh::idx_t> lg((size_t)nxe);
-        std::vector<scalar_t>     lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
-        std::vector<scalar_t>     lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
-        std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
-        std::vector<scalar_t>     lout((size_t)nxe * 16);
+        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
+        // shared between them because only one is live inside a parallel region and
+        // they all want the same macro-element size.
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe * 16));
+        scalar_t *const SFEM_RESTRICT lx = _arena5;
+        scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lux = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT luz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lp = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
+        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
+        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
@@ -3627,7 +3715,7 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
                 lpgy[(size_t)a]      = pgy[(size_t)g];
                 lpgz[(size_t)a]      = pgz[(size_t)g];
             }
-            std::fill(lout.begin(), lout.end(), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * 16), scalar_t(0));
 
             // Micro-cell 0's corners, hoisted: the geometry AND the coordinates the
             // Rhie-Chow term differences.
@@ -3659,20 +3747,20 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
             }
 
             if (sscvfem_macro_curved(macro_curved, e)) {
-                sscvfem_block_diag_curved_macro(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz, level, face_mask, natural_mask, pressure_mask, traction_mask, rcfg, rho, mu, e, off, lx.data(), ly.data(), lz.data(), lux.data(),
-                                                luy.data(), luz.data(), lp.data(), lpgx.data(), lpgy.data(),
-                                                lpgz.data(), lout.data());
+                sscvfem_block_diag_curved_macro(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz, level, face_mask, natural_mask, pressure_mask, traction_mask, rcfg, rho, mu, e, off, lx, ly, lz, lux,
+                                                luy, luz, lp, lpgx, lpgy,
+                                                lpgz, lout);
             } else {
                 for (int zi = 0; zi < L; ++zi)
                     for (int yi = 0; yi < L; ++yi)
                         for (int xi = 0; xi < L; ++xi)
-                            sscvfem_block_diag_cell(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz, face_mask, natural_mask, pressure_mask, traction_mask, rcfg, rho, mu, e, L, xi, yi, zi, off, lx.data(), ly.data(),
-                                                    lz.data(), lux.data(), luy.data(), luz.data(), lp.data(),
-                                                    lpgx.data(), lpgy.data(), lpgz.data(), madj, mdet, c0x, c0y,
-                                                    c0z, lout.data());
+                            sscvfem_block_diag_cell(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz, face_mask, natural_mask, pressure_mask, traction_mask, rcfg, rho, mu, e, L, xi, yi, zi, off, lx, ly,
+                                                    lz, lux, luy, luz, lp,
+                                                    lpgx, lpgy, lpgz, madj, mdet, c0x, c0y,
+                                                    c0z, lout);
             }
             if (slot)
-                sscvfem_scatter_element_w<16>(slot, nxe, e, lg.data(), lout.data(), out,
+                sscvfem_scatter_element_w<16>(slot, nxe, e, lg, lout, out,
                                               const_cast<scalar_t *>(stage16));
             else
                 for (int a = 0; a < nxe; ++a) {
