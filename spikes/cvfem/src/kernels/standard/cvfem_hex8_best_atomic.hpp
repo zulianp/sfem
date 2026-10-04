@@ -14,7 +14,8 @@
 // null is the lagged one. The atomic path exists here so the layouts can be compared on the same
 // operator -- a packed row carrying the correction against an atomic row that silently dropped it
 // would not be a layout comparison.
-static SFEM_NOINLINE void apply_jacobian_action_atomic(
+template <KernelKind K>
+static SFEM_NOINLINE void apply_jacobian_action_atomic_kernel(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
         const scalar_t *const SFEM_RESTRICT det_ptr,
@@ -42,11 +43,10 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
                                                        const scalar_t        mu,
                                                        const scalar_t *const dir,
                                                        scalar_t *const       jv,
-                                                       const KernelKind      kernel = KernelKind::Sumfact,
-                                                       const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
-                                                       const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
-                                                       const int             limiter = 0,
-                                                       const scalar_t        venkat_c = scalar_t(0)) {
+                                                       const scalar_t *const SFEM_RESTRICT ugrad,
+                                                       const scalar_t *const SFEM_RESTRICT vgrad,
+                                                       const int             limiter,
+                                                       const scalar_t        venkat_c) {
     const bool with_ho = ugrad != nullptr && vgrad != nullptr;
     cvfem_zero_scalars(jv, nnodes * CVFEM_HEX8_N_FIELDS);
 
@@ -82,17 +82,17 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
         // generator builds them from the bare flux algebra, as it does the residual and the
         // assembly -- so the driver refuses --rhie-chow with them rather than letting a row
         // claim a term the kernel does not compute.
-        if (kernel == KernelKind::SympyAction) {
+        if constexpr (K == KernelKind::SympyAction) {
             cvfem_hex8_ns_upwind_sympy_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
-        } else if (kernel == KernelKind::SympyActionNode) {
+        } else if constexpr (K == KernelKind::SympyActionNode) {
             cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
-        } else if (kernel == KernelKind::SympyActionComp) {
+        } else if constexpr (K == KernelKind::SympyActionComp) {
             cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
-        } else if (kernel == KernelKind::SympyActionFace) {
+        } else if constexpr (K == KernelKind::SympyActionFace) {
             cvfem_hex8_ns_upwind_sympy_jacobian_action_facewise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
-        } else if (kernel == KernelKind::SympyActionGeom) {
+        } else if constexpr (K == KernelKind::SympyActionGeom) {
             cvfem_hex8_ns_upwind_sympy_jacobian_action_geom(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
-        } else if (kernel == KernelKind::SympyActionGeomFace) {
+        } else if constexpr (K == KernelKind::SympyActionGeomFace) {
             cvfem_hex8_ns_upwind_sympy_jacobian_action_geomface(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r);
         }
         // Branch rather than pass `ex.rc` and `p` unconditionally: with --rhie-chow off the
@@ -141,6 +141,68 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
             atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 2, 0, r[a * 4 + 2]);
             atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 3, 0, r[a * 4 + 3]);
         }
+    }
+}
+
+static SFEM_NOINLINE void apply_jacobian_action_atomic(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+                                              // Which optional terms are on, resolved once per
+                                              // solve by the caller rather than per sweep here:
+                                              // cvfem_hex8_extras_of reads the mesh, which this
+                                              // kernel is not meant to name.
+                                              const Hex8Extras &opt,
+                                                       const scalar_t        rho,
+                                                       const scalar_t        mu,
+                                                       const scalar_t *const dir,
+                                                       scalar_t *const       jv,
+                                                       const KernelKind      kernel = KernelKind::Sumfact,
+                                                       const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
+                                                       const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
+                                                       const int             limiter = 0,
+                                                       const scalar_t        venkat_c = scalar_t(0)) {
+    // THE VARIANT IS CHOSEN HERE, NOT PER ELEMENT. The six generated arrangements were
+    // selected by a ladder inside the element loop: a user-level option (--kernel) reaching
+    // into a kernel, and a loop-invariant branch taken on every element. This dispatcher keeps
+    // the signature its callers use and picks the instantiation once.
+    switch (kernel) {
+        case KernelKind::SympyAction:
+            apply_jacobian_action_atomic_kernel<KernelKind::SympyAction>(adj_ptr, det_ptr, mesh_elems, face_mask, nelements, nnodes, pres, pgx, pgy, pgz, points, qgx, qgy, qgz, ux_src, uy_src, uz_src, opt, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c);
+            break;
+        case KernelKind::SympyActionNode:
+            apply_jacobian_action_atomic_kernel<KernelKind::SympyActionNode>(adj_ptr, det_ptr, mesh_elems, face_mask, nelements, nnodes, pres, pgx, pgy, pgz, points, qgx, qgy, qgz, ux_src, uy_src, uz_src, opt, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c);
+            break;
+        case KernelKind::SympyActionComp:
+            apply_jacobian_action_atomic_kernel<KernelKind::SympyActionComp>(adj_ptr, det_ptr, mesh_elems, face_mask, nelements, nnodes, pres, pgx, pgy, pgz, points, qgx, qgy, qgz, ux_src, uy_src, uz_src, opt, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c);
+            break;
+        case KernelKind::SympyActionFace:
+            apply_jacobian_action_atomic_kernel<KernelKind::SympyActionFace>(adj_ptr, det_ptr, mesh_elems, face_mask, nelements, nnodes, pres, pgx, pgy, pgz, points, qgx, qgy, qgz, ux_src, uy_src, uz_src, opt, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c);
+            break;
+        case KernelKind::SympyActionGeom:
+            apply_jacobian_action_atomic_kernel<KernelKind::SympyActionGeom>(adj_ptr, det_ptr, mesh_elems, face_mask, nelements, nnodes, pres, pgx, pgy, pgz, points, qgx, qgy, qgz, ux_src, uy_src, uz_src, opt, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c);
+            break;
+        case KernelKind::SympyActionGeomFace:
+            apply_jacobian_action_atomic_kernel<KernelKind::SympyActionGeomFace>(adj_ptr, det_ptr, mesh_elems, face_mask, nelements, nnodes, pres, pgx, pgy, pgz, points, qgx, qgy, qgz, ux_src, uy_src, uz_src, opt, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c);
+            break;
+        default:
+            apply_jacobian_action_atomic_kernel<KernelKind::Sumfact>(adj_ptr, det_ptr, mesh_elems, face_mask, nelements, nnodes, pres, pgx, pgy, pgz, points, qgx, qgy, qgz, ux_src, uy_src, uz_src, opt, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c);
+            break;
     }
 }
 
