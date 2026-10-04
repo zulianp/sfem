@@ -627,29 +627,41 @@ static SFEM_NOINLINE void apply_residual_atomic_sympy(MeshData &d, const scalar_
     }
 }
 
-static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+static SFEM_NOINLINE void assemble_jacobian_atomic_fd(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src, 
+        const idx_t *const SFEM_RESTRICT bsr_colidx,
+        const count_t *const SFEM_RESTRICT slots,
+        const ptrdiff_t bsr_nnz,
+        const count_t *const SFEM_RESTRICT bsr_rowptr,
+        scalar_t *const SFEM_RESTRICT values, const scalar_t rho, const scalar_t mu) {
     // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
     // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
     // the phase probe, which the macros carry here.
     CVFEM_PHASE_CLOCK(_tz);
-    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    cvfem_zero_scalars(values, bsr_nnz * 16);
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
-    scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const count_t *const SFEM_RESTRICT slots = b.element_slots.empty() ? nullptr : b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, adj, det, ux, uy, uz, p, ke);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const idx_t row = d.elems[a][e];
+            const idx_t row = mesh_elems[a][e];
             for (int bnode = 0; bnode < CVFEM_HEX8_N_NODES; ++bnode) {
                 const count_t slot =
-                        slots ? slots[(size_t)e * 64 + a * 8 + bnode] : find_bsr_slot(b.rowptr, b.colidx, row, d.elems[bnode][e]);
+                        slots ? slots[(size_t)e * 64 + a * 8 + bnode] : find_bsr_slot(bsr_rowptr, bsr_colidx, row, mesh_elems[bnode][e]);
                 scalar_t *const      blk  = values + (ptrdiff_t)slot * 16;
                 for (int rf = 0; rf < 4; ++rf) {
                     for (int cf = 0; cf < 4; ++cf) {
@@ -668,34 +680,44 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, cons
 // under the name `fd`. The kernel it needs already existed and was already used by the
 // packed layout (cvfem_hex8_best_packed.hpp), which is why that layout reported the
 // honest -- and much slower, as a finite-difference Jacobian should be -- figure.
-static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
-                                                               BSR4          &b,
+static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+                                                               
+        const idx_t *const SFEM_RESTRICT bsr_colidx,
+        const count_t *const SFEM_RESTRICT slots,
+        const ptrdiff_t bsr_nnz,
+        const count_t *const SFEM_RESTRICT bsr_rowptr,
+        scalar_t *const SFEM_RESTRICT values,
                                                                const scalar_t rho,
                                                                const scalar_t mu) {
     // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
     // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
     // the phase probe, which the macros carry here.
     CVFEM_PHASE_CLOCK(_tz);
-    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    cvfem_zero_scalars(values, bsr_nnz * 16);
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
-    scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const count_t *const SFEM_RESTRICT slots =
-            b.element_slots.empty() ? nullptr : b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
         scalar_t ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
-        gather_element_coords(d.elems, d.points, e, x, y, z);
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_coords(mesh_elems, points, e, x, y, z);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_fd_isoparam(rho, mu, x, y, z, ux, uy, uz, p, ke);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const idx_t row = d.elems[a][e];
+            const idx_t row = mesh_elems[a][e];
             for (int bnode = 0; bnode < CVFEM_HEX8_N_NODES; ++bnode) {
                 const count_t slot =
                         slots ? slots[(size_t)e * 64 + a * 8 + bnode]
-                              : find_bsr_slot(b.rowptr, b.colidx, row, d.elems[bnode][e]);
+                              : find_bsr_slot(bsr_rowptr, bsr_colidx, row, mesh_elems[bnode][e]);
                 scalar_t *const blk = values + (ptrdiff_t)slot * 16;
                 for (int rf = 0; rf < 4; ++rf)
                     for (int cf = 0; cf < 4; ++cf)
@@ -706,84 +728,124 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
     }
 }
 
-static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src, 
+        const count_t *const SFEM_RESTRICT slots,
+        const ptrdiff_t bsr_nnz,
+        scalar_t *const SFEM_RESTRICT values, const scalar_t rho, const scalar_t mu) {
     // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
     // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
     // the phase probe, which the macros carry here.
     CVFEM_PHASE_CLOCK(_tz);
-    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    cvfem_zero_scalars(values, bsr_nnz * 16);
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
-    scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
 
-static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_block(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_block(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src, 
+        const count_t *const SFEM_RESTRICT slots,
+        const ptrdiff_t bsr_nnz,
+        scalar_t *const SFEM_RESTRICT values, const scalar_t rho, const scalar_t mu) {
     // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
     // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
     // the phase probe, which the macros carry here.
     CVFEM_PHASE_CLOCK(_tz);
-    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    cvfem_zero_scalars(values, bsr_nnz * 16);
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
-    scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
 
-static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_row(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_row(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src, 
+        const count_t *const SFEM_RESTRICT slots,
+        const ptrdiff_t bsr_nnz,
+        scalar_t *const SFEM_RESTRICT values, const scalar_t rho, const scalar_t mu) {
     // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
     // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
     // the phase probe, which the macros carry here.
     CVFEM_PHASE_CLOCK(_tz);
-    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    cvfem_zero_scalars(values, bsr_nnz * 16);
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
-    scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
 
-static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src, 
+        const count_t *const SFEM_RESTRICT slots,
+        const ptrdiff_t bsr_nnz,
+        scalar_t *const SFEM_RESTRICT values, const scalar_t rho, const scalar_t mu) {
     // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
     // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
     // the phase probe, which the macros carry here.
     CVFEM_PHASE_CLOCK(_tz);
-    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    cvfem_zero_scalars(values, bsr_nnz * 16);
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
-    scalar_t *const SFEM_RESTRICT values = b.values->data();
-    const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
@@ -927,24 +989,33 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam_sympy(MeshData      &d,
     }
 }
 
-static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(MeshData      &d,
-                                                                  BSR4          &b,
+static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+                                                                  
+        const count_t *const SFEM_RESTRICT slots,
+        const ptrdiff_t bsr_nnz,
+        scalar_t *const SFEM_RESTRICT values,
                                                                   const scalar_t rho,
                                                                   const scalar_t mu) {
     // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
     // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
     // the phase probe, which the macros carry here.
     CVFEM_PHASE_CLOCK(_tz);
-    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    cvfem_zero_scalars(values, bsr_nnz * 16);
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
-    scalar_t *const SFEM_RESTRICT             values = b.values->data();
-    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d.elems, d.points, e, x, y, z);
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_coords(mesh_elems, points, e, x, y, z);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_isoparam(
                 rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
         (void)p;
@@ -964,10 +1035,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(MeshData      
 
 // The masked slot array for one element: -1 everywhere but the diagonal, where it is the
 // global node index into the node-indexed destination.
-static SFEM_INLINE void diag_node_slots(const MeshData &d, const ptrdiff_t e, ptrdiff_t sl[64]) {
+static SFEM_INLINE void diag_node_slots(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        idx_t **const SFEM_RESTRICT mesh_elems, const ptrdiff_t e, ptrdiff_t sl[64]) {
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
         for (int b = 0; b < CVFEM_HEX8_N_NODES; ++b) sl[a * 8 + b] = -1;
-        sl[a * 8 + a] = (ptrdiff_t)d.elems[a][e];
+        sl[a * 8 + a] = (ptrdiff_t)mesh_elems[a][e];
     }
 }
 
@@ -990,7 +1063,7 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &
         const int       fmask = (int)d.face_mask_eff[(size_t)e];
         ptrdiff_t       sl[64];
         scalar_t        x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        diag_node_slots(d, e, sl);
+        diag_node_slots(d.elems, e, sl);
         gather_element_coords(d.elems, d.points, e, x, y, z);
         gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det = scalar_t(0);
@@ -1032,7 +1105,7 @@ static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
         scalar_t         ux[8], uy[8], uz[8], p[8];
         Hex8ExtraScratch ex;
         ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
-        diag_node_slots(d, e, sl);
+        diag_node_slots(d.elems, e, sl);
         gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
@@ -1058,7 +1131,7 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
         Hex8ExtraScratch ex;
         ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
         if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d.elems, d.points, e, ex.x, ex.y, ex.z);
-        diag_node_slots(d, e, sl);
+        diag_node_slots(d.elems, e, sl);
         gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
                 rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, sl, values, ex.rc, p);

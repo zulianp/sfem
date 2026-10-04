@@ -1892,9 +1892,9 @@ int main(int argc, char **argv) {
             else if (kernel_kind == KernelKind::Split)
                 assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear.data());
             else if (kernel_kind == KernelKind::Sympy)
-                assemble_jacobian_atomic_isoparam_sympy(d, bsr, rho, mu);
+                assemble_jacobian_atomic_isoparam_sympy(d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
             else if (kernel_kind == KernelKind::Fd)
-                assemble_jacobian_atomic_fd_isoparam(d, bsr, rho, mu);
+                assemble_jacobian_atomic_fd_isoparam(d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), bsr.colidx, bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.rowptr, bsr.values->data(), rho, mu);
             else
                 // Current: the hand-written isoparametric kernel. Every other name is
                 // rejected during validation, so this is not a fallback.
@@ -1908,13 +1908,13 @@ int main(int argc, char **argv) {
         } else if (kernel_kind == KernelKind::Sumfact)
             assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
         else if (kernel_kind == KernelKind::Sympy)
-            assemble_jacobian_atomic_sympy(d, bsr, rho, mu);
+            assemble_jacobian_atomic_sympy(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         else if (kernel_kind == KernelKind::SympyBlock)
-            assemble_jacobian_atomic_sympy_block(d, bsr, rho, mu);
+            assemble_jacobian_atomic_sympy_block(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         else if (kernel_kind == KernelKind::SympyRow)
-            assemble_jacobian_atomic_sympy_row(d, bsr, rho, mu);
+            assemble_jacobian_atomic_sympy_row(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         else if (kernel_kind == KernelKind::SympyFace)
-            assemble_jacobian_atomic_sympy_face(d, bsr, rho, mu);
+            assemble_jacobian_atomic_sympy_face(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         else if (kernel_kind == KernelKind::Split)
             // Restore the geometry-only half built once at setup, then add only
             // the velocity-dependent half. The linear half is not rebuilt here:
@@ -1927,7 +1927,7 @@ int main(int argc, char **argv) {
             // finite-difference kernel. Kept as the fallback rather than
             // rejected, because fd is also the correctness reference, but the
             // two rows are the same kernel and should not be read as distinct.
-            assemble_jacobian_atomic_fd(d, bsr, rho, mu);
+            assemble_jacobian_atomic_fd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.colidx, bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.rowptr, bsr.values->data(), rho, mu);
 
         if (boundary)
             assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
