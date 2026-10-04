@@ -83,7 +83,8 @@ using geom_t  = smesh::geom_t;
 // first. Putting this at the top of the file breaks that contract, and the error it produces --
 // "use of undeclared identifier 'scalar_t'" from inside the microkernel header -- points at the
 // kernel rather than at the include that was too early.
-#include "kernels/cvfem_hex8_flags.hpp"   // Hex8RcConfig, Hex8Extras
+#include "kernels/cvfem_hex8_flags.hpp"
+#include "kernels/cvfem_hex8_element_gather.hpp"   // Hex8RcConfig, Hex8Extras
 
 static constexpr int N_FIELDS = 4;
 
@@ -568,41 +569,7 @@ static void precompute_element_bsr_slots(const MeshData &d, BSR4 &b) {
 // Take the arrays, not the mesh: both are called from inside the standard-layout sweeps in
 // src/kernels/, where naming MeshData is what keeps that directory dependent on this one. The
 // sources are suffixed because the destinations already own the short names.
-static SFEM_INLINE void gather_element_fields(smesh::idx_t **const SFEM_RESTRICT elems,
-                                              const scalar_t *const SFEM_RESTRICT ux_src,
-                                              const scalar_t *const SFEM_RESTRICT uy_src,
-                                              const scalar_t *const SFEM_RESTRICT uz_src,
-                                              const scalar_t *const SFEM_RESTRICT p_src,
-                                              const ptrdiff_t                  e,
-                                              scalar_t *const SFEM_RESTRICT    ux,
-                                              scalar_t *const SFEM_RESTRICT    uy,
-                                              scalar_t *const SFEM_RESTRICT    uz,
-                                              scalar_t *const SFEM_RESTRICT    p) {
-    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = elems[a][e];
-        ux[a]                = ux_src[g];
-        uy[a]                = uy_src[g];
-        uz[a]                = uz_src[g];
-        p[a]                 = p_src[g];
-    }
-}
 
-static SFEM_INLINE void gather_element_coords(smesh::idx_t **const SFEM_RESTRICT elems,
-                                              smesh::geom_t **const SFEM_RESTRICT points,
-                                              const ptrdiff_t               e,
-                                              scalar_t *const SFEM_RESTRICT x,
-                                              scalar_t *const SFEM_RESTRICT y,
-                                              scalar_t *const SFEM_RESTRICT z) {
-    const auto *const px = points[0];
-    const auto *const py = points[1];
-    const auto *const pz = points[2];
-    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = elems[a][e];
-        x[a]                 = scalar_t(px[g]);
-        y[a]                 = scalar_t(py[g]);
-        z[a]                 = scalar_t(pz[g]);
-    }
-}
 
 // ---- boundary closure as a post-pass -----------------------------------------
 //
@@ -922,85 +889,6 @@ inline Hex8Extras cvfem_hex8_extras_of(const MeshData &d) {
 
 // Per-element scratch for the above. Declared inside the element loop; `rc` points into
 // this object, so it must outlive the kernel call -- which it does, being a local.
-struct Hex8ExtraScratch {
-    scalar_t     x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
-    scalar_t     pgx[CVFEM_HEX8_N_NODES], pgy[CVFEM_HEX8_N_NODES], pgz[CVFEM_HEX8_N_NODES];
-    scalar_t     qgx[CVFEM_HEX8_N_NODES], qgy[CVFEM_HEX8_N_NODES], qgz[CVFEM_HEX8_N_NODES];
-    // The advecting velocity, for the convective branch of the Rhie-Chow time scale.
-    scalar_t     ux[CVFEM_HEX8_N_NODES], uy[CVFEM_HEX8_N_NODES], uz[CVFEM_HEX8_N_NODES];
-    Hex8RhieChow rc{};
-    int          fmask{0};
-
-    // Takes the arrays, not the mesh. This method is reached from inside a pack sweep, so a
-    // MeshData parameter here is the last thing keeping that sweep's signature tied to the
-    // staging layer. The sources carry a _src suffix because this object's own members already
-    // own the short names -- its whole job is to copy pgx[] out of pgx_src[].
-    SFEM_INLINE void load(smesh::idx_t **const SFEM_RESTRICT  elems,
-                          smesh::geom_t **const SFEM_RESTRICT points,
-                          const uint8_t *const SFEM_RESTRICT  face_mask,
-                          const scalar_t *const SFEM_RESTRICT pgx_src,
-                          const scalar_t *const SFEM_RESTRICT pgy_src,
-                          const scalar_t *const SFEM_RESTRICT pgz_src,
-                          const scalar_t *const SFEM_RESTRICT qgx_src,
-                          const scalar_t *const SFEM_RESTRICT qgy_src,
-                          const scalar_t *const SFEM_RESTRICT qgz_src,
-                          const scalar_t *const SFEM_RESTRICT ux_src,
-                          const scalar_t *const SFEM_RESTRICT uy_src,
-                          const scalar_t *const SFEM_RESTRICT uz_src,
-                          const scalar_t *const *const SFEM_RESTRICT adj_ptr,
-                          const scalar_t *const SFEM_RESTRICT        det_ptr,
-                          const Hex8Extras &opt, const ptrdiff_t e) {
-        if (!opt.with_rc && !opt.with_bnd) return;
-        gather_element_coords(elems, points, e, x, y, z);
-        if (opt.with_bnd) fmask = (int)face_mask[(size_t)e];
-        if (opt.with_rc) {
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const smesh::idx_t g = elems[a][e];
-                pgx[a]               = pgx_src[g];
-                pgy[a]               = pgy_src[g];
-                pgz[a]               = pgz_src[g];
-                ux[a]                = ux_src[g];
-                uy[a]                = uy_src[g];
-                uz[a]                = uz_src[g];
-            }
-            rc = Hex8RhieChow{};
-            rc.x = x; rc.y = y; rc.z = z;
-            rc.pgx = pgx; rc.pgy = pgy; rc.pgz = pgz;
-            rc.scale = opt.rcfg.scale;
-            rc.ux = ux; rc.uy = uy; rc.uz = uz;
-            rc.tau = opt.rcfg.tau;
-            // The affine edge vectors, so this reference discretises the same operator the
-            // vectorised kernels do. Without them the reference differences node coordinates
-            // while the kernel under test takes the Jacobian column, and the two disagree
-            // wherever the mesh is not exactly affine in floating point -- amplified by the
-            // near-cancellation in the Rhie-Chow correction into a visible error.
-            {
-                scalar_t adj_[9], det_;
-                load_hex8_adj(adj_ptr, det_ptr, e, adj_, &det_);
-                scalar_t ex_[3], ey_[3], ez_[3];
-                cvfem_hex8_affine_edge_cols(adj_[0], adj_[1], adj_[2], adj_[3], adj_[4], adj_[5],
-                                            adj_[6], adj_[7], adj_[8], det_, ex_, ey_, ez_);
-                for (int q_ = 0; q_ < 3; ++q_) {
-                    rc.ecol[0 * 3 + q_] = ex_[q_];
-                    rc.ecol[1 * 3 + q_] = ey_[q_];
-                    rc.ecol[2 * 3 + q_] = ez_[q_];
-                }
-                rc.has_ecol = true;
-            }
-            if (opt.with_qg) {
-                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const smesh::idx_t g = elems[a][e];
-                    qgx[a]               = qgx_src[g];
-                    qgy[a]               = qgy_src[g];
-                    qgz[a]               = qgz_src[g];
-                }
-                rc.qgx = qgx;
-                rc.qgy = qgy;
-                rc.qgz = qgz;
-            }
-        }
-    }
-};
 
 
 static SFEM_INLINE void gather_hex8_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,

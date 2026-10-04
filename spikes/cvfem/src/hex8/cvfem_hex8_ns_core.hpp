@@ -72,6 +72,7 @@ using scalar_t = double;
 using idx_t   = smesh::idx_t;
 using count_t = smesh::count_t;
 using geom_t  = smesh::geom_t;
+#include "kernels/cvfem_hex8_element_gather.hpp"
 
 static constexpr int N_FIELDS = 4;
 
@@ -477,41 +478,7 @@ inline void precompute_element_bsr_slots(const MeshData &d, BSR4 &b) {
 // The two families define these separately and deliberately -- see the note at the top of this
 // file on why they differ in physics -- so both had to be converted, and keeping them the same
 // shape is what lets the sweeps above them be converted the same way.
-SFEM_INLINE void gather_element_fields(smesh::idx_t **const SFEM_RESTRICT elems,
-                                              const scalar_t *const SFEM_RESTRICT ux_src,
-                                              const scalar_t *const SFEM_RESTRICT uy_src,
-                                              const scalar_t *const SFEM_RESTRICT uz_src,
-                                              const scalar_t *const SFEM_RESTRICT p_src,
-                                              const ptrdiff_t               e,
-                                              scalar_t *const SFEM_RESTRICT ux,
-                                              scalar_t *const SFEM_RESTRICT uy,
-                                              scalar_t *const SFEM_RESTRICT uz,
-                                              scalar_t *const SFEM_RESTRICT p) {
-    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = elems[a][e];
-        ux[a]                = ux_src[g];
-        uy[a]                = uy_src[g];
-        uz[a]                = uz_src[g];
-        p[a]                 = p_src[g];
-    }
-}
 
-SFEM_INLINE void gather_element_coords(smesh::idx_t **const SFEM_RESTRICT elems,
-                                              smesh::geom_t **const SFEM_RESTRICT points,
-                                              const ptrdiff_t               e,
-                                              scalar_t *const SFEM_RESTRICT x,
-                                              scalar_t *const SFEM_RESTRICT y,
-                                              scalar_t *const SFEM_RESTRICT z) {
-    const auto *const px = points[0];
-    const auto *const py = points[1];
-    const auto *const pz = points[2];
-    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = elems[a][e];
-        x[a]                 = scalar_t(px[g]);
-        y[a]                 = scalar_t(py[g]);
-        z[a]                 = scalar_t(pz[g]);
-    }
-}
 
 
 /* Nodal ∇p (volume-weighted element gradients). Element-local ∇p makes

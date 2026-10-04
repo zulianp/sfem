@@ -19,19 +19,14 @@
 // header's 546 lines, 83 (15%) were duplicated, 68 (12%) are Rhie-Chow staging the
 // benchmark has no use for, and 370 (68%) genuinely differ.
 
-#include "kernels/cvfem_hex8_flags.hpp"   // Hex8RcConfig, Hex8Extras
+#include "kernels/cvfem_hex8_flags.hpp"
+#include "kernels/cvfem_hex8_element_gather.hpp"   // Hex8RcConfig, Hex8Extras
 #include "core/cvfem_element_coloring.hpp"
 
 // Takes the affine geometry, not the mesh. It is called from inside more than twenty sweeps in
 // src/kernels/, so a MeshT parameter here is what keeps that directory dependent on the staging
 // layer. adj_ptr and det_ptr are published by precompute_affine_geometry, which is the only
 // thing that sizes the vectors behind them.
-static SFEM_INLINE void load_hex8_adj(const scalar_t *const *const SFEM_RESTRICT adj_ptr,
-                                      const scalar_t *const SFEM_RESTRICT        det_ptr,
-                                      const ptrdiff_t e, scalar_t adj[9], scalar_t *det) {
-    for (int c = 0; c < 9; ++c) adj[c] = adj_ptr[c][(size_t)e];
-    *det = det_ptr[(size_t)e];
-}
 
 template <typename MeshT>
 static void precompute_affine_geometry(MeshT &d) {
@@ -79,45 +74,6 @@ static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRI
 }
 
 // Takes the affine geometry, not the mesh; see load_hex8_adj above.
-static SFEM_INLINE void gather_hex8_adj_soa(const scalar_t *const *const SFEM_RESTRICT adj_ptr,
-                                            const scalar_t *const SFEM_RESTRICT        det_ptr,
-                                            const ptrdiff_t               begin,
-                                            const int                     nlanes,
-                                            scalar_t *const SFEM_RESTRICT cof0,
-                                            scalar_t *const SFEM_RESTRICT cof1,
-                                            scalar_t *const SFEM_RESTRICT cof2,
-                                            scalar_t *const SFEM_RESTRICT cof3,
-                                            scalar_t *const SFEM_RESTRICT cof4,
-                                            scalar_t *const SFEM_RESTRICT cof5,
-                                            scalar_t *const SFEM_RESTRICT cof6,
-                                            scalar_t *const SFEM_RESTRICT cof7,
-                                            scalar_t *const SFEM_RESTRICT cof8,
-                                            scalar_t *const SFEM_RESTRICT det) {
-    const size_t n = (size_t)nlanes * sizeof(scalar_t);
-    std::memcpy(cof0, adj_ptr[0] + begin, n);
-    std::memcpy(cof1, adj_ptr[1] + begin, n);
-    std::memcpy(cof2, adj_ptr[2] + begin, n);
-    std::memcpy(cof3, adj_ptr[3] + begin, n);
-    std::memcpy(cof4, adj_ptr[4] + begin, n);
-    std::memcpy(cof5, adj_ptr[5] + begin, n);
-    std::memcpy(cof6, adj_ptr[6] + begin, n);
-    std::memcpy(cof7, adj_ptr[7] + begin, n);
-    std::memcpy(cof8, adj_ptr[8] + begin, n);
-    std::memcpy(det, det_ptr + begin, n);
-    if (nlanes < CVFEM_HEX8_VEC_SIZE) {
-        const size_t pad = (size_t)(CVFEM_HEX8_VEC_SIZE - nlanes) * sizeof(scalar_t);
-        std::memset(cof0 + nlanes, 0, pad);
-        std::memset(cof1 + nlanes, 0, pad);
-        std::memset(cof2 + nlanes, 0, pad);
-        std::memset(cof3 + nlanes, 0, pad);
-        std::memset(cof4 + nlanes, 0, pad);
-        std::memset(cof5 + nlanes, 0, pad);
-        std::memset(cof6 + nlanes, 0, pad);
-        std::memset(cof7 + nlanes, 0, pad);
-        std::memset(cof8 + nlanes, 0, pad);
-        for (int lane = nlanes; lane < CVFEM_HEX8_VEC_SIZE; ++lane) det[lane] = scalar_t(1);
-    }
-}
 
 // ---------------------------------------------------------------- Rhie-Chow pack staging
 //
