@@ -23,7 +23,8 @@
 #include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
 #include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 
-#include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "kernels/microkernels/hex8/affine/generated/cvfem_hex8_ns_upwind_sympy_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/generated/cvfem_hex8_ns_upwind_sympy_isoparam.hpp"
 #ifdef CVFEM_ENABLE_SUBPAR
 #include "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
 #endif

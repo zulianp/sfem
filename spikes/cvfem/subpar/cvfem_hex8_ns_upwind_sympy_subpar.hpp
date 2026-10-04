@@ -19748,13 +19748,6 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
     }
 }
 
-// ---------------------------------------------------------------- isoparametric
-//
-// Same algebra, per-face geometry. The twelve sub-control-surface Jacobians are
-// evaluated by ordinary code rather than generated: expressing the adjugate as a
-// polynomial in the 24 nodal coordinates and letting it feed the element matrix makes
-// the expressions explode, and it would not save any arithmetic, since the hand-written
-// kernel evaluates exactly the same twelve geometries.
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(const scalar_t rho,
                                                                                     const scalar_t mu,

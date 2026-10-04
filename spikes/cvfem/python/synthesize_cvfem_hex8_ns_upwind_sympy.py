@@ -26,7 +26,13 @@ HERE = Path(__file__).resolve().parent
 # python/ -> spike root. The emitted headers live with the sources they are
 # compiled into, not beside the generator that writes them.
 SPIKE_ROOT = HERE.parent
-OUT = SPIKE_ROOT / "src" / "kernels" / "microkernels" / "hex8" / "generated" / "cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+OUT = (SPIKE_ROOT / "src" / "kernels" / "microkernels" / "hex8" / "affine" / "generated"
+       / "cvfem_hex8_ns_upwind_sympy_affine.hpp")
+# The isoparametric pair goes to the isoparametric folder, for the same reason the hand-written
+# kernels are separated by geometry: what differs between the two sets is where the Jacobian comes
+# from. Everything else this generator emits takes one adjugate and one determinant per element.
+ISOPARAM_OUT = (SPIKE_ROOT / "src" / "kernels" / "microkernels" / "hex8" / "isoparametric"
+                / "generated" / "cvfem_hex8_ns_upwind_sympy_isoparam.hpp")
 
 N_NODE = 8
 N_DOF = N_NODE * N_FIELD
@@ -1316,36 +1322,68 @@ SUBPAR_MARKERS = (
 SUBPAR_OUT = SPIKE_ROOT / "subpar" / "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
 
 
-def split_generated(text: str) -> tuple[str, str]:
-    """Partition the generated header into survivors and quarantined arrangements.
+def split_generated(text: str) -> tuple[str, str, str]:
+    """Partition the generated header into affine, isoparametric and quarantined sets.
 
     The functions are *moved*, not re-emitted: both outputs carry the exact text this
     run produced, so a survivor cannot drift as a side effect of the split. That is the
     property worth having -- the alternative, generating each set separately, would let
     a change in which expressions are built perturb the CSE of the ones that stayed.
     """
-    marker = "template <typename scalar_t"
-    first = text.index(marker)
-    prologue, tail = text[:first], "\n#endif\n"
-    body = text[first : text.rindex("#endif")]
+    # A CHUNK IS ONE FUNCTION, AND THE BOUNDARY IS THE DEFINITION -- NOT `template <typename
+    # scalar_t`.
+    #
+    # That marker misses every kernel this generator emits without a template header: the eight
+    # lane-blocked `_residual_defcor_*_simd` kernels are `static SFEM_INLINE void`. They did not
+    # start a chunk, so they were ABSORBED into whichever templated function preceded them and
+    # were partitioned as part of it. The two-way split survived that because both of its halves
+    # were published anyway; the three-way split did not -- eight affine deferred-correction
+    # kernels came out in isoparametric/ behind _residual_isoparam, the function that happens to
+    # precede them.
+    #
+    # This is the second incarnation of this bug. The comment below records the first, a substring
+    # test that could not tell `_residual` from `_residual_isoparam`.
+    defn = re.compile(r"^(?:template <[^>]*>\n)?static SFEM_INLINE [^;{\n]*?\b\w+\(", re.M)
+    hits = list(defn.finditer(text))
+    assert hits, "no function definitions found in the generated text"
+    end_all = text.rindex("#endif")
+    tail = "\n#endif\n"
 
-    chunks, keep, drop = [], [], []
-    idx = [i for i in range(len(body)) if body.startswith(marker, i)]
-    for a, b in zip(idx, idx[1:] + [len(body)]):
-        chunks.append(body[a:b])
+    def chunk_start(at: int) -> int:
+        """`at` back to the start of the comment block introducing it."""
+        lines = text[:at].split("\n")
+        q = len(lines) - 1
+        while q > 0 and (lines[q].lstrip().startswith("//") or lines[q].strip() == ""):
+            q -= 1
+        return len("\n".join(lines[: q + 1])) + 1
+
+    bounds = [chunk_start(m.start()) for m in hits] + [end_all]
+    prologue = text[: bounds[0]]
+    chunks = [text[a:b] for a, b in zip(bounds, bounds[1:])]
+    keep, drop = [], []
+
     # EXACT function names, not substrings. The previous rule asked whether a marker was a
     # substring of the text before the first "(", which cannot tell a name from that same name
     # with a suffix: quarantining `_residual` would silently take `_residual_isoparam` with it,
     # and that one is a measured WINNER. The earlier incarnation of this rule already swallowed
     # an unmeasured kernel for the same reason, which is why the comment above says to name
     # them precisely -- this makes the code enforce what the comment asks for.
-    def fn_name(chunk: str) -> str:
-        head = chunk.split("(")[0]
-        m = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", head)
-        return m[-1] if m else ""
+    # The name comes from the DEFINITION inside the chunk, not from the text before its first
+    # "(": a chunk now carries the comment block that introduces it, and those comments contain
+    # parentheses, so splitting on the first one reads a word out of prose.
+    name_re = re.compile(r"^(?:template <[^>]*>\n)?static SFEM_INLINE [^;{\n]*?\b(\w+)\(", re.M)
 
+    def fn_name(chunk: str) -> str:
+        m = name_re.search(chunk)
+        return m.group(1) if m else ""
+
+    # THREE WAYS, QUARANTINE FIRST. A kernel can be both isoparametric and quarantined, and the
+    # quarantine is the stronger claim: it says this arrangement is not the fastest anywhere, which
+    # is true whatever its geometry. Testing geometry first would publish it in isoparametric/.
+    iso = []
     for c in chunks:
-        (drop if fn_name(c) in SUBPAR_MARKERS else keep).append(c)
+        n = fn_name(c)
+        (drop if n in SUBPAR_MARKERS else iso if n.endswith("_isoparam") else keep).append(c)
 
     subpar_prologue = prologue.replace(
         "CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP", "CVFEM_HEX8_NS_UPWIND_SYMPY_SUBPAR_HPP"
@@ -1357,17 +1395,39 @@ def split_generated(text: str) -> tuple[str, str]:
         "//\n"
         "// Not self-contained:",
     )
-    return prologue + "".join(keep) + tail, subpar_prologue + "".join(drop) + tail
+    iso_prologue = prologue.replace(
+        "CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP", "CVFEM_HEX8_NS_UPWIND_SYMPY_ISOPARAM_HPP"
+    ).replace(
+        "// Not self-contained:",
+        "// THE ISOPARAMETRIC GENERATED KERNELS. Each sub-control volume derives its own geometry\n"
+        "// from the element's node coordinates, so these take x/y/z where the rest of this\n"
+        "// generator's output takes one adjugate and one determinant per element.\n"
+        "//\n"
+        "// Not self-contained:",
+    )
+    affine_prologue = prologue.replace(
+        "CVFEM_HEX8_NS_UPWIND_SYMPY_KERNELS_HPP", "CVFEM_HEX8_NS_UPWIND_SYMPY_AFFINE_HPP"
+    ).replace(
+        "// Not self-contained:",
+        "// THE AFFINE GENERATED KERNELS: one adjugate and one determinant for the whole element,\n"
+        "// which the caller derives once and the sweep reads from a table.\n"
+        "//\n"
+        "// Not self-contained:",
+    )
+    return (affine_prologue + "".join(keep) + tail,
+            iso_prologue + "".join(iso) + tail,
+            subpar_prologue + "".join(drop) + tail)
 
 
 def main() -> int:
     args = add_output_arguments(argparse.ArgumentParser(description=__doc__)).parse_args()
-    main_hpp, subpar_hpp = split_generated(generate())
+    affine_hpp, iso_hpp, subpar_hpp = split_generated(generate())
     out = args.out or OUT
-    # --out relocates the main header; the quarantined half follows it, so a check
-    # against a scratch copy still exercises both.
+    # --out relocates the affine header; the other two follow it, so a check against a scratch
+    # copy still exercises all three.
+    iso_out = ISOPARAM_OUT if args.out is None else out.parent / ISOPARAM_OUT.name
     subpar_out = SUBPAR_OUT if args.out is None else out.parent / SUBPAR_OUT.name
-    return emit([(out, main_hpp), (subpar_out, subpar_hpp)], args.check)
+    return emit([(out, affine_hpp), (iso_out, iso_hpp), (subpar_out, subpar_hpp)], args.check)
 
 
 if __name__ == "__main__":

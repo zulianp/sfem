@@ -269,7 +269,8 @@ struct MeshData {
 };
 
 #include "frontend/staging/cvfem_hex8_ns_packed_launch.hpp"
-#include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "kernels/microkernels/hex8/affine/generated/cvfem_hex8_ns_upwind_sympy_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/generated/cvfem_hex8_ns_upwind_sympy_isoparam.hpp"
 #include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 
 // The Rhie-Chow time-scale configuration for this mesh's solve. Declared here and defined

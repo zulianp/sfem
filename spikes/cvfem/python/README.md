@@ -72,7 +72,7 @@ quietly fits the wrong slope is worse than no report.
 
 | script | writes | consumed by |
 |---|---|---|
-| `synthesize_cvfem_hex8_ns_upwind_sympy.py` | `src/upwind/cvfem_hex8_ns_upwind_sympy_kernels.hpp`, `subpar/cvfem_hex8_ns_upwind_sympy_subpar.hpp` | `src/best/cvfem_hex8_best_common.hpp`, `src/hex8/cvfem_hex8_ns_core.hpp`, `cuda/cvfem_hex8_ns_cuda.cu` |
+| `synthesize_cvfem_hex8_ns_upwind_sympy.py` | `src/kernels/microkernels/hex8/affine/generated/cvfem_hex8_ns_upwind_sympy_affine.hpp`, `src/kernels/microkernels/hex8/isoparametric/generated/cvfem_hex8_ns_upwind_sympy_isoparam.hpp`, `subpar/cvfem_hex8_ns_upwind_sympy_subpar.hpp` | `src/frontend/staging/cvfem_hex8_best_common.hpp`, `src/frontend/op/cvfem_hex8_ns_core.hpp`, `src/frontend/cuda/cvfem_hex8_ns_cuda.cu` |
 | `synthesize_cvfem_tet4_ns_upwind_sympy.py` | `src/upwind/cvfem_tet4_ns_upwind_sympy_kernels.hpp` | `src/upwind/cvfem_tet4_ns_upwind_kernels.hpp` |
 | `gen_mms_case.py` | `src/cases/cvfem_ns_mms_case.hpp` (stdout by default) | `drivers/cvfem_hex8_ns_ssgmg.cpp` |
 

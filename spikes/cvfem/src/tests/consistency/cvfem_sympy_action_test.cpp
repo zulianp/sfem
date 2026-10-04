@@ -41,7 +41,8 @@ using count_t = smesh::count_t;
 static constexpr int N_FIELDS = 4;
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
-#include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
+#include "kernels/microkernels/hex8/affine/generated/cvfem_hex8_ns_upwind_sympy_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/generated/cvfem_hex8_ns_upwind_sympy_isoparam.hpp"
 #ifdef CVFEM_ENABLE_SUBPAR
 // The arrangements this file checks are quarantined, so they are emitted here rather
 // than into the main header. Including both is what lets the test compare a retired
