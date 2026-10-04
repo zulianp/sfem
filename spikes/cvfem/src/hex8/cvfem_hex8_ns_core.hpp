@@ -472,31 +472,40 @@ inline void precompute_element_bsr_slots(const MeshData &d, BSR4 &b) {
     }
 }
 
-SFEM_INLINE void gather_element_fields(const MeshData               &d,
+// Take the arrays, not the mesh, matching the bench family's pair in cvfem_hex8_best_common.hpp.
+// The two families define these separately and deliberately -- see the note at the top of this
+// file on why they differ in physics -- so both had to be converted, and keeping them the same
+// shape is what lets the sweeps above them be converted the same way.
+SFEM_INLINE void gather_element_fields(smesh::idx_t **const SFEM_RESTRICT elems,
+                                              const scalar_t *const SFEM_RESTRICT ux_src,
+                                              const scalar_t *const SFEM_RESTRICT uy_src,
+                                              const scalar_t *const SFEM_RESTRICT uz_src,
+                                              const scalar_t *const SFEM_RESTRICT p_src,
                                               const ptrdiff_t               e,
                                               scalar_t *const SFEM_RESTRICT ux,
                                               scalar_t *const SFEM_RESTRICT uy,
                                               scalar_t *const SFEM_RESTRICT uz,
                                               scalar_t *const SFEM_RESTRICT p) {
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = d.elems[a][e];
-        ux[a]                = d.ux[g];
-        uy[a]                = d.uy[g];
-        uz[a]                = d.uz[g];
-        p[a]                 = d.p[g];
+        const smesh::idx_t g = elems[a][e];
+        ux[a]                = ux_src[g];
+        uy[a]                = uy_src[g];
+        uz[a]                = uz_src[g];
+        p[a]                 = p_src[g];
     }
 }
 
-SFEM_INLINE void gather_element_coords(const MeshData               &d,
+SFEM_INLINE void gather_element_coords(smesh::idx_t **const SFEM_RESTRICT elems,
+                                              smesh::geom_t **const SFEM_RESTRICT points,
                                               const ptrdiff_t               e,
                                               scalar_t *const SFEM_RESTRICT x,
                                               scalar_t *const SFEM_RESTRICT y,
                                               scalar_t *const SFEM_RESTRICT z) {
-    const auto *const px = d.points[0];
-    const auto *const py = d.points[1];
-    const auto *const pz = d.points[2];
+    const auto *const px = points[0];
+    const auto *const py = points[1];
+    const auto *const pz = points[2];
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = d.elems[a][e];
+        const smesh::idx_t g = elems[a][e];
         x[a]                 = scalar_t(px[g]);
         y[a]                 = scalar_t(py[g]);
         z[a]                 = scalar_t(pz[g]);
@@ -696,8 +705,8 @@ inline SFEM_NOINLINE void apply_boundary_scs_residual(MeshData &d, const scalar_
         const ptrdiff_t e     = d.bnd_elems[(size_t)i];
         const int       fmask = (int)d.face_mask_eff[(size_t)e];
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         std::memset(r, 0, sizeof(r));
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) cvfem_hex8_load_adj(d, e, adj, &det);
@@ -740,8 +749,8 @@ inline SFEM_NOINLINE void apply_boundary_scs_jacobian_action(MeshData &d, const 
         const ptrdiff_t e     = d.bnd_elems[(size_t)i];
         const int       fmask = (int)d.face_mask_eff[(size_t)e];
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         gather_element_dir(d, e, dir, vx, vy, vz, q);
         std::memset(r, 0, sizeof(r));
         scalar_t adj[9], det = scalar_t(0);
@@ -769,8 +778,8 @@ inline SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
@@ -809,8 +818,8 @@ inline SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
@@ -857,8 +866,8 @@ inline SFEM_NOINLINE void assemble_jacobian_colored_sumfact(MeshData           &
                 const ptrdiff_t e_end   = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
                 for (ptrdiff_t e = e_start; e < e_end; ++e) {
                     scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], pp[8];
-                    gather_element_coords(d, e, x, y, z);
-                    gather_element_fields(d, e, ux, uy, uz, pp);
+                    gather_element_coords(d.elems, d.points, e, x, y, z);
+                    gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, pp);
                     scalar_t pgx[8], pgy[8], pgz[8];
                     gather_element_pgrad(d, e, pgx, pgy, pgz);
                     const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
@@ -894,8 +903,8 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
@@ -921,8 +930,8 @@ inline SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
@@ -984,8 +993,8 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
         for (int k = 0; k < 64 * 16; ++k) loc[k] = scalar_t(0);
 
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t pgx[8], pgy[8], pgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
         const Hex8RhieChow rc{x,       y,  z,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
@@ -1529,8 +1538,8 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_sumfact(MeshData &d, cons
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         gather_element_dir(d, e, dir, vx, vy, vz, q);
         scalar_t pgx[8], pgy[8], pgz[8], qgx[8], qgy[8], qgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);
@@ -1563,8 +1572,8 @@ inline SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData &d, con
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         gather_element_dir(d, e, dir, vx, vy, vz, q);
         scalar_t pgx[8], pgy[8], pgz[8], qgx[8], qgy[8], qgz[8];
         gather_element_pgrad(d, e, pgx, pgy, pgz);

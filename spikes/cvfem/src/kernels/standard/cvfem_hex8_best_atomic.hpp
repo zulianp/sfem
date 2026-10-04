@@ -31,7 +31,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
         scalar_t xe[8], ye[8], ze[8], g8[72], gv8[72];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         if (with_ho) {
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                 const idx_t gn = d.elems[a][e];
@@ -273,8 +273,8 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
         scalar_t         ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
-        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d.elems, d.points, e, ex.x, ex.y, ex.z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const idx_t                  g  = d.elems[a][e];
             const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
@@ -302,7 +302,7 @@ static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho,
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
         scalar_t adj[9], det;
@@ -328,7 +328,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
         scalar_t adj[9], det;
@@ -551,7 +551,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
         scalar_t adj[9], det;
@@ -591,8 +591,8 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
         scalar_t         ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
-        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d.elems, d.points, e, ex.x, ex.y, ex.z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_residual_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, p, r, ex.rc);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -611,7 +611,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sympy(MeshData &d, const scalar_
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_residual(rho, mu, adj, det, ux, uy, uz, p, r);
@@ -634,7 +634,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, cons
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, adj, det, ux, uy, uz, p, ke);
@@ -675,8 +675,8 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
         scalar_t ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_fd_isoparam(rho, mu, x, y, z, ux, uy, uz, p, ke);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -703,7 +703,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(MeshData &d, BSR4 &b, c
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
@@ -718,7 +718,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_block(MeshData &d, BSR4
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(
@@ -734,7 +734,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_row(MeshData &d, BSR4 &
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise(
@@ -750,7 +750,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(MeshData &d, BSR4 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise(
@@ -804,7 +804,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
         scalar_t         ux[8], uy[8], uz[8], p[8];
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots_nonlinear<true>(
@@ -821,7 +821,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
         scalar_t adj[9], det;
@@ -853,8 +853,8 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
         ex.load(d, opt, e);
         // load() gathers the coordinates only when it has a reason to. This kernel always
         // needs them, so gather into the same buffers when it did not.
-        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d.elems, d.points, e, ex.x, ex.y, ex.z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
                 rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
     }
@@ -871,8 +871,8 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam_sympy(MeshData      &d,
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_sympy_residual_isoparam(rho, mu, x, y, z, ux, uy, uz, p, r);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const idx_t g = d.elems[a][e];
@@ -895,8 +895,8 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(MeshData      
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_isoparam(
                 rho, mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
         (void)p;
@@ -943,8 +943,8 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &
         ptrdiff_t       sl[64];
         scalar_t        x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
         diag_node_slots(d, e, sl);
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         if (isoparam)
@@ -983,7 +983,7 @@ static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
         diag_node_slots(d, e, sl);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det;
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, values, ex.rc, p);
@@ -1005,9 +1005,9 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
         scalar_t         ux[8], uy[8], uz[8], p[8];
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
-        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d.elems, d.points, e, ex.x, ex.y, ex.z);
         diag_node_slots(d, e, sl);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
                 rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, sl, values, ex.rc, p);
     }
@@ -1032,8 +1032,8 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_linear_isoparam(MeshData     
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true, CVFEM_HEX8_PART_LINEAR>(
                 scalar_t(0), mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
         (void)p;
@@ -1056,8 +1056,8 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear_isoparam(
         scalar_t         ux[8], uy[8], uz[8], p[8];
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
-        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d, e, ex.x, ex.y, ex.z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d.elems, d.points, e, ex.x, ex.y, ex.z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true, CVFEM_HEX8_PART_NONLINEAR>(
                 rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
     }

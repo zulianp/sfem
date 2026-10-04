@@ -124,8 +124,8 @@ static std::vector<scalar_t> serial_reference(Run &r) {
         const int       fmask = (int)d.face_mask_eff[(size_t)e];
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8];
         scalar_t r_e[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         gather_element_dir(d, e, r.dir.data(), vx, vy, vz, q);
         std::memset(r_e, 0, sizeof(r_e));
         scalar_t adj[9], det = scalar_t(0);

@@ -1360,7 +1360,7 @@ int main(int argc, char **argv) {
 #pragma omp parallel for schedule(static)
         for (ptrdiff_t e = 0; e < d.nelements; ++e) {
             scalar_t x[CVFEM_HEX8_N_NODES], y[CVFEM_HEX8_N_NODES], z[CVFEM_HEX8_N_NODES];
-            gather_element_coords(d, e, x, y, z);
+            gather_element_coords(d.elems, d.points, e, x, y, z);
             uint8_t m = 0;
             for (int f = 0; f < 6; ++f)
                 if (hex8_face_on_domain(f, x, y, z, d.Lx, d.Ly, d.Lz)) m |= (uint8_t)(1u << f);

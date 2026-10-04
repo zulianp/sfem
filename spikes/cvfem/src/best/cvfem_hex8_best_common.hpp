@@ -557,31 +557,39 @@ static void precompute_element_bsr_slots(const MeshData &d, BSR4 &b) {
 }
 
 
-static SFEM_INLINE void gather_element_fields(const MeshData                  &d,
+// Take the arrays, not the mesh: both are called from inside the standard-layout sweeps in
+// src/kernels/, where naming MeshData is what keeps that directory dependent on this one. The
+// sources are suffixed because the destinations already own the short names.
+static SFEM_INLINE void gather_element_fields(smesh::idx_t **const SFEM_RESTRICT elems,
+                                              const scalar_t *const SFEM_RESTRICT ux_src,
+                                              const scalar_t *const SFEM_RESTRICT uy_src,
+                                              const scalar_t *const SFEM_RESTRICT uz_src,
+                                              const scalar_t *const SFEM_RESTRICT p_src,
                                               const ptrdiff_t                  e,
                                               scalar_t *const SFEM_RESTRICT    ux,
                                               scalar_t *const SFEM_RESTRICT    uy,
                                               scalar_t *const SFEM_RESTRICT    uz,
                                               scalar_t *const SFEM_RESTRICT    p) {
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = d.elems[a][e];
-        ux[a]                = d.ux[g];
-        uy[a]                = d.uy[g];
-        uz[a]                = d.uz[g];
-        p[a]                 = d.p[g];
+        const smesh::idx_t g = elems[a][e];
+        ux[a]                = ux_src[g];
+        uy[a]                = uy_src[g];
+        uz[a]                = uz_src[g];
+        p[a]                 = p_src[g];
     }
 }
 
-static SFEM_INLINE void gather_element_coords(const MeshData               &d,
+static SFEM_INLINE void gather_element_coords(smesh::idx_t **const SFEM_RESTRICT elems,
+                                              smesh::geom_t **const SFEM_RESTRICT points,
                                               const ptrdiff_t               e,
                                               scalar_t *const SFEM_RESTRICT x,
                                               scalar_t *const SFEM_RESTRICT y,
                                               scalar_t *const SFEM_RESTRICT z) {
-    const auto *const px = d.points[0];
-    const auto *const py = d.points[1];
-    const auto *const pz = d.points[2];
+    const auto *const px = points[0];
+    const auto *const py = points[1];
+    const auto *const pz = points[2];
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = d.elems[a][e];
+        const smesh::idx_t g = elems[a][e];
         x[a]                 = scalar_t(px[g]);
         y[a]                 = scalar_t(py[g]);
         z[a]                 = scalar_t(pz[g]);
@@ -619,8 +627,8 @@ static SFEM_NOINLINE void apply_boundary_scs_residual_pass(MeshData &d, const sc
         const ptrdiff_t e     = d.bnd_elems[(size_t)i];
         const int       fmask = (int)d.face_mask_eff[(size_t)e];
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         std::memset(r, 0, sizeof(r));
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
@@ -655,8 +663,8 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
         const ptrdiff_t e     = d.bnd_elems[(size_t)i];
         const int       fmask = (int)d.face_mask_eff[(size_t)e];
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const ptrdiff_t g = (ptrdiff_t)d.elems[a][e] * N_FIELDS;
             vx[a]             = dir[g + 0];
@@ -710,8 +718,8 @@ static SFEM_NOINLINE void assemble_boundary_scs_jacobian_pass(MeshData      &d,
         const ptrdiff_t e     = d.bnd_elems[(size_t)i];
         const int       fmask = (int)d.face_mask_eff[(size_t)e];
         scalar_t        x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d, e, x, y, z);
-        gather_element_fields(d, e, ux, uy, uz, p);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
+        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
         scalar_t adj[9], det = scalar_t(0);
         if (!isoparam) load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         smesh::count_t              found[64];
@@ -757,7 +765,7 @@ static void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol
             det = d.jacobian_determinant[(size_t)e];
         } else {
             scalar_t x[8], y[8], z[8], adj[9];
-            gather_element_coords(d, e, x, y, z);
+            gather_element_coords(d.elems, d.points, e, x, y, z);
             cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
         }
         const scalar_t v = std::fabs(det) / scalar_t(8);
@@ -924,7 +932,7 @@ struct Hex8ExtraScratch {
 
     SFEM_INLINE void load(const MeshData &d, const Hex8Extras &opt, const ptrdiff_t e) {
         if (!opt.with_rc && !opt.with_bnd) return;
-        gather_element_coords(d, e, x, y, z);
+        gather_element_coords(d.elems, d.points, e, x, y, z);
         if (opt.with_bnd) fmask = (int)d.face_mask[(size_t)e];
         if (opt.with_rc) {
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {

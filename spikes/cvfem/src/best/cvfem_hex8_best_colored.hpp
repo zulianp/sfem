@@ -430,7 +430,7 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
 
                 for (ptrdiff_t e = e_start; e < e_end; ++e) {
                     scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
-                    gather_element_fields(d, e, ux_e, uy_e, uz_e, p_e);
+                    gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux_e, uy_e, uz_e, p_e);
                     Hex8ExtraScratch ex;
                     ex.load(d, opt, e);
                     const scalar_t *const          rc_p  = opt.with_rc ? p_e : nullptr;
@@ -438,7 +438,7 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
 
                     if (geom_kind == GeomKind::Isoparam) {
                         scalar_t x[8], y[8], z[8];
-                        gather_element_coords(d, e, x, y, z);
+                        gather_element_coords(d.elems, d.points, e, x, y, z);
                         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
                                 rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, values, ex.rc, rc_p);
                     } else {
