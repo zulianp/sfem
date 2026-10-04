@@ -7,6 +7,8 @@
 // memcpy, so every global block is written exactly once: no zero_bsr4 pass and no
 // read-modify-write. Only the ghost rows still need a reduction.
 
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/cvfem_scatter.hpp"
 #include "kernels/cvfem_phases.hpp"
 #include "kernels/cvfem_range.hpp"

@@ -19,6 +19,8 @@
 // header's 546 lines, 83 (15%) were duplicated, 68 (12%) are Rhie-Chow staging the
 // benchmark has no use for, and 370 (68%) genuinely differ.
 
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_affine_geometry.hpp"
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
 #include "kernels/cvfem_hex8_flags.hpp"
 #include "kernels/cvfem_hex8_element_gather.hpp"
 #include "kernels/cvfem_scatter.hpp"   // MIN   // Hex8RcConfig, Hex8Extras

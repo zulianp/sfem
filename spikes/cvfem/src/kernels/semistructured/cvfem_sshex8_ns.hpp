@@ -39,6 +39,7 @@
 // The element kernels are reused verbatim from cvfem_hex8_ns_core.hpp. Nothing about the
 // physics is reimplemented here, which is what makes the comparison meaningful.
 
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
 #include "kernels/cvfem_hex8_flags.hpp"
 #include "kernels/cvfem_phases.hpp"
 #include "kernels/cvfem_portability.hpp"

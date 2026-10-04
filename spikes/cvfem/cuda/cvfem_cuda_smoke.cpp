@@ -15,6 +15,8 @@ using scalar_t = double;
 #endif
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_affine_geometry.hpp"
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
 
 #include "cvfem_cuda_smoke.hpp"
 

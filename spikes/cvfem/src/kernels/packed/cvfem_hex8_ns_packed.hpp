@@ -1,6 +1,8 @@
 #ifndef CVFEM_HEX8_NS_PACKED_HPP
 #define CVFEM_HEX8_NS_PACKED_HPP
 
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/cvfem_scatter.hpp"
 #include "kernels/packed/cvfem_pack_scratch.hpp"
 #include "kernels/cvfem_hex8_element_gather.hpp"

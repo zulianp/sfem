@@ -6,6 +6,8 @@
 // and no scratch, which makes it the simplest and the reference for correctness,
 // but assembly pays ~1024 atomic read-modify-writes per element.
 
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/cvfem_scatter.hpp"
 #include "kernels/cvfem_phases.hpp"
 // NOTHING FROM OUTSIDE THIS DIRECTORY. The include that used to sit here --

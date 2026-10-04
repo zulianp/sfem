@@ -24,6 +24,8 @@
 // contribution per colour, in colour order, so the summation order is fixed by the colouring:
 // reproducible as long as the colouring is, which it is for a fixed mesh and element order.
 
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/cvfem_range.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 

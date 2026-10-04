@@ -23,13 +23,15 @@ using scalar_t = double;
 #endif
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 
 namespace smesh { using count_t = int32_t; }
 #include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 #ifdef CVFEM_ENABLE_SUBPAR
 #include "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
 #endif
-#include "hex8/cvfem_hex8_boundary_scs.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 
 #include "cvfem_hex8_ns_cuda.hpp"
 

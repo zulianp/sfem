@@ -77,6 +77,9 @@ using scalar_t = double;
 using idx_t   = smesh::idx_t;
 using count_t = smesh::count_t;
 using geom_t  = smesh::geom_t;
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_affine_geometry.hpp"
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/cvfem_bdf.hpp"
 #include "kernels/cvfem_hex8_element_gather.hpp"
 

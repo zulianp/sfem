@@ -15,6 +15,7 @@
 //
 // Hex8ExtraScratch comes along because it is the per-element staging those gathers fill for the
 // reference path, and it has no staging dependency left either.
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_affine_geometry.hpp"
 #include "kernels/cvfem_hex8_flags.hpp"
 
 #include <cstring>   // memcpy, for the SoA geometry gather

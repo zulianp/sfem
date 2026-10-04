@@ -17,11 +17,13 @@
 
 #include <mpi.h>
 
-#include "best/cvfem_hex8_best_common.hpp"
+#include "frontend/staging/cvfem_hex8_best_common.hpp"
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
+#include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
-#include "core/cvfem_pack_coloring.hpp"
-#include "hex8/cvfem_hex8_boundary_scs.hpp"
-#include "core/cvfem_element_coloring.hpp"
+#include "frontend/staging/cvfem_pack_coloring.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
+#include "frontend/staging/cvfem_element_coloring.hpp"
 
 #include "cvfem_hex8_ns_cuda.hpp"
 
