@@ -27,7 +27,7 @@
 #define ALIGN_BYTES 64
 #endif
 
-#include "core/cvfem_portability.hpp"
+#include "kernels/cvfem_portability.hpp"
 
 static constexpr int CVFEM_HEX8_N_FIELDS = 4;
 static constexpr int CVFEM_HEX8_N_NODES  = 8;

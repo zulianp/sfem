@@ -29,7 +29,7 @@
 #include "smesh_mesh.hpp"
 #include "smesh_packed_mesh.hpp"
 
-#include "core/cvfem_portability.hpp"
+#include "kernels/cvfem_portability.hpp"
 
 #include "kernels/packed/cvfem_pack_scratch.hpp"   // pack_idx_t, thread_scratch, sizings
 

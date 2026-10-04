@@ -88,7 +88,7 @@ using geom_t  = smesh::geom_t;
 
 static constexpr int N_FIELDS = 4;
 
-#include "core/cvfem_portability.hpp"
+#include "kernels/cvfem_portability.hpp"
 
 // Needs scalar_t and N_FIELDS above.
 #include "hex8/cvfem_hex8_pack_common.hpp"

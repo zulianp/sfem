@@ -76,7 +76,7 @@ using geom_t  = smesh::geom_t;
 
 static constexpr int N_FIELDS = 4;
 
-#include "core/cvfem_portability.hpp"
+#include "kernels/cvfem_portability.hpp"
 
 #include "frontend/cvfem_env_config.hpp"  // resolves SFEM_PECLET_* / SFEM_LIMITER_STATS;
                                         // it includes the kernel headers in turn

@@ -1,6 +1,13 @@
 #ifndef CVFEM_PORTABILITY_HPP
 #define CVFEM_PORTABILITY_HPP
 
+// (moved from src/core/) This is the kernels' own wrapper over the few things that differ between
+// host and device -- SFEM_HOST_DEVICE, the restrict and inline spellings, the atomic add. It
+// includes nothing and names no library, which is why DESIGN.md's "no library dependencies" for
+// src/kernels/ can admit it: the clause's own exception is "CUDA, OpenMP or other wrappers", and
+// this is that wrapper. It sat in src/core/, so every kernel header reached outside the directory
+// for it.
+
 // Portability shims shared by the CVFEM kernels, the generated SymPy kernels and
 // the layout drivers. Include this before any CVFEM kernel header.
 //

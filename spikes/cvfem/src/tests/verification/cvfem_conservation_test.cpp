@@ -21,7 +21,7 @@
 
 #include "smesh_types.hpp"
 
-#include "core/cvfem_portability.hpp"
+#include "kernels/cvfem_portability.hpp"
 
 #include <cmath>
 #include <cstdio>
