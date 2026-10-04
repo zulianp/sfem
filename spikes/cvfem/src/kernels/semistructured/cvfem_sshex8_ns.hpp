@@ -1698,6 +1698,9 @@ static SFEM_INLINE void sscvfem_action_blocks(const scalar_t rho, const scalar_t
 // it runs on a vanishing fraction of the elements and its cost does not drive this.
 template <int Blocks>
 inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
+        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
+        // sweep and what arrives is a range, so the sweep owns no parallel region.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t box_lx,
         const scalar_t box_ly,
@@ -1713,7 +1716,6 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
         const uint8_t *const SFEM_RESTRICT natural_mask,
         const uint8_t *const SFEM_RESTRICT pressure_mask,
         const uint8_t *const SFEM_RESTRICT traction_mask,
-        const ptrdiff_t nmacro,
         const int nxe_src,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx_src,
@@ -1750,7 +1752,6 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
     sscvfem_corner_offsets(L, off);
 
 
-#pragma omp parallel
     {
         // construction, so this gather is skipped along with the rest of the pressure work.
         const bool                has_qg = (up || pp) && qgx_src;
@@ -1779,8 +1780,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
         idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
         idx_t *const SFEM_RESTRICT lg = _arena6;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < nmacro; ++e) {
+        for (ptrdiff_t e = r.begin; e < r.end; ++e) {
             // Gather only what this block reads. On Grace the gather and scatter alone are
             // 35% of the full operator, so a block that still loads all fourteen arrays
             // cannot get far below that however little arithmetic it does -- C was 46%
@@ -2019,7 +2019,8 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
         }
     }
 
-    if (slot) sscvfem_reduce_shared(red_idx, red_ptr, shared_node, const_cast<scalar_t *>(stage), n_shared, jv);
+    // The shared reduction is the launcher's: a second, independent loop over the reduction
+    // rows, run once after the element pass's threads have joined.
 }
 
 // Subtract the body force from the momentum rows of an interleaved residual. Mirrors
