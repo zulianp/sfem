@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
 
     // Nonlinear alone: assemble the split against a zero linear buffer.
     std::vector<scalar_t> zero(N, 0.0), nl_only;
-    assemble_jacobian_atomic_nonlinear(d, cvfem_hex8_extras_of(d), bsr, rho, mu, zero.data());
+    assemble_jacobian_atomic_nonlinear(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu, zero.data());
     nl_only.assign(bsr.values->data(), bsr.values->data() + N);
 
     // Full, for reference.

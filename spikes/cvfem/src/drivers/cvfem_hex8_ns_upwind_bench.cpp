@@ -1919,7 +1919,7 @@ int main(int argc, char **argv) {
             // Restore the geometry-only half built once at setup, then add only
             // the velocity-dependent half. The linear half is not rebuilt here:
             // that is the whole point of the split.
-            assemble_jacobian_atomic_nonlinear(d, cvfem_hex8_extras_of(d), bsr, rho, mu, jac_linear.data());
+            assemble_jacobian_atomic_nonlinear(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu, jac_linear.data());
         else
             // Current and Fd both land here. There is no dedicated `current`
             // assembly kernel -- the loop residual kernel has no assembled

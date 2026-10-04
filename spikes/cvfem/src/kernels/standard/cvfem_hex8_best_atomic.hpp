@@ -1062,35 +1062,53 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_linear(
     }
 }
 
-static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData                    &d,
+static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
                                               // Which optional terms are on, resolved once per
                                               // solve by the caller rather than per sweep here:
                                               // cvfem_hex8_extras_of reads the mesh, which this
                                               // kernel is not meant to name.
                                               const Hex8Extras &opt,
-                                                             BSR4                        &b,
+                                                             
+        const count_t *const SFEM_RESTRICT slots,
+        const ptrdiff_t bsr_nnz,
+        scalar_t *const SFEM_RESTRICT values,
                                                              const scalar_t               rho,
                                                              const scalar_t               mu,
                                                              const scalar_t *const SFEM_RESTRICT linear) {
-    scalar_t *const SFEM_RESTRICT             values = b.values->data();
-    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
     // Restore the constant part. A streaming copy, in place of the scattered
     // accumulation it replaces.
-    std::memcpy(values, linear, (size_t)b.nnz * 16 * sizeof(scalar_t));
+    std::memcpy(values, linear, (size_t)bsr_nnz * 16 * sizeof(scalar_t));
 
     // Rhie-Chow belongs entirely to this half: the linear half is the viscous block, which
     // depends on the geometry and mu alone. So linear + nonlinear still reproduces the full
     // assembly with the term on, and verify_split_isoparam_vs_full_rel still proves it.
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t         ux[8], uy[8], uz[8], p[8];
         Hex8ExtraScratch ex;
-        ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots_nonlinear<true>(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
     }
