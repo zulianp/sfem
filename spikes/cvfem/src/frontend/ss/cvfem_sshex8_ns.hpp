@@ -597,7 +597,32 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
         const ptrdiff_t n_packed = p.n_packed_elements > 0 ? p.n_packed_elements : 0;
         // Zeroes the outputs itself, since it cannot own all of them here.
         sscvfem_nodal_grad_packed(d, p, src, stride, ogx, ogy, ogz, /*apply_weight=*/false);
-        sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(), n_packed, d.nmacro);
+        {
+            // A PARTIAL range needs the staging buffer pre-zeroed: a slot a pack already
+            // wrote is read by the reduction, and a slot this range never writes would
+            // otherwise carry whatever the buffer held. The full range writes every slot
+            // before reading it, so it skips the fill -- which is why this is the caller's
+            // and not the sweep's: it is shared work that must happen once, not per thread.
+            const ptrdiff_t _b = n_packed, _e = d.nmacro;
+            if (d.scatter && d.scatter->ready && _b > 0 && d.scatter->n_slots > 0) {
+                const SSScatter &sc = *d.scatter;
+                scalar_t *const st = const_cast<scalar_t *>(sc.stage.data());
+                std::fill(st, st + (size_t)sc.n_slots * 3, scalar_t(0));
+            }
+        #pragma omp parallel
+            sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(),
+                    cvfem_range_split(_b, _e, 1, cvfem_thread_index(), cvfem_n_threads()));
+            if (d.scatter && d.scatter->ready) {
+                const SSScatter &sc = *d.scatter;
+                scalar_t *dst[3] = {ogx.data(), ogy.data(), ogz.data()};
+                const ptrdiff_t nrows = (ptrdiff_t)sc.shared_node.size();
+        #pragma omp parallel
+                sscvfem_reduce_shared_soa_w<3>(
+                        cvfem_range_split(0, nrows, 1, cvfem_thread_index(), cvfem_n_threads()),
+                        sc.red_idx.data(), sc.red_ptr.data(), sc.shared_node.data(),
+                        const_cast<scalar_t *>(sc.stage.data()), dst);
+            }
+        }
         sscvfem_nodal_grad_normalize(d, ogx, ogy, ogz);
         return;
     }
@@ -609,7 +634,32 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
     ogy.assign((size_t)d.nnodes, 0);
     ogz.assign((size_t)d.nnodes, 0);
 
-    sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(), 0, d.nmacro);
+    {
+        // A PARTIAL range needs the staging buffer pre-zeroed: a slot a pack already
+        // wrote is read by the reduction, and a slot this range never writes would
+        // otherwise carry whatever the buffer held. The full range writes every slot
+        // before reading it, so it skips the fill -- which is why this is the caller's
+        // and not the sweep's: it is shared work that must happen once, not per thread.
+        const ptrdiff_t _b = 0, _e = d.nmacro;
+        if (d.scatter && d.scatter->ready && _b > 0 && d.scatter->n_slots > 0) {
+            const SSScatter &sc = *d.scatter;
+            scalar_t *const st = const_cast<scalar_t *>(sc.stage.data());
+            std::fill(st, st + (size_t)sc.n_slots * 3, scalar_t(0));
+        }
+    #pragma omp parallel
+        sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(),
+                cvfem_range_split(_b, _e, 1, cvfem_thread_index(), cvfem_n_threads()));
+        if (d.scatter && d.scatter->ready) {
+            const SSScatter &sc = *d.scatter;
+            scalar_t *dst[3] = {ogx.data(), ogy.data(), ogz.data()};
+            const ptrdiff_t nrows = (ptrdiff_t)sc.shared_node.size();
+    #pragma omp parallel
+            sscvfem_reduce_shared_soa_w<3>(
+                    cvfem_range_split(0, nrows, 1, cvfem_thread_index(), cvfem_n_threads()),
+                    sc.red_idx.data(), sc.red_ptr.data(), sc.shared_node.data(),
+                    const_cast<scalar_t *>(sc.stage.data()), dst);
+        }
+    }
     sscvfem_nodal_grad_normalize(d, ogx, ogy, ogz);
 }
 
