@@ -977,9 +977,16 @@ inline void sscvfem_nodal_grad_normalize(SSMeshData &d, std::vector<scalar_t> &o
 }
 
 // Defined below, declared here because sscvfem_nodal_grad_strided calls it.
-inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
-                                             const int stride, std::vector<scalar_t> &ogx,
-                                             std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz,
+inline void sscvfem_nodal_grad_scatter_range(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT macro_curved,
+        const int nxe,
+        geom_t **const SFEM_RESTRICT points,
+        const SSScatter *const sc, const scalar_t *const SFEM_RESTRICT src,
+                                             const int stride, scalar_t *const SFEM_RESTRICT ogx,
+                                             scalar_t *const SFEM_RESTRICT ogy, scalar_t *const SFEM_RESTRICT ogz,
                                              const ptrdiff_t e_begin, const ptrdiff_t e_end);
 
 inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
@@ -1020,7 +1027,7 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
         const ptrdiff_t n_packed = p.n_packed_elements > 0 ? p.n_packed_elements : 0;
         // Zeroes the outputs itself, since it cannot own all of them here.
         sscvfem_nodal_grad_packed(d, p, src, stride, ogx, ogy, ogz, /*apply_weight=*/false);
-        sscvfem_nodal_grad_scatter_range(d, src, stride, ogx, ogy, ogz, n_packed, d.nmacro);
+        sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter.get() : nullptr, src, stride, ogx.data(), ogy.data(), ogz.data(), n_packed, d.nmacro);
         sscvfem_nodal_grad_normalize(d, ogx, ogy, ogz);
         return;
     }
@@ -1032,7 +1039,7 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
     ogy.assign((size_t)d.nnodes, 0);
     ogz.assign((size_t)d.nnodes, 0);
 
-    sscvfem_nodal_grad_scatter_range(d, src, stride, ogx, ogy, ogz, 0, d.nmacro);
+    sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter.get() : nullptr, src, stride, ogx.data(), ogy.data(), ogz.data(), 0, d.nmacro);
     sscvfem_nodal_grad_normalize(d, ogx, ogy, ogz);
 }
 
@@ -1043,17 +1050,23 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
 // writes is additive -- exclusive nodes go straight out with +=, shared ones through the
 // staged reduce, which also accumulates -- so a partial range adds to whatever is already
 // there instead of replacing it.
-inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *const SFEM_RESTRICT src,
-                                             const int stride, std::vector<scalar_t> &ogx,
-                                             std::vector<scalar_t> &ogy, std::vector<scalar_t> &ogz,
+inline void sscvfem_nodal_grad_scatter_range(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT macro_curved,
+        const int nxe,
+        geom_t **const SFEM_RESTRICT points,
+        const SSScatter *const sc, const scalar_t *const SFEM_RESTRICT src,
+                                             const int stride, scalar_t *const SFEM_RESTRICT ogx,
+                                             scalar_t *const SFEM_RESTRICT ogy, scalar_t *const SFEM_RESTRICT ogz,
                                              const ptrdiff_t e_begin, const ptrdiff_t e_end) {
     if (e_begin >= e_end) return;
 
-    const int L = d.level;
+    const int L = level;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
-    const SSScatter *const sc = d.scatter ? d.scatter.get() : nullptr;
     // Three fields where there were four. The weight used to ride along through the
     // per-element accumulator, the scatter and the shared reduction, which is a third of the
     // traffic of each spent re-deriving a quantity that does not change.
@@ -1074,9 +1087,9 @@ inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *cons
 
 #pragma omp parallel
     {
-        std::vector<scalar_t>     lp((size_t)d.nxe);
-        std::vector<smesh::idx_t> lg((size_t)d.nxe);
-        std::vector<scalar_t>     lacc((size_t)d.nxe * NG);
+        std::vector<scalar_t>     lp((size_t)nxe);
+        std::vector<smesh::idx_t> lg((size_t)nxe);
+        std::vector<scalar_t>     lacc((size_t)nxe * NG);
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = e_begin; e < e_end; ++e) {
@@ -1084,8 +1097,8 @@ inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *cons
             // Only the field. The coordinates used to be gathered for every node of the
             // macro-element -- three arrays of (L+1)^3 -- to feed a geometry computation that
             // is the same for all of them.
-            for (int a = 0; a < d.nxe; ++a) {
-                const smesh::idx_t g = d.elems[a][e];
+            for (int a = 0; a < nxe; ++a) {
+                const smesh::idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
                 lp[(size_t)a]        = src[(ptrdiff_t)g * stride];
             }
@@ -1102,14 +1115,14 @@ inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *cons
             {
                 scalar_t ex[8], ey[8], ez[8];
                 for (int a = 0; a < 8; ++a) {
-                    const smesh::idx_t g = d.elems[off[a]][e];
-                    ex[a]                = (scalar_t)d.points[0][g];
-                    ey[a]                = (scalar_t)d.points[1][g];
-                    ez[a]                = (scalar_t)d.points[2][g];
+                    const smesh::idx_t g = elems[off[a]][e];
+                    ex[a]                = (scalar_t)points[0][g];
+                    ey[a]                = (scalar_t)points[1][g];
+                    ez[a]                = (scalar_t)points[2][g];
                 }
                 sscvfem_micro_geom(ex, ey, ez, adj, &det);
             }
-            const bool curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
+            const bool curved_e = sscvfem_macro_curved(macro_curved, e);
             if (!curved_e && std::fabs(det) < scalar_t(1e-30)) continue;
             // |det| * grad, where grad itself carries a 1/det. The determinant cancels and
             // only its SIGN survives, so the division the gradient used to do and the
@@ -1125,7 +1138,7 @@ inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *cons
                         scalar_t gx, gy, gz;
                         if (curved_e) {
                             scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
-                            sscvfem_cell_corners(d.elems, d.points, e, base, off, cx, cy, cz);
+                            sscvfem_cell_corners(elems, points, e, base, off, cx, cy, cz);
                             sscvfem_micro_geom(cx, cy, cz, cadj, &cdet);
                             if (std::fabs(cdet) < scalar_t(1e-30)) continue;
                             cvfem_hex8_grad_scalar(cadj, cdet > 0 ? scalar_t(1) : scalar_t(-1), ep, gx, gy, gz);
@@ -1141,9 +1154,9 @@ inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *cons
                                 acc[2] += gz;
                             } else {
                                 const smesh::idx_t id = lg[(size_t)l];
-                                atomic_add(ogx.data(), id, gx);
-                                atomic_add(ogy.data(), id, gy);
-                                atomic_add(ogz.data(), id, gz);
+                                atomic_add(ogx, id, gx);
+                                atomic_add(ogy, id, gy);
+                                atomic_add(ogz, id, gz);
                             }
                         }
                     }
@@ -1151,14 +1164,14 @@ inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *cons
             }
 
             if (sc) {
-                scalar_t *dst[NG] = {ogx.data(), ogy.data(), ogz.data()};
-                sscvfem_scatter_element_soa_w<NG>(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), d.nxe, e, lg.data(), lacc.data(), dst);
+                scalar_t *dst[NG] = {ogx, ogy, ogz};
+                sscvfem_scatter_element_soa_w<NG>(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lacc.data(), dst);
             }
         }
     }
 
     if (sc) {
-        scalar_t *dst[NG] = {ogx.data(), ogy.data(), ogz.data()};
+        scalar_t *dst[NG] = {ogx, ogy, ogz};
         sscvfem_reduce_shared_soa_w<NG>(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), dst);
     }
 
