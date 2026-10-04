@@ -71,6 +71,7 @@ using scalar_t = double;
 // them without editing them.
 using idx_t   = smesh::idx_t;
 using count_t = smesh::count_t;
+using geom_t  = smesh::geom_t;
 
 static constexpr int N_FIELDS = 4;
 

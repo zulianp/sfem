@@ -279,7 +279,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
     scalar_t *const SFEM_RESTRICT rz = d.rz.data();
     scalar_t *const SFEM_RESTRICT rc = d.rc.data();
     const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
-    const Hex8Extras              opt(d);
+    const Hex8Extras              opt = cvfem_hex8_extras_of(d);
     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 
@@ -478,7 +478,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
     scalar_t *const SFEM_RESTRICT rz = d.rz.data();
     scalar_t *const SFEM_RESTRICT rc = d.rc.data();
     const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
-    const Hex8Extras              opt(d);
+    const Hex8Extras              opt = cvfem_hex8_extras_of(d);
     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
     // The generated Rhie-Chow kernel reads the coefficient out of the staged table instead of

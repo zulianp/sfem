@@ -203,7 +203,7 @@ static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
                                                   const int       limiter  = 0,
                                                   const scalar_t  venkat_c = scalar_t(0)) {
     reset_residual(d);
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
     // The deferred correction, on the same sweep. The hand-written SIMD kernel takes the
     // higher-order pack, so the standard layout's higher-order arms vectorise too; the generated
     // sympy variants are packed-only, which is why this is the hand-written kernel rather than
@@ -386,7 +386,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored(MeshData              &
                                                          const int             limiter  = 0,
                                                          const scalar_t        venkat_c = scalar_t(0)) {
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
     const bool       has_qg  = opt.with_qg;
     const bool       with_ho = ugrad != nullptr && vgrad != nullptr;
     // The per-surface Rhie-Chow coefficient is hoisted out of the face loops, so it has to be

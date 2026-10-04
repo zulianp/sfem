@@ -413,7 +413,7 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
     // This assembly reads the mesh directly rather than a staged pack, so Rhie-Chow enters
     // exactly as it does on the atomic layout -- through Hex8ExtraScratch. Only the two
     // hand-written kernels take the term.
-    const Hex8Extras                    opt(d);
+    const Hex8Extras                    opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel
     {

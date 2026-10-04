@@ -19,6 +19,7 @@
 // header's 546 lines, 83 (15%) were duplicated, 68 (12%) are Rhie-Chow staging the
 // benchmark has no use for, and 370 (68%) genuinely differ.
 
+#include "kernels/cvfem_hex8_flags.hpp"   // Hex8RcConfig, Hex8Extras
 #include "core/cvfem_element_coloring.hpp"
 
 // Takes the affine geometry, not the mesh. It is called from inside more than twenty sweeps in
@@ -186,10 +187,9 @@ static SFEM_INLINE void cvfem_hex8_gather_qg_from_pack(pack_idx_t **const SFEM_R
 // transient branch, and twice the scale, which reproduces the previous diffusion-only
 // coefficient Df = rc_scale h^2 / (2 mu) exactly. It is a measurement escape hatch, not a
 // supported mode -- see cvfem_hex8_rhie_chow_mdot_coeff for why that coefficient was wrong.
-struct Hex8RcConfig {
-    Hex8RcTau tau;
-    scalar_t  scale{0};
-};
+// Hex8RcConfig moved to kernels/cvfem_hex8_flags.hpp, which this header reaches through the
+// microkernel include below: a kernel signature cannot name a type that only a staging
+// header defines. The factories that resolve it from a mesh stay on this side.
 
 // Declared here, beside the type it returns, because the pack sweeps resolve the configuration at
 // their call sites now: cvfem_hex8_gather_rc_coeff below takes a Hex8RcConfig rather than a mesh,

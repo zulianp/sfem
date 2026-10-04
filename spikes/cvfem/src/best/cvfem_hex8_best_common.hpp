@@ -76,6 +76,14 @@ using scalar_t = double;
 // them without editing them.
 using idx_t   = smesh::idx_t;
 using count_t = smesh::count_t;
+using geom_t  = smesh::geom_t;
+
+// After the aliases above, not before: the flags header pulls in the microkernels, and those
+// name scalar_t, idx_t and count_t on the contract that whoever includes them declared those
+// first. Putting this at the top of the file breaks that contract, and the error it produces --
+// "use of undeclared identifier 'scalar_t'" from inside the microkernel header -- points at the
+// kernel rather than at the include that was too early.
+#include "kernels/cvfem_hex8_flags.hpp"   // Hex8RcConfig, Hex8Extras
 
 static constexpr int N_FIELDS = 4;
 
@@ -902,22 +910,15 @@ inline Hex8RcConfig cvfem_hex8_rc_config_for(const MeshData &d) {
     return cvfem_hex8_rc_config(d.rhie_chow_scale, transient_diag_weight(d, scalar_t(1)));
 }
 
-struct Hex8Extras {
-    int with_rc{0};
-    int with_bnd{0};
-    // The exact Rhie-Chow Jacobian, which differentiates through the nodal gradient
-    // reconstruction as well. Only the Jacobian action fills qgx/qgy/qgz, so this is off
-    // wherever they are empty and the kernel falls back to the frozen-gradient form.
-    int with_qg{0};
-    // The Rhie-Chow time-scale configuration, resolved once here rather than per element.
-    Hex8RcConfig rcfg{};
-
-    explicit Hex8Extras(const MeshData &d)
-        : with_rc(!d.pgx.empty() && d.rhie_chow_scale != scalar_t(0)),
-          with_bnd(!d.face_mask.empty()),
-          with_qg(!d.pgx.empty() && d.rhie_chow_scale != scalar_t(0) && !d.qgx.empty()),
-          rcfg(cvfem_hex8_rc_config_for(d)) {}
-};
+// Hex8Extras moved to kernels/cvfem_hex8_flags.hpp; the resolution from a mesh stays here.
+inline Hex8Extras cvfem_hex8_extras_of(const MeshData &d) {
+    Hex8Extras x;
+    x.with_rc  = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
+    x.with_bnd = !d.face_mask.empty();
+    x.with_qg  = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0) && !d.qgx.empty();
+    x.rcfg     = cvfem_hex8_rc_config_for(d);
+    return x;
+}
 
 // Per-element scratch for the above. Declared inside the element loop; `rc` points into
 // this object, so it must outlive the kernel call -- which it does, being a local.

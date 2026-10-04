@@ -25,7 +25,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
     const bool with_ho = ugrad != nullptr && vgrad != nullptr;
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
 
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -138,7 +138,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                                                             const int             limiter  = 0,
                                                             const scalar_t        venkat_c = scalar_t(0)) {
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
     const bool       has_qg  = opt.with_qg;
     const bool       with_ho = ugrad != nullptr && vgrad != nullptr;
     // The per-surface Rhie-Chow coefficient is hoisted out of the face loops, so it has to be
@@ -266,7 +266,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
                                                                 const scalar_t *const dir,
                                                                 scalar_t *const       jv) {
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -297,7 +297,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
 
 static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho, const scalar_t mu) {
     reset_residual(d);
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -323,7 +323,7 @@ static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho,
 
 static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu) {
     reset_residual(d);
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -374,7 +374,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
                                                              const int       limiter  = 0,
                                                              const scalar_t  venkat_c = scalar_t(0)) {
     reset_residual(d);
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
     // The deferred correction, on the same sweep. The hand-written SIMD kernel takes the
     // higher-order pack, so the standard layout's higher-order arms vectorise too; the generated
     // sympy variants are packed-only, which is why this is the hand-written kernel rather than
@@ -546,7 +546,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d
                                                                const int       limiter,
                                                                const scalar_t  venkat_c) {
     reset_residual(d);
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -584,7 +584,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d
 
 static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu) {
     reset_residual(d);
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -797,7 +797,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
     // Rhie-Chow belongs entirely to this half: the linear half is the viscous block, which
     // depends on the geometry and mu alone. So linear + nonlinear still reproduces the full
     // assembly with the term on, and verify_split_isoparam_vs_full_rel still proves it.
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -816,7 +816,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT                 values = b.values->data();
     const count_t *const SFEM_RESTRICT     slots  = b.element_slots.data();
-    const Hex8Extras                              opt(d);
+    const Hex8Extras                              opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -844,7 +844,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
     zero_bsr4(b);
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
     const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
-    const Hex8Extras                          opt(d);
+    const Hex8Extras                          opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -974,7 +974,7 @@ static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
                                                std::vector<scalar_t> &diag) {
     diag.assign((size_t)d.nnodes * 16, scalar_t(0));
     scalar_t *const SFEM_RESTRICT values = diag.data();
-    const Hex8Extras              opt(d);
+    const Hex8Extras              opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -997,7 +997,7 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
                                                         std::vector<scalar_t> &diag) {
     diag.assign((size_t)d.nnodes * 16, scalar_t(0));
     scalar_t *const SFEM_RESTRICT values = diag.data();
-    const Hex8Extras              opt(d);
+    const Hex8Extras              opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -1049,7 +1049,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear_isoparam(
     // Restore the constant part, then add only what the velocity changes.
     std::memcpy(values, linear.data(), linear.size() * sizeof(scalar_t));
 
-    const Hex8Extras opt(d);
+    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
