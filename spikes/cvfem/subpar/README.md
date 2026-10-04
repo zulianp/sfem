@@ -421,3 +421,46 @@ not a gate.
 One hardening came out of this. `SUBPAR_MARKERS` matched by substring, which cannot tell a
 name from that same name with a suffix: quarantining `_residual` would have silently taken
 `_residual_isoparam`, the winner, with it. The rule now compares whole function names.
+
+## The scalar matrix-free sweeps are NOT here, and this is the measurement that settled it
+
+DESIGN.md says "for the matrix-free kernels only the SIMD version is kept, the rest is moved to
+subpar". The spike has ten scalar matrix-free sweeps. **None of them can move here**, and the
+reason is not reluctance: every one is either a verification oracle that runs in the default
+build, or a variant a recorded earlier decision explicitly declined to retire. Quarantining any
+of them puts a check that currently runs behind `-DCVFEM_ENABLE_SUBPAR`, which is the opposite of
+what this directory is for — nothing here is load-bearing, and that is the property that makes
+the flag safe to leave off.
+
+| sweep | why it stays |
+|---|---|
+| `apply_residual_atomic` | the CUDA verify driver's host reference |
+| `apply_jacobian_action_atomic` | the CUDA verify driver's host reference |
+| `apply_residual_atomic_isoparam` | the CUDA verify driver's host reference |
+| `apply_jacobian_action_atomic_isoparam` | the CUDA verify driver's host reference |
+| `apply_residual_atomic_sumfact` | reached from the solver family's own core, not only the bench |
+| `apply_jacobian_action_atomic_kernel` | the body the two above share |
+| `apply_residual_atomic_sumfact_defcor` | `verify_packed_ho_residual_vs_atomic_abs` compares the packed higher-order residual against it |
+| `apply_residual_atomic_sympy` | `verify_sympy_residual_vs_current_abs` compares the generated residual against `current` through it |
+| `apply_residual_packed_defcor_scalar_range` | `--ho-scalar`: `verify_packed_ho_simd_vs_packed_ho_scalar_abs` AND `verify_packed_ho_sympy_vs_packed_ho_scalar_abs` both compare against it |
+| `apply_residual_atomic_isoparam_sympy` | the isoparametric scalar winner, and the campaign that retired the affine form measured affine geometry only — the driver's own message says it "is NOT retired" |
+
+**Why the scalar sweeps are the right oracle for the device, specifically.** The CUDA kernels call
+the scalar `SFEM_HOST_DEVICE` leaf templates — there is no device counterpart to lane blocking —
+so comparing the device against the scalar host sweep tests the same arithmetic on both sides.
+Comparing it against the SIMD host sweep instead would conflate two differences at once, host-SIMD
+against host-scalar and host against device, and a disagreement would not say which moved.
+
+**Measured on Grace while settling this**, 3,650,692 dof, 72 threads, the atomic layout:
+
+| arm | MDOF/s |
+|---|---|
+| `--kernel sumfact` (the SIMD one DESIGN.md keeps) | 1132.3 |
+| `--kernel sumfact --conv-ho 2` (scalar deferred correction) | 532.1 |
+| `--kernel sympy --geom isoparam` (scalar) | 454.4 |
+| `--kernel sympy --geom affine` | refused — already quarantined at the driver |
+
+The affine generated arm is the one case where the clause already holds: the benchmark refuses it
+without the flag and says why. Its code still sits in `kernels/standard/affine/` because the
+verification block that compares it against `current` is in the default build, so moving the code
+would take that check with it.
