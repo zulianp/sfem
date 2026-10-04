@@ -8,7 +8,12 @@
 
 #include "kernels/cvfem_scatter.hpp"
 #include "kernels/cvfem_phases.hpp"
-#include "best/cvfem_hex8_best_common.hpp"
+// NOTHING FROM OUTSIDE THIS DIRECTORY. The include that used to sit here --
+// best/cvfem_hex8_best_common.hpp, the bench's staging header -- is gone, because after the 27
+// sweeps in this file stopped taking MeshData and BSR4 the only names left were the ones the
+// includer supplies by contract (scalar_t, idx_t, count_t, geom_t and the SFEM_ spellings) and
+// MIN, which now lives beside the scatter helpers that use it.
+#include "kernels/cvfem_kernel_kind.hpp"
 
 // The two gradient arguments carry the exact higher-order action, as on the packed sweep; both
 // null is the lagged one. The atomic path exists here so the layouts can be compared on the same
