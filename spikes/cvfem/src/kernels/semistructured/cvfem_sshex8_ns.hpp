@@ -2027,14 +2027,15 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
 // Subtract the body force from the momentum rows of an interleaved residual. Mirrors
 // apply_body_force in cvfem_hex8_ns_core.hpp; see the sign argument there.
 inline void sscvfem_apply_body_force_sweep(
+        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
+        // sweep and what arrives is a range, so the sweep owns no parallel region.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t *const SFEM_RESTRICT fx,
         const scalar_t *const SFEM_RESTRICT fy,
         const scalar_t *const SFEM_RESTRICT fz,
-        const ptrdiff_t nnodes,
         const scalar_t *const SFEM_RESTRICT node_vol, scalar_t *const SFEM_RESTRICT res) {
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const scalar_t v = node_vol[(size_t)i];
         res[i * CVFEM_HEX8_N_FIELDS + 0] -= fx[(size_t)i] * v;
         res[i * CVFEM_HEX8_N_FIELDS + 1] -= fy[(size_t)i] * v;
@@ -2046,9 +2047,11 @@ inline void sscvfem_apply_body_force_sweep(
 // cvfem_hex8_ns_core.hpp -- same coefficients, same lumped control volume, same reason for
 // being a post-pass rather than a term inside the macro-element sweeps.
 inline void sscvfem_apply_transient_sweep(
+        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
+        // sweep and what arrives is a range, so the sweep owns no parallel region.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t dt,
-        const ptrdiff_t nnodes,
         const scalar_t *const SFEM_RESTRICT node_vol,
         const scalar_t *const SFEM_RESTRICT u_prev,
         const scalar_t *const SFEM_RESTRICT u_prev2,
@@ -2060,8 +2063,7 @@ inline void sscvfem_apply_transient_sweep(
     const bool      two = c.order >= 2;
     const scalar_t  a0 = c.a0, a1 = c.a1, a2 = c.a2;
     const scalar_t inv = scalar_t(1) / dt;
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const scalar_t w   = rho * node_vol[(size_t)i] * inv;
         const size_t   k   = (size_t)i * 3;
         const scalar_t u[3] = {ux[(size_t)i], uy[(size_t)i], uz[(size_t)i]};
@@ -2073,16 +2075,16 @@ inline void sscvfem_apply_transient_sweep(
 }
 
 inline void sscvfem_apply_transient_action_sweep(
-        // The staging object is gone; what this sweep reads out of it is what it takes.
-        const ptrdiff_t nnodes,
+        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
+        // sweep and what arrives is a range, so the sweep owns no parallel region.
+        const cvfem_range r,
         const scalar_t *const SFEM_RESTRICT node_vol,
         const scalar_t transient_w, const scalar_t rho,
                                                  const scalar_t *const SFEM_RESTRICT dir,
                                                  scalar_t *const SFEM_RESTRICT       jv) {
     CVFEM_TRACE_SCOPE("sscvfem::apply_transient_action_sweep");
     const scalar_t a = transient_w;
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const scalar_t w = a * node_vol[(size_t)i];
         for (int c = 0; c < 3; ++c) jv[i * CVFEM_HEX8_N_FIELDS + c] += w * dir[i * CVFEM_HEX8_N_FIELDS + c];
     }
@@ -2618,15 +2620,15 @@ static SFEM_NOINLINE void sscvfem_block_diag_curved_macro(
 // pressure. A post-pass over nodes rather than part of the macro-element sweep, for the same
 // reason sscvfem_apply_transient is one, so the two stay consistent by construction.
 inline void sscvfem_block_diag_transient(
-        // The staging object is gone; what this sweep reads out of it is what it takes.
-        const ptrdiff_t nnodes,
+        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
+        // sweep and what arrives is a range, so the sweep owns no parallel region.
+        const cvfem_range r,
         const scalar_t *const SFEM_RESTRICT node_vol,
         const scalar_t transient_w, const scalar_t rho,
                                          scalar_t *const SFEM_RESTRICT out) {
     const scalar_t a = transient_w;
     if (a == scalar_t(0)) return;
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const scalar_t w = a * node_vol[(size_t)i];
         for (int c = 0; c < 3; ++c) out[(size_t)i * 16 + (size_t)c * 4 + (size_t)c] += w;
     }

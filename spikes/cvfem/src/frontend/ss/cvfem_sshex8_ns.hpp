@@ -846,7 +846,8 @@ inline void sscvfem_node_volume(SSMeshData &d, std::vector<scalar_t> &node_vol) 
 inline void sscvfem_apply_body_force(SSMeshData &d, scalar_t *const SFEM_RESTRICT res) {
     if (d.fx.empty()) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
-    sscvfem_apply_body_force_sweep(d.fx.data(), d.fy.data(), d.fz.data(), d.nnodes, d.node_vol.data(), res);
+    #pragma omp parallel
+        sscvfem_apply_body_force_sweep(cvfem_range_split(0, d.nnodes, 1, cvfem_thread_index(), cvfem_n_threads()),d.fx.data(), d.fy.data(), d.fz.data(), d.node_vol.data(), res);
 }
 
 // Whether the term is live -- a positive step and a history of the right length -- and whether
@@ -860,7 +861,8 @@ inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t 
     // the history has two levels is what this side knows. The sweep reads u_prev2 only when
     // the order it is handed says two levels are there, so resolving the coefficients here is
     // also what keeps that read in bounds.
-    sscvfem_apply_transient_sweep(d.dt, d.nnodes, d.node_vol.data(), d.u_prev.data(), d.u_prev2.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho,
+    #pragma omp parallel
+        sscvfem_apply_transient_sweep(cvfem_range_split(0, d.nnodes, 1, cvfem_thread_index(), cvfem_n_threads()),d.dt, d.node_vol.data(), d.u_prev.data(), d.u_prev2.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho,
                                   cvfem_bdf_coeffs(d.bdf_order, d.dt, d.dt_prev,
                                                    (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes),
                                   res);
@@ -902,7 +904,8 @@ inline void sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
                                            scalar_t *const SFEM_RESTRICT       jv) {
     if (sscvfem_transient_diag_weight(d, rho) == scalar_t(0)) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
-    sscvfem_apply_transient_action_sweep(d.nnodes, d.node_vol.data(), sscvfem_transient_diag_weight(d, rho), rho, dir, jv);
+    #pragma omp parallel
+        sscvfem_apply_transient_action_sweep(cvfem_range_split(0, d.nnodes, 1, cvfem_thread_index(), cvfem_n_threads()), d.node_vol.data(), sscvfem_transient_diag_weight(d, rho), rho, dir, jv);
 }
 
 // The control residual, end to end. The body force and the transient term are post-passes over
@@ -1080,7 +1083,8 @@ inline void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, const scalar_t
     // sscvfem_node_volume is a full sweep over the macro elements for nothing.
     if (sscvfem_transient_diag_weight(d, rho) != scalar_t(0)) {
         if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
-        sscvfem_block_diag_transient(d.nnodes, d.node_vol.data(), sscvfem_transient_diag_weight(d, rho), rho, diag.data());
+        #pragma omp parallel
+            sscvfem_block_diag_transient(cvfem_range_split(0, d.nnodes, 1, cvfem_thread_index(), cvfem_n_threads()), d.node_vol.data(), sscvfem_transient_diag_weight(d, rho), rho, diag.data());
     }
 }
 
