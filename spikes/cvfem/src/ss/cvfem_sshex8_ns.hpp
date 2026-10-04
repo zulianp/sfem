@@ -2864,18 +2864,38 @@ inline void sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
     sscvfem_apply_transient_action_sweep(d.nnodes, d.node_vol.data(), sscvfem_transient_diag_weight(d, rho), rho, dir, jv);
 }
 
-inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const Hex8PecletConfig<scalar_t> peclet,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT macro_curved,
+        const ptrdiff_t nmacro,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                  scalar_t *const SFEM_RESTRICT res) {
     SFEM_TRACE_SCOPE("sscvfem::residual_naive");
-    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    const ptrdiff_t ndof = nnodes * N_FIELDS;
     for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
 
-    const int L = d.level;
+    const int L = level;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+    for (ptrdiff_t e = 0; e < nmacro; ++e) {
         // The geometry every micro cell of this macro element uses, as the hoisted
         // variants use it; see sscvfem_hoisted_cell. Real positions stay per cell.
         scalar_t hx[8], hy[8], hz[8];
@@ -2883,14 +2903,14 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(SSMeshData &d, const scal
             int ext[8];
             sscvfem_macro_corner_offsets(L, ext);
             for (int a = 0; a < 8; ++a) {
-                const smesh::idx_t gm = d.elems[ext[a]][e];
-                hx[a] = (scalar_t)d.points[0][gm];
-                hy[a] = (scalar_t)d.points[1][gm];
-                hz[a] = (scalar_t)d.points[2][gm];
+                const smesh::idx_t gm = elems[ext[a]][e];
+                hx[a] = (scalar_t)points[0][gm];
+                hy[a] = (scalar_t)points[1][gm];
+                hz[a] = (scalar_t)points[2][gm];
             }
             sscvfem_hoisted_cell(hx, hy, hz, L, hx, hy, hz);
         }
-        const bool curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
+        const bool curved_e = sscvfem_macro_curved(macro_curved, e);
         for (int zi = 0; zi < L; ++zi) {
             for (int yi = 0; yi < L; ++yi) {
                 for (int xi = 0; xi < L; ++xi) {
@@ -2899,36 +2919,35 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(SSMeshData &d, const scal
                     scalar_t     x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
                     scalar_t     r[CVFEM_HEX8_N_DOF];
                     for (int a = 0; a < 8; ++a) {
-                        g[a]   = d.elems[base + off[a]][e];
-                        x[a]   = (scalar_t)d.points[0][g[a]];
-                        y[a]   = (scalar_t)d.points[1][g[a]];
-                        z[a]   = (scalar_t)d.points[2][g[a]];
-                        ux[a]  = d.ux[(size_t)g[a]];
-                        uy[a]  = d.uy[(size_t)g[a]];
-                        uz[a]  = d.uz[(size_t)g[a]];
-                        p[a]   = d.p[(size_t)g[a]];
-                        pgx[a] = d.pgx[(size_t)g[a]];
-                        pgy[a] = d.pgy[(size_t)g[a]];
-                        pgz[a] = d.pgz[(size_t)g[a]];
+                        g[a]   = elems[base + off[a]][e];
+                        x[a]   = (scalar_t)points[0][g[a]];
+                        y[a]   = (scalar_t)points[1][g[a]];
+                        z[a]   = (scalar_t)points[2][g[a]];
+                        ux[a]  = ux_src[(size_t)g[a]];
+                        uy[a]  = uy_src[(size_t)g[a]];
+                        uz[a]  = uz_src[(size_t)g[a]];
+                        p[a]   = pres[(size_t)g[a]];
+                        pgx[a] = pgx_src[(size_t)g[a]];
+                        pgy[a] = pgy_src[(size_t)g[a]];
+                        pgz[a] = pgz_src[(size_t)g[a]];
                     }
                     // A curved macro element: this cell's own geometry, not the hoisted one, selected
                     // through pointers so the hoisted corners stay loop-invariant.
                     const scalar_t *const gx = curved_e ? x : hx;
                     const scalar_t *const gy = curved_e ? y : hy;
                     const scalar_t *const gz = curved_e ? z : hz;
-                    const Hex8RcConfig rcfg = sscvfem_rc_config(d);
                     const Hex8RhieChow rc{gx,      gy, gz,   pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                           nullptr, ux, uy, uz,  rcfg.tau};
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(gx, gy, gz, adj, &det);
                     cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, rc,
-                                                         d.upwind_eps,
+                                                         upwind_eps,
                                                          (const scalar_t *)nullptr,
                                                          (const scalar_t *)nullptr,
                                                          (const scalar_t *)nullptr,
                                                          (const scalar_t *)nullptr, 0, scalar_t(0),
-                                                         nullptr, d.conv_peclet);
-                    boundary_scs_add_residual<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, p, r);
+                                                         nullptr, peclet);
+                    boundary_scs_add_residual<false>(rho, mu, adj, det, box_lx, box_ly, box_lz, x, y, z, ux, uy, uz, p, r);
                     for (int a = 0; a < 8; ++a)
                         for (int c = 0; c < N_FIELDS; ++c)
                             atomic_add(res + (ptrdiff_t)g[a] * N_FIELDS + c, 0, r[a * 4 + c]);
@@ -2943,7 +2962,7 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(SSMeshData &d, const scal
 // sweep is the element pass.
 inline void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                    scalar_t *const SFEM_RESTRICT res) {
-    sscvfem_residual_naive_sweep(d, rho, mu, res);
+    sscvfem_residual_naive_sweep(d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
 }
@@ -2972,120 +2991,13 @@ inline void sscvfem_assemble_nodal_u_grad(SSMeshData &d) {
 // ho_override: -1 takes SFEM_CONV_HO from the environment as before, 0 or 1 forces it. The
 // freezing path below needs the same residual evaluated both ways on one state, and it is the
 // only caller that passes it; every existing call keeps the default and the existing behaviour.
-inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, const scalar_t mu,
-                                           scalar_t *const SFEM_RESTRICT res, const bool zero_first = true,
-                                           const int ho_override = -1) {
-    SFEM_TRACE_SCOPE("sscvfem::residual");
-    // Deferred-correction convection. Off by default and then bit-for-bit the scheme every
-    // recorded number here was measured with; the gradient is built once per residual, which
-    // is once per Newton step, because the correction is lagged by construction.
-    d.conv_ho      = (ho_override >= 0) ? ho_override : smesh::Env::read<int>("SFEM_CONV_HO", 0);
-    // DEFAULT 0, BECAUSE 0 IS WHAT CONVERGES. Measured on the backward-facing step at
-    // Re = 40, the deferred correction reaches the target in 24 Newton steps unlimited
-    // and does not converge at all with either limiter -- the bounded-face clip stalls
-    // at Re 14.04 after 399 steps, Venkatakrishnan's smooth form at Re 21.92 after 411.
-    // The limiter is the cause, not the reconstruction. Both remain reachable, because
-    // a bounded scheme is still wanted and reproducing the failure is a legitimate need.
-    d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 0);
-    // SFEM_VENKAT_K: the dimensionless K in Venkatakrishnan's eps^2 = (K dx)^3, which is his
-    // deactivation threshold -- below it the limiter switches itself off and the increment
-    // passes through untouched. DEFAULT 0, which is the zero-severity control: it recovers
-    // the arm measured above exactly, so a sweep over K starts from a known point rather than
-    // from a different scheme. K is dimensionless and the scales are restored here, from the
-    // reference velocity and the box length, because the kernel has neither.
-    {
-        const scalar_t k = smesh::Env::read<scalar_t>("SFEM_VENKAT_K", 0);
-        const scalar_t u = smesh::Env::read<scalar_t>("SFEM_U", 1);
-        d.conv_venkat_c  = cvfem_venkata_eps2_coeff(k, u, d.Lx);
-    }
-    {
-        d.limiter_stats = cvfem_limiter_stats_sink();
-    }
-
-    d.conv_peclet = cvfem_hex8_peclet_config<scalar_t>();
-    if (d.conv_ho && d.conv_peclet.form) {
-        // Same refusal as the flat path, and it must be here too: this reader is independent,
-        // so a check in only one of them leaves the other running the undefined combination.
-        std::fprintf(stderr,
-                     "SFEM_PECLET_BLEND with SFEM_CONV_HO is not defined: the deferred "
-                     "correction's donor split comes from the unblended flux. Run one or the "
-                     "other.\n");
-        std::abort();
-    }
-    // SFEM_CONV_FREEZE: hold the deferred correction fixed through a continuation stage.
-    //
-    // The correction is a LAGGED source, so the Newton loop is also a fixed-point iteration on
-    // it, and an arm whose limiter changes which branch it takes between iterations makes that
-    // iteration chatter instead of settle. Freezing removes the fixed point outright: the
-    // stage's correction is built once from the stage's opening state and then it is a
-    // constant, so Newton sees a smooth first-order problem with a source term.
-    //
-    // Built as the DIFFERENCE of two residuals on the same state rather than by a new sweep.
-    // R(ho) - R(lo) is exactly the correction's contribution -- every other term is identical
-    // between them -- so this reuses the residual the tree already has instead of adding a
-    // second path that computes the same quantity. It costs two extra residual evaluations per
-    // stage, against the tens to hundreds of Newton steps the arm takes.
-    //
-    // AND IT MAKES NEWTON CONSISTENT, which is the part worth predicting before measuring.
-    // Frozen, the residual is R_lo(u) plus a constant, so its exact Jacobian is J_lo(u) --
-    // which is precisely the first-order Jacobian this path already assembles, because the
-    // deferred correction deliberately keeps the tangent first order. Unfrozen, the
-    // correction moves with u and that assembled Jacobian is NOT the residual's derivative,
-    // so Newton is inexact and the outer iteration is really a fixed point on the lagged
-    // source. Freezing removes the inexactness rather than damping it, so the expectation is
-    // convergence at roughly the first-order arm's step count -- and that is the prediction
-    // the measurement should be read against.
-    //
-    // The recursion terminates because the two inner calls pass ho_override, and the branch
-    // fires only for the outer, environment-driven call.
-    if (ho_override < 0) {
-    // DEFAULT 1, BECAUSE 1 IS WHAT WORKS. Measured on Grace, backward-facing step at Re = 40
-    // and the manufactured solution at Re = 100:
-    //
-    //                          Newton steps          u L2 rate
-    //                       7,060      47,268        (8/16/32)
-    //   unfrozen, K = 0       103         303          2.120
-    //   unfrozen, unlimited    24    NO CONVERGENCE    2.227
-    //   FROZEN,   K = 0        15          12          2.272
-    //
-    // Frozen is better on every axis measured: fewer Newton steps, 3.3x fewer linear
-    // iterations, final residuals of 1e-9 against 5e-7, a HIGHER fitted order of accuracy,
-    // and it converges where the unlimited arm does not. It also keeps the bound fully
-    // intact, which Venkatakrishnan's eps^2 buys its convergence by giving up.
-    //
-    // It is an approximation and the default should say so: frozen, the converged state
-    // solves R_lo(u) + frozen = 0 rather than R_ho(u) = 0, with the correction taken at the
-    // stage's opening state. The accuracy ladder is what licenses the default -- if the
-    // correction were too stale the order would fall toward 1, and it rises instead.
-    //
-    // SFEM_CONV_FREEZE=0 restores the unfrozen scheme. This changes nothing when
-    // SFEM_CONV_HO is off, which is still the overall default: the branch is guarded on it.
-        d.conv_freeze = smesh::Env::read<int>("SFEM_CONV_FREEZE", 1);
-        if (d.conv_freeze && d.conv_ho) {
-            const ptrdiff_t n = d.nnodes * N_FIELDS;
-            if ((ptrdiff_t)d.conv_frozen.size() != n) {
-                std::vector<scalar_t> r_ho((size_t)n), r_lo((size_t)n);
-                sscvfem_residual(d, rho, mu, r_ho.data(), true, 1);
-                sscvfem_residual(d, rho, mu, r_lo.data(), true, 0);
-                d.conv_frozen.resize((size_t)n);
-                for (ptrdiff_t i = 0; i < n; ++i) d.conv_frozen[(size_t)i] = r_ho[(size_t)i] - r_lo[(size_t)i];
-            }
-            sscvfem_residual(d, rho, mu, res, zero_first, 0);
-            for (ptrdiff_t i = 0; i < n; ++i) res[i] += d.conv_frozen[(size_t)i];
-            return;
-        }
-        // Not frozen this call: drop any correction held from an earlier configuration so a
-        // run that turns freezing off mid-flight cannot keep adding a stale source.
-        if (!d.conv_freeze && !d.conv_frozen.empty()) d.conv_frozen.clear();
-    }
-
-    if (d.conv_ho) sscvfem_assemble_nodal_u_grad(d);
-    else d.ugrad.clear();
-
-    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
-    if (zero_first)
-        for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
-
+// The residual's element pass. Everything the options decide -- which convection scheme, which
+// limiter, whether the correction is frozen, whether a nodal velocity gradient exists at all --
+// has been decided by the launcher below and reaches here as data.
+inline SFEM_NOINLINE void sscvfem_residual_sweep(SSMeshData &d, const scalar_t rho,
+                                                 const scalar_t                mu,
+                                                 scalar_t *const SFEM_RESTRICT res) {
+    SFEM_TRACE_SCOPE("sscvfem::residual_sweep");
     const int L   = d.level;
     const int nxe = d.nxe;
     int       off[8];
@@ -3228,6 +3140,123 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
     }
 
     if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), res);
+}
+
+inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                           scalar_t *const SFEM_RESTRICT res, const bool zero_first = true,
+                                           const int ho_override = -1) {
+    SFEM_TRACE_SCOPE("sscvfem::residual");
+    // Deferred-correction convection. Off by default and then bit-for-bit the scheme every
+    // recorded number here was measured with; the gradient is built once per residual, which
+    // is once per Newton step, because the correction is lagged by construction.
+    d.conv_ho      = (ho_override >= 0) ? ho_override : smesh::Env::read<int>("SFEM_CONV_HO", 0);
+    // DEFAULT 0, BECAUSE 0 IS WHAT CONVERGES. Measured on the backward-facing step at
+    // Re = 40, the deferred correction reaches the target in 24 Newton steps unlimited
+    // and does not converge at all with either limiter -- the bounded-face clip stalls
+    // at Re 14.04 after 399 steps, Venkatakrishnan's smooth form at Re 21.92 after 411.
+    // The limiter is the cause, not the reconstruction. Both remain reachable, because
+    // a bounded scheme is still wanted and reproducing the failure is a legitimate need.
+    d.conv_limiter = smesh::Env::read<int>("SFEM_CONV_LIMITER", 0);
+    // SFEM_VENKAT_K: the dimensionless K in Venkatakrishnan's eps^2 = (K dx)^3, which is his
+    // deactivation threshold -- below it the limiter switches itself off and the increment
+    // passes through untouched. DEFAULT 0, which is the zero-severity control: it recovers
+    // the arm measured above exactly, so a sweep over K starts from a known point rather than
+    // from a different scheme. K is dimensionless and the scales are restored here, from the
+    // reference velocity and the box length, because the kernel has neither.
+    {
+        const scalar_t k = smesh::Env::read<scalar_t>("SFEM_VENKAT_K", 0);
+        const scalar_t u = smesh::Env::read<scalar_t>("SFEM_U", 1);
+        d.conv_venkat_c  = cvfem_venkata_eps2_coeff(k, u, d.Lx);
+    }
+    {
+        d.limiter_stats = cvfem_limiter_stats_sink();
+    }
+
+    d.conv_peclet = cvfem_hex8_peclet_config<scalar_t>();
+    if (d.conv_ho && d.conv_peclet.form) {
+        // Same refusal as the flat path, and it must be here too: this reader is independent,
+        // so a check in only one of them leaves the other running the undefined combination.
+        std::fprintf(stderr,
+                     "SFEM_PECLET_BLEND with SFEM_CONV_HO is not defined: the deferred "
+                     "correction's donor split comes from the unblended flux. Run one or the "
+                     "other.\n");
+        std::abort();
+    }
+    // SFEM_CONV_FREEZE: hold the deferred correction fixed through a continuation stage.
+    //
+    // The correction is a LAGGED source, so the Newton loop is also a fixed-point iteration on
+    // it, and an arm whose limiter changes which branch it takes between iterations makes that
+    // iteration chatter instead of settle. Freezing removes the fixed point outright: the
+    // stage's correction is built once from the stage's opening state and then it is a
+    // constant, so Newton sees a smooth first-order problem with a source term.
+    //
+    // Built as the DIFFERENCE of two residuals on the same state rather than by a new sweep.
+    // R(ho) - R(lo) is exactly the correction's contribution -- every other term is identical
+    // between them -- so this reuses the residual the tree already has instead of adding a
+    // second path that computes the same quantity. It costs two extra residual evaluations per
+    // stage, against the tens to hundreds of Newton steps the arm takes.
+    //
+    // AND IT MAKES NEWTON CONSISTENT, which is the part worth predicting before measuring.
+    // Frozen, the residual is R_lo(u) plus a constant, so its exact Jacobian is J_lo(u) --
+    // which is precisely the first-order Jacobian this path already assembles, because the
+    // deferred correction deliberately keeps the tangent first order. Unfrozen, the
+    // correction moves with u and that assembled Jacobian is NOT the residual's derivative,
+    // so Newton is inexact and the outer iteration is really a fixed point on the lagged
+    // source. Freezing removes the inexactness rather than damping it, so the expectation is
+    // convergence at roughly the first-order arm's step count -- and that is the prediction
+    // the measurement should be read against.
+    //
+    // The recursion terminates because the two inner calls pass ho_override, and the branch
+    // fires only for the outer, environment-driven call.
+    if (ho_override < 0) {
+    // DEFAULT 1, BECAUSE 1 IS WHAT WORKS. Measured on Grace, backward-facing step at Re = 40
+    // and the manufactured solution at Re = 100:
+    //
+    //                          Newton steps          u L2 rate
+    //                       7,060      47,268        (8/16/32)
+    //   unfrozen, K = 0       103         303          2.120
+    //   unfrozen, unlimited    24    NO CONVERGENCE    2.227
+    //   FROZEN,   K = 0        15          12          2.272
+    //
+    // Frozen is better on every axis measured: fewer Newton steps, 3.3x fewer linear
+    // iterations, final residuals of 1e-9 against 5e-7, a HIGHER fitted order of accuracy,
+    // and it converges where the unlimited arm does not. It also keeps the bound fully
+    // intact, which Venkatakrishnan's eps^2 buys its convergence by giving up.
+    //
+    // It is an approximation and the default should say so: frozen, the converged state
+    // solves R_lo(u) + frozen = 0 rather than R_ho(u) = 0, with the correction taken at the
+    // stage's opening state. The accuracy ladder is what licenses the default -- if the
+    // correction were too stale the order would fall toward 1, and it rises instead.
+    //
+    // SFEM_CONV_FREEZE=0 restores the unfrozen scheme. This changes nothing when
+    // SFEM_CONV_HO is off, which is still the overall default: the branch is guarded on it.
+        d.conv_freeze = smesh::Env::read<int>("SFEM_CONV_FREEZE", 1);
+        if (d.conv_freeze && d.conv_ho) {
+            const ptrdiff_t n = d.nnodes * N_FIELDS;
+            if ((ptrdiff_t)d.conv_frozen.size() != n) {
+                std::vector<scalar_t> r_ho((size_t)n), r_lo((size_t)n);
+                sscvfem_residual(d, rho, mu, r_ho.data(), true, 1);
+                sscvfem_residual(d, rho, mu, r_lo.data(), true, 0);
+                d.conv_frozen.resize((size_t)n);
+                for (ptrdiff_t i = 0; i < n; ++i) d.conv_frozen[(size_t)i] = r_ho[(size_t)i] - r_lo[(size_t)i];
+            }
+            sscvfem_residual(d, rho, mu, res, zero_first, 0);
+            for (ptrdiff_t i = 0; i < n; ++i) res[i] += d.conv_frozen[(size_t)i];
+            return;
+        }
+        // Not frozen this call: drop any correction held from an earlier configuration so a
+        // run that turns freezing off mid-flight cannot keep adding a stale source.
+        if (!d.conv_freeze && !d.conv_frozen.empty()) d.conv_frozen.clear();
+    }
+
+    if (d.conv_ho) sscvfem_assemble_nodal_u_grad(d);
+    else d.ugrad.clear();
+
+    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    if (zero_first)
+        for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
+
+    sscvfem_residual_sweep(d, rho, mu, res);
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
 }
