@@ -1447,7 +1447,7 @@ int main(int argc, char **argv) {
     // sum-factorised kernel with the same per-pack staging; a difference here is a staging
     // bug and nothing else.
     if (rhie_chow && (verify || verify_jac) && layout != "ecolor") {
-        apply_residual_atomic_sumfact(d, rho, mu);
+        apply_residual_atomic_sumfact(d, cvfem_hex8_extras_of(d), rho, mu);
         std::vector<scalar_t> atomic_r;
         pack_residual(d, atomic_r);
         apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Sumfact);
@@ -1557,7 +1557,7 @@ int main(int argc, char **argv) {
         std::vector<scalar_t> current_r;
         pack_residual(d, current_r);
 
-        apply_residual_atomic_sumfact(d, rho, mu);
+        apply_residual_atomic_sumfact(d, cvfem_hex8_extras_of(d), rho, mu);
         std::vector<scalar_t> sumfact_r;
         pack_residual(d, sumfact_r);
         const scalar_t sumfact_err = max_abs_diff(current_r.data(), sumfact_r.data(), (ptrdiff_t)current_r.size());
