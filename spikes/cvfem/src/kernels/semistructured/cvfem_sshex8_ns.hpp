@@ -359,6 +359,9 @@ static SFEM_INLINE Hex8BoundaryDataT<scalar_t> sscvfem_bd(
 // the whole reason the packed path beats the scatter one -- and multiplying by an exact 1
 // otherwise, so the default path is unchanged bit for bit rather than merely equivalent.
 inline void sscvfem_nodal_grad_packed_sweep(
+        // The range of PACKS this call is to cover. DESIGN.md: the threading is abstract
+        // outside the sweep and what arrives is a range.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t *const SFEM_RESTRICT grad_w_inv,
         const int level,
@@ -395,14 +398,12 @@ inline void sscvfem_nodal_grad_packed_sweep(
     const auto *const py = points[1];
     const auto *const pz = points[2];
 
-#pragma omp parallel
     {
         // Slots 7 and 8, which belong to this routine; see CVFEM_PACK_SCRATCH_SLOTS.
         scalar_t *const SFEM_RESTRICT pack_f   = thread_scratch<scalar_t>(7, (size_t)node_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(8, 3 * (size_t)node_n);
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+        for (ptrdiff_t pack = r.begin; pack < r.end; ++pack) {
             const ptrdiff_t e_start      = pack * n_elements_per_pack;
             // Bounded by the PACKED element count, not by the block's.
             //
@@ -492,19 +493,10 @@ inline void sscvfem_nodal_grad_packed_sweep(
         }
     }
 
-    // The packed layout's ghost reduction, which is cvfem_hex8_ghost_reduce_soa_range at width
-    // three with the reconstruction's weight folded in. This was a copy of that loop; the one in
-    // kernels/packed/ is now templated on the width and on whether it scales, so both widths
-    // compile from one body.
-    {
-        scalar_t *const g3[3] = {gx_out, gy_out, gz_out};
-#pragma omp parallel
-        cvfem_hex8_ghost_reduce_soa_range<3, /*SCALED=*/true>(
-                cvfem_range_split(0, n_ghost_reduce_rows, 1, cvfem_thread_index(),
-                                  cvfem_n_threads()),
-                ghost_reduce_dest, ghost_reduce_ptr, ghost_reduce_idx, n_ghost_entries,
-                ghost_buf, apply_weight ? w : nullptr, g3);
-    }
+    // The ghost reduction is the launcher's: a second, independent loop over the ghost
+    // reduce rows, run after this pass's threads have joined. It is
+    // cvfem_hex8_ghost_reduce_soa_range at width three with the reconstruction's weight
+    // folded in; see sscvfem_nodal_grad_packed.
 }
 
 // Defined below, declared here because sscvfem_nodal_grad_strided calls it.

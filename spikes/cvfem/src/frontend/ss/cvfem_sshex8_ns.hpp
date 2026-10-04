@@ -432,8 +432,25 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
         ogz.assign((size_t)d.nnodes, scalar_t(0));
     }
 
-    sscvfem_nodal_grad_packed_sweep(d.grad_w_inv.data(), d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.points, p.elems, const_cast<scalar_t *>(p.ghost_buf.data()), p.ghost_idx, p.ghost_ptr, p.ghost_reduce_dest, p.ghost_reduce_idx, p.ghost_reduce_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.n_ghost_reduce_rows, p.n_packed_elements, p.n_packs, p.owned_nodes_ptr, src, stride, ogx.data(), ogy.data(), ogz.data(),
+    #pragma omp parallel
+        sscvfem_nodal_grad_packed_sweep(
+                cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),d.grad_w_inv.data(), d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.points, p.elems, const_cast<scalar_t *>(p.ghost_buf.data()), p.ghost_idx, p.ghost_ptr, p.ghost_reduce_dest, p.ghost_reduce_idx, p.ghost_reduce_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.n_ghost_reduce_rows, p.n_packed_elements, p.n_packs, p.owned_nodes_ptr, src, stride, ogx.data(), ogy.data(), ogz.data(),
                                     apply_weight);
+    // The ghost reduction, the pack layout's second and independent loop: over the ghost
+    // reduce rows rather than the packs, so it gets its own range and runs after the pack
+    // pass's threads have joined. Width three with the reconstruction's weight folded in,
+    // which is what the scaled instantiation is for -- the ghost rows have to be
+    // normalised the same way the drain normalises the owned ones.
+    if (p.n_ghost_reduce_rows > 0) {
+        scalar_t *const g3[3] = {ogx.data(), ogy.data(), ogz.data()};
+    #pragma omp parallel
+        cvfem_hex8_ghost_reduce_soa_range<3, /*SCALED=*/true>(
+                cvfem_range_split(0, p.n_ghost_reduce_rows, 1, cvfem_thread_index(),
+                                  cvfem_n_threads()),
+                p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx,
+                p.n_ghost_entries, p.ghost_buf.data(),
+                apply_weight ? d.grad_w_inv.data() : nullptr, g3);
+    }
 }
 
 // Whether the packing spans the whole mesh. On a distributed mesh it does not.
