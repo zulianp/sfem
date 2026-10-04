@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
             // the diagonal blocks. The second is what makes this a statement about the
             // Jacobian rather than about two functions agreeing with each other.
             std::vector<scalar_t> bd_naive, bd_macro;
-            sscvfem_block_diag_naive(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, bd_naive);
+            sscvfem_block_diag_naive(d, rho, mu, bd_naive);
             sscvfem_block_diag(d, rho, mu, bd_macro);
 
             double bdmax = 0, bdref = 0;
@@ -244,7 +244,7 @@ int main(int argc, char **argv) {
             const double t_emf  = 0;
             const double t_best = std::min(std::min(t_macro, t_aff), t_hoi);
 #endif
-            const double t_bdn = time_it([&] { sscvfem_block_diag_naive(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, bd_naive); });
+            const double t_bdn = time_it([&] { sscvfem_block_diag_naive(d, rho, mu, bd_naive); });
             const double t_bdm = time_it([&] { sscvfem_block_diag(d, rho, mu, bd_macro); });
 
             // Residual: the two layouts must agree, as everywhere else.

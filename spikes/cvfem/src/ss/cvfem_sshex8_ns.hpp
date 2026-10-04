@@ -3243,7 +3243,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
 
 // Control: the flat gather, one masked element assembly per micro-element, atomics to a
 // node-indexed destination.
-inline SFEM_NOINLINE void sscvfem_block_diag_naive(
+inline SFEM_NOINLINE void sscvfem_block_diag_naive_sweep(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t box_lx,
         const scalar_t box_ly,
@@ -3262,10 +3262,8 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive(
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
-                                                   std::vector<scalar_t> &diag) {
+                                                   scalar_t *const SFEM_RESTRICT out) {
     SFEM_TRACE_SCOPE("sscvfem::block_diag_naive");
-    diag.assign((size_t)nnodes * 16, scalar_t(0));
-    scalar_t *const SFEM_RESTRICT out = diag.data();
 
     const int L = level;
     int       off[8];
@@ -3334,6 +3332,17 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive(
             }
         }
     }
+}
+
+// The control's allocation, which is the caller's. The sweep writes a buffer.
+inline void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                     std::vector<scalar_t> &diag) {
+    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
+    sscvfem_block_diag_naive_sweep(d.Lx, d.Ly, d.Lz, d.elems, d.level,
+                                   d.macro_curved.empty() ? nullptr : d.macro_curved.data(),
+                                   d.nmacro, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
+                                   d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(),
+                                   sscvfem_rc_config(d), rho, mu, diag.data());
 }
 
 // The default: gather the macro-element once, accumulate into a macro-local destination
