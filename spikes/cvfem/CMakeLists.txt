@@ -51,6 +51,23 @@ enable_testing()
 # is where most of this spike is developed.
 option(CVFEM_ENABLE_CUDA "Build the CVFEM HEX8 CUDA targets" OFF)
 
+# THE PHASE BREAKDOWN, AND WHERE IT IS NOT WANTED.
+#
+# The packed sweeps carry probes that report where their time goes -- local memset, gather,
+# kernel, scatter, ghost reduction -- which is what the benchmark's --breakdown prints. They are
+# macros (see src/kernels/cvfem_phases.hpp) so that they can be compiled out rather than merely
+# switched off at runtime: with CVFEM_PHASES=0 there is no clock read, no accumulator, no branch
+# and no parameter carrying the accumulator through the signature. Measured on a probe kernel,
+# the disabled build holds no reference to wall_time or g_breakdown at all.
+#
+# ON by default, because the benchmark is where this spike measures things and --breakdown is one
+# of the ways it does. The operator library below sets it to 0 regardless: a breakdown is a
+# benchmark feature, and the library SFEM links has no caller for it.
+option(CVFEM_ENABLE_PHASES "Compile the packed sweeps' phase-breakdown probes" ON)
+if(NOT CVFEM_ENABLE_PHASES)
+    add_compile_definitions(CVFEM_PHASES=0)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(CVFEMCMakeFunctions)
 
@@ -105,6 +122,12 @@ target_link_libraries(cvfem_ns_op
     PUBLIC
         SFEM::sfem
         $<$<BOOL:${OpenMP_CXX_FOUND}>:OpenMP::OpenMP_CXX>)
+# The breakdown probes are a benchmark feature; this library has no caller for one, so they are
+# compiled out of it whatever CVFEM_ENABLE_PHASES says. The kernels it does instantiate carry no
+# probes today, so this states the intent rather than changing the code -- which is the point of
+# saying it on the target rather than relying on that staying true.
+target_compile_definitions(cvfem_ns_op PRIVATE CVFEM_PHASES=0)
+
 target_include_directories(cvfem_ns_op PUBLIC
     ${CVFEM_INCLUDE_DIRS}
     ${CVFEM_SFEM_ALGEBRA_INCLUDES})

@@ -7,6 +7,7 @@
 // memcpy, so every global block is written exactly once: no zero_bsr4 pass and no
 // read-modify-write. Only the ghost rows still need a reduction.
 
+#include "kernels/cvfem_phases.hpp"
 #include "best/cvfem_hex8_best_common.hpp"
 #include "kernels/cvfem_range.hpp"
 
@@ -194,7 +195,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
         const KernelKind kernel_kind,
         scalar_t *const SFEM_RESTRICT gvalues,
         const int                     with_rc,
-        PhaseAcc                     &acc,
+        CVFEM_PHASE_ACC_PARAM
         scalar_t *const SFEM_RESTRICT pack_u,
         scalar_t *const SFEM_RESTRICT local_vals,
         scalar_t *const SFEM_RESTRICT pack_x,
@@ -217,9 +218,9 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
             const int                               owned_nnz    = st_owned_nnz[(size_t)pack];
             const int                               local_nnz    = st_local_nnz[(size_t)pack];
 
-            double _t = phase_now();
+            CVFEM_PHASE_CLOCK(_t);
             std::memset(local_vals, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
 
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
@@ -227,7 +228,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
                                                pack_pgx, pack_pgy, pack_pgz);
             if constexpr (ISO)
                 fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             for (ptrdiff_t e = e_start; e < e_end; ++e) {
                 scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
@@ -296,7 +297,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
                     }
                 }
             }
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
             // owned rows: one streaming store over a contiguous global slice
             std::memcpy(gvalues + (ptrdiff_t)rowptr[owned] * 16, local_vals, (size_t)owned_nnz * 16 * sizeof(scalar_t));
@@ -310,7 +311,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
                             local_vals + (ptrdiff_t)owned_nnz * 16,
                             (size_t)n * 16 * sizeof(scalar_t));
             }
-            if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
+            CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
     }
 }
 
@@ -334,7 +335,7 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
 
 #pragma omp parallel
     {
-        PhaseAcc                      acc;
+        CVFEM_PHASE_ACC(acc);
         scalar_t *const SFEM_RESTRICT pack_u     = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals = thread_scratch<scalar_t>(2, bsr_n);
         scalar_t *const SFEM_RESTRICT pack_xyz =
@@ -353,14 +354,14 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack)
             assemble_jacobian_store_range<ISO>(cvfem_range{pack, pack + 1},
                                                d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr, p.n_elements_per_pack, p.owned_nodes_ptr, p.st_element_slot.data(), p.st_ghost_ptr.data(), p.st_ghost_val.data(), p.st_local_nnz.data(), p.st_owned_nnz.data(), b.rowptr, rho, mu, kernel_kind, gvalues, with_rc,
-                                               acc, pack_u, local_vals, pack_x, pack_y, pack_z,
+                                               CVFEM_PHASE_ACC_ARG pack_u, local_vals, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz,
             cvfem_hex8_rc_config_for(d));
-        acc.flush();
+        CVFEM_PHASE_FLUSH(acc);
     }
 
 
-    const double _tg = phase_now();
+    CVFEM_PHASE_CLOCK(_tg);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
         const ptrdiff_t begin = p.ghost_reduce_ptr[row];
@@ -374,7 +375,7 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
             }
         }
     }
-    if (g_breakdown) g_phase[PH_GHOST] += wall_time() - _tg;
+    CVFEM_PHASE_GLOBAL(_tg, PH_GHOST);
 }
 
 #endif  // CVFEM_HEX8_BEST_STORE_HPP

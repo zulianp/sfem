@@ -11,6 +11,7 @@
 // trip through it costs more than it saves; see cvfem_hex8_best_colored.hpp
 // and cvfem_hex8_best_store.hpp.
 
+#include "kernels/cvfem_phases.hpp"
 #include "best/cvfem_hex8_best_common.hpp"
 #include "kernels/cvfem_range.hpp"
 
@@ -842,7 +843,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
         const Hex8RcConfig &rc_cfg) {
-        PhaseAcc acc;
+        CVFEM_PHASE_ACC(acc);
         alignas(ALIGN_BYTES) scalar_t dense_ke[64 * 16];
         std::memset(dense_ke, 0, sizeof(dense_ke));
         scalar_t *const SFEM_RESTRICT pack_u          = thread_scratch<scalar_t>(0, u_n);
@@ -875,9 +876,9 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
             // because this becomes a raw pointer when the kernel stops taking PackedData.
             const int                               local_nnz    = lrowptr[(size_t)(n_contiguous + n_ghost)];
 
-            double _t = phase_now();
+            CVFEM_PHASE_CLOCK(_t);
             std::memset(local_vals_pack, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
 
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
@@ -885,7 +886,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
                                                pack_pgx, pack_pgy, pack_pgz);
             if constexpr (ISO)
                 fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             for (ptrdiff_t e = e_start; e < e_end; ++e) {
                 scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
@@ -947,7 +948,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
                 }
             }
 
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
             const int                     owned_nnz = n_contiguous > 0 ? lrowptr[(size_t)n_contiguous] : 0;
             if (!g_kernel_only)
                 for (int t = 0; t < owned_nnz; ++t)
@@ -963,9 +964,9 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
                             local_vals_pack + (ptrdiff_t)begin * 16,
                             (size_t)(end - begin) * 16 * sizeof(scalar_t));
             }
-            if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
+            CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
     }
-        acc.flush();
+        CVFEM_PHASE_FLUSH(acc);
 }
 
 
@@ -993,7 +994,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
             d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, kernel_kind, u_n, bsr_n, with_rc,
             cvfem_hex8_rc_config_for(d));
 
-    const double _tg = phase_now();
+    CVFEM_PHASE_CLOCK(_tg);
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
@@ -1008,7 +1009,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
             }
         }
     }
-    if (g_breakdown) g_phase[PH_GHOST] += wall_time() - _tg;
+    CVFEM_PHASE_GLOBAL(_tg, PH_GHOST);
 }
 
 
@@ -1088,7 +1089,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
         // The breakdown covered packed assembly and the colored matvec but not this one --
         // the operator the solver's Krylov loop actually applies. Without it nothing here
         // could be attributed to a phase.
-        PhaseAcc                      acc;
+        CVFEM_PHASE_ACC(acc);
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
@@ -1117,9 +1118,9 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
             const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = ghost_ptr[pack];
 
-            double _t = phase_now();
+            CVFEM_PHASE_CLOCK(_t);
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
 
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
             fill_pack_interleaved(owned_nodes_ptr, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
@@ -1142,7 +1143,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
                 cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
             if constexpr (ISO)
                 fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                 const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
@@ -1240,7 +1241,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
                 }
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
             std::memcpy(jv + owned * N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)N_FIELDS * sizeof(scalar_t));
 
@@ -1255,9 +1256,9 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
                 gz[ghost_off + k]                       = out[2];
                 gc[ghost_off + k]                       = out[3];
             }
-            if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
+            CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
     }
-        acc.flush();
+        CVFEM_PHASE_FLUSH(acc);
 }
 
 
@@ -1294,7 +1295,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
             cvfem_hex8_rc_config_for(d),
             d.adj_ptr, d.det_ptr);
 
-    const double _tg = phase_now();
+    CVFEM_PHASE_CLOCK(_tg);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
         const idx_t dest  = p.ghost_reduce_dest[row];
@@ -1308,7 +1309,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
             out[f] += sum;
         }
     }
-    if (g_breakdown) g_phase[PH_GHOST] += wall_time() - _tg;
+    CVFEM_PHASE_GLOBAL(_tg, PH_GHOST);
 }
 
 
@@ -1371,7 +1372,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
         const Hex8RcConfig &rc_cfg) {
-        PhaseAcc                      acc;
+        CVFEM_PHASE_ACC(acc);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         // Three arrays in slot 3, not six: the nodal pressure gradient is inside the store.
@@ -1396,16 +1397,16 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
             const idx_t *const SFEM_RESTRICT ghosts    = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off = ghost_ptr[pack];
 
-            double _t = phase_now();
+            CVFEM_PHASE_CLOCK(_t);
             std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
 
             fill_pack_interleaved(owned_nodes_ptr, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
             if (with_qg) {
                 fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
                 cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
             }
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             Hex8InputPack    du_pack;
             Hex8ResidualPack outp;
@@ -1431,7 +1432,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
                                                              with_rc ? &rcp : nullptr, rhie_chow_scale, with_qg);
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
-            if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
+            CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
             std::memcpy(jv + owned * N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)N_FIELDS * sizeof(scalar_t));
             scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
@@ -1445,9 +1446,9 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
                 gz[ghost_off + k]                       = out[2];
                 gc[ghost_off + k]                       = out[3];
             }
-            if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
+            CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
     }
-        acc.flush();
+        CVFEM_PHASE_FLUSH(acc);
 }
 
 
@@ -1467,7 +1468,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
             d.adj_ptr, d.det_ptr, d.nelements, d.pa_tangent.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, scratch_n, with_rc, with_qg,
             cvfem_hex8_rc_config_for(d));
 
-    const double _tg = phase_now();
+    CVFEM_PHASE_CLOCK(_tg);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
         const idx_t dest  = p.ghost_reduce_dest[row];
@@ -1481,7 +1482,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
             out[f] += sum;
         }
     }
-    if (g_breakdown) g_phase[PH_GHOST] += wall_time() - _tg;
+    CVFEM_PHASE_GLOBAL(_tg, PH_GHOST);
 }
 
 #endif  // CVFEM_HEX8_BEST_PACKED_HPP
