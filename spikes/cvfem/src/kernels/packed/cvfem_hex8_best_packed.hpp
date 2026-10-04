@@ -830,7 +830,7 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
-template <bool ISO>
+template <bool ISO, KernelKind K>
 static SFEM_NOINLINE void assemble_jacobian_packed_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -864,7 +864,6 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
         scalar_t *const SFEM_RESTRICT gvalues,
         const scalar_t rho,
         const scalar_t mu,
-        const KernelKind kernel_kind,
         const size_t u_n,
         const size_t bsr_n,
         const int with_rc,
@@ -948,7 +947,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
                 if constexpr (ISO) {
                     scalar_t x[8], y[8], z[8];
                     gather_hex8_coords_from_pack(pack_elems, pack_x, pack_y, pack_z, e, x, y, z);
-                    if (kernel_kind == KernelKind::Fd) {
+                    if constexpr (K == KernelKind::Fd) {
                         scalar_t ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
                         cvfem_hex8_ns_upwind_jacobian_fd_isoparam(rho, mu, x, y, z, ux_e, uy_e, uz_e, p_e, ke);
                         hex8_local_slots_to_bsr4(slots, ke, local_vals);
@@ -956,18 +955,18 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
                         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
                                 rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
                     }
-                } else if (kernel_kind == KernelKind::Sumfact) {
+                } else if constexpr (K == KernelKind::Sumfact) {
                     cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
                             rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
-                } else if (kernel_kind == KernelKind::Sympy) {
+                } else if constexpr (K == KernelKind::Sympy) {
                     cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
-                } else if (kernel_kind == KernelKind::SympyBlock) {
+                } else if constexpr (K == KernelKind::SympyBlock) {
                     cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_blockwise(
                             rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
-                } else if (kernel_kind == KernelKind::SympyRow) {
+                } else if constexpr (K == KernelKind::SympyRow) {
                     cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(
                             rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
-                } else if (kernel_kind == KernelKind::SympyFace) {
+                } else if constexpr (K == KernelKind::SympyFace) {
                     cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise(
                             rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
                 } else {
@@ -1019,9 +1018,46 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
 
 
 #pragma omp parallel
-    assemble_jacobian_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, kernel_kind, u_n, bsr_n, with_rc,
+    // Six variants, chosen here instead of tested per pack. The default carries the remaining
+    // values to the body's own final branch, which treated them alike already, so this
+    // instantiates seven bodies rather than the enum's thirteen.
+    switch (kernel_kind) {
+        case KernelKind::Fd:
+            assemble_jacobian_packed_range<ISO, KernelKind::Fd>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
             cvfem_hex8_rc_config_for(d));
+            break;
+        case KernelKind::Sumfact:
+            assemble_jacobian_packed_range<ISO, KernelKind::Sumfact>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
+            cvfem_hex8_rc_config_for(d));
+            break;
+        case KernelKind::Sympy:
+            assemble_jacobian_packed_range<ISO, KernelKind::Sympy>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
+            cvfem_hex8_rc_config_for(d));
+            break;
+        case KernelKind::SympyBlock:
+            assemble_jacobian_packed_range<ISO, KernelKind::SympyBlock>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
+            cvfem_hex8_rc_config_for(d));
+            break;
+        case KernelKind::SympyRow:
+            assemble_jacobian_packed_range<ISO, KernelKind::SympyRow>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
+            cvfem_hex8_rc_config_for(d));
+            break;
+        case KernelKind::SympyFace:
+            assemble_jacobian_packed_range<ISO, KernelKind::SympyFace>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
+            cvfem_hex8_rc_config_for(d));
+            break;
+        default:
+            assemble_jacobian_packed_range<ISO, KernelKind::Current>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
+            cvfem_hex8_rc_config_for(d));
+            break;
+    }
 
     CVFEM_PHASE_CLOCK(_tg);
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
