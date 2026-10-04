@@ -553,7 +553,7 @@ namespace cvfem_ss {
                         }
 
                 if (sc)
-                    sscvfem_scatter_element(*sc, nxe, e, lg.data(), lz.data(), z);
+                    sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lz.data(), z);
                 else
                     for (int a = 0; a < nxe; ++a)
                         for (int t = 0; t < N_FIELDS; ++t)
@@ -562,7 +562,7 @@ namespace cvfem_ss {
             }
         }
 
-        if (sc) sscvfem_reduce_shared(*sc, z);
+        if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), z);
 
         // Average over the patches touching each node, damp, leave constrained dofs alone, and
         // ACCUMULATE into the caller's vector.
@@ -712,7 +712,7 @@ namespace cvfem_ss {
                 }
 
                 if (sc)
-                    sscvfem_scatter_element(*sc, nxe, e, lg.data(), zl.data(), z);
+                    sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), zl.data(), z);
                 else
                     for (int a = 0; a < nxe; ++a)
                         for (int t = 0; t < N_FIELDS; ++t)
@@ -723,7 +723,7 @@ namespace cvfem_ss {
             }
         }
 
-        if (sc) sscvfem_reduce_shared(*sc, z);
+        if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), z);
 
         // Average over the macro-elements sharing a node (additive between subdomains), skip
         // constrained dofs, and ACCUMULATE, matching BlockJacobi::apply.

@@ -14,6 +14,10 @@
 #ifdef CVFEM_ENABLE_SUBPAR_EM
 #include "cvfem_sshex8_em.hpp"
 #endif
+#ifdef CVFEM_ENABLE_SUBPAR
+// Quarantined and unreferenced, so this is the only place that keeps them compiling.
+#include "cvfem_ss_scatter_fixed_width.hpp"
+#endif
 #include "cases/cvfem_ns_channel_case.hpp"
 
 #include "sfem_context.hpp"

@@ -276,11 +276,14 @@ inline void sscvfem_reduce_shared_w(
     }
 }
 
-static SFEM_INLINE void sscvfem_scatter_element(const SSScatter &s, const int nxe, const ptrdiff_t e,
+static SFEM_INLINE void sscvfem_scatter_element(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage, const int nxe, const ptrdiff_t e,
                                                 const smesh::idx_t *const SFEM_RESTRICT lg,
                                                 const scalar_t *const SFEM_RESTRICT     lout,
                                                 scalar_t *const SFEM_RESTRICT           jv) {
-    sscvfem_scatter_element_w<N_FIELDS>(s.slot.data(), nxe, e, lg, lout, jv, const_cast<scalar_t *>(s.stage.data()));
+    sscvfem_scatter_element_w<N_FIELDS>(slot, nxe, e, lg, lout, jv, const_cast<scalar_t *>(stage));
 }
 
 // The same, for four separate destination arrays rather than one interleaved one. The
@@ -332,20 +335,17 @@ inline void sscvfem_reduce_shared_soa_w(
     }
 }
 
-static SFEM_INLINE void sscvfem_scatter_element_soa(const SSScatter &s, const int nxe, const ptrdiff_t e,
-                                                    const smesh::idx_t *const SFEM_RESTRICT lg,
-                                                    const scalar_t *const SFEM_RESTRICT     lacc,
-                                                    scalar_t *const                        dst[N_FIELDS]) {
-    sscvfem_scatter_element_soa_w<N_FIELDS>(s.slot.data(), const_cast<scalar_t *>(s.stage.data()), nxe, e, lg, lacc, dst);
-}
 
-inline void sscvfem_reduce_shared_soa(const SSScatter &s, scalar_t *const dst[N_FIELDS]) {
-    sscvfem_reduce_shared_soa_w<N_FIELDS>(s.red_idx.data(), s.red_ptr.data(), s.shared_node.data(), const_cast<scalar_t *>(s.stage.data()), (ptrdiff_t)s.shared_node.size(), dst);
-}
 
 // Second pass: each shared node gathers its own contributions, in slot order.
-inline void sscvfem_reduce_shared(const SSScatter &s, scalar_t *const SFEM_RESTRICT jv) {
-    sscvfem_reduce_shared_w<N_FIELDS>(s.red_idx.data(), s.red_ptr.data(), s.shared_node.data(), (ptrdiff_t)s.shared_node.size(), jv, s.stage.data());
+inline void sscvfem_reduce_shared(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        scalar_t *const SFEM_RESTRICT stage,
+        const ptrdiff_t n_shared, scalar_t *const SFEM_RESTRICT jv) {
+    sscvfem_reduce_shared_w<N_FIELDS>(red_idx, red_ptr, shared_node, n_shared, jv, stage);
 }
 
 static SFEM_INLINE int sscvfem_lidx(const int L, const int x, const int y, const int z) {
@@ -1883,7 +1883,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
             }
 
             if (sc)
-                sscvfem_scatter_element(*sc, nxe, e, lg.data(), lout.data(), jv);
+                sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lout.data(), jv);
             else
                 for (int a = 0; a < nxe; ++a) {
                     const smesh::idx_t g = lg[(size_t)a];
@@ -1893,7 +1893,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(SSMeshData &d, const
         }
     }
 
-    if (sc) sscvfem_reduce_shared(*sc, jv);
+    if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), jv);
 }
 
 // ---------------------------------------------------------------------------
@@ -2450,7 +2450,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
             // the saving the component-wise atomics bought no longer applies once the
             // scatter is a plain write.
             if (sc)
-                sscvfem_scatter_element(*sc, nxe, e, lg.data(), lout.data(), jv);
+                sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lout.data(), jv);
             else
                 for (int a = 0; a < nxe; ++a) {
                     const smesh::idx_t g = lg[(size_t)a];
@@ -2463,7 +2463,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(SSMeshData &d, const scalar_
         }
     }
 
-    if (sc) sscvfem_reduce_shared(*sc, jv);
+    if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), jv);
 }
 
 // Runtime entry. The mask is a compile-time parameter inside, so each combination gets a
@@ -2998,7 +2998,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
             }
 
             if (sc)
-                sscvfem_scatter_element(*sc, nxe, e, lg.data(), lout.data(), res);
+                sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lout.data(), res);
             else
                 for (int a = 0; a < nxe; ++a) {
                     const smesh::idx_t g = lg[(size_t)a];
@@ -3008,7 +3008,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
         }
     }
 
-    if (sc) sscvfem_reduce_shared(*sc, res);
+    if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), res);
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
 }
