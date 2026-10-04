@@ -1898,7 +1898,7 @@ int main(int argc, char **argv) {
             else
                 // Current: the hand-written isoparametric kernel. Every other name is
                 // rejected during validation, so this is not a fallback.
-                assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
+                assemble_jacobian_atomic_isoparam(d, cvfem_hex8_extras_of(d), bsr, rho, mu);
         } else if (layout == "store") {
             assemble_jacobian_store<false>(d, packed, bsr, rho, mu, kernel_kind);
         } else if (layout == "colored") {
@@ -2321,7 +2321,7 @@ int main(int argc, char **argv) {
     // slot array: they must reproduce the full assembly exactly, not approximately.
     if (verify_jac && (assemble_diag || kernel_kind == KernelKind::Split)) {
         if (geom_kind == GeomKind::Isoparam)
-            assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
+            assemble_jacobian_atomic_isoparam(d, cvfem_hex8_extras_of(d), bsr, rho, mu);
         else
             assemble_jacobian_atomic_sumfact(d, cvfem_hex8_extras_of(d), bsr, rho, mu);
         // The reference has to be closed the same way the thing under test is, or the
