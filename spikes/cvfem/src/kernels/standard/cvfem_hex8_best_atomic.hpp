@@ -1338,7 +1338,21 @@ static SFEM_INLINE void diag_node_slots(
 // boundary shell -- the same arrangement assemble_boundary_scs_jacobian_pass uses for the
 // full matrix, and for the same reason: the closure is a per-face term that neither
 // geometry nor kernel choice changes, so it does not belong inside the element loops.
-static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &d,
+static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT bnd_elems,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const uint8_t *const SFEM_RESTRICT face_mask_eff,
+        const scalar_t *const SFEM_RESTRICT pres,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
                                               // Two facts that belong to the containers rather
                                               // than to the arrays they hold: whether the mask
                                               // exists at all, and how many boundary elements
@@ -1358,20 +1372,20 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &
     scalar_t *const SFEM_RESTRICT values = diag;
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < n_bnd; ++i) {
-        const ptrdiff_t e     = d.bnd_elems[(size_t)i];
-        const int       fmask = (int)d.face_mask_eff[(size_t)e];
+        const ptrdiff_t e     = bnd_elems[(size_t)i];
+        const int       fmask = (int)face_mask_eff[(size_t)e];
         ptrdiff_t       sl[64];
         scalar_t        x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        diag_node_slots(d.elems, e, sl);
-        gather_element_coords(d.elems, d.points, e, x, y, z);
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        diag_node_slots(mesh_elems, e, sl);
+        gather_element_coords(mesh_elems, points, e, x, y, z);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         scalar_t adj[9], det = scalar_t(0);
-        if (!isoparam) load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        if (!isoparam) load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         if (isoparam)
-            boundary_scs_add_jacobian<true, true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz,
+            boundary_scs_add_jacobian<true, true>(rho, mu, (const scalar_t *)nullptr, det, box_lx, box_ly, box_lz,
                                         x, y, z, ux, uy, uz, sl, values, fmask, 0);
         else
-            boundary_scs_add_jacobian<true, false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz,
+            boundary_scs_add_jacobian<true, false>(rho, mu, adj, det, box_lx, box_ly, box_lz,
                                         x, y, z, ux, uy, uz, sl, values, fmask, 0);
         (void)p;
     }
@@ -1414,7 +1428,7 @@ static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, values, ex.rc, p);
     }
-    assemble_diag_boundary_scs_pass(d, !d.face_mask.empty(), (ptrdiff_t)d.bnd_elems.size(), rho, mu, 0, diag);
+    assemble_diag_boundary_scs_pass(d.Lx, d.Ly, d.Lz, d.adj_ptr, d.bnd_elems.data(), d.det_ptr, d.elems, d.face_mask_eff.data(), d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), !d.face_mask.empty(), (ptrdiff_t)d.bnd_elems.size(), rho, mu, 0, diag);
 }
 
 static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
@@ -1443,7 +1457,7 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
                 rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, sl, values, ex.rc, p);
     }
-    assemble_diag_boundary_scs_pass(d, !d.face_mask.empty(), (ptrdiff_t)d.bnd_elems.size(), rho, mu, 1, diag);
+    assemble_diag_boundary_scs_pass(d.Lx, d.Ly, d.Lz, d.adj_ptr, d.bnd_elems.data(), d.det_ptr, d.elems, d.face_mask_eff.data(), d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), !d.face_mask.empty(), (ptrdiff_t)d.bnd_elems.size(), rho, mu, 1, diag);
 }
 
 // ---------------------------------------------------------------------------
