@@ -13,7 +13,25 @@
 // null is the lagged one. The atomic path exists here so the layouts can be compared on the same
 // operator -- a packed row carrying the correction against an atomic row that silently dropped it
 // would not be a layout comparison.
-static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
+static SFEM_NOINLINE void apply_jacobian_action_atomic(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
                                               // Which optional terms are on, resolved once per
                                               // solve by the caller rather than per sweep here:
                                               // cvfem_hex8_extras_of reads the mesh, which this
@@ -29,20 +47,20 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
                                                        const int             limiter = 0,
                                                        const scalar_t        venkat_c = scalar_t(0)) {
     const bool with_ho = ugrad != nullptr && vgrad != nullptr;
-    cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
+    cvfem_zero_scalars(jv, nnodes * N_FIELDS);
 
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
         scalar_t xe[8], ye[8], ze[8], g8[72], gv8[72];
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         if (with_ho) {
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const idx_t gn = d.elems[a][e];
-                xe[a] = scalar_t(d.points[0][gn]);
-                ye[a] = scalar_t(d.points[1][gn]);
-                ze[a] = scalar_t(d.points[2][gn]);
+                const idx_t gn = mesh_elems[a][e];
+                xe[a] = scalar_t(points[0][gn]);
+                ye[a] = scalar_t(points[1][gn]);
+                ze[a] = scalar_t(points[2][gn]);
                 for (int c = 0; c < 9; ++c) {
                     g8[a * 9 + c]  = ugrad[(ptrdiff_t)gn * 9 + c];
                     gv8[a * 9 + c] = vgrad[(ptrdiff_t)gn * 9 + c];
@@ -50,7 +68,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
             }
         }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const idx_t g         = d.elems[a][e];
+            const idx_t g         = mesh_elems[a][e];
             const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
             vx[a]                            = dv[0];
             vy[a]                            = dv[1];
@@ -58,7 +76,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
             q[a]                             = dv[3];
         }
         scalar_t adj[9], det;
-        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         // The generated Jacobian-action arrangements. They carry no Rhie-Chow term -- the
         // generator builds them from the bare flux algebra, as it does the residual and the
         // assembly -- so the driver refuses --rhie-chow with them rather than letting a row
@@ -83,7 +101,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
         // Rhie-Chow branch in the hot loop for every run that does not ask for it.
         else if (opt.with_rc) {
             Hex8ExtraScratch ex;
-            ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
+            ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
             // The limiter is selected at compile time, as it is on the packed sweep and for the
             // same reason; the switch sits here, outside the element loop's face loop.
 #define CVFEM_HEX8_JV_RC(LIM_)                                                                  \
@@ -116,7 +134,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
 #undef CVFEM_HEX8_JV_BARE
         }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const idx_t g = d.elems[a][e];
+            const idx_t g = mesh_elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 1, 0, r[a * 4 + 1]);
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 2, 0, r[a * 4 + 2]);

@@ -2166,7 +2166,7 @@ int main(int argc, char **argv) {
                                               with_hograd ? vgrad.data() : nullptr,
                                               conv_limiter, scalar_t(0));
         else
-            apply_jacobian_action_atomic(d, cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(), kernel_kind,
+            apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(), kernel_kind,
                                          with_hograd ? ugrad.data() : nullptr,
                                          with_hograd ? vgrad.data() : nullptr,
                                          conv_limiter, scalar_t(0));
@@ -2257,7 +2257,7 @@ int main(int argc, char **argv) {
         if (geom_kind == GeomKind::Isoparam)
             apply_jacobian_action_atomic_isoparam(d, cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jv_mf_atomic.data());
         else
-            apply_jacobian_action_atomic(d, cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jv_mf_atomic.data());
+            apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jv_mf_atomic.data());
         if (colors.n_colors > 0)
             apply_jacobian_action_colored(
                     d, packed, colors, rho, mu, jac_dir.data(), jv_mf_colored.data(), geom_kind);
@@ -2446,7 +2446,7 @@ int main(int argc, char **argv) {
         // The reference carries whatever the timed sweep carried, including the exact
         // higher-order correction. Comparing a packed sweep that has the term against an atomic
         // reference that does not is not a layout check -- it reports the term as a defect.
-        apply_jacobian_action_atomic(d, cvfem_hex8_extras_of(d), rho, mu, last_dir, jv_ref.data(), KernelKind::Sumfact,
+        apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, last_dir, jv_ref.data(), KernelKind::Sumfact,
                                      with_hograd ? ugrad.data() : nullptr,
                                      with_hograd ? vgrad.data() : nullptr,
                                      conv_limiter, scalar_t(0));
