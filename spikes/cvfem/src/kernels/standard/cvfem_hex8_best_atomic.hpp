@@ -1169,30 +1169,48 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(
     // the same arrangement the residual and the Jacobian action already used.
 }
 
-static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d,
+static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
                                               // Which optional terms are on, resolved once per
                                               // solve by the caller rather than per sweep here:
                                               // cvfem_hex8_extras_of reads the mesh, which this
                                               // kernel is not meant to name.
-                                              const Hex8Extras &opt, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+                                              const Hex8Extras &opt, 
+        const count_t *const SFEM_RESTRICT slots,
+        const ptrdiff_t bsr_nnz,
+        scalar_t *const SFEM_RESTRICT values, const scalar_t rho, const scalar_t mu) {
     // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
     // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
     // the phase probe, which the macros carry here.
     CVFEM_PHASE_CLOCK(_tz);
-    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    cvfem_zero_scalars(values, bsr_nnz * 16);
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
-    scalar_t *const SFEM_RESTRICT             values = b.values->data();
-    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t         ux[8], uy[8], uz[8], p[8];
         Hex8ExtraScratch ex;
-        ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
+        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
         // load() gathers the coordinates only when it has a reason to. This kernel always
         // needs them, so gather into the same buffers when it did not.
-        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d.elems, d.points, e, ex.x, ex.y, ex.z);
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(mesh_elems, points, e, ex.x, ex.y, ex.z);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
                 rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
     }
