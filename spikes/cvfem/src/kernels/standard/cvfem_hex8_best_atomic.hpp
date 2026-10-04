@@ -6,6 +6,7 @@
 // and no scratch, which makes it the simplest and the reference for correctness,
 // but assembly pays ~1024 atomic read-modify-writes per element.
 
+#include "kernels/cvfem_phases.hpp"
 #include "best/cvfem_hex8_best_common.hpp"
 
 // The two gradient arguments carry the exact higher-order action, as on the packed sweep; both
@@ -627,7 +628,12 @@ static SFEM_NOINLINE void apply_residual_atomic_sympy(MeshData &d, const scalar_
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
-    zero_bsr4(b);
+    // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
+    // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
+    // the phase probe, which the macros carry here.
+    CVFEM_PHASE_CLOCK(_tz);
+    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
     const count_t *const SFEM_RESTRICT slots = b.element_slots.empty() ? nullptr : b.element_slots.data();
 
@@ -666,7 +672,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
                                                                BSR4          &b,
                                                                const scalar_t rho,
                                                                const scalar_t mu) {
-    zero_bsr4(b);
+    // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
+    // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
+    // the phase probe, which the macros carry here.
+    CVFEM_PHASE_CLOCK(_tz);
+    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
     const count_t *const SFEM_RESTRICT slots =
             b.element_slots.empty() ? nullptr : b.element_slots.data();
@@ -696,7 +707,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd_isoparam(MeshData      &d,
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
-    zero_bsr4(b);
+    // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
+    // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
+    // the phase probe, which the macros carry here.
+    CVFEM_PHASE_CLOCK(_tz);
+    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
     const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
@@ -711,7 +727,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(MeshData &d, BSR4 &b, c
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_block(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
-    zero_bsr4(b);
+    // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
+    // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
+    // the phase probe, which the macros carry here.
+    CVFEM_PHASE_CLOCK(_tz);
+    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
     const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
@@ -727,7 +748,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_block(MeshData &d, BSR4
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_row(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
-    zero_bsr4(b);
+    // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
+    // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
+    // the phase probe, which the macros carry here.
+    CVFEM_PHASE_CLOCK(_tz);
+    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
     const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
@@ -743,7 +769,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_row(MeshData &d, BSR4 &
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
-    zero_bsr4(b);
+    // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
+    // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
+    // the phase probe, which the macros carry here.
+    CVFEM_PHASE_CLOCK(_tz);
+    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT values = b.values->data();
     const count_t *const SFEM_RESTRICT slots = b.element_slots.data();
 
@@ -815,7 +846,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
-    zero_bsr4(b);
+    // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
+    // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
+    // the phase probe, which the macros carry here.
+    CVFEM_PHASE_CLOCK(_tz);
+    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT                 values = b.values->data();
     const count_t *const SFEM_RESTRICT     slots  = b.element_slots.data();
     const Hex8Extras                              opt = cvfem_hex8_extras_of(d);
@@ -843,7 +879,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
-    zero_bsr4(b);
+    // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
+    // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
+    // the phase probe, which the macros carry here.
+    CVFEM_PHASE_CLOCK(_tz);
+    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
     const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
     const Hex8Extras                          opt = cvfem_hex8_extras_of(d);
@@ -890,7 +931,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(MeshData      
                                                                   BSR4          &b,
                                                                   const scalar_t rho,
                                                                   const scalar_t mu) {
-    zero_bsr4(b);
+    // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
+    // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
+    // the phase probe, which the macros carry here.
+    CVFEM_PHASE_CLOCK(_tz);
+    cvfem_zero_scalars(b.values->data(), b.nnz * 16);
+    CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
     const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
