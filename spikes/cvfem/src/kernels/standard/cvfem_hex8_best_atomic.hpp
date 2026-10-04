@@ -1458,7 +1458,29 @@ static SFEM_NOINLINE void assemble_diag_atomic(
     assemble_diag_boundary_scs_pass(box_lx, box_ly, box_lz, adj_ptr, bnd_elems, det_ptr, mesh_elems, face_mask_eff, pres, points, ux_src, uy_src, uz_src, opt.with_bnd, n_bnd, rho, mu, 0, diag);
 }
 
-static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
+static SFEM_NOINLINE void assemble_diag_atomic_isoparam(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const ptrdiff_t *const SFEM_RESTRICT bnd_elems,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const uint8_t *const SFEM_RESTRICT face_mask_eff,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
                                               // How many boundary elements bnd_elems was
                                               // compacted to. opt.with_bnd already answers the
                                               // other half -- it IS !face_mask.empty() -- so only
@@ -1478,18 +1500,18 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
     scalar_t *const SFEM_RESTRICT values = diag;
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         ptrdiff_t        sl[64];
         scalar_t         ux[8], uy[8], uz[8], p[8];
         Hex8ExtraScratch ex;
-        ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
-        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d.elems, d.points, e, ex.x, ex.y, ex.z);
-        diag_node_slots(d.elems, e, sl);
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(mesh_elems, points, e, ex.x, ex.y, ex.z);
+        diag_node_slots(mesh_elems, e, sl);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
                 rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, sl, values, ex.rc, p);
     }
-    assemble_diag_boundary_scs_pass(d.Lx, d.Ly, d.Lz, d.adj_ptr, d.bnd_elems.data(), d.det_ptr, d.elems, d.face_mask_eff.data(), d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), opt.with_bnd, n_bnd, rho, mu, 1, diag);
+    assemble_diag_boundary_scs_pass(box_lx, box_ly, box_lz, adj_ptr, bnd_elems, det_ptr, mesh_elems, face_mask_eff, pres, points, ux_src, uy_src, uz_src, opt.with_bnd, n_bnd, rho, mu, 1, diag);
 }
 
 // ---------------------------------------------------------------------------
