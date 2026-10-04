@@ -49,11 +49,13 @@ cvfem_uenv() { uenv run --view="$CVFEM_VIEW" "$CVFEM_UENV" -- "$@"; }
 # missing one is an error rather than a silence.
 cvfem_touch() {
     local roots=() d
-    for d in src cuda subpar; do
+    # cuda/ is gone: the device kernels are in src/kernels/<layout>/cuda/ and the launcher
+    # translation unit in src/frontend/cuda/, so src/ covers them. subpar/ keeps its own.
+    for d in src subpar; do
         if [ -d "$CVFEM_SRC/$d" ]; then roots+=("$CVFEM_SRC/$d"); fi
     done
     if [ ${#roots[@]} -eq 0 ]; then
-        echo "cvfem_touch: none of src/ cuda/ subpar/ exist under $CVFEM_SRC" >&2
+        echo "cvfem_touch: neither src/ nor subpar/ exists under $CVFEM_SRC" >&2
         return 1
     fi
     find "${roots[@]}" \

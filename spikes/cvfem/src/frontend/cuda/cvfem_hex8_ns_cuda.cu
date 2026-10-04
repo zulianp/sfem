@@ -29,7 +29,7 @@
 #endif
 #include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 
-#include "cvfem_hex8_ns_cuda.hpp"
+#include "frontend/cuda/cvfem_hex8_ns_cuda.hpp"
 
 #define CVFEM_CUDA_CHECK(expr)                                                       \
     do {                                                                             \

@@ -27,7 +27,7 @@
 #include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 #include "frontend/staging/cvfem_element_coloring.hpp"
 
-#include "cvfem_hex8_ns_cuda.hpp"
+#include "frontend/cuda/cvfem_hex8_ns_cuda.hpp"
 
 namespace {
 

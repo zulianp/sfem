@@ -107,7 +107,7 @@ note what it does and does not buy: it makes the ghost gather reproducible, not 
 whole residual. A GPU implementation that accumulates a pack's element contributions
 with `atomicAdd` into shared memory is still non-reproducible run to run, because those
 shared-memory atomics fix no order either -- measured, on the implementation in
-cuda/cvfem_hex8_ns_cuda.cu, which is bit-unstable in both flush modes for exactly this
+src/frontend/cuda/cvfem_hex8_ns_cuda.cu, which is bit-unstable in both flush modes for exactly this
 reason.
 
 Making a GPU residual genuinely bit-reproducible therefore needs the *in-pack*

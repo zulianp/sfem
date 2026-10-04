@@ -193,6 +193,13 @@ set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACRO
 file(GLOB_RECURSE CVFEM_TESTS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/tests/*.cpp")
 list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_guard_selftest.cpp)
 list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_vectorization_gate.cpp)
+# The two device tests are built by the CUDA block below, with nvcc and the CUDA libraries, and
+# only when CVFEM_ENABLE_CUDA is on. Left in this glob they would be configured a second time as
+# plain CPU targets -- a duplicate target name where CUDA is on, and a link failure where it is
+# off. They live under src/tests/verification/ because that is what they are: a device-against-host
+# comparison. Where they are built from is not where they are grouped.
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_cuda_smoke.cpp)
+list(REMOVE_ITEM CVFEM_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_hex8_ns_cuda_verify.cpp)
 
 set(CVFEM_OP_TESTS cvfem_ns_op_gate cvfem_ns_op_isolation cvfem_bc_sideset_test cvfem_flat_vs_ss_test cvfem_flow_diag_test cvfem_ss_packed_probe cvfem_operator_consistency_test)
 foreach(TEST_SOURCE ${CVFEM_TESTS})
@@ -517,7 +524,9 @@ if(CVFEM_ENABLE_CUDA)
     function(cvfem_cuda_target tgt)
         target_compile_definitions(${tgt} PRIVATE CVFEM_ENABLE_CUDA)
         target_include_directories(${tgt} PRIVATE
-            ${CVFEM_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
+            ${CVFEM_INCLUDE_DIRS}
+            # The device tests include their own headers by bare name.
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification)
         cvfem_subpar_target(${tgt})
         cvfem_trace_target(${tgt})
         target_compile_options(${tgt} PRIVATE
@@ -533,15 +542,16 @@ if(CVFEM_ENABLE_CUDA)
 
     # Smoke target: proves the toolchain, the device, and the C-ABI/stream convention
     # before any real kernel depends on them.
-    add_executable(cvfem_cuda_smoke cuda/cvfem_cuda_smoke.cpp cuda/cvfem_cuda_smoke.cu)
+    add_executable(cvfem_cuda_smoke src/tests/verification/cvfem_cuda_smoke.cpp
+                               src/tests/verification/cvfem_cuda_smoke.cu)
     cvfem_cuda_target(cvfem_cuda_smoke)
 
     # Packed residual: verification against the CPU reference, plus timing. Kept as its
     # own driver rather than folded into cvfem_hex8_ns_upwind_bench, so the CPU
     # benchmark's build -- and therefore its measured baseline -- is left alone.
     add_executable(cvfem_hex8_ns_cuda_verify
-        cuda/cvfem_hex8_ns_cuda_verify.cpp
-        cuda/cvfem_hex8_ns_cuda.cu)
+        src/tests/verification/cvfem_hex8_ns_cuda_verify.cpp
+        src/frontend/cuda/cvfem_hex8_ns_cuda.cu)
     cvfem_cuda_target(cvfem_hex8_ns_cuda_verify)
 endif()
 
