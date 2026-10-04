@@ -2994,16 +2994,56 @@ inline void sscvfem_assemble_nodal_u_grad(SSMeshData &d) {
 // The residual's element pass. Everything the options decide -- which convection scheme, which
 // limiter, whether the correction is frozen, whether a nodal velocity gradient exists at all --
 // has been decided by the launcher below and reaches here as data.
-inline SFEM_NOINLINE void sscvfem_residual_sweep(SSMeshData &d, const scalar_t rho,
+inline SFEM_NOINLINE void sscvfem_residual_sweep(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const scalar_t bc_p,
+        const scalar_t bc_tx,
+        const scalar_t bc_ty,
+        const scalar_t bc_tz,
+        const int conv_ho,
+        const int conv_limiter,
+        const Hex8PecletConfig<scalar_t> peclet,
+        const scalar_t conv_venkat_c,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        Hex8LimiterStats *const limiter_stats,
+        const uint8_t *const SFEM_RESTRICT macro_curved,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const uint8_t *const SFEM_RESTRICT natural_mask,
+        const uint8_t *const SFEM_RESTRICT pressure_mask,
+        const uint8_t *const SFEM_RESTRICT traction_mask,
+        const ptrdiff_t nmacro,
+        const int nxe_src,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT ugrad_f,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg,
+        
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage,
+        const ptrdiff_t n_shared, const scalar_t rho,
                                                  const scalar_t                mu,
                                                  scalar_t *const SFEM_RESTRICT res) {
     SFEM_TRACE_SCOPE("sscvfem::residual_sweep");
-    const int L   = d.level;
-    const int nxe = d.nxe;
+    const int L   = level;
+    const int nxe = nxe_src;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
-    const SSScatter *const sc = d.scatter ? d.scatter.get() : nullptr;
 
 #pragma omp parallel
     {
@@ -3013,33 +3053,33 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(SSMeshData &d, const scalar_t r
         std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
         // Nine per node when the correction is on, empty otherwise -- one allocation that
         // costs nothing to a run that has not asked for it.
-        std::vector<scalar_t>     lug(d.conv_ho ? (size_t)nxe * 9 : 0);
+        std::vector<scalar_t>     lug(conv_ho ? (size_t)nxe * 9 : 0);
         std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+        for (ptrdiff_t e = 0; e < nmacro; ++e) {
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = d.elems[a][e];
+                const smesh::idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
-                lx[(size_t)a]        = (scalar_t)d.points[0][g];
-                ly[(size_t)a]        = (scalar_t)d.points[1][g];
-                lz[(size_t)a]        = (scalar_t)d.points[2][g];
-                lux[(size_t)a]       = d.ux[(size_t)g];
-                luy[(size_t)a]       = d.uy[(size_t)g];
-                luz[(size_t)a]       = d.uz[(size_t)g];
-                lp[(size_t)a]        = d.p[(size_t)g];
-                lpgx[(size_t)a]      = d.pgx[(size_t)g];
-                lpgy[(size_t)a]      = d.pgy[(size_t)g];
-                lpgz[(size_t)a]      = d.pgz[(size_t)g];
+                lx[(size_t)a]        = (scalar_t)points[0][g];
+                ly[(size_t)a]        = (scalar_t)points[1][g];
+                lz[(size_t)a]        = (scalar_t)points[2][g];
+                lux[(size_t)a]       = ux_src[(size_t)g];
+                luy[(size_t)a]       = uy_src[(size_t)g];
+                luz[(size_t)a]       = uz_src[(size_t)g];
+                lp[(size_t)a]        = pres[(size_t)g];
+                lpgx[(size_t)a]      = pgx_src[(size_t)g];
+                lpgy[(size_t)a]      = pgy_src[(size_t)g];
+                lpgz[(size_t)a]      = pgz_src[(size_t)g];
                 if (!lug.empty())
-                    for (int k = 0; k < 9; ++k) lug[(size_t)a * 9 + (size_t)k] = d.ugrad[(size_t)g * 9 + (size_t)k];
+                    for (int k = 0; k < 9; ++k) lug[(size_t)a * 9 + (size_t)k] = ugrad_f[(size_t)g * 9 + (size_t)k];
             }
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
             // Per macro element, and the curved branch below reads the same one: a call per
             // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
             // which then became a call in every cell of the block diagonal, 9% slower on boxes.
-            const Hex8RcConfig rc_macro = sscvfem_rc_config(d);
+            const Hex8RcConfig rc_macro = rcfg;
             SSMacroGeom mg;
             // The hoisted cell's corners outlive the block below, because the Rhie-Chow term
             // takes its node distances from them -- as the Jacobian action takes them from
@@ -3062,7 +3102,7 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(SSMeshData &d, const scalar_t r
                 sscvfem_macro_geom(ex, ey, ez, rho, mu, rc_macro.scale, rc_macro.tau, mg);
             }
 
-            const bool curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
+            const bool curved_e = sscvfem_macro_curved(macro_curved, e);
             for (int zi = 0; zi < L; ++zi) {
                 for (int yi = 0; yi < L; ++yi) {
                     for (int xi = 0; xi < L; ++xi) {
@@ -3092,7 +3132,6 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(SSMeshData &d, const scalar_t r
                             std::copy(y, y + 8, ey);
                             std::copy(z, z + 8, ez);
                         }
-                        const Hex8RcConfig rcfg = sscvfem_rc_config(d);
                         const Hex8RhieChow rc{ex,      ey, ez, pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                               nullptr, ux, uy, uz,  rcfg.tau};
                         // Deferred-correction convection, on the path the production solver
@@ -3102,24 +3141,24 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(SSMeshData &d, const scalar_t r
                         // call did before.
                         const bool ho = !lug.empty();
                         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, mg.adj, mg.det, ux, uy, uz, p, r,
-                                                             rc, d.upwind_eps,
+                                                             rc, upwind_eps,
                                                              ho ? g8 : nullptr,
                                                              ho ? x : nullptr, ho ? y : nullptr,
-                                                             ho ? z : nullptr, d.conv_limiter,
-                                                             d.conv_venkat_c, d.limiter_stats,
-                                                             d.conv_peclet);
-                        boundary_scs_add_residual<false>(rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z,
+                                                             ho ? z : nullptr, conv_limiter,
+                                                             conv_venkat_c, limiter_stats,
+                                                             peclet);
+                        boundary_scs_add_residual<false>(rho, mu, mg.adj, mg.det, box_lx, box_ly, box_lz, x, y, z,
                                                   ux, uy, uz, p, r,
-                                                  d.macro_face_mask.empty()
+                                                  !face_mask
                                                           ? -1
                                                           : sscvfem_micro_face_mask(
-                                                                    (int)d.macro_face_mask[(size_t)e],
+                                                                    (int)face_mask[(size_t)e],
                                                                     L, xi, yi, zi),
                                                   sscvfem_micro_face_mask(
-                                                          d.macro_natural_mask.empty() ? 0
-                                                              : (int)d.macro_natural_mask[(size_t)e],
+                                                          !natural_mask ? 0
+                                                              : (int)natural_mask[(size_t)e],
                                                           L, xi, yi, zi),
-                                                  sscvfem_bd(d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), e, L, xi, yi, zi));
+                                                  sscvfem_bd(bc_p, bc_tx, bc_ty, bc_tz, pressure_mask, traction_mask, e, L, xi, yi, zi));
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
                             for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
@@ -3128,8 +3167,8 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(SSMeshData &d, const scalar_t r
                 }
             }
 
-            if (sc)
-                sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lout.data(), res);
+            if (slot)
+                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg.data(), lout.data(), res);
             else
                 for (int a = 0; a < nxe; ++a) {
                     const smesh::idx_t g = lg[(size_t)a];
@@ -3139,7 +3178,7 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(SSMeshData &d, const scalar_t r
         }
     }
 
-    if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), res);
+    if (slot) sscvfem_reduce_shared(red_idx, red_ptr, shared_node, const_cast<scalar_t *>(stage), n_shared, res);
 }
 
 inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, const scalar_t mu,
@@ -3256,7 +3295,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
     if (zero_first)
         for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
 
-    sscvfem_residual_sweep(d, rho, mu, res);
+    sscvfem_residual_sweep(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.conv_ho, d.conv_limiter, d.conv_peclet, d.conv_venkat_c, d.elems, d.level, d.limiter_stats, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.ugrad.empty() ? nullptr : d.ugrad.data(), d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, res);
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
 }
