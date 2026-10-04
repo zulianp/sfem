@@ -296,7 +296,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
 }
 
 static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho, const scalar_t mu) {
-    reset_residual(d);
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
@@ -322,7 +322,7 @@ static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho,
 }
 
 static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scalar_t rho, const scalar_t mu) {
-    reset_residual(d);
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
@@ -373,7 +373,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
                                                              const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
                                                              const int       limiter  = 0,
                                                              const scalar_t  venkat_c = scalar_t(0)) {
-    reset_residual(d);
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     const Hex8Extras opt = cvfem_hex8_extras_of(d);
     // The deferred correction, on the same sweep. The hand-written SIMD kernel takes the
     // higher-order pack, so the standard layout's higher-order arms vectorise too; the generated
@@ -545,7 +545,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d
                                                                const scalar_t *const SFEM_RESTRICT ugrad,
                                                                const int       limiter,
                                                                const scalar_t  venkat_c) {
-    reset_residual(d);
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
@@ -583,7 +583,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d
 }
 
 static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu) {
-    reset_residual(d);
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
@@ -606,7 +606,7 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scal
 }
 
 static SFEM_NOINLINE void apply_residual_atomic_sympy(MeshData &d, const scalar_t rho, const scalar_t mu) {
-    reset_residual(d);
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
@@ -768,9 +768,11 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(MeshData &d, BSR4 
 static SFEM_NOINLINE void assemble_jacobian_atomic_linear(MeshData             &d,
                                                           BSR4                 &b,
                                                           const scalar_t        mu,
-                                                          std::vector<scalar_t> &linear) {
-    linear.assign((size_t)b.nnz * 16, scalar_t(0));
-    scalar_t *const SFEM_RESTRICT             values = linear.data();
+                                                          scalar_t *const SFEM_RESTRICT linear) {
+    // The buffer arrives sized. It used to be a std::vector& that this sweep called .assign() on,
+    // which is an allocation inside a kernel -- and a kernel that allocates cannot be handed a
+    // device buffer or a sub-range. The caller sizes and zeroes it.
+    scalar_t *const SFEM_RESTRICT             values = linear;
     const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
@@ -786,13 +788,13 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
                                                              BSR4                        &b,
                                                              const scalar_t               rho,
                                                              const scalar_t               mu,
-                                                             const std::vector<scalar_t> &linear) {
+                                                             const scalar_t *const SFEM_RESTRICT linear) {
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
     const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
     // Restore the constant part. A streaming copy, in place of the scattered
     // accumulation it replaces.
-    std::memcpy(values, linear.data(), linear.size() * sizeof(scalar_t));
+    std::memcpy(values, linear, (size_t)b.nnz * 16 * sizeof(scalar_t));
 
     // Rhie-Chow belongs entirely to this half: the linear half is the viscous block, which
     // depends on the geometry and mu alone. So linear + nonlinear still reproduces the full
@@ -867,7 +869,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(MeshData &d, BSR4 &b
 static SFEM_NOINLINE void apply_residual_atomic_isoparam_sympy(MeshData      &d,
                                                                const scalar_t rho,
                                                                const scalar_t mu) {
-    reset_residual(d);
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
@@ -931,10 +933,10 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &
                                                           const scalar_t        rho,
                                                           const scalar_t        mu,
                                                           const int             isoparam,
-                                                          std::vector<scalar_t> &diag) {
+                                                          scalar_t *const SFEM_RESTRICT diag) {
     if (d.face_mask.empty()) return;
     cvfem_hex8_build_face_mask_eff(d);
-    scalar_t *const SFEM_RESTRICT values = diag.data();
+    scalar_t *const SFEM_RESTRICT values = diag;
     const ptrdiff_t               n_bnd  = (ptrdiff_t)d.bnd_elems.size();
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < n_bnd; ++i) {
@@ -971,9 +973,11 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &
 static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
                                                const scalar_t        rho,
                                                const scalar_t        mu,
-                                               std::vector<scalar_t> &diag) {
-    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
-    scalar_t *const SFEM_RESTRICT values = diag.data();
+                                               scalar_t *const SFEM_RESTRICT diag) {
+    // The buffer arrives sized. It used to be a std::vector& that this sweep called .assign() on,
+    // which is an allocation inside a kernel -- and a kernel that allocates cannot be handed a
+    // device buffer or a sub-range. The caller sizes and zeroes it.
+    scalar_t *const SFEM_RESTRICT values = diag;
     const Hex8Extras              opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
@@ -994,9 +998,11 @@ static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
 static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
                                                         const scalar_t        rho,
                                                         const scalar_t        mu,
-                                                        std::vector<scalar_t> &diag) {
-    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
-    scalar_t *const SFEM_RESTRICT values = diag.data();
+                                                        scalar_t *const SFEM_RESTRICT diag) {
+    // The buffer arrives sized. It used to be a std::vector& that this sweep called .assign() on,
+    // which is an allocation inside a kernel -- and a kernel that allocates cannot be handed a
+    // device buffer or a sub-range. The caller sizes and zeroes it.
+    scalar_t *const SFEM_RESTRICT values = diag;
     const Hex8Extras              opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
@@ -1024,9 +1030,11 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
 static SFEM_NOINLINE void assemble_jacobian_atomic_linear_isoparam(MeshData             &d,
                                                                    BSR4                 &b,
                                                                    const scalar_t        mu,
-                                                                   std::vector<scalar_t> &linear) {
-    linear.assign((size_t)b.nnz * 16, scalar_t(0));
-    scalar_t *const SFEM_RESTRICT             values = linear.data();
+                                                                   scalar_t *const SFEM_RESTRICT linear) {
+    // The buffer arrives sized. It used to be a std::vector& that this sweep called .assign() on,
+    // which is an allocation inside a kernel -- and a kernel that allocates cannot be handed a
+    // device buffer or a sub-range. The caller sizes and zeroes it.
+    scalar_t *const SFEM_RESTRICT             values = linear;
     const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
@@ -1042,12 +1050,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_linear_isoparam(MeshData     
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear_isoparam(
         MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu,
-        const std::vector<scalar_t> &linear) {
+        const scalar_t *const SFEM_RESTRICT linear) {
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
     const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
     // Restore the constant part, then add only what the velocity changes.
-    std::memcpy(values, linear.data(), linear.size() * sizeof(scalar_t));
+    std::memcpy(values, linear, (size_t)b.nnz * 16 * sizeof(scalar_t));
 
     const Hex8Extras opt = cvfem_hex8_extras_of(d);
 

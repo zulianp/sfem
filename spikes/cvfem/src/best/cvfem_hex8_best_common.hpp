@@ -467,13 +467,19 @@ static void fill_fields(MeshData &d) {
     }
 }
 
-static void reset_residual(MeshData &d) {
+// Takes the arrays and the count, not the mesh: it is called from inside the standard-layout
+// sweeps, where a MeshData parameter is what keeps src/kernels/ dependent on this header.
+static void reset_residual(const ptrdiff_t nnodes,
+                           scalar_t *const SFEM_RESTRICT rx,
+                           scalar_t *const SFEM_RESTRICT ry,
+                           scalar_t *const SFEM_RESTRICT rz,
+                           scalar_t *const SFEM_RESTRICT rc) {
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        d.rx[i] = scalar_t(0);
-        d.ry[i] = scalar_t(0);
-        d.rz[i] = scalar_t(0);
-        d.rc[i] = scalar_t(0);
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        rx[i] = scalar_t(0);
+        ry[i] = scalar_t(0);
+        rz[i] = scalar_t(0);
+        rc[i] = scalar_t(0);
     }
 }
 

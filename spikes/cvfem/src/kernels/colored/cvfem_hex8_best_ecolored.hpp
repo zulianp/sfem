@@ -216,7 +216,7 @@ static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
                                                   const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
                                                   const int       limiter  = 0,
                                                   const scalar_t  venkat_c = scalar_t(0)) {
-    reset_residual(d);
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
     const Hex8Extras opt = cvfem_hex8_extras_of(d);
     // The deferred correction, on the same sweep. The hand-written SIMD kernel takes the
     // higher-order pack, so the standard layout's higher-order arms vectorise too; the generated

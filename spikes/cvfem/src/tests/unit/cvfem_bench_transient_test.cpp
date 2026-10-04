@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
                 d.uy[i] = uy0[(size_t)i] + sign * eps * dir[(size_t)i * N_FIELDS + 1];
                 d.uz[i] = uz0[(size_t)i] + sign * eps * dir[(size_t)i * N_FIELDS + 2];
             }
-            reset_residual(d);
+            reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
             apply_transient_pass(d, rho);
             std::vector<scalar_t> &dst = sign < 0 ? rm : rp;
             for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
@@ -199,7 +199,7 @@ int main(int argc, char **argv) {
                 e.u_prev[(size_t)i * 3 + (size_t)c] = u;
                 if (!e.u_prev2.empty()) e.u_prev2[(size_t)i * 3 + (size_t)c] = u;
             }
-        reset_residual(e);
+        reset_residual(e.nnodes, e.rx.data(), e.ry.data(), e.rz.data(), e.rc.data());
         apply_transient_pass(e, rho);
         scalar_t worst = 0;
         for (ptrdiff_t i = 0; i < e.nnodes; ++i)
@@ -220,7 +220,7 @@ int main(int argc, char **argv) {
         MeshData                     e;
         std::shared_ptr<smesh::Mesh> m;
         build(e, m, ctx, scalar_t(0), 1);
-        reset_residual(e);
+        reset_residual(e.nnodes, e.rx.data(), e.ry.data(), e.rz.data(), e.rc.data());
         apply_transient_pass(e, rho);
         std::vector<scalar_t> jv((size_t)e.nnodes * N_FIELDS, scalar_t(1));
         apply_transient_action_pass(e, rho, jv.data(), jv.data());

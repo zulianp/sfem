@@ -28,11 +28,12 @@ int main(int argc, char **argv) {
 
     // Linear part alone.
     std::vector<scalar_t> lin;
-    assemble_jacobian_atomic_linear(d, bsr, mu, lin);
+    lin.assign((size_t)(bsr.nnz * 16), scalar_t(0));
+    assemble_jacobian_atomic_linear(d, bsr, mu, lin.data());
 
     // Nonlinear alone: assemble the split against a zero linear buffer.
     std::vector<scalar_t> zero(N, 0.0), nl_only;
-    assemble_jacobian_atomic_nonlinear(d, bsr, rho, mu, zero);
+    assemble_jacobian_atomic_nonlinear(d, bsr, rho, mu, zero.data());
     nl_only.assign(bsr.values->data(), bsr.values->data() + N);
 
     // Full, for reference.

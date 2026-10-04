@@ -1409,10 +1409,11 @@ int main(int argc, char **argv) {
         if (kernel_kind == KernelKind::Split) {
             // One-time cost in a Newton loop, so it is built before the timed region.
             precompute_element_bsr_slots(d, bsr);
+            jac_linear.assign((size_t)(bsr.nnz * 16), scalar_t(0));
             if (geom_kind == GeomKind::Isoparam)
-                assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear);
+                assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear.data());
             else
-                assemble_jacobian_atomic_linear(d, bsr, mu, jac_linear);
+                assemble_jacobian_atomic_linear(d, bsr, mu, jac_linear.data());
         }
         if (layout == "store") build_pack_store_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
     }
@@ -1889,7 +1890,7 @@ int main(int argc, char **argv) {
             else if (layout == "packed")
                 assemble_jacobian_packed<true>(d, packed, bsr, rho, mu, kernel_kind);
             else if (kernel_kind == KernelKind::Split)
-                assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear);
+                assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear.data());
             else if (kernel_kind == KernelKind::Sympy)
                 assemble_jacobian_atomic_isoparam_sympy(d, bsr, rho, mu);
             else if (kernel_kind == KernelKind::Fd)
@@ -1918,7 +1919,7 @@ int main(int argc, char **argv) {
             // Restore the geometry-only half built once at setup, then add only
             // the velocity-dependent half. The linear half is not rebuilt here:
             // that is the whole point of the split.
-            assemble_jacobian_atomic_nonlinear(d, bsr, rho, mu, jac_linear);
+            assemble_jacobian_atomic_nonlinear(d, bsr, rho, mu, jac_linear.data());
         else
             // Current and Fd both land here. There is no dedicated `current`
             // assembly kernel -- the loop residual kernel has no assembled
@@ -2197,10 +2198,11 @@ int main(int argc, char **argv) {
     // diagonal blocks -- 16 doubles per node instead of the whole matrix.
     std::vector<scalar_t> diag_blocks;
     auto diag_fn = [&]() {
+        diag_blocks.assign((size_t)(d.nnodes * 16), scalar_t(0));
         if (geom_kind == GeomKind::Isoparam)
-            assemble_diag_atomic_isoparam(d, rho, mu, diag_blocks);
+            assemble_diag_atomic_isoparam(d, rho, mu, diag_blocks.data());
         else
-            assemble_diag_atomic(d, rho, mu, diag_blocks);
+            assemble_diag_atomic(d, rho, mu, diag_blocks.data());
         assemble_diag_transient_pass(d, rho, diag_blocks);
     };
 
@@ -2355,8 +2357,9 @@ int main(int argc, char **argv) {
             std::vector<scalar_t> full(ref, ref + (size_t)bsr.nnz * 16);
             scalar_t              fmax = 0;
             for (scalar_t v : full) fmax = std::max(fmax, std::fabs(v));
-            assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear);
-            assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear);
+            jac_linear.assign((size_t)(bsr.nnz * 16), scalar_t(0));
+            assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear.data());
+            assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear.data());
             if (boundary)
                 assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, 1);
             assemble_transient_diag_pass(d, rho, bsr);

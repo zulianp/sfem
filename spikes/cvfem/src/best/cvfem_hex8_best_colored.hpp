@@ -109,7 +109,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                                                  const scalar_t      mu,
                                                  const KernelKind    kernel_kind,
                                                  const GeomKind      geom_kind) {
-    reset_residual(d);
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 
     scalar_t *const SFEM_RESTRICT rx        = d.rx.data();
     scalar_t *const SFEM_RESTRICT ry        = d.ry.data();
