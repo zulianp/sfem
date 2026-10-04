@@ -47,8 +47,8 @@ struct SSMeshData {
     ptrdiff_t                    nnodes{0};
     ptrdiff_t                    nmacro{0};
     int                          nxe{0};  // (L+1)^3, nodes per macro-element
-    smesh::idx_t               **elems{nullptr};
-    smesh::geom_t              **points{nullptr};
+    idx_t               **elems{nullptr};
+    geom_t              **points{nullptr};
     scalar_t                     Lx{1}, Ly{1}, Lz{1};
     scalar_t                     rhie_chow_scale{1};
     // Harten band for the upwind switch, as an absolute mass-flux magnitude. Zero is the
@@ -193,11 +193,11 @@ struct SSScatter;
 struct SSScatter {
     bool                      ready{false};
     std::vector<int>          slot;         // (e * nxe + a) -> staging slot, -1 if exclusive
-    std::vector<smesh::idx_t> shared_node;  // one global node per reduction row
+    std::vector<idx_t> shared_node;  // one global node per reduction row
     std::vector<ptrdiff_t>    red_ptr;      // CRS over reduction rows
     std::vector<ptrdiff_t>    red_idx;      // staging slots feeding each row
     ptrdiff_t                 n_slots{0};
-    std::vector<scalar_t>     stage;        // n_slots * N_FIELDS, for the 4-wide kernels
+    std::vector<scalar_t>     stage;        // n_slots * CVFEM_HEX8_N_FIELDS, for the 4-wide kernels
     std::vector<scalar_t>     stage16;      // n_slots * 16, for the block diagonal
     // BUILD-TIME SCRATCH, HELD RATHER THAN DECLARED LOCALLY.
     //
@@ -228,7 +228,7 @@ inline void sscvfem_build_scatter(const SSMeshData &d, SSScatter &s) {
     for (ptrdiff_t g = 0; g < d.nnodes; ++g)
         if (touches[(size_t)g] > 1) {
             row_of[(size_t)g] = (ptrdiff_t)s.shared_node.size();
-            s.shared_node.push_back((smesh::idx_t)g);
+            s.shared_node.push_back((idx_t)g);
         }
 
     const ptrdiff_t nrows = (ptrdiff_t)s.shared_node.size();
@@ -254,7 +254,7 @@ inline void sscvfem_build_scatter(const SSMeshData &d, SSScatter &s) {
             s.red_idx[(size_t)k]        = k;  // slot index is its own position
         }
 
-    s.stage.assign((size_t)s.n_slots * N_FIELDS, scalar_t(0));
+    s.stage.assign((size_t)s.n_slots * CVFEM_HEX8_N_FIELDS, scalar_t(0));
     s.stage16.assign((size_t)s.n_slots * 16, scalar_t(0));
     s.ready = true;
 }
@@ -266,7 +266,7 @@ template <int W>
 static SFEM_INLINE void sscvfem_scatter_element_w(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const int *const SFEM_RESTRICT slot, const int nxe, const ptrdiff_t e,
-                                                  const smesh::idx_t *const SFEM_RESTRICT lg,
+                                                  const idx_t *const SFEM_RESTRICT lg,
                                                   const scalar_t *const SFEM_RESTRICT     lout,
                                                   scalar_t *const SFEM_RESTRICT           dst,
                                                   scalar_t *const SFEM_RESTRICT           stage) {
@@ -304,10 +304,10 @@ static SFEM_INLINE void sscvfem_scatter_element(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const int *const SFEM_RESTRICT slot,
         scalar_t *const SFEM_RESTRICT stage, const int nxe, const ptrdiff_t e,
-                                                const smesh::idx_t *const SFEM_RESTRICT lg,
+                                                const idx_t *const SFEM_RESTRICT lg,
                                                 const scalar_t *const SFEM_RESTRICT     lout,
                                                 scalar_t *const SFEM_RESTRICT           jv) {
-    sscvfem_scatter_element_w<N_FIELDS>(slot, nxe, e, lg, lout, jv, const_cast<scalar_t *>(stage));
+    sscvfem_scatter_element_w<CVFEM_HEX8_N_FIELDS>(slot, nxe, e, lg, lout, jv, const_cast<scalar_t *>(stage));
 }
 
 // The same, for four separate destination arrays rather than one interleaved one. The
@@ -326,13 +326,13 @@ static SFEM_INLINE void sscvfem_scatter_element_soa_w(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const int *const SFEM_RESTRICT slot,
         scalar_t *const SFEM_RESTRICT stage, const int nxe, const ptrdiff_t e,
-                                                      const smesh::idx_t *const SFEM_RESTRICT lg,
+                                                      const idx_t *const SFEM_RESTRICT lg,
                                                       const scalar_t *const SFEM_RESTRICT     lacc,
                                                       scalar_t *const                        dst[W]) {
     for (int a = 0; a < nxe; ++a) {
         const int sl = slot[(size_t)e * nxe + a];
         if (sl < 0) {
-            const smesh::idx_t g = lg[a];
+            const idx_t g = lg[a];
             for (int c = 0; c < W; ++c) dst[c][g] += lacc[(size_t)a * W + c];
         } else {
             for (int c = 0; c < W; ++c) stage[(size_t)sl * W + c] = lacc[(size_t)a * W + c];
@@ -354,7 +354,7 @@ inline void sscvfem_reduce_shared_soa_w(
         scalar_t acc[W] = {0};
         for (ptrdiff_t k = red_ptr[(size_t)r]; k < red_ptr[(size_t)r + 1]; ++k)
             for (int c = 0; c < W; ++c) acc[c] += stage[(size_t)red_idx[(size_t)k] * W + c];
-        const smesh::idx_t g = shared_node[(size_t)r];
+        const idx_t g = shared_node[(size_t)r];
         for (int c = 0; c < W; ++c) dst[c][g] += acc[c];
     }
 }
@@ -369,7 +369,7 @@ inline void sscvfem_reduce_shared(
         const idx_t *const SFEM_RESTRICT shared_node,
         scalar_t *const SFEM_RESTRICT stage,
         const ptrdiff_t n_shared, scalar_t *const SFEM_RESTRICT jv) {
-    sscvfem_reduce_shared_w<N_FIELDS>(red_idx, red_ptr, shared_node, n_shared, jv, stage);
+    sscvfem_reduce_shared_w<CVFEM_HEX8_N_FIELDS>(red_idx, red_ptr, shared_node, n_shared, jv, stage);
 }
 
 static SFEM_INLINE int sscvfem_lidx(const int L, const int x, const int y, const int z) {
@@ -503,7 +503,7 @@ static SFEM_INLINE void sscvfem_cell_corners(
         geom_t **const SFEM_RESTRICT points, const ptrdiff_t e, const int base,
                                              const int off[8], scalar_t x[8], scalar_t y[8], scalar_t z[8]) {
     for (int a = 0; a < 8; ++a) {
-        const smesh::idx_t gn = elems[base + off[a]][e];
+        const idx_t gn = elems[base + off[a]][e];
         x[a]                  = (scalar_t)points[0][gn];
         y[a]                  = (scalar_t)points[1][gn];
         z[a]                  = (scalar_t)points[2][gn];
@@ -529,7 +529,7 @@ inline void sscvfem_classify_macros(SSMeshData &d) {
     for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
         double c[8][3];
         for (int a = 0; a < 8; ++a) {
-            const smesh::idx_t gn = d.elems[ext[a]][e];
+            const idx_t gn = d.elems[ext[a]][e];
             for (int k = 0; k < 3; ++k) c[a][k] = (double)d.points[k][gn];
         }
         double lin = 0, cross = 0;
@@ -550,7 +550,7 @@ inline void sscvfem_classify_macros(SSMeshData &d) {
                 for (int yi = 0; yi <= L; ++yi)
                     for (int xi = 0; xi <= L; ++xi) {
                         const double          r[3] = {(double)xi / L, (double)yi / L, (double)zi / L};
-                        const smesh::idx_t gn   = d.elems[sscvfem_lidx(L, xi, yi, zi)][e];
+                        const idx_t gn   = d.elems[sscvfem_lidx(L, xi, yi, zi)][e];
                         for (int k = 0; k < 3; ++k) {
                             double t = 0;
                             for (int a = 0; a < 8; ++a) {
@@ -671,7 +671,7 @@ inline void sscvfem_build_grad_weight(SSMeshData &d) {
         // determinant.
         scalar_t ex[8], ey[8], ez[8], adj[9], det;
         for (int a = 0; a < 8; ++a) {
-            const smesh::idx_t g = d.elems[off[a]][e];
+            const idx_t g = d.elems[off[a]][e];
             ex[a]                = (scalar_t)d.points[0][g];
             ey[a]                = (scalar_t)d.points[1][g];
             ez[a]                = (scalar_t)d.points[2][g];
@@ -785,7 +785,7 @@ inline void sscvfem_nodal_grad_packed_sweep(
             const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned;
             const ptrdiff_t n_ghost      = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts    = &ghost_idx[ghost_ptr[pack]];
+            const idx_t *const SFEM_RESTRICT ghosts    = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off = ghost_ptr[pack];
 
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) pack_f[k] = src[(owned + k) * stride];
@@ -798,7 +798,7 @@ inline void sscvfem_nodal_grad_packed_sweep(
                 // a Jacobian exactly, which is what sscvfem_macro_geom has always relied on.
                 scalar_t ex[8], ey[8], ez[8], adj[9], det;
                 for (int a = 0; a < 8; ++a) {
-                    const smesh::idx_t g = cvfem_pack_local_to_global(owned, ghosts, n_contiguous, pack_elems[off[a]][e]);
+                    const idx_t g = cvfem_pack_local_to_global(owned, ghosts, n_contiguous, pack_elems[off[a]][e]);
                     ex[a]                = (scalar_t)px[g];
                     ey[a]                = (scalar_t)py[g];
                     ez[a]                = (scalar_t)pz[g];
@@ -818,7 +818,7 @@ inline void sscvfem_nodal_grad_packed_sweep(
                             if (curved_e) {
                                 scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
                                 for (int a = 0; a < 8; ++a) {
-                                    const smesh::idx_t gn = cvfem_pack_local_to_global(
+                                    const idx_t gn = cvfem_pack_local_to_global(
                                             owned, ghosts, n_contiguous, pack_elems[base + off[a]][e]);
                                     cx[a] = (scalar_t)px[gn];
                                     cy[a] = (scalar_t)py[gn];
@@ -1155,8 +1155,8 @@ inline void sscvfem_nodal_grad_scatter_range(
         scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe * NG));
         scalar_t *const SFEM_RESTRICT lp = _arena5;
         scalar_t *const SFEM_RESTRICT lacc = _arena5 + ((size_t)nxe);
-        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
-        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
+        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
+        idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = e_begin; e < e_end; ++e) {
@@ -1165,7 +1165,7 @@ inline void sscvfem_nodal_grad_scatter_range(
             // macro-element -- three arrays of (L+1)^3 -- to feed a geometry computation that
             // is the same for all of them.
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = elems[a][e];
+                const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
                 lp[(size_t)a]        = src[(ptrdiff_t)g * stride];
             }
@@ -1182,7 +1182,7 @@ inline void sscvfem_nodal_grad_scatter_range(
             {
                 scalar_t ex[8], ey[8], ez[8];
                 for (int a = 0; a < 8; ++a) {
-                    const smesh::idx_t g = elems[off[a]][e];
+                    const idx_t g = elems[off[a]][e];
                     ex[a]                = (scalar_t)points[0][g];
                     ey[a]                = (scalar_t)points[1][g];
                     ez[a]                = (scalar_t)points[2][g];
@@ -1220,7 +1220,7 @@ inline void sscvfem_nodal_grad_scatter_range(
                                 acc[1] += gy;
                                 acc[2] += gz;
                             } else {
-                                const smesh::idx_t id = lg[(size_t)l];
+                                const idx_t id = lg[(size_t)l];
                                 atomic_add(ogx, id, gx);
                                 atomic_add(ogy, id, gy);
                                 atomic_add(ogz, id, gz);
@@ -1254,7 +1254,7 @@ inline void sscvfem_nodal_p_grad(SSMeshData &d) {
 // The same reconstruction applied to the Jacobian direction's pressure component.
 inline void sscvfem_nodal_q_grad(SSMeshData &d, const scalar_t *const SFEM_RESTRICT dir) {
     SFEM_TRACE_SCOPE("sscvfem::nodal_q_grad");
-    sscvfem_nodal_grad_strided(d, dir + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
+    sscvfem_nodal_grad_strided(d, dir + 3, CVFEM_HEX8_N_FIELDS, d.qgx, d.qgy, d.qgz);
 }
 
 
@@ -1297,7 +1297,7 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(
             int ext[8];
             sscvfem_macro_corner_offsets(L, ext);
             for (int a = 0; a < 8; ++a) {
-                const smesh::idx_t gm = elems[ext[a]][e];
+                const idx_t gm = elems[ext[a]][e];
                 hx[a] = (scalar_t)points[0][gm];
                 hy[a] = (scalar_t)points[1][gm];
                 hz[a] = (scalar_t)points[2][gm];
@@ -1310,7 +1310,7 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(
                 for (int xi = 0; xi < L; ++xi) {
                     const int base = sscvfem_lidx(L, xi, yi, zi);
 
-                    smesh::idx_t g[8];
+                    idx_t g[8];
                     scalar_t     x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
                     scalar_t     vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
                     scalar_t     r[CVFEM_HEX8_N_DOF];
@@ -1348,8 +1348,8 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(
                                                      vx, vy, vz, q, r);
 
                     for (int a = 0; a < 8; ++a)
-                        for (int c = 0; c < N_FIELDS; ++c)
-                            atomic_add(jv + (ptrdiff_t)g[a] * N_FIELDS + c, 0, r[a * 4 + c]);
+                        for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
+                            atomic_add(jv + (ptrdiff_t)g[a] * CVFEM_HEX8_N_FIELDS + c, 0, r[a * 4 + c]);
                 }
             }
         }
@@ -1394,7 +1394,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
         // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
         // shared between them because only one is live inside a parallel region and
         // they all want the same macro-element size.
-        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe * CVFEM_HEX8_N_FIELDS));
         scalar_t *const SFEM_RESTRICT lx = _arena5;
         scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
@@ -1410,14 +1410,14 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
         scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
-        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
+        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
+        idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
             // Gather once. This is the only indirection in the sweep.
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = elems[a][e];
+                const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
                 lx[(size_t)a]        = (scalar_t)points[0][g];
                 ly[(size_t)a]        = (scalar_t)points[1][g];
@@ -1434,7 +1434,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
                 lpgy[(size_t)a]      = pgy_src[(size_t)g];
                 lpgz[(size_t)a]      = pgz_src[(size_t)g];
             }
-            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * CVFEM_HEX8_N_FIELDS), scalar_t(0));
 
             // The geometry every micro cell of this macro element uses, as the hoisted
             // variants use it; see sscvfem_hoisted_cell. Real positions stay per cell.
@@ -1443,7 +1443,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
                 int ext[8];
                 sscvfem_macro_corner_offsets(L, ext);
                 for (int a = 0; a < 8; ++a) {
-                    const smesh::idx_t gm = elems[ext[a]][e];
+                    const idx_t gm = elems[ext[a]][e];
                     hx[a] = (scalar_t)points[0][gm];
                     hy[a] = (scalar_t)points[1][gm];
                     hz[a] = (scalar_t)points[2][gm];
@@ -1494,7 +1494,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
                         // Accumulate locally: no atomic, no contention, contiguous.
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
-                            for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
+                            for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) lout[(size_t)l * CVFEM_HEX8_N_FIELDS + c] += r[a * 4 + c];
                         }
                     }
                 }
@@ -1502,9 +1502,9 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
 
             // Scatter once per macro node instead of once per element-node incidence.
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = lg[(size_t)a];
-                for (int c = 0; c < N_FIELDS; ++c)
-                    atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+                const idx_t g = lg[(size_t)a];
+                for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
+                    atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + c, 0, lout[(size_t)a * CVFEM_HEX8_N_FIELDS + c]);
             }
         }
     }
@@ -1557,7 +1557,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
         // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
         // shared between them because only one is live inside a parallel region and
         // they all want the same macro-element size.
-        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe * CVFEM_HEX8_N_FIELDS));
         scalar_t *const SFEM_RESTRICT lx = _arena5;
         scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
@@ -1573,13 +1573,13 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
         scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
-        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
+        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
+        idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = elems[a][e];
+                const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
                 lx[(size_t)a]        = (scalar_t)points[0][g];
                 ly[(size_t)a]        = (scalar_t)points[1][g];
@@ -1596,7 +1596,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
                 lpgy[(size_t)a]      = pgy_src[(size_t)g];
                 lpgz[(size_t)a]      = pgz_src[(size_t)g];
             }
-            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * CVFEM_HEX8_N_FIELDS), scalar_t(0));
 
             // Once per macro-element, from its first micro-element.
             // Micro-cell 0's corners, hoisted: the geometry AND the coordinates the
@@ -1606,7 +1606,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
             // to cell 0 and one adjugate serves all of them -- that is what the action does.
             // This used to hoist the adjugate but then hand the Rhie-Chow struct each cell's
             // OWN coordinates, and the two agree only to the precision the node positions are
-            // stored in. smesh::geom_t is float32, so the block diagonal disagreed with the
+            // stored in. geom_t is float32, so the block diagonal disagreed with the
             // action it is supposed to be the diagonal of by 4.23e-08 -- eight orders above
             // round-off, and invisible until the q-independent consistency gate looked.
             //
@@ -1675,16 +1675,16 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
 
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
-                            for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
+                            for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) lout[(size_t)l * CVFEM_HEX8_N_FIELDS + c] += r[a * 4 + c];
                         }
                     }
                 }
             }
 
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = lg[(size_t)a];
-                for (int c = 0; c < N_FIELDS; ++c)
-                    atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+                const idx_t g = lg[(size_t)a];
+                for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
+                    atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + c, 0, lout[(size_t)a * CVFEM_HEX8_N_FIELDS + c]);
             }
         }
     }
@@ -1970,7 +1970,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
         // shared between them because only one is live inside a parallel region and
         // they all want the same macro-element size.
-        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)nxe * CVFEM_HEX8_N_FIELDS));
         scalar_t *const SFEM_RESTRICT lx = _arena5;
         scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
@@ -1989,13 +1989,13 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         scalar_t *const SFEM_RESTRICT lqgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0));
         scalar_t *const SFEM_RESTRICT lqgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
         scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
-        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
-        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
+        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
+        idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = elems[a][e];
+                const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
                 lx[(size_t)a]        = (scalar_t)points[0][g];
                 ly[(size_t)a]        = (scalar_t)points[1][g];
@@ -2017,7 +2017,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
                     lqgz[(size_t)a] = qgz_src[(size_t)g];
                 }
             }
-            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * CVFEM_HEX8_N_FIELDS), scalar_t(0));
 
             // Per macro element, and the curved branch below reads the same one: a call per
             // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
@@ -2093,7 +2093,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
 
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
-                            for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
+                            for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) lout[(size_t)l * CVFEM_HEX8_N_FIELDS + c] += r[a * 4 + c];
                         }
                     }
                 }
@@ -2103,9 +2103,9 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
                 sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lout, jv);
             else
                 for (int a = 0; a < nxe; ++a) {
-                    const smesh::idx_t g = lg[(size_t)a];
-                    for (int c = 0; c < N_FIELDS; ++c)
-                        atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+                    const idx_t g = lg[(size_t)a];
+                    for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
+                        atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + c, 0, lout[(size_t)a * CVFEM_HEX8_N_FIELDS + c]);
                 }
         }
     }
@@ -2213,7 +2213,7 @@ inline bool sscvfem_wants_q_grad(const SSMeshData &d, const int blocks) {
 inline void sscvfem_apply_blocks_ref(SSMeshData &d, const scalar_t rho, const scalar_t mu, const int blocks,
                                      const scalar_t *const SFEM_RESTRICT dir,
                                      scalar_t *const SFEM_RESTRICT       jv) {
-    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    const ptrdiff_t ndof = d.nnodes * CVFEM_HEX8_N_FIELDS;
     // The reference implementation's two work vectors, held with the others.
     std::vector<scalar_t> &v = d.blocks_ref_work[0], &y = d.blocks_ref_work[1];
     v.assign((size_t)ndof, scalar_t(0));
@@ -2472,7 +2472,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
         // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
         // shared between them because only one is live inside a parallel region and
         // they all want the same macro-element size.
-        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)nxe * CVFEM_HEX8_N_FIELDS));
         scalar_t *const SFEM_RESTRICT lx = _arena5;
         scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
@@ -2491,8 +2491,8 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
         scalar_t *const SFEM_RESTRICT lqgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0));
         scalar_t *const SFEM_RESTRICT lqgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
         scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0)) + ((size_t)(has_qg ? nxe : 0));
-        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
-        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
+        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
+        idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
@@ -2516,7 +2516,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
             constexpr bool need_dir_q   = up || pp;
 
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = elems[a][e];
+                const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
                 lx[(size_t)a]        = (scalar_t)points[0][g];
                 ly[(size_t)a]        = (scalar_t)points[1][g];
@@ -2556,7 +2556,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
                 std::fill(lvz, lvz + ((size_t)nxe), scalar_t(0));
             }
             if constexpr (!need_dir_q) std::fill(lq, lq + ((size_t)nxe), scalar_t(0));
-            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * CVFEM_HEX8_N_FIELDS), scalar_t(0));
 
             // Per macro element, and the curved branch below reads the same one: a call per
             // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
@@ -2708,7 +2708,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
 
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
-                            for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
+                            for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) lout[(size_t)l * CVFEM_HEX8_N_FIELDS + c] += r[a * 4 + c];
                         }
                     }
                 }
@@ -2724,12 +2724,12 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
                 sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lout, jv);
             else
                 for (int a = 0; a < nxe; ++a) {
-                    const smesh::idx_t g = lg[(size_t)a];
+                    const idx_t g = lg[(size_t)a];
                     if constexpr (uu || up)
                         for (int c = 0; c < 3; ++c)
-                            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+                            atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + c, 0, lout[(size_t)a * CVFEM_HEX8_N_FIELDS + c]);
                     if constexpr (pu || pp)
-                        atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 3, 0, lout[(size_t)a * N_FIELDS + 3]);
+                        atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 3, 0, lout[(size_t)a * CVFEM_HEX8_N_FIELDS + 3]);
                 }
         }
     }
@@ -2800,7 +2800,7 @@ inline void sscvfem_node_volume(SSMeshData &d, std::vector<scalar_t> &node_vol) 
     for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
         scalar_t ex[8], ey[8], ez[8];
         for (int a = 0; a < 8; ++a) {
-            const smesh::idx_t g = d.elems[off[a]][e];
+            const idx_t g = d.elems[off[a]][e];
             ex[a] = (scalar_t)d.points[0][g];
             ey[a] = (scalar_t)d.points[1][g];
             ez[a] = (scalar_t)d.points[2][g];
@@ -2822,7 +2822,7 @@ inline void sscvfem_node_volume(SSMeshData &d, std::vector<scalar_t> &node_vol) 
                         vc = std::fabs(cdet) / scalar_t(8);
                     }
                     for (int a = 0; a < 8; ++a) {
-                        const smesh::idx_t g = d.elems[base + off[a]][e];
+                        const idx_t g = d.elems[base + off[a]][e];
                         atomic_add(node_vol.data(), g, vc);
                     }
                 }
@@ -2841,9 +2841,9 @@ inline void sscvfem_apply_body_force_sweep(
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         const scalar_t v = node_vol[(size_t)i];
-        res[i * N_FIELDS + 0] -= fx[(size_t)i] * v;
-        res[i * N_FIELDS + 1] -= fy[(size_t)i] * v;
-        res[i * N_FIELDS + 2] -= fz[(size_t)i] * v;
+        res[i * CVFEM_HEX8_N_FIELDS + 0] -= fx[(size_t)i] * v;
+        res[i * CVFEM_HEX8_N_FIELDS + 1] -= fy[(size_t)i] * v;
+        res[i * CVFEM_HEX8_N_FIELDS + 2] -= fz[(size_t)i] * v;
     }
 }
 
@@ -2869,7 +2869,7 @@ inline void sscvfem_apply_transient_sweep(
         const scalar_t *const SFEM_RESTRICT uy,
         const scalar_t *const SFEM_RESTRICT uz, const scalar_t rho, const BdfCoeffs c,
                                           scalar_t *const SFEM_RESTRICT res) {
-    SFEM_TRACE_SCOPE("sscvfem::apply_transient");
+    CVFEM_TRACE_SCOPE("sscvfem::apply_transient_sweep");
     const bool      two = c.order >= 2;
     const scalar_t  a0 = c.a0, a1 = c.a1, a2 = c.a2;
     const scalar_t inv = scalar_t(1) / dt;
@@ -2880,7 +2880,7 @@ inline void sscvfem_apply_transient_sweep(
         const scalar_t u[3] = {ux[(size_t)i], uy[(size_t)i], uz[(size_t)i]};
         for (int c = 0; c < 3; ++c) {
             const scalar_t prev2 = two ? u_prev2[k + (size_t)c] : scalar_t(0);
-            res[i * N_FIELDS + c] += w * (a0 * u[c] + a1 * u_prev[k + (size_t)c] + a2 * prev2);
+            res[i * CVFEM_HEX8_N_FIELDS + c] += w * (a0 * u[c] + a1 * u_prev[k + (size_t)c] + a2 * prev2);
         }
     }
 }
@@ -2938,12 +2938,12 @@ inline void sscvfem_apply_transient_action_sweep(
         const scalar_t transient_w, const scalar_t rho,
                                                  const scalar_t *const SFEM_RESTRICT dir,
                                                  scalar_t *const SFEM_RESTRICT       jv) {
-    SFEM_TRACE_SCOPE("sscvfem::apply_transient_action");
+    CVFEM_TRACE_SCOPE("sscvfem::apply_transient_action_sweep");
     const scalar_t a = transient_w;
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < nnodes; ++i) {
         const scalar_t w = a * node_vol[(size_t)i];
-        for (int c = 0; c < 3; ++c) jv[i * N_FIELDS + c] += w * dir[i * N_FIELDS + c];
+        for (int c = 0; c < 3; ++c) jv[i * CVFEM_HEX8_N_FIELDS + c] += w * dir[i * CVFEM_HEX8_N_FIELDS + c];
     }
 }
 
@@ -2979,8 +2979,8 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(
         const scalar_t *const SFEM_RESTRICT uz_src,
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                  scalar_t *const SFEM_RESTRICT res) {
-    SFEM_TRACE_SCOPE("sscvfem::residual_naive");
-    const ptrdiff_t ndof = nnodes * N_FIELDS;
+    CVFEM_TRACE_SCOPE("sscvfem::residual_naive_sweep");
+    const ptrdiff_t ndof = nnodes * CVFEM_HEX8_N_FIELDS;
     for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
 
     const int L = level;
@@ -2996,7 +2996,7 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(
             int ext[8];
             sscvfem_macro_corner_offsets(L, ext);
             for (int a = 0; a < 8; ++a) {
-                const smesh::idx_t gm = elems[ext[a]][e];
+                const idx_t gm = elems[ext[a]][e];
                 hx[a] = (scalar_t)points[0][gm];
                 hy[a] = (scalar_t)points[1][gm];
                 hz[a] = (scalar_t)points[2][gm];
@@ -3008,7 +3008,7 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(
             for (int yi = 0; yi < L; ++yi) {
                 for (int xi = 0; xi < L; ++xi) {
                     const int    base = sscvfem_lidx(L, xi, yi, zi);
-                    smesh::idx_t g[8];
+                    idx_t g[8];
                     scalar_t     x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
                     scalar_t     r[CVFEM_HEX8_N_DOF];
                     for (int a = 0; a < 8; ++a) {
@@ -3042,8 +3042,8 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(
                                                          nullptr, peclet);
                     boundary_scs_add_residual<false>(rho, mu, adj, det, box_lx, box_ly, box_lz, x, y, z, ux, uy, uz, p, r);
                     for (int a = 0; a < 8; ++a)
-                        for (int c = 0; c < N_FIELDS; ++c)
-                            atomic_add(res + (ptrdiff_t)g[a] * N_FIELDS + c, 0, r[a * 4 + c]);
+                        for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
+                            atomic_add(res + (ptrdiff_t)g[a] * CVFEM_HEX8_N_FIELDS + c, 0, r[a * 4 + c]);
                 }
             }
         }
@@ -3143,7 +3143,7 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
         // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
         // shared between them because only one is live inside a parallel region and
         // they all want the same macro-element size.
-        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + (conv_ho ? (size_t)nxe * 9 : 0) + ((size_t)nxe * N_FIELDS));
+        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + (conv_ho ? (size_t)nxe * 9 : 0) + ((size_t)nxe * CVFEM_HEX8_N_FIELDS));
         scalar_t *const SFEM_RESTRICT lx = _arena5;
         scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
@@ -3156,13 +3156,13 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
         scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lug = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + (conv_ho ? (size_t)nxe * 9 : 0);
-        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
-        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
+        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
+        idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = elems[a][e];
+                const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
                 lx[(size_t)a]        = (scalar_t)points[0][g];
                 ly[(size_t)a]        = (scalar_t)points[1][g];
@@ -3177,7 +3177,7 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
                 if (conv_ho)
                     for (int k = 0; k < 9; ++k) lug[(size_t)a * 9 + (size_t)k] = ugrad_f[(size_t)g * 9 + (size_t)k];
             }
-            std::fill(lout, lout + ((size_t)nxe * N_FIELDS), scalar_t(0));
+            std::fill(lout, lout + ((size_t)nxe * CVFEM_HEX8_N_FIELDS), scalar_t(0));
 
             // Per macro element, and the curved branch below reads the same one: a call per
             // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
@@ -3264,7 +3264,7 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
                                                   sscvfem_bd(bc_p, bc_tx, bc_ty, bc_tz, pressure_mask, traction_mask, e, L, xi, yi, zi));
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
-                            for (int c = 0; c < N_FIELDS; ++c) lout[(size_t)l * N_FIELDS + c] += r[a * 4 + c];
+                            for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) lout[(size_t)l * CVFEM_HEX8_N_FIELDS + c] += r[a * 4 + c];
                         }
                     }
                 }
@@ -3274,9 +3274,9 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
                 sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lout, res);
             else
                 for (int a = 0; a < nxe; ++a) {
-                    const smesh::idx_t g = lg[(size_t)a];
-                    for (int c = 0; c < N_FIELDS; ++c)
-                        atomic_add(res + (ptrdiff_t)g * N_FIELDS + c, 0, lout[(size_t)a * N_FIELDS + c]);
+                    const idx_t g = lg[(size_t)a];
+                    for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
+                        atomic_add(res + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + c, 0, lout[(size_t)a * CVFEM_HEX8_N_FIELDS + c]);
                 }
         }
     }
@@ -3374,7 +3374,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
     // SFEM_CONV_HO is off, which is still the overall default: the branch is guarded on it.
         d.conv_freeze = smesh::Env::read<int>("SFEM_CONV_FREEZE", 1);
         if (d.conv_freeze && d.conv_ho) {
-            const ptrdiff_t n = d.nnodes * N_FIELDS;
+            const ptrdiff_t n = d.nnodes * CVFEM_HEX8_N_FIELDS;
             if ((ptrdiff_t)d.conv_frozen.size() != n) {
                 std::vector<scalar_t> &r_ho = d.conv_work[0], &r_lo = d.conv_work[1];
                 r_ho.assign((size_t)n, scalar_t(0));
@@ -3396,7 +3396,7 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
     if (d.conv_ho) sscvfem_assemble_nodal_u_grad(d);
     else d.ugrad.clear();
 
-    const ptrdiff_t ndof = d.nnodes * N_FIELDS;
+    const ptrdiff_t ndof = d.nnodes * CVFEM_HEX8_N_FIELDS;
     if (zero_first)
         for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
 
@@ -3444,7 +3444,7 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive_sweep(
         const scalar_t *const SFEM_RESTRICT uz_src,
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                    scalar_t *const SFEM_RESTRICT out) {
-    SFEM_TRACE_SCOPE("sscvfem::block_diag_naive");
+    CVFEM_TRACE_SCOPE("sscvfem::block_diag_naive_sweep");
 
     const int L = level;
     int       off[8];
@@ -3459,7 +3459,7 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive_sweep(
             int ext[8];
             sscvfem_macro_corner_offsets(L, ext);
             for (int a = 0; a < 8; ++a) {
-                const smesh::idx_t gm = elems[ext[a]][e];
+                const idx_t gm = elems[ext[a]][e];
                 hx[a] = (scalar_t)points[0][gm];
                 hy[a] = (scalar_t)points[1][gm];
                 hz[a] = (scalar_t)points[2][gm];
@@ -3472,7 +3472,7 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive_sweep(
                 for (int xi = 0; xi < L; ++xi) {
                     const int base = sscvfem_lidx(L, xi, yi, zi);
 
-                    smesh::idx_t g[8];
+                    idx_t g[8];
                     scalar_t     x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
                     for (int a = 0; a < 8; ++a) {
                         g[a]   = elems[base + off[a]][e];
@@ -3497,10 +3497,10 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive_sweep(
                     // dropped by the guard in cvfem_hex8_bsr_acc.
                     // count_t, not ptrdiff_t: boundary_scs_add_jacobian takes count_t
                     // slots. It is signed, so -1 still means "drop this block".
-                    smesh::count_t sl[64];
+                    count_t sl[64];
                     for (int a = 0; a < 8; ++a) {
                         for (int b = 0; b < 8; ++b) sl[a * 8 + b] = -1;
-                        sl[a * 8 + a] = (smesh::count_t)g[a];
+                        sl[a * 8 + a] = (count_t)g[a];
                     }
 
                     const Hex8RhieChow rc{gx,      gy, gz,   pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
@@ -3564,7 +3564,7 @@ static SFEM_INLINE void sscvfem_block_diag_cell(
     const int base = sscvfem_lidx(L, xi, yi, zi);
 
     scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
-    smesh::count_t sl[64];
+    count_t sl[64];
     for (int a = 0; a < 8; ++a) {
         const int l = base + off[a];
         x[a]        = lx[(size_t)l];
@@ -3581,7 +3581,7 @@ static SFEM_INLINE void sscvfem_block_diag_cell(
     }
     // Local node index: the destination is this macro-element's own
     // buffer, so no thread can be writing the same entry.
-    for (int a = 0; a < 8; ++a) sl[a * 8 + a] = (smesh::count_t)(base + off[a]);
+    for (int a = 0; a < 8; ++a) sl[a * 8 + a] = (count_t)(base + off[a]);
 
     scalar_t              cadj[9], cdet = 0;
     const scalar_t       *adj = hadj;
@@ -3700,7 +3700,7 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
         scalar_t *const SFEM_RESTRICT stage16,
         const ptrdiff_t n_shared, const scalar_t rho, const scalar_t mu,
                                              scalar_t *const SFEM_RESTRICT out) {
-    SFEM_TRACE_SCOPE("sscvfem::block_diag");
+    CVFEM_TRACE_SCOPE("sscvfem::block_diag_sweep");
 
     const int L   = level;
     const int nxe = nxe_src;
@@ -3725,13 +3725,13 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
         scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
         scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        smesh::idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<smesh::idx_t>(6, ((size_t)nxe));
-        smesh::idx_t *const SFEM_RESTRICT lg = _arena6;
+        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
+        idx_t *const SFEM_RESTRICT lg = _arena6;
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = 0; e < nmacro; ++e) {
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = elems[a][e];
+                const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
                 lx[(size_t)a]        = (scalar_t)points[0][g];
                 ly[(size_t)a]        = (scalar_t)points[1][g];
@@ -3753,7 +3753,7 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
             // to cell 0 and one adjugate serves all of them -- that is what the action does.
             // This used to hoist the adjugate but then hand the Rhie-Chow struct each cell's
             // OWN coordinates, and the two agree only to the precision the node positions are
-            // stored in. smesh::geom_t is float32, so the block diagonal disagreed with the
+            // stored in. geom_t is float32, so the block diagonal disagreed with the
             // action it is supposed to be the diagonal of by 4.23e-08 -- eight orders above
             // round-off, and invisible until the q-independent consistency gate looked.
             //
@@ -3793,7 +3793,7 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
                                               const_cast<scalar_t *>(stage16));
             else
                 for (int a = 0; a < nxe; ++a) {
-                    const smesh::idx_t g = lg[(size_t)a];
+                    const idx_t g = lg[(size_t)a];
                     for (int k = 0; k < 16; ++k)
                         atomic_add(out + (ptrdiff_t)g * 16 + k, 0, lout[(size_t)a * 16 + k]);
                 }
