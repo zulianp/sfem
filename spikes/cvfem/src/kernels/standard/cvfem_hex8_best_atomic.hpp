@@ -939,7 +939,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
     }
 }
 
-static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu) {
+static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d,
+                                              // Which optional terms are on, resolved once per
+                                              // solve by the caller rather than per sweep here:
+                                              // cvfem_hex8_extras_of reads the mesh, which this
+                                              // kernel is not meant to name.
+                                              const Hex8Extras &opt, BSR4 &b, const scalar_t rho, const scalar_t mu) {
     // zero_bsr4 inlined, so that this sweep names the matrix arrays it already writes rather
     // than the BSR4 object that owns them. Identical work: that function is this zeroing plus
     // the phase probe, which the macros carry here.
@@ -948,7 +953,6 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
     scalar_t *const SFEM_RESTRICT                 values = b.values->data();
     const count_t *const SFEM_RESTRICT     slots  = b.element_slots.data();
-    const Hex8Extras                              opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
