@@ -913,7 +913,11 @@ inline void sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
 // sweep is the element pass.
 inline void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                    scalar_t *const SFEM_RESTRICT res) {
-    sscvfem_residual_naive_sweep(d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
+    // Zeroed here, not in the sweep: the sweep is range-driven and runs once per thread.
+    const ptrdiff_t ndof = d.nnodes * CVFEM_HEX8_N_FIELDS;
+    for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
+    #pragma omp parallel
+        sscvfem_residual_naive_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
 }
@@ -1064,9 +1068,9 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
 inline void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                      std::vector<scalar_t> &diag) {
     diag.assign((size_t)d.nnodes * 16, scalar_t(0));
-    sscvfem_block_diag_naive_sweep(d.Lx, d.Ly, d.Lz, d.elems, d.level,
-                                   d.macro_curved.empty() ? nullptr : d.macro_curved.data(),
-                                   d.nmacro, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
+    #pragma omp parallel
+        sscvfem_block_diag_naive_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level,
+                                   d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
                                    d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(),
                                    sscvfem_rc_config(d), rho, mu, diag.data());
 }
