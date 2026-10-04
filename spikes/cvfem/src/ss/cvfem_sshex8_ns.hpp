@@ -239,13 +239,15 @@ inline void sscvfem_build_scatter(const SSMeshData &d, SSScatter &s) {
 // number of values per node so the same tables serve the 4-wide kernels (Jacobian action,
 // residual, block split) and the 16-wide block diagonal.
 template <int W>
-static SFEM_INLINE void sscvfem_scatter_element_w(const SSScatter &s, const int nxe, const ptrdiff_t e,
+static SFEM_INLINE void sscvfem_scatter_element_w(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const int *const SFEM_RESTRICT slot, const int nxe, const ptrdiff_t e,
                                                   const smesh::idx_t *const SFEM_RESTRICT lg,
                                                   const scalar_t *const SFEM_RESTRICT     lout,
                                                   scalar_t *const SFEM_RESTRICT           dst,
                                                   scalar_t *const SFEM_RESTRICT           stage) {
     for (int a = 0; a < nxe; ++a) {
-        const int sl = s.slot[(size_t)e * nxe + a];
+        const int sl = slot[(size_t)e * nxe + a];
         if (sl < 0) {
             const ptrdiff_t g = (ptrdiff_t)lg[a] * W;
             for (int c = 0; c < W; ++c) dst[g + c] += lout[(size_t)a * W + c];
@@ -256,15 +258,20 @@ static SFEM_INLINE void sscvfem_scatter_element_w(const SSScatter &s, const int 
 }
 
 template <int W>
-inline void sscvfem_reduce_shared_w(const SSScatter &s, scalar_t *const SFEM_RESTRICT dst,
+inline void sscvfem_reduce_shared_w(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        const ptrdiff_t n_shared, scalar_t *const SFEM_RESTRICT dst,
                                     const scalar_t *const SFEM_RESTRICT stage) {
-    const ptrdiff_t nrows = (ptrdiff_t)s.shared_node.size();
+    const ptrdiff_t nrows = n_shared;
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t r = 0; r < nrows; ++r) {
         scalar_t acc[W] = {0};
-        for (ptrdiff_t k = s.red_ptr[(size_t)r]; k < s.red_ptr[(size_t)r + 1]; ++k)
-            for (int c = 0; c < W; ++c) acc[c] += stage[(size_t)s.red_idx[(size_t)k] * W + c];
-        const ptrdiff_t g = (ptrdiff_t)s.shared_node[(size_t)r] * W;
+        for (ptrdiff_t k = red_ptr[(size_t)r]; k < red_ptr[(size_t)r + 1]; ++k)
+            for (int c = 0; c < W; ++c) acc[c] += stage[(size_t)red_idx[(size_t)k] * W + c];
+        const ptrdiff_t g = (ptrdiff_t)shared_node[(size_t)r] * W;
         for (int c = 0; c < W; ++c) dst[g + c] += acc[c];
     }
 }
@@ -273,7 +280,7 @@ static SFEM_INLINE void sscvfem_scatter_element(const SSScatter &s, const int nx
                                                 const smesh::idx_t *const SFEM_RESTRICT lg,
                                                 const scalar_t *const SFEM_RESTRICT     lout,
                                                 scalar_t *const SFEM_RESTRICT           jv) {
-    sscvfem_scatter_element_w<N_FIELDS>(s, nxe, e, lg, lout, jv, const_cast<scalar_t *>(s.stage.data()));
+    sscvfem_scatter_element_w<N_FIELDS>(s.slot.data(), nxe, e, lg, lout, jv, const_cast<scalar_t *>(s.stage.data()));
 }
 
 // The same, for four separate destination arrays rather than one interleaved one. The
@@ -288,13 +295,15 @@ static SFEM_INLINE void sscvfem_scatter_element(const SSScatter &s, const int nx
 // simply addresses less of it; write and read must agree, which is why the width is a
 // template parameter and not an argument that could differ between the two calls.
 template <int W>
-static SFEM_INLINE void sscvfem_scatter_element_soa_w(const SSScatter &s, const int nxe, const ptrdiff_t e,
+static SFEM_INLINE void sscvfem_scatter_element_soa_w(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage, const int nxe, const ptrdiff_t e,
                                                       const smesh::idx_t *const SFEM_RESTRICT lg,
                                                       const scalar_t *const SFEM_RESTRICT     lacc,
                                                       scalar_t *const                        dst[W]) {
-    scalar_t *const stage = const_cast<scalar_t *>(s.stage.data());
     for (int a = 0; a < nxe; ++a) {
-        const int sl = s.slot[(size_t)e * nxe + a];
+        const int sl = slot[(size_t)e * nxe + a];
         if (sl < 0) {
             const smesh::idx_t g = lg[a];
             for (int c = 0; c < W; ++c) dst[c][g] += lacc[(size_t)a * W + c];
@@ -305,14 +314,20 @@ static SFEM_INLINE void sscvfem_scatter_element_soa_w(const SSScatter &s, const 
 }
 
 template <int W>
-inline void sscvfem_reduce_shared_soa_w(const SSScatter &s, scalar_t *const dst[W]) {
-    const ptrdiff_t nrows = (ptrdiff_t)s.shared_node.size();
+inline void sscvfem_reduce_shared_soa_w(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        scalar_t *const SFEM_RESTRICT stage,
+        const ptrdiff_t n_shared, scalar_t *const dst[W]) {
+    const ptrdiff_t nrows = n_shared;
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t r = 0; r < nrows; ++r) {
         scalar_t acc[W] = {0};
-        for (ptrdiff_t k = s.red_ptr[(size_t)r]; k < s.red_ptr[(size_t)r + 1]; ++k)
-            for (int c = 0; c < W; ++c) acc[c] += s.stage[(size_t)s.red_idx[(size_t)k] * W + c];
-        const smesh::idx_t g = s.shared_node[(size_t)r];
+        for (ptrdiff_t k = red_ptr[(size_t)r]; k < red_ptr[(size_t)r + 1]; ++k)
+            for (int c = 0; c < W; ++c) acc[c] += stage[(size_t)red_idx[(size_t)k] * W + c];
+        const smesh::idx_t g = shared_node[(size_t)r];
         for (int c = 0; c < W; ++c) dst[c][g] += acc[c];
     }
 }
@@ -321,16 +336,16 @@ static SFEM_INLINE void sscvfem_scatter_element_soa(const SSScatter &s, const in
                                                     const smesh::idx_t *const SFEM_RESTRICT lg,
                                                     const scalar_t *const SFEM_RESTRICT     lacc,
                                                     scalar_t *const                        dst[N_FIELDS]) {
-    sscvfem_scatter_element_soa_w<N_FIELDS>(s, nxe, e, lg, lacc, dst);
+    sscvfem_scatter_element_soa_w<N_FIELDS>(s.slot.data(), const_cast<scalar_t *>(s.stage.data()), nxe, e, lg, lacc, dst);
 }
 
 inline void sscvfem_reduce_shared_soa(const SSScatter &s, scalar_t *const dst[N_FIELDS]) {
-    sscvfem_reduce_shared_soa_w<N_FIELDS>(s, dst);
+    sscvfem_reduce_shared_soa_w<N_FIELDS>(s.red_idx.data(), s.red_ptr.data(), s.shared_node.data(), const_cast<scalar_t *>(s.stage.data()), (ptrdiff_t)s.shared_node.size(), dst);
 }
 
 // Second pass: each shared node gathers its own contributions, in slot order.
 inline void sscvfem_reduce_shared(const SSScatter &s, scalar_t *const SFEM_RESTRICT jv) {
-    sscvfem_reduce_shared_w<N_FIELDS>(s, jv, s.stage.data());
+    sscvfem_reduce_shared_w<N_FIELDS>(s.red_idx.data(), s.red_ptr.data(), s.shared_node.data(), (ptrdiff_t)s.shared_node.size(), jv, s.stage.data());
 }
 
 static SFEM_INLINE int sscvfem_lidx(const int L, const int x, const int y, const int z) {
@@ -1137,14 +1152,14 @@ inline void sscvfem_nodal_grad_scatter_range(SSMeshData &d, const scalar_t *cons
 
             if (sc) {
                 scalar_t *dst[NG] = {ogx.data(), ogy.data(), ogz.data()};
-                sscvfem_scatter_element_soa_w<NG>(*sc, d.nxe, e, lg.data(), lacc.data(), dst);
+                sscvfem_scatter_element_soa_w<NG>(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), d.nxe, e, lg.data(), lacc.data(), dst);
             }
         }
     }
 
     if (sc) {
         scalar_t *dst[NG] = {ogx.data(), ogy.data(), ogz.data()};
-        sscvfem_reduce_shared_soa_w<NG>(*sc, dst);
+        sscvfem_reduce_shared_soa_w<NG>(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), dst);
     }
 
     // No normalisation here: the caller divides once, after whichever passes it ran. See
@@ -3295,7 +3310,7 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag(SSMeshData
                                                     c0z, lout.data());
             }
             if (sc)
-                sscvfem_scatter_element_w<16>(*sc, nxe, e, lg.data(), lout.data(), out,
+                sscvfem_scatter_element_w<16>(sc->slot.data(), nxe, e, lg.data(), lout.data(), out,
                                               const_cast<scalar_t *>(sc->stage16.data()));
             else
                 for (int a = 0; a < nxe; ++a) {
@@ -3306,7 +3321,7 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag(SSMeshData
         }
     }
 
-    if (sc) sscvfem_reduce_shared_w<16>(*sc, out, sc->stage16.data());
+    if (sc) sscvfem_reduce_shared_w<16>(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), (ptrdiff_t)sc->shared_node.size(), out, sc->stage16.data());
 
     // The transient term's diagonal: rho V a0 / dt on each velocity component, nothing on
     // pressure. Added here rather than in the macro-element sweeps for the same reason
