@@ -1413,7 +1413,7 @@ int main(int argc, char **argv) {
             if (geom_kind == GeomKind::Isoparam)
                 assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear.data());
             else
-                assemble_jacobian_atomic_linear(d, bsr, mu, jac_linear.data());
+                assemble_jacobian_atomic_linear(d.adj_ptr, d.det_ptr, d.nelements, bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), mu, jac_linear.data());
         }
         if (layout == "store") build_pack_store_crs(packed, d.nelements, bsr.rowptr, bsr.colidx);
     }

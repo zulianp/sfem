@@ -900,20 +900,24 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(
 // `linear` is a buffer of the same shape as b.values. The pair is exact, not an
 // approximation: linear + nonlinear reproduces assemble_jacobian_atomic_sumfact
 // bit-for-bit, because they are the two halves of the same kernel.
-static SFEM_NOINLINE void assemble_jacobian_atomic_linear(MeshData             &d,
-                                                          BSR4                 &b,
+static SFEM_NOINLINE void assemble_jacobian_atomic_linear(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const ptrdiff_t nelements,
+                                                          
+        const count_t *const SFEM_RESTRICT slots,
                                                           const scalar_t        mu,
                                                           scalar_t *const SFEM_RESTRICT linear) {
     // The buffer arrives sized. It used to be a std::vector& that this sweep called .assign() on,
     // which is an allocation inside a kernel -- and a kernel that allocates cannot be handed a
     // device buffer or a sub-range. The caller sizes and zeroes it.
     scalar_t *const SFEM_RESTRICT             values = linear;
-    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t adj[9], det;
-        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots_linear<true>(mu, adj, det,
                                                              slots + (size_t)e * 64, values);
     }
