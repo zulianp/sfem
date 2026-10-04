@@ -2153,7 +2153,7 @@ int main(int argc, char **argv) {
                                          with_hograd ? vgrad.data() : nullptr,
                                          conv_limiter, scalar_t(0));
         else if (geom_kind == GeomKind::Isoparam)
-            apply_jacobian_action_atomic_isoparam(d, cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data());
+            apply_jacobian_action_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data());
         // The lane-blocked sweep wherever it applies, for the reason the residual gives: the
         // standard layout is measured at its best or the comparison credits the format with a
         // vectorisation difference. It carries the first-order flux, Rhie-Chow exact or frozen,
@@ -2255,7 +2255,7 @@ int main(int argc, char **argv) {
         if (vs_matrix) bsr4_spmv(bsr, d.nnodes, jac_dir.data(), jv_spmv.data());
         apply_jacobian_action_packed_geom(geom_kind, d, packed, rho, mu, jac_dir.data(), jv_mf.data());
         if (geom_kind == GeomKind::Isoparam)
-            apply_jacobian_action_atomic_isoparam(d, cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jv_mf_atomic.data());
+            apply_jacobian_action_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jv_mf_atomic.data());
         else
             apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jv_mf_atomic.data());
         if (colors.n_colors > 0)

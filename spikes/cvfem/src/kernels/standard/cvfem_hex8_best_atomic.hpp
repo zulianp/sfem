@@ -283,7 +283,25 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
     }
 }
 
-static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData             &d,
+static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
                                               // Which optional terms are on, resolved once per
                                               // solve by the caller rather than per sweep here:
                                               // cvfem_hex8_extras_of reads the mesh, which this
@@ -293,17 +311,17 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
                                                                 const scalar_t        mu,
                                                                 const scalar_t *const dir,
                                                                 scalar_t *const       jv) {
-    cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
+    cvfem_zero_scalars(jv, nnodes * N_FIELDS);
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t         ux[8], uy[8], uz[8], p[8], vx[8], vy[8], vz[8], q[8], r[CVFEM_HEX8_N_DOF];
         Hex8ExtraScratch ex;
-        ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
-        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(d.elems, d.points, e, ex.x, ex.y, ex.z);
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
+        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(mesh_elems, points, e, ex.x, ex.y, ex.z);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const idx_t                  g  = d.elems[a][e];
+            const idx_t                  g  = mesh_elems[a][e];
             const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
             vx[a]                                  = dv[0];
             vy[a]                                  = dv[1];
@@ -313,7 +331,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(MeshData        
         cvfem_hex8_ns_upwind_jacobian_action_isoparam(rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, vx, vy, vz, q, r,
                                                       ex.rc, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const idx_t g = d.elems[a][e];
+            const idx_t g = mesh_elems[a][e];
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 1, 0, r[a * 4 + 1]);
             atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 2, 0, r[a * 4 + 2]);
