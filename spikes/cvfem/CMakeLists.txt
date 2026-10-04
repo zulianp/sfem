@@ -237,6 +237,23 @@ if(CVFEM_REPORT_PYTHON)
     add_test(NAME cvfem_kernels_self_contained
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_kernels_self_contained.py)
+    # ------------------------------------------------- an absent input is a null pointer
+    #
+    # The sweeps signal "this input is not there" with a null pointer: no boundary mask, no
+    # prescribed pressure, no curved macro element. A caller that spells such an argument
+    # `d.mask.data()` breaks that signal, because std::vector::data() is only required to
+    # return null for a vector that never allocated, and the Op clears four of these masks on
+    # every setup -- so a cleared-but-allocated mask arrives looking present, carrying the
+    # entries of the previous setup.
+    #
+    # This is not a style check. Fifty-three arguments were spelled that way when the
+    # semi-structured sweeps shed their staging objects, and none of them was visible one
+    # level deep: the sweep itself rarely tests the pointer, it hands it to the kernel that
+    # does. The test propagates the null test through calls until it stops finding new ones,
+    # which is what makes the fifty-three appear at all.
+    add_test(NAME cvfem_null_tested_args
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_null_tested_args.py)
 endif()
 
 if(CVFEM_REPORT_PYTHON)
