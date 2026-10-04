@@ -3358,11 +3358,23 @@ static SFEM_NOINLINE void sscvfem_block_diag_curved_macro(
                                         lpgy, lpgz, nullptr, scalar_t(0), nullptr, nullptr, nullptr, lout);
 }
 
-inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, const scalar_t mu,
-                                             std::vector<scalar_t> &diag) {
+// The transient term's diagonal: rho V a0 / dt on each velocity component, nothing on
+// pressure. A post-pass over nodes rather than part of the macro-element sweep, for the same
+// reason sscvfem_apply_transient is one, so the two stay consistent by construction.
+inline void sscvfem_block_diag_transient(SSMeshData &d, const scalar_t rho,
+                                         scalar_t *const SFEM_RESTRICT out) {
+    const scalar_t a = sscvfem_transient_diag_weight(d, rho);
+    if (a == scalar_t(0)) return;
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
+        const scalar_t w = a * d.node_vol[(size_t)i];
+        for (int c = 0; c < 3; ++c) out[(size_t)i * 16 + (size_t)c * 4 + (size_t)c] += w;
+    }
+}
+
+inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                             scalar_t *const SFEM_RESTRICT out) {
     SFEM_TRACE_SCOPE("sscvfem::block_diag");
-    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
-    scalar_t *const SFEM_RESTRICT out = diag.data();
 
     const int L   = d.level;
     const int nxe = d.nxe;
@@ -3453,19 +3465,21 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag(SSMeshData
 
     if (sc) sscvfem_reduce_shared_w<16>(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), (ptrdiff_t)sc->shared_node.size(), out, sc->stage16.data());
 
-    // The transient term's diagonal: rho V a0 / dt on each velocity component, nothing on
-    // pressure. Added here rather than in the macro-element sweeps for the same reason
-    // sscvfem_apply_transient is a post-pass, so the two stay consistent by construction.
-    {
-        const scalar_t a = sscvfem_transient_diag_weight(d, rho);
-        if (a != scalar_t(0)) {
-            if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
-#pragma omp parallel for schedule(static)
-            for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-                const scalar_t w = a * d.node_vol[(size_t)i];
-                for (int c = 0; c < 3; ++c) diag[(size_t)i * 16 + (size_t)c * 4 + (size_t)c] += w;
-            }
-        }
+}
+
+// The block diagonal, end to end. This is the front-end side: it owns the allocation, makes
+// sure the cached node volume the transient pass reads has been built, and runs the two passes
+// in order. Neither sweep allocates or decides anything.
+inline void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                               std::vector<scalar_t> &diag) {
+    diag.assign((size_t)d.nnodes * 16, scalar_t(0));
+    sscvfem_block_diag_sweep(d, rho, mu, diag.data());
+    // The node volume is built only when the transient pass will read it, which is what the
+    // guard inside the sweep used to do: on a steady solve the weight is zero and
+    // sscvfem_node_volume is a full sweep over the macro elements for nothing.
+    if (sscvfem_transient_diag_weight(d, rho) != scalar_t(0)) {
+        if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
+        sscvfem_block_diag_transient(d, rho, diag.data());
     }
 }
 

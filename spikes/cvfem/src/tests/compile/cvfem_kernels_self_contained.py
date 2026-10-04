@@ -19,6 +19,8 @@ plus support/ for what fits nowhere else and ss/ for the semi-structured layer t
 converted. A new one should be a deliberate act, not a side effect.
 """
 import pathlib
+import re
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]          # src/
@@ -57,14 +59,45 @@ def main():
                            f"of the tree; if a launcher needs this, the launcher belongs in "
                            f"src/frontend/staging/.")
 
+    # EVERY SHELL TEST CTEST RUNS DIRECTLY MUST BE EXECUTABLE IN THE INDEX, NOT JUST ON DISK.
+    #
+    # CMake registers these as `COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/<script>`, so a script
+    # without the bit fails as BAD_COMMAND -- "Process not started ... [permission denied]" --
+    # and ctest reports it as a failure rather than a skip. Three of the nine were committed
+    # 100644 and had only survived because the bit happened to be set in one working tree;
+    # cvfem_warped_geometry.sh, the only oracle on a non-affine mesh, was among them. The test
+    # reads the INDEX rather than the filesystem, because that is what a fresh clone gets.
+    cml = (ROOT.parent / "CMakeLists.txt").read_text()
+    want = sorted(set(re.findall(r"COMMAND \$\{CMAKE_CURRENT_SOURCE_DIR\}/(\S+\.sh)", cml)))
+    if want:
+        try:
+            idx = subprocess.run(["git", "ls-files", "-s", "--", *want], cwd=ROOT.parent,
+                                 capture_output=True, text=True, check=True).stdout
+        except (OSError, subprocess.CalledProcessError) as e:
+            bad.append(f"could not read the git index to check script modes: {e}")
+        else:
+            modes = {}
+            for line in idx.splitlines():
+                head, _, path = line.partition("\t")
+                modes[path] = head.split()[0]
+            for f in want:
+                m = modes.get(f)
+                if m is None:
+                    bad.append(f"{f} is registered as a ctest command but is not tracked by git.")
+                elif m != "100755":
+                    bad.append(f"{f} is mode {m} in the git index but ctest runs it directly, "
+                               f"so a fresh clone gets BAD_COMMAND. "
+                               f"Fix with: git update-index --chmod=+x {f}")
+
     if bad:
-        print("FAILED: src/kernels/ is not self-contained\n", file=sys.stderr)
+        print("FAILED: the layout this test holds has been broken\n", file=sys.stderr)
         for b in bad:
             print("  " + b, file=sys.stderr)
         return 1
     n_hdr = sum(1 for _ in kernels.rglob("*.hpp"))
     print(f"PASSED: {n_hdr} headers under src/kernels/, none reaching outside it; "
-          f"src/ has only the directories this layout names")
+          f"src/ has only the directories this layout names; "
+          f"all {len(want)} shell tests ctest runs are executable in the index")
     return 0
 
 
