@@ -428,7 +428,26 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(
 // another layout. Measured at n=128 on Grace, bare and with Rhie-Chow: lane-blocking the atomic
 // sweep alone is worth 1.29x and 1.37x, and what remains between the layouts -- 2.45x and 1.76x
 // -- is the format.
-static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
+static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        scalar_t *const SFEM_RESTRICT rc_out,
+        const scalar_t rhie_chow_scale,
+        scalar_t *const SFEM_RESTRICT rx,
+        scalar_t *const SFEM_RESTRICT ry,
+        scalar_t *const SFEM_RESTRICT rz,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
                                               // Which optional terms are on, resolved once per
                                               // solve by the caller rather than per sweep here:
                                               // cvfem_hex8_extras_of reads the mesh, which this
@@ -439,7 +458,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
                                                              const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
                                                              const int       limiter  = 0,
                                                              const scalar_t  venkat_c = scalar_t(0)) {
-    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
+    reset_residual(nnodes, rx, ry, rz, rc_out);
     // The deferred correction, on the same sweep. The hand-written SIMD kernel takes the
     // higher-order pack, so the standard layout's higher-order arms vectorise too; the generated
     // sympy variants are packed-only, which is why this is the hand-written kernel rather than
@@ -447,10 +466,6 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
     // which is required for a non-zero Venkatakrishnan eps squared.
     const bool with_ho = ugrad != nullptr;
 
-    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
-    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
-    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
-    scalar_t *const SFEM_RESTRICT rc_out = d.rc.data();
 
 #pragma omp parallel
     {
@@ -465,19 +480,19 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
         Hex8UGradPack    hop;
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t e0 = 0; e0 < d.nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
-            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, d.nelements - e0);
-            gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+        for (ptrdiff_t e0 = 0; e0 < nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
+            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, nelements - e0);
+            gather_hex8_adj_soa(adj_ptr, det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                 if (lane < nlanes) {
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const idx_t g = d.elems[a][e];
-                        in.ux[a][lane]       = d.ux[g];
-                        in.uy[a][lane]       = d.uy[g];
-                        in.uz[a][lane]       = d.uz[g];
-                        in.p[a][lane]        = d.p[g];
+                        const idx_t g = mesh_elems[a][e];
+                        in.ux[a][lane]       = ux[g];
+                        in.uy[a][lane]       = uy[g];
+                        in.uz[a][lane]       = uz[g];
+                        in.p[a][lane]        = pres[g];
                     }
                 } else {
                     // A padding lane must carry a STATE, not zeros that the flux would treat as a
@@ -490,17 +505,17 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
             }
 
             if (opt.with_rc) {
-                const auto *const px = d.points[0];
-                const auto *const py = d.points[1];
-                const auto *const pz = d.points[2];
+                const auto *const px = points[0];
+                const auto *const py = points[1];
+                const auto *const pz = points[2];
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     if (lane < nlanes) {
                         const ptrdiff_t e = e0 + lane;
                         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            const idx_t g = d.elems[a][e];
-                            rcp.pgx[a][lane]     = d.pgx[g];
-                            rcp.pgy[a][lane]     = d.pgy[g];
-                            rcp.pgz[a][lane]     = d.pgz[g];
+                            const idx_t g = mesh_elems[a][e];
+                            rcp.pgx[a][lane]     = pgx[g];
+                            rcp.pgy[a][lane]     = pgy[g];
+                            rcp.pgz[a][lane]     = pgz[g];
                         }
                     } else {
                         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -518,10 +533,10 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
                             for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
                             continue;
                         }
-                        const idx_t gn = d.elems[a][e0 + lane];
-                        hop.x[a][lane]        = scalar_t(d.points[0][gn]);
-                        hop.y[a][lane]        = scalar_t(d.points[1][gn]);
-                        hop.z[a][lane]        = scalar_t(d.points[2][gn]);
+                        const idx_t gn = mesh_elems[a][e0 + lane];
+                        hop.x[a][lane]        = scalar_t(points[0][gn]);
+                        hop.y[a][lane]        = scalar_t(points[1][gn]);
+                        hop.z[a][lane]        = scalar_t(points[2][gn]);
                         for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = ugrad[(ptrdiff_t)gn * 9 + c];
                     }
                 }
@@ -570,14 +585,14 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
             } else {
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5,
                                                            cof6, cof7, cof8, detv, in, outp,
-                                                           opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale,
+                                                           opt.with_rc ? &rcp : nullptr, rhie_chow_scale,
                                                            scalar_t(0), with_ho ? &hop : nullptr);
             }
 
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const idx_t g = d.elems[a][e];
+                    const idx_t g = mesh_elems[a][e];
                     atomic_add(rx, g, outp.rx[a][lane]);
                     atomic_add(ry, g, outp.ry[a][lane]);
                     atomic_add(rz, g, outp.rz[a][lane]);
