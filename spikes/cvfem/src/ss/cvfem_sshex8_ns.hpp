@@ -702,28 +702,12 @@ inline void sscvfem_build_grad_weight(SSMeshData &d) {
 // The default folds it into the drain as before -- one pass over the nodes saved, which is
 // the whole reason the packed path beats the scatter one -- and multiplying by an exact 1
 // otherwise, so the default path is unchanged bit for bit rather than merely equivalent.
-inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
+inline void sscvfem_nodal_grad_packed_sweep(SSMeshData &d, PackedData &p,
                                       const scalar_t *const SFEM_RESTRICT src, const int stride,
-                                      std::vector<scalar_t> &ogx, std::vector<scalar_t> &ogy,
-                                      std::vector<scalar_t> &ogz, const bool apply_weight = true) {
-    sscvfem_build_grad_weight(d);
-
-    // The owned ranges tile [0, nnodes) exactly, so every entry is written and there is
-    // nothing to pre-zero. Checked rather than assumed: a node no pack owned would otherwise
-    // keep whatever the buffer held.
-    const bool owns_all = p.n_packs > 0 && p.owned_nodes_ptr[0] == 0 && p.owned_nodes_ptr[p.n_packs] == d.nnodes;
-    if (owns_all && (ptrdiff_t)ogx.size() == d.nnodes) {
-        ogy.resize((size_t)d.nnodes);
-        ogz.resize((size_t)d.nnodes);
-    } else {
-        ogx.assign((size_t)d.nnodes, scalar_t(0));
-        ogy.assign((size_t)d.nnodes, scalar_t(0));
-        ogz.assign((size_t)d.nnodes, scalar_t(0));
-    }
-
-    scalar_t *const SFEM_RESTRICT       gx_out = ogx.data();
-    scalar_t *const SFEM_RESTRICT       gy_out = ogy.data();
-    scalar_t *const SFEM_RESTRICT       gz_out = ogz.data();
+                                      scalar_t *const SFEM_RESTRICT gx_out,
+                                      scalar_t *const SFEM_RESTRICT gy_out,
+                                      scalar_t *const SFEM_RESTRICT gz_out,
+                                      const bool apply_weight) {
     const scalar_t *const SFEM_RESTRICT w      = d.grad_w_inv.data();
     const ptrdiff_t node_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
 
@@ -844,6 +828,31 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
                 p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx, p.n_ghost_entries,
                 p.ghost_buf.data(), apply_weight ? w : nullptr, g3);
     }
+}
+
+// The packed nodal gradient, end to end. The front-end side: the cached reconstruction weight,
+// the allocation, and the decision about whether the outputs need pre-zeroing at all.
+inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
+                                      const scalar_t *const SFEM_RESTRICT src, const int stride,
+                                      std::vector<scalar_t> &ogx, std::vector<scalar_t> &ogy,
+                                      std::vector<scalar_t> &ogz, const bool apply_weight = true) {
+    sscvfem_build_grad_weight(d);
+
+    // The owned ranges tile [0, nnodes) exactly, so every entry is written and there is
+    // nothing to pre-zero. Checked rather than assumed: a node no pack owned would otherwise
+    // keep whatever the buffer held.
+    const bool owns_all = p.n_packs > 0 && p.owned_nodes_ptr[0] == 0 && p.owned_nodes_ptr[p.n_packs] == d.nnodes;
+    if (owns_all && (ptrdiff_t)ogx.size() == d.nnodes) {
+        ogy.resize((size_t)d.nnodes);
+        ogz.resize((size_t)d.nnodes);
+    } else {
+        ogx.assign((size_t)d.nnodes, scalar_t(0));
+        ogy.assign((size_t)d.nnodes, scalar_t(0));
+        ogz.assign((size_t)d.nnodes, scalar_t(0));
+    }
+
+    sscvfem_nodal_grad_packed_sweep(d, p, src, stride, ogx.data(), ogy.data(), ogz.data(),
+                                    apply_weight);
 }
 
 // Whether the packing spans the whole mesh. On a distributed mesh it does not.
