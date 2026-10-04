@@ -83,6 +83,7 @@ using geom_t  = smesh::geom_t;
 // first. Putting this at the top of the file breaks that contract, and the error it produces --
 // "use of undeclared identifier 'scalar_t'" from inside the microkernel header -- points at the
 // kernel rather than at the include that was too early.
+#include "frontend/staging/cvfem_bnd_gather_build.hpp"
 #include "kernels/cvfem_bdf.hpp"
 #include "kernels/cvfem_hex8_flags.hpp"
 #include "kernels/cvfem_kernel_kind.hpp"  // KernelKind

@@ -103,6 +103,18 @@ struct SSMeshData {
     // Since the gradient's cost tracks that fraction almost exactly across levels, this is
     // the lever rather than the arithmetic.
     PackedData           *packed{nullptr};
+    // WORK BUFFERS, HELD RATHER THAN DECLARED AT EACH CALL.
+    //
+    // Three front-end paths used to open with std::vector locals: the nodal velocity gradient's
+    // three component arrays, and the two residuals the frozen deferred correction differences.
+    // Both run inside the Newton loop, so those were allocations per step rather than per mesh.
+    // They sit here with ugrad and conv_frozen, which are the same kind of thing.
+    std::vector<scalar_t> ugrad_work[3];
+    std::vector<scalar_t> conv_work[2];
+    // The reference block apply's own pair. Not conv_work: nothing calls it from inside the
+    // frozen-correction branch today, and a shared buffer that is only safe because of that
+    // is a trap for whatever calls it next.
+    std::vector<scalar_t> blocks_ref_work[2];
     std::vector<scalar_t> grad_w_inv;
     ptrdiff_t             grad_w_nmacro{-1};
     int                   grad_w_level{-1};
@@ -187,6 +199,16 @@ struct SSScatter {
     ptrdiff_t                 n_slots{0};
     std::vector<scalar_t>     stage;        // n_slots * N_FIELDS, for the 4-wide kernels
     std::vector<scalar_t>     stage16;      // n_slots * 16, for the block diagonal
+    // BUILD-TIME SCRATCH, HELD RATHER THAN DECLARED LOCALLY.
+    //
+    // sscvfem_build_scatter's three working arrays: the per-node incidence count, the node to
+    // reduction-row map, and the running fill position per row. They are only meaningful while
+    // the tables above are being built, and they are here because no std::vector local belongs
+    // in this file -- not because anything reads them afterwards. `fill` is sized by rows, the
+    // other two by nodes.
+    std::vector<int>       build_touches;
+    std::vector<ptrdiff_t> build_row_of;
+    std::vector<ptrdiff_t> build_fill;
 };
 
 inline void sscvfem_build_scatter(const SSMeshData &d, SSScatter &s) {
@@ -194,12 +216,14 @@ inline void sscvfem_build_scatter(const SSMeshData &d, SSScatter &s) {
     const int       nxe = d.nxe;
     const ptrdiff_t ne  = d.nmacro;
 
-    std::vector<int> touches((size_t)d.nnodes, 0);
+    std::vector<int> &touches = s.build_touches;
+    touches.assign((size_t)d.nnodes, 0);
     for (ptrdiff_t e = 0; e < ne; ++e)
         for (int a = 0; a < nxe; ++a) touches[(size_t)d.elems[a][e]]++;
 
     // Shared nodes get a reduction row; exclusive ones are written directly.
-    std::vector<ptrdiff_t> row_of((size_t)d.nnodes, -1);
+    std::vector<ptrdiff_t> &row_of = s.build_row_of;
+    row_of.assign((size_t)d.nnodes, -1);
     s.shared_node.clear();
     for (ptrdiff_t g = 0; g < d.nnodes; ++g)
         if (touches[(size_t)g] > 1) {
@@ -218,8 +242,8 @@ inline void sscvfem_build_scatter(const SSMeshData &d, SSScatter &s) {
     s.red_idx.assign((size_t)s.n_slots, 0);
 
     // Fill in element order, so the gather below sums in a fixed order every run.
-    std::vector<ptrdiff_t> fill(s.red_ptr.begin(), s.red_ptr.end() - (nrows ? 1 : 0));
-    fill.resize((size_t)std::max<ptrdiff_t>(nrows, 0));
+    std::vector<ptrdiff_t> &fill = s.build_fill;
+    fill.assign((size_t)std::max<ptrdiff_t>(nrows, 0), 0);
     for (ptrdiff_t r = 0; r < nrows; ++r) fill[(size_t)r] = s.red_ptr[(size_t)r];
     for (ptrdiff_t e = 0; e < ne; ++e)
         for (int a = 0; a < nxe; ++a) {
@@ -2190,7 +2214,10 @@ inline void sscvfem_apply_blocks_ref(SSMeshData &d, const scalar_t rho, const sc
                                      const scalar_t *const SFEM_RESTRICT dir,
                                      scalar_t *const SFEM_RESTRICT       jv) {
     const ptrdiff_t ndof = d.nnodes * N_FIELDS;
-    std::vector<scalar_t> v((size_t)ndof), y((size_t)ndof);
+    // The reference implementation's two work vectors, held with the others.
+    std::vector<scalar_t> &v = d.blocks_ref_work[0], &y = d.blocks_ref_work[1];
+    v.assign((size_t)ndof, scalar_t(0));
+    y.assign((size_t)ndof, scalar_t(0));
 
     const bool want_ucol = (blocks & (SSBLOCK_UU | SSBLOCK_PU)) != 0;
     const bool want_pcol = (blocks & (SSBLOCK_UP | SSBLOCK_PP)) != 0;
@@ -3041,7 +3068,7 @@ inline void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scal
 // [i*9 + r*3 + c] layout the correction kernel reads.
 inline void sscvfem_assemble_nodal_u_grad(SSMeshData &d) {
     SFEM_TRACE_SCOPE("sscvfem::assemble_nodal_u_grad");
-    std::vector<scalar_t> gx, gy, gz;
+    std::vector<scalar_t> &gx = d.ugrad_work[0], &gy = d.ugrad_work[1], &gz = d.ugrad_work[2];
     d.ugrad.assign((size_t)d.nnodes * 9, scalar_t(0));
     const scalar_t *const src[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
     for (int r = 0; r < 3; ++r) {
@@ -3349,7 +3376,9 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
         if (d.conv_freeze && d.conv_ho) {
             const ptrdiff_t n = d.nnodes * N_FIELDS;
             if ((ptrdiff_t)d.conv_frozen.size() != n) {
-                std::vector<scalar_t> r_ho((size_t)n), r_lo((size_t)n);
+                std::vector<scalar_t> &r_ho = d.conv_work[0], &r_lo = d.conv_work[1];
+                r_ho.assign((size_t)n, scalar_t(0));
+                r_lo.assign((size_t)n, scalar_t(0));
                 sscvfem_residual(d, rho, mu, r_ho.data(), true, 1);
                 sscvfem_residual(d, rho, mu, r_lo.data(), true, 0);
                 d.conv_frozen.resize((size_t)n);

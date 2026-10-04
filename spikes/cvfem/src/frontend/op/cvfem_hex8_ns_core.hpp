@@ -82,6 +82,7 @@ static constexpr int N_FIELDS = 4;
 #include "frontend/cvfem_env_config.hpp"  // resolves SFEM_PECLET_* / SFEM_LIMITER_STATS;
                                         // it includes the kernel headers in turn
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "frontend/staging/cvfem_bnd_gather_build.hpp"
 #include "frontend/staging/cvfem_pack_coloring.hpp"
 
 enum class GeomKind { Affine, Isoparam };
