@@ -634,23 +634,37 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d,
     }
 }
 
-static SFEM_NOINLINE void apply_residual_atomic_sympy(MeshData &d, const scalar_t rho, const scalar_t mu) {
-    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
+static SFEM_NOINLINE void apply_residual_atomic_sympy(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT pres,
+        scalar_t *const SFEM_RESTRICT rc_out,
+        scalar_t *const SFEM_RESTRICT rx,
+        scalar_t *const SFEM_RESTRICT ry,
+        scalar_t *const SFEM_RESTRICT rz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src, const scalar_t rho, const scalar_t mu) {
+    reset_residual(nnodes, rx, ry, rz, rc_out);
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_residual(rho, mu, adj, det, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            const idx_t g = d.elems[a][e];
-            atomic_add(d.rx.data(), g, r[a * 4 + 0]);
-            atomic_add(d.ry.data(), g, r[a * 4 + 1]);
-            atomic_add(d.rz.data(), g, r[a * 4 + 2]);
-            atomic_add(d.rc.data(), g, r[a * 4 + 3]);
+            const idx_t g = mesh_elems[a][e];
+            atomic_add(rx, g, r[a * 4 + 0]);
+            atomic_add(ry, g, r[a * 4 + 1]);
+            atomic_add(rz, g, r[a * 4 + 2]);
+            atomic_add(rc_out, g, r[a * 4 + 3]);
         }
     }
 }

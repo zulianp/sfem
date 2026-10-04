@@ -1753,7 +1753,7 @@ int main(int argc, char **argv) {
         if (layout == "packed")
             apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Sympy);
         else
-            apply_residual_atomic_sympy(d, rho, mu);
+            apply_residual_atomic_sympy(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
         std::vector<scalar_t> sympy_r;
         pack_residual(d, sympy_r);
         const scalar_t max_err = max_abs_diff(current_r.data(), sympy_r.data(), (ptrdiff_t)current_r.size());
@@ -1864,7 +1864,7 @@ int main(int argc, char **argv) {
         else if (layout == "packed" || layout == "store")
             apply_residual_packed<false>(d, packed, rho, mu, kernel_kind);
         else if (kernel_uses_sympy_residual(kernel_kind))
-            apply_residual_atomic_sympy(d, rho, mu);
+            apply_residual_atomic_sympy(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
         else if (kernel_kind == KernelKind::Sumfact && conv_ho && !ho_scalar)
             apply_residual_atomic_sumfact_simd(d, cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact && conv_ho)
