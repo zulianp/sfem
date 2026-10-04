@@ -2700,20 +2700,29 @@ inline void sscvfem_apply_body_force(SSMeshData &d, scalar_t *const SFEM_RESTRIC
 // The transient term on an interleaved residual. Mirrors apply_transient in
 // cvfem_hex8_ns_core.hpp -- same coefficients, same lumped control volume, same reason for
 // being a post-pass rather than a term inside the macro-element sweeps.
-inline void sscvfem_apply_transient_sweep(SSMeshData &d, const scalar_t rho, const BdfCoeffs c,
+inline void sscvfem_apply_transient_sweep(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t dt,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT node_vol,
+        const scalar_t *const SFEM_RESTRICT u_prev,
+        const scalar_t *const SFEM_RESTRICT u_prev2,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz, const scalar_t rho, const BdfCoeffs c,
                                           scalar_t *const SFEM_RESTRICT res) {
     SFEM_TRACE_SCOPE("sscvfem::apply_transient");
     const bool      two = c.order >= 2;
     const scalar_t  a0 = c.a0, a1 = c.a1, a2 = c.a2;
-    const scalar_t inv = scalar_t(1) / d.dt;
+    const scalar_t inv = scalar_t(1) / dt;
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        const scalar_t w   = rho * d.node_vol[(size_t)i] * inv;
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        const scalar_t w   = rho * node_vol[(size_t)i] * inv;
         const size_t   k   = (size_t)i * 3;
-        const scalar_t u[3] = {d.ux[(size_t)i], d.uy[(size_t)i], d.uz[(size_t)i]};
+        const scalar_t u[3] = {ux[(size_t)i], uy[(size_t)i], uz[(size_t)i]};
         for (int c = 0; c < 3; ++c) {
-            const scalar_t prev2 = two ? d.u_prev2[k + (size_t)c] : scalar_t(0);
-            res[i * N_FIELDS + c] += w * (a0 * u[c] + a1 * d.u_prev[k + (size_t)c] + a2 * prev2);
+            const scalar_t prev2 = two ? u_prev2[k + (size_t)c] : scalar_t(0);
+            res[i * N_FIELDS + c] += w * (a0 * u[c] + a1 * u_prev[k + (size_t)c] + a2 * prev2);
         }
     }
 }
@@ -2729,7 +2738,7 @@ inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t 
     // the history has two levels is what this side knows. The sweep reads u_prev2 only when
     // the order it is handed says two levels are there, so resolving the coefficients here is
     // also what keeps that read in bounds.
-    sscvfem_apply_transient_sweep(d, rho,
+    sscvfem_apply_transient_sweep(d.dt, d.nnodes, d.node_vol.data(), d.u_prev.data(), d.u_prev2.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho,
                                   cvfem_bdf_coeffs(d.bdf_order, d.dt, d.dt_prev,
                                                    (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes),
                                   res);
