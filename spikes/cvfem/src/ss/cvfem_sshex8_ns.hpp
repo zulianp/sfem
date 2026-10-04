@@ -2673,9 +2673,7 @@ inline void sscvfem_node_volume(SSMeshData &d, std::vector<scalar_t> &node_vol) 
 
 // Subtract the body force from the momentum rows of an interleaved residual. Mirrors
 // apply_body_force in cvfem_hex8_ns_core.hpp; see the sign argument there.
-inline void sscvfem_apply_body_force(SSMeshData &d, scalar_t *const SFEM_RESTRICT res) {
-    if (d.fx.empty()) return;
-    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
+inline void sscvfem_apply_body_force_sweep(SSMeshData &d, scalar_t *const SFEM_RESTRICT res) {
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
         const scalar_t v = d.node_vol[(size_t)i];
@@ -2685,14 +2683,19 @@ inline void sscvfem_apply_body_force(SSMeshData &d, scalar_t *const SFEM_RESTRIC
     }
 }
 
+// Whether there is a body force at all, and whether the control volume it is weighted by has
+// been built, are staging questions; the sweep above answers neither.
+inline void sscvfem_apply_body_force(SSMeshData &d, scalar_t *const SFEM_RESTRICT res) {
+    if (d.fx.empty()) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
+    sscvfem_apply_body_force_sweep(d, res);
+}
+
 // The transient term on an interleaved residual. Mirrors apply_transient in
 // cvfem_hex8_ns_core.hpp -- same coefficients, same lumped control volume, same reason for
 // being a post-pass rather than a term inside the macro-element sweeps.
-inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t *const SFEM_RESTRICT res) {
+inline void sscvfem_apply_transient_sweep(SSMeshData &d, const scalar_t rho, scalar_t *const SFEM_RESTRICT res) {
     SFEM_TRACE_SCOPE("sscvfem::apply_transient");
-    if (d.dt <= scalar_t(0)) return;
-    if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return;
-    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
     // The same rule the flat families use, from kernels/cvfem_bdf.hpp. It was inlined here, a
     // third copy of coefficients that two other sites already derived identically.
     const BdfCoeffs c   = cvfem_bdf_coeffs(d.bdf_order, d.dt, d.dt_prev,
@@ -2710,6 +2713,16 @@ inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t 
             res[i * N_FIELDS + c] += w * (a0 * u[c] + a1 * d.u_prev[k + (size_t)c] + a2 * prev2);
         }
     }
+}
+
+// Whether the term is live -- a positive step and a history of the right length -- and whether
+// the control volume has been built. The sweep divides by dt unconditionally, so these two
+// guards are what make that safe, and they are the caller's to answer.
+inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t *const SFEM_RESTRICT res) {
+    if (d.dt <= scalar_t(0)) return;
+    if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
+    sscvfem_apply_transient_sweep(d, rho, res);
 }
 
 // The weight the transient term puts on each velocity diagonal entry: rho V a0 / dt.
@@ -2741,18 +2754,26 @@ inline scalar_t sscvfem_transient_diag_weight(const SSMeshData &d, const scalar_
     return (d.bdf_order >= 2 ? scalar_t(1.5) : scalar_t(1)) * rho / d.dt;
 }
 
-inline void sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
-                                           const scalar_t *const SFEM_RESTRICT dir,
-                                           scalar_t *const SFEM_RESTRICT       jv) {
+inline void sscvfem_apply_transient_action_sweep(SSMeshData &d, const scalar_t rho,
+                                                 const scalar_t *const SFEM_RESTRICT dir,
+                                                 scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("sscvfem::apply_transient_action");
     const scalar_t a = sscvfem_transient_diag_weight(d, rho);
-    if (a == scalar_t(0)) return;
-    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
         const scalar_t w = a * d.node_vol[(size_t)i];
         for (int c = 0; c < 3; ++c) jv[i * N_FIELDS + c] += w * dir[i * N_FIELDS + c];
     }
+}
+
+// As for the residual's transient term: a zero weight means there is nothing to add, and the
+// control volume has to exist before the sweep reads it.
+inline void sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
+                                           const scalar_t *const SFEM_RESTRICT dir,
+                                           scalar_t *const SFEM_RESTRICT       jv) {
+    if (sscvfem_transient_diag_weight(d, rho) == scalar_t(0)) return;
+    if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
+    sscvfem_apply_transient_action_sweep(d, rho, dir, jv);
 }
 
 inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
