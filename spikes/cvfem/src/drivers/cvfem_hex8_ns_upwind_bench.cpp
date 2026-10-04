@@ -2210,7 +2210,7 @@ int main(int argc, char **argv) {
         if (geom_kind == GeomKind::Isoparam)
             assemble_diag_atomic_isoparam(d, (ptrdiff_t)d.bnd_elems.size(), cvfem_hex8_extras_of(d), rho, mu, diag_blocks.data());
         else
-            assemble_diag_atomic(d, (ptrdiff_t)d.bnd_elems.size(), cvfem_hex8_extras_of(d), rho, mu, diag_blocks.data());
+            assemble_diag_atomic(d.Lx, d.Ly, d.Lz, d.adj_ptr, d.bnd_elems.data(), d.det_ptr, d.elems, d.face_mask.data(), d.face_mask_eff.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), (ptrdiff_t)d.bnd_elems.size(), cvfem_hex8_extras_of(d), rho, mu, diag_blocks.data());
         assemble_diag_transient_pass(d, rho, diag_blocks);
     };
 
