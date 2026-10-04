@@ -10,7 +10,7 @@
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 #include "best/cvfem_hex8_best_colored.hpp"
 #include "frontend/staging/cvfem_hex8_ecolored_launch.hpp"
-#include "kernels/packed/cvfem_hex8_best_packed.hpp"
+#include "frontend/staging/cvfem_hex8_packed_launch.hpp"
 #include "frontend/staging/cvfem_hex8_store_launch.hpp"
 
 // Consumes the churn's reduction under --live-vectors so the compiler cannot delete the

@@ -30,7 +30,7 @@
 
 #include "best/cvfem_hex8_best_common.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
-#include "kernels/packed/cvfem_hex8_best_packed.hpp"
+#include "frontend/staging/cvfem_hex8_packed_launch.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"
