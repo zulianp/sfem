@@ -31,7 +31,7 @@
 // coloring costs the residual another ~20% in barrier waits.
 
 #include "frontend/staging/cvfem_hex8_best_common.hpp"
-#include "core/cvfem_pack_coloring.hpp"
+#include "frontend/staging/cvfem_pack_coloring.hpp"
 
 // ---------------------------------------------------------------------------
 // Global-index gather / scatter

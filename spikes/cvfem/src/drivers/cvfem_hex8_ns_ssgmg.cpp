@@ -12,9 +12,9 @@
 // driver states the problem and the operator stays opaque.
 
 #include "frontend/op/cvfem_hex8_ns_op.hpp"
-#include "diag/cvfem_flow_diagnostics.hpp"
-#include "core/cvfem_fgmres.hpp"
-#include "core/cvfem_parallel.hpp"
+#include "support/cvfem_flow_diagnostics.hpp"
+#include "support/cvfem_fgmres.hpp"
+#include "support/cvfem_parallel.hpp"
 #include "ss/cvfem_ss_transfer.hpp"
 #include "frontend/galerkin/cvfem_ss_galerkin_api.hpp"
 

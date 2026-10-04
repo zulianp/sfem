@@ -22,7 +22,7 @@
 #include "kernels/cvfem_hex8_flags.hpp"
 #include "kernels/cvfem_hex8_element_gather.hpp"
 #include "kernels/cvfem_scatter.hpp"   // MIN   // Hex8RcConfig, Hex8Extras
-#include "core/cvfem_element_coloring.hpp"
+#include "frontend/staging/cvfem_element_coloring.hpp"
 
 // Takes the affine geometry, not the mesh. It is called from inside more than twenty sweeps in
 // src/kernels/, so a MeshT parameter here is what keeps that directory dependent on the staging

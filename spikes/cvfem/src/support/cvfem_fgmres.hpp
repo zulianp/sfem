@@ -24,7 +24,7 @@
 // alone was ~280 s of a 713 s solve on one core while the other 71 waited. The BLAS dot is the
 // deterministic fixed-chunk sum, so the solve stays reproducible across thread counts.
 
-#include "core/cvfem_parallel.hpp"
+#include "support/cvfem_parallel.hpp"
 
 #include "sfem_Operator.hpp"
 #include "sfem_ParallelOperator.hpp"

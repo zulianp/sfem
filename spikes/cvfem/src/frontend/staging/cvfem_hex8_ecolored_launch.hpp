@@ -8,11 +8,11 @@
 // pull the arrays out, own the `#pragma omp parallel`, hand each thread a cvfem_range of one
 // colour and barrier between colours. The kernels they call take nothing but arrays and a range.
 //
-// Moving them here is what lets kernels/colored/ stop including core/cvfem_element_coloring.hpp:
+// Moving them here is what lets kernels/colored/ stop including frontend/staging/cvfem_element_coloring.hpp:
 // the colouring object is read here, and what crosses the boundary is the element range it
 // implies.
 #include "frontend/staging/cvfem_hex8_best_common.hpp"
-#include "core/cvfem_element_coloring.hpp"
+#include "frontend/staging/cvfem_element_coloring.hpp"
 #include "kernels/colored/cvfem_hex8_best_ecolored.hpp"
 
 static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,

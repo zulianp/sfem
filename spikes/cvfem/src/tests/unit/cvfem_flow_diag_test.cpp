@@ -20,7 +20,7 @@
 // laminar Poiseuille, where dE/dt is zero and the flow is resolved -- belongs in the
 // verification matrix beside the other cases that need a driver run.
 
-#include "diag/cvfem_flow_diagnostics.hpp"
+#include "support/cvfem_flow_diagnostics.hpp"
 #include "frontend/op/cvfem_hex8_ns_op.hpp"
 
 #include "sfem_context.hpp"
