@@ -931,19 +931,37 @@ struct Hex8ExtraScratch {
     Hex8RhieChow rc{};
     int          fmask{0};
 
-    SFEM_INLINE void load(const MeshData &d, const Hex8Extras &opt, const ptrdiff_t e) {
+    // Takes the arrays, not the mesh. This method is reached from inside a pack sweep, so a
+    // MeshData parameter here is the last thing keeping that sweep's signature tied to the
+    // staging layer. The sources carry a _src suffix because this object's own members already
+    // own the short names -- its whole job is to copy pgx[] out of pgx_src[].
+    SFEM_INLINE void load(smesh::idx_t **const SFEM_RESTRICT  elems,
+                          smesh::geom_t **const SFEM_RESTRICT points,
+                          const uint8_t *const SFEM_RESTRICT  face_mask,
+                          const scalar_t *const SFEM_RESTRICT pgx_src,
+                          const scalar_t *const SFEM_RESTRICT pgy_src,
+                          const scalar_t *const SFEM_RESTRICT pgz_src,
+                          const scalar_t *const SFEM_RESTRICT qgx_src,
+                          const scalar_t *const SFEM_RESTRICT qgy_src,
+                          const scalar_t *const SFEM_RESTRICT qgz_src,
+                          const scalar_t *const SFEM_RESTRICT ux_src,
+                          const scalar_t *const SFEM_RESTRICT uy_src,
+                          const scalar_t *const SFEM_RESTRICT uz_src,
+                          const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+                          const scalar_t *const SFEM_RESTRICT        det_ptr,
+                          const Hex8Extras &opt, const ptrdiff_t e) {
         if (!opt.with_rc && !opt.with_bnd) return;
-        gather_element_coords(d.elems, d.points, e, x, y, z);
-        if (opt.with_bnd) fmask = (int)d.face_mask[(size_t)e];
+        gather_element_coords(elems, points, e, x, y, z);
+        if (opt.with_bnd) fmask = (int)face_mask[(size_t)e];
         if (opt.with_rc) {
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const smesh::idx_t g = d.elems[a][e];
-                pgx[a]               = d.pgx[g];
-                pgy[a]               = d.pgy[g];
-                pgz[a]               = d.pgz[g];
-                ux[a]                = d.ux[g];
-                uy[a]                = d.uy[g];
-                uz[a]                = d.uz[g];
+                const smesh::idx_t g = elems[a][e];
+                pgx[a]               = pgx_src[g];
+                pgy[a]               = pgy_src[g];
+                pgz[a]               = pgz_src[g];
+                ux[a]                = ux_src[g];
+                uy[a]                = uy_src[g];
+                uz[a]                = uz_src[g];
             }
             rc = Hex8RhieChow{};
             rc.x = x; rc.y = y; rc.z = z;
@@ -958,7 +976,7 @@ struct Hex8ExtraScratch {
             // near-cancellation in the Rhie-Chow correction into a visible error.
             {
                 scalar_t adj_[9], det_;
-                load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj_, &det_);
+                load_hex8_adj(adj_ptr, det_ptr, e, adj_, &det_);
                 scalar_t ex_[3], ey_[3], ez_[3];
                 cvfem_hex8_affine_edge_cols(adj_[0], adj_[1], adj_[2], adj_[3], adj_[4], adj_[5],
                                             adj_[6], adj_[7], adj_[8], det_, ex_, ey_, ez_);
@@ -971,10 +989,10 @@ struct Hex8ExtraScratch {
             }
             if (opt.with_qg) {
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const smesh::idx_t g = d.elems[a][e];
-                    qgx[a]               = d.qgx[g];
-                    qgy[a]               = d.qgy[g];
-                    qgz[a]               = d.qgz[g];
+                    const smesh::idx_t g = elems[a][e];
+                    qgx[a]               = qgx_src[g];
+                    qgy[a]               = qgy_src[g];
+                    qgz[a]               = qgz_src[g];
                 }
                 rc.qgx = qgx;
                 rc.qgy = qgy;

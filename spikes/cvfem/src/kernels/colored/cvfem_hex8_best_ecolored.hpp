@@ -275,7 +275,11 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
         Hex8ResidualPack &outp,
         Hex8RhieChowPack &rcp,
         Hex8UGradPack    &hop,
-        Hex8UGradPack    &hovp) {
+        Hex8UGradPack    &hovp,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg) {
     for (ptrdiff_t e0 = r.begin; e0 < r.end; e0 += CVFEM_HEX8_VEC_SIZE) {
             const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, r.end - e0);
             gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
@@ -326,7 +330,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                 }
             }
 
-            if (opt.with_rc) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), e0, nlanes, rcp);
+            if (opt.with_rc) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), rc_cfg, e0, nlanes, rcp);
 
             // The state's nodal velocity gradient and the direction's, staged exactly as the
             // packed Jacobian stages them. Both are needed by the EXACT higher-order action; the
@@ -415,7 +419,8 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored(MeshData              &
                                       CVFEM_HEX8_VEC_SIZE, part, n_parts),
                     d, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, opt, has_qg, with_ho,
                     cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv,
-                    u_pack, du_pack, outp, rcp, hop, hovp);
+                    u_pack, du_pack, outp, rcp, hop, hovp,
+            cvfem_hex8_rc_config_for(d));
             cvfem_thread_barrier();
         }
     }

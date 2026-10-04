@@ -218,7 +218,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
                 // The Rhie-Chow inputs come through the shared scratch, exactly as the atomic
                 // sweep takes them, so the kernel sees identical inputs in both layouts.
                 Hex8ExtraScratch ex;
-                ex.load(d, opt, e);
+                ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
                 // Coordinates are gathered here rather than taken from `ex`, and that is not
                 // redundant: Hex8ExtraScratch::load returns EARLY when neither Rhie-Chow nor
                 // the boundary closure is on, leaving its x/y/z untouched. The reconstruction
@@ -322,7 +322,11 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         scalar_t *const SFEM_RESTRICT rz,
         scalar_t *const SFEM_RESTRICT rc,
         const size_t scratch_n,
-        const int with_rc) {
+        const int with_rc,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         // Coordinates always, and the pressure gradient when Rhie-Chow is on: the same
@@ -372,7 +376,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                 if (with_rc) {
                     cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx,
                                                    pack_pgy, pack_pgz, begin, nlanes, rcp);
-                    if (sympy) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), begin, nlanes, rcp);
+                    if (sympy) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), rc_cfg, begin, nlanes, rcp);
                 }
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     const ptrdiff_t e = begin + lane;
@@ -490,7 +494,8 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
 
 #pragma omp parallel
     apply_residual_packed_defcor_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d, p, rho, mu, ugrad, limiter, venkat_c, sympy, rx, ry, rz, rc, scratch_n, with_rc);
+            d, p, rho, mu, ugrad, limiter, venkat_c, sympy, rx, ry, rz, rc, scratch_n, with_rc,
+            cvfem_hex8_rc_config_for(d));
 
     scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
@@ -729,7 +734,11 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
         const KernelKind kernel_kind,
         const size_t u_n,
         const size_t bsr_n,
-        const int with_rc) {
+        const int with_rc,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg) {
         PhaseAcc acc;
         alignas(ALIGN_BYTES) scalar_t dense_ke[64 * 16];
         std::memset(dense_ke, 0, sizeof(dense_ke));
@@ -790,7 +799,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
                 // Hex8RhieChow points at these locals, so they must outlive the call, which
                 // they do.
                 scalar_t     rc_x[8], rc_y[8], rc_z[8], rc_pgx[8], rc_pgy[8], rc_pgz[8];
-                const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+                const Hex8RcConfig rcfg = rc_cfg;
                 Hex8RhieChow rc{};
                 if (with_rc) {
                     gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, rc_x, rc_y, rc_z);
@@ -874,7 +883,8 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
 
 #pragma omp parallel
     assemble_jacobian_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d, p, b.values->data(), rho, mu, kernel_kind, u_n, bsr_n, with_rc);
+            d, p, b.values->data(), rho, mu, kernel_kind, u_n, bsr_n, with_rc,
+            cvfem_hex8_rc_config_for(d));
 
     const double _tg = phase_now();
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
@@ -933,7 +943,11 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
         const size_t scratch_n,
         const int with_rc,
         const bool with_qg,
-        const size_t slot3_n) {
+        const size_t slot3_n,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg) {
         // The breakdown covered packed assembly and the colored matvec but not this one --
         // the operator the solver's Krylov loop actually applies. Without it nothing here
         // could be attributed to a phase.
@@ -1037,7 +1051,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
                     if (with_rc) {
                         cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz,
                                                        begin, nlanes, rcp);
-                        cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), begin, nlanes, rcp);
+                        cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), rc_cfg, begin, nlanes, rcp);
                     }
                     if (with_qg)
                         cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
@@ -1138,7 +1152,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
 
 #pragma omp parallel
     apply_jacobian_action_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d, p, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, with_rc, with_qg, slot3_n);
+            d, p, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, with_rc, with_qg, slot3_n,
+            cvfem_hex8_rc_config_for(d));
 
     const double _tg = phase_now();
 #pragma omp parallel for schedule(static)
@@ -1192,7 +1207,11 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
         scalar_t *const jv,
         const size_t scratch_n,
         const int with_rc,
-        const bool with_qg) {
+        const bool with_qg,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg) {
         PhaseAcc                      acc;
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
@@ -1243,7 +1262,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
                 alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
                 gather_hex8_simd_from_pack(p.elems, pack_dir, d, begin, nlanes, du_pack, cof0, cof1, cof2, cof3,
                                            cof4, cof5, cof6, cof7, cof8, det);
-                if (with_rc) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), begin, nlanes, rcp);
+                if (with_rc) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), rc_cfg, begin, nlanes, rcp);
                 if (with_qg) {
                     cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
                 }
@@ -1286,7 +1305,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
 
 #pragma omp parallel
     apply_jacobian_action_packed_pa_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d, p, rho, mu, dir, jv, scratch_n, with_rc, with_qg);
+            d, p, rho, mu, dir, jv, scratch_n, with_rc, with_qg,
+            cvfem_hex8_rc_config_for(d));
 
     const double _tg = phase_now();
 #pragma omp parallel for schedule(static)

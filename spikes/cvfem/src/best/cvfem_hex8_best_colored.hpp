@@ -432,7 +432,7 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
                     scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
                     gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux_e, uy_e, uz_e, p_e);
                     Hex8ExtraScratch ex;
-                    ex.load(d, opt, e);
+                    ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
                     const scalar_t *const          rc_p  = opt.with_rc ? p_e : nullptr;
                     const int *const SFEM_RESTRICT slots = gslots + (size_t)e * 64;
 

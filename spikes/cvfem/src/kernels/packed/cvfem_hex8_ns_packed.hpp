@@ -433,7 +433,11 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
         const size_t qg_n,
         const int with_rc,
         const bool with_qg,
-        const bool with_ho) {
+        const bool with_ho,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
@@ -519,7 +523,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
                 if (with_rc) {
                     cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz, begin,
                                                    nlanes, rcp);
-                    cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), begin, nlanes, rcp);
+                    cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), rc_cfg, begin, nlanes, rcp);
                 }
                 if (with_qg)
                     cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
@@ -618,7 +622,8 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
 
 #pragma omp parallel
     cvfem_hex8_apply_jacobian_action_packed_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d, p, rho, mu, dir, jv, scratch_n, rc_n, qg_n, with_rc, with_qg, with_ho);
+            d, p, rho, mu, dir, jv, scratch_n, rc_n, qg_n, with_rc, with_qg, with_ho,
+            cvfem_hex8_rc_config_for(d));
 
 
     cvfem_hex8_ghost_reduce_interleaved(p, jv);

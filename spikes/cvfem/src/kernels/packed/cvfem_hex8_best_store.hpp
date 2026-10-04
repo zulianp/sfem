@@ -179,7 +179,11 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
         scalar_t *const SFEM_RESTRICT pack_z,
         scalar_t *const SFEM_RESTRICT pack_pgx,
         scalar_t *const SFEM_RESTRICT pack_pgy,
-        scalar_t *const SFEM_RESTRICT pack_pgz) {
+        scalar_t *const SFEM_RESTRICT pack_pgz,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg) {
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
@@ -214,7 +218,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
                 const int *const SFEM_RESTRICT slots = p.st_element_slot.data() + (size_t)e * 64;
 
                 scalar_t     rc_x[8], rc_y[8], rc_z[8], rc_pgx[8], rc_pgy[8], rc_pgz[8];
-                const Hex8RcConfig rcfg = cvfem_hex8_rc_config_for(d);
+                const Hex8RcConfig rcfg = rc_cfg;
                 Hex8RhieChow rc{};
                 if (with_rc) {
                     gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, rc_x, rc_y, rc_z);
@@ -327,7 +331,8 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
             assemble_jacobian_store_range<ISO>(cvfem_range{pack, pack + 1},
                                                d, p, b.rowptr, rho, mu, kernel_kind, gvalues, with_rc,
                                                acc, pack_u, local_vals, pack_x, pack_y, pack_z,
-                                               pack_pgx, pack_pgy, pack_pgz);
+                                               pack_pgx, pack_pgy, pack_pgz,
+            cvfem_hex8_rc_config_for(d));
         acc.flush();
     }
 
