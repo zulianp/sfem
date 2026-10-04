@@ -163,7 +163,9 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
         const cvfem_range packs,
         MeshData        &d,
         PackedData      &p,
-        BSR4            &b,
+        // BSR4 is a staging type (it owns a SharedBuffer and a graph); the kernel reads one
+        // array out of it, so that is what it takes.
+        const count_t *const SFEM_RESTRICT rowptr,
         const scalar_t   rho,
         const scalar_t   mu,
         const KernelKind kernel_kind,
@@ -270,7 +272,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
 
             // owned rows: one streaming store over a contiguous global slice
-            std::memcpy(gvalues + (ptrdiff_t)b.rowptr[owned] * 16, local_vals, (size_t)owned_nnz * 16 * sizeof(scalar_t));
+            std::memcpy(gvalues + (ptrdiff_t)rowptr[owned] * 16, local_vals, (size_t)owned_nnz * 16 * sizeof(scalar_t));
 
             // ghost rows: park for the reduction below
             const ptrdiff_t ghost_off = p.ghost_ptr[pack];
@@ -323,7 +325,7 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
 #pragma omp for schedule(dynamic, 1)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack)
             assemble_jacobian_store_range<ISO>(cvfem_range{pack, pack + 1},
-                                               d, p, b, rho, mu, kernel_kind, gvalues, with_rc,
+                                               d, p, b.rowptr, rho, mu, kernel_kind, gvalues, with_rc,
                                                acc, pack_u, local_vals, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz);
         acc.flush();

@@ -721,7 +721,9 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
         const cvfem_range packs,
         MeshData &d,
         PackedData &p,
-        BSR4 &b,
+        // BSR4 is a staging type (it owns a SharedBuffer and a graph); the kernel reads one
+        // array out of it, so that is what it takes.
+        scalar_t *const SFEM_RESTRICT gvalues,
         const scalar_t rho,
         const scalar_t mu,
         const KernelKind kernel_kind,
@@ -830,8 +832,6 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
             }
 
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
-
-            scalar_t *const SFEM_RESTRICT gvalues   = b.values->data();
             const int                     owned_nnz = n_contiguous > 0 ? lrowptr[(size_t)n_contiguous] : 0;
             if (!g_kernel_only)
                 for (int t = 0; t < owned_nnz; ++t)
@@ -874,7 +874,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
 
 #pragma omp parallel
     assemble_jacobian_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d, p, b, rho, mu, kernel_kind, u_n, bsr_n, with_rc);
+            d, p, b.values->data(), rho, mu, kernel_kind, u_n, bsr_n, with_rc);
 
     const double _tg = phase_now();
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
