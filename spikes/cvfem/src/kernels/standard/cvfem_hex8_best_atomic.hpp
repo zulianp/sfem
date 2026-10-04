@@ -168,7 +168,9 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
     // built before the sweep and staged per lane group -- exactly as the packed Jacobian does.
     // Omitting the staging leaves rcp.coeff, rcp.scale and rcp.tau untouched and the kernel
     // returns nan, which is how this was found.
-    if (opt.with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
+    // The coefficient table arrives built. cvfem_hex8_build_rc_coeff reads the mesh and is
+    // cached by its own key, so it is a once-per-solve setup rather than part of this sweep;
+    // the caller runs it, as the packed Jacobian's launcher already does.
 
 #pragma omp parallel
     {

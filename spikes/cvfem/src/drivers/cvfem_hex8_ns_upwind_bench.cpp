@@ -2160,11 +2160,15 @@ int main(int argc, char **argv) {
         // and the EXACT higher-order action -- the SIMD kernel takes ho and hov, which is what
         // the packed Jacobian passes it. Only the generated kernel arrangements are outside it,
         // and the recorded row says which one ran.
-        else if (kernel_kind == KernelKind::Sumfact)
+        else if (kernel_kind == KernelKind::Sumfact) {
+            // Braced on purpose: the build below is a second statement in this branch, and an
+            // unbraced one would attach the else that follows to the wrong call.
+            if (cvfem_hex8_extras_of(d).with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
             apply_jacobian_action_atomic_simd(d, rho, mu, dir_v, jac_out.data(),
                                               with_hograd ? ugrad.data() : nullptr,
                                               with_hograd ? vgrad.data() : nullptr,
                                               conv_limiter, scalar_t(0));
+        }
         else
             apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(), kernel_kind,
                                          with_hograd ? ugrad.data() : nullptr,
