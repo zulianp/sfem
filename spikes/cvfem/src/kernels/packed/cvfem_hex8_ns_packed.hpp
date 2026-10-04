@@ -163,22 +163,39 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const ptrdiff_t *const SFEM_
 // passed". PackedData is a staging object -- it owns std::vectors and a shared_ptr<smesh::Mesh> --
 // so naming it in a kernel signature is what keeps src/kernels/ dependent on a library. These
 // four arrays and one count are the whole of what the reduction reads; the launcher resolves them.
+// Templated on the number of destination arrays, not fixed at the four fields, because the
+// semi-structured nodal gradient reduces three -- it stopped carrying a volume weight -- and had
+// grown its own copy of this loop. A COMPILE-TIME width rather than an argument: this is on the
+// matvec's hot path and is compiled for exactly one width there, so W = CVFEM_HEX8_N_FIELDS
+// folds to the same code it did before, while W = 3 gives the gradient the same body instead of
+// a second one. It is the same reason the semi-structured scatter templates its own width.
+// SCALED multiplies each destination's reduced sum by a per-node factor, which is what the
+// semi-structured nodal gradient needs: its drain folds the reconstruction's 1/sum(|det|) in as
+// it writes, so the ghost rows have to be folded the same way or the shared nodes come out
+// unnormalised. A template parameter and not an argument, so the matvec's reduction -- which
+// scales nothing -- compiles to exactly the body it had. Inside the scaled branch a null factor
+// means unity, which is how the gradient's two-pass path asks for raw sums.
+template <int W, bool SCALED = false>
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa_range(const cvfem_range rows,
         const idx_t *const SFEM_RESTRICT     ghost_reduce_dest,
         const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
         const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
         const ptrdiff_t                      n_ghost_entries,
         const scalar_t *const SFEM_RESTRICT  ghost_buf,
-        scalar_t *const fields[CVFEM_HEX8_N_FIELDS]) {
+        const scalar_t *const SFEM_RESTRICT  scale,
+        scalar_t *const fields[W]) {
     for (ptrdiff_t row = rows.begin; row < rows.end; ++row) {
         const idx_t dest  = ghost_reduce_dest[row];
         const ptrdiff_t    begin = ghost_reduce_ptr[row];
         const ptrdiff_t    end   = ghost_reduce_ptr[row + 1];
-        for (int f = 0; f < CVFEM_HEX8_N_FIELDS; ++f) {
+        scalar_t           wi    = scalar_t(1);
+        if constexpr (SCALED) wi = scale ? scale[dest] : scalar_t(1);
+        for (int f = 0; f < W; ++f) {
             const scalar_t *const SFEM_RESTRICT ghost = ghost_buf + f * n_ghost_entries;
             scalar_t                            sum   = 0;
             for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[ghost_reduce_idx[j]];
-            fields[f][dest] += sum;
+            if constexpr (SCALED) fields[f][dest] += sum * wi;
+            else fields[f][dest] += sum;
         }
     }
 }

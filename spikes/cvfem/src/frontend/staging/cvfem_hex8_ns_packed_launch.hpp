@@ -27,10 +27,10 @@ static SFEM_INLINE void cvfem_hex8_load_adj(const MeshData &d, const ptrdiff_t e
 
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa(PackedData &p, scalar_t *const fields[CVFEM_HEX8_N_FIELDS]) {
 #pragma omp parallel
-    cvfem_hex8_ghost_reduce_soa_range(cvfem_range_split(0, p.n_ghost_reduce_rows, 1,
+    cvfem_hex8_ghost_reduce_soa_range<CVFEM_HEX8_N_FIELDS>(cvfem_range_split(0, p.n_ghost_reduce_rows, 1,
                                    cvfem_thread_index(), cvfem_n_threads()),
             p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx,
-            p.n_ghost_entries, p.ghost_buf.data(), fields);
+            p.n_ghost_entries, p.ghost_buf.data(), nullptr, fields);
 }
 
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide(PackedData                         &p,

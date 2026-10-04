@@ -831,25 +831,18 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
         }
     }
 
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
-        const smesh::idx_t dest  = p.ghost_reduce_dest[row];
-        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
-        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
-        const scalar_t *const SFEM_RESTRICT bx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
-        const scalar_t *const SFEM_RESTRICT by = p.ghost_buf.data() + 1 * p.n_ghost_entries;
-        const scalar_t *const SFEM_RESTRICT bz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
-        scalar_t sx = 0, sy = 0, sz = 0;
-        for (ptrdiff_t j = begin; j < end; ++j) {
-            const ptrdiff_t idx = p.ghost_reduce_idx[j];
-            sx += bx[idx];
-            sy += by[idx];
-            sz += bz[idx];
-        }
-        const scalar_t wi = apply_weight ? w[dest] : scalar_t(1);
-        gx_out[dest] += sx * wi;
-        gy_out[dest] += sy * wi;
-        gz_out[dest] += sz * wi;
+    // The packed layout's ghost reduction, which is cvfem_hex8_ghost_reduce_soa_range at width
+    // three with the reconstruction's weight folded in. This was a copy of that loop; the one in
+    // kernels/packed/ is now templated on the width and on whether it scales, so both widths
+    // compile from one body.
+    {
+        scalar_t *const g3[3] = {gx_out, gy_out, gz_out};
+#pragma omp parallel
+        cvfem_hex8_ghost_reduce_soa_range<3, /*SCALED=*/true>(
+                cvfem_range_split(0, p.n_ghost_reduce_rows, 1, cvfem_thread_index(),
+                                  cvfem_n_threads()),
+                p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx, p.n_ghost_entries,
+                p.ghost_buf.data(), apply_weight ? w : nullptr, g3);
     }
 }
 
