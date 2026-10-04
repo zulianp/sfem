@@ -21,10 +21,15 @@
 
 #include "core/cvfem_element_coloring.hpp"
 
-template <typename MeshT>
-static SFEM_INLINE void load_hex8_adj(const MeshT &d, const ptrdiff_t e, scalar_t adj[9], scalar_t *det) {
-    for (int c = 0; c < 9; ++c) adj[c] = d.jacobian_adjugate[c][(size_t)e];
-    *det = d.jacobian_determinant[(size_t)e];
+// Takes the affine geometry, not the mesh. It is called from inside more than twenty sweeps in
+// src/kernels/, so a MeshT parameter here is what keeps that directory dependent on the staging
+// layer. adj_ptr and det_ptr are published by precompute_affine_geometry, which is the only
+// thing that sizes the vectors behind them.
+static SFEM_INLINE void load_hex8_adj(const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+                                      const scalar_t *const SFEM_RESTRICT        det_ptr,
+                                      const ptrdiff_t e, scalar_t adj[9], scalar_t *det) {
+    for (int c = 0; c < 9; ++c) adj[c] = adj_ptr[c][(size_t)e];
+    *det = det_ptr[(size_t)e];
 }
 
 template <typename MeshT>
@@ -48,6 +53,10 @@ static void precompute_affine_geometry(MeshT &d) {
         for (int c = 0; c < 9; ++c) d.jacobian_adjugate[c][(size_t)e] = adj[c];
         d.jacobian_determinant[(size_t)e] = det;
     }
+
+    // Published after the resize above, which is the only thing that can invalidate them.
+    for (int c = 0; c < 9; ++c) d.adj_ptr[c] = d.jacobian_adjugate[c].data();
+    d.det_ptr = d.jacobian_determinant.data();
 }
 
 // No mesh argument, so no template parameter to deduce -- a plain function.
@@ -68,8 +77,9 @@ static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRI
     }
 }
 
-template <typename MeshT>
-static SFEM_INLINE void gather_hex8_adj_soa(const MeshT               &d,
+// Takes the affine geometry, not the mesh; see load_hex8_adj above.
+static SFEM_INLINE void gather_hex8_adj_soa(const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+                                            const scalar_t *const SFEM_RESTRICT        det_ptr,
                                             const ptrdiff_t               begin,
                                             const int                     nlanes,
                                             scalar_t *const SFEM_RESTRICT cof0,
@@ -83,16 +93,16 @@ static SFEM_INLINE void gather_hex8_adj_soa(const MeshT               &d,
                                             scalar_t *const SFEM_RESTRICT cof8,
                                             scalar_t *const SFEM_RESTRICT det) {
     const size_t n = (size_t)nlanes * sizeof(scalar_t);
-    std::memcpy(cof0, d.jacobian_adjugate[0].data() + begin, n);
-    std::memcpy(cof1, d.jacobian_adjugate[1].data() + begin, n);
-    std::memcpy(cof2, d.jacobian_adjugate[2].data() + begin, n);
-    std::memcpy(cof3, d.jacobian_adjugate[3].data() + begin, n);
-    std::memcpy(cof4, d.jacobian_adjugate[4].data() + begin, n);
-    std::memcpy(cof5, d.jacobian_adjugate[5].data() + begin, n);
-    std::memcpy(cof6, d.jacobian_adjugate[6].data() + begin, n);
-    std::memcpy(cof7, d.jacobian_adjugate[7].data() + begin, n);
-    std::memcpy(cof8, d.jacobian_adjugate[8].data() + begin, n);
-    std::memcpy(det, d.jacobian_determinant.data() + begin, n);
+    std::memcpy(cof0, adj_ptr[0] + begin, n);
+    std::memcpy(cof1, adj_ptr[1] + begin, n);
+    std::memcpy(cof2, adj_ptr[2] + begin, n);
+    std::memcpy(cof3, adj_ptr[3] + begin, n);
+    std::memcpy(cof4, adj_ptr[4] + begin, n);
+    std::memcpy(cof5, adj_ptr[5] + begin, n);
+    std::memcpy(cof6, adj_ptr[6] + begin, n);
+    std::memcpy(cof7, adj_ptr[7] + begin, n);
+    std::memcpy(cof8, adj_ptr[8] + begin, n);
+    std::memcpy(det, det_ptr + begin, n);
     if (nlanes < CVFEM_HEX8_VEC_SIZE) {
         const size_t pad = (size_t)(CVFEM_HEX8_VEC_SIZE - nlanes) * sizeof(scalar_t);
         std::memset(cof0 + nlanes, 0, pad);
@@ -296,7 +306,7 @@ static void cvfem_hex8_build_rc_coeff(MeshT &d, const scalar_t rho, const scalar
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t adj[9], det, A[3][3];
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_dir_areas(adj, A);
         // The three affine edge vectors, from the same adjugate, so this table and the face loops
         // that read it use ONE geometry. Differencing node coordinates here while the face uses
@@ -386,7 +396,7 @@ static void cvfem_hex8_build_pa_tangent(MeshT &d, const scalar_t rho, const scal
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t adj[9], det, A[3][3];
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_dir_areas(adj, A);
         // The same affine edge vector the PA face kernel reads. Building this table from node
         // coordinates while the kernel used the Jacobian column is what cvfem_pa_tangent_test
@@ -759,7 +769,7 @@ static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                              
                     cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
                     cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
                 } else {
-                    load_hex8_adj(d, e, adj, &det);
+                    load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
                 }
                 if (std::fabs(det) < scalar_t(1e-30)) continue;
                 const scalar_t sgn = det > scalar_t(0) ? scalar_t(1) : scalar_t(-1);
@@ -815,7 +825,7 @@ static void cvfem_hex8_nodal_grads_atomic_nc(MeshT                              
             cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
             cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
         } else {
-            load_hex8_adj(d, e, adj, &det);
+            load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         }
         if (std::fabs(det) < scalar_t(1e-30)) continue;
         const scalar_t sgn = det > scalar_t(0) ? scalar_t(1) : scalar_t(-1);
@@ -1030,7 +1040,7 @@ static void cvfem_hex8_nodal_grads_packed_nc(MeshT                              
                     cvfem_hex8_dn_ref(scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), dN);
                     cvfem_hex8_geom_at(x, y, z, scalar_t(0.5), scalar_t(0.5), scalar_t(0.5), adj, &det);
                 } else {
-                    load_hex8_adj(d, e, adj, &det);
+                    load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
                 }
                 if (std::fabs(det) < scalar_t(1e-30)) continue;
                 const scalar_t sgn = det > scalar_t(0) ? scalar_t(1) : scalar_t(-1);

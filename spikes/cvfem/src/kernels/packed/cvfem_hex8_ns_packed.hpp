@@ -32,7 +32,7 @@ static void cvfem_hex8_precompute_affine_geometry(MeshData &d) {
 }
 
 static SFEM_INLINE void cvfem_hex8_load_adj(const MeshData &d, const ptrdiff_t e, scalar_t adj[9], scalar_t *det) {
-    load_hex8_adj(d, e, adj, det);
+    load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, det);
 }
 
 static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const MeshData               &d,
@@ -48,7 +48,7 @@ static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const MeshData               &
                                                   scalar_t *const SFEM_RESTRICT cof7,
                                                   scalar_t *const SFEM_RESTRICT cof8,
                                                   scalar_t *const SFEM_RESTRICT det) {
-    gather_hex8_adj_soa(d, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+    gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
 }
 
 static SFEM_INLINE void cvfem_hex8_gather_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,

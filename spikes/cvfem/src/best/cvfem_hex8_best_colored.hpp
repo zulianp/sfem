@@ -222,7 +222,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                             p_e[a]                                = u[3];
                         }
                         scalar_t adj[9], det;
-                        load_hex8_adj(d, e, adj, &det);
+                        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
                         if (sympy)
                             cvfem_hex8_ns_upwind_sympy_residual(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r);
                         else
@@ -443,7 +443,7 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
                                 rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, values, ex.rc, rc_p);
                     } else {
                         scalar_t adj[9], det;
-                        load_hex8_adj(d, e, adj, &det);
+                        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
                         switch (kernel_kind) {
                             case KernelKind::Sympy:
                                 cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(

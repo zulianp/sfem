@@ -234,7 +234,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
                     for (int c = 0; c < 9; ++c) g8[a * 9 + c] = ugrad[(ptrdiff_t)g * 9 + c];
                 }
                 scalar_t adj[9], det;
-                load_hex8_adj(d, e, adj, &det);
+                load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
                 cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r,
                                                       ex.rc, /*ueps=*/scalar_t(0),
                                                       g8, xe, ye, ze,
@@ -623,7 +623,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                         p_e[a]                               = u[3];
                     }
                     scalar_t adj[9], det;
-                    load_hex8_adj(d, e, adj, &det);
+                    load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
                     if (sympy)
                         cvfem_hex8_ns_upwind_sympy_residual(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r);
                     else
@@ -783,7 +783,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
                         g_kernel_only ? g_identity_slots : p.local_element_slot.data() + (size_t)e * 64;
                 scalar_t *const SFEM_RESTRICT local_vals = g_kernel_only ? dense_ke : local_vals_pack;
                 scalar_t adj[9], det;
-                if constexpr (!ISO) load_hex8_adj(d, e, adj, &det);
+                if constexpr (!ISO) load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
                 // The coordinates and the nodal gradient come out of the pack; the
                 // Hex8RhieChow points at these locals, so they must outlive the call, which
                 // they do.

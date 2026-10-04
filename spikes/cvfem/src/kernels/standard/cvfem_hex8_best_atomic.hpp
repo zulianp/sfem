@@ -53,7 +53,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
             q[a]                             = dv[3];
         }
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         // The generated Jacobian-action arrangements. They carry no Rhie-Chow term -- the
         // generator builds them from the bare flux algebra, as it does the residual and the
         // assembly -- so the driver refuses --rhie-chow with them rather than letting a row
@@ -162,7 +162,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
 #pragma omp for schedule(static)
         for (ptrdiff_t e0 = 0; e0 < d.nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
             const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, d.nelements - e0);
-            gather_hex8_adj_soa(d, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+            gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                 if (lane < nlanes) {
@@ -306,7 +306,7 @@ static SFEM_NOINLINE void apply_residual_atomic(MeshData &d, const scalar_t rho,
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         // No rc: the hand-written `current` kernel carries no Rhie-Chow term. --rhie-chow
         // is rejected for this kernel at the CLI, so reaching here with it on is a bug.
         cvfem_hex8_ns_upwind_residual(rho, mu, adj, det, ux, uy, uz, p, r);
@@ -332,7 +332,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d, const scala
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, adj, det, ux, uy, uz, p, r, ex.rc);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -402,7 +402,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
 #pragma omp for schedule(static)
         for (ptrdiff_t e0 = 0; e0 < d.nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
             const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, d.nelements - e0);
-            gather_hex8_adj_soa(d, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+            gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                 if (lane < nlanes) {
@@ -555,7 +555,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
 
         // The reconstruction needs the element's node coordinates and the eight nodes' nodal
         // velocity gradients; both are gathered per element, like the fields above.
@@ -613,7 +613,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sympy(MeshData &d, const scalar_
         scalar_t ux[8], uy[8], uz[8], p[8], r[CVFEM_HEX8_N_DOF];
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_residual(rho, mu, adj, det, ux, uy, uz, p, r);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -636,7 +636,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_fd(MeshData &d, BSR4 &b, cons
         scalar_t ux[8], uy[8], uz[8], p[8], ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, adj, det, ux, uy, uz, p, ke);
 
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -705,7 +705,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy(MeshData &d, BSR4 &b, c
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
 }
@@ -720,7 +720,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_block(MeshData &d, BSR4
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
@@ -736,7 +736,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_row(MeshData &d, BSR4 &
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_rowwise(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
@@ -752,7 +752,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sympy_face(MeshData &d, BSR4 
         scalar_t ux[8], uy[8], uz[8], p[8];
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_facewise(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values);
     }
@@ -776,7 +776,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_linear(MeshData             &
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots_linear<true>(mu, adj, det,
                                                              slots + (size_t)e * 64, values);
     }
@@ -806,7 +806,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
         ex.load(d, opt, e);
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots_nonlinear<true>(
                 rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
     }
@@ -825,7 +825,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(MeshData &d, BSR4 &b,
         Hex8ExtraScratch ex;
         ex.load(d, opt, e);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         // rc and p go through the same upwind switch the residual uses, so this matches
         // the matrix-free action. Without --rhie-chow the pressure-pressure block of this
         // matrix is structurally zero, which is the saddle-point structure the solver's
@@ -946,7 +946,7 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &
         gather_element_coords(d, e, x, y, z);
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det = scalar_t(0);
-        if (!isoparam) load_hex8_adj(d, e, adj, &det);
+        if (!isoparam) load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         if (isoparam)
             boundary_scs_add_jacobian<true, true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz,
                                         x, y, z, ux, uy, uz, sl, values, fmask, 0);
@@ -985,7 +985,7 @@ static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
         diag_node_slots(d, e, sl);
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, values, ex.rc, p);
     }
     assemble_diag_boundary_scs_pass(d, rho, mu, 0, diag);

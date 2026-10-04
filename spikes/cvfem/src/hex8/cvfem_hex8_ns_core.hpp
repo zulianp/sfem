@@ -243,6 +243,17 @@ struct MeshData {
     bool                     bnd_gather_valid{false};
     std::vector<scalar_t> jacobian_adjugate[9];
     std::vector<scalar_t> jacobian_determinant;
+
+    // THE SAME ADJUGATE AND DETERMINANT, AS RAW POINTERS, so that a kernel can be handed the
+    // affine geometry without being handed this object. jacobian_adjugate is nine separate
+    // vectors, so there is no single pointer into it and the alternative was building a
+    // nine-element array of pointers at thirty-one call sites. PackedData already carries raw
+    // pointers beside its vectors for the same reason.
+    //
+    // Filled by precompute_affine_geometry, which is the only thing that sizes those vectors.
+    // They are valid until it runs again, which is the same lifetime the vectors themselves have.
+    const scalar_t *adj_ptr[9]{};
+    const scalar_t *det_ptr{nullptr};
     PackedData           *packed{nullptr};
     const PackColoring   *coloring{nullptr};
     // Field-major ghost staging for the block diagonal's packed sweep, 16 wide where

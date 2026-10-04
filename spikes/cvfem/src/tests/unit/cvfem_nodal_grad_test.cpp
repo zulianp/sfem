@@ -57,7 +57,7 @@ static void reference_grad(const MeshData &d, const std::vector<scalar_t> &f,
         scalar_t fe[CVFEM_HEX8_N_NODES];
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) fe[a] = f[(size_t)d.elems[a][e]];
         scalar_t adj[9], det;
-        load_hex8_adj(d, e, adj, &det);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         const scalar_t vol = std::fabs(det);
         if (vol < scalar_t(1e-30)) continue;
         scalar_t dr, ds, dt, ex, ey, ez;

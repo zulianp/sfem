@@ -75,7 +75,7 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
         Hex8UGradPack    &hop) {
     for (ptrdiff_t e0 = r.begin; e0 < r.end; e0 += CVFEM_HEX8_VEC_SIZE) {
             const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, r.end - e0);
-            gather_hex8_adj_soa(d, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+            gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                 if (lane < nlanes) {
@@ -278,7 +278,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
         Hex8UGradPack    &hovp) {
     for (ptrdiff_t e0 = r.begin; e0 < r.end; e0 += CVFEM_HEX8_VEC_SIZE) {
             const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, r.end - e0);
-            gather_hex8_adj_soa(d, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+            gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                 if (lane < nlanes) {

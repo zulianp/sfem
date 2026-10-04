@@ -237,6 +237,17 @@ struct MeshData {
     std::vector<scalar_t> jacobian_adjugate[9];
     std::vector<scalar_t> jacobian_determinant;
 
+    // THE SAME ADJUGATE AND DETERMINANT, AS RAW POINTERS, so that a kernel can be handed the
+    // affine geometry without being handed this object. jacobian_adjugate is nine separate
+    // vectors, so there is no single pointer into it and the alternative was building a
+    // nine-element array of pointers at thirty-one call sites. PackedData already carries raw
+    // pointers beside its vectors for the same reason.
+    //
+    // Filled by precompute_affine_geometry, which is the only thing that sizes those vectors.
+    // They are valid until it runs again, which is the same lifetime the vectors themselves have.
+    const scalar_t *adj_ptr[9]{};
+    const scalar_t *det_ptr{nullptr};
+
     // --- optional physics, off unless the corresponding option is passed ---------------
     //
     // The benchmark measures the element kernel in isolation by default, which is why
@@ -612,7 +623,7 @@ static SFEM_NOINLINE void apply_boundary_scs_residual_pass(MeshData &d, const sc
         gather_element_fields(d, e, ux, uy, uz, p);
         std::memset(r, 0, sizeof(r));
         scalar_t adj[9], det = scalar_t(0);
-        if (!isoparam) load_hex8_adj(d, e, adj, &det);
+        if (!isoparam) load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         if (isoparam)
             boundary_scs_add_residual<true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz, x, y, z,
                                             ux, uy, uz, p, r, fmask, 0);
@@ -655,7 +666,7 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
         }
         std::memset(r, 0, sizeof(r));
         scalar_t adj[9], det = scalar_t(0);
-        if (!isoparam) load_hex8_adj(d, e, adj, &det);
+        if (!isoparam) load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         if (isoparam)
             boundary_scs_add_jacobian_action<true>(rho, mu, (const scalar_t *)nullptr, det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                    ux, uy, uz, vx, vy, vz, q, r, fmask, 0);
@@ -702,7 +713,7 @@ static SFEM_NOINLINE void assemble_boundary_scs_jacobian_pass(MeshData      &d,
         gather_element_coords(d, e, x, y, z);
         gather_element_fields(d, e, ux, uy, uz, p);
         scalar_t adj[9], det = scalar_t(0);
-        if (!isoparam) load_hex8_adj(d, e, adj, &det);
+        if (!isoparam) load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         smesh::count_t              found[64];
         const smesh::count_t *const esl = slots ? slots + (size_t)e * 64 : found;
         if (!slots)
@@ -938,7 +949,7 @@ struct Hex8ExtraScratch {
             // near-cancellation in the Rhie-Chow correction into a visible error.
             {
                 scalar_t adj_[9], det_;
-                load_hex8_adj(d, e, adj_, &det_);
+                load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj_, &det_);
                 scalar_t ex_[3], ey_[3], ez_[3];
                 cvfem_hex8_affine_edge_cols(adj_[0], adj_[1], adj_[2], adj_[3], adj_[4], adj_[5],
                                             adj_[6], adj_[7], adj_[8], det_, ex_, ey_, ez_);
@@ -981,7 +992,7 @@ static SFEM_INLINE void gather_hex8_simd_from_pack(pack_idx_t **const SFEM_RESTR
                                                    scalar_t *const SFEM_RESTRICT       cof7,
                                                    scalar_t *const SFEM_RESTRICT       cof8,
                                                    scalar_t *const SFEM_RESTRICT       det) {
-    gather_hex8_adj_soa(d, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+    gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
