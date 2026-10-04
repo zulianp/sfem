@@ -9,7 +9,7 @@
 #include "best/cvfem_hex8_best_common.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 #include "best/cvfem_hex8_best_colored.hpp"
-#include "kernels/colored/cvfem_hex8_best_ecolored.hpp"
+#include "frontend/staging/cvfem_hex8_ecolored_launch.hpp"
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
 #include "kernels/packed/cvfem_hex8_best_store.hpp"
 
