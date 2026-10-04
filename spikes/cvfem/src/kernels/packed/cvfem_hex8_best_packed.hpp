@@ -278,7 +278,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
     scalar_t *const SFEM_RESTRICT ry = d.ry.data();
     scalar_t *const SFEM_RESTRICT rz = d.rz.data();
     scalar_t *const SFEM_RESTRICT rc = d.rc.data();
-    const size_t                  scratch_n = packed_scratch_n(p);
+    const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     const Hex8Extras              opt(d);
     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
@@ -477,7 +477,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
     scalar_t *const SFEM_RESTRICT ry = d.ry.data();
     scalar_t *const SFEM_RESTRICT rz = d.rz.data();
     scalar_t *const SFEM_RESTRICT rc = d.rc.data();
-    const size_t                  scratch_n = packed_scratch_n(p);
+    const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     const Hex8Extras              opt(d);
     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
@@ -677,7 +677,7 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
     scalar_t *const SFEM_RESTRICT       ry = d.ry.data();
     scalar_t *const SFEM_RESTRICT       rz = d.rz.data();
     scalar_t *const SFEM_RESTRICT       rc = d.rc.data();
-    const size_t                        scratch_n = packed_scratch_n(p);
+    const size_t                        scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     // Rhie-Chow needs the coordinates and the nodal gradient staged per pack, six arrays
     // rather than three, so slot 3 is sized for six when it is on. This is the solver's
     // own arrangement (packed_rc_n, cvfem_hex8_ns_packed.hpp) and the constant already
@@ -862,7 +862,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                                                    const KernelKind kernel_kind) {
     zero_bsr4(b);
 
-    const size_t u_n   = packed_scratch_n(p);
+    const size_t u_n   = packed_scratch_n(p.max_actual_nodes_per_pack);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.max_local_nnz, 1);
     // This sweep is scalar per element, not SIMD over a pack, so Rhie-Chow enters through
     // the same Hex8RhieChow the atomic assembly builds -- the only difference is that the
@@ -1125,7 +1125,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
     // this free after the first call, so --warmup absorbs the build and the timed loop
     // measures what the solver's Krylov iterations measure.
     cvfem_hex8_build_rc_coeff(d, rho, mu);
-    const size_t scratch_n = packed_scratch_n(p);
+    const size_t scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     // Rhie-Chow staged per pack, exactly as apply_residual_packed does it and exactly as
     // the solver's own packed Jacobian does (cvfem_hex8_ns_packed.hpp). Slot 3 grows from
     // three arrays to six when it is on, and slot 4 carries the direction's reconstructed
@@ -1279,7 +1279,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
                                                           const scalar_t        mu,
                                                           const scalar_t *const dir,
                                                           scalar_t *const       jv) {
-    const size_t scratch_n = packed_scratch_n(p);
+    const size_t scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
     const bool   with_qg   = with_rc && !d.qgx.empty();
 

@@ -293,7 +293,7 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
                                                   const scalar_t   rho,
                                                   const scalar_t   mu,
                                                   const KernelKind kernel_kind) {
-    const size_t u_n   = packed_scratch_n(p);
+    const size_t u_n   = packed_scratch_n(p.max_actual_nodes_per_pack);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.st_max_local_nnz, 1);
 
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();

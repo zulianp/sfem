@@ -170,8 +170,8 @@ static PackedData make_packed(const std::shared_ptr<smesh::Mesh> &mesh, const in
     return p;
 }
 
-static SFEM_INLINE size_t packed_scratch_n(const PackedData &p) {
-    const ptrdiff_t n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+static SFEM_INLINE size_t packed_scratch_n(const ptrdiff_t max_actual_nodes_per_pack) {
+    const ptrdiff_t n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
     return (size_t)N_FIELDS * (size_t)n;
 }
 

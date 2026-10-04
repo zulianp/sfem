@@ -35,7 +35,10 @@ static SFEM_INLINE void cvfem_hex8_load_adj(const MeshData &d, const ptrdiff_t e
     load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, det);
 }
 
-static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const MeshData               &d,
+// A thin alias for gather_hex8_adj_soa under this family's name; it takes the affine geometry
+// rather than the mesh for the same reason the function it forwards to does.
+static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+                                                  const scalar_t *const SFEM_RESTRICT        det_ptr,
                                                   const ptrdiff_t               begin,
                                                   const int                     nlanes,
                                                   scalar_t *const SFEM_RESTRICT cof0,
@@ -48,7 +51,7 @@ static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const MeshData               &
                                                   scalar_t *const SFEM_RESTRICT cof7,
                                                   scalar_t *const SFEM_RESTRICT cof8,
                                                   scalar_t *const SFEM_RESTRICT det) {
-    gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+    gather_hex8_adj_soa(adj_ptr, det_ptr, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
 }
 
 static SFEM_INLINE void cvfem_hex8_gather_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
@@ -67,7 +70,7 @@ static SFEM_INLINE void cvfem_hex8_gather_simd_from_pack(pack_idx_t **const SFEM
                                                          scalar_t *const SFEM_RESTRICT       cof7,
                                                          scalar_t *const SFEM_RESTRICT       cof8,
                                                          scalar_t *const SFEM_RESTRICT       det) {
-    cvfem_hex8_gather_adj_soa(d, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+    cvfem_hex8_gather_adj_soa(d.adj_ptr, d.det_ptr, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
@@ -400,7 +403,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
 
 static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_residual_packed");
-    const size_t scratch_n = packed_scratch_n(p);
+    const size_t scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     const size_t rc_n      = packed_rc_n(p.max_actual_nodes_per_pack);
     const int    with_rc   = d.rhie_chow_scale != scalar_t(0);
 
@@ -598,7 +601,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed(MeshData      
         cvfem_hex8_build_rc_coeff(d, rho, mu);
     }
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::apply_jacobian_action_packed");
-    const size_t scratch_n = packed_scratch_n(p);
+    const size_t scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     const size_t rc_n      = packed_rc_n(p.max_actual_nodes_per_pack);
     const size_t qg_n      = packed_qg_n(p.max_actual_nodes_per_pack);
     const int    with_rc   = d.rhie_chow_scale != scalar_t(0);

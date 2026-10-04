@@ -115,7 +115,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
     scalar_t *const SFEM_RESTRICT ry        = d.ry.data();
     scalar_t *const SFEM_RESTRICT rz        = d.rz.data();
     scalar_t *const SFEM_RESTRICT rc        = d.rc.data();
-    const size_t                  scratch_n = packed_scratch_n(p);
+    const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     // Rhie-Chow staged exactly as apply_residual_packed stages it: six per-pack arrays in
     // scratch slot 3 rather than three, the coordinates and the nodal gradient. The colored
     // sweep is the same pack sweep with a colour loop around it, so the staging is the same
@@ -267,7 +267,7 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
     // is a no-op unless rho, mu, the scale or the mesh moved -- see Hex8RhieChowPack::coeff.
     cvfem_hex8_build_rc_coeff(d, rho, mu);
 
-    const size_t scratch_n = packed_scratch_n(p);
+    const size_t scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
     // The exact form differentiates through the nodal gradient reconstruction, so it needs
     // that reconstruction applied to the DIRECTION's pressure too. Present only when the

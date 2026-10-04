@@ -1419,7 +1419,7 @@ int main(int argc, char **argv) {
 
     if (layout == "packed" || layout == "colored" || layout == "store" || verify || verify_jac || jac_action ||
         bsr_apply) {
-        const size_t scratch_n = packed_scratch_n(packed);
+        const size_t scratch_n = packed_scratch_n(packed.max_actual_nodes_per_pack);
         const size_t bsr_n =
                 16 * (size_t)std::max<ptrdiff_t>(std::max(packed.max_local_nnz, packed.st_max_local_nnz), 1);
         const size_t slot2_n   = std::max(scratch_n, bsr_n);
