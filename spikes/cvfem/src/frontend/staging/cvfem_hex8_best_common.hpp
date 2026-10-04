@@ -568,7 +568,14 @@ static SFEM_NOINLINE void apply_boundary_scs_residual_pass(MeshData &d, const sc
         else
             boundary_scs_add_residual<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
                                              ux, uy, uz, p, r, fmask, 0);
-        cvfem_hex8_bnd_commit(d, i, e, r, bnd_atomic, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
+        // The caller picks the instantiation, so the staged-or-atomic choice is made once per
+        // pass rather than once per boundary element.
+        if (bnd_atomic)
+            cvfem_hex8_bnd_commit<true>(d.elems, d.bnd_r.data(), i, e, r, d.rx.data(),
+                                        d.ry.data(), d.rz.data(), d.rc.data());
+        else
+            cvfem_hex8_bnd_commit<false>(d.elems, d.bnd_r.data(), i, e, r, d.rx.data(),
+                                         d.ry.data(), d.rz.data(), d.rc.data());
     }
     if (!bnd_atomic) cvfem_hex8_drain_boundary_soa(d, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 }
@@ -611,7 +618,10 @@ static SFEM_NOINLINE void apply_boundary_scs_jacobian_action_pass(MeshData &d, c
         else
             boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z,
                                                     ux, uy, uz, vx, vy, vz, q, r, fmask, 0);
-        cvfem_hex8_bnd_commit_interleaved(d, i, e, r, bnd_atomic, jv);
+        if (bnd_atomic)
+            cvfem_hex8_bnd_commit_interleaved<true>(d.elems, d.bnd_r.data(), i, e, r, jv);
+        else
+            cvfem_hex8_bnd_commit_interleaved<false>(d.elems, d.bnd_r.data(), i, e, r, jv);
     }
     if (!bnd_atomic) cvfem_hex8_drain_boundary_interleaved(d, jv);
 }

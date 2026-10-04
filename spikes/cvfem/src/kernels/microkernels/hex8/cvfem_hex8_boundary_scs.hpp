@@ -178,48 +178,58 @@ static void cvfem_hex8_compact_boundary_elems(MeshT &d) {
 // The all-zero early-out is kept on the atomic path only. There it skips four atomics; on
 // the staged path there is nothing to skip, and skipping the write would leave the previous
 // call's value in the slot for the gather to read.
-template <typename MeshT>
-static SFEM_INLINE void cvfem_hex8_bnd_commit(MeshT &d, const ptrdiff_t i, const ptrdiff_t e,
-                                              const scalar_t *const SFEM_RESTRICT r, const int force_atomic,
+// ATOMIC IS A TEMPLATE PARAMETER, AND THE MESH IS GONE. DESIGN.md asks the micro-kernels to
+// avoid branching -- "if constexpr is allowed" -- and asks that no user-level option flag reach
+// this directory: `force_atomic` was one, tested per boundary element. The caller picks the
+// instantiation now, so the choice is made once per pass instead of once per element, and the
+// staged path's dead code is not even compiled into the atomic one.
+template <bool ATOMIC>
+static SFEM_INLINE void cvfem_hex8_bnd_commit(idx_t **const SFEM_RESTRICT elems,
+                                              scalar_t *const SFEM_RESTRICT bnd_stage,
+                                              const ptrdiff_t i, const ptrdiff_t e,
+                                              const scalar_t *const SFEM_RESTRICT r,
                                               scalar_t *const SFEM_RESTRICT fx, scalar_t *const SFEM_RESTRICT fy,
                                               scalar_t *const SFEM_RESTRICT fz, scalar_t *const SFEM_RESTRICT fc) {
-    if (!force_atomic) {
-        scalar_t *const SFEM_RESTRICT stage = d.bnd_r.data() + i * CVFEM_HEX8_N_DOF;
+    if constexpr (!ATOMIC) {
+        scalar_t *const SFEM_RESTRICT stage = bnd_stage + i * CVFEM_HEX8_N_DOF;
         for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) stage[k] = r[k];
         return;
-    }
+    } else {
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
         if (r[a * 4 + 0] == scalar_t(0) && r[a * 4 + 1] == scalar_t(0) && r[a * 4 + 2] == scalar_t(0) &&
             r[a * 4 + 3] == scalar_t(0))
             continue;
-        const idx_t g = d.elems[a][e];
+        const idx_t g = elems[a][e];
         CVFEM_ATOMIC_ADD(fx[g], r[a * 4 + 0]);
         CVFEM_ATOMIC_ADD(fy[g], r[a * 4 + 1]);
         CVFEM_ATOMIC_ADD(fz[g], r[a * 4 + 2]);
         CVFEM_ATOMIC_ADD(fc[g], r[a * 4 + 3]);
     }
+    }
 }
 
 // The same, for a destination that interleaves the four fields per node.
-template <typename MeshT>
-static SFEM_INLINE void cvfem_hex8_bnd_commit_interleaved(MeshT &d, const ptrdiff_t i, const ptrdiff_t e,
+template <bool ATOMIC>
+static SFEM_INLINE void cvfem_hex8_bnd_commit_interleaved(idx_t **const SFEM_RESTRICT elems,
+                                                          scalar_t *const SFEM_RESTRICT bnd_stage,
+                                                          const ptrdiff_t i, const ptrdiff_t e,
                                                           const scalar_t *const SFEM_RESTRICT r,
-                                                          const int                           force_atomic,
                                                           scalar_t *const SFEM_RESTRICT       jv) {
-    if (!force_atomic) {
-        scalar_t *const SFEM_RESTRICT stage = d.bnd_r.data() + i * CVFEM_HEX8_N_DOF;
+    if constexpr (!ATOMIC) {
+        scalar_t *const SFEM_RESTRICT stage = bnd_stage + i * CVFEM_HEX8_N_DOF;
         for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) stage[k] = r[k];
         return;
-    }
+    } else {
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
         if (r[a * 4 + 0] == scalar_t(0) && r[a * 4 + 1] == scalar_t(0) && r[a * 4 + 2] == scalar_t(0) &&
             r[a * 4 + 3] == scalar_t(0))
             continue;
-        const ptrdiff_t g = (ptrdiff_t)d.elems[a][e] * 4;
+        const ptrdiff_t g = (ptrdiff_t)elems[a][e] * 4;
         CVFEM_ATOMIC_ADD(jv[g + 0], r[a * 4 + 0]);
         CVFEM_ATOMIC_ADD(jv[g + 1], r[a * 4 + 1]);
         CVFEM_ATOMIC_ADD(jv[g + 2], r[a * 4 + 2]);
         CVFEM_ATOMIC_ADD(jv[g + 3], r[a * 4 + 3]);
+    }
     }
 }
 // THE TABLES, NOT THE MESH, AND A RANGE, NOT A PARALLEL REGION.
