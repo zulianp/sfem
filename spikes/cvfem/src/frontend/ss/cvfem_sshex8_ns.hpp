@@ -861,11 +861,14 @@ inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t 
     // the history has two levels is what this side knows. The sweep reads u_prev2 only when
     // the order it is handed says two levels are there, so resolving the coefficients here is
     // also what keeps that read in bounds.
-    #pragma omp parallel
-        sscvfem_apply_transient_sweep(cvfem_range_split(0, d.nnodes, 1, cvfem_thread_index(), cvfem_n_threads()),d.dt, d.node_vol.data(), d.u_prev.data(), d.u_prev2.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho,
-                                  cvfem_bdf_coeffs(d.bdf_order, d.dt, d.dt_prev,
-                                                   (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes),
-                                  res);
+    {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+        CVFEM_TRACE_SCOPE("sscvfem::apply_transient_sweep");
+        #pragma omp parallel
+            sscvfem_apply_transient_sweep(cvfem_range_split(0, d.nnodes, 1, cvfem_thread_index(), cvfem_n_threads()),d.dt, d.node_vol.data(), d.u_prev.data(), d.u_prev2.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho,
+                                      cvfem_bdf_coeffs(d.bdf_order, d.dt, d.dt_prev,
+                                                       (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes),
+                                      res);
+    }
 }
 
 // The weight the transient term puts on each velocity diagonal entry: rho V a0 / dt.
@@ -904,8 +907,11 @@ inline void sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
                                            scalar_t *const SFEM_RESTRICT       jv) {
     if (sscvfem_transient_diag_weight(d, rho) == scalar_t(0)) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
-    #pragma omp parallel
-        sscvfem_apply_transient_action_sweep(cvfem_range_split(0, d.nnodes, 1, cvfem_thread_index(), cvfem_n_threads()), d.node_vol.data(), sscvfem_transient_diag_weight(d, rho), rho, dir, jv);
+    {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+        CVFEM_TRACE_SCOPE("sscvfem::apply_transient_action_sweep");
+        #pragma omp parallel
+            sscvfem_apply_transient_action_sweep(cvfem_range_split(0, d.nnodes, 1, cvfem_thread_index(), cvfem_n_threads()), d.node_vol.data(), sscvfem_transient_diag_weight(d, rho), rho, dir, jv);
+    }
 }
 
 // The control residual, end to end. The body force and the transient term are post-passes over
@@ -916,8 +922,11 @@ inline void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scal
     // Zeroed here, not in the sweep: the sweep is range-driven and runs once per thread.
     const ptrdiff_t ndof = d.nnodes * CVFEM_HEX8_N_FIELDS;
     for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
-    #pragma omp parallel
-        sscvfem_residual_naive_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
+    {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+        CVFEM_TRACE_SCOPE("sscvfem::residual_naive_sweep");
+        #pragma omp parallel
+            sscvfem_residual_naive_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
+    }
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
 }
@@ -1068,11 +1077,14 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
 inline void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                      std::vector<scalar_t> &diag) {
     diag.assign((size_t)d.nnodes * 16, scalar_t(0));
-    #pragma omp parallel
-        sscvfem_block_diag_naive_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level,
-                                   d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
-                                   d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(),
-                                   sscvfem_rc_config(d), rho, mu, diag.data());
+    {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+        CVFEM_TRACE_SCOPE("sscvfem::block_diag_naive_sweep");
+        #pragma omp parallel
+            sscvfem_block_diag_naive_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level,
+                                       d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
+                                       d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(),
+                                       sscvfem_rc_config(d), rho, mu, diag.data());
+    }
 }
 
 // The block diagonal, end to end. This is the front-end side: it owns the allocation, makes
@@ -1081,8 +1093,11 @@ inline void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t rho, const sc
 inline void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                std::vector<scalar_t> &diag) {
     diag.assign((size_t)d.nnodes * 16, scalar_t(0));
-    #pragma omp parallel
-        sscvfem_block_diag_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage16.empty() ? nullptr : d.scatter->stage16.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, diag.data());
+    {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+        CVFEM_TRACE_SCOPE("sscvfem::block_diag_sweep");
+        #pragma omp parallel
+            sscvfem_block_diag_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage16.empty() ? nullptr : d.scatter->stage16.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, diag.data());
+    }
     // The element pass has joined, so the staging slots are all written: now each shared node
     // sums the ones that belong to it, in slot order.
     if (d.scatter && d.scatter->ready) {

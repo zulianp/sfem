@@ -116,10 +116,21 @@ int main(int argc, char **argv) {
             sscvfem_nodal_p_grad(d);
 
             std::vector<scalar_t> y_naive((size_t)ndof, 0), y_macro((size_t)ndof, 0), y_aff((size_t)ndof, 0);
-            #pragma omp parallel
-                sscvfem_apply_naive(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
-            sscvfem_apply_macro_local(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
-            sscvfem_apply_macro_local_affine(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
+            {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                CVFEM_TRACE_SCOPE("sscvfem::apply_naive");
+                #pragma omp parallel
+                    sscvfem_apply_naive(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
+            }
+            {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
+                #pragma omp parallel
+                    sscvfem_apply_macro_local(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+            }
+            {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_affine");
+                #pragma omp parallel
+                    sscvfem_apply_macro_local_affine(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
+            }
             std::vector<scalar_t> y_hoi((size_t)ndof, 0), y_em((size_t)ndof, 0);
             sscvfem_apply_macro_local_hoisted(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir.data(), y_hoi.data());
 #ifdef CVFEM_ENABLE_SUBPAR_EM
@@ -210,17 +221,28 @@ int main(int argc, char **argv) {
 
             const double t_naive = time_it([&] {
                 std::fill(y_naive.begin(), y_naive.end(), scalar_t(0));
-                #pragma omp parallel
-                    sscvfem_apply_naive(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
+                {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                    CVFEM_TRACE_SCOPE("sscvfem::apply_naive");
+                    #pragma omp parallel
+                        sscvfem_apply_naive(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
+                }
             });
             const double t_macro = time_it([&] {
                 std::fill(y_macro.begin(), y_macro.end(), scalar_t(0));
-                sscvfem_apply_macro_local(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
+                    #pragma omp parallel
+                        sscvfem_apply_macro_local(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                }
             });
 
             const double t_aff = time_it([&] {
                 std::fill(y_aff.begin(), y_aff.end(), scalar_t(0));
-                sscvfem_apply_macro_local_affine(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
+                {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
+                    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_affine");
+                    #pragma omp parallel
+                        sscvfem_apply_macro_local_affine(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
+                }
             });
 
             const double t_hoi = time_it([&] {

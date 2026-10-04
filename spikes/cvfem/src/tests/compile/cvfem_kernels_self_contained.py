@@ -74,6 +74,38 @@ def main():
                            f"of the tree; if a launcher needs this, the launcher belongs in "
                            f"src/frontend/staging/.")
 
+    # A RANGE-DRIVEN SWEEP MUST NOT CARRY A TRACE SCOPE.
+    #
+    # CVFEM_TRACE_SCOPE expands to a smesh::ScopedEvent whose destructor records on
+    # smesh::Tracer::instance() -- a process-wide singleton that appends with no lock. A sweep
+    # that takes a cvfem_range is entered once per thread by its launcher, so the scope is
+    # constructed and destroyed concurrently and the tracer's container races. It surfaced as one
+    # segfault in eight runs of cvfem_sshex8_agree, did not reproduce under a direct run of the
+    # same binary, and took a bisect to locate. The scope belongs in the launcher, which is also
+    # where one event per operator call is what a reader of the trace wants.
+    for src in sorted(kernels.rglob("*.hpp")):
+        text = src.read_text()
+        for m in re.finditer(r"^(?:template <[^>]*>\n)?(?:static |inline )[^;{\n]*?\b(\w+)\(",
+                             text, re.M):
+            k = text.find("(", m.end() - 1)
+            depth, j = 0, k
+            while j < len(text):
+                if text[j] == "(": depth += 1
+                elif text[j] == ")":
+                    depth -= 1
+                    if depth == 0: break
+                j += 1
+            if text[j + 1:].lstrip(" \n")[:1] != "{": continue
+            stop = text.find("\n}\n", m.start())
+            if stop < 0: continue
+            head, body = text[m.start():j + 1], text[j:stop]
+            if "cvfem_range" in re.sub(r"//[^\n]*", "", head) and "CVFEM_TRACE_SCOPE" in body:
+                ln = text[:m.start()].count("\n") + 1
+                bad.append(f"{src.relative_to(ROOT.parent)}:{ln}: {m.group(1)} takes a "
+                           f"cvfem_range and carries a CVFEM_TRACE_SCOPE. The launcher enters it "
+                           f"once per thread and the tracer is an unlocked singleton; put the "
+                           f"scope in the launcher.")
+
     # EVERY SHELL TEST CTEST RUNS DIRECTLY MUST BE EXECUTABLE IN THE INDEX, NOT JUST ON DISK.
     #
     # CMake registers these as `COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/<script>`, so a script

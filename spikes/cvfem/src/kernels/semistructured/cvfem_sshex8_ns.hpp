@@ -697,7 +697,6 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                               const scalar_t *const SFEM_RESTRICT dir,
                                               scalar_t *const SFEM_RESTRICT       jv) {
-    CVFEM_TRACE_SCOPE("sscvfem::apply_naive");
     const int L = level;
     int       off[8];
     sscvfem_corner_offsets(L, off);
@@ -774,6 +773,9 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(
 // against constant offsets into contiguous local buffers, scatter once at the end.
 
 inline SFEM_NOINLINE void sscvfem_apply_macro_local(
+        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
+        // sweep and what arrives is a range, so the sweep owns no parallel region.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t box_lx,
         const scalar_t box_ly,
@@ -781,7 +783,6 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
         idx_t **const SFEM_RESTRICT elems,
         const int level,
         const uint8_t *const SFEM_RESTRICT macro_curved,
-        const ptrdiff_t nmacro,
         const int nxe_src,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx_src,
@@ -795,13 +796,11 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                     const scalar_t *const SFEM_RESTRICT dir,
                                                     scalar_t *const SFEM_RESTRICT       jv) {
-    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
     const int L   = level;
     const int nxe = nxe_src;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
-#pragma omp parallel
     {
         // One allocation per thread for the whole sweep, not per macro-element.
         // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
@@ -826,8 +825,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
         idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
         idx_t *const SFEM_RESTRICT lg = _arena6;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < nmacro; ++e) {
+        for (ptrdiff_t e = r.begin; e < r.end; ++e) {
             // Gather once. This is the only indirection in the sweep.
             for (int a = 0; a < nxe; ++a) {
                 const idx_t g = elems[a][e];
@@ -938,6 +936,9 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
 // is compared against the hoisted value, so a curved macro-element fails loudly rather
 // than silently returning a wrong operator.
 inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
+        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
+        // sweep and what arrives is a range, so the sweep owns no parallel region.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t box_lx,
         const scalar_t box_ly,
@@ -945,7 +946,6 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
         idx_t **const SFEM_RESTRICT elems,
         const int level,
         const uint8_t *const SFEM_RESTRICT macro_curved,
-        const ptrdiff_t nmacro,
         const int nxe_src,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx_src,
@@ -959,13 +959,11 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                            const scalar_t *const SFEM_RESTRICT dir,
                                                            scalar_t *const SFEM_RESTRICT       jv) {
-    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_affine");
     const int L   = level;
     const int nxe = nxe_src;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
-#pragma omp parallel
     {
         // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
         // shared between them because only one is live inside a parallel region and
@@ -989,8 +987,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
         idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
         idx_t *const SFEM_RESTRICT lg = _arena6;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < nmacro; ++e) {
+        for (ptrdiff_t e = r.begin; e < r.end; ++e) {
             for (int a = 0; a < nxe; ++a) {
                 const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
@@ -2060,7 +2057,6 @@ inline void sscvfem_apply_transient_sweep(
         const scalar_t *const SFEM_RESTRICT uy,
         const scalar_t *const SFEM_RESTRICT uz, const scalar_t rho, const BdfCoeffs c,
                                           scalar_t *const SFEM_RESTRICT res) {
-    CVFEM_TRACE_SCOPE("sscvfem::apply_transient_sweep");
     const bool      two = c.order >= 2;
     const scalar_t  a0 = c.a0, a1 = c.a1, a2 = c.a2;
     const scalar_t inv = scalar_t(1) / dt;
@@ -2083,7 +2079,6 @@ inline void sscvfem_apply_transient_action_sweep(
         const scalar_t transient_w, const scalar_t rho,
                                                  const scalar_t *const SFEM_RESTRICT dir,
                                                  scalar_t *const SFEM_RESTRICT       jv) {
-    CVFEM_TRACE_SCOPE("sscvfem::apply_transient_action_sweep");
     const scalar_t a = transient_w;
     for (ptrdiff_t i = r.begin; i < r.end; ++i) {
         const scalar_t w = a * node_vol[(size_t)i];
@@ -2115,7 +2110,6 @@ inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(
         const scalar_t *const SFEM_RESTRICT uz_src,
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                  scalar_t *const SFEM_RESTRICT res) {
-    CVFEM_TRACE_SCOPE("sscvfem::residual_naive_sweep");
     // The destination arrives ZEROED. It used to be zeroed here, which was correct while this
     // sweep owned its parallel region and ran once; driven by a range it runs once per thread,
     // and every thread would re-zero the whole array -- over the contributions the others had
@@ -2431,7 +2425,6 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive_sweep(
         const scalar_t *const SFEM_RESTRICT uz_src,
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                    scalar_t *const SFEM_RESTRICT out) {
-    CVFEM_TRACE_SCOPE("sscvfem::block_diag_naive_sweep");
 
     const int L = level;
     int       off[8];
@@ -2677,7 +2670,6 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
         scalar_t *const SFEM_RESTRICT stage16,
         const ptrdiff_t n_shared, const scalar_t rho, const scalar_t mu,
                                              scalar_t *const SFEM_RESTRICT out) {
-    CVFEM_TRACE_SCOPE("sscvfem::block_diag_sweep");
 
     const int L   = level;
     const int nxe = nxe_src;
