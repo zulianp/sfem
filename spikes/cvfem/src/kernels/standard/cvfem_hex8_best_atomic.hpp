@@ -1411,6 +1411,11 @@ static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
 }
 
 static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
+                                              // Which optional terms are on, resolved once per
+                                              // solve by the caller rather than per sweep here:
+                                              // cvfem_hex8_extras_of reads the mesh, which this
+                                              // kernel is not meant to name.
+                                              const Hex8Extras &opt,
                                                         const scalar_t        rho,
                                                         const scalar_t        mu,
                                                         scalar_t *const SFEM_RESTRICT diag) {
@@ -1418,7 +1423,6 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
     // which is an allocation inside a kernel -- and a kernel that allocates cannot be handed a
     // device buffer or a sub-range. The caller sizes and zeroes it.
     scalar_t *const SFEM_RESTRICT values = diag;
-    const Hex8Extras              opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
