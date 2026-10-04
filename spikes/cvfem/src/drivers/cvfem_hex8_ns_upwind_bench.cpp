@@ -1411,7 +1411,7 @@ int main(int argc, char **argv) {
             precompute_element_bsr_slots(d, bsr);
             jac_linear.assign((size_t)(bsr.nnz * 16), scalar_t(0));
             if (geom_kind == GeomKind::Isoparam)
-                assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear.data());
+                assemble_jacobian_atomic_linear_isoparam(d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), mu, jac_linear.data());
             else
                 assemble_jacobian_atomic_linear(d.adj_ptr, d.det_ptr, d.nelements, bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), mu, jac_linear.data());
         }
@@ -2358,7 +2358,7 @@ int main(int argc, char **argv) {
             scalar_t              fmax = 0;
             for (scalar_t v : full) fmax = std::max(fmax, std::fabs(v));
             jac_linear.assign((size_t)(bsr.nnz * 16), scalar_t(0));
-            assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear.data());
+            assemble_jacobian_atomic_linear_isoparam(d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), mu, jac_linear.data());
             assemble_jacobian_atomic_nonlinear_isoparam(d, cvfem_hex8_extras_of(d), bsr, rho, mu, jac_linear.data());
             if (boundary)
                 assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, 1);

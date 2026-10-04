@@ -1217,21 +1217,29 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
 // iterations even though the geometry is rebuilt at each sub-control surface. The two
 // halves are selected out of one kernel body by the Part parameter, so linear +
 // nonlinear reproduces the full assembly by construction.
-static SFEM_NOINLINE void assemble_jacobian_atomic_linear_isoparam(MeshData             &d,
-                                                                   BSR4                 &b,
+static SFEM_NOINLINE void assemble_jacobian_atomic_linear_isoparam(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+                                                                   
+        const count_t *const SFEM_RESTRICT slots,
                                                                    const scalar_t        mu,
                                                                    scalar_t *const SFEM_RESTRICT linear) {
     // The buffer arrives sized. It used to be a std::vector& that this sweep called .assign() on,
     // which is an allocation inside a kernel -- and a kernel that allocates cannot be handed a
     // device buffer or a sub-range. The caller sizes and zeroes it.
     scalar_t *const SFEM_RESTRICT             values = linear;
-    const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nelements; ++e) {
+    for (ptrdiff_t e = 0; e < nelements; ++e) {
         scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-        gather_element_coords(d.elems, d.points, e, x, y, z);
-        gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux, uy, uz, p);
+        gather_element_coords(mesh_elems, points, e, x, y, z);
+        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true, CVFEM_HEX8_PART_LINEAR>(
                 scalar_t(0), mu, x, y, z, ux, uy, uz, slots + (size_t)e * 64, values);
         (void)p;
