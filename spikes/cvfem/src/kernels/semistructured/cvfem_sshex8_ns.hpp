@@ -1283,6 +1283,9 @@ static SFEM_INLINE void sscvfem_action_hoisted(const scalar_t rho, const scalar_
 }
 
 inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
+        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
+        // sweep and what arrives is a range, so the sweep owns no parallel region.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t box_lx,
         const scalar_t box_ly,
@@ -1298,7 +1301,6 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         const uint8_t *const SFEM_RESTRICT natural_mask,
         const uint8_t *const SFEM_RESTRICT pressure_mask,
         const uint8_t *const SFEM_RESTRICT traction_mask,
-        const ptrdiff_t nmacro,
         const int nxe_src,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx_src,
@@ -1323,14 +1325,12 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         const ptrdiff_t n_shared, const scalar_t rho, const scalar_t mu,
                                                             const scalar_t *const SFEM_RESTRICT dir,
                                                             scalar_t *const SFEM_RESTRICT       jv) {
-    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_hoisted");
     const int L   = level;
     const int nxe = nxe_src;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
 
-#pragma omp parallel
     {
         // Whether the direction's pressure gradient is there at all. Above the scratch because
         // the scratch is sized from it.
@@ -1360,8 +1360,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
         idx_t *const SFEM_RESTRICT lg = _arena6;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < nmacro; ++e) {
+        for (ptrdiff_t e = r.begin; e < r.end; ++e) {
             for (int a = 0; a < nxe; ++a) {
                 const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
@@ -1478,7 +1477,8 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         }
     }
 
-    if (slot) sscvfem_reduce_shared(red_idx, red_ptr, shared_node, const_cast<scalar_t *>(stage), n_shared, jv);
+    // The shared reduction is the caller's: a second, independent loop over the reduction
+    // rows, run after this sweep's threads have joined. See sscvfem_drain_shared.
 }
 
 // ---------------------------------------------------------------------------
