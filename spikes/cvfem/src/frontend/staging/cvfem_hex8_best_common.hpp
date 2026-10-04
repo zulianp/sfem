@@ -83,6 +83,7 @@ using geom_t  = smesh::geom_t;
 // first. Putting this at the top of the file breaks that contract, and the error it produces --
 // "use of undeclared identifier 'scalar_t'" from inside the microkernel header -- points at the
 // kernel rather than at the include that was too early.
+#include "kernels/cvfem_bdf.hpp"
 #include "kernels/cvfem_hex8_flags.hpp"
 #include "kernels/cvfem_kernel_kind.hpp"  // KernelKind
 #include "kernels/cvfem_scatter.hpp"      // atomic_add, find_bsr_slot, reset_residual, MIN
@@ -701,38 +702,11 @@ static void build_node_volume(const MeshData &d, std::vector<scalar_t> &node_vol
     }
 }
 
-// BDF1/BDF2 coefficients for r += rho V (a0 u^{n+1} + a1 u^n + a2 u^{n-1}) / dt. BDF2 needs
-// two history levels, so a run that has only one falls back to BDF1 -- the standard
-// start-up, signalled by leaving u_prev2 empty.
-struct BdfCoeffs {
-    scalar_t a0, a1, a2;
-    int      order;
-};
-
+// The staging read for the BDF coefficients. The rule is in kernels/cvfem_bdf.hpp;
+// what belongs here is which members hold the step sizes and the history.
 static BdfCoeffs bdf_coeffs(const MeshData &d) {
-    const bool have_two = d.bdf_order >= 2 && (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes;
-    if (!have_two) return {scalar_t(1), scalar_t(-1), scalar_t(0), 1};
-
-    // BDF2 on a VARIABLE step. With w = dt / dt_prev,
-    //
-    //     a0 = (1 + 2w)/(1 + w),   a1 = -(1 + w),   a2 = w^2/(1 + w)
-    //
-    // which is {3/2, -2, 1/2} at w = 1 and reduces to it exactly, so a run that never changes
-    // its step is bit-for-bit what it was. dt_prev <= 0 means nothing has recorded a previous
-    // step -- a fresh run, a coarse level built by clone_onto, any caller that does not adapt
-    // -- and those take the uniform branch rather than a guess.
-    //
-    // The guard matters more than the formula. Using {3/2, -2, 1/2} after the step size has
-    // changed is not an approximation, it is the wrong scheme: the truncation error stops
-    // cancelling and BDF2 silently becomes first order while still reporting itself as second.
-    if (d.dt_prev > scalar_t(0) && d.dt > scalar_t(0)) {
-        const scalar_t w = d.dt / d.dt_prev;
-        if (w != scalar_t(1)) {
-            const scalar_t den = scalar_t(1) + w;
-            return {(scalar_t(1) + scalar_t(2) * w) / den, -den, w * w / den, 2};
-        }
-    }
-    return {scalar_t(1.5), scalar_t(-2), scalar_t(0.5), 2};
+    return cvfem_bdf_coeffs(d.bdf_order, d.dt, d.dt_prev,
+                            (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes);
 }
 
 static SFEM_NOINLINE void apply_transient_pass(MeshData &d, const scalar_t rho) {

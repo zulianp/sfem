@@ -2693,23 +2693,12 @@ inline void sscvfem_apply_transient(SSMeshData &d, const scalar_t rho, scalar_t 
     if (d.dt <= scalar_t(0)) return;
     if ((ptrdiff_t)d.u_prev.size() != 3 * d.nnodes) return;
     if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
-    const bool     two = d.bdf_order >= 2 && (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes;
-    // Variable-step BDF2 when a previous step size has been recorded; see bdf_coeffs in the
-    // flat core for the derivation and for why using the uniform coefficients after the step
-    // changes is the wrong scheme rather than an approximation. w = 1 and dt_prev = 0 both
-    // reduce to {3/2, -2, 1/2} exactly, so nothing that does not adapt moves.
-    scalar_t a0 = two ? scalar_t(1.5) : scalar_t(1);
-    scalar_t a1 = two ? scalar_t(-2) : scalar_t(-1);
-    scalar_t a2 = two ? scalar_t(0.5) : scalar_t(0);
-    if (two && d.dt_prev > scalar_t(0)) {
-        const scalar_t w = d.dt / d.dt_prev;
-        if (w != scalar_t(1)) {
-            const scalar_t den = scalar_t(1) + w;
-            a0 = (scalar_t(1) + scalar_t(2) * w) / den;
-            a1 = -den;
-            a2 = w * w / den;
-        }
-    }
+    // The same rule the flat families use, from kernels/cvfem_bdf.hpp. It was inlined here, a
+    // third copy of coefficients that two other sites already derived identically.
+    const BdfCoeffs c   = cvfem_bdf_coeffs(d.bdf_order, d.dt, d.dt_prev,
+                                           (ptrdiff_t)d.u_prev2.size() == 3 * d.nnodes);
+    const bool      two = c.order >= 2;
+    const scalar_t  a0 = c.a0, a1 = c.a1, a2 = c.a2;
     const scalar_t inv = scalar_t(1) / d.dt;
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
@@ -3361,27 +3350,57 @@ static SFEM_NOINLINE void sscvfem_block_diag_curved_macro(
 // The transient term's diagonal: rho V a0 / dt on each velocity component, nothing on
 // pressure. A post-pass over nodes rather than part of the macro-element sweep, for the same
 // reason sscvfem_apply_transient is one, so the two stay consistent by construction.
-inline void sscvfem_block_diag_transient(SSMeshData &d, const scalar_t rho,
+inline void sscvfem_block_diag_transient(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT node_vol,
+        const scalar_t transient_w, const scalar_t rho,
                                          scalar_t *const SFEM_RESTRICT out) {
-    const scalar_t a = sscvfem_transient_diag_weight(d, rho);
+    const scalar_t a = transient_w;
     if (a == scalar_t(0)) return;
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        const scalar_t w = a * d.node_vol[(size_t)i];
+    for (ptrdiff_t i = 0; i < nnodes; ++i) {
+        const scalar_t w = a * node_vol[(size_t)i];
         for (int c = 0; c < 3; ++c) out[(size_t)i * 16 + (size_t)c * 4 + (size_t)c] += w;
     }
 }
 
-inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const scalar_t bc_p,
+        const scalar_t bc_tx,
+        const scalar_t bc_ty,
+        const scalar_t bc_tz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT macro_curved,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const uint8_t *const SFEM_RESTRICT natural_mask,
+        const uint8_t *const SFEM_RESTRICT pressure_mask,
+        const uint8_t *const SFEM_RESTRICT traction_mask,
+        const ptrdiff_t nmacro,
+        const int nxe_src,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        const Hex8RcConfig rcfg,
+        const SSScatter *const sc, const scalar_t rho, const scalar_t mu,
                                              scalar_t *const SFEM_RESTRICT out) {
     SFEM_TRACE_SCOPE("sscvfem::block_diag");
 
-    const int L   = d.level;
-    const int nxe = d.nxe;
+    const int L   = level;
+    const int nxe = nxe_src;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
-    const SSScatter *const sc = d.scatter ? d.scatter.get() : nullptr;
 
 #pragma omp parallel
     {
@@ -3392,20 +3411,20 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(SSMe
         std::vector<scalar_t>     lout((size_t)nxe * 16);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+        for (ptrdiff_t e = 0; e < nmacro; ++e) {
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = d.elems[a][e];
+                const smesh::idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
-                lx[(size_t)a]        = (scalar_t)d.points[0][g];
-                ly[(size_t)a]        = (scalar_t)d.points[1][g];
-                lz[(size_t)a]        = (scalar_t)d.points[2][g];
-                lux[(size_t)a]       = d.ux[(size_t)g];
-                luy[(size_t)a]       = d.uy[(size_t)g];
-                luz[(size_t)a]       = d.uz[(size_t)g];
-                lp[(size_t)a]        = d.p[(size_t)g];
-                lpgx[(size_t)a]      = d.pgx[(size_t)g];
-                lpgy[(size_t)a]      = d.pgy[(size_t)g];
-                lpgz[(size_t)a]      = d.pgz[(size_t)g];
+                lx[(size_t)a]        = (scalar_t)points[0][g];
+                ly[(size_t)a]        = (scalar_t)points[1][g];
+                lz[(size_t)a]        = (scalar_t)points[2][g];
+                lux[(size_t)a]       = ux[(size_t)g];
+                luy[(size_t)a]       = uy[(size_t)g];
+                luz[(size_t)a]       = uz[(size_t)g];
+                lp[(size_t)a]        = pres[(size_t)g];
+                lpgx[(size_t)a]      = pgx[(size_t)g];
+                lpgy[(size_t)a]      = pgy[(size_t)g];
+                lpgz[(size_t)a]      = pgz[(size_t)g];
             }
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
@@ -3438,15 +3457,15 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(SSMe
                 sscvfem_micro_geom(c0x, c0y, c0z, madj, &mdet);
             }
 
-            if (sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e)) {
-                sscvfem_block_diag_curved_macro(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.level, d.macro_face_mask.data(), d.macro_natural_mask.data(), d.macro_pressure_mask.data(), d.macro_traction_mask.data(), sscvfem_rc_config(d), rho, mu, e, off, lx.data(), ly.data(), lz.data(), lux.data(),
+            if (sscvfem_macro_curved(macro_curved, e)) {
+                sscvfem_block_diag_curved_macro(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz, level, face_mask, natural_mask, pressure_mask, traction_mask, rcfg, rho, mu, e, off, lx.data(), ly.data(), lz.data(), lux.data(),
                                                 luy.data(), luz.data(), lp.data(), lpgx.data(), lpgy.data(),
                                                 lpgz.data(), lout.data());
             } else {
                 for (int zi = 0; zi < L; ++zi)
                     for (int yi = 0; yi < L; ++yi)
                         for (int xi = 0; xi < L; ++xi)
-                            sscvfem_block_diag_cell(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.data(), d.macro_traction_mask.data(), sscvfem_rc_config(d), rho, mu, e, L, xi, yi, zi, off, lx.data(), ly.data(),
+                            sscvfem_block_diag_cell(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz, face_mask, natural_mask, pressure_mask, traction_mask, rcfg, rho, mu, e, L, xi, yi, zi, off, lx.data(), ly.data(),
                                                     lz.data(), lux.data(), luy.data(), luz.data(), lp.data(),
                                                     lpgx.data(), lpgy.data(), lpgz.data(), madj, mdet, c0x, c0y,
                                                     c0z, lout.data());
@@ -3473,13 +3492,13 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(SSMe
 inline void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                std::vector<scalar_t> &diag) {
     diag.assign((size_t)d.nnodes * 16, scalar_t(0));
-    sscvfem_block_diag_sweep(d, rho, mu, diag.data());
+    sscvfem_block_diag_sweep(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.data(), d.macro_face_mask.data(), d.macro_natural_mask.data(), d.macro_pressure_mask.data(), d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, diag.data());
     // The node volume is built only when the transient pass will read it, which is what the
     // guard inside the sweep used to do: on a steady solve the weight is zero and
     // sscvfem_node_volume is a full sweep over the macro elements for nothing.
     if (sscvfem_transient_diag_weight(d, rho) != scalar_t(0)) {
         if ((ptrdiff_t)d.node_vol.size() != d.nnodes) sscvfem_node_volume(d, d.node_vol);
-        sscvfem_block_diag_transient(d, rho, diag.data());
+        sscvfem_block_diag_transient(d.nnodes, d.node_vol.data(), sscvfem_transient_diag_weight(d, rho), rho, diag.data());
     }
 }
 
