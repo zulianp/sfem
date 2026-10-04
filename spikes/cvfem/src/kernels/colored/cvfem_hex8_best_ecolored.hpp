@@ -322,7 +322,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         const idx_t                  g  = mesh_elems[a][e];
-                        const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
+                        const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS;
                         u_pack.ux[a][lane]                     = ux[g];
                         u_pack.uy[a][lane]                     = uy[g];
                         u_pack.uz[a][lane]                     = uz[g];
@@ -403,10 +403,10 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                     const idx_t g = mesh_elems[a][e];
-                    jv[g * N_FIELDS + 0] += outp.rx[a][lane];
-                    jv[g * N_FIELDS + 1] += outp.ry[a][lane];
-                    jv[g * N_FIELDS + 2] += outp.rz[a][lane];
-                    jv[g * N_FIELDS + 3] += outp.rc[a][lane];
+                    jv[g * CVFEM_HEX8_N_FIELDS + 0] += outp.rx[a][lane];
+                    jv[g * CVFEM_HEX8_N_FIELDS + 1] += outp.ry[a][lane];
+                    jv[g * CVFEM_HEX8_N_FIELDS + 2] += outp.rz[a][lane];
+                    jv[g * CVFEM_HEX8_N_FIELDS + 3] += outp.rc[a][lane];
                 }
             }
     }
@@ -422,7 +422,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored(MeshData              &
                                                          const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
                                                          const int             limiter  = 0,
                                                          const scalar_t        venkat_c = scalar_t(0)) {
-    cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
+    cvfem_zero_scalars(jv, d.nnodes * CVFEM_HEX8_N_FIELDS);
     const Hex8Extras opt = cvfem_hex8_extras_of(d);
     const bool       has_qg  = opt.with_qg;
     const bool       with_ho = ugrad != nullptr && vgrad != nullptr;

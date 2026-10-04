@@ -234,7 +234,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
             for (ptrdiff_t e = e_start; e < e_end; ++e) {
                 scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * N_FIELDS;
+                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * CVFEM_HEX8_N_FIELDS;
                     ux_e[a]                               = u[0];
                     uy_e[a]                               = u[1];
                     uz_e[a]                               = u[2];

@@ -17,6 +17,10 @@
 #include <cstdint>
 #include <cstdlib>
 
+// CVFEM_HEX8_N_FIELDS, which the scratch sizings multiply by. It replaced a bare N_FIELDS that
+// each operator family declared for itself -- the microkernels already own the constant.
+#include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+
 using pack_idx_t = uint16_t;
 
 // Per-thread scratch arena, CVFEM_PACK_SCRATCH_SLOTS slots, grown on demand and never shrunk.
@@ -48,7 +52,7 @@ static T *thread_scratch(const int slot, const size_t n) {
 
 static SFEM_INLINE size_t packed_scratch_n(const ptrdiff_t max_actual_nodes_per_pack) {
     const ptrdiff_t n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
-    return (size_t)N_FIELDS * (size_t)n;
+    return (size_t)CVFEM_HEX8_N_FIELDS * (size_t)n;
 }
 
 // THEY TAKE THE COUNT, NOT THE STAGING OBJECT. DESIGN.md requires src/kernels/ to name no

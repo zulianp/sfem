@@ -48,7 +48,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
                                                        const int             limiter = 0,
                                                        const scalar_t        venkat_c = scalar_t(0)) {
     const bool with_ho = ugrad != nullptr && vgrad != nullptr;
-    cvfem_zero_scalars(jv, nnodes * N_FIELDS);
+    cvfem_zero_scalars(jv, nnodes * CVFEM_HEX8_N_FIELDS);
 
 
 #pragma omp parallel for schedule(static)
@@ -70,7 +70,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
         }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const idx_t g         = mesh_elems[a][e];
-            const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
+            const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS;
             vx[a]                            = dv[0];
             vy[a]                            = dv[1];
             vz[a]                            = dv[2];
@@ -136,10 +136,10 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
         }
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const idx_t g = mesh_elems[a][e];
-            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
-            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 1, 0, r[a * 4 + 1]);
-            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 2, 0, r[a * 4 + 2]);
-            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 3, 0, r[a * 4 + 3]);
+            atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 0, 0, r[a * 4 + 0]);
+            atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 1, 0, r[a * 4 + 1]);
+            atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 2, 0, r[a * 4 + 2]);
+            atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 3, 0, r[a * 4 + 3]);
         }
     }
 }
@@ -186,7 +186,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
                                                             const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
                                                             const int             limiter  = 0,
                                                             const scalar_t        venkat_c = scalar_t(0)) {
-    cvfem_zero_scalars(jv, nnodes * N_FIELDS);
+    cvfem_zero_scalars(jv, nnodes * CVFEM_HEX8_N_FIELDS);
     const bool       has_qg  = opt.with_qg;
     const bool       with_ho = ugrad != nullptr && vgrad != nullptr;
     // The per-surface Rhie-Chow coefficient is hoisted out of the face loops, so it has to be
@@ -219,7 +219,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         const idx_t                  g  = mesh_elems[a][e];
-                        const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
+                        const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS;
                         u_pack.ux[a][lane]                     = ux[g];
                         u_pack.uy[a][lane]                     = uy[g];
                         u_pack.uz[a][lane]                     = uz[g];
@@ -300,10 +300,10 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                     const idx_t g = mesh_elems[a][e];
-                    atomic_add(jv, (idx_t)(g * N_FIELDS + 0), outp.rx[a][lane]);
-                    atomic_add(jv, (idx_t)(g * N_FIELDS + 1), outp.ry[a][lane]);
-                    atomic_add(jv, (idx_t)(g * N_FIELDS + 2), outp.rz[a][lane]);
-                    atomic_add(jv, (idx_t)(g * N_FIELDS + 3), outp.rc[a][lane]);
+                    atomic_add(jv, (idx_t)(g * CVFEM_HEX8_N_FIELDS + 0), outp.rx[a][lane]);
+                    atomic_add(jv, (idx_t)(g * CVFEM_HEX8_N_FIELDS + 1), outp.ry[a][lane]);
+                    atomic_add(jv, (idx_t)(g * CVFEM_HEX8_N_FIELDS + 2), outp.rz[a][lane]);
+                    atomic_add(jv, (idx_t)(g * CVFEM_HEX8_N_FIELDS + 3), outp.rc[a][lane]);
                 }
             }
         }
@@ -338,7 +338,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(
                                                                 const scalar_t        mu,
                                                                 const scalar_t *const dir,
                                                                 scalar_t *const       jv) {
-    cvfem_zero_scalars(jv, nnodes * N_FIELDS);
+    cvfem_zero_scalars(jv, nnodes * CVFEM_HEX8_N_FIELDS);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < nelements; ++e) {
@@ -349,7 +349,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(
         gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const idx_t                  g  = mesh_elems[a][e];
-            const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
+            const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS;
             vx[a]                                  = dv[0];
             vy[a]                                  = dv[1];
             vz[a]                                  = dv[2];
@@ -359,10 +359,10 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(
                                                       ex.rc, p);
         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
             const idx_t g = mesh_elems[a][e];
-            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 0, 0, r[a * 4 + 0]);
-            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 1, 0, r[a * 4 + 1]);
-            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 2, 0, r[a * 4 + 2]);
-            atomic_add(jv + (ptrdiff_t)g * N_FIELDS + 3, 0, r[a * 4 + 3]);
+            atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 0, 0, r[a * 4 + 0]);
+            atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 1, 0, r[a * 4 + 1]);
+            atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 2, 0, r[a * 4 + 2]);
+            atomic_add(jv + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + 3, 0, r[a * 4 + 3]);
         }
     }
 }

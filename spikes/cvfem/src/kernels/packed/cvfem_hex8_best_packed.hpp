@@ -226,7 +226,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
             const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = ghost_ptr[pack];
 
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, n_contiguous, n_ghost, ghosts, pack_x,
@@ -248,7 +248,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
                 // Fields come from the PACK -- read once per pack node, contiguously for the
                 // owned majority, which is the layout's advantage.
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * N_FIELDS;
+                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * CVFEM_HEX8_N_FIELDS;
                     ux_e[a] = u[0]; uy_e[a] = u[1]; uz_e[a] = u[2]; p_e[a] = u[3];
                 }
                 // The Rhie-Chow inputs come through the shared scratch, exactly as the atomic
@@ -277,7 +277,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
                                                       limiter, venkat_c, nullptr);
 
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    scalar_t *const SFEM_RESTRICT out = pack_out + (ptrdiff_t)pack_elems[a][e] * N_FIELDS;
+                    scalar_t *const SFEM_RESTRICT out = pack_out + (ptrdiff_t)pack_elems[a][e] * CVFEM_HEX8_N_FIELDS;
                     out[0] += r[a * 4 + 0];
                     out[1] += r[a * 4 + 1];
                     out[2] += r[a * 4 + 2];
@@ -286,7 +286,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
             }
 
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + k * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT out = pack_out + k * CVFEM_HEX8_N_FIELDS;
                 const ptrdiff_t                     g   = owned + k;
                 rx[g] = out[0]; ry[g] = out[1]; rz[g] = out[2]; rc[g] = out[3];
             }
@@ -295,7 +295,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar_range(
             scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
                 gx[ghost_off + k] = out[0]; gy[ghost_off + k] = out[1];
                 gz[ghost_off + k] = out[2]; gc[ghost_off + k] = out[3];
             }
@@ -323,13 +323,13 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
     apply_residual_packed_defcor_scalar_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
             d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, opt, with_rc);
 
-    scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
+    scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
         const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
-        for (int f = 0; f < N_FIELDS; ++f) {
+        for (int f = 0; f < CVFEM_HEX8_N_FIELDS; ++f) {
             const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + (ptrdiff_t)f * p.n_ghost_entries;
             scalar_t                            sum   = 0;
             for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
@@ -411,7 +411,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
             const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = ghost_ptr[pack];
 
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, n_contiguous, n_ghost, ghosts, pack_x,
@@ -496,7 +496,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + k * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT out = pack_out + k * CVFEM_HEX8_N_FIELDS;
                 const ptrdiff_t                     g   = owned + k;
                 rx[g] = out[0]; ry[g] = out[1]; rz[g] = out[2]; rc[g] = out[3];
             }
@@ -505,7 +505,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
             scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
                 gx[ghost_off + k] = out[0]; gy[ghost_off + k] = out[1];
                 gz[ghost_off + k] = out[2]; gc[ghost_off + k] = out[3];
             }
@@ -557,13 +557,13 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
             d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, sympy, rx, ry, rz, rc, scratch_n, with_rc,
             cvfem_hex8_rc_config_for(d));
 
-    scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
+    scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
         const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
-        for (int f = 0; f < N_FIELDS; ++f) {
+        for (int f = 0; f < CVFEM_HEX8_N_FIELDS; ++f) {
             const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + (ptrdiff_t)f * p.n_ghost_entries;
             scalar_t                            sum   = 0;
             for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
@@ -643,7 +643,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
             const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
             const ptrdiff_t                         ghost_off    = ghost_ptr[pack];
 
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
 
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
@@ -702,7 +702,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                 for (ptrdiff_t e = e_start; e < e_end; ++e) {
                     scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8], r[CVFEM_HEX8_N_DOF];
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * N_FIELDS;
+                        const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * CVFEM_HEX8_N_FIELDS;
                         ux_e[a]                              = u[0];
                         uy_e[a]                              = u[1];
                         uz_e[a]                              = u[2];
@@ -716,7 +716,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                         cvfem_hex8_ns_upwind_residual(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r);
 
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        scalar_t *const SFEM_RESTRICT out = pack_out + (ptrdiff_t)pack_elems[a][e] * N_FIELDS;
+                        scalar_t *const SFEM_RESTRICT out = pack_out + (ptrdiff_t)pack_elems[a][e] * CVFEM_HEX8_N_FIELDS;
                         out[0] += r[a * 4 + 0];
                         out[1] += r[a * 4 + 1];
                         out[2] += r[a * 4 + 2];
@@ -726,7 +726,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
             }
 
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + k * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT out = pack_out + k * CVFEM_HEX8_N_FIELDS;
                 const ptrdiff_t                     g   = owned + k;
                 rx[g]                                   = out[0];
                 ry[g]                                   = out[1];
@@ -739,7 +739,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
             scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
                 gx[ghost_off + k]                       = out[0];
                 gy[ghost_off + k]                       = out[1];
                 gz[ghost_off + k]                       = out[2];
@@ -775,13 +775,13 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
     apply_residual_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
             d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, kernel_kind, rx, ry, rz, rc, scratch_n, with_rc);
 
-    scalar_t *const fields[N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
+    scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
         const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
-        for (int f = 0; f < N_FIELDS; ++f) {
+        for (int f = 0; f < CVFEM_HEX8_N_FIELDS; ++f) {
             const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + f * p.n_ghost_entries;
             scalar_t                            sum   = 0;
             for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
@@ -892,7 +892,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
             for (ptrdiff_t e = e_start; e < e_end; ++e) {
                 scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * N_FIELDS;
+                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * CVFEM_HEX8_N_FIELDS;
                     ux_e[a]                              = u[0];
                     uy_e[a]                              = u[1];
                     uz_e[a]                              = u[2];
@@ -1120,7 +1120,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
             const ptrdiff_t                         ghost_off    = ghost_ptr[pack];
 
             CVFEM_PHASE_CLOCK(_t);
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
             CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
 
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
@@ -1244,14 +1244,14 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
             }
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
-            std::memcpy(jv + owned * N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)N_FIELDS * sizeof(scalar_t));
+            std::memcpy(jv + owned * CVFEM_HEX8_N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
 
             scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
                 gx[ghost_off + k]                       = out[0];
                 gy[ghost_off + k]                       = out[1];
                 gz[ghost_off + k]                       = out[2];
@@ -1302,8 +1302,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
         const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
-        scalar_t *const    out   = jv + (ptrdiff_t)dest * N_FIELDS;
-        for (int f = 0; f < N_FIELDS; ++f) {
+        scalar_t *const    out   = jv + (ptrdiff_t)dest * CVFEM_HEX8_N_FIELDS;
+        for (int f = 0; f < CVFEM_HEX8_N_FIELDS; ++f) {
             const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + f * p.n_ghost_entries;
             scalar_t                            sum   = 0;
             for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
@@ -1399,7 +1399,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
             const ptrdiff_t                         ghost_off = ghost_ptr[pack];
 
             CVFEM_PHASE_CLOCK(_t);
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)N_FIELDS * sizeof(scalar_t));
+            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
             CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
 
             fill_pack_interleaved(owned_nodes_ptr, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
@@ -1435,13 +1435,13 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
             }
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
-            std::memcpy(jv + owned * N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)N_FIELDS * sizeof(scalar_t));
+            std::memcpy(jv + owned * CVFEM_HEX8_N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
             scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * N_FIELDS;
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
                 gx[ghost_off + k]                       = out[0];
                 gy[ghost_off + k]                       = out[1];
                 gz[ghost_off + k]                       = out[2];
@@ -1475,8 +1475,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa(MeshData             &
         const idx_t dest  = p.ghost_reduce_dest[row];
         const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
         const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
-        scalar_t *const    out   = jv + (ptrdiff_t)dest * N_FIELDS;
-        for (int f = 0; f < N_FIELDS; ++f) {
+        scalar_t *const    out   = jv + (ptrdiff_t)dest * CVFEM_HEX8_N_FIELDS;
+        for (int f = 0; f < CVFEM_HEX8_N_FIELDS; ++f) {
             const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + f * p.n_ghost_entries;
             scalar_t                            sum   = 0;
             for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
