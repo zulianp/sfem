@@ -1200,7 +1200,12 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_linear_isoparam(MeshData     
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear_isoparam(
-        MeshData &d, BSR4 &b, const scalar_t rho, const scalar_t mu,
+        MeshData &d,
+                                              // Which optional terms are on, resolved once per
+                                              // solve by the caller rather than per sweep here:
+                                              // cvfem_hex8_extras_of reads the mesh, which this
+                                              // kernel is not meant to name.
+                                              const Hex8Extras &opt, BSR4 &b, const scalar_t rho, const scalar_t mu,
         const scalar_t *const SFEM_RESTRICT linear) {
     scalar_t *const SFEM_RESTRICT             values = b.values->data();
     const count_t *const SFEM_RESTRICT slots  = b.element_slots.data();
@@ -1208,7 +1213,6 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear_isoparam(
     // Restore the constant part, then add only what the velocity changes.
     std::memcpy(values, linear, (size_t)b.nnz * 16 * sizeof(scalar_t));
 
-    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {

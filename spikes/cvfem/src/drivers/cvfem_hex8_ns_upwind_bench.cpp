@@ -1890,7 +1890,7 @@ int main(int argc, char **argv) {
             else if (layout == "packed")
                 assemble_jacobian_packed<true>(d, packed, bsr, rho, mu, kernel_kind);
             else if (kernel_kind == KernelKind::Split)
-                assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear.data());
+                assemble_jacobian_atomic_nonlinear_isoparam(d, cvfem_hex8_extras_of(d), bsr, rho, mu, jac_linear.data());
             else if (kernel_kind == KernelKind::Sympy)
                 assemble_jacobian_atomic_isoparam_sympy(d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
             else if (kernel_kind == KernelKind::Fd)
@@ -2359,7 +2359,7 @@ int main(int argc, char **argv) {
             for (scalar_t v : full) fmax = std::max(fmax, std::fabs(v));
             jac_linear.assign((size_t)(bsr.nnz * 16), scalar_t(0));
             assemble_jacobian_atomic_linear_isoparam(d, bsr, mu, jac_linear.data());
-            assemble_jacobian_atomic_nonlinear_isoparam(d, bsr, rho, mu, jac_linear.data());
+            assemble_jacobian_atomic_nonlinear_isoparam(d, cvfem_hex8_extras_of(d), bsr, rho, mu, jac_linear.data());
             if (boundary)
                 assemble_boundary_scs_jacobian_pass(d, bsr, rho, mu, 1);
             assemble_transient_diag_pass(d, rho, bsr);
