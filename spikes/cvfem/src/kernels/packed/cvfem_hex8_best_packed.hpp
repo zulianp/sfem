@@ -123,6 +123,14 @@ static void build_pack_local_crs(PackedData               &p,
             }
         }
     }
+
+    // Published after the loop above, which is the only thing that sizes them.
+    p.local_rowptr_ptr.resize((size_t)p.n_packs);
+    p.local_global_slot_ptr.resize((size_t)p.n_packs);
+    for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
+        p.local_rowptr_ptr[(size_t)pack]      = p.local_rowptr[(size_t)pack].data();
+        p.local_global_slot_ptr[(size_t)pack] = p.local_global_slot[(size_t)pack].data();
+    }
 }
 
 // The DEFERRED-CORRECTION higher-order convective flux, on the packed layout.
@@ -371,7 +379,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
             hop.venkat_c = venkat_c;
             for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
                 const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
-                gather_hex8_simd_from_pack(p.elems, pack_u, d, begin, nlanes, in,
+                gather_hex8_simd_from_pack(p.elems, pack_u, d.adj_ptr, d.det_ptr, begin, nlanes, in,
                                            cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
                 if (with_rc) {
                     cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx,
@@ -593,7 +601,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                     const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
                     gather_hex8_simd_from_pack(p.elems,
                                                pack_u,
-                                               d,
+                                               d.adj_ptr, d.det_ptr,
                                                begin,
                                                nlanes,
                                                in,
@@ -1260,7 +1268,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
                 alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE],
                         cof8[CVFEM_HEX8_VEC_SIZE];
                 alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
-                gather_hex8_simd_from_pack(p.elems, pack_dir, d, begin, nlanes, du_pack, cof0, cof1, cof2, cof3,
+                gather_hex8_simd_from_pack(p.elems, pack_dir, d.adj_ptr, d.det_ptr, begin, nlanes, du_pack, cof0, cof1, cof2, cof3,
                                            cof4, cof5, cof6, cof7, cof8, det);
                 if (with_rc) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), rc_cfg, begin, nlanes, rcp);
                 if (with_qg) {

@@ -59,6 +59,13 @@ struct PackedData {
     std::vector<std::vector<int>>                  local_rowptr;
     std::vector<std::vector<pack_idx_t>>           local_colidx;
     std::vector<std::vector<smesh::count_t>>       local_global_slot;
+    // THE SAME TWO, AS ARRAYS OF POINTERS, so that a kernel can be handed them without being
+    // handed this object. They are vectors of vectors, so there is no flat pointer into them and
+    // `local_rowptr[pack]` in a kernel would otherwise require naming PackedData. Published by
+    // build_pack_local_crs, which is the only thing that sizes the vectors behind them, exactly
+    // as MeshData publishes adj_ptr beside jacobian_adjugate.
+    std::vector<const int *>            local_rowptr_ptr;
+    std::vector<const smesh::count_t *> local_global_slot_ptr;
     std::vector<int>                               local_element_slot;
     ptrdiff_t                                      max_local_nnz{0};
     std::vector<ptrdiff_t>                         ghost_mat_ptr;

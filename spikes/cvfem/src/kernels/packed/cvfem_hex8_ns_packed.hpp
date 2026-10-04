@@ -56,7 +56,8 @@ static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const scalar_t *const *const S
 
 static SFEM_INLINE void cvfem_hex8_gather_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
                                                          const scalar_t *const SFEM_RESTRICT pack_u,
-                                                         const MeshData                     &d,
+                                                         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+                                                         const scalar_t *const SFEM_RESTRICT        det_ptr,
                                                          const ptrdiff_t                     begin,
                                                          const int                           nlanes,
                                                          Hex8InputPack                      &in,
@@ -70,7 +71,7 @@ static SFEM_INLINE void cvfem_hex8_gather_simd_from_pack(pack_idx_t **const SFEM
                                                          scalar_t *const SFEM_RESTRICT       cof7,
                                                          scalar_t *const SFEM_RESTRICT       cof8,
                                                          scalar_t *const SFEM_RESTRICT       det) {
-    cvfem_hex8_gather_adj_soa(d.adj_ptr, d.det_ptr, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+    cvfem_hex8_gather_adj_soa(adj_ptr, det_ptr, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
@@ -92,7 +93,8 @@ static SFEM_INLINE void cvfem_hex8_gather_simd_from_pack(pack_idx_t **const SFEM
 static SFEM_INLINE void cvfem_hex8_gather_action_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
                                                                 const scalar_t *const SFEM_RESTRICT pack_u,
                                                                 const scalar_t *const SFEM_RESTRICT pack_dir,
-                                                                const MeshData                     &d,
+                                                                const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+                                                                const scalar_t *const SFEM_RESTRICT        det_ptr,
                                                                 const ptrdiff_t                     begin,
                                                                 const int                           nlanes,
                                                                 Hex8InputPack                      &u,
@@ -108,7 +110,7 @@ static SFEM_INLINE void cvfem_hex8_gather_action_simd_from_pack(pack_idx_t **con
                                                                 scalar_t *const SFEM_RESTRICT       cof8,
                                                                 scalar_t *const SFEM_RESTRICT       det) {
     cvfem_hex8_gather_simd_from_pack(
-            elems, pack_u, d, begin, nlanes, u, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+            elems, pack_u, adj_ptr, det_ptr, begin, nlanes, u, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
@@ -339,7 +341,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
                 const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
                 cvfem_hex8_gather_simd_from_pack(p.elems,
                                                  pack_u,
-                                                 d,
+                                                 d.adj_ptr, d.det_ptr,
                                                  begin,
                                                  nlanes,
                                                  in,
@@ -505,7 +507,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
                 cvfem_hex8_gather_action_simd_from_pack(p.elems,
                                                         pack_u,
                                                         pack_dir,
-                                                        d,
+                                                        d.adj_ptr, d.det_ptr,
                                                         begin,
                                                         nlanes,
                                                         u_pack,

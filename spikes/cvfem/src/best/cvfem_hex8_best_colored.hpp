@@ -188,7 +188,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                         const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
                         gather_hex8_simd_from_pack(p.elems,
                                                    pack_u,
-                                                   d,
+                                                   d.adj_ptr, d.det_ptr,
                                                    begin,
                                                    nlanes,
                                                    in,
