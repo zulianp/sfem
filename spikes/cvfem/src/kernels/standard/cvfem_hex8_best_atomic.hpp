@@ -599,9 +599,13 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_defcor(MeshData       &d
     }
 }
 
-static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d, const scalar_t rho, const scalar_t mu) {
+static SFEM_NOINLINE void apply_residual_atomic_isoparam(MeshData &d,
+                                              // Which optional terms are on, resolved once per
+                                              // solve by the caller rather than per sweep here:
+                                              // cvfem_hex8_extras_of reads the mesh, which this
+                                              // kernel is not meant to name.
+                                              const Hex8Extras &opt, const scalar_t rho, const scalar_t mu) {
     reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
-    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {

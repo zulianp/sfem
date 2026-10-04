@@ -247,7 +247,7 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
         d.p[i]  = x0[(size_t)i * 4 + 3] - eps * dir[(size_t)i * 4 + 3];
     }
     if (geom_kind == GeomKind::Isoparam)
-        apply_residual_atomic_isoparam(d, rho, mu);
+        apply_residual_atomic_isoparam(d, cvfem_hex8_extras_of(d), rho, mu);
     else
         apply_residual_atomic(d, cvfem_hex8_extras_of(d), rho, mu);
     // The assembled matrix carries the boundary closure whenever --boundary is on, so the
@@ -266,7 +266,7 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
         d.p[i]  = x0[(size_t)i * 4 + 3] + eps * dir[(size_t)i * 4 + 3];
     }
     if (geom_kind == GeomKind::Isoparam)
-        apply_residual_atomic_isoparam(d, rho, mu);
+        apply_residual_atomic_isoparam(d, cvfem_hex8_extras_of(d), rho, mu);
     else
         apply_residual_atomic(d, cvfem_hex8_extras_of(d), rho, mu);
     apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
@@ -1568,7 +1568,7 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        apply_residual_atomic_isoparam(d, rho, mu);
+        apply_residual_atomic_isoparam(d, cvfem_hex8_extras_of(d), rho, mu);
         std::vector<scalar_t> isoparam_r;
         pack_residual(d, isoparam_r);
         const scalar_t iso_err = max_abs_diff(current_r.data(), isoparam_r.data(), (ptrdiff_t)current_r.size());
@@ -1843,7 +1843,7 @@ int main(int argc, char **argv) {
             else if (kernel_kind == KernelKind::Sympy)
                 apply_residual_atomic_isoparam_sympy(d, rho, mu);
             else
-                apply_residual_atomic_isoparam(d, rho, mu);
+                apply_residual_atomic_isoparam(d, cvfem_hex8_extras_of(d), rho, mu);
         } else if (layout == "ecolor")
             apply_residual_ecolored(d, ecolors, rho, mu, conv_ho ? ugrad.data() : nullptr, conv_limiter,
                                     scalar_t(0));
