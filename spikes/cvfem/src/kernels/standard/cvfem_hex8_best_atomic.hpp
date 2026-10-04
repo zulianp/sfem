@@ -906,6 +906,11 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_linear(MeshData             &
 }
 
 static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData                    &d,
+                                              // Which optional terms are on, resolved once per
+                                              // solve by the caller rather than per sweep here:
+                                              // cvfem_hex8_extras_of reads the mesh, which this
+                                              // kernel is not meant to name.
+                                              const Hex8Extras &opt,
                                                              BSR4                        &b,
                                                              const scalar_t               rho,
                                                              const scalar_t               mu,
@@ -920,7 +925,6 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(MeshData           
     // Rhie-Chow belongs entirely to this half: the linear half is the viscous block, which
     // depends on the geometry and mu alone. So linear + nonlinear still reproduces the full
     // assembly with the term on, and verify_split_isoparam_vs_full_rel still proves it.
-    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
