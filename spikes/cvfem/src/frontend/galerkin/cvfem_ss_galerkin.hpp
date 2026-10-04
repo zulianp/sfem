@@ -288,7 +288,7 @@ namespace cvfem_ss {
 
                 scalar_t *const Ce = g.C.data() + (size_t)(e - e0) * (size_t)nc * 27 * 16;
 
-                const bool curved_e = sscvfem_macro_curved(d, e);
+                const bool curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
                 for (int zi = 0; zi < L; ++zi) {
                     for (int yi = 0; yi < L; ++yi) {
                         for (int xi = 0; xi < L; ++xi) {
@@ -372,7 +372,7 @@ namespace cvfem_ss {
                                     d.macro_natural_mask.empty()
                                             ? 0
                                             : sscvfem_micro_face_mask((int)d.macro_natural_mask[(size_t)e], L, xi, yi, zi),
-                                    sscvfem_bd(d, e, L, xi, yi, zi));
+                                    sscvfem_bd(d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), e, L, xi, yi, zi));
 
                             if (!g.fine_constrained.empty()) {
                                 for (int a = 0; a < 8; ++a) {

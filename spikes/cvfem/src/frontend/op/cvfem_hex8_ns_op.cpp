@@ -784,7 +784,7 @@ namespace sfem {
                             pe[a]  = d.p[(size_t)g];
                         }
                         scalar_t adj[9], det, re[CVFEM_HEX8_N_DOF];
-                        if (sscvfem_macro_curved(d, e)) {
+                        if (sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e)) {
                             sscvfem_micro_geom(xe, ye, ze, adj, &det);
                         } else {
                             std::copy(hadj, hadj + 9, adj);
