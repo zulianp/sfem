@@ -84,6 +84,7 @@ using geom_t  = smesh::geom_t;
 // "use of undeclared identifier 'scalar_t'" from inside the microkernel header -- points at the
 // kernel rather than at the include that was too early.
 #include "kernels/cvfem_hex8_flags.hpp"
+#include "kernels/cvfem_kernel_kind.hpp"  // KernelKind
 #include "kernels/cvfem_scatter.hpp"      // atomic_add, find_bsr_slot, reset_residual, MIN
 #include "kernels/cvfem_hex8_element_gather.hpp"   // Hex8RcConfig, Hex8Extras
 
@@ -145,36 +146,9 @@ CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_action_geomface)
 #undef CVFEM_SUBPAR_STUB
 #endif
 
-enum class KernelKind {
-    Current,
-    Fd,
-    Sumfact,
-    Sympy,
-    SympyBlock,
-    SympyRow,
-    SympyFace,
-    // Assembly only: rebuild just the velocity-dependent terms, reusing a viscous part
-    // assembled once. See assemble_jacobian_atomic_{linear,nonlinear}.
-    Split,
-    // Jacobian action only. Generated, and differing from each other solely in the scope
-    // one sp.cse call was given: all 32 outputs at once, the four dofs of a node, or one
-    // component across the eight nodes. The action had no generated form at all until
-    // these, so this axis has never been measured for it.
-    SympyAction,
-    SympyActionNode,
-    SympyActionComp,
-    // The finest cut: one sub-control surface per scope. Face-wise lost badly as an
-    // ASSEMBLY arrangement, but for a reason that does not exist here -- it issued
-    // 2016 atomic adds against flat's 768, and the action accumulates into a local.
-    SympyActionFace,
-    // Two-level: the geometry-only subexpressions factored in their own pass, then the
-    // field algebra with the geometry reduced to atoms. Emitted flat and face-wise so
-    // the hoist can be read on its own and on top of the best arrangement -- cutting
-    // the scope loses cross-scope reuse, and hoisting is what gives the shared
-    // adjugate back.
-    SympyActionGeom,
-    SympyActionGeomFace
-};
+// KernelKind moved to kernels/cvfem_kernel_kind.hpp, so that the sweeps can be TEMPLATED on
+// it rather than branching on it per element. parse_kernel and the predicates below stay:
+// turning --kernel into a value is front-end work.
 
 static KernelKind parse_kernel(const std::string &name) {
     if (name == "current") return KernelKind::Current;
