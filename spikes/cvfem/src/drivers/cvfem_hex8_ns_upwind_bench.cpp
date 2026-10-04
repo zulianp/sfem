@@ -2164,7 +2164,7 @@ int main(int argc, char **argv) {
             // Braced on purpose: the build below is a second statement in this branch, and an
             // unbraced one would attach the else that follows to the wrong call.
             if (cvfem_hex8_extras_of(d).with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
-            apply_jacobian_action_atomic_simd(d, rho, mu, dir_v, jac_out.data(),
+            apply_jacobian_action_atomic_simd(d, cvfem_hex8_extras_of(d), rho, mu, dir_v, jac_out.data(),
                                               with_hograd ? ugrad.data() : nullptr,
                                               with_hograd ? vgrad.data() : nullptr,
                                               conv_limiter, scalar_t(0));
