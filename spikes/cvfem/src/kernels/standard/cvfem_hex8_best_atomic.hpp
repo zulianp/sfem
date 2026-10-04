@@ -14,6 +14,11 @@
 // operator -- a packed row carrying the correction against an atomic row that silently dropped it
 // would not be a layout comparison.
 static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
+                                              // Which optional terms are on, resolved once per
+                                              // solve by the caller rather than per sweep here:
+                                              // cvfem_hex8_extras_of reads the mesh, which this
+                                              // kernel is not meant to name.
+                                              const Hex8Extras &opt,
                                                        const scalar_t        rho,
                                                        const scalar_t        mu,
                                                        const scalar_t *const dir,
@@ -26,7 +31,6 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(MeshData             &d,
     const bool with_ho = ugrad != nullptr && vgrad != nullptr;
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
 
-    const Hex8Extras opt = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel for schedule(static)
     for (ptrdiff_t e = 0; e < d.nelements; ++e) {
