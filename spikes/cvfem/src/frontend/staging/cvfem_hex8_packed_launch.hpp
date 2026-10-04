@@ -13,7 +13,7 @@
 // None of that is element arithmetic, and all of it needs the staging objects -- which is why
 // kernels/packed/cvfem_hex8_best_packed.hpp included the bench's staging header for as long as
 // they lived there. It no longer does.
-#include "best/cvfem_hex8_best_common.hpp"
+#include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
 
 static void build_pack_local_crs(PackedData               &p,

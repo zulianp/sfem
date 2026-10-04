@@ -10,7 +10,7 @@
 //
 // Both were in kernels/packed/ beside the kernel they serve, which is why that header included
 // the bench's staging header.
-#include "best/cvfem_hex8_best_common.hpp"
+#include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "kernels/packed/cvfem_hex8_best_store.hpp"
 
 static void build_pack_store_crs(PackedData           &p,

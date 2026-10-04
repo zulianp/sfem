@@ -28,7 +28,7 @@
 // invalidate would serve a tangent from the previous Newton iterate, which is exactly the
 // silent-wrong-operator failure this test exists to prevent.
 
-#include "best/cvfem_hex8_best_common.hpp"
+#include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 #include "frontend/staging/cvfem_hex8_packed_launch.hpp"
 

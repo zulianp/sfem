@@ -30,7 +30,7 @@
 // Colors are balanced by construction (see cvfem_pack_coloring.hpp); an unbalanced
 // coloring costs the residual another ~20% in barrier waits.
 
-#include "best/cvfem_hex8_best_common.hpp"
+#include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "core/cvfem_pack_coloring.hpp"
 
 // ---------------------------------------------------------------------------

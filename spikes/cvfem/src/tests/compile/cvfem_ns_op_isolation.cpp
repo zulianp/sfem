@@ -16,7 +16,7 @@
 #include "frontend/op/cvfem_hex8_ns_op.hpp"
 
 // The benchmark family, included alongside the operator on purpose.
-#include "best/cvfem_hex8_best_common.hpp"
+#include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 
 namespace check_no_core_leak {

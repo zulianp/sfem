@@ -93,7 +93,7 @@ static constexpr int N_FIELDS = 4;
 #include "kernels/cvfem_portability.hpp"
 
 // Needs scalar_t and N_FIELDS above.
-#include "hex8/cvfem_hex8_pack_common.hpp"
+#include "frontend/staging/cvfem_hex8_pack_common.hpp"
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
 #include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
@@ -105,7 +105,7 @@ static constexpr int N_FIELDS = 4;
 // must precede cvfem_hex8_pack_helpers.hpp.
 #include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 
-#include "hex8/cvfem_hex8_pack_helpers.hpp"
+#include "frontend/staging/cvfem_hex8_pack_helpers.hpp"
 
 // The rowwise and facewise CSE arrangements lost the saturated evaluation (see
 // subpar/README.md) and were moved to subpar/. Building with -DCVFEM_ENABLE_SUBPAR puts

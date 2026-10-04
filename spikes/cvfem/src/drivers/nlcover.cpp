@@ -6,7 +6,7 @@
 #include <cstring>
 #include <vector>
 #include <mpi.h>
-#include "best/cvfem_hex8_best_common.hpp"
+#include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 
 int main(int argc, char **argv) {

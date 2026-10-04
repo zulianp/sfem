@@ -12,8 +12,8 @@
 // This was the last file in src/kernels/ reaching outside the directory -- for
 // smesh_packed_mesh.hpp and the two pack staging headers, all of which these functions need and
 // the kernels do not.
-#include "hex8/cvfem_hex8_pack_common.hpp"
-#include "hex8/cvfem_hex8_pack_helpers.hpp"
+#include "frontend/staging/cvfem_hex8_pack_common.hpp"
+#include "frontend/staging/cvfem_hex8_pack_helpers.hpp"
 #include "kernels/packed/cvfem_hex8_ns_packed.hpp"
 #include "smesh_packed_mesh.hpp"
 

@@ -11,7 +11,7 @@
 // Moving them here is what lets kernels/colored/ stop including core/cvfem_element_coloring.hpp:
 // the colouring object is read here, and what crosses the boundary is the element range it
 // implies.
-#include "best/cvfem_hex8_best_common.hpp"
+#include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "core/cvfem_element_coloring.hpp"
 #include "kernels/colored/cvfem_hex8_best_ecolored.hpp"
 
