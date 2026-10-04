@@ -708,14 +708,29 @@ inline void sscvfem_nodal_grad_packed_sweep(
         const int level,
         const uint8_t *const SFEM_RESTRICT macro_curved,
         const ptrdiff_t nmacro,
-        geom_t **const SFEM_RESTRICT points, PackedData &p,
+        geom_t **const SFEM_RESTRICT points, 
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        pack_idx_t **const SFEM_RESTRICT pack_elems,
+        scalar_t *const SFEM_RESTRICT ghost_buf,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const idx_t *const SFEM_RESTRICT ghost_reduce_dest,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_idx,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
+        const ptrdiff_t max_actual_nodes_per_pack,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t n_ghost_reduce_rows,
+        const ptrdiff_t n_packed_elements,
+        const ptrdiff_t n_packs,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
                                       const scalar_t *const SFEM_RESTRICT src, const int stride,
                                       scalar_t *const SFEM_RESTRICT gx_out,
                                       scalar_t *const SFEM_RESTRICT gy_out,
                                       scalar_t *const SFEM_RESTRICT gz_out,
                                       const bool apply_weight) {
     const scalar_t *const SFEM_RESTRICT w      = grad_w_inv;
-    const ptrdiff_t node_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
+    const ptrdiff_t node_n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
 
     const int L = level;
     int       off[8];
@@ -731,23 +746,23 @@ inline void sscvfem_nodal_grad_packed_sweep(
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(8, 3 * (size_t)node_n);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
-            const ptrdiff_t e_start      = pack * p.n_elements_per_pack;
+        for (ptrdiff_t pack = 0; pack < n_packs; ++pack) {
+            const ptrdiff_t e_start      = pack * n_elements_per_pack;
             // Bounded by the PACKED element count, not by the block's.
             //
-            // p.elems is sized to the elements the packs cover. Those used to be all of them,
+            // pack_elems is sized to the elements the packs cover. Those used to be all of them,
             // so bounding by nmacro was harmless; on a distributed mesh the packs span only
             // the owned-not-shared prefix, and the last pack then walks this array past its
             // allocation. The fallback keeps the old bound for any caller that has not filled
             // the field in.
-            const ptrdiff_t e_limit      = p.n_packed_elements > 0 ? p.n_packed_elements : nmacro;
-            const ptrdiff_t e_end        = MIN(e_limit, (pack + 1) * p.n_elements_per_pack);
-            const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
-            const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
-            const ptrdiff_t n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
+            const ptrdiff_t e_limit      = n_packed_elements > 0 ? n_packed_elements : nmacro;
+            const ptrdiff_t e_end        = MIN(e_limit, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t owned        = owned_nodes_ptr[pack];
+            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t n_ghost      = ghost_ptr[pack + 1] - ghost_ptr[pack];
             const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const smesh::idx_t *const SFEM_RESTRICT ghosts    = &p.ghost_idx[p.ghost_ptr[pack]];
-            const ptrdiff_t                         ghost_off = p.ghost_ptr[pack];
+            const smesh::idx_t *const SFEM_RESTRICT ghosts    = &ghost_idx[ghost_ptr[pack]];
+            const ptrdiff_t                         ghost_off = ghost_ptr[pack];
 
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) pack_f[k] = src[(owned + k) * stride];
             for (ptrdiff_t k = 0; k < n_ghost; ++k)
@@ -759,7 +774,7 @@ inline void sscvfem_nodal_grad_packed_sweep(
                 // a Jacobian exactly, which is what sscvfem_macro_geom has always relied on.
                 scalar_t ex[8], ey[8], ez[8], adj[9], det;
                 for (int a = 0; a < 8; ++a) {
-                    const smesh::idx_t g = cvfem_pack_local_to_global(owned, ghosts, n_contiguous, p.elems[off[a]][e]);
+                    const smesh::idx_t g = cvfem_pack_local_to_global(owned, ghosts, n_contiguous, pack_elems[off[a]][e]);
                     ex[a]                = (scalar_t)px[g];
                     ey[a]                = (scalar_t)py[g];
                     ez[a]                = (scalar_t)pz[g];
@@ -775,12 +790,12 @@ inline void sscvfem_nodal_grad_packed_sweep(
                         for (int xi = 0; xi < L; ++xi) {
                             const int base = sscvfem_lidx(L, xi, yi, zi);
                             scalar_t  ep[8], gx, gy, gz;
-                            for (int a = 0; a < 8; ++a) ep[a] = pack_f[p.elems[base + off[a]][e]];
+                            for (int a = 0; a < 8; ++a) ep[a] = pack_f[pack_elems[base + off[a]][e]];
                             if (curved_e) {
                                 scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
                                 for (int a = 0; a < 8; ++a) {
                                     const smesh::idx_t gn = cvfem_pack_local_to_global(
-                                            owned, ghosts, n_contiguous, p.elems[base + off[a]][e]);
+                                            owned, ghosts, n_contiguous, pack_elems[base + off[a]][e]);
                                     cx[a] = (scalar_t)px[gn];
                                     cy[a] = (scalar_t)py[gn];
                                     cz[a] = (scalar_t)pz[gn];
@@ -793,7 +808,7 @@ inline void sscvfem_nodal_grad_packed_sweep(
                             }
                             for (int a = 0; a < 8; ++a) {
                                 scalar_t *const SFEM_RESTRICT o =
-                                        pack_out + (ptrdiff_t)p.elems[base + off[a]][e] * 3;
+                                        pack_out + (ptrdiff_t)pack_elems[base + off[a]][e] * 3;
                                 o[0] += gx;
                                 o[1] += gy;
                                 o[2] += gz;
@@ -809,9 +824,9 @@ inline void sscvfem_nodal_grad_packed_sweep(
                 gy_out[owned + k] = pack_out[k * 3 + 1] * wi;
                 gz_out[owned + k] = pack_out[k * 3 + 2] * wi;
             }
-            scalar_t *const SFEM_RESTRICT bx = p.ghost_buf.data() + 0 * p.n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT by = p.ghost_buf.data() + 1 * p.n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT bz = p.ghost_buf.data() + 2 * p.n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT bx = ghost_buf + 0 * n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT by = ghost_buf + 1 * n_ghost_entries;
+            scalar_t *const SFEM_RESTRICT bz = ghost_buf + 2 * n_ghost_entries;
             for (ptrdiff_t k = 0; k < n_ghost; ++k) {
                 const scalar_t *const SFEM_RESTRICT o = pack_out + (n_contiguous + k) * 3;
                 bx[ghost_off + k]                     = o[0];
@@ -829,10 +844,10 @@ inline void sscvfem_nodal_grad_packed_sweep(
         scalar_t *const g3[3] = {gx_out, gy_out, gz_out};
 #pragma omp parallel
         cvfem_hex8_ghost_reduce_soa_range<3, /*SCALED=*/true>(
-                cvfem_range_split(0, p.n_ghost_reduce_rows, 1, cvfem_thread_index(),
+                cvfem_range_split(0, n_ghost_reduce_rows, 1, cvfem_thread_index(),
                                   cvfem_n_threads()),
-                p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx, p.n_ghost_entries,
-                p.ghost_buf.data(), apply_weight ? w : nullptr, g3);
+                ghost_reduce_dest, ghost_reduce_ptr, ghost_reduce_idx, n_ghost_entries,
+                ghost_buf, apply_weight ? w : nullptr, g3);
     }
 }
 
@@ -857,7 +872,7 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
         ogz.assign((size_t)d.nnodes, scalar_t(0));
     }
 
-    sscvfem_nodal_grad_packed_sweep(d.grad_w_inv.data(), d.level, d.macro_curved.data(), d.nmacro, d.points, p, src, stride, ogx.data(), ogy.data(), ogz.data(),
+    sscvfem_nodal_grad_packed_sweep(d.grad_w_inv.data(), d.level, d.macro_curved.data(), d.nmacro, d.points, p.elems, const_cast<scalar_t *>(p.ghost_buf.data()), p.ghost_idx, p.ghost_ptr, p.ghost_reduce_dest, p.ghost_reduce_idx, p.ghost_reduce_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.n_ghost_reduce_rows, p.n_packed_elements, p.n_packs, p.owned_nodes_ptr, src, stride, ogx.data(), ogy.data(), ogz.data(),
                                     apply_weight);
 }
 
