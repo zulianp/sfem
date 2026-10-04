@@ -2203,6 +2203,10 @@ int main(int argc, char **argv) {
     std::vector<scalar_t> diag_blocks;
     auto diag_fn = [&]() {
         diag_blocks.assign((size_t)(d.nnodes * 16), scalar_t(0));
+        // Hoisted out of assemble_diag_boundary_scs_pass, which both branches below reach: it is
+        // a once-per-solve cache on the mesh, not part of an element pass. Above the `if` rather
+        // than inside each branch, so no branch gains a second unbraced statement.
+        cvfem_hex8_build_face_mask_eff(d);
         if (geom_kind == GeomKind::Isoparam)
             assemble_diag_atomic_isoparam(d, rho, mu, diag_blocks.data());
         else

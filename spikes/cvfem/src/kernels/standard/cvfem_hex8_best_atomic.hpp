@@ -1344,7 +1344,9 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(MeshData             &
                                                           const int             isoparam,
                                                           scalar_t *const SFEM_RESTRICT diag) {
     if (d.face_mask.empty()) return;
-    cvfem_hex8_build_face_mask_eff(d);
+    // The effective face mask arrives built. cvfem_hex8_build_face_mask_eff reads the mesh
+    // and caches on it, so it is a once-per-solve setup rather than part of this pass; the
+    // caller runs it, and both diag sweeps that reach here need it, so it hoists above them.
     scalar_t *const SFEM_RESTRICT values = diag;
     const ptrdiff_t               n_bnd  = (ptrdiff_t)d.bnd_elems.size();
 #pragma omp parallel for schedule(static)
