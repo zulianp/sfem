@@ -11,6 +11,7 @@
 // trip through it costs more than it saves; see cvfem_hex8_best_colored.hpp
 // and cvfem_hex8_best_store.hpp.
 
+#include "kernels/cvfem_scatter.hpp"
 #include "kernels/cvfem_phases.hpp"
 #include "best/cvfem_hex8_best_common.hpp"
 #include "kernels/cvfem_range.hpp"

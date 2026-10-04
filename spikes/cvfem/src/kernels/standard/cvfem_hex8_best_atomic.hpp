@@ -6,6 +6,7 @@
 // and no scratch, which makes it the simplest and the reference for correctness,
 // but assembly pays ~1024 atomic read-modify-writes per element.
 
+#include "kernels/cvfem_scatter.hpp"
 #include "kernels/cvfem_phases.hpp"
 #include "best/cvfem_hex8_best_common.hpp"
 

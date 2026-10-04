@@ -1,6 +1,7 @@
 #ifndef CVFEM_HEX8_NS_PACKED_HPP
 #define CVFEM_HEX8_NS_PACKED_HPP
 
+#include "kernels/cvfem_scatter.hpp"
 #include "smesh_packed_mesh.hpp"
 #include "kernels/cvfem_range.hpp"
 
@@ -12,7 +13,6 @@
 #include <vector>
 
 #ifndef MIN
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
 // PackedData and the pack helpers live in the shared header; this file used to

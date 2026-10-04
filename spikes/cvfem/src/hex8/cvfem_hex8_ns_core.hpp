@@ -410,14 +410,10 @@ inline void exact_state(const FlowCase flow,
     p                = G * (scalar_t(0.5) * Lx - x);
 }
 
+// Forwards to the array form in kernels/cvfem_scatter.hpp rather than repeating its body: this
+// family's callers pass the mesh, and the loop itself is the same four writes per node.
 inline void reset_residual(MeshData &d) {
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < d.nnodes; ++i) {
-        d.rx[i] = scalar_t(0);
-        d.ry[i] = scalar_t(0);
-        d.rz[i] = scalar_t(0);
-        d.rc[i] = scalar_t(0);
-    }
+    reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 }
 
 inline BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
@@ -433,21 +429,9 @@ inline BSR4 make_bsr4(const std::shared_ptr<smesh::Mesh> &mesh) {
 
 inline void zero_bsr4(BSR4 &b) { cvfem_zero_scalars(b.data(), b.nnz * 16); }
 
-SFEM_INLINE void atomic_add(scalar_t *const SFEM_RESTRICT f, const smesh::idx_t id, const scalar_t value) {
-    CVFEM_ATOMIC_ADD(f[id], value);
-}
+// atomic_add and find_bsr_slot moved to kernels/cvfem_scatter.hpp, which this family reaches
+// through the kernel headers. They were defined identically on both sides; one copy now.
 
-SFEM_INLINE smesh::count_t find_bsr_slot(const smesh::count_t *const SFEM_RESTRICT rowptr,
-                                                const smesh::idx_t *const SFEM_RESTRICT   colidx,
-                                                const smesh::idx_t                        row,
-                                                const smesh::idx_t                        col) {
-    const smesh::count_t begin = rowptr[row];
-    const smesh::count_t end   = rowptr[row + 1];
-    for (smesh::count_t k = begin; k < end; ++k) {
-        if (colidx[k] == col) return k;
-    }
-    return begin;
-}
 
 inline void precompute_element_bsr_slots(const MeshData &d, BSR4 &b) {
     SFEM_TRACE_SCOPE("cvfem_hex8_ns_steady::precompute_element_bsr_slots");

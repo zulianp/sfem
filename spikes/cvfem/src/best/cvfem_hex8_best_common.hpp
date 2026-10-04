@@ -84,6 +84,7 @@ using geom_t  = smesh::geom_t;
 // "use of undeclared identifier 'scalar_t'" from inside the microkernel header -- points at the
 // kernel rather than at the include that was too early.
 #include "kernels/cvfem_hex8_flags.hpp"
+#include "kernels/cvfem_scatter.hpp"      // atomic_add, find_bsr_slot, reset_residual, MIN
 #include "kernels/cvfem_hex8_element_gather.hpp"   // Hex8RcConfig, Hex8Extras
 
 static constexpr int N_FIELDS = 4;
@@ -469,19 +470,6 @@ static void fill_fields(MeshData &d) {
 
 // Takes the arrays and the count, not the mesh: it is called from inside the standard-layout
 // sweeps, where a MeshData parameter is what keeps src/kernels/ dependent on this header.
-static void reset_residual(const ptrdiff_t nnodes,
-                           scalar_t *const SFEM_RESTRICT rx,
-                           scalar_t *const SFEM_RESTRICT ry,
-                           scalar_t *const SFEM_RESTRICT rz,
-                           scalar_t *const SFEM_RESTRICT rc) {
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t i = 0; i < nnodes; ++i) {
-        rx[i] = scalar_t(0);
-        ry[i] = scalar_t(0);
-        rz[i] = scalar_t(0);
-        rc[i] = scalar_t(0);
-    }
-}
 
 
 
@@ -520,9 +508,6 @@ static void zero_bsr4(BSR4 &b) {
     if (g_breakdown) g_phase[PH_ZERO] += wall_time() - t0;
 }
 
-static SFEM_INLINE void atomic_add(scalar_t *const SFEM_RESTRICT f, const smesh::idx_t id, const scalar_t value) {
-    CVFEM_ATOMIC_ADD(f[id], value);
-}
 
 // The bench is driven by flags rather than by the environment, so it has no smesh::Env to
 // read through; this is for the one escape hatch that has to match the solver's spelling.
@@ -531,17 +516,6 @@ static int cvfem_env_flag(const char *const name) {
     return v && *v && *v != '0' ? 1 : 0;
 }
 
-static SFEM_INLINE smesh::count_t find_bsr_slot(const smesh::count_t *const SFEM_RESTRICT rowptr,
-                                                const smesh::idx_t *const SFEM_RESTRICT   colidx,
-                                                const smesh::idx_t                        row,
-                                                const smesh::idx_t                        col) {
-    const smesh::count_t begin = rowptr[row];
-    const smesh::count_t end   = rowptr[row + 1];
-    for (smesh::count_t k = begin; k < end; ++k) {
-        if (colidx[k] == col) return k;
-    }
-    return begin;
-}
 
 
 

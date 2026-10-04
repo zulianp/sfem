@@ -7,6 +7,7 @@
 // memcpy, so every global block is written exactly once: no zero_bsr4 pass and no
 // read-modify-write. Only the ghost rows still need a reduction.
 
+#include "kernels/cvfem_scatter.hpp"
 #include "kernels/cvfem_phases.hpp"
 #include "best/cvfem_hex8_best_common.hpp"
 #include "kernels/cvfem_range.hpp"
