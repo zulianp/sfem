@@ -80,19 +80,20 @@ static SFEM_INLINE void sscvfem_scatter_element_w(
 
 template <int W>
 inline void sscvfem_reduce_shared_w(
+        // The range of reduction ROWS this call is to cover. DESIGN.md: the threading is
+        // abstract outside the sweep and what arrives is a range.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const ptrdiff_t *const SFEM_RESTRICT red_idx,
         const ptrdiff_t *const SFEM_RESTRICT red_ptr,
         const idx_t *const SFEM_RESTRICT shared_node,
-        const ptrdiff_t n_shared, scalar_t *const SFEM_RESTRICT dst,
+        scalar_t *const SFEM_RESTRICT dst,
                                     const scalar_t *const SFEM_RESTRICT stage) {
-    const ptrdiff_t nrows = n_shared;
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t r = 0; r < nrows; ++r) {
+    for (ptrdiff_t row = r.begin; row < r.end; ++row) {
         scalar_t acc[W] = {0};
-        for (ptrdiff_t k = red_ptr[(size_t)r]; k < red_ptr[(size_t)r + 1]; ++k)
+        for (ptrdiff_t k = red_ptr[(size_t)row]; k < red_ptr[(size_t)row + 1]; ++k)
             for (int c = 0; c < W; ++c) acc[c] += stage[(size_t)red_idx[(size_t)k] * W + c];
-        const ptrdiff_t g = (ptrdiff_t)shared_node[(size_t)r] * W;
+        const ptrdiff_t g = (ptrdiff_t)shared_node[(size_t)row] * W;
         for (int c = 0; c < W; ++c) dst[g + c] += acc[c];
     }
 }
@@ -160,13 +161,18 @@ inline void sscvfem_reduce_shared_soa_w(
 
 // Second pass: each shared node gathers its own contributions, in slot order.
 inline void sscvfem_reduce_shared(
+        // The range of reduction ROWS this call is to cover. DESIGN.md: the threading is
+        // abstract outside the sweep and what arrives is a range.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const ptrdiff_t *const SFEM_RESTRICT red_idx,
         const ptrdiff_t *const SFEM_RESTRICT red_ptr,
         const idx_t *const SFEM_RESTRICT shared_node,
         scalar_t *const SFEM_RESTRICT stage,
-        const ptrdiff_t n_shared, scalar_t *const SFEM_RESTRICT jv) {
-    sscvfem_reduce_shared_w<CVFEM_HEX8_N_FIELDS>(red_idx, red_ptr, shared_node, n_shared, jv, stage);
+        scalar_t *const SFEM_RESTRICT jv) {
+    // Forwards the range; it does not make one. A wrapper that split the rows again would be a
+    // second threading decision for one loop.
+    sscvfem_reduce_shared_w<CVFEM_HEX8_N_FIELDS>(r, red_idx, red_ptr, shared_node, jv, stage);
 }
 
 static SFEM_INLINE int sscvfem_lidx(const int L, const int x, const int y, const int z) {

@@ -562,7 +562,17 @@ namespace cvfem_ss {
             }
         }
 
-        if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), z);
+        // The row loop's parallel region is in the reduction's launcher now; the kernel takes
+        // a range. nrows is the pointer's own, so this keeps the null test it had.
+        if (sc) {
+            const ptrdiff_t nrows = (ptrdiff_t)sc->shared_node.size();
+        #pragma omp parallel
+            sscvfem_reduce_shared(cvfem_range_split(0, nrows, 1, cvfem_thread_index(),
+                                                    cvfem_n_threads()),
+                                  sc->red_idx.data(), sc->red_ptr.data(),
+                                  sc->shared_node.data(),
+                                  const_cast<scalar_t *>(sc->stage.data()), z);
+        }
 
         // Average over the patches touching each node, damp, leave constrained dofs alone, and
         // ACCUMULATE into the caller's vector.
@@ -723,7 +733,17 @@ namespace cvfem_ss {
             }
         }
 
-        if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), z);
+        // The row loop's parallel region is in the reduction's launcher now; the kernel takes
+        // a range. nrows is the pointer's own, so this keeps the null test it had.
+        if (sc) {
+            const ptrdiff_t nrows = (ptrdiff_t)sc->shared_node.size();
+        #pragma omp parallel
+            sscvfem_reduce_shared(cvfem_range_split(0, nrows, 1, cvfem_thread_index(),
+                                                    cvfem_n_threads()),
+                                  sc->red_idx.data(), sc->red_ptr.data(),
+                                  sc->shared_node.data(),
+                                  const_cast<scalar_t *>(sc->stage.data()), z);
+        }
 
         // Average over the macro-elements sharing a node (additive between subdomains), skip
         // constrained dofs, and ACCUMULATE, matching BlockJacobi::apply.

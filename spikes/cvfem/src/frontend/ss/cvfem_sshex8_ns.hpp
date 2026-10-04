@@ -704,15 +704,25 @@ inline bool sscvfem_wants_q_grad(const SSMeshData &d, const int blocks) {
 // joined, which is also the barrier it needs: a row sums staging slots other macro elements
 // wrote. Null or unbuilt scatter means the atomic path, which has nothing to reduce.
 //
-// Not inside a parallel region: sscvfem_reduce_shared still owns one, and nesting gives each
-// outer thread a one-thread inner team that runs the whole row loop, so every shared node is
-// accumulated once per thread. The operator-consistency tests caught exactly that.
+// THIS is where the row loop's parallel region lives, and the only place: the reduction kernel
+// takes a range like every other sweep. Getting that wrong once cost the operator-consistency
+// tests -- while the kernel still owned a region, wrapping it in another gave each outer thread
+// a one-thread inner team, so every thread ran the whole row loop and each shared node was
+// accumulated once per thread.
+//
+// Templated on the width because the two widths read different staging buffers: the 4-wide
+// passes stage into SSScatter::stage and the block diagonal into stage16, at 16 values per slot.
+// One helper, so a width cannot be paired with the wrong buffer.
+template <int W = CVFEM_HEX8_N_FIELDS>
 inline void sscvfem_drain_shared(SSMeshData &d, scalar_t *const SFEM_RESTRICT dst) {
     if (!d.scatter || !d.scatter->ready) return;
-    const SSScatter &sc = *d.scatter;
-    sscvfem_reduce_shared(sc.red_idx.data(), sc.red_ptr.data(), sc.shared_node.data(),
-                          const_cast<scalar_t *>(sc.stage.data()),
-                          (ptrdiff_t)sc.shared_node.size(), dst);
+    const SSScatter &sc    = *d.scatter;
+    const scalar_t *const stage = (W == 16) ? sc.stage16.data() : sc.stage.data();
+    const ptrdiff_t       nrows = (ptrdiff_t)sc.shared_node.size();
+#pragma omp parallel
+    sscvfem_reduce_shared_w<W>(cvfem_range_split(0, nrows, 1, cvfem_thread_index(), cvfem_n_threads()),
+                               sc.red_idx.data(), sc.red_ptr.data(), sc.shared_node.data(), dst,
+                               stage);
 }
 
 inline void sscvfem_apply_blocks_ref(SSMeshData &d, const scalar_t rho, const scalar_t mu, const int blocks,
@@ -1145,16 +1155,7 @@ inline void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, const scalar_t
     }
     // The element pass has joined, so the staging slots are all written: now each shared node
     // sums the ones that belong to it, in slot order.
-    if (d.scatter && d.scatter->ready) {
-        const SSScatter &sc = *d.scatter;
-        // No parallel region here: sscvfem_reduce_shared_w still owns its own, and nesting one
-        // inside another gives each outer thread a one-thread inner team -- so every thread runs
-        // the WHOLE row loop and each shared node is accumulated once per thread. That is what
-        // the operator-consistency tests caught. It becomes range-driven in its turn.
-        sscvfem_reduce_shared_w<16>(sc.red_idx.data(), sc.red_ptr.data(), sc.shared_node.data(),
-                                    (ptrdiff_t)sc.shared_node.size(), diag.data(),
-                                    sc.stage16.data());
-    }
+    sscvfem_drain_shared<16>(d, diag.data());
     // The node volume is built only when the transient pass will read it, which is what the
     // guard inside the sweep used to do: on a steady solve the weight is zero and
     // sscvfem_node_volume is a full sweep over the macro elements for nothing.
