@@ -11,13 +11,7 @@
 #include <omp.h>
 #endif
 
-#ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT __restrict__
-#endif
 
-#ifndef SFEM_INLINE
-#define SFEM_INLINE inline __attribute__((always_inline))
-#endif
 
 #ifndef VEC_BYTES
 #define VEC_BYTES 128

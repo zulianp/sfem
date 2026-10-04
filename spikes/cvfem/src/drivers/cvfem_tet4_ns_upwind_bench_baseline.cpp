@@ -1,4 +1,5 @@
 #include "smesh_mesh.hpp"
+#include "kernels/cvfem_portability.hpp"
 #include "smesh_buffer.hpp"
 #include "sfem_BSR.hpp"
 
@@ -20,19 +21,10 @@
 #include <omp.h>
 #endif
 
-#ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT __restrict__
-#endif
 
-#ifndef SFEM_INLINE
-#define SFEM_INLINE inline __attribute__((always_inline))
-#endif
 
-#ifndef SFEM_NOINLINE
-#define SFEM_NOINLINE __attribute__((noinline))
-#endif
 
-using scalar_t = double;
+#include "support/cvfem_default_types.hpp"
 using jacobian_t = smesh::jacobian_t;
 
 #ifndef VEC_BYTES

@@ -52,17 +52,8 @@
 #include <omp.h>
 #endif
 
-#ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT __restrict__
-#endif
 
-#ifndef SFEM_INLINE
-#define SFEM_INLINE inline __attribute__((always_inline))
-#endif
 
-#ifndef SFEM_NOINLINE
-#define SFEM_NOINLINE __attribute__((noinline))
-#endif
 
 using scalar_t = double;
 // THE INDEX TYPES THE KERNELS NAME, declared here for the same reason scalar_t above is.

@@ -27,7 +27,7 @@
 #include <cstring>
 #include <vector>
 
-using scalar_t = double;
+#include "support/cvfem_default_types.hpp"
 static constexpr int N_FIELDS = 4;
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"

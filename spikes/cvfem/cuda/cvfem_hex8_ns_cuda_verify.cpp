@@ -21,6 +21,8 @@
 #include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
 #include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
+#include "kernels/standard/affine/cvfem_hex8_best_atomic_affine.hpp"
+#include "kernels/standard/isoparametric/cvfem_hex8_best_atomic_isoparam.hpp"
 #include "frontend/staging/cvfem_pack_coloring.hpp"
 #include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 #include "frontend/staging/cvfem_element_coloring.hpp"
@@ -202,7 +204,7 @@ int main(int argc, char **argv) {
 
     // ---- host reference ------------------------------------------------------
     const scalar_t rho = 1.0, mu = 0.01;
-    apply_residual_atomic(d, rho, mu);
+    apply_residual_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
     std::vector<double> ref;
     residual_soa_to_interleaved(d, ref);
 
@@ -380,7 +382,7 @@ int main(int argc, char **argv) {
                 vh[i * 4 + 2] = 0.5 * std::sin(0.023 * (double)i + 1.0);
                 vh[i * 4 + 3] = 0.9 * std::cos(0.007 * (double)i + 2.0);
             }
-            apply_jacobian_action_atomic(d, rho, mu, vh.data(), jv_h.data());
+            apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, vh.data(), jv_h.data());
             const double jvmax = max_abs(jv_h);
 
             if (cvfem_cuda_upload_v(ctx, vh.data()) != 0) return 1;
@@ -414,7 +416,7 @@ int main(int argc, char **argv) {
                 (double)bsr.nnz * 16 * sizeof(double) / (1024.0 * 1024.0));
 
     // Host reference: the same kernel the device runs, Atomic=true.
-    assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+    assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
     std::vector<double> href((size_t)bsr.nnz * 16);
     std::memcpy(href.data(), bsr.values->data(), href.size() * sizeof(double));
     double hmax = 0;
@@ -503,7 +505,7 @@ int main(int argc, char **argv) {
     {
         // The reference is the full hand-written assembly: linear + nonlinear must
         // reproduce it, because they are the two halves of the same kernel.
-        assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         std::vector<double> ref2((size_t)bsr.nnz * 16);
         std::memcpy(ref2.data(), bsr.values->data(), ref2.size() * sizeof(double));
         double r2max = 0;
@@ -546,7 +548,7 @@ int main(int argc, char **argv) {
                         const double t = 0.3 + 0.7 * std::sin(0.013 * (double)(i + 7 * trial));
                         d.ux[i] = t; d.uy[i] = 0.5 * t + 0.2 * trial; d.uz[i] = 0.25 - 0.4 * t;
                     }
-                    assemble_jacobian_atomic_nonlinear(d, bsr, rho, mu, probe);  // probe is all zeros
+                    assemble_jacobian_atomic_nonlinear(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu, probe.data());  // probe is all zeros
                     const scalar_t *pv = bsr.values->data();
                     for (size_t i = 0; i < acc.size(); ++i) acc[i] += std::fabs(pv[i]);
                 }
@@ -671,7 +673,7 @@ int main(int argc, char **argv) {
     std::printf("\n=== block diagonal (block-Jacobi preconditioner) ===\n");
     {
         // Reference: the diagonal blocks of the full assembly.
-        assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         const scalar_t *hv = bsr.values->data();
         std::vector<double> ref_diag((size_t)d.nnodes * 16, 0.0);
         for (ptrdiff_t r = 0; r < d.nnodes; ++r)
@@ -743,7 +745,7 @@ int main(int argc, char **argv) {
             vh[i * 4 + 2] = 0.5 * std::sin(0.023 * (double)i + 1.0);
             vh[i * 4 + 3] = 0.9 * std::cos(0.007 * (double)i + 2.0);
         }
-        apply_jacobian_action_atomic(d, rho, mu, vh.data(), jv_h.data());
+        apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, vh.data(), jv_h.data());
         const double jvmax = max_abs(jv_h);
 
         if (cvfem_cuda_upload_v(ctx, vh.data()) != 0) return 1;
@@ -865,7 +867,7 @@ int main(int argc, char **argv) {
             gvh[i * 4 + 2] = 0.5 * std::sin(0.023 * (double)i + 1.0);
             gvh[i * 4 + 3] = 0.9 * std::cos(0.007 * (double)i + 2.0);
         }
-        apply_jacobian_action_atomic(d, rho, mu, gvh.data(), jv_ref.data());
+        apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, gvh.data(), jv_ref.data());
         if (cvfem_cuda_upload_v(ctx, gvh.data()) != 0) return 1;
 
         std::printf("%-38s %12s %12s %10s\n", "operator / mesh", "s/call", "MDOF/s", "rel");
@@ -926,7 +928,7 @@ int main(int argc, char **argv) {
         // Assembly writes 64 blocks x 16 doubles per element and reads 32 doubles, so
         // the write side dominates and is identical in both forms. What is being
         // compared is purely the gather.
-        assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         std::vector<double> asm_ref(bsr.values->data(), bsr.values->data() + (size_t)bsr.nnz * 16);
         double amax = 0;
         for (double v : asm_ref) amax = std::fmax(amax, std::fabs(v));
@@ -990,7 +992,7 @@ int main(int argc, char **argv) {
         }
 
         // --- residual -------------------------------------------------------
-        apply_residual_atomic_isoparam(d, rho, mu);
+        apply_residual_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
         std::vector<double> iref;
         residual_soa_to_interleaved(d, iref);
         const double irefmax = max_abs(iref);
@@ -1035,7 +1037,7 @@ int main(int argc, char **argv) {
             ivh[i * 4 + 2] = 0.5 * std::sin(0.023 * (double)i + 1.0);
             ivh[i * 4 + 3] = 0.9 * std::cos(0.007 * (double)i + 2.0);
         }
-        apply_jacobian_action_atomic_isoparam(d, rho, mu, ivh.data(), ijv_h.data());
+        apply_jacobian_action_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ivh.data(), ijv_h.data());
         const double jrefmax = max_abs(ijv_h);
         if (cvfem_cuda_upload_v(ctx, ivh.data()) != 0) return 1;
         for (auto &m : modes) {
@@ -1053,7 +1055,7 @@ int main(int argc, char **argv) {
         }
 
         // --- assembled Jacobian ---------------------------------------------
-        assemble_jacobian_atomic_isoparam(d, bsr, rho, mu);
+        assemble_jacobian_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         std::vector<double> iso_vals(bsr.values->data(), bsr.values->data() + (size_t)bsr.nnz * 16);
         const double        vmax = max_abs(iso_vals);
         if (cvfem_cuda_assemble_isoparam(ctx, rho, mu, block_size, nullptr) != 0) {
@@ -1159,7 +1161,7 @@ int main(int argc, char **argv) {
         }
 
         // Leave the affine matrix in place for anything downstream.
-        assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
     }
 
     std::printf("\n=== boundary sub-control-surface residual ===\n");
@@ -1185,7 +1187,7 @@ int main(int argc, char **argv) {
 
     // Host reference: volume residual, then the boundary correction, mirroring
     // apply_boundary_scs_residual in cvfem_hex8_ns_steady.cpp.
-    apply_residual_atomic(d, rho, mu);
+    apply_residual_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
     for (int32_t e : blist) {
         scalar_t ex[8], ey[8], ez[8], eu[8], ev_[8], ew[8], ep[8], re[CVFEM_HEX8_N_DOF] = {0};
         for (int a = 0; a < 8; ++a) {
@@ -1194,7 +1196,7 @@ int main(int argc, char **argv) {
             eu[a] = d.ux[g]; ev_[a] = d.uy[g]; ew[a] = d.uz[g]; ep[a] = d.p[g];
         }
         scalar_t adj_e[9], det_e;
-        load_hex8_adj(d, e, adj_e, &det_e);
+        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj_e, &det_e);
         boundary_scs_add_residual<false>(rho, mu, adj_e, det_e, Lx, Ly, Lz,
                                   ex, ey, ez, eu, ev_, ew, ep, re);
         for (int a = 0; a < 8; ++a) {
@@ -1236,7 +1238,7 @@ int main(int argc, char **argv) {
             vh[i * 4 + 3] = 0.9 * std::cos(0.007 * (double)i + 2.0);
         }
         // Host: volume J*v, then the boundary correction.
-        apply_jacobian_action_atomic(d, rho, mu, vh.data(), jv_h.data());
+        apply_jacobian_action_atomic(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, vh.data(), jv_h.data());
         for (int32_t e : blist) {
             scalar_t ex[8], ey[8], ez[8], eu[8], ev_[8], ew[8];
             scalar_t gx[8], gy[8], gz[8], gq[8], re[CVFEM_HEX8_N_DOF] = {0};
@@ -1248,7 +1250,7 @@ int main(int argc, char **argv) {
                 gz[a] = vh[(size_t)g * 4 + 2]; gq[a] = vh[(size_t)g * 4 + 3];
             }
             scalar_t adj_e[9], det_e;
-            load_hex8_adj(d, e, adj_e, &det_e);
+            load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj_e, &det_e);
             boundary_scs_add_jacobian_action<false>(rho, mu, adj_e, det_e, Lx, Ly, Lz,
                                              ex, ey, ez, eu, ev_, ew, gx, gy, gz, gq, re);
             for (int a = 0; a < 8; ++a) {
@@ -1268,7 +1270,7 @@ int main(int argc, char **argv) {
         std::printf("volume+boundary J*v vs host: rel = %.3e  %s\n", rel, ok ? "OK" : "FAIL");
 
         // Boundary assembly: host reference is the same kernel with Atomic=true.
-        assemble_jacobian_atomic_sumfact(d, bsr, rho, mu);
+        assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         {
             scalar_t *const hv = bsr.values->data();
             for (int32_t e : blist) {
@@ -1279,7 +1281,7 @@ int main(int argc, char **argv) {
                     eu[a] = d.ux[g]; ev_[a] = d.uy[g]; ew[a] = d.uz[g];
                 }
                 scalar_t adj_e[9], det_e;
-                load_hex8_adj(d, e, adj_e, &det_e);
+                load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj_e, &det_e);
                 boundary_scs_add_jacobian<true, false>(rho, mu, adj_e, det_e, Lx, Ly, Lz,
                                                 ex, ey, ez, eu, ev_, ew,
                                                 bsr.element_slots.data() + (size_t)e * 64, hv);
@@ -1312,7 +1314,7 @@ int main(int argc, char **argv) {
         for (ptrdiff_t e = 0; e < d.nelements; ++e) {
             scalar_t pe[8], adj_e[9], det_e, gx, gy, gz;
             for (int a = 0; a < 8; ++a) pe[a] = d.p[d.elems[a][e]];
-            load_hex8_adj(d, e, adj_e, &det_e);
+            load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj_e, &det_e);
             const scalar_t vol = std::fabs(det_e);
             if (vol < scalar_t(1e-30)) continue;
             cvfem_hex8_grad_scalar(adj_e, det_e, pe, gx, gy, gz);
@@ -1365,7 +1367,7 @@ int main(int argc, char **argv) {
                     rgx[a] = ghx[g]; rgy[a] = ghy[g]; rgz[a] = ghz[g];
                 }
                 scalar_t adj_e[9], det_e;
-                load_hex8_adj(d, e, adj_e, &det_e);
+                load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj_e, &det_e);
                 Hex8RhieChowT<scalar_t> rc;
                 rc.x = rx; rc.y = ry; rc.z = rz;
                 rc.pgx = rgx; rc.pgy = rgy; rc.pgz = rgz; rc.scale = rc_scale;

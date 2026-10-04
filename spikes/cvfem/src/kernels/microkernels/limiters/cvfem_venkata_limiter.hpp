@@ -2,15 +2,10 @@
 #define CVFEM_VENKATA_LIMITER_HPP
 
 #include <cmath>
+#include "kernels/cvfem_portability.hpp"
 #include <cstdio>
 #include <cstdlib>
 
-#ifndef SFEM_INLINE
-#define SFEM_INLINE inline
-#endif
-#ifndef SFEM_HOST_DEVICE
-#define SFEM_HOST_DEVICE
-#endif
 
 // The slope limiters for the deferred-correction convective flux.
 //

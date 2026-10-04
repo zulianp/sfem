@@ -11,12 +11,10 @@
 
 // The kernel header is not self-contained: it needs scalar_t and SFEM_RESTRICT in
 // scope, exactly as cvfem_hex8_best_common.hpp provides them on the host.
-using scalar_t = double;
-#ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT __restrict__
-#endif
+#include "support/cvfem_default_types.hpp"
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
 
 #include "cvfem_cuda_smoke.hpp"
 

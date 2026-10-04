@@ -50,6 +50,17 @@ def main():
             # arena, thread_scratch<T>(slot, n), which is also the only such mechanism the tree
             # has -- a std::vector local beside it would be a second one. And a std::vector in a
             # signature is what keeps this directory from being free of library types at all.
+            # NO LIBRARY NAMESPACE IN THIS DIRECTORY'S CODE.
+            #
+            # The kernels name scalar_t, idx_t, count_t and geom_t unqualified and the including
+            # translation unit supplies them; that is what lets a CUDA .cu, which cannot include a
+            # family header, instantiate them. Twenty `smesh::idx_t` and `smesh::count_t`
+            # spellings had survived in three headers, and no host build could see it because a
+            # host translation unit always has smesh in scope. The first CUDA build in a while
+            # failed on "namespace smesh has no member idx_t".
+            for q in re.finditer(r"\b(smesh|sfem)::(\w+)", t.split("//")[0]):
+                bad.append(f"{src.relative_to(ROOT.parent)}:{n}: {q.group(0)} under src/kernels/. "
+                           f"Name the type unqualified; the includer supplies the alias.")
             if "std::vector" in t.split("//")[0]:
                 bad.append(f"{src.relative_to(ROOT.parent)}:{n}: std::vector under src/kernels/. "
                            f"Scratch comes from thread_scratch<T>(slot, n); a buffer a caller "

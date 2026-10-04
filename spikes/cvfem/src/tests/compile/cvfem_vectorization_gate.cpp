@@ -24,7 +24,7 @@
 // includes nothing of smesh -- it uses the name and leaves it to the includer. Spelling it here
 // rather than pulling in smesh_config.hpp is therefore part of what this gate checks: that the
 // lane-blocked kernels compile against nothing but the standard library.
-using scalar_t = double;
+#include "support/cvfem_default_types.hpp"
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
 

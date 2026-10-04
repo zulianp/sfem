@@ -17,16 +17,12 @@
 #include <cuda_runtime.h>
 #include <cusparse.h>
 
-using scalar_t = double;
-#ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT __restrict__
-#endif
+#include "support/cvfem_default_types.hpp"
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
 #include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
 #include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 
-namespace smesh { using count_t = int32_t; }
 #include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
 #ifdef CVFEM_ENABLE_SUBPAR
 #include "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
@@ -390,7 +386,11 @@ __global__ void cvfem_hex8_jacobian_action_pack_kernel(
             double adj_e[9];
 #pragma unroll
             for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
-            cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj_e, det[e], ux, uy, uz,
+            // LIM is a compile-time template parameter with no default, and the device path carries no
+            // limiter: 0 is the unlimited branch, which is what this call got when the limiter was a
+            // runtime argument defaulting to zero. Without the explicit argument the call does not
+            // compile at all, and nothing noticed because CUDA is not built on the development machine.
+            cvfem_hex8_ns_upwind_jacobian_action</*LIM=*/0>(rho, mu, adj_e, det[e], ux, uy, uz,
                                                  vx, vy, vz, q, re);
         }
 #pragma unroll
@@ -756,7 +756,11 @@ __global__ void cvfem_hex8_jacobian_action_global_kernel(
             double adj_e[9];
 #pragma unroll
             for (int c = 0; c < 9; ++c) adj_e[c] = adj[(ptrdiff_t)c * nelements + e];
-            cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj_e, det[e], ux, uy, uz,
+            // LIM is a compile-time template parameter with no default, and the device path carries no
+            // limiter: 0 is the unlimited branch, which is what this call got when the limiter was a
+            // runtime argument defaulting to zero. Without the explicit argument the call does not
+            // compile at all, and nothing noticed because CUDA is not built on the development machine.
+            cvfem_hex8_ns_upwind_jacobian_action</*LIM=*/0>(rho, mu, adj_e, det[e], ux, uy, uz,
                                                  vx, vy, vz, q, re);
         }
 

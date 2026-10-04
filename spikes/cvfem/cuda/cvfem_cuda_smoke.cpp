@@ -5,14 +5,12 @@
 // compares, in double and in float.
 
 #include <cmath>
+#include "kernels/cvfem_portability.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
 
-using scalar_t = double;
-#ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT __restrict__
-#endif
+#include "support/cvfem_default_types.hpp"
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
 #include "kernels/microkernels/hex8/affine/cvfem_hex8_affine_geometry.hpp"

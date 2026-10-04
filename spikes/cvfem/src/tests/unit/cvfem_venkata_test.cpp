@@ -13,7 +13,7 @@
 
 #include "kernels/microkernels/limiters/cvfem_venkata_limiter.hpp"
 
-using scalar_t = double;
+#include "support/cvfem_default_types.hpp"
 
 static int g_failures = 0;
 

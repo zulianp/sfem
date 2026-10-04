@@ -35,17 +35,17 @@ static void reset_residual(const ptrdiff_t nnodes,
     }
 }
 
-static SFEM_INLINE void atomic_add(scalar_t *const SFEM_RESTRICT f, const smesh::idx_t id, const scalar_t value) {
+static SFEM_INLINE void atomic_add(scalar_t *const SFEM_RESTRICT f, const idx_t id, const scalar_t value) {
     CVFEM_ATOMIC_ADD(f[id], value);
 }
 
-static SFEM_INLINE smesh::count_t find_bsr_slot(const smesh::count_t *const SFEM_RESTRICT rowptr,
-                                                const smesh::idx_t *const SFEM_RESTRICT   colidx,
-                                                const smesh::idx_t                        row,
-                                                const smesh::idx_t                        col) {
-    const smesh::count_t begin = rowptr[row];
-    const smesh::count_t end   = rowptr[row + 1];
-    for (smesh::count_t k = begin; k < end; ++k) {
+static SFEM_INLINE count_t find_bsr_slot(const count_t *const SFEM_RESTRICT rowptr,
+                                                const idx_t *const SFEM_RESTRICT   colidx,
+                                                const idx_t                        row,
+                                                const idx_t                        col) {
+    const count_t begin = rowptr[row];
+    const count_t end   = rowptr[row + 1];
+    for (count_t k = begin; k < end; ++k) {
         if (colidx[k] == col) return k;
     }
     return begin;

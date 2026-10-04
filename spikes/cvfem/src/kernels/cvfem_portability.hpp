@@ -44,6 +44,36 @@
 #define SFEM_DEVICE_INLINE SFEM_HOST_DEVICE inline
 #endif
 
+// THE OTHER THREE, HERE AND NOWHERE ELSE.
+//
+// SFEM_RESTRICT, SFEM_INLINE and SFEM_NOINLINE had nine definitions between them across the
+// spike, all under #ifndef, so the effective one was decided by include order. Two of the nine
+// disagreed with the rest, both in cvfem_venkata_limiter.hpp, which the HEX8 kernels header
+// includes at its line 5 -- twenty-five lines before this file:
+//
+//   * `#define SFEM_INLINE inline`, without always_inline. Every other site spells it
+//     `inline __attribute__((always_inline))`. Which one a kernel got depended on whether its
+//     translation unit reached a family header before the limiter.
+//   * `#define SFEM_HOST_DEVICE` unconditionally, with no __CUDACC__ test. That one is not a
+//     weaker spelling but a wrong one: it made SFEM_HOST_DEVICE empty in EVERY CUDA translation
+//     unit, so every kernel was host-only and the device smoke test could not compile at all --
+//     "calling a __host__ function from a __global__ function". Nothing caught it because CUDA
+//     is not built on the development machine.
+//
+// So they are defined here, with this file included where they are needed, rather than
+// re-spelled per site.
+#ifndef SFEM_RESTRICT
+#define SFEM_RESTRICT __restrict__
+#endif
+
+#ifndef SFEM_INLINE
+#define SFEM_INLINE inline __attribute__((always_inline))
+#endif
+
+#ifndef SFEM_NOINLINE
+#define SFEM_NOINLINE __attribute__((noinline))
+#endif
+
 // clang-format off
 #if defined(__CUDA_ARCH__)
 // Device: native atomicAdd. Requires sm_60+ for the double overload.

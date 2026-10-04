@@ -2,6 +2,7 @@
 #define CVFEM_TET4_NS_UPWIND_KERNELS_HPP
 
 #include <cassert>
+#include "kernels/cvfem_portability.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -10,13 +11,7 @@
 #include <omp.h>
 #endif
 
-#ifndef SFEM_RESTRICT
-#define SFEM_RESTRICT __restrict__
-#endif
 
-#ifndef SFEM_INLINE
-#define SFEM_INLINE inline __attribute__((always_inline))
-#endif
 
 #ifndef CVFEM_IDX_INVALID
 #define CVFEM_IDX_INVALID (-1)

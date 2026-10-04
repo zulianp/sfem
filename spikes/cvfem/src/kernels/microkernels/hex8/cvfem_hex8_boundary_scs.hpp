@@ -191,7 +191,7 @@ static SFEM_INLINE void cvfem_hex8_bnd_commit(MeshT &d, const ptrdiff_t i, const
         if (r[a * 4 + 0] == scalar_t(0) && r[a * 4 + 1] == scalar_t(0) && r[a * 4 + 2] == scalar_t(0) &&
             r[a * 4 + 3] == scalar_t(0))
             continue;
-        const smesh::idx_t g = d.elems[a][e];
+        const idx_t g = d.elems[a][e];
         CVFEM_ATOMIC_ADD(fx[g], r[a * 4 + 0]);
         CVFEM_ATOMIC_ADD(fy[g], r[a * 4 + 1]);
         CVFEM_ATOMIC_ADD(fz[g], r[a * 4 + 2]);
@@ -243,7 +243,7 @@ static void cvfem_hex8_bnd_gather_soa(MeshT &d, scalar_t *const SFEM_RESTRICT fx
             sz += v[2];
             sc += v[3];
         }
-        const smesh::idx_t g = d.bnd_gather_dest[(size_t)k];
+        const idx_t g = d.bnd_gather_dest[(size_t)k];
         fx[g] += sx;
         fy[g] += sy;
         fz[g] += sz;

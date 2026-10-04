@@ -31,7 +31,7 @@
 #include <cstdio>
 #include <cstring>
 
-using scalar_t = double;
+#include "support/cvfem_default_types.hpp"
 // The index types the kernel headers name, on the same contract as scalar_t above: src/kernels/
 // spells them unqualified so that it depends on no library, and whoever includes it supplies the
 // alias. This test includes those headers directly rather than through a family header, so it

@@ -70,7 +70,7 @@ static SFEM_INLINE void gather_hex8_adj_soa(const scalar_t *const *const SFEM_RE
 }
 
 
-static SFEM_INLINE void gather_element_fields(smesh::idx_t **const SFEM_RESTRICT elems,
+static SFEM_INLINE void gather_element_fields(idx_t **const SFEM_RESTRICT elems,
                                               const scalar_t *const SFEM_RESTRICT ux_src,
                                               const scalar_t *const SFEM_RESTRICT uy_src,
                                               const scalar_t *const SFEM_RESTRICT uz_src,
@@ -81,7 +81,7 @@ static SFEM_INLINE void gather_element_fields(smesh::idx_t **const SFEM_RESTRICT
                                               scalar_t *const SFEM_RESTRICT    uz,
                                               scalar_t *const SFEM_RESTRICT    p) {
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = elems[a][e];
+        const idx_t g = elems[a][e];
         ux[a]                = ux_src[g];
         uy[a]                = uy_src[g];
         uz[a]                = uz_src[g];
@@ -89,8 +89,8 @@ static SFEM_INLINE void gather_element_fields(smesh::idx_t **const SFEM_RESTRICT
     }
 }
 
-static SFEM_INLINE void gather_element_coords(smesh::idx_t **const SFEM_RESTRICT elems,
-                                              smesh::geom_t **const SFEM_RESTRICT points,
+static SFEM_INLINE void gather_element_coords(idx_t **const SFEM_RESTRICT elems,
+                                              geom_t **const SFEM_RESTRICT points,
                                               const ptrdiff_t               e,
                                               scalar_t *const SFEM_RESTRICT x,
                                               scalar_t *const SFEM_RESTRICT y,
@@ -99,7 +99,7 @@ static SFEM_INLINE void gather_element_coords(smesh::idx_t **const SFEM_RESTRICT
     const auto *const py = points[1];
     const auto *const pz = points[2];
     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const smesh::idx_t g = elems[a][e];
+        const idx_t g = elems[a][e];
         x[a]                 = scalar_t(px[g]);
         y[a]                 = scalar_t(py[g]);
         z[a]                 = scalar_t(pz[g]);
@@ -119,8 +119,8 @@ struct Hex8ExtraScratch {
     // MeshData parameter here is the last thing keeping that sweep's signature tied to the
     // staging layer. The sources carry a _src suffix because this object's own members already
     // own the short names -- its whole job is to copy pgx[] out of pgx_src[].
-    SFEM_INLINE void load(smesh::idx_t **const SFEM_RESTRICT  elems,
-                          smesh::geom_t **const SFEM_RESTRICT points,
+    SFEM_INLINE void load(idx_t **const SFEM_RESTRICT  elems,
+                          geom_t **const SFEM_RESTRICT points,
                           const uint8_t *const SFEM_RESTRICT  face_mask,
                           const scalar_t *const SFEM_RESTRICT pgx_src,
                           const scalar_t *const SFEM_RESTRICT pgy_src,
@@ -139,7 +139,7 @@ struct Hex8ExtraScratch {
         if (opt.with_bnd) fmask = (int)face_mask[(size_t)e];
         if (opt.with_rc) {
             for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const smesh::idx_t g = elems[a][e];
+                const idx_t g = elems[a][e];
                 pgx[a]               = pgx_src[g];
                 pgy[a]               = pgy_src[g];
                 pgz[a]               = pgz_src[g];
@@ -173,7 +173,7 @@ struct Hex8ExtraScratch {
             }
             if (opt.with_qg) {
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const smesh::idx_t g = elems[a][e];
+                    const idx_t g = elems[a][e];
                     qgx[a]               = qgx_src[g];
                     qgy[a]               = qgy_src[g];
                     qgz[a]               = qgz_src[g];
