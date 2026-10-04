@@ -1007,7 +1007,15 @@ inline void sscvfem_nodal_grad_scatter_range(
         const uint8_t *const SFEM_RESTRICT macro_curved,
         const int nxe,
         geom_t **const SFEM_RESTRICT points,
-        const SSScatter *const sc, const scalar_t *const SFEM_RESTRICT src,
+        
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t n_slots,
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage,
+        const ptrdiff_t n_shared, const scalar_t *const SFEM_RESTRICT src,
                                              const int stride, scalar_t *const SFEM_RESTRICT ogx,
                                              scalar_t *const SFEM_RESTRICT ogy, scalar_t *const SFEM_RESTRICT ogz,
                                              const ptrdiff_t e_begin, const ptrdiff_t e_end);
@@ -1050,7 +1058,7 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
         const ptrdiff_t n_packed = p.n_packed_elements > 0 ? p.n_packed_elements : 0;
         // Zeroes the outputs itself, since it cannot own all of them here.
         sscvfem_nodal_grad_packed(d, p, src, stride, ogx, ogy, ogz, /*apply_weight=*/false);
-        sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter.get() : nullptr, src, stride, ogx.data(), ogy.data(), ogz.data(), n_packed, d.nmacro);
+        sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(), n_packed, d.nmacro);
         sscvfem_nodal_grad_normalize(d, ogx, ogy, ogz);
         return;
     }
@@ -1062,7 +1070,7 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
     ogy.assign((size_t)d.nnodes, 0);
     ogz.assign((size_t)d.nnodes, 0);
 
-    sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter.get() : nullptr, src, stride, ogx.data(), ogy.data(), ogz.data(), 0, d.nmacro);
+    sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(), 0, d.nmacro);
     sscvfem_nodal_grad_normalize(d, ogx, ogy, ogz);
 }
 
@@ -1080,7 +1088,15 @@ inline void sscvfem_nodal_grad_scatter_range(
         const uint8_t *const SFEM_RESTRICT macro_curved,
         const int nxe,
         geom_t **const SFEM_RESTRICT points,
-        const SSScatter *const sc, const scalar_t *const SFEM_RESTRICT src,
+        
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t n_slots,
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage,
+        const ptrdiff_t n_shared, const scalar_t *const SFEM_RESTRICT src,
                                              const int stride, scalar_t *const SFEM_RESTRICT ogx,
                                              scalar_t *const SFEM_RESTRICT ogy, scalar_t *const SFEM_RESTRICT ogz,
                                              const ptrdiff_t e_begin, const ptrdiff_t e_end) {
@@ -1103,9 +1119,8 @@ inline void sscvfem_nodal_grad_scatter_range(
     //
     // Skipped for a full range, where every slot is written before it is read and this would be
     // pure cost on the path that runs in serial.
-    if (sc && e_begin > 0 && sc->n_slots > 0) {
-        scalar_t *const stage = const_cast<scalar_t *>(sc->stage.data());
-        std::fill(stage, stage + (size_t)sc->n_slots * NG, scalar_t(0));
+    if (slot && e_begin > 0 && n_slots > 0) {
+        std::fill(stage, stage + (size_t)n_slots * NG, scalar_t(0));
     }
 
 #pragma omp parallel
@@ -1116,7 +1131,7 @@ inline void sscvfem_nodal_grad_scatter_range(
 
 #pragma omp for schedule(static)
         for (ptrdiff_t e = e_begin; e < e_end; ++e) {
-            if (sc) std::fill(lacc.begin(), lacc.end(), scalar_t(0));
+            if (slot) std::fill(lacc.begin(), lacc.end(), scalar_t(0));
             // Only the field. The coordinates used to be gathered for every node of the
             // macro-element -- three arrays of (L+1)^3 -- to feed a geometry computation that
             // is the same for all of them.
@@ -1170,7 +1185,7 @@ inline void sscvfem_nodal_grad_scatter_range(
                         }
                         for (int a = 0; a < 8; ++a) {
                             const int l = base + off[a];
-                            if (sc) {
+                            if (slot) {
                                 scalar_t *const acc = lacc.data() + (size_t)l * NG;
                                 acc[0] += gx;
                                 acc[1] += gy;
@@ -1186,16 +1201,16 @@ inline void sscvfem_nodal_grad_scatter_range(
                 }
             }
 
-            if (sc) {
+            if (slot) {
                 scalar_t *dst[NG] = {ogx, ogy, ogz};
-                sscvfem_scatter_element_soa_w<NG>(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lacc.data(), dst);
+                sscvfem_scatter_element_soa_w<NG>(slot, const_cast<scalar_t *>(stage), nxe, e, lg.data(), lacc.data(), dst);
             }
         }
     }
 
-    if (sc) {
+    if (slot) {
         scalar_t *dst[NG] = {ogx, ogy, ogz};
-        sscvfem_reduce_shared_soa_w<NG>(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), dst);
+        sscvfem_reduce_shared_soa_w<NG>(red_idx, red_ptr, shared_node, const_cast<scalar_t *>(stage), n_shared, dst);
     }
 
     // No normalisation here: the caller divides once, after whichever passes it ran. See
@@ -1871,7 +1886,14 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
         const Hex8RcConfig rcfg,
-        const SSScatter *const sc, const scalar_t rho, const scalar_t mu,
+        
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage,
+        const ptrdiff_t n_shared, const scalar_t rho, const scalar_t mu,
                                                             const scalar_t *const SFEM_RESTRICT dir,
                                                             scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("sscvfem::apply_macro_local_hoisted");
@@ -2001,8 +2023,8 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
                 }
             }
 
-            if (sc)
-                sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lout.data(), jv);
+            if (slot)
+                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg.data(), lout.data(), jv);
             else
                 for (int a = 0; a < nxe; ++a) {
                     const smesh::idx_t g = lg[(size_t)a];
@@ -2012,7 +2034,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         }
     }
 
-    if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), jv);
+    if (slot) sscvfem_reduce_shared(red_idx, red_ptr, shared_node, const_cast<scalar_t *>(stage), n_shared, jv);
 }
 
 // ---------------------------------------------------------------------------
@@ -2149,7 +2171,7 @@ inline void sscvfem_apply_blocks_ref(SSMeshData &d, const scalar_t rho, const sc
         if (exact) sscvfem_nodal_q_grad(d, v.data());
         // The default apply, named directly rather than through sscvfem_apply, which
         // is declared below this point.
-        sscvfem_apply_macro_local_hoisted(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, v.data(), y.data());
+        sscvfem_apply_macro_local_hoisted(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, v.data(), y.data());
 
         const int mom_bit = ucol ? SSBLOCK_UU : SSBLOCK_UP;
         const int con_bit = ucol ? SSBLOCK_PU : SSBLOCK_PP;
@@ -2342,7 +2364,14 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
         const Hex8RcConfig rcfg,
-        const SSScatter *const sc, const scalar_t rho, const scalar_t mu,
+        
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage,
+        const ptrdiff_t n_shared, const scalar_t rho, const scalar_t mu,
                                                     const scalar_t *const SFEM_RESTRICT dir,
                                                     scalar_t *const SFEM_RESTRICT       jv) {
     constexpr bool uu = (Blocks & SSBLOCK_UU) != 0;
@@ -2598,8 +2627,8 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
             // selection does not write are zero in lout, so they contribute nothing, and
             // the saving the component-wise atomics bought no longer applies once the
             // scatter is a plain write.
-            if (sc)
-                sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lout.data(), jv);
+            if (slot)
+                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg.data(), lout.data(), jv);
             else
                 for (int a = 0; a < nxe; ++a) {
                     const smesh::idx_t g = lg[(size_t)a];
@@ -2612,7 +2641,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_impl(
         }
     }
 
-    if (sc) sscvfem_reduce_shared(sc->red_idx.data(), sc->red_ptr.data(), sc->shared_node.data(), const_cast<scalar_t *>(sc->stage.data()), (ptrdiff_t)sc->shared_node.size(), jv);
+    if (slot) sscvfem_reduce_shared(red_idx, red_ptr, shared_node, const_cast<scalar_t *>(stage), n_shared, jv);
 }
 
 // Runtime entry. The mask is a compile-time parameter inside, so each combination gets a
@@ -2641,14 +2670,14 @@ inline void sscvfem_apply_blocks(SSMeshData &d, const scalar_t rho, const scalar
         // 0 selects no block at all: the sweep gathers the macro-element, computes
         // nothing, and scatters zeros. That is the floor any block specialisation can
         // reach, and it is worth being able to measure rather than infer.
-        case 0:           sscvfem_apply_blocks_impl<0>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir, jv);           break;
-        case SSBLOCK_UU:  sscvfem_apply_blocks_impl<SSBLOCK_UU>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir, jv);  break;
-        case SSBLOCK_UP:  sscvfem_apply_blocks_impl<SSBLOCK_UP>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir, jv);  break;
-        case SSBLOCK_PU:  sscvfem_apply_blocks_impl<SSBLOCK_PU>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir, jv);  break;
-        case SSBLOCK_PP:  sscvfem_apply_blocks_impl<SSBLOCK_PP>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir, jv);  break;
-        case SSBLOCK_MOM: sscvfem_apply_blocks_impl<SSBLOCK_MOM>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir, jv); break;
-        case SSBLOCK_CON: sscvfem_apply_blocks_impl<SSBLOCK_CON>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir, jv); break;
-        case SSBLOCK_ALL: sscvfem_apply_blocks_impl<SSBLOCK_ALL>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir, jv); break;
+        case 0:           sscvfem_apply_blocks_impl<0>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir, jv);           break;
+        case SSBLOCK_UU:  sscvfem_apply_blocks_impl<SSBLOCK_UU>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir, jv);  break;
+        case SSBLOCK_UP:  sscvfem_apply_blocks_impl<SSBLOCK_UP>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir, jv);  break;
+        case SSBLOCK_PU:  sscvfem_apply_blocks_impl<SSBLOCK_PU>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir, jv);  break;
+        case SSBLOCK_PP:  sscvfem_apply_blocks_impl<SSBLOCK_PP>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir, jv);  break;
+        case SSBLOCK_MOM: sscvfem_apply_blocks_impl<SSBLOCK_MOM>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir, jv); break;
+        case SSBLOCK_CON: sscvfem_apply_blocks_impl<SSBLOCK_CON>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir, jv); break;
+        case SSBLOCK_ALL: sscvfem_apply_blocks_impl<SSBLOCK_ALL>(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir, jv); break;
         default:          sscvfem_apply_blocks_ref(d, rho, mu, blocks, dir, jv);       break;
     }
 
@@ -3619,7 +3648,7 @@ inline void sscvfem_apply(SSMeshData &d, const scalar_t rho, const scalar_t mu,
         d.qgy.clear();
         d.qgz.clear();
     }
-    sscvfem_apply_macro_local_hoisted(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir, jv);
+    sscvfem_apply_macro_local_hoisted(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, dir, jv);
     // The transient term's contribution to the Jacobian action, rho V a0 / dt on each
     // velocity component. The flat path does this in
     // apply_jacobian_action_accumulate and this line was simply missing, so the
