@@ -1130,6 +1130,27 @@ int main(int argc, char **argv) {
     // not a defect: the atomic-vs-packed action came out at 2.4e-04 that way. --verify is the
     // gate for this layout; it compares against the atomic sweep on the same connectivity and
     // checks the cached geometry against the permuted connectivity directly.
+    // ELEMENT COLOURING IMPLEMENTS THE MATRIX-FREE OPERATIONS AND NOTHING ELSE.
+    //
+    // kernels/colored/affine/ has exactly two sweeps, the residual and the Jacobian action; there
+    // is no coloured assembly, no BSR apply and no block diagonal. The driver used to accept the
+    // flags anyway and SEGFAULT -- `--layout ecolor --assemble` has done so since before this
+    // layout's own verification arm existed, because the dispatch falls through to a path that
+    // reads tables this layout never built. A refusal that names the layout is cheap; a crash in
+    // a benchmark is how a measurement campaign loses an afternoon.
+    //
+    // PACK colouring, which is `--layout colored`, is the colouring that assembles, and it is the
+    // fastest assembly arm in scripts/perf_regression.sh. The two are different layouts and the
+    // names do not say so.
+    if (layout == "ecolor" && (assemble || bsr_apply || assemble_diag)) {
+        std::fprintf(stderr,
+                     "--layout ecolor has no %s: element colouring implements the matrix-free "
+                     "residual and Jacobian action only (kernels/colored/affine/).\n"
+                     "For a coloured ASSEMBLY use --layout colored, which is PACK colouring.\n",
+                     assemble ? "assembly" : (bsr_apply ? "BSR apply" : "block diagonal"));
+        if (own_mpi) MPI_Finalize();
+        return 1;
+    }
     if (layout == "ecolor" && (verify_jac || verify_ho)) {
         std::fprintf(stderr,
                      "--layout ecolor renumbers the elements, so the pack-based oracles behind "
