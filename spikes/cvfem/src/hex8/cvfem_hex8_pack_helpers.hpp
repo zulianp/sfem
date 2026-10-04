@@ -20,7 +20,8 @@
 // benchmark has no use for, and 370 (68%) genuinely differ.
 
 #include "kernels/cvfem_hex8_flags.hpp"
-#include "kernels/cvfem_hex8_element_gather.hpp"   // Hex8RcConfig, Hex8Extras
+#include "kernels/cvfem_hex8_element_gather.hpp"
+#include "kernels/cvfem_scatter.hpp"   // MIN   // Hex8RcConfig, Hex8Extras
 #include "core/cvfem_element_coloring.hpp"
 
 // Takes the affine geometry, not the mesh. It is called from inside more than twenty sweeps in
