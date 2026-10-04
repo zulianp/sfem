@@ -1068,7 +1068,20 @@ inline SFEM_NOINLINE void sscvfem_residual(SSMeshData &d, const scalar_t rho, co
     if (zero_first)
         for (ptrdiff_t i = 0; i < ndof; ++i) res[i] = scalar_t(0);
 
-    sscvfem_residual_sweep(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.conv_ho, d.conv_limiter, d.conv_peclet, d.conv_venkat_c, d.elems, d.level, d.limiter_stats, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.ugrad.empty() ? nullptr : d.ugrad.data(), d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, res);
+    {
+        CVFEM_TRACE_SCOPE("sscvfem::residual_sweep");
+        #pragma omp parallel
+            sscvfem_residual_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.conv_ho, d.conv_limiter, d.conv_peclet, d.conv_venkat_c, d.elems, d.level, d.limiter_stats, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.ugrad.empty() ? nullptr : d.ugrad.data(), d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, res);
+    }
+    // The element pass has written every staging slot: now each shared node sums the ones that
+    // belong to it, in slot order. Not inside a parallel region -- sscvfem_reduce_shared still
+    // owns one, and nesting gives each outer thread a one-thread team that runs the whole loop.
+    if (d.scatter && d.scatter->ready) {
+        const SSScatter &sc = *d.scatter;
+        sscvfem_reduce_shared(sc.red_idx.data(), sc.red_ptr.data(), sc.shared_node.data(),
+                              const_cast<scalar_t *>(sc.stage.data()),
+                              (ptrdiff_t)sc.shared_node.size(), res);
+    }
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
 }
