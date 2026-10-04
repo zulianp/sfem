@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
             sscvfem_apply_macro_local(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
             sscvfem_apply_macro_local_affine(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
             std::vector<scalar_t> y_hoi((size_t)ndof, 0), y_em((size_t)ndof, 0);
-            sscvfem_apply_macro_local_hoisted(d, rho, mu, dir.data(), y_hoi.data());
+            sscvfem_apply_macro_local_hoisted(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.data(), d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir.data(), y_hoi.data());
 #ifdef CVFEM_ENABLE_SUBPAR_EM
             sscvfem_apply_macro_local_em(d, rho, mu, dir.data(), y_em.data());
 #endif
@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
             // the diagonal blocks. The second is what makes this a statement about the
             // Jacobian rather than about two functions agreeing with each other.
             std::vector<scalar_t> bd_naive, bd_macro;
-            sscvfem_block_diag_naive(d, rho, mu, bd_naive);
+            sscvfem_block_diag_naive(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, bd_naive);
             sscvfem_block_diag(d, rho, mu, bd_macro);
 
             double bdmax = 0, bdref = 0;
@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
                     std::fill(ecol.begin(), ecol.end(), scalar_t(0));
                     ecol[(size_t)c] = scalar_t(1);
                     std::fill(ycol.begin(), ycol.end(), scalar_t(0));
-                    sscvfem_apply_macro_local_hoisted(d, rho, mu, ecol.data(), ycol.data());
+                    sscvfem_apply_macro_local_hoisted(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.data(), d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, ecol.data(), ycol.data());
                     // Column c of J touches the diagonal block of node c/4 in rows of the
                     // same node.
                     const ptrdiff_t node = c / 4, fld = c % 4;
@@ -223,7 +223,7 @@ int main(int argc, char **argv) {
 
             const double t_hoi = time_it([&] {
                 std::fill(y_hoi.begin(), y_hoi.end(), scalar_t(0));
-                sscvfem_apply_macro_local_hoisted(d, rho, mu, dir.data(), y_hoi.data());
+                sscvfem_apply_macro_local_hoisted(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.data(), d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.empty() ? nullptr : d.qgx.data(), d.qgy.data(), d.qgz.data(), d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter.get() : nullptr, rho, mu, dir.data(), y_hoi.data());
             });
 
 #ifdef CVFEM_ENABLE_SUBPAR_EM
@@ -244,7 +244,7 @@ int main(int argc, char **argv) {
             const double t_emf  = 0;
             const double t_best = std::min(std::min(t_macro, t_aff), t_hoi);
 #endif
-            const double t_bdn = time_it([&] { sscvfem_block_diag_naive(d, rho, mu, bd_naive); });
+            const double t_bdn = time_it([&] { sscvfem_block_diag_naive(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, bd_naive); });
             const double t_bdm = time_it([&] { sscvfem_block_diag(d, rho, mu, bd_macro); });
 
             // Residual: the two layouts must agree, as everywhere else.
