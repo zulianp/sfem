@@ -1403,6 +1403,11 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(
 // block-Jacobi cannot invert. A diagonal measured without it is a preconditioner that
 // could never be used.
 static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
+                                              // How many boundary elements bnd_elems was
+                                              // compacted to. opt.with_bnd already answers the
+                                              // other half -- it IS !face_mask.empty() -- so only
+                                              // the count has to be told.
+                                              const ptrdiff_t n_bnd,
                                               // Which optional terms are on, resolved once per
                                               // solve by the caller rather than per sweep here:
                                               // cvfem_hex8_extras_of reads the mesh, which this
@@ -1428,10 +1433,15 @@ static SFEM_NOINLINE void assemble_diag_atomic(MeshData             &d,
         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
         cvfem_hex8_ns_upwind_jacobian_add_slots<true>(rho, mu, adj, det, ux, uy, uz, sl, values, ex.rc, p);
     }
-    assemble_diag_boundary_scs_pass(d.Lx, d.Ly, d.Lz, d.adj_ptr, d.bnd_elems.data(), d.det_ptr, d.elems, d.face_mask_eff.data(), d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), !d.face_mask.empty(), (ptrdiff_t)d.bnd_elems.size(), rho, mu, 0, diag);
+    assemble_diag_boundary_scs_pass(d.Lx, d.Ly, d.Lz, d.adj_ptr, d.bnd_elems.data(), d.det_ptr, d.elems, d.face_mask_eff.data(), d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), opt.with_bnd, n_bnd, rho, mu, 0, diag);
 }
 
 static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
+                                              // How many boundary elements bnd_elems was
+                                              // compacted to. opt.with_bnd already answers the
+                                              // other half -- it IS !face_mask.empty() -- so only
+                                              // the count has to be told.
+                                              const ptrdiff_t n_bnd,
                                               // Which optional terms are on, resolved once per
                                               // solve by the caller rather than per sweep here:
                                               // cvfem_hex8_extras_of reads the mesh, which this
@@ -1457,7 +1467,7 @@ static SFEM_NOINLINE void assemble_diag_atomic_isoparam(MeshData             &d,
         cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
                 rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, sl, values, ex.rc, p);
     }
-    assemble_diag_boundary_scs_pass(d.Lx, d.Ly, d.Lz, d.adj_ptr, d.bnd_elems.data(), d.det_ptr, d.elems, d.face_mask_eff.data(), d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), !d.face_mask.empty(), (ptrdiff_t)d.bnd_elems.size(), rho, mu, 1, diag);
+    assemble_diag_boundary_scs_pass(d.Lx, d.Ly, d.Lz, d.adj_ptr, d.bnd_elems.data(), d.det_ptr, d.elems, d.face_mask_eff.data(), d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), opt.with_bnd, n_bnd, rho, mu, 1, diag);
 }
 
 // ---------------------------------------------------------------------------

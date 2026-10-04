@@ -2208,9 +2208,9 @@ int main(int argc, char **argv) {
         // than inside each branch, so no branch gains a second unbraced statement.
         cvfem_hex8_build_face_mask_eff(d);
         if (geom_kind == GeomKind::Isoparam)
-            assemble_diag_atomic_isoparam(d, cvfem_hex8_extras_of(d), rho, mu, diag_blocks.data());
+            assemble_diag_atomic_isoparam(d, (ptrdiff_t)d.bnd_elems.size(), cvfem_hex8_extras_of(d), rho, mu, diag_blocks.data());
         else
-            assemble_diag_atomic(d, cvfem_hex8_extras_of(d), rho, mu, diag_blocks.data());
+            assemble_diag_atomic(d, (ptrdiff_t)d.bnd_elems.size(), cvfem_hex8_extras_of(d), rho, mu, diag_blocks.data());
         assemble_diag_transient_pass(d, rho, diag_blocks);
     };
 
