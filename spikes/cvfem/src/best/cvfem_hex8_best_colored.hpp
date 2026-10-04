@@ -353,7 +353,7 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                         gather_hex8_action_simd_from_pack(p.elems,
                                                           pack_u,
                                                           pack_dir,
-                                                          d,
+                                                          d.adj_ptr, d.det_ptr,
                                                           begin,
                                                           nlanes,
                                                           u_pack,

@@ -47,7 +47,21 @@
 // per-thread state: the launcher owns one set per thread, in its parallel region, and passes it.
 static SFEM_NOINLINE void apply_residual_ecolored_range(
         const cvfem_range r,
-        MeshData         &d,
+        // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
+        // mesh -- so what this kernel reads out of them is what it takes. DESIGN.md: only
+        // arguments that are actually used are passed.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t rhie_chow_scale,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
         const scalar_t    rho,
         const scalar_t    mu,
         const scalar_t *const SFEM_RESTRICT ugrad,
@@ -75,17 +89,17 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
         Hex8UGradPack    &hop) {
     for (ptrdiff_t e0 = r.begin; e0 < r.end; e0 += CVFEM_HEX8_VEC_SIZE) {
             const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, r.end - e0);
-            gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+            gather_hex8_adj_soa(adj_ptr, det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                 if (lane < nlanes) {
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const idx_t g = d.elems[a][e];
-                        in.ux[a][lane]       = d.ux[g];
-                        in.uy[a][lane]       = d.uy[g];
-                        in.uz[a][lane]       = d.uz[g];
-                        in.p[a][lane]        = d.p[g];
+                        const idx_t g = mesh_elems[a][e];
+                        in.ux[a][lane]       = ux[g];
+                        in.uy[a][lane]       = uy[g];
+                        in.uz[a][lane]       = uz[g];
+                        in.p[a][lane]        = pres[g];
                     }
                 } else {
                     // A padding lane must carry a STATE, not zeros that the flux would treat as a
@@ -98,17 +112,17 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
             }
 
             if (opt.with_rc) {
-                const auto *const px = d.points[0];
-                const auto *const py = d.points[1];
-                const auto *const pz = d.points[2];
+                const auto *const px = points[0];
+                const auto *const py = points[1];
+                const auto *const pz = points[2];
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     if (lane < nlanes) {
                         const ptrdiff_t e = e0 + lane;
                         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            const idx_t g = d.elems[a][e];
-                            rcp.pgx[a][lane]     = d.pgx[g];
-                            rcp.pgy[a][lane]     = d.pgy[g];
-                            rcp.pgz[a][lane]     = d.pgz[g];
+                            const idx_t g = mesh_elems[a][e];
+                            rcp.pgx[a][lane]     = pgx[g];
+                            rcp.pgy[a][lane]     = pgy[g];
+                            rcp.pgz[a][lane]     = pgz[g];
                         }
                     } else {
                         for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -126,10 +140,10 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
                             for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = scalar_t(0);
                             continue;
                         }
-                        const idx_t gn = d.elems[a][e0 + lane];
-                        hop.x[a][lane]        = scalar_t(d.points[0][gn]);
-                        hop.y[a][lane]        = scalar_t(d.points[1][gn]);
-                        hop.z[a][lane]        = scalar_t(d.points[2][gn]);
+                        const idx_t gn = mesh_elems[a][e0 + lane];
+                        hop.x[a][lane]        = scalar_t(points[0][gn]);
+                        hop.y[a][lane]        = scalar_t(points[1][gn]);
+                        hop.z[a][lane]        = scalar_t(points[2][gn]);
                         for (int c = 0; c < 9; ++c) hop.g[a][c][lane] = ugrad[(ptrdiff_t)gn * 9 + c];
                     }
                 }
@@ -178,14 +192,14 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
             } else {
                 cvfem_hex8_ns_upwind_residual_sumfact_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5,
                                                            cof6, cof7, cof8, detv, in, outp,
-                                                           opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale,
+                                                           opt.with_rc ? &rcp : nullptr, rhie_chow_scale,
                                                            scalar_t(0), with_ho ? &hop : nullptr);
             }
 
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const idx_t g = d.elems[a][e];
+                    const idx_t g = mesh_elems[a][e];
                     rx[g] += outp.rx[a][lane];
                     ry[g] += outp.ry[a][lane];
                     rz[g] += outp.rz[a][lane];
@@ -234,7 +248,7 @@ static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
                     cvfem_range_split(ec.color_ptr[(size_t)color],
                                       ec.color_ptr[(size_t)color + 1],
                                       CVFEM_HEX8_VEC_SIZE, part, n_parts),
-                    d, rho, mu, ugrad, limiter, venkat_c, opt, with_ho, rx, ry, rz, rc_out,
+                    d.adj_ptr, d.det_ptr, d.elems, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), rho, mu, ugrad, limiter, venkat_c, opt, with_ho, rx, ry, rz, rc_out,
                     cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in, outp, rcp, hop);
             // No two elements of a colour share a node, so the slices above need no
             // synchronisation between them. The next colour does: this is the barrier that used
@@ -248,7 +262,26 @@ static SFEM_NOINLINE void apply_residual_ecolored(MeshData              &d,
 // apply_residual_ecolored_range above.
 static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
         const cvfem_range r,
-        MeshData         &d,
+        // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
+        // mesh -- so what this kernel reads out of them is what it takes. DESIGN.md: only
+        // arguments that are actually used are passed.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT rc_coeff,
+        const scalar_t *const SFEM_RESTRICT rc_w,
+        const scalar_t rhie_chow_scale,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
         const scalar_t    rho,
         const scalar_t    mu,
         const scalar_t *const dir,
@@ -282,18 +315,18 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
         const Hex8RcConfig &rc_cfg) {
     for (ptrdiff_t e0 = r.begin; e0 < r.end; e0 += CVFEM_HEX8_VEC_SIZE) {
             const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, r.end - e0);
-            gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+            gather_hex8_adj_soa(adj_ptr, det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                 if (lane < nlanes) {
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const idx_t                  g  = d.elems[a][e];
+                        const idx_t                  g  = mesh_elems[a][e];
                         const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
-                        u_pack.ux[a][lane]                     = d.ux[g];
-                        u_pack.uy[a][lane]                     = d.uy[g];
-                        u_pack.uz[a][lane]                     = d.uz[g];
-                        u_pack.p[a][lane]                      = d.p[g];
+                        u_pack.ux[a][lane]                     = ux[g];
+                        u_pack.uy[a][lane]                     = uy[g];
+                        u_pack.uz[a][lane]                     = uz[g];
+                        u_pack.p[a][lane]                      = pres[g];
                         du_pack.ux[a][lane]                    = dv[0];
                         du_pack.uy[a][lane]                    = dv[1];
                         du_pack.uz[a][lane]                    = dv[2];
@@ -309,19 +342,19 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
             }
 
             if (opt.with_rc) {
-                const auto *const px = d.points[0];
-                const auto *const py = d.points[1];
-                const auto *const pz = d.points[2];
+                const auto *const px = points[0];
+                const auto *const py = points[1];
+                const auto *const pz = points[2];
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         if (lane < nlanes) {
-                            const idx_t g = d.elems[a][e0 + lane];
-                            rcp.pgx[a][lane]     = d.pgx[g];
-                            rcp.pgy[a][lane]     = d.pgy[g];
-                            rcp.pgz[a][lane]     = d.pgz[g];
-                            rcp.qgx[a][lane]     = has_qg ? d.qgx[g] : scalar_t(0);
-                            rcp.qgy[a][lane]     = has_qg ? d.qgy[g] : scalar_t(0);
-                            rcp.qgz[a][lane]     = has_qg ? d.qgz[g] : scalar_t(0);
+                            const idx_t g = mesh_elems[a][e0 + lane];
+                            rcp.pgx[a][lane]     = pgx[g];
+                            rcp.pgy[a][lane]     = pgy[g];
+                            rcp.pgz[a][lane]     = pgz[g];
+                            rcp.qgx[a][lane]     = has_qg ? qgx[g] : scalar_t(0);
+                            rcp.qgy[a][lane]     = has_qg ? qgy[g] : scalar_t(0);
+                            rcp.qgz[a][lane]     = has_qg ? qgz[g] : scalar_t(0);
                         } else {
                             rcp.pgx[a][lane] = rcp.pgy[a][lane] = rcp.pgz[a][lane] = scalar_t(0);
                             rcp.qgx[a][lane] = rcp.qgy[a][lane] = rcp.qgz[a][lane] = scalar_t(0);
@@ -330,7 +363,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                 }
             }
 
-            if (opt.with_rc) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), rc_cfg, e0, nlanes, rcp);
+            if (opt.with_rc) cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, e0, nlanes, rcp);
 
             // The state's nodal velocity gradient and the direction's, staged exactly as the
             // packed Jacobian stages them. Both are needed by the EXACT higher-order action; the
@@ -346,10 +379,10 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
                             }
                             continue;
                         }
-                        const idx_t gn = d.elems[a][e0 + lane];
-                        hop.x[a][lane]        = scalar_t(d.points[0][gn]);
-                        hop.y[a][lane]        = scalar_t(d.points[1][gn]);
-                        hop.z[a][lane]        = scalar_t(d.points[2][gn]);
+                        const idx_t gn = mesh_elems[a][e0 + lane];
+                        hop.x[a][lane]        = scalar_t(points[0][gn]);
+                        hop.y[a][lane]        = scalar_t(points[1][gn]);
+                        hop.z[a][lane]        = scalar_t(points[2][gn]);
                         for (int c = 0; c < 9; ++c) {
                             hop.g[a][c][lane]  = ugrad[(ptrdiff_t)gn * 9 + c];
                             hovp.g[a][c][lane] = vgrad[(ptrdiff_t)gn * 9 + c];
@@ -362,14 +395,14 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
 
             cvfem_hex8_ns_upwind_jacobian_action_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6,
                                                       cof7, cof8, detv, u_pack, du_pack, outp,
-                                                      opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale, has_qg,
+                                                      opt.with_rc ? &rcp : nullptr, rhie_chow_scale, has_qg,
                                                       scalar_t(0), with_ho ? &hop : nullptr,
                                                       with_ho ? &hovp : nullptr);
 
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const idx_t g = d.elems[a][e];
+                    const idx_t g = mesh_elems[a][e];
                     jv[g * N_FIELDS + 0] += outp.rx[a][lane];
                     jv[g * N_FIELDS + 1] += outp.ry[a][lane];
                     jv[g * N_FIELDS + 2] += outp.rz[a][lane];
@@ -417,7 +450,7 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored(MeshData              &
                     cvfem_range_split(ec.color_ptr[(size_t)color],
                                       ec.color_ptr[(size_t)color + 1],
                                       CVFEM_HEX8_VEC_SIZE, part, n_parts),
-                    d, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, opt, has_qg, with_ho,
+                    d.adj_ptr, d.det_ptr, d.elems, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, opt, has_qg, with_ho,
                     cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv,
                     u_pack, du_pack, outp, rcp, hop, hovp,
             cvfem_hex8_rc_config_for(d));

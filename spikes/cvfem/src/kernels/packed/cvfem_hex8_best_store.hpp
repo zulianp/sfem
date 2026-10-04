@@ -161,8 +161,31 @@ static void build_pack_store_crs(PackedData           &p,
 template <bool ISO>
 static SFEM_NOINLINE void assemble_jacobian_store_range(
         const cvfem_range packs,
-        MeshData        &d,
-        PackedData      &p,
+        // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
+        // mesh -- so what this kernel reads out of them is what it takes. DESIGN.md: only
+        // arguments that are actually used are passed.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t rhie_chow_scale,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        pack_idx_t **const SFEM_RESTRICT pack_elems,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const int *const SFEM_RESTRICT st_element_slot,
+        const ptrdiff_t *const SFEM_RESTRICT st_ghost_ptr,
+        scalar_t *const SFEM_RESTRICT st_ghost_val,
+        const int *const SFEM_RESTRICT st_local_nnz,
+        const int *const SFEM_RESTRICT st_owned_nnz,
         // BSR4 is a staging type (it owns a SharedBuffer and a graph); the kernel reads one
         // array out of it, so that is what it takes.
         const count_t *const SFEM_RESTRICT rowptr,
@@ -185,44 +208,44 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
         // the mesh, which a kernel is not meant to name.
         const Hex8RcConfig &rc_cfg) {
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
-            const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
-            const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
-            const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
-            const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
-            const int                               owned_nnz    = p.st_owned_nnz[(size_t)pack];
-            const int                               local_nnz    = p.st_local_nnz[(size_t)pack];
+            const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
+            const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
+            const ptrdiff_t                         owned        = owned_nodes_ptr[pack];
+            const ptrdiff_t                         n_contiguous = owned_nodes_ptr[pack + 1] - owned;
+            const ptrdiff_t                         n_ghost      = ghost_ptr[pack + 1] - ghost_ptr[pack];
+            const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
+            const int                               owned_nnz    = st_owned_nnz[(size_t)pack];
+            const int                               local_nnz    = st_local_nnz[(size_t)pack];
 
             double _t = phase_now();
             std::memset(local_vals, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_LOCAL_MEMSET] += _n - _t; _t = _n; }
 
-            fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
+            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
             if (with_rc)
-                cvfem_hex8_fill_pack_xyz_pgrad(p.owned_nodes_ptr, d.points, d.pgx.data(), d.pgy.data(), d.pgz.data(), !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0), pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
+                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz);
             if constexpr (ISO)
-                fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
             if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
 
             for (ptrdiff_t e = e_start; e < e_end; ++e) {
                 scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)p.elems[a][e] * N_FIELDS;
+                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * N_FIELDS;
                     ux_e[a]                               = u[0];
                     uy_e[a]                               = u[1];
                     uz_e[a]                               = u[2];
                     p_e[a]                                = u[3];
                 }
-                const int *const SFEM_RESTRICT slots = p.st_element_slot.data() + (size_t)e * 64;
+                const int *const SFEM_RESTRICT slots = st_element_slot + (size_t)e * 64;
 
                 scalar_t     rc_x[8], rc_y[8], rc_z[8], rc_pgx[8], rc_pgy[8], rc_pgz[8];
                 const Hex8RcConfig rcfg = rc_cfg;
                 Hex8RhieChow rc{};
                 if (with_rc) {
-                    gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, rc_x, rc_y, rc_z);
-                    gather_hex8_coords_from_pack(p.elems, pack_pgx, pack_pgy, pack_pgz, e, rc_pgx, rc_pgy, rc_pgz);
+                    gather_hex8_coords_from_pack(pack_elems, pack_x, pack_y, pack_z, e, rc_x, rc_y, rc_z);
+                    gather_hex8_coords_from_pack(pack_elems, pack_pgx, pack_pgy, pack_pgz, e, rc_pgx, rc_pgy, rc_pgz);
                     rc = Hex8RhieChow{rc_x,    rc_y,    rc_z,    rc_pgx, rc_pgy, rc_pgz, rcfg.scale,
                                       nullptr, nullptr, nullptr, ux_e,   uy_e,   uz_e,   rcfg.tau};
                 }
@@ -230,12 +253,12 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
 
                 if constexpr (ISO) {
                     scalar_t x[8], y[8], z[8];
-                    gather_hex8_coords_from_pack(p.elems, pack_x, pack_y, pack_z, e, x, y, z);
+                    gather_hex8_coords_from_pack(pack_elems, pack_x, pack_y, pack_z, e, x, y, z);
                     cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
                             rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
                 } else {
                     scalar_t adj[9], det;
-                    load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
+                    load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
                     switch (kernel_kind) {
                         case KernelKind::Sympy:
                             cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(
@@ -279,11 +302,11 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
             std::memcpy(gvalues + (ptrdiff_t)rowptr[owned] * 16, local_vals, (size_t)owned_nnz * 16 * sizeof(scalar_t));
 
             // ghost rows: park for the reduction below
-            const ptrdiff_t ghost_off = p.ghost_ptr[pack];
+            const ptrdiff_t ghost_off = ghost_ptr[pack];
             if (n_ghost > 0) {
-                const ptrdiff_t dest = p.st_ghost_ptr[(size_t)ghost_off];
-                const ptrdiff_t n    = p.st_ghost_ptr[(size_t)ghost_off + (size_t)n_ghost] - dest;
-                std::memcpy(p.st_ghost_val.data() + dest * 16,
+                const ptrdiff_t dest = st_ghost_ptr[(size_t)ghost_off];
+                const ptrdiff_t n    = st_ghost_ptr[(size_t)ghost_off + (size_t)n_ghost] - dest;
+                std::memcpy(st_ghost_val + dest * 16,
                             local_vals + (ptrdiff_t)owned_nnz * 16,
                             (size_t)n * 16 * sizeof(scalar_t));
             }
@@ -329,7 +352,7 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
 #pragma omp for schedule(dynamic, 1)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack)
             assemble_jacobian_store_range<ISO>(cvfem_range{pack, pack + 1},
-                                               d, p, b.rowptr, rho, mu, kernel_kind, gvalues, with_rc,
+                                               d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr, p.n_elements_per_pack, p.owned_nodes_ptr, p.st_element_slot.data(), p.st_ghost_ptr.data(), p.st_ghost_val.data(), p.st_local_nnz.data(), p.st_owned_nnz.data(), b.rowptr, rho, mu, kernel_kind, gvalues, with_rc,
                                                acc, pack_u, local_vals, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz,
             cvfem_hex8_rc_config_for(d));

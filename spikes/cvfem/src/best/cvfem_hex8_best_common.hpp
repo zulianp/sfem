@@ -1043,7 +1043,8 @@ static SFEM_INLINE void gather_hex8_simd_from_pack(pack_idx_t **const SFEM_RESTR
 static SFEM_INLINE void gather_hex8_action_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
                                                           const scalar_t *const SFEM_RESTRICT pack_u,
                                                           const scalar_t *const SFEM_RESTRICT pack_dir,
-                                                          const MeshData                     &d,
+                                                          const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+                                                          const scalar_t *const SFEM_RESTRICT        det_ptr,
                                                           const ptrdiff_t                     begin,
                                                           const int                           nlanes,
                                                           Hex8InputPack                      &u,
@@ -1058,7 +1059,7 @@ static SFEM_INLINE void gather_hex8_action_simd_from_pack(pack_idx_t **const SFE
                                                           scalar_t *const SFEM_RESTRICT       cof7,
                                                           scalar_t *const SFEM_RESTRICT       cof8,
                                                           scalar_t *const SFEM_RESTRICT       det) {
-    gather_hex8_simd_from_pack(elems, pack_u, d.adj_ptr, d.det_ptr, begin, nlanes, u, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+    gather_hex8_simd_from_pack(elems, pack_u, adj_ptr, det_ptr, begin, nlanes, u, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
     for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
         if (lane < nlanes) {
             const ptrdiff_t e = begin + lane;
