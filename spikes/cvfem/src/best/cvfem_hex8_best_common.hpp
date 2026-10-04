@@ -103,7 +103,7 @@ static constexpr int N_FIELDS = 4;
 // so including it costs an unused function per kernel and nothing at run time. It also
 // supplies cvfem_hex8_grad_scalar, which the nodal pressure gradient below needs, so it
 // must precede cvfem_hex8_pack_helpers.hpp.
-#include "hex8/cvfem_hex8_boundary_scs.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 
 #include "hex8/cvfem_hex8_pack_helpers.hpp"
 

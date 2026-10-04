@@ -31,7 +31,7 @@ using scalar_t = double;
 static constexpr int N_FIELDS = 4;
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
-#include "hex8/cvfem_hex8_boundary_scs.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 
 static int g_failures = 0;
 

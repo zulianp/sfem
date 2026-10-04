@@ -269,7 +269,7 @@ struct MeshData {
 
 #include "frontend/staging/cvfem_hex8_ns_packed_launch.hpp"
 #include "kernels/microkernels/hex8/generated/cvfem_hex8_ns_upwind_sympy_kernels.hpp"
-#include "hex8/cvfem_hex8_boundary_scs.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 
 // The Rhie-Chow time-scale configuration for this mesh's solve. Declared here and defined
 // below, next to the BDF coefficients it reads: the element sweeps that need it all sit
