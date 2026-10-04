@@ -22,6 +22,11 @@
 // This header is self-contained: it pulls in the smesh/SFEM headers, the HEX8
 // element kernels, and the scalar/index types the layouts are written against.
 
+// The kernels trace through their own spelling, which is nothing unless a translation
+// unit says what it means. See kernels/cvfem_phases.hpp.
+#include "sfem_aliases.hpp"
+#define CVFEM_TRACE_SCOPE(name) SFEM_TRACE_SCOPE(name)
+
 #include "smesh_mesh.hpp"
 #include "smesh_mesh_reorder.hpp"
 #include "smesh_packed_mesh.hpp"

@@ -89,4 +89,16 @@
 
 #endif  // CVFEM_PHASES
 
+// ------------------------------------------------- the tracer, if the caller has one
+//
+// SFEM_TRACE_SCOPE comes from sfem_aliases.hpp, which src/kernels/ may not name. The sweeps had
+// one each, and the names they trace are worth keeping, so the kernels get their own spelling
+// that is nothing unless the including translation unit has said what it means. The front-end
+// family headers define it as SFEM_TRACE_SCOPE before they include any kernel, which is the same
+// #ifndef shape cvfem_portability.hpp uses for SFEM_HOST_DEVICE, and the clause DESIGN.md allows
+// this directory: "localized macros".
+#ifndef CVFEM_TRACE_SCOPE
+#define CVFEM_TRACE_SCOPE(name) ((void)0)
+#endif
+
 #endif  // CVFEM_PHASES_HPP

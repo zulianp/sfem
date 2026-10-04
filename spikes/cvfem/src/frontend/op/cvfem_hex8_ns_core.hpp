@@ -18,6 +18,11 @@
 // only: no logic changed, and file-scope `static` became `inline` so the header can
 // be included from more than one TU.
 
+// The kernels trace through their own spelling, which is nothing unless a translation
+// unit says what it means. See kernels/cvfem_phases.hpp.
+#include "sfem_aliases.hpp"
+#define CVFEM_TRACE_SCOPE(name) SFEM_TRACE_SCOPE(name)
+
 #include "sfem_BSR.hpp"
 #include "sfem_Operator.hpp"
 #include "sfem_base.hpp"

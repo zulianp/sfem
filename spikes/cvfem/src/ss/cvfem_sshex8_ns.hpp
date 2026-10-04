@@ -1283,7 +1283,7 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                               const scalar_t *const SFEM_RESTRICT dir,
                                               scalar_t *const SFEM_RESTRICT       jv) {
-    SFEM_TRACE_SCOPE("sscvfem::apply_naive");
+    CVFEM_TRACE_SCOPE("sscvfem::apply_naive");
     const int L = level;
     int       off[8];
     sscvfem_corner_offsets(L, off);
@@ -1382,7 +1382,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                     const scalar_t *const SFEM_RESTRICT dir,
                                                     scalar_t *const SFEM_RESTRICT       jv) {
-    SFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
+    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
     const int L   = level;
     const int nxe = nxe_src;
     int       off[8];
@@ -1546,7 +1546,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                            const scalar_t *const SFEM_RESTRICT dir,
                                                            scalar_t *const SFEM_RESTRICT       jv) {
-    SFEM_TRACE_SCOPE("sscvfem::apply_macro_local_affine");
+    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_affine");
     const int L   = level;
     const int nxe = nxe_src;
     int       off[8];
@@ -1955,7 +1955,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_hoisted(
         const ptrdiff_t n_shared, const scalar_t rho, const scalar_t mu,
                                                             const scalar_t *const SFEM_RESTRICT dir,
                                                             scalar_t *const SFEM_RESTRICT       jv) {
-    SFEM_TRACE_SCOPE("sscvfem::apply_macro_local_hoisted");
+    CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_hoisted");
     const int L   = level;
     const int nxe = nxe_src;
     int       off[8];
@@ -3131,7 +3131,7 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
         const ptrdiff_t n_shared, const scalar_t rho,
                                                  const scalar_t                mu,
                                                  scalar_t *const SFEM_RESTRICT res) {
-    SFEM_TRACE_SCOPE("sscvfem::residual_sweep");
+    CVFEM_TRACE_SCOPE("sscvfem::residual_sweep");
     const int L   = level;
     const int nxe = nxe_src;
     int       off[8];
