@@ -1578,7 +1578,7 @@ int main(int argc, char **argv) {
         // the same discretisation, so this must be at rounding level -- unlike the
         // comparison above, which is isoparametric against affine and is a property of
         // the mesh rather than of the code.
-        apply_residual_atomic_isoparam_sympy(d, rho, mu);
+        apply_residual_atomic_isoparam_sympy(d.elems, d.nelements, d.nnodes, d.p.data(), d.points, d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
         std::vector<scalar_t> isoparam_sympy_r;
         pack_residual(d, isoparam_sympy_r);
         const scalar_t iso_sympy_err = max_abs_diff(isoparam_r.data(), isoparam_sympy_r.data(),
@@ -1841,7 +1841,7 @@ int main(int argc, char **argv) {
             else if (layout == "packed" || layout == "store")
                 apply_residual_packed<true>(d, packed, rho, mu, kernel_kind);
             else if (kernel_kind == KernelKind::Sympy)
-                apply_residual_atomic_isoparam_sympy(d, rho, mu);
+                apply_residual_atomic_isoparam_sympy(d.elems, d.nelements, d.nnodes, d.p.data(), d.points, d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
             else
                 apply_residual_atomic_isoparam(d, cvfem_hex8_extras_of(d), rho, mu);
         } else if (layout == "ecolor")
