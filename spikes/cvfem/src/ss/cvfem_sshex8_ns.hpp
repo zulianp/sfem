@@ -1182,16 +1182,34 @@ inline void sscvfem_nodal_q_grad(SSMeshData &d, const scalar_t *const SFEM_RESTR
 // Control: the flat gather, on the semi-structured mesh. Every micro-element reads its
 // eight nodes through the global id, exactly as the flat kernel does.
 
-inline SFEM_NOINLINE void sscvfem_apply_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE void sscvfem_apply_naive(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT macro_curved,
+        const ptrdiff_t nmacro,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                               const scalar_t *const SFEM_RESTRICT dir,
                                               scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("sscvfem::apply_naive");
-    const int L = d.level;
+    const int L = level;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+    for (ptrdiff_t e = 0; e < nmacro; ++e) {
         // The geometry every micro cell of this macro element uses, as the hoisted
         // variants use it; see sscvfem_hoisted_cell. Real positions stay per cell.
         scalar_t hx[8], hy[8], hz[8];
@@ -1199,14 +1217,14 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(SSMeshData &d, const scalar_t rho,
             int ext[8];
             sscvfem_macro_corner_offsets(L, ext);
             for (int a = 0; a < 8; ++a) {
-                const smesh::idx_t gm = d.elems[ext[a]][e];
-                hx[a] = (scalar_t)d.points[0][gm];
-                hy[a] = (scalar_t)d.points[1][gm];
-                hz[a] = (scalar_t)d.points[2][gm];
+                const smesh::idx_t gm = elems[ext[a]][e];
+                hx[a] = (scalar_t)points[0][gm];
+                hy[a] = (scalar_t)points[1][gm];
+                hz[a] = (scalar_t)points[2][gm];
             }
             sscvfem_hoisted_cell(hx, hy, hz, L, hx, hy, hz);
         }
-        const bool curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
+        const bool curved_e = sscvfem_macro_curved(macro_curved, e);
         for (int zi = 0; zi < L; ++zi) {
             for (int yi = 0; yi < L; ++yi) {
                 for (int xi = 0; xi < L; ++xi) {
@@ -1217,21 +1235,21 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(SSMeshData &d, const scalar_t rho,
                     scalar_t     vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
                     scalar_t     r[CVFEM_HEX8_N_DOF];
                     for (int a = 0; a < 8; ++a) {
-                        g[a]   = d.elems[base + off[a]][e];
-                        x[a]   = (scalar_t)d.points[0][g[a]];
-                        y[a]   = (scalar_t)d.points[1][g[a]];
-                        z[a]   = (scalar_t)d.points[2][g[a]];
-                        ux[a]  = d.ux[(size_t)g[a]];
-                        uy[a]  = d.uy[(size_t)g[a]];
-                        uz[a]  = d.uz[(size_t)g[a]];
-                        p[a]   = d.p[(size_t)g[a]];
+                        g[a]   = elems[base + off[a]][e];
+                        x[a]   = (scalar_t)points[0][g[a]];
+                        y[a]   = (scalar_t)points[1][g[a]];
+                        z[a]   = (scalar_t)points[2][g[a]];
+                        ux[a]  = ux_src[(size_t)g[a]];
+                        uy[a]  = uy_src[(size_t)g[a]];
+                        uz[a]  = uz_src[(size_t)g[a]];
+                        p[a]   = pres[(size_t)g[a]];
                         vx[a]  = dir[(size_t)g[a] * 4 + 0];
                         vy[a]  = dir[(size_t)g[a] * 4 + 1];
                         vz[a]  = dir[(size_t)g[a] * 4 + 2];
                         q[a]   = dir[(size_t)g[a] * 4 + 3];
-                        pgx[a] = d.pgx[(size_t)g[a]];
-                        pgy[a] = d.pgy[(size_t)g[a]];
-                        pgz[a] = d.pgz[(size_t)g[a]];
+                        pgx[a] = pgx_src[(size_t)g[a]];
+                        pgy[a] = pgy_src[(size_t)g[a]];
+                        pgz[a] = pgz_src[(size_t)g[a]];
                     }
                     // A curved macro element: this cell's own geometry, not the hoisted one, selected
                     // through pointers so the hoisted corners stay loop-invariant.
@@ -1240,14 +1258,13 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(SSMeshData &d, const scalar_t rho,
                     const scalar_t *const gz = curved_e ? z : hz;
 
 
-                    const Hex8RcConfig rcfg = sscvfem_rc_config(d);
                     const Hex8RhieChow rc{gx,      gy, gz,   pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                           nullptr, ux, uy, uz,  rcfg.tau};
                     scalar_t           adj[9], det;
                     sscvfem_micro_geom(gx, gy, gz, adj, &det);
                     cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
-                                                        rc, p, d.upwind_eps);
-                    boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+                                                        rc, p, upwind_eps);
+                    boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, box_lx, box_ly, box_lz, x, y, z, ux, uy, uz,
                                                      vx, vy, vz, q, r);
 
                     for (int a = 0; a < 8; ++a)
@@ -1263,12 +1280,31 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(SSMeshData &d, const scalar_t rho,
 // The transformation: gather the macro-element's nodes once, run its L^3 micro-elements
 // against constant offsets into contiguous local buffers, scatter once at the end.
 
-inline SFEM_NOINLINE void sscvfem_apply_macro_local(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE void sscvfem_apply_macro_local(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT macro_curved,
+        const ptrdiff_t nmacro,
+        const int nxe_src,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                     const scalar_t *const SFEM_RESTRICT dir,
                                                     scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
-    const int L   = d.level;
-    const int nxe = d.nxe;
+    const int L   = level;
+    const int nxe = nxe_src;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
@@ -1283,25 +1319,25 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(SSMeshData &d, const scalar_
         std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+        for (ptrdiff_t e = 0; e < nmacro; ++e) {
             // Gather once. This is the only indirection in the sweep.
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = d.elems[a][e];
+                const smesh::idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
-                lx[(size_t)a]        = (scalar_t)d.points[0][g];
-                ly[(size_t)a]        = (scalar_t)d.points[1][g];
-                lz[(size_t)a]        = (scalar_t)d.points[2][g];
-                lux[(size_t)a]       = d.ux[(size_t)g];
-                luy[(size_t)a]       = d.uy[(size_t)g];
-                luz[(size_t)a]       = d.uz[(size_t)g];
-                lp[(size_t)a]        = d.p[(size_t)g];
+                lx[(size_t)a]        = (scalar_t)points[0][g];
+                ly[(size_t)a]        = (scalar_t)points[1][g];
+                lz[(size_t)a]        = (scalar_t)points[2][g];
+                lux[(size_t)a]       = ux_src[(size_t)g];
+                luy[(size_t)a]       = uy_src[(size_t)g];
+                luz[(size_t)a]       = uz_src[(size_t)g];
+                lp[(size_t)a]        = pres[(size_t)g];
                 lvx[(size_t)a]       = dir[(size_t)g * 4 + 0];
                 lvy[(size_t)a]       = dir[(size_t)g * 4 + 1];
                 lvz[(size_t)a]       = dir[(size_t)g * 4 + 2];
                 lq[(size_t)a]        = dir[(size_t)g * 4 + 3];
-                lpgx[(size_t)a]      = d.pgx[(size_t)g];
-                lpgy[(size_t)a]      = d.pgy[(size_t)g];
-                lpgz[(size_t)a]      = d.pgz[(size_t)g];
+                lpgx[(size_t)a]      = pgx_src[(size_t)g];
+                lpgy[(size_t)a]      = pgy_src[(size_t)g];
+                lpgz[(size_t)a]      = pgz_src[(size_t)g];
             }
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
@@ -1312,14 +1348,14 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(SSMeshData &d, const scalar_
                 int ext[8];
                 sscvfem_macro_corner_offsets(L, ext);
                 for (int a = 0; a < 8; ++a) {
-                    const smesh::idx_t gm = d.elems[ext[a]][e];
-                    hx[a] = (scalar_t)d.points[0][gm];
-                    hy[a] = (scalar_t)d.points[1][gm];
-                    hz[a] = (scalar_t)d.points[2][gm];
+                    const smesh::idx_t gm = elems[ext[a]][e];
+                    hx[a] = (scalar_t)points[0][gm];
+                    hy[a] = (scalar_t)points[1][gm];
+                    hz[a] = (scalar_t)points[2][gm];
                 }
                 sscvfem_hoisted_cell(hx, hy, hz, L, hx, hy, hz);
             }
-            const bool curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
+            const bool curved_e = sscvfem_macro_curved(macro_curved, e);
             for (int zi = 0; zi < L; ++zi) {
                 for (int yi = 0; yi < L; ++yi) {
                     for (int xi = 0; xi < L; ++xi) {
@@ -1351,14 +1387,13 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(SSMeshData &d, const scalar_
                         const scalar_t *const gy = curved_e ? y : hy;
                         const scalar_t *const gz = curved_e ? z : hz;
 
-                        const Hex8RcConfig rcfg = sscvfem_rc_config(d);
                         const Hex8RhieChow rc{gx,      gy, gz,   pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                               nullptr, ux, uy, uz,  rcfg.tau};
                         scalar_t           adj[9], det;
                         sscvfem_micro_geom(gx, gy, gz, adj, &det);
                         cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
-                                                        rc, p, d.upwind_eps);
-                        boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+                                                        rc, p, upwind_eps);
+                        boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, box_lx, box_ly, box_lz, x, y, z, ux, uy, uz,
                                                          vx, vy, vz, q, r);
 
                         // Accumulate locally: no atomic, no contention, contiguous.
@@ -1394,12 +1429,31 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local(SSMeshData &d, const scalar_
 // varies across its lattice. The assert guards it: the geometry of the last micro-element
 // is compared against the hoisted value, so a curved macro-element fails loudly rather
 // than silently returning a wrong operator.
-inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT macro_curved,
+        const ptrdiff_t nmacro,
+        const int nxe_src,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
                                                            const scalar_t *const SFEM_RESTRICT dir,
                                                            scalar_t *const SFEM_RESTRICT       jv) {
     SFEM_TRACE_SCOPE("sscvfem::apply_macro_local_affine");
-    const int L   = d.level;
-    const int nxe = d.nxe;
+    const int L   = level;
+    const int nxe = nxe_src;
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
@@ -1413,24 +1467,24 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
         std::vector<scalar_t>     lout((size_t)nxe * N_FIELDS);
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
+        for (ptrdiff_t e = 0; e < nmacro; ++e) {
             for (int a = 0; a < nxe; ++a) {
-                const smesh::idx_t g = d.elems[a][e];
+                const smesh::idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
-                lx[(size_t)a]        = (scalar_t)d.points[0][g];
-                ly[(size_t)a]        = (scalar_t)d.points[1][g];
-                lz[(size_t)a]        = (scalar_t)d.points[2][g];
-                lux[(size_t)a]       = d.ux[(size_t)g];
-                luy[(size_t)a]       = d.uy[(size_t)g];
-                luz[(size_t)a]       = d.uz[(size_t)g];
-                lp[(size_t)a]        = d.p[(size_t)g];
+                lx[(size_t)a]        = (scalar_t)points[0][g];
+                ly[(size_t)a]        = (scalar_t)points[1][g];
+                lz[(size_t)a]        = (scalar_t)points[2][g];
+                lux[(size_t)a]       = ux_src[(size_t)g];
+                luy[(size_t)a]       = uy_src[(size_t)g];
+                luz[(size_t)a]       = uz_src[(size_t)g];
+                lp[(size_t)a]        = pres[(size_t)g];
                 lvx[(size_t)a]       = dir[(size_t)g * 4 + 0];
                 lvy[(size_t)a]       = dir[(size_t)g * 4 + 1];
                 lvz[(size_t)a]       = dir[(size_t)g * 4 + 2];
                 lq[(size_t)a]        = dir[(size_t)g * 4 + 3];
-                lpgx[(size_t)a]      = d.pgx[(size_t)g];
-                lpgy[(size_t)a]      = d.pgy[(size_t)g];
-                lpgz[(size_t)a]      = d.pgz[(size_t)g];
+                lpgx[(size_t)a]      = pgx_src[(size_t)g];
+                lpgy[(size_t)a]      = pgy_src[(size_t)g];
+                lpgz[(size_t)a]      = pgz_src[(size_t)g];
             }
             std::fill(lout.begin(), lout.end(), scalar_t(0));
 
@@ -1464,7 +1518,7 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
                 sscvfem_micro_geom(c0x, c0y, c0z, madj, &mdet);
             }
 
-            const bool curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
+            const bool curved_e = sscvfem_macro_curved(macro_curved, e);
             for (int zi = 0; zi < L; ++zi) {
                 for (int yi = 0; yi < L; ++yi) {
                     for (int xi = 0; xi < L; ++xi) {
@@ -1501,13 +1555,12 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(SSMeshData &d, const 
                         const scalar_t *const gy = curved_e ? y : c0y;
                         const scalar_t *const gz = curved_e ? z : c0z;
 
-                        const Hex8RcConfig rcfg = sscvfem_rc_config(d);
                         // The hoisted cell's distances, matching madj: see sscvfem_residual.
                         const Hex8RhieChow rc{gx,      gy,  gz,  pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
                                               nullptr, ux, uy, uz,  rcfg.tau};
                         cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, gadj, gdet, ux, uy, uz, vx, vy, vz, q, r,
-                                                             rc, p, d.upwind_eps);
-                        boundary_scs_add_jacobian_action<false>(rho, mu, gadj, gdet, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz,
+                                                             rc, p, upwind_eps);
+                        boundary_scs_add_jacobian_action<false>(rho, mu, gadj, gdet, box_lx, box_ly, box_lz, x, y, z, ux, uy, uz,
                                                          vx, vy, vz, q, r);
 
                         for (int a = 0; a < 8; ++a) {

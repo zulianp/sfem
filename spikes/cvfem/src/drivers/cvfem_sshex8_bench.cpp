@@ -116,9 +116,9 @@ int main(int argc, char **argv) {
             sscvfem_nodal_p_grad(d);
 
             std::vector<scalar_t> y_naive((size_t)ndof, 0), y_macro((size_t)ndof, 0), y_aff((size_t)ndof, 0);
-            sscvfem_apply_naive(d, rho, mu, dir.data(), y_naive.data());
-            sscvfem_apply_macro_local(d, rho, mu, dir.data(), y_macro.data());
-            sscvfem_apply_macro_local_affine(d, rho, mu, dir.data(), y_aff.data());
+            sscvfem_apply_naive(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
+            sscvfem_apply_macro_local(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+            sscvfem_apply_macro_local_affine(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
             std::vector<scalar_t> y_hoi((size_t)ndof, 0), y_em((size_t)ndof, 0);
             sscvfem_apply_macro_local_hoisted(d, rho, mu, dir.data(), y_hoi.data());
 #ifdef CVFEM_ENABLE_SUBPAR_EM
@@ -209,16 +209,16 @@ int main(int argc, char **argv) {
 
             const double t_naive = time_it([&] {
                 std::fill(y_naive.begin(), y_naive.end(), scalar_t(0));
-                sscvfem_apply_naive(d, rho, mu, dir.data(), y_naive.data());
+                sscvfem_apply_naive(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_naive.data());
             });
             const double t_macro = time_it([&] {
                 std::fill(y_macro.begin(), y_macro.end(), scalar_t(0));
-                sscvfem_apply_macro_local(d, rho, mu, dir.data(), y_macro.data());
+                sscvfem_apply_macro_local(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
             });
 
             const double t_aff = time_it([&] {
                 std::fill(y_aff.begin(), y_aff.end(), scalar_t(0));
-                sscvfem_apply_macro_local_affine(d, rho, mu, dir.data(), y_aff.data());
+                sscvfem_apply_macro_local_affine(d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_aff.data());
             });
 
             const double t_hoi = time_it([&] {
