@@ -249,7 +249,7 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
     if (geom_kind == GeomKind::Isoparam)
         apply_residual_atomic_isoparam(d, rho, mu);
     else
-        apply_residual_atomic(d, rho, mu);
+        apply_residual_atomic(d, cvfem_hex8_extras_of(d), rho, mu);
     // The assembled matrix carries the boundary closure whenever --boundary is on, so the
     // residual differenced here has to as well -- otherwise the check reports the closure
     // as the error. Adding it also makes this a finite-difference check of
@@ -268,7 +268,7 @@ static scalar_t verify_jacobian_fd(MeshData        &d,
     if (geom_kind == GeomKind::Isoparam)
         apply_residual_atomic_isoparam(d, rho, mu);
     else
-        apply_residual_atomic(d, rho, mu);
+        apply_residual_atomic(d, cvfem_hex8_extras_of(d), rho, mu);
     apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
     apply_transient_pass(d, rho);
     pack_residual(d, rp);
@@ -1553,7 +1553,7 @@ int main(int argc, char **argv) {
     }
 
     if ((verify || verify_ho) && !rhie_chow) {
-        apply_residual_atomic(d, rho, mu);
+        apply_residual_atomic(d, cvfem_hex8_extras_of(d), rho, mu);
         std::vector<scalar_t> current_r;
         pack_residual(d, current_r);
 
@@ -1876,7 +1876,7 @@ int main(int argc, char **argv) {
             // vectorisation difference that has nothing to do with the format.
             apply_residual_atomic_sumfact_simd(d, rho, mu);
         else
-            apply_residual_atomic(d, rho, mu);
+            apply_residual_atomic(d, cvfem_hex8_extras_of(d), rho, mu);
 
         if (boundary) apply_boundary_scs_residual_pass(d, rho, mu, geom_kind == GeomKind::Isoparam ? 1 : 0);
         apply_transient_pass(d, rho);
