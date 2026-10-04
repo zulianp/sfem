@@ -1507,7 +1507,7 @@ int main(int argc, char **argv) {
             return 1;
         }
 
-        apply_residual_atomic_sumfact_simd(d, rho, mu);
+        apply_residual_atomic_sumfact_simd(d, cvfem_hex8_extras_of(d), rho, mu);
         std::vector<scalar_t> atomic_r;
         pack_residual(d, atomic_r);
         apply_residual_ecolored(d, ecolors, rho, mu);
@@ -1866,7 +1866,7 @@ int main(int argc, char **argv) {
         else if (kernel_uses_sympy_residual(kernel_kind))
             apply_residual_atomic_sympy(d, rho, mu);
         else if (kernel_kind == KernelKind::Sumfact && conv_ho && !ho_scalar)
-            apply_residual_atomic_sumfact_simd(d, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
+            apply_residual_atomic_sumfact_simd(d, cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact && conv_ho)
             apply_residual_atomic_sumfact_defcor(d, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact)
@@ -1874,7 +1874,7 @@ int main(int argc, char **argv) {
             // standard layout should be measured on: it issues 0.1% vector instructions where
             // this issues 23%, and reporting it would credit the packed format with a
             // vectorisation difference that has nothing to do with the format.
-            apply_residual_atomic_sumfact_simd(d, rho, mu);
+            apply_residual_atomic_sumfact_simd(d, cvfem_hex8_extras_of(d), rho, mu);
         else
             apply_residual_atomic(d, cvfem_hex8_extras_of(d), rho, mu);
 

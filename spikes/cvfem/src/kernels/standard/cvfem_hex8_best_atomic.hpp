@@ -377,13 +377,17 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(MeshData &d,
 // sweep alone is worth 1.29x and 1.37x, and what remains between the layouts -- 2.45x and 1.76x
 // -- is the format.
 static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(MeshData       &d,
+                                              // Which optional terms are on, resolved once per
+                                              // solve by the caller rather than per sweep here:
+                                              // cvfem_hex8_extras_of reads the mesh, which this
+                                              // kernel is not meant to name.
+                                              const Hex8Extras &opt,
                                                              const scalar_t  rho,
                                                              const scalar_t  mu,
                                                              const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
                                                              const int       limiter  = 0,
                                                              const scalar_t  venkat_c = scalar_t(0)) {
     reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
-    const Hex8Extras opt = cvfem_hex8_extras_of(d);
     // The deferred correction, on the same sweep. The hand-written SIMD kernel takes the
     // higher-order pack, so the standard layout's higher-order arms vectorise too; the generated
     // sympy variants are packed-only, which is why this is the hand-written kernel rather than
