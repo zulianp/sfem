@@ -227,6 +227,18 @@ set_tests_properties(cvfem_sympy_action_test PROPERTIES SKIP_RETURN_CODE 77)
 # Standard-library only and no build dependency, so this runs wherever a python3 does,
 # including inside the Alps uenv where numpy, matplotlib and markdown are all absent.
 find_program(CVFEM_REPORT_PYTHON NAMES python3 python)
+# ------------------------------------------------- src/kernels/ carries no dependency
+#
+# The property this checks took a long cascade to establish and one convenient #include to
+# undo, which is exactly the shape of thing that needs a test rather than a note. It also
+# replaces the old depth-1 directory guard, which only ever looked one level down and would
+# have passed a stray src/kernels/packed/affine/ without seeing it.
+if(CVFEM_REPORT_PYTHON)
+    add_test(NAME cvfem_kernels_self_contained
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_kernels_self_contained.py)
+endif()
+
 if(CVFEM_REPORT_PYTHON)
     add_test(NAME cvfem_verify_report_selftest
              COMMAND ${CVFEM_REPORT_PYTHON}
