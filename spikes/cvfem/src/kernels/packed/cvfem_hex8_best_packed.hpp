@@ -583,7 +583,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
 // nodes this part owns -- that is what the packed layout is for -- so the parts need no
 // synchronisation between them, and the ghost rows they do share are reduced afterwards in the
 // launcher, which is the second and independent parallel loop.
-template <bool ISO>
+template <bool ISO, KernelKind K>
 static SFEM_NOINLINE void apply_residual_packed_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -611,7 +611,6 @@ static SFEM_NOINLINE void apply_residual_packed_range(
         const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
         const scalar_t rho,
         const scalar_t mu,
-        const KernelKind kernel_kind,
         scalar_t *const SFEM_RESTRICT rx,
         scalar_t *const SFEM_RESTRICT ry,
         scalar_t *const SFEM_RESTRICT rz,
@@ -662,7 +661,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                     cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp);
                     scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
                 }
-            } else if (kernel_kind == KernelKind::Sumfact) {
+            } else if constexpr (K == KernelKind::Sumfact) {
                 alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE], cof2[CVFEM_HEX8_VEC_SIZE];
                 alignas(ALIGN_BYTES) scalar_t cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE], cof5[CVFEM_HEX8_VEC_SIZE];
                 alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE], cof8[CVFEM_HEX8_VEC_SIZE];
@@ -698,7 +697,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                     scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
                 }
             } else {
-                const bool sympy = kernel_uses_sympy_residual(kernel_kind);
+                constexpr bool sympy = kernel_uses_sympy_residual(K);
                 for (ptrdiff_t e = e_start; e < e_end; ++e) {
                     scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8], r[CVFEM_HEX8_N_DOF];
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
@@ -772,8 +771,37 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
 
 
 #pragma omp parallel
-    apply_residual_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, kernel_kind, rx, ry, rz, rc, scratch_n, with_rc);
+    // The variant is a template argument now, so the choice is made here rather than tested per
+    // pack. Instantiated for the values this body actually distinguishes -- Sumfact, the four
+    // generated residuals that kernel_uses_sympy_residual selects, and everything else through
+    // the default -- so the enum's thirteen values do not become thirteen copies of it. Same
+    // shape as the limiter dispatch in the higher-order lane kernels.
+    switch (kernel_kind) {
+        case KernelKind::Sumfact:
+            apply_residual_packed_range<ISO, KernelKind::Sumfact>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+            break;
+        case KernelKind::Sympy:
+            apply_residual_packed_range<ISO, KernelKind::Sympy>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+            break;
+        case KernelKind::SympyBlock:
+            apply_residual_packed_range<ISO, KernelKind::SympyBlock>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+            break;
+        case KernelKind::SympyRow:
+            apply_residual_packed_range<ISO, KernelKind::SympyRow>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+            break;
+        case KernelKind::SympyFace:
+            apply_residual_packed_range<ISO, KernelKind::SympyFace>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+            break;
+        default:
+            apply_residual_packed_range<ISO, KernelKind::Current>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+            break;
+    }
 
     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)

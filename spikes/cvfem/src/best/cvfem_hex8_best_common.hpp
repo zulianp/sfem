@@ -172,9 +172,8 @@ static KernelKind parse_kernel(const std::string &name) {
     return KernelKind::Sumfact;
 }
 
-static bool kernel_uses_sympy_residual(const KernelKind k) {
-    return k == KernelKind::Sympy || k == KernelKind::SympyBlock || k == KernelKind::SympyRow || k == KernelKind::SympyFace;
-}
+// kernel_uses_sympy_residual moved to kernels/cvfem_kernel_kind.hpp: it is a pure function of
+// the enum, and the sweeps need it as a compile-time test on their template argument.
 
 static bool kernel_is_valid(const std::string &name) {
     return name == "current" || name == "fd" || name == "sumfact" || name == "sympy" || name == "sympy_block" ||

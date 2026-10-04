@@ -48,4 +48,10 @@ enum class KernelKind {
     SympyActionGeomFace
 };
 
+// Which variants are the generated residual. constexpr, because the sweeps test it on their
+// template argument -- `if constexpr (kernel_uses_sympy_residual(K))` -- rather than per pack.
+static constexpr bool kernel_uses_sympy_residual(const KernelKind k) {
+    return k == KernelKind::Sympy || k == KernelKind::SympyBlock || k == KernelKind::SympyRow || k == KernelKind::SympyFace;
+}
+
 #endif  // CVFEM_KERNEL_KIND_HPP
