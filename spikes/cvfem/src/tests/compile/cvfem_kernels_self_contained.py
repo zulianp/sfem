@@ -50,6 +50,16 @@ def main():
             continue
         for n, line in enumerate(src.read_text().splitlines(), 1):
             t = line.strip()
+            # NO std::vector UNDER src/kernels/, IN A SIGNATURE OR A LOCAL.
+            #
+            # Patrick: "No std vector locals!" A kernel's scratch comes from the per-thread
+            # arena, thread_scratch<T>(slot, n), which is also the only such mechanism the tree
+            # has -- a std::vector local beside it would be a second one. And a std::vector in a
+            # signature is what keeps this directory from being free of library types at all.
+            if "std::vector" in t.split("//")[0]:
+                bad.append(f"{src.relative_to(ROOT.parent)}:{n}: std::vector under src/kernels/. "
+                           f"Scratch comes from thread_scratch<T>(slot, n); a buffer a caller "
+                           f"owns arrives as a pointer.")
             if not t.startswith("#include") or '"' not in t:
                 continue
             path = t.split('"')[1]
