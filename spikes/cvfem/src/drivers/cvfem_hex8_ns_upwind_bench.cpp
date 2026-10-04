@@ -1650,7 +1650,7 @@ int main(int argc, char **argv) {
             const scalar_t       *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
             cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, 3, ug);
 
-            apply_residual_atomic_sumfact_defcor(d, cvfem_hex8_extras_of(d), rho, mu, ug.data(), conv_limiter, scalar_t(0));
+            apply_residual_atomic_sumfact_defcor(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ug.data(), conv_limiter, scalar_t(0));
             std::vector<scalar_t> ho_atomic_r;
             pack_residual(d, ho_atomic_r);
 
@@ -1868,7 +1868,7 @@ int main(int argc, char **argv) {
         else if (kernel_kind == KernelKind::Sumfact && conv_ho && !ho_scalar)
             apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact && conv_ho)
-            apply_residual_atomic_sumfact_defcor(d, cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
+            apply_residual_atomic_sumfact_defcor(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact)
             // The lane-blocked sweep, unconditionally. The scalar one is not an option the
             // standard layout should be measured on: it issues 0.1% vector instructions where
