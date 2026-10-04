@@ -18,7 +18,7 @@
 // buildable inside it would make it unbuildable too. These two compile under
 // -DCVFEM_ENABLE_SUBPAR alone.
 
-#include "ss/cvfem_sshex8_ns.hpp"
+#include "frontend/ss/cvfem_sshex8_ns.hpp"
 
 static SFEM_INLINE void sscvfem_scatter_element_soa(const int *const SFEM_RESTRICT      slot,
                                                    scalar_t *const SFEM_RESTRICT       stage,

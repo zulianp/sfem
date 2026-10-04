@@ -131,7 +131,7 @@ struct Hex8RhieChowPack {
     // cvfem_hex8_build_rc_coeff, so a degenerate sub-control surface still yields exactly
     // zero here, which is what the scalar and isoparametric paths get from calling the
     // function directly. This is the arrangement the semi-structured path has always used
-    // (SSMacroGeom::coeff, src/ss/cvfem_sshex8_ns.hpp) -- which is why it never paid this.
+    // (SSMacroGeom::coeff, kernels/semistructured/cvfem_sshex8_ns.hpp) -- which is why it never paid this.
     alignas(ALIGN_BYTES) scalar_t coeff[CVFEM_HEX8_N_SCS][CVFEM_HEX8_VEC_SIZE];
     // The coefficient's velocity-sensitivity weight, tabulated beside it because it is purely
     // geometric: see cvfem_hex8_build_rc_coeff.

@@ -11,7 +11,7 @@
 // Included only under -DCVFEM_ENABLE_SUBPAR, so the comparison stays reproducible on
 // other hardware without carrying the variants in the default build.
 
-#include "ss/cvfem_sshex8_ns.hpp"
+#include "frontend/ss/cvfem_sshex8_ns.hpp"
 
 // Momentum element matrix, assembled on the fly, applied with a gemm.
 //

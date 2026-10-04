@@ -15,7 +15,7 @@
 #include "support/cvfem_flow_diagnostics.hpp"
 #include "support/cvfem_fgmres.hpp"
 #include "support/cvfem_parallel.hpp"
-#include "ss/cvfem_ss_transfer.hpp"
+#include "frontend/ss/cvfem_ss_transfer.hpp"
 #include "frontend/galerkin/cvfem_ss_galerkin_api.hpp"
 
 #include "sfem_CRS_X_BSR.hpp"

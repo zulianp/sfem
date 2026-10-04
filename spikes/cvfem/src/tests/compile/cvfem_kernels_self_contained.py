@@ -24,13 +24,7 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]          # src/
-ALLOWED_DIRS = {
-    "cases", "drivers", "frontend", "kernels", "support", "tests",
-    # Not in DESIGN.md's list, and deliberately named here rather than silently tolerated: the
-    # semi-structured sweeps still take staging objects, so they cannot move into kernels/ yet.
-    # When they are converted this entry goes away with the directory.
-    "ss",
-}
+ALLOWED_DIRS = {"cases", "drivers", "frontend", "kernels", "support", "tests"}
 
 def main():
     bad = []

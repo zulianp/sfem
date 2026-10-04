@@ -300,7 +300,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE scalar_t cvfem_venkata_inc(const scalar_t ba
 // 47,268 dof -- so it can serve as the accuracy reference and not as a fallback. And the
 // stalls previously recorded for these arms (the clip at Re 14.04, the smooth form at 21.92)
 // do not reproduce: both now reach Re 40. The likely cause is the block-B Rhie-Chow term
-// restored in src/ss/cvfem_sshex8_ns.hpp, which is what Vanka assembles, but that has not
+// restored in kernels/semistructured/cvfem_sshex8_ns.hpp, which is what Vanka assembles, but that has not
 // been confirmed by building the prior commit and is recorded here as a hypothesis.
 
 // The dimensional bridge for the term above: eps^2 = coeff * h^3, with h a local length.

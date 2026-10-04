@@ -13,7 +13,7 @@
 // Mirrors the flat test's structure deliberately, so the two can be read against each other
 // and a divergence between the paths shows up as a divergence between the files.
 
-#include "ss/cvfem_sshex8_ns.hpp"
+#include "frontend/ss/cvfem_sshex8_ns.hpp"
 
 #include "sfem_context.hpp"
 #include "smesh_mesh.hpp"

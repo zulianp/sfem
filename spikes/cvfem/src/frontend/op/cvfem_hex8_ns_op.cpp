@@ -4,7 +4,7 @@
 
 // The core is included here and nowhere a driver can see it. See the note in the header.
 #include "frontend/op/cvfem_hex8_ns_core.hpp"
-#include "ss/cvfem_sshex8_ns.hpp"
+#include "frontend/ss/cvfem_sshex8_ns.hpp"
 
 #include "smesh_mesh.hpp"
 

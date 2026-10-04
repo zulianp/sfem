@@ -115,7 +115,7 @@ function gained a `Hex8RcTau` argument. The `coeff` is not.
 now formed per cell by `sscvfem_rc_coeff(g, s, u2)` out of `rc_num`, `rc_base` and `inv_h2`, with
 `u2` the squared advecting velocity at the sub-control surface. The two residual/Jacobian sites in
 this file have `ux/uy/uz` in scope and could be ported mechanically, following the live pattern at
-`src/ss/cvfem_sshex8_ns.hpp:1655-1659`.
+`src/kernels/semistructured/cvfem_sshex8_ns.hpp` (sscvfem_macro_geom).
 
 `sscvfem_build_full_em` cannot. It takes `(g, rho, mu, Mf)` and no velocity, by design: the 32x32
 variant exists *because* the Rhie-Chow coupling was a constant of the geometry, which is what made
