@@ -2864,7 +2864,7 @@ inline void sscvfem_apply_transient_action(SSMeshData &d, const scalar_t rho,
     sscvfem_apply_transient_action_sweep(d.nnodes, d.node_vol.data(), sscvfem_transient_diag_weight(d, rho), rho, dir, jv);
 }
 
-inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+inline SFEM_NOINLINE void sscvfem_residual_naive_sweep(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                                  scalar_t *const SFEM_RESTRICT res) {
     SFEM_TRACE_SCOPE("sscvfem::residual_naive");
     const ptrdiff_t ndof = d.nnodes * N_FIELDS;
@@ -2936,6 +2936,14 @@ inline SFEM_NOINLINE void sscvfem_residual_naive(SSMeshData &d, const scalar_t r
             }
         }
     }
+}
+
+// The control residual, end to end. The body force and the transient term are post-passes over
+// nodes with their own guards and their own cached control volume, which is front-end work; the
+// sweep is the element pass.
+inline void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scalar_t mu,
+                                   scalar_t *const SFEM_RESTRICT res) {
+    sscvfem_residual_naive_sweep(d, rho, mu, res);
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
 }
