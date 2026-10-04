@@ -702,21 +702,27 @@ inline void sscvfem_build_grad_weight(SSMeshData &d) {
 // The default folds it into the drain as before -- one pass over the nodes saved, which is
 // the whole reason the packed path beats the scatter one -- and multiplying by an exact 1
 // otherwise, so the default path is unchanged bit for bit rather than merely equivalent.
-inline void sscvfem_nodal_grad_packed_sweep(SSMeshData &d, PackedData &p,
+inline void sscvfem_nodal_grad_packed_sweep(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t *const SFEM_RESTRICT grad_w_inv,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT macro_curved,
+        const ptrdiff_t nmacro,
+        geom_t **const SFEM_RESTRICT points, PackedData &p,
                                       const scalar_t *const SFEM_RESTRICT src, const int stride,
                                       scalar_t *const SFEM_RESTRICT gx_out,
                                       scalar_t *const SFEM_RESTRICT gy_out,
                                       scalar_t *const SFEM_RESTRICT gz_out,
                                       const bool apply_weight) {
-    const scalar_t *const SFEM_RESTRICT w      = d.grad_w_inv.data();
+    const scalar_t *const SFEM_RESTRICT w      = grad_w_inv;
     const ptrdiff_t node_n = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
 
-    const int L = d.level;
+    const int L = level;
     int       off[8];
     sscvfem_corner_offsets(L, off);
-    const auto *const px = d.points[0];
-    const auto *const py = d.points[1];
-    const auto *const pz = d.points[2];
+    const auto *const px = points[0];
+    const auto *const py = points[1];
+    const auto *const pz = points[2];
 
 #pragma omp parallel
     {
@@ -730,11 +736,11 @@ inline void sscvfem_nodal_grad_packed_sweep(SSMeshData &d, PackedData &p,
             // Bounded by the PACKED element count, not by the block's.
             //
             // p.elems is sized to the elements the packs cover. Those used to be all of them,
-            // so bounding by d.nmacro was harmless; on a distributed mesh the packs span only
+            // so bounding by nmacro was harmless; on a distributed mesh the packs span only
             // the owned-not-shared prefix, and the last pack then walks this array past its
             // allocation. The fallback keeps the old bound for any caller that has not filled
             // the field in.
-            const ptrdiff_t e_limit      = p.n_packed_elements > 0 ? p.n_packed_elements : d.nmacro;
+            const ptrdiff_t e_limit      = p.n_packed_elements > 0 ? p.n_packed_elements : nmacro;
             const ptrdiff_t e_end        = MIN(e_limit, (pack + 1) * p.n_elements_per_pack);
             const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
             const ptrdiff_t n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
@@ -753,13 +759,13 @@ inline void sscvfem_nodal_grad_packed_sweep(SSMeshData &d, PackedData &p,
                 // a Jacobian exactly, which is what sscvfem_macro_geom has always relied on.
                 scalar_t ex[8], ey[8], ez[8], adj[9], det;
                 for (int a = 0; a < 8; ++a) {
-                    const smesh::idx_t g = pack_local_to_global(p, pack, n_contiguous, p.elems[off[a]][e]);
+                    const smesh::idx_t g = cvfem_pack_local_to_global(owned, ghosts, n_contiguous, p.elems[off[a]][e]);
                     ex[a]                = (scalar_t)px[g];
                     ey[a]                = (scalar_t)py[g];
                     ez[a]                = (scalar_t)pz[g];
                 }
                 sscvfem_micro_geom(ex, ey, ez, adj, &det);
-                const bool curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
+                const bool curved_e = sscvfem_macro_curved(macro_curved, e);
                 if (!curved_e && std::fabs(det) < scalar_t(1e-30)) continue;
                 // |det| times a gradient carrying 1/det: only the sign survives.
                 const scalar_t sgn = det > 0 ? scalar_t(1) : scalar_t(-1);
@@ -773,8 +779,8 @@ inline void sscvfem_nodal_grad_packed_sweep(SSMeshData &d, PackedData &p,
                             if (curved_e) {
                                 scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
                                 for (int a = 0; a < 8; ++a) {
-                                    const smesh::idx_t gn =
-                                            pack_local_to_global(p, pack, n_contiguous, p.elems[base + off[a]][e]);
+                                    const smesh::idx_t gn = cvfem_pack_local_to_global(
+                                            owned, ghosts, n_contiguous, p.elems[base + off[a]][e]);
                                     cx[a] = (scalar_t)px[gn];
                                     cy[a] = (scalar_t)py[gn];
                                     cz[a] = (scalar_t)pz[gn];
@@ -851,7 +857,7 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
         ogz.assign((size_t)d.nnodes, scalar_t(0));
     }
 
-    sscvfem_nodal_grad_packed_sweep(d, p, src, stride, ogx.data(), ogy.data(), ogz.data(),
+    sscvfem_nodal_grad_packed_sweep(d.grad_w_inv.data(), d.level, d.macro_curved.data(), d.nmacro, d.points, p, src, stride, ogx.data(), ogy.data(), ogz.data(),
                                     apply_weight);
 }
 

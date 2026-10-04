@@ -152,12 +152,15 @@ static PackedData make_packed(const std::shared_ptr<smesh::Mesh> &mesh, const in
     return p;
 }
 
+// The staging form: which of the pack's tables hold the two values the mapping is a function
+// of. The mapping itself is cvfem_pack_local_to_global, in kernels/packed/, because a sweep
+// needs it and a sweep cannot name PackedData.
 static SFEM_INLINE smesh::idx_t pack_local_to_global(const PackedData &p,
                                                      const ptrdiff_t   pack,
                                                      const ptrdiff_t   n_contiguous,
                                                      const pack_idx_t  local) {
-    if ((ptrdiff_t)local < n_contiguous) return smesh::idx_t(p.owned_nodes_ptr[pack] + (ptrdiff_t)local);
-    return p.ghost_idx[p.ghost_ptr[pack] + ((ptrdiff_t)local - n_contiguous)];
+    return cvfem_pack_local_to_global(p.owned_nodes_ptr[pack], p.ghost_idx + p.ghost_ptr[pack],
+                                      n_contiguous, local);
 }
 
 static SFEM_INLINE int find_pack_col(const pack_idx_t target, const pack_idx_t *const SFEM_RESTRICT row, const int n) {
