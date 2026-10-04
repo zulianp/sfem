@@ -2640,6 +2640,9 @@ inline void sscvfem_block_diag_transient(
 }
 
 inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
+        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
+        // sweep and what arrives is a range, so the sweep owns no parallel region.
+        const cvfem_range r,
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t box_lx,
         const scalar_t box_ly,
@@ -2655,7 +2658,6 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
         const uint8_t *const SFEM_RESTRICT natural_mask,
         const uint8_t *const SFEM_RESTRICT pressure_mask,
         const uint8_t *const SFEM_RESTRICT traction_mask,
-        const ptrdiff_t nmacro,
         const int nxe_src,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx,
@@ -2683,7 +2685,6 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
     sscvfem_corner_offsets(L, off);
 
 
-#pragma omp parallel
     {
         // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
         // shared between them because only one is live inside a parallel region and
@@ -2703,8 +2704,7 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
         idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
         idx_t *const SFEM_RESTRICT lg = _arena6;
 
-#pragma omp for schedule(static)
-        for (ptrdiff_t e = 0; e < nmacro; ++e) {
+        for (ptrdiff_t e = r.begin; e < r.end; ++e) {
             for (int a = 0; a < nxe; ++a) {
                 const idx_t g = elems[a][e];
                 lg[(size_t)a]        = g;
@@ -2775,6 +2775,10 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_sweep(
         }
     }
 
-    if (slot) sscvfem_reduce_shared_w<16>(red_idx, red_ptr, shared_node, n_shared, out, stage16);
+    // The shared reduction is NOT here. It is a second, independent loop -- over the reduction
+    // rows rather than the macro elements -- and DESIGN.md's threading rule applies to it as much
+    // as to the element pass, so it needs its own range and its own entry point. The launcher
+    // runs it after this sweep's threads have joined, which is also the barrier it needs: a row
+    // sums staging slots that other macro elements wrote.
 
 }

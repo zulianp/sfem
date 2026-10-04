@@ -1081,7 +1081,20 @@ inline void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t rho, const sc
 inline void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, const scalar_t mu,
                                std::vector<scalar_t> &diag) {
     diag.assign((size_t)d.nnodes * 16, scalar_t(0));
-    sscvfem_block_diag_sweep(d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.data(), d.macro_traction_mask.data(), d.nmacro, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage16.empty() ? nullptr : d.scatter->stage16.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, diag.data());
+    #pragma omp parallel
+        sscvfem_block_diag_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_face_mask.empty() ? nullptr : d.macro_face_mask.data(), d.macro_natural_mask.empty() ? nullptr : d.macro_natural_mask.data(), d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage16.empty() ? nullptr : d.scatter->stage16.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, rho, mu, diag.data());
+    // The element pass has joined, so the staging slots are all written: now each shared node
+    // sums the ones that belong to it, in slot order.
+    if (d.scatter && d.scatter->ready) {
+        const SSScatter &sc = *d.scatter;
+        // No parallel region here: sscvfem_reduce_shared_w still owns its own, and nesting one
+        // inside another gives each outer thread a one-thread inner team -- so every thread runs
+        // the WHOLE row loop and each shared node is accumulated once per thread. That is what
+        // the operator-consistency tests caught. It becomes range-driven in its turn.
+        sscvfem_reduce_shared_w<16>(sc.red_idx.data(), sc.red_ptr.data(), sc.shared_node.data(),
+                                    (ptrdiff_t)sc.shared_node.size(), diag.data(),
+                                    sc.stage16.data());
+    }
     // The node volume is built only when the transient pass will read it, which is what the
     // guard inside the sweep used to do: on a steady solve the weight is zero and
     // sscvfem_node_volume is a full sweep over the macro elements for nothing.

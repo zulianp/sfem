@@ -73,11 +73,19 @@ while changed:
                 parts = [q.strip() for q in split_top(body[cm.end():k])]
                 for i, _ in tested.items():
                     if i >= len(parts): continue
-                    if parts[i] in names and i not in DEFS.get(host, {}):
-                        idx = names[parts[i]]
-                        if idx not in DEFS.get(host, {}):
-                            DEFS.setdefault(host, {})[idx] = parts[i]
-                            changed = True
+                    # THE CALLEE'S POSITION SAYS NOTHING ABOUT THE HOST'S SET.
+                    #
+                    # This used to also require `i not in DEFS[host]` -- the CALLEE's index
+                    # tested against the HOST's already-marked positions -- so a host that had
+                    # any parameter marked at that index stopped propagating there. It is how the
+                    # gate reported zero findings for sscvfem_block_diag_sweep while its
+                    # pressure_mask and traction_mask arguments were unguarded and reach
+                    # sscvfem_bd, which null-tests both. Only the host's own index matters.
+                    if parts[i] not in names: continue
+                    idx = names[parts[i]]
+                    if idx not in DEFS.get(host, {}):
+                        DEFS.setdefault(host, {})[idx] = parts[i]
+                        changed = True
 
 bad = []
 for f in FILES:
