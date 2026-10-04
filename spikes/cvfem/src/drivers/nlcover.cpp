@@ -8,6 +8,7 @@
 #include <mpi.h>
 #include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
+#include "kernels/standard/affine/cvfem_hex8_best_atomic_affine.hpp"
 
 int main(int argc, char **argv) {
     MPI_Init(&argc, &argv);
