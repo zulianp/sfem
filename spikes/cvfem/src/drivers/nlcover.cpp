@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
     nl_only.assign(bsr.values->data(), bsr.values->data() + N);
 
     // Full, for reference.
-    assemble_jacobian_atomic_sumfact(d, cvfem_hex8_extras_of(d), bsr, rho, mu);
+    assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
     const scalar_t *full = bsr.values->data();
 
     size_t nz_lin = 0, nz_nl = 0, both = 0, nz_full = 0, chk = 0;

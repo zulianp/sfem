@@ -1906,7 +1906,7 @@ int main(int argc, char **argv) {
         } else if (layout == "packed") {
             assemble_jacobian_packed<false>(d, packed, bsr, rho, mu, kernel_kind);
         } else if (kernel_kind == KernelKind::Sumfact)
-            assemble_jacobian_atomic_sumfact(d, cvfem_hex8_extras_of(d), bsr, rho, mu);
+            assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         else if (kernel_kind == KernelKind::Sympy)
             assemble_jacobian_atomic_sympy(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.ux.data(), d.uy.data(), d.uz.data(), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         else if (kernel_kind == KernelKind::SympyBlock)
@@ -2323,7 +2323,7 @@ int main(int argc, char **argv) {
         if (geom_kind == GeomKind::Isoparam)
             assemble_jacobian_atomic_isoparam(d, cvfem_hex8_extras_of(d), bsr, rho, mu);
         else
-            assemble_jacobian_atomic_sumfact(d, cvfem_hex8_extras_of(d), bsr, rho, mu);
+            assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         // The reference has to be closed the same way the thing under test is, or the
         // comparison reports the boundary term as a mismatch. Same for the transient
         // diagonal.
