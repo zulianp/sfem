@@ -151,7 +151,27 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
 //
 // Global gather through d.elems, wide index, untouched element order, per-lane atomic scatter --
 // everything that makes this the standard layout is kept.
-static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData             &d,
+static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
+        // The staging objects are gone; what this sweep reads out of them is what it takes.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT rc_coeff,
+        const scalar_t *const SFEM_RESTRICT rc_w,
+        const scalar_t rhie_chow_scale,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
                                               // Which optional terms are on, resolved once per
                                               // solve by the caller rather than per sweep here:
                                               // cvfem_hex8_extras_of reads the mesh, which this
@@ -165,7 +185,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                                                             const scalar_t *const SFEM_RESTRICT vgrad = nullptr,
                                                             const int             limiter  = 0,
                                                             const scalar_t        venkat_c = scalar_t(0)) {
-    cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
+    cvfem_zero_scalars(jv, nnodes * N_FIELDS);
     const bool       has_qg  = opt.with_qg;
     const bool       with_ho = ugrad != nullptr && vgrad != nullptr;
     // The per-surface Rhie-Chow coefficient is hoisted out of the face loops, so it has to be
@@ -189,20 +209,20 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
         Hex8UGradPack    hop, hovp;
 
 #pragma omp for schedule(static)
-        for (ptrdiff_t e0 = 0; e0 < d.nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
-            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, d.nelements - e0);
-            gather_hex8_adj_soa(d.adj_ptr, d.det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
+        for (ptrdiff_t e0 = 0; e0 < nelements; e0 += CVFEM_HEX8_VEC_SIZE) {
+            const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, nelements - e0);
+            gather_hex8_adj_soa(adj_ptr, det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
 
             for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                 if (lane < nlanes) {
                     const ptrdiff_t e = e0 + lane;
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                        const idx_t                  g  = d.elems[a][e];
+                        const idx_t                  g  = mesh_elems[a][e];
                         const scalar_t *const SFEM_RESTRICT dv = dir + (ptrdiff_t)g * N_FIELDS;
-                        u_pack.ux[a][lane]                     = d.ux[g];
-                        u_pack.uy[a][lane]                     = d.uy[g];
-                        u_pack.uz[a][lane]                     = d.uz[g];
-                        u_pack.p[a][lane]                      = d.p[g];
+                        u_pack.ux[a][lane]                     = ux[g];
+                        u_pack.uy[a][lane]                     = uy[g];
+                        u_pack.uz[a][lane]                     = uz[g];
+                        u_pack.p[a][lane]                      = pres[g];
                         du_pack.ux[a][lane]                    = dv[0];
                         du_pack.uy[a][lane]                    = dv[1];
                         du_pack.uz[a][lane]                    = dv[2];
@@ -218,19 +238,19 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
             }
 
             if (opt.with_rc) {
-                const auto *const px = d.points[0];
-                const auto *const py = d.points[1];
-                const auto *const pz = d.points[2];
+                const auto *const px = points[0];
+                const auto *const py = points[1];
+                const auto *const pz = points[2];
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                         if (lane < nlanes) {
-                            const idx_t g = d.elems[a][e0 + lane];
-                            rcp.pgx[a][lane]     = d.pgx[g];
-                            rcp.pgy[a][lane]     = d.pgy[g];
-                            rcp.pgz[a][lane]     = d.pgz[g];
-                            rcp.qgx[a][lane]     = has_qg ? d.qgx[g] : scalar_t(0);
-                            rcp.qgy[a][lane]     = has_qg ? d.qgy[g] : scalar_t(0);
-                            rcp.qgz[a][lane]     = has_qg ? d.qgz[g] : scalar_t(0);
+                            const idx_t g = mesh_elems[a][e0 + lane];
+                            rcp.pgx[a][lane]     = pgx[g];
+                            rcp.pgy[a][lane]     = pgy[g];
+                            rcp.pgz[a][lane]     = pgz[g];
+                            rcp.qgx[a][lane]     = has_qg ? qgx[g] : scalar_t(0);
+                            rcp.qgy[a][lane]     = has_qg ? qgy[g] : scalar_t(0);
+                            rcp.qgz[a][lane]     = has_qg ? qgz[g] : scalar_t(0);
                         } else {
                             rcp.pgx[a][lane] = rcp.pgy[a][lane] = rcp.pgz[a][lane] = scalar_t(0);
                             rcp.qgx[a][lane] = rcp.qgy[a][lane] = rcp.qgz[a][lane] = scalar_t(0);
@@ -239,7 +259,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                 }
             }
 
-            if (opt.with_rc) cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), opt.rcfg, e0, nlanes, rcp);
+            if (opt.with_rc) cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, opt.rcfg, e0, nlanes, rcp);
 
             // The state's nodal velocity gradient and the direction's, staged exactly as the
             // packed Jacobian stages them. Both are needed by the EXACT higher-order action; the
@@ -255,10 +275,10 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
                             }
                             continue;
                         }
-                        const idx_t gn = d.elems[a][e0 + lane];
-                        hop.x[a][lane]        = scalar_t(d.points[0][gn]);
-                        hop.y[a][lane]        = scalar_t(d.points[1][gn]);
-                        hop.z[a][lane]        = scalar_t(d.points[2][gn]);
+                        const idx_t gn = mesh_elems[a][e0 + lane];
+                        hop.x[a][lane]        = scalar_t(points[0][gn]);
+                        hop.y[a][lane]        = scalar_t(points[1][gn]);
+                        hop.z[a][lane]        = scalar_t(points[2][gn]);
                         for (int c = 0; c < 9; ++c) {
                             hop.g[a][c][lane]  = ugrad[(ptrdiff_t)gn * 9 + c];
                             hovp.g[a][c][lane] = vgrad[(ptrdiff_t)gn * 9 + c];
@@ -271,14 +291,14 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(MeshData            
 
             cvfem_hex8_ns_upwind_jacobian_action_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6,
                                                       cof7, cof8, detv, u_pack, du_pack, outp,
-                                                      opt.with_rc ? &rcp : nullptr, d.rhie_chow_scale, has_qg,
+                                                      opt.with_rc ? &rcp : nullptr, rhie_chow_scale, has_qg,
                                                       scalar_t(0), with_ho ? &hop : nullptr,
                                                       with_ho ? &hovp : nullptr);
 
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const idx_t g = d.elems[a][e];
+                    const idx_t g = mesh_elems[a][e];
                     atomic_add(jv, (idx_t)(g * N_FIELDS + 0), outp.rx[a][lane]);
                     atomic_add(jv, (idx_t)(g * N_FIELDS + 1), outp.ry[a][lane]);
                     atomic_add(jv, (idx_t)(g * N_FIELDS + 2), outp.rz[a][lane]);
