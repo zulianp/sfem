@@ -11,7 +11,7 @@
 #include "best/cvfem_hex8_best_colored.hpp"
 #include "frontend/staging/cvfem_hex8_ecolored_launch.hpp"
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
-#include "kernels/packed/cvfem_hex8_best_store.hpp"
+#include "frontend/staging/cvfem_hex8_store_launch.hpp"
 
 // Consumes the churn's reduction under --live-vectors so the compiler cannot delete the
 // memory traffic that option exists to create.
