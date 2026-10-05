@@ -49,6 +49,34 @@ this geometry for any pack-based layout — so `with_rc`, the three pressure-gra
 three direction-gradient arrays, the coefficient table, the scale and the config were all
 parameters that half could not use and had to accept.
 
+## One thing that is deliberately NOT shared, and the measurement that decided it
+
+The residual's lane loop is written out in all four sweeps -- the contiguous packed pair here and
+in `../isoparametric/`, and the pack-coloured pair beside them -- although the four differ only
+in their drain. That is the one-path rule being overruled by a measurement, and the numbers are
+in the code beside each copy so it is not re-shared by someone applying the rule without them.
+
+Two A/B runs against the same reference, each reproduced within its own allocation
+(`jobs/ab_refactor.sbatch` 4983280 and 4983377):
+
+| row | first run | second |
+|---|---|---|
+| `residual_packed_sumfact` | −9.4% | −9.7% |
+| `residual_packed_sumfact_big` | −8.2% | −8.4% |
+| `residual_colored_sumfact` | −17.3% | −20.0% |
+
+Everything else was inside its band. Two facts narrow the cause: every row carrying Rhie-Chow or
+the higher-order correction was clean, so the cost is fixed per pack and only the cheapest lane
+loop notices it; and the **Jacobian action's** lane loop, which *is* still shared, measured +0.4%
+and +0.2% — its packs are larger and its arithmetic per pack far greater. Hoisting the lane
+scratch into one object per thread, so the packs were not re-materialised per pack, did not
+recover it either; that is what the second run measured.
+
+Worth keeping from this: the numerical gates cannot see it. All 66 flat fingerprints and the
+semi-structured one were unchanged across the regression, because the arithmetic was identical.
+A kernel restructuring needs `scripts/perf_regression.sh --against` even when every oracle is
+silent.
+
 ## Where the shared machinery is, and why it had to move first
 
 Nothing is duplicated between the two folders. Splitting would have copied whatever the two
