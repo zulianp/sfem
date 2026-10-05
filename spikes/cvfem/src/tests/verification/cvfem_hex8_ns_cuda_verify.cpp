@@ -712,14 +712,33 @@ int main(int argc, char **argv) {
                         "diagonal, split rebuild", rel, t,
                         t > 0 ? (double)(d.nnodes * 4) / t * 1e-6 : 0.0, ok ? "OK" : "FAIL");
         }
-        // The preconditioner block, against the same routine applied on the host.
+        // The preconditioner block, against the same routine applied on the host TO THE SAME
+        // INPUT -- which is the fix for a flaky check, not a convenience.
+        //
+        // It used to invert the HOST's assembled diagonal and compare that against the device's
+        // inverted one. Those are inversions of two different matrices: the device assembles
+        // with atomics, so its diagonal differs from the host's by a summation-order round-off
+        // (8.967e-16 above, which that check reports and passes). A 4x4 block whose velocity
+        // part is an ill-conditioned 3x3 amplifies that by three orders, and the result landed
+        // on either side of this 1e-12 tolerance depending on which atomic ordering the run
+        // happened to take -- two discrete values, 7.675e-13 and 1.754e-12, both reproducible
+        // and one of them a failure. Measured on four runs of each of two binaries, including a
+        // commit that predates the work being gated: 3 of 4 one way, 1 of 4 the other.
+        //
+        // What this check is for is the device's INVERSION kernel, so it downloads the device's
+        // assembled diagonal, inverts that on the host, and compares. Same input, so the
+        // comparison is about the inversion and nothing else, and the amplification has nothing
+        // to amplify.
+        std::vector<double> dev_pre((size_t)d.nnodes * 16);
         if (cvfem_cuda_assemble_diag(ctx, rho, mu, block_size, nullptr) == 0 &&
+            cvfem_cuda_synchronize() == 0 &&
+            cvfem_cuda_download_diag(ctx, dev_pre.data()) == 0 &&
             cvfem_cuda_invert_diag(ctx, block_size, nullptr) == 0 &&
             cvfem_cuda_synchronize() == 0 &&
             cvfem_cuda_download_diag(ctx, dev_diag.data()) == 0) {
             std::vector<double> host_inv((size_t)d.nnodes * 16);
             for (ptrdiff_t n2 = 0; n2 < d.nnodes; ++n2)
-                cvfem_hex8_block_jacobi_block(&ref_diag[(size_t)n2 * 16], (const unsigned char *)nullptr,
+                cvfem_hex8_block_jacobi_block(&dev_pre[(size_t)n2 * 16], (const unsigned char *)nullptr,
                                               &host_inv[(size_t)n2 * 16]);
             double hm = 0;
             for (double v : host_inv) hm = std::fmax(hm, std::fabs(v));
