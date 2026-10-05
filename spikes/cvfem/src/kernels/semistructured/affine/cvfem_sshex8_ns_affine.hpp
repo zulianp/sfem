@@ -723,4 +723,100 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_affine(
     // rows, run once after the element pass's threads have joined.
 }
 
+
+// The block diagonal over STRAIGHT macro elements.
+//
+// Flattened, because the micro-cell kernel has a second call site in the isoparametric sweep's
+// out-of-line loop: gcc outlines the Jacobian slot and boundary kernels once they have two
+// callers, and the per-micro-cell call measured 3% slower on the box.
+inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_affine(
+        // The range this call is to cover, as positions in macro_order. DESIGN.md: the
+        // threading is abstract outside the sweep and what arrives is a range, so the sweep
+        // owns no parallel region.
+        const cvfem_range r,
+        // The curvature partition; null means the identity, which is a mesh with nothing
+        // curved. See SSMeshData::macro_order.
+        const ptrdiff_t *const SFEM_RESTRICT macro_order,
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const scalar_t bc_p,
+        const scalar_t bc_tx,
+        const scalar_t bc_ty,
+        const scalar_t bc_tz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const uint8_t *const SFEM_RESTRICT natural_mask,
+        const uint8_t *const SFEM_RESTRICT pressure_mask,
+        const uint8_t *const SFEM_RESTRICT traction_mask,
+        const int nxe_src,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        const Hex8RcConfig rcfg,
+        
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage16,
+        const ptrdiff_t n_shared, const scalar_t rho, const scalar_t mu,
+                                                   scalar_t *const SFEM_RESTRICT out) {
+    const int L   = level;
+    const int nxe = nxe_src;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+    // Sixteen wide: this destination is a 4x4 block per node, not a residual.
+    const SSMacroScratch s = sscvfem_macro_scratch(nxe, 16, false, false, false);
+
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
+        const ptrdiff_t e = macro_order ? macro_order[i] : i;
+        sscvfem_macro_gather(s, elems, points, pres, pgx, pgy, pgz, nullptr, nullptr, nullptr,
+                             nullptr, ux, uy, uz, nullptr, e, nxe, 16);
+        // Micro cell 0's corners, hoisted: the geometry AND the coordinates the Rhie-Chow term
+        // differences.
+        //
+        // The lattice inside a macro element is uniform, so every micro cell is congruent to
+        // cell 0 and one adjugate serves all of them -- that is what the action does. This used
+        // to hoist the adjugate but then hand the Rhie-Chow struct each cell's OWN coordinates,
+        // and the two agree only to the precision the node positions are stored in. geom_t is
+        // float32, so the block diagonal disagreed with the action it is supposed to be the
+        // diagonal of by 4.23e-08 -- eight orders above round-off, and invisible until the
+        // q-independent consistency gate looked.
+        //
+        // Only DIFFERENCES of these are taken (d = x_j - x_i), so cell 0's coordinates are exact
+        // for the purpose, not an approximation. The boundary closure still gets each cell's real
+        // position, because it tests where the cell actually is.
+        scalar_t madj[9], mdet;
+        scalar_t c0x[8], c0y[8], c0z[8];
+        sscvfem_macro_hoisted_corners(s, L, c0x, c0y, c0z);
+        sscvfem_micro_geom(c0x, c0y, c0z, madj, &mdet);
+
+        for (int zi = 0; zi < L; ++zi)
+            for (int yi = 0; yi < L; ++yi)
+                for (int xi = 0; xi < L; ++xi)
+                    sscvfem_block_diag_cell(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz,
+                                            face_mask, natural_mask, pressure_mask, traction_mask,
+                                            rcfg, rho, mu, s, e, L, xi, yi, zi, off, madj, mdet, c0x,
+                                            c0y, c0z);
+
+        sscvfem_macro_drain_w<16>(s, slot, const_cast<scalar_t *>(stage16), nxe, e, out);
+    }
+
+    // The shared reduction is NOT here. It is a second, independent loop -- over the reduction
+    // rows rather than the macro elements -- and DESIGN.md's threading rule applies to it as much
+    // as to the element pass, so it needs its own range and its own entry point. The launcher
+    // runs it after this sweep's threads have joined, which is also the barrier it needs: a row
+    // sums staging slots that other macro elements wrote.
+}
+
 #endif  // CVFEM_SSHEX8_NS_AFFINE_HPP
