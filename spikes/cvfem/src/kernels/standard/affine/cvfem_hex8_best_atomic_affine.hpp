@@ -14,6 +14,7 @@
 // copies of the pack staging, the drain and the ghost reduction.
 
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
+#include "kernels/packed/cvfem_hex8_pack_staging.hpp"
 
 
 // The two gradient arguments carry the exact higher-order action, as on the packed sweep; both

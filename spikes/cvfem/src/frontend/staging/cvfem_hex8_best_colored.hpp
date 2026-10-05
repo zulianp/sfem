@@ -32,6 +32,7 @@
 
 #include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "frontend/staging/cvfem_pack_coloring.hpp"
+#include "kernels/packed/cvfem_hex8_pack_staging.hpp"
 
 // ---------------------------------------------------------------------------
 // Global-index gather / scatter

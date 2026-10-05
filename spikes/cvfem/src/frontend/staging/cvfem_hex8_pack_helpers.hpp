@@ -25,6 +25,7 @@
 #include "kernels/cvfem_hex8_element_gather.hpp"
 #include "kernels/cvfem_scatter.hpp"   // MIN   // Hex8RcConfig, Hex8Extras
 #include "frontend/staging/cvfem_element_coloring.hpp"
+#include "kernels/packed/cvfem_hex8_pack_staging.hpp"
 
 // Takes the affine geometry, not the mesh. It is called from inside more than twenty sweeps in
 // src/kernels/, so a MeshT parameter here is what keeps that directory dependent on the staging
@@ -58,81 +59,11 @@ static void precompute_affine_geometry(MeshT &d) {
     d.det_ptr = d.jacobian_determinant.data();
 }
 
-// No mesh argument, so no template parameter to deduce -- a plain function.
-static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRICT elems,
-                                                  scalar_t *const SFEM_RESTRICT    pack_out,
-                                                  const ptrdiff_t                  begin,
-                                                  const int                        nlanes,
-                                                  const Hex8ResidualPack          &out) {
-    for (int lane = 0; lane < nlanes; ++lane) {
-        const ptrdiff_t e = begin + lane;
-        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-            scalar_t *const SFEM_RESTRICT dst = pack_out + (ptrdiff_t)elems[a][e] * N_FIELDS;
-            dst[0] += out.rx[a][lane];
-            dst[1] += out.ry[a][lane];
-            dst[2] += out.rz[a][lane];
-            dst[3] += out.rc[a][lane];
-        }
-    }
-}
 
 // Takes the affine geometry, not the mesh; see load_hex8_adj above.
 
-// ---------------------------------------------------------------- Rhie-Chow pack staging
-//
-// Moved here from cvfem_hex8_ns_packed.hpp so the benchmark can stage the term too. The
-// gather needs nothing but raw arrays and was already family-independent; the filler is
-// templated on the two container types the way the rest of this header is.
-static SFEM_INLINE void cvfem_hex8_gather_rc_from_pack(pack_idx_t **const SFEM_RESTRICT     elems,
-                                                       const scalar_t *const SFEM_RESTRICT pack_pgx,
-                                                       const scalar_t *const SFEM_RESTRICT pack_pgy,
-                                                       const scalar_t *const SFEM_RESTRICT pack_pgz,
-                                                       const ptrdiff_t                     begin,
-                                                       const int                           nlanes,
-                                                       Hex8RhieChowPack                   &rc) {
-    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-        if (lane < nlanes) {
-            const ptrdiff_t e = begin + lane;
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const pack_idx_t loc = elems[a][e];
-                rc.pgx[a][lane]      = pack_pgx[loc];
-                rc.pgy[a][lane]      = pack_pgy[loc];
-                rc.pgz[a][lane]      = pack_pgz[loc];
-            }
-        } else {
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                rc.pgx[a][lane] = rc.pgy[a][lane] = rc.pgz[a][lane] = scalar_t(0);
-            }
-        }
-    }
-}
 
 
-// The direction's gradient into the same pack, called straight after the routine above
-// when the Jacobian action needs it. Padding lanes are zeroed here too: they multiply real
-// geometry and would otherwise contribute whatever the last sweep left behind.
-static SFEM_INLINE void cvfem_hex8_gather_qg_from_pack(pack_idx_t **const SFEM_RESTRICT     elems,
-                                                       const scalar_t *const SFEM_RESTRICT pack_qgx,
-                                                       const scalar_t *const SFEM_RESTRICT pack_qgy,
-                                                       const scalar_t *const SFEM_RESTRICT pack_qgz,
-                                                       const ptrdiff_t                     begin,
-                                                       const int                           nlanes,
-                                                       Hex8RhieChowPack                   &rc) {
-    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-        if (lane < nlanes) {
-            const ptrdiff_t e = begin + lane;
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const pack_idx_t loc = elems[a][e];
-                rc.qgx[a][lane]      = pack_qgx[loc];
-                rc.qgy[a][lane]      = pack_qgy[loc];
-                rc.qgz[a][lane]      = pack_qgz[loc];
-            }
-        } else {
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a)
-                rc.qgx[a][lane] = rc.qgy[a][lane] = rc.qgz[a][lane] = scalar_t(0);
-        }
-    }
-}
 
 // ------------------------------------------------------- hoisted Rhie-Chow coefficient
 //
@@ -436,124 +367,7 @@ static SFEM_INLINE double cvfem_hex8_pa_bytes_per_dof(const MeshT &d) {
     return ndof > 0 ? double(d.pa_tangent.size()) * double(sizeof(scalar_t)) / ndof : 0.0;
 }
 
-// The SoA gather for the above, straight into the pack the face loops read.
-//
-// It takes the two tables rather than the mesh, because it is called from inside five pack
-// sweeps and a MeshT parameter here is a staging dependency in src/kernels/, which DESIGN.md
-// does not allow there. They are the only things it read.
-static SFEM_INLINE void cvfem_hex8_gather_rc_coeff(const scalar_t *const SFEM_RESTRICT src,
-                                                   const scalar_t *const SFEM_RESTRICT srcw,
-                                                   const Hex8RcConfig &cfg,
-                                                   const ptrdiff_t   begin,
-                                                   const int         nlanes,
-                                                   Hex8RhieChowPack &rc) {
-    // Lane-major out of an element-major table: one element's twelve coefficients are
-    // consecutive, so this walks one stream instead of twelve. Measured neutral, not faster.
-    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-        if (lane < nlanes) {
-            const scalar_t *const SFEM_RESTRICT e = src + (ptrdiff_t)(begin + lane) * CVFEM_HEX8_N_SCS;
-            const scalar_t *const SFEM_RESTRICT w = srcw + (ptrdiff_t)(begin + lane) * CVFEM_HEX8_N_SCS;
-            for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
-                rc.coeff[s][lane] = e[s];
-                rc.wdu[s][lane]   = w[s];
-            }
-        } else {
-            for (int s = 0; s < CVFEM_HEX8_N_SCS; ++s) {
-                rc.coeff[s][lane] = scalar_t(0);
-                rc.wdu[s][lane]   = scalar_t(0);
-            }
-        }
-    }
-    // What the coefficient table was built with, for its velocity sensitivity in the face loop.
-    // Resolved by the caller: this function no longer sees a mesh.
-    rc.scale               = cfg.scale;
-    rc.tau                 = cfg.tau;
-}
 
-static SFEM_INLINE void cvfem_hex8_scatter_simd_to_pack(pack_idx_t **const SFEM_RESTRICT elems,
-                                                        scalar_t *const SFEM_RESTRICT    pack_out,
-                                                        const ptrdiff_t                  begin,
-                                                        const int                        nlanes,
-                                                        const Hex8ResidualPack          &out) {
-    scatter_hex8_simd_to_pack(elems, pack_out, begin, nlanes, out);
-}
-
-// Takes the arrays and the flag, not the staging objects, for the reason the gathers above do:
-// called from inside the pack sweeps, a PackT or MeshT parameter here is what keeps
-// src/kernels/ dependent on the staging layer. with_pg is resolved by the caller, where the
-// Rhie-Chow decision already lives.
-static SFEM_INLINE void cvfem_hex8_fill_pack_xyz_pgrad(const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-                                                       geom_t **const SFEM_RESTRICT       points,
-                                                       const scalar_t *const SFEM_RESTRICT pgx,
-                                                       const scalar_t *const SFEM_RESTRICT pgy,
-                                                       const scalar_t *const SFEM_RESTRICT pgz,
-                                                       const int                          with_pg,
-                                                       const ptrdiff_t                    pack,
-                                                       const ptrdiff_t                    n_contiguous,
-                                                       const ptrdiff_t                    n_ghost,
-                                                       const smesh::idx_t *const SFEM_RESTRICT ghosts,
-                                                       scalar_t *const SFEM_RESTRICT      pack_x,
-                                                       scalar_t *const SFEM_RESTRICT      pack_y,
-                                                       scalar_t *const SFEM_RESTRICT      pack_z,
-                                                       scalar_t *const SFEM_RESTRICT      pack_pgx,
-                                                       scalar_t *const SFEM_RESTRICT      pack_pgy,
-                                                       scalar_t *const SFEM_RESTRICT      pack_pgz) {
-    const auto *const px    = points[0];
-    const auto *const py    = points[1];
-    const auto *const pz    = points[2];
-    const ptrdiff_t   owned = owned_nodes_ptr[pack];
-    for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-        const ptrdiff_t g = owned + k;
-        pack_x[k]         = scalar_t(px[g]);
-        pack_y[k]         = scalar_t(py[g]);
-        pack_z[k]         = scalar_t(pz[g]);
-        pack_pgx[k]       = with_pg ? pgx[(size_t)g] : scalar_t(0);
-        pack_pgy[k]       = with_pg ? pgy[(size_t)g] : scalar_t(0);
-        pack_pgz[k]       = with_pg ? pgz[(size_t)g] : scalar_t(0);
-    }
-    for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-        const smesh::idx_t g         = ghosts[k];
-        pack_x[n_contiguous + k]     = scalar_t(px[g]);
-        pack_y[n_contiguous + k]     = scalar_t(py[g]);
-        pack_z[n_contiguous + k]     = scalar_t(pz[g]);
-        pack_pgx[n_contiguous + k]   = with_pg ? pgx[(size_t)g] : scalar_t(0);
-        pack_pgy[n_contiguous + k]   = with_pg ? pgy[(size_t)g] : scalar_t(0);
-        pack_pgz[n_contiguous + k]   = with_pg ? pgz[(size_t)g] : scalar_t(0);
-    }
-}
-
-// The same staging for the DIRECTION's reconstructed gradient, which only the Jacobian
-// action needs. Separate from the routine above rather than another pair of arguments on
-// it: the residual and the benchmark call that one and have nothing to put here.
-// Takes the arrays and the flag, not the staging objects, for the reason the gathers above do:
-// called from inside the pack sweeps, a PackT or MeshT parameter here is what keeps
-// src/kernels/ dependent on the staging layer.
-
-static SFEM_INLINE void cvfem_hex8_fill_pack_qgrad(const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-                                                   const scalar_t *const SFEM_RESTRICT qgx,
-                                                   const scalar_t *const SFEM_RESTRICT qgy,
-                                                   const scalar_t *const SFEM_RESTRICT qgz,
-                                                   const ptrdiff_t                    pack,
-                                                   const ptrdiff_t                    n_contiguous,
-                                                   const ptrdiff_t                    n_ghost,
-                                                   const smesh::idx_t *const SFEM_RESTRICT ghosts,
-                                                   scalar_t *const SFEM_RESTRICT      pack_qgx,
-                                                   scalar_t *const SFEM_RESTRICT      pack_qgy,
-                                                   scalar_t *const SFEM_RESTRICT      pack_qgz) {
-    const ptrdiff_t owned = owned_nodes_ptr[pack];
-    for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-        const ptrdiff_t g = owned + k;
-        pack_qgx[k]       = qgx[(size_t)g];
-        pack_qgy[k]       = qgy[(size_t)g];
-        pack_qgz[k]       = qgz[(size_t)g];
-    }
-    for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-        const smesh::idx_t g       = ghosts[k];
-        pack_qgx[n_contiguous + k] = qgx[(size_t)g];
-        pack_qgy[n_contiguous + k] = qgy[(size_t)g];
-        pack_qgz[n_contiguous + k] = qgz[(size_t)g];
-    }
-}
 
 // ---------------------------------------------------------------- nodal pressure gradient
 //

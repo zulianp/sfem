@@ -14,6 +14,7 @@
 #include <cstring>
 #include <memory>
 #include <vector>
+#include "kernels/packed/cvfem_hex8_pack_staging.hpp"
 
 #ifndef MIN
 #endif

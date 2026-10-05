@@ -136,13 +136,75 @@ def main():
                                f"so a fresh clone gets BAD_COMMAND. "
                                f"Fix with: git update-index --chmod=+x {f}")
 
+    # AND NO KERNEL MAY CALL A FUNCTION DEFINED OUTSIDE src/kernels/.
+    #
+    # The include check above is necessary and was not sufficient. Ten pack staging functions --
+    # the gathers, the fills and the scatter that every pack sweep runs around its element
+    # kernel -- lived in src/frontend/staging/ and the sweeps called them anyway, reached by
+    # INCLUDE ORDER: a launcher pulls the staging header in before the kernel header, so the
+    # names are in scope by the time the kernel is parsed. There was no include from kernels/ to
+    # object to, so this test passed for as long as that arrangement lasted. Four of those ten
+    # named smesh::idx_t, which this very test forbids in kernels/ code, from inside a call tree
+    # that kernels/ owned.
+    #
+    # The check is by NAME, against the set of functions defined elsewhere under src/. That
+    # cannot see a name defined in no SFEM source -- a libc or OpenMP call, or one of the
+    # contract aliases -- which is the right blind spot to have: those are what DESIGN.md's
+    # parenthetical allows ("exceptions for CUDA, OpenMP or other wrappers").
+    # NAMES THE INCLUDER SUPPLIES BY CONTRACT ARE NOT VIOLATIONS. cvfem_phases.hpp says so at
+    # its head: the enabled expansion "can name PhaseAcc, g_breakdown, wall_time, g_phase and
+    # the PH_ enumerators without this header depending on whatever defines them ... the same
+    # contract the kernels already use for scalar_t". That is deliberate and is what lets the
+    # instrumentation live in src/kernels/ while the breakdown's state lives with the driver
+    # that owns the flag. The check below found them on its first run, which is how this list
+    # came to exist -- and moving one of them here was the wrong fix, briefly made.
+    #
+    # Anything added here needs that kind of reason: a documented contract, not a convenience.
+    CONTRACT = {"wall_time", "phase_now", "phase_reset"}
+    DEF = re.compile(r"^(?:template <[^>\n]*>\s*\n)?(?:static |inline )[^;{\n]*?\b(\w+)\s*\(",
+                     re.M)
+    outside = {}
+    for src in sorted(ROOT.rglob("*.hpp")):
+        if "kernels" in src.relative_to(ROOT).parts[:1]:
+            continue
+        for m in DEF.finditer(src.read_text()):
+            outside.setdefault(m.group(1), src.relative_to(ROOT.parent))
+    inside = set()
+    for src in sorted(kernels.rglob("*")):
+        if src.suffix in (".hpp", ".h", ".cuh"):
+            inside |= {m.group(1) for m in DEF.finditer(src.read_text())}
+    reachable_only_by_order = {}
+    for src in sorted(kernels.rglob("*")):
+        # HOST HEADERS ONLY. A .cuh has the CUDA runtime's names in scope -- min, max, the
+        # intrinsics -- and this check cannot tell CUDA's min() from one of ours that happens
+        # to share the name, so it would report a violation that is not one.
+        if src.suffix not in (".hpp", ".h"):
+            continue
+        for n, line in enumerate(src.read_text().splitlines(), 1):
+            code = line.split("//")[0]
+            for m in re.finditer(r"(?<![\w.>:])(\w+)\s*(?:<[^<>()]*>)?\s*\(", code):
+                name = m.group(1)
+                if name in inside or name not in outside or name in CONTRACT:
+                    continue
+                if name in ("if", "for", "while", "switch", "return", "sizeof", "static_cast",
+                            "const_cast", "reinterpret_cast", "alignas", "assert"):
+                    continue
+                reachable_only_by_order.setdefault(name, (src.relative_to(ROOT.parent), n))
+    for name, (where, n) in sorted(reachable_only_by_order.items()):
+        bad.append(f"{where}:{n}: calls {name}(), which is defined in "
+                   f"{outside[name]} -- outside src/kernels/. It is reachable only because a "
+                   f"launcher includes that header first, which makes this directory's "
+                   f"self-containment an accident of include order. Move the definition here, "
+                   f"or make the caller a launcher.")
+
     if bad:
         print("FAILED: the layout this test holds has been broken\n", file=sys.stderr)
         for b in bad:
             print("  " + b, file=sys.stderr)
         return 1
     n_hdr = sum(1 for _ in kernels.rglob("*.hpp"))
-    print(f"PASSED: {n_hdr} headers under src/kernels/, none reaching outside it; "
+    print(f"PASSED: {n_hdr} headers under src/kernels/, none reaching outside it by "
+          f"include or by call; "
           f"src/ has only the directories this layout names; "
           f"all {len(want)} shell tests ctest runs are executable in the index")
     return 0

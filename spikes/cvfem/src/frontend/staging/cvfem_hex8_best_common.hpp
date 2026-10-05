@@ -118,6 +118,8 @@ static constexpr int N_FIELDS = 4;
 // than being carved up with preprocessor branches. Reaching one is a bug, and says so.
 #ifdef CVFEM_ENABLE_SUBPAR
 #include "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
+#include "kernels/packed/cvfem_hex8_pack_staging.hpp"
+
 // The standard layout's retired sweeps. They are included from the DRIVER rather than here --
 // they need kernels/standard/, which this header does not pull in -- so this note is a pointer:
 // subpar/cvfem_hex8_atomic_retired.hpp.
@@ -179,16 +181,6 @@ static GeomKind parse_geom(const std::string &name) {
     if (name == "isoparam") return GeomKind::Isoparam;
     return GeomKind::Affine;
 }
-
-static constexpr scalar_t CVFEM_HEX8_UNIT_CUBE[CVFEM_HEX8_N_NODES][3] = {
-        {0, 0, 0},
-        {1, 0, 0},
-        {1, 1, 0},
-        {0, 1, 0},
-        {0, 0, 1},
-        {1, 0, 1},
-        {1, 1, 1},
-        {0, 1, 1}};
 
 struct MeshData {
     std::shared_ptr<smesh::Mesh> mesh;
@@ -332,12 +324,18 @@ static int threads_active() {
 #endif
 }
 
+// ---- lightweight phase breakdown (enabled with --breakdown) -------------------
+static int g_breakdown = 0;
+
+// The clock the phase macros read, and phase_now's zero-cost form when the breakdown is off.
+// kernels/cvfem_phases.hpp names both without defining them -- the same contract it uses for
+// PhaseAcc, g_breakdown, g_phase and the PH_ enumerators, and the same one the kernels use for
+// scalar_t. cvfem_kernels_self_contained knows these names for that reason.
 static double wall_time() {
     return std::chrono::duration<double>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 }
 
-// ---- lightweight phase breakdown (enabled with --breakdown) -------------------
-static int g_breakdown = 0;
+static SFEM_INLINE double phase_now() { return g_breakdown ? wall_time() : 0.0; }
 static int g_dense_flush = 0;  // --dense-flush: stage ke densely, then flush 64 contiguous blocks
 static int g_kernel_only = 0;  // --kernel-only: element kernel writes to a dense stack buffer (no scatter)
 static int g_identity_slots[64];
@@ -364,6 +362,10 @@ static const char *const g_phase_name[PH_N] = {"zero_global",
                                                "ghost_reduce",
                                                "qgrad"};
 static double g_phase[PH_N] = {0};
+
+static void phase_reset() {
+    for (int i = 0; i < PH_N; ++i) g_phase[i] = 0;
+}
 struct PhaseAcc {
     double t[PH_N] = {0};
     void   flush() {
@@ -372,10 +374,6 @@ struct PhaseAcc {
         for (int i = 0; i < PH_N; ++i) g_phase[i] += t[i];
     }
 };
-static SFEM_INLINE double phase_now() { return g_breakdown ? wall_time() : 0.0; }
-static void phase_reset() {
-    for (int i = 0; i < PH_N; ++i) g_phase[i] = 0;
-}
 static void phase_report(const char *tag, const int repeat, const int nthreads) {
     if (!g_breakdown) return;
     // PH_QGRAD is WALL time for a whole pass; every other phase is thread time summed over
@@ -469,17 +467,6 @@ static void zero_bsr4(BSR4 &b) {
 static int cvfem_env_flag(const char *const name) {
     const char *const v = std::getenv(name);
     return v && *v && *v != '0' ? 1 : 0;
-}
-
-
-
-
-
-
-
-static SFEM_INLINE void bsr4_add16(scalar_t *const SFEM_RESTRICT dst, const scalar_t *const SFEM_RESTRICT src) {
-#pragma omp simd
-    for (int i = 0; i < 16; ++i) dst[i] += src[i];
 }
 
 static void precompute_element_bsr_slots(const MeshData &d, BSR4 &b) {
@@ -805,268 +792,11 @@ inline Hex8Extras cvfem_hex8_extras_of(const MeshData &d) {
     return x;
 }
 
-// Per-element scratch for the above. Declared inside the element loop; `rc` points into
-// this object, so it must outlive the kernel call -- which it does, being a local.
-
-
-static SFEM_INLINE void gather_hex8_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
-                                                   const scalar_t *const SFEM_RESTRICT pack_u,
-                                                   const scalar_t *const *const SFEM_RESTRICT adj_ptr,
-                                                   const scalar_t *const SFEM_RESTRICT        det_ptr,
-                                                   const ptrdiff_t                     begin,
-                                                   const int                           nlanes,
-                                                   Hex8InputPack                      &in,
-                                                   scalar_t *const SFEM_RESTRICT       cof0,
-                                                   scalar_t *const SFEM_RESTRICT       cof1,
-                                                   scalar_t *const SFEM_RESTRICT       cof2,
-                                                   scalar_t *const SFEM_RESTRICT       cof3,
-                                                   scalar_t *const SFEM_RESTRICT       cof4,
-                                                   scalar_t *const SFEM_RESTRICT       cof5,
-                                                   scalar_t *const SFEM_RESTRICT       cof6,
-                                                   scalar_t *const SFEM_RESTRICT       cof7,
-                                                   scalar_t *const SFEM_RESTRICT       cof8,
-                                                   scalar_t *const SFEM_RESTRICT       det) {
-    gather_hex8_adj_soa(adj_ptr, det_ptr, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
-    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-        if (lane < nlanes) {
-            const ptrdiff_t e = begin + lane;
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)elems[a][e] * N_FIELDS;
-                in.ux[a][lane]                        = u[0];
-                in.uy[a][lane]                        = u[1];
-                in.uz[a][lane]                        = u[2];
-                in.p[a][lane]                         = u[3];
-            }
-        } else {
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                in.ux[a][lane] = in.uy[a][lane] = in.uz[a][lane] = in.p[a][lane] = scalar_t(0);
-            }
-        }
-    }
-}
-
-
-static SFEM_INLINE void gather_hex8_action_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
-                                                          const scalar_t *const SFEM_RESTRICT pack_u,
-                                                          const scalar_t *const SFEM_RESTRICT pack_dir,
-                                                          const scalar_t *const *const SFEM_RESTRICT adj_ptr,
-                                                          const scalar_t *const SFEM_RESTRICT        det_ptr,
-                                                          const ptrdiff_t                     begin,
-                                                          const int                           nlanes,
-                                                          Hex8InputPack                      &u,
-                                                          Hex8InputPack                      &du,
-                                                          scalar_t *const SFEM_RESTRICT       cof0,
-                                                          scalar_t *const SFEM_RESTRICT       cof1,
-                                                          scalar_t *const SFEM_RESTRICT       cof2,
-                                                          scalar_t *const SFEM_RESTRICT       cof3,
-                                                          scalar_t *const SFEM_RESTRICT       cof4,
-                                                          scalar_t *const SFEM_RESTRICT       cof5,
-                                                          scalar_t *const SFEM_RESTRICT       cof6,
-                                                          scalar_t *const SFEM_RESTRICT       cof7,
-                                                          scalar_t *const SFEM_RESTRICT       cof8,
-                                                          scalar_t *const SFEM_RESTRICT       det) {
-    gather_hex8_simd_from_pack(elems, pack_u, adj_ptr, det_ptr, begin, nlanes, u, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
-    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-        if (lane < nlanes) {
-            const ptrdiff_t e = begin + lane;
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const scalar_t *const SFEM_RESTRICT dvec = pack_dir + (ptrdiff_t)elems[a][e] * N_FIELDS;
-                du.ux[a][lane]                           = dvec[0];
-                du.uy[a][lane]                           = dvec[1];
-                du.uz[a][lane]                           = dvec[2];
-                du.p[a][lane]                            = dvec[3];
-            }
-        } else {
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                du.ux[a][lane] = du.uy[a][lane] = du.uz[a][lane] = du.p[a][lane] = scalar_t(0);
-            }
-        }
-    }
-}
-
-// Takes the arrays, not the staging objects: it is called from inside the pack sweeps, and a
-// PackedData or MeshData parameter here is a staging dependency in src/kernels/, which DESIGN.md
-// does not allow there.
-static SFEM_INLINE void fill_pack_xyz(const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-                                      geom_t **const SFEM_RESTRICT       points,
-                                      const ptrdiff_t                    pack,
-                                      const ptrdiff_t                    n_contiguous,
-                                      const ptrdiff_t                    n_ghost,
-                                      const smesh::idx_t *const SFEM_RESTRICT ghosts,
-                                      scalar_t *const SFEM_RESTRICT      pack_x,
-                                      scalar_t *const SFEM_RESTRICT      pack_y,
-                                      scalar_t *const SFEM_RESTRICT      pack_z) {
-    const auto *const px    = points[0];
-    const auto *const py    = points[1];
-    const auto *const pz    = points[2];
-    const ptrdiff_t   owned = owned_nodes_ptr[pack];
-    for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-        const ptrdiff_t g = owned + k;
-        pack_x[k]         = scalar_t(px[g]);
-        pack_y[k]         = scalar_t(py[g]);
-        pack_z[k]         = scalar_t(pz[g]);
-    }
-    for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-        const smesh::idx_t g = ghosts[k];
-        pack_x[n_contiguous + k] = scalar_t(px[g]);
-        pack_y[n_contiguous + k] = scalar_t(py[g]);
-        pack_z[n_contiguous + k] = scalar_t(pz[g]);
-    }
-}
-
-static SFEM_INLINE void gather_hex8_isoparam_simd_from_pack(pack_idx_t **const SFEM_RESTRICT     elems,
-                                                            const scalar_t *const SFEM_RESTRICT pack_u,
-                                                            const scalar_t *const SFEM_RESTRICT pack_x,
-                                                            const scalar_t *const SFEM_RESTRICT pack_y,
-                                                            const scalar_t *const SFEM_RESTRICT pack_z,
-                                                            const ptrdiff_t                     begin,
-                                                            const int                           nlanes,
-                                                            Hex8InputPack                      &in,
-                                                            Hex8CoordPack                      &xyz) {
-    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-        if (lane < nlanes) {
-            const ptrdiff_t e = begin + lane;
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const pack_idx_t                    loc = elems[a][e];
-                const scalar_t *const SFEM_RESTRICT u   = pack_u + (ptrdiff_t)loc * N_FIELDS;
-                in.ux[a][lane]                          = u[0];
-                in.uy[a][lane]                          = u[1];
-                in.uz[a][lane]                          = u[2];
-                in.p[a][lane]                           = u[3];
-                xyz.x[a][lane]                          = pack_x[loc];
-                xyz.y[a][lane]                          = pack_y[loc];
-                xyz.z[a][lane]                          = pack_z[loc];
-            }
-        } else {
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                in.ux[a][lane] = in.uy[a][lane] = in.uz[a][lane] = in.p[a][lane] = scalar_t(0);
-                xyz.x[a][lane]                                                   = CVFEM_HEX8_UNIT_CUBE[a][0];
-                xyz.y[a][lane]                                                   = CVFEM_HEX8_UNIT_CUBE[a][1];
-                xyz.z[a][lane]                                                   = CVFEM_HEX8_UNIT_CUBE[a][2];
-            }
-        }
-    }
-}
-
-static SFEM_INLINE void gather_hex8_isoparam_action_simd_from_pack(pack_idx_t **const SFEM_RESTRICT     elems,
-                                                                   const scalar_t *const SFEM_RESTRICT pack_u,
-                                                                   const scalar_t *const SFEM_RESTRICT pack_dir,
-                                                                   const scalar_t *const SFEM_RESTRICT pack_x,
-                                                                   const scalar_t *const SFEM_RESTRICT pack_y,
-                                                                   const scalar_t *const SFEM_RESTRICT pack_z,
-                                                                   const ptrdiff_t                     begin,
-                                                                   const int                           nlanes,
-                                                                   Hex8InputPack                      &u,
-                                                                   Hex8InputPack                      &du,
-                                                                   Hex8CoordPack                      &xyz) {
-    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-        if (lane < nlanes) {
-            const ptrdiff_t e = begin + lane;
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                const pack_idx_t                    loc  = elems[a][e];
-                const scalar_t *const SFEM_RESTRICT usrc = pack_u + (ptrdiff_t)loc * N_FIELDS;
-                const scalar_t *const SFEM_RESTRICT dsrc = pack_dir + (ptrdiff_t)loc * N_FIELDS;
-                u.ux[a][lane]                            = usrc[0];
-                u.uy[a][lane]                            = usrc[1];
-                u.uz[a][lane]                            = usrc[2];
-                u.p[a][lane]                             = usrc[3];
-                du.ux[a][lane]                           = dsrc[0];
-                du.uy[a][lane]                           = dsrc[1];
-                du.uz[a][lane]                           = dsrc[2];
-                du.p[a][lane]                            = dsrc[3];
-                xyz.x[a][lane]                           = pack_x[loc];
-                xyz.y[a][lane]                           = pack_y[loc];
-                xyz.z[a][lane]                           = pack_z[loc];
-            }
-        } else {
-            for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                u.ux[a][lane] = u.uy[a][lane] = u.uz[a][lane] = u.p[a][lane] = scalar_t(0);
-                du.ux[a][lane] = du.uy[a][lane] = du.uz[a][lane] = du.p[a][lane] = scalar_t(0);
-                xyz.x[a][lane]                                                   = CVFEM_HEX8_UNIT_CUBE[a][0];
-                xyz.y[a][lane]                                                   = CVFEM_HEX8_UNIT_CUBE[a][1];
-                xyz.z[a][lane]                                                   = CVFEM_HEX8_UNIT_CUBE[a][2];
-            }
-        }
-    }
-}
-
-static SFEM_INLINE void gather_hex8_coords_from_pack(pack_idx_t **const SFEM_RESTRICT     elems,
-                                                     const scalar_t *const SFEM_RESTRICT pack_x,
-                                                     const scalar_t *const SFEM_RESTRICT pack_y,
-                                                     const scalar_t *const SFEM_RESTRICT pack_z,
-                                                     const ptrdiff_t                     e,
-                                                     scalar_t *const SFEM_RESTRICT       x,
-                                                     scalar_t *const SFEM_RESTRICT       y,
-                                                     scalar_t *const SFEM_RESTRICT       z) {
-    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-        const pack_idx_t loc = elems[a][e];
-        x[a]                 = pack_x[loc];
-        y[a]                 = pack_y[loc];
-        z[a]                 = pack_z[loc];
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Pack staging
 // ---------------------------------------------------------------------------
 
-// Copy a pack's nodal fields into an interleaved pack-local buffer. Indexing the
-// element kernels through pack-local ids turns four scattered global reads per
-// node into one contiguous read, which is why the packed and colored layouts both
-// stage through this buffer rather than gathering from d.ux/uy/uz/p directly.
-// Takes the arrays, not the staging objects: it is called from inside the pack sweeps, and a
-// PackedData or MeshData parameter here is a staging dependency in src/kernels/, which DESIGN.md
-// does not allow there.
-static SFEM_INLINE void fill_pack_fields(const ptrdiff_t *const SFEM_RESTRICT    owned_nodes_ptr,
-                                         const scalar_t *const SFEM_RESTRICT     ux,
-                                         const scalar_t *const SFEM_RESTRICT     uy,
-                                         const scalar_t *const SFEM_RESTRICT     uz,
-                                         const scalar_t *const SFEM_RESTRICT     pr,
-                                         const ptrdiff_t                         pack,
-                                         const ptrdiff_t                         n_contiguous,
-                                         const ptrdiff_t                         n_ghost,
-                                         const smesh::idx_t *const SFEM_RESTRICT ghosts,
-                                         scalar_t *const SFEM_RESTRICT           pack_u) {
-    const ptrdiff_t                     owned = owned_nodes_ptr[pack];
-    for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-        scalar_t *const SFEM_RESTRICT dst = pack_u + k * N_FIELDS;
-        const ptrdiff_t               g   = owned + k;
-        dst[0]                            = ux[g];
-        dst[1]                            = uy[g];
-        dst[2]                            = uz[g];
-        dst[3]                            = pr[g];
-    }
-    for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-        scalar_t *const SFEM_RESTRICT dst = pack_u + (n_contiguous + k) * N_FIELDS;
-        const smesh::idx_t            g   = ghosts[k];
-        dst[0]                            = ux[g];
-        dst[1]                            = uy[g];
-        dst[2]                            = uz[g];
-        dst[3]                            = pr[g];
-    }
-}
 
-// Same, for an already-interleaved global vector (a Krylov direction).
-// Takes the arrays, not the staging objects: it is called from inside the pack sweeps, and a
-// PackedData or MeshData parameter here is a staging dependency in src/kernels/, which DESIGN.md
-// does not allow there.
-static SFEM_INLINE void fill_pack_interleaved(const ptrdiff_t *const SFEM_RESTRICT    owned_nodes_ptr,
-                                              const ptrdiff_t                         pack,
-                                              const ptrdiff_t                         n_contiguous,
-                                              const ptrdiff_t                         n_ghost,
-                                              const smesh::idx_t *const SFEM_RESTRICT ghosts,
-                                              const scalar_t *const SFEM_RESTRICT     src,
-                                              scalar_t *const SFEM_RESTRICT           pack_v) {
-    const ptrdiff_t owned = owned_nodes_ptr[pack];
-    for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-        std::memcpy(pack_v + k * N_FIELDS, src + (owned + k) * N_FIELDS, N_FIELDS * sizeof(scalar_t));
-    }
-    for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-        std::memcpy(pack_v + (n_contiguous + k) * N_FIELDS,
-                    src + (ptrdiff_t)ghosts[k] * N_FIELDS,
-                    N_FIELDS * sizeof(scalar_t));
-    }
-}
 
 // Pack-local node id -> global node id. The colored layout scatters into the
 // global arrays directly, so it needs this to translate the pack-local element
@@ -1086,18 +816,6 @@ static SFEM_INLINE void fill_pack_l2g(const PackedData                       &p,
 // Element matrix -> target matrix
 // ---------------------------------------------------------------------------
 
-// Flush a dense block-major element matrix ke[(i*8+k)*16 + c] into the target
-// matrix: 64 contiguous 16-double adds instead of ~768 scattered scalar updates.
-static SFEM_INLINE void hex8_blocks_to_slots(const int *const SFEM_RESTRICT      slots,
-                                             const scalar_t *const SFEM_RESTRICT ke,
-                                             scalar_t *const SFEM_RESTRICT       values) {
-    for (int blk = 0; blk < 64; ++blk) {
-        scalar_t *const SFEM_RESTRICT       dst = values + (ptrdiff_t)slots[blk] * 16;
-        const scalar_t *const SFEM_RESTRICT src = ke + blk * 16;
-#pragma omp simd
-        for (int c = 0; c < 16; ++c) dst[c] += src[c];
-    }
-}
 
 static SFEM_INLINE void hex8_local_slots_to_bsr4(const int *const SFEM_RESTRICT      slots,
                                                  const scalar_t *const SFEM_RESTRICT ke,

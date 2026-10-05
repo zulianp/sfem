@@ -48,6 +48,18 @@ static_assert(CVFEM_HEX8_VEC_SIZE >= 1, "invalid HEX8 vector size");
 static_assert(cvfem_hex8_vec_size<float> == 2 * cvfem_hex8_vec_size<double>,
               "a single-precision lane group must hold twice as many elements");
 
+// The reference element's node coordinates, in this element's node order. Read by the
+// isoparametric gather for a pack that stages no geometry of its own.
+static constexpr scalar_t CVFEM_HEX8_UNIT_CUBE[CVFEM_HEX8_N_NODES][3] = {
+        {0, 0, 0},
+        {1, 0, 0},
+        {1, 1, 0},
+        {0, 1, 0},
+        {0, 0, 1},
+        {1, 0, 1},
+        {1, 1, 1},
+        {0, 1, 1}};
+
 struct Hex8Face {
     int    i;
     int    j;
