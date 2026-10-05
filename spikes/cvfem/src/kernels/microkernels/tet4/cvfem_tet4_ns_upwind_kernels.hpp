@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <type_traits>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -17,24 +18,54 @@
 #define CVFEM_IDX_INVALID (-1)
 #endif
 
+// The lane group's byte budget and the alignment it needs, with the same defaults and the same
+// #ifndef shape the HEX8 kernels use. They used to arrive from whichever driver included this
+// header, which made the lane width a property of the includer rather than of the element.
+#ifndef VEC_BYTES
+#define VEC_BYTES 128
+#endif
+
+#ifndef ALIGN_BYTES
+#define ALIGN_BYTES 64
+#endif
+
 static constexpr int CVFEM_N_FIELDS = 4;
 static constexpr int CVFEM_N_NODES  = 4;
 static constexpr int CVFEM_N_DOF    = CVFEM_N_NODES * CVFEM_N_FIELDS;
 
-struct Tet4InputPack {
-    scalar_t ux[4][VEC_SIZE];
-    scalar_t uy[4][VEC_SIZE];
-    scalar_t uz[4][VEC_SIZE];
-    scalar_t p[4][VEC_SIZE];
+// THE LANE WIDTH IS A PROPERTY OF THE SCALAR, which is what DESIGN.md's third correction needs
+// of it. `cvfem_tet4_vec_size<scalar_t>` arrives from the includer as VEC_BYTES / sizeof(the build's scalar) -- one
+// number per build -- so a pack instantiated at float would have been sized for double and the
+// kernel would have strided through half of it. The HEX8 packs carry cvfem_hex8_vec_size<S> for
+// the same reason, and the failure there was silent: nothing fails to compile, the lanes past
+// the stride are simply never written and the reads run off the end of every staged array.
+template <typename S>
+static constexpr int cvfem_tet4_vec_size = VEC_BYTES / int(sizeof(S));
+
+static constexpr int CVFEM_TET4_VEC_SIZE = cvfem_tet4_vec_size<scalar_t>;
+static_assert(cvfem_tet4_vec_size<float> == 2 * cvfem_tet4_vec_size<double>,
+              "the lane count must follow the scalar's width");
+
+template <typename scalar_t>
+struct Tet4InputPackT {
+    scalar_t ux[4][cvfem_tet4_vec_size<scalar_t>];
+    scalar_t uy[4][cvfem_tet4_vec_size<scalar_t>];
+    scalar_t uz[4][cvfem_tet4_vec_size<scalar_t>];
+    scalar_t p[4][cvfem_tet4_vec_size<scalar_t>];
 };
 
-struct Tet4ResidualPack {
-    scalar_t rx[4][VEC_SIZE];
-    scalar_t ry[4][VEC_SIZE];
-    scalar_t rz[4][VEC_SIZE];
-    scalar_t rc[4][VEC_SIZE];
+template <typename scalar_t>
+struct Tet4ResidualPackT {
+    scalar_t rx[4][cvfem_tet4_vec_size<scalar_t>];
+    scalar_t ry[4][cvfem_tet4_vec_size<scalar_t>];
+    scalar_t rz[4][cvfem_tet4_vec_size<scalar_t>];
+    scalar_t rc[4][cvfem_tet4_vec_size<scalar_t>];
 };
 
+using Tet4InputPack    = Tet4InputPackT<scalar_t>;
+using Tet4ResidualPack = Tet4ResidualPackT<scalar_t>;
+
+template <typename jacobian_t>
 static SFEM_INLINE const jacobian_t *cvfem_aligned_geom(const jacobian_t *p) {
     return static_cast<const jacobian_t *>(__builtin_assume_aligned(p, ALIGN_BYTES));
 }
@@ -51,25 +82,44 @@ static constexpr double CVFEM_RESIDUAL_FLOPS_PER_ELEMENT = 562.0;
 #endif
 #endif
 
-static constexpr int SIMD_SIZE = CVFEM_SIMD_BYTES / int(sizeof(scalar_t));
+// The SIMD lane count and the vector type, both per scalar for the reason the pack width is.
+// The compiler's vector extension takes a dependent element type through an alias template, so
+// one spelling serves both precisions and the lane count follows from the same byte budget.
+template <typename S>
+static constexpr int cvfem_tet4_simd_size = CVFEM_SIMD_BYTES / int(sizeof(S));
+
+static constexpr int SIMD_SIZE = cvfem_tet4_simd_size<scalar_t>;
 static_assert(SIMD_SIZE >= 1, "invalid SIMD size");
 
-using scalar_v __attribute__((vector_size(CVFEM_SIMD_BYTES))) = scalar_t;
+template <typename S> using scalar_v_t __attribute__((vector_size(CVFEM_SIMD_BYTES))) = S;
 
-static SFEM_INLINE scalar_v cvfem_load_scalar_v(const scalar_t *const SFEM_RESTRICT p) {
-    return *reinterpret_cast<const scalar_v *>(p);
+using scalar_v = scalar_v_t<scalar_t>;
+
+template <typename scalar_t>
+static SFEM_INLINE scalar_v_t<scalar_t> cvfem_load_scalar_v(const scalar_t *const SFEM_RESTRICT p) {
+    return *reinterpret_cast<const scalar_v_t<scalar_t> *>(p);
 }
 
-static SFEM_INLINE scalar_v cvfem_splat_scalar_v(const scalar_t a) {
-    return scalar_v{} + a;
+template <typename scalar_t>
+static SFEM_INLINE scalar_v_t<scalar_t> cvfem_splat_scalar_v(const scalar_t a) {
+    return scalar_v_t<scalar_t>{} + a;
 }
 
-static SFEM_INLINE void cvfem_store_scalar_v(scalar_t *const SFEM_RESTRICT p, const scalar_v v) {
-    *reinterpret_cast<scalar_v *>(p) = v;
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_store_scalar_v(scalar_t *const SFEM_RESTRICT p, const scalar_v_t<scalar_t> v) {
+    *reinterpret_cast<scalar_v_t<scalar_t> *>(p) = v;
 }
 
-static SFEM_INLINE void cvfem_store_scalar_v(scalar_t *const SFEM_RESTRICT p, const scalar_t v) {
-    cvfem_store_scalar_v(p, cvfem_splat_scalar_v(v));
+// THE SCALAR OVERLOAD TAKES ITS TYPE FROM THE DESTINATION, not from the value.
+//
+// common_type is a non-deduced context, which is the point: the generated kernels broadcast a
+// literal here -- `cvfem_store_scalar_v(ke + 59 * cvfem_tet4_simd_size<scalar_t>, 0)` -- and a deduced parameter
+// would make that `int` and conflict with the pointer's scalar. The lane type is a property of
+// where the value is going, so deducing it from the pointer alone is also the right reading.
+template <typename scalar_t>
+static SFEM_INLINE void cvfem_store_scalar_v(scalar_t *const SFEM_RESTRICT p,
+                                             const typename std::common_type<scalar_t>::type v) {
+    cvfem_store_scalar_v(p, cvfem_splat_scalar_v<scalar_t>(v));
 }
 
 // Source add/mul/div in cvfem_tet4_ns_upwind_jacobian_dense. Not counted: abs/ternary,
@@ -79,6 +129,7 @@ static SFEM_INLINE void cvfem_store_scalar_v(scalar_t *const SFEM_RESTRICT p, co
 static constexpr double CVFEM_JACOBIAN_FLOPS_PER_ELEMENT = 1.0 + 9.0 + 6.0 + (3.0 * 15.0 + 3.0 * 9.0) +
                                                            6.0 * (6.0 + 6.0 + 4.0 + 4.0 + 4.0 + 6.0 * 31.0 + 15.0 + 4.0 * 51.0);
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_zero_scalars(scalar_t *const SFEM_RESTRICT p, const ptrdiff_t n) {
 #ifdef _OPENMP
 #pragma omp parallel
@@ -94,6 +145,7 @@ static SFEM_INLINE void cvfem_zero_scalars(scalar_t *const SFEM_RESTRICT p, cons
 #endif
 }
 
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_microkernel(const scalar_t                        rho_s,
                                                               const scalar_t                        mu_s,
                                                               const jacobian_t *const SFEM_RESTRICT adj0_ptr,
@@ -106,8 +158,8 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_microkernel(const scalar_t    
                                                               const jacobian_t *const SFEM_RESTRICT adj7_ptr,
                                                               const jacobian_t *const SFEM_RESTRICT adj8_ptr,
                                                               const jacobian_t *const SFEM_RESTRICT det_ptr,
-                                                              const Tet4InputPack                  &in,
-                                                              Tet4ResidualPack                     &out) {
+                                                              const Tet4InputPackT<scalar_t>                  &in,
+                                                              Tet4ResidualPackT<scalar_t>                     &out) {
     const scalar_t half = 0.5;
     const scalar_t two  = 2.0;
     const scalar_t rho  = rho_s;
@@ -116,12 +168,12 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_microkernel(const scalar_t    
     const scalar_t c12 = 1.0 / 12.0;
     const scalar_t c24 = 1.0 / 24.0;
 
-    alignas(ALIGN_BYTES) scalar_t g00v[VEC_SIZE], g01v[VEC_SIZE], g02v[VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t g10v[VEC_SIZE], g11v[VEC_SIZE], g12v[VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t g20v[VEC_SIZE], g21v[VEC_SIZE], g22v[VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t g00v[cvfem_tet4_vec_size<scalar_t>], g01v[cvfem_tet4_vec_size<scalar_t>], g02v[cvfem_tet4_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t g10v[cvfem_tet4_vec_size<scalar_t>], g11v[cvfem_tet4_vec_size<scalar_t>], g12v[cvfem_tet4_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t g20v[cvfem_tet4_vec_size<scalar_t>], g21v[cvfem_tet4_vec_size<scalar_t>], g22v[cvfem_tet4_vec_size<scalar_t>];
 
 #pragma omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr : 64)
-    for (int lane = 0; lane < VEC_SIZE; ++lane) {
+    for (int lane = 0; lane < cvfem_tet4_vec_size<scalar_t>; ++lane) {
         const scalar_t adj0    = scalar_t(adj0_ptr[lane]);
         const scalar_t adj1    = scalar_t(adj1_ptr[lane]);
         const scalar_t adj2    = scalar_t(adj2_ptr[lane]);
@@ -214,7 +266,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_microkernel(const scalar_t    
 
 #define SCS_FLUX_LANES(I, J, AREA)                                                                   \
     do {                                                                                             \
-        GEOM_SIMD_PRAGMA for (int lane = 0; lane < VEC_SIZE; ++lane) {                               \
+        GEOM_SIMD_PRAGMA for (int lane = 0; lane < cvfem_tet4_vec_size<scalar_t>; ++lane) {                               \
             AREA;                                                                                    \
             const scalar_t uxI      = in.ux[I][lane];                                                \
             const scalar_t uxJ      = in.ux[J][lane];                                                \
@@ -271,6 +323,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_simd_microkernel(const scalar_t    
 #undef GEOM_SIMD_PRAGMA
 }
 
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(
         const scalar_t                        rho_s,
         const scalar_t                        mu_s,
@@ -284,9 +337,9 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(
         const jacobian_t *const SFEM_RESTRICT adj7_ptr,
         const jacobian_t *const SFEM_RESTRICT adj8_ptr,
         const jacobian_t *const SFEM_RESTRICT det_ptr,
-        const Tet4InputPack                  &u,
-        const Tet4InputPack                  &du,
-        Tet4ResidualPack                     &out) {
+        const Tet4InputPackT<scalar_t>                  &u,
+        const Tet4InputPackT<scalar_t>                  &du,
+        Tet4ResidualPackT<scalar_t>                     &out) {
     const scalar_t half = 0.5;
     const scalar_t two  = 2.0;
     const scalar_t one  = 1.0;
@@ -296,12 +349,12 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(
     const scalar_t c12 = 1.0 / 12.0;
     const scalar_t c24 = 1.0 / 24.0;
 
-    alignas(ALIGN_BYTES) scalar_t dg00v[VEC_SIZE], dg01v[VEC_SIZE], dg02v[VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t dg10v[VEC_SIZE], dg11v[VEC_SIZE], dg12v[VEC_SIZE];
-    alignas(ALIGN_BYTES) scalar_t dg20v[VEC_SIZE], dg21v[VEC_SIZE], dg22v[VEC_SIZE];
+    alignas(ALIGN_BYTES) scalar_t dg00v[cvfem_tet4_vec_size<scalar_t>], dg01v[cvfem_tet4_vec_size<scalar_t>], dg02v[cvfem_tet4_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t dg10v[cvfem_tet4_vec_size<scalar_t>], dg11v[cvfem_tet4_vec_size<scalar_t>], dg12v[cvfem_tet4_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t dg20v[cvfem_tet4_vec_size<scalar_t>], dg21v[cvfem_tet4_vec_size<scalar_t>], dg22v[cvfem_tet4_vec_size<scalar_t>];
 
 #pragma omp simd aligned(adj0_ptr, adj1_ptr, adj2_ptr, adj3_ptr, adj4_ptr, adj5_ptr, adj6_ptr, adj7_ptr, adj8_ptr, det_ptr : 64)
-    for (int lane = 0; lane < VEC_SIZE; ++lane) {
+    for (int lane = 0; lane < cvfem_tet4_vec_size<scalar_t>; ++lane) {
         const scalar_t adj0    = scalar_t(adj0_ptr[lane]);
         const scalar_t adj1    = scalar_t(adj1_ptr[lane]);
         const scalar_t adj2    = scalar_t(adj2_ptr[lane]);
@@ -394,7 +447,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(
 
 #define SCS_ACTION_LANES(I, J, AREA)                                                                 \
     do {                                                                                             \
-        GEOM_SIMD_PRAGMA for (int lane = 0; lane < VEC_SIZE; ++lane) {                               \
+        GEOM_SIMD_PRAGMA for (int lane = 0; lane < cvfem_tet4_vec_size<scalar_t>; ++lane) {                               \
             AREA;                                                                                    \
             const scalar_t uxI      = u.ux[I][lane];                                                 \
             const scalar_t uxJ      = u.ux[J][lane];                                                 \
@@ -463,6 +516,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(
 #undef GEOM_SIMD_PRAGMA
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_dense(const scalar_t                rho,
                                                             const scalar_t                mu,
                                                             const scalar_t                adj0,
@@ -640,6 +694,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_jacobian_dense(const scalar_t      
 #undef KE
 }
 
+template <typename jacobian_t>
 static SFEM_INLINE void cvfem_pad_geom_lanes(const jacobian_t *const SFEM_RESTRICT adj0,
                                              const jacobian_t *const SFEM_RESTRICT adj1,
                                              const jacobian_t *const SFEM_RESTRICT adj2,
@@ -662,7 +717,7 @@ static SFEM_INLINE void cvfem_pad_geom_lanes(const jacobian_t *const SFEM_RESTRI
                                              jacobian_t *const SFEM_RESTRICT       a8,
                                              jacobian_t *const SFEM_RESTRICT       det_out) {
     const int last = nlanes - 1;
-    for (int lane = 0; lane < VEC_SIZE; ++lane) {
+    for (int lane = 0; lane < cvfem_tet4_vec_size<scalar_t>; ++lane) {
         const int e = lane < nlanes ? lane : last;
         a0[lane]    = adj0[e];
         a1[lane]    = adj1[e];
@@ -677,6 +732,7 @@ static SFEM_INLINE void cvfem_pad_geom_lanes(const jacobian_t *const SFEM_RESTRI
     }
 }
 
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_run_residual_kernel(const scalar_t                        rho,
                                                   const scalar_t                        mu,
                                                   const jacobian_t *const SFEM_RESTRICT adj0,
@@ -690,9 +746,9 @@ static SFEM_INLINE void cvfem_run_residual_kernel(const scalar_t                
                                                   const jacobian_t *const SFEM_RESTRICT adj8,
                                                   const jacobian_t *const SFEM_RESTRICT det,
                                                   const int                             nlanes,
-                                                  const Tet4InputPack                  &in,
-                                                  Tet4ResidualPack                     &out) {
-    if (nlanes == VEC_SIZE) {
+                                                  const Tet4InputPackT<scalar_t>                  &in,
+                                                  Tet4ResidualPackT<scalar_t>                     &out) {
+    if (nlanes == cvfem_tet4_vec_size<scalar_t>) {
         cvfem_tet4_ns_upwind_simd_microkernel(rho,
                                               mu,
                                               cvfem_aligned_geom(adj0),
@@ -709,12 +765,13 @@ static SFEM_INLINE void cvfem_run_residual_kernel(const scalar_t                
                                               out);
         return;
     }
-    alignas(ALIGN_BYTES) jacobian_t a0[VEC_SIZE], a1[VEC_SIZE], a2[VEC_SIZE], a3[VEC_SIZE], a4[VEC_SIZE];
-    alignas(ALIGN_BYTES) jacobian_t a5[VEC_SIZE], a6[VEC_SIZE], a7[VEC_SIZE], a8[VEC_SIZE], detp[VEC_SIZE];
+    alignas(ALIGN_BYTES) jacobian_t a0[cvfem_tet4_vec_size<scalar_t>], a1[cvfem_tet4_vec_size<scalar_t>], a2[cvfem_tet4_vec_size<scalar_t>], a3[cvfem_tet4_vec_size<scalar_t>], a4[cvfem_tet4_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) jacobian_t a5[cvfem_tet4_vec_size<scalar_t>], a6[cvfem_tet4_vec_size<scalar_t>], a7[cvfem_tet4_vec_size<scalar_t>], a8[cvfem_tet4_vec_size<scalar_t>], detp[cvfem_tet4_vec_size<scalar_t>];
     cvfem_pad_geom_lanes(adj0, adj1, adj2, adj3, adj4, adj5, adj6, adj7, adj8, det, nlanes, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp);
     cvfem_tet4_ns_upwind_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, in, out);
 }
 
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_run_jacobian_action_kernel(const scalar_t                        rho,
                                                          const scalar_t                        mu,
                                                          const jacobian_t *const SFEM_RESTRICT adj0,
@@ -728,10 +785,10 @@ static SFEM_INLINE void cvfem_run_jacobian_action_kernel(const scalar_t         
                                                          const jacobian_t *const SFEM_RESTRICT adj8,
                                                          const jacobian_t *const SFEM_RESTRICT det,
                                                          const int                             nlanes,
-                                                         const Tet4InputPack                  &u,
-                                                         const Tet4InputPack                  &du,
-                                                         Tet4ResidualPack                     &out) {
-    if (nlanes == VEC_SIZE) {
+                                                         const Tet4InputPackT<scalar_t>                  &u,
+                                                         const Tet4InputPackT<scalar_t>                  &du,
+                                                         Tet4ResidualPackT<scalar_t>                     &out) {
+    if (nlanes == cvfem_tet4_vec_size<scalar_t>) {
         cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(rho,
                                                               mu,
                                                               cvfem_aligned_geom(adj0),
@@ -749,8 +806,8 @@ static SFEM_INLINE void cvfem_run_jacobian_action_kernel(const scalar_t         
                                                               out);
         return;
     }
-    alignas(ALIGN_BYTES) jacobian_t a0[VEC_SIZE], a1[VEC_SIZE], a2[VEC_SIZE], a3[VEC_SIZE], a4[VEC_SIZE];
-    alignas(ALIGN_BYTES) jacobian_t a5[VEC_SIZE], a6[VEC_SIZE], a7[VEC_SIZE], a8[VEC_SIZE], detp[VEC_SIZE];
+    alignas(ALIGN_BYTES) jacobian_t a0[cvfem_tet4_vec_size<scalar_t>], a1[cvfem_tet4_vec_size<scalar_t>], a2[cvfem_tet4_vec_size<scalar_t>], a3[cvfem_tet4_vec_size<scalar_t>], a4[cvfem_tet4_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) jacobian_t a5[cvfem_tet4_vec_size<scalar_t>], a6[cvfem_tet4_vec_size<scalar_t>], a7[cvfem_tet4_vec_size<scalar_t>], a8[cvfem_tet4_vec_size<scalar_t>], detp[cvfem_tet4_vec_size<scalar_t>];
     cvfem_pad_geom_lanes(adj0, adj1, adj2, adj3, adj4, adj5, adj6, adj7, adj8, det, nlanes, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp);
     cvfem_tet4_ns_upwind_jacobian_action_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, u, du, out);
 }
@@ -789,7 +846,7 @@ static SFEM_INLINE void cvfem_find_cols4(const Idx *const SFEM_RESTRICT targets,
     }
 }
 
-template <bool Atomic>
+template <bool Atomic, typename scalar_t>
 static SFEM_INLINE void cvfem_bsr4_accum_dense_block(scalar_t *const SFEM_RESTRICT       block,
                                                      const scalar_t *const SFEM_RESTRICT src00) {
     if constexpr (Atomic) {
@@ -818,21 +875,23 @@ static SFEM_INLINE void cvfem_bsr4_accum_dense_block(scalar_t *const SFEM_RESTRI
     }
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_bsr4_add16(scalar_t *const SFEM_RESTRICT       dst,
                                          const scalar_t *const SFEM_RESTRICT src) {
 #pragma omp simd
     for (int t = 0; t < 16; ++t) dst[t] += src[t];
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_bsr4_add16_vec(scalar_t *const SFEM_RESTRICT       dst,
                                              const scalar_t *const SFEM_RESTRICT src) {
 #pragma unroll
-    for (int t = 0; t < 16; t += SIMD_SIZE) {
+    for (int t = 0; t < 16; t += cvfem_tet4_simd_size<scalar_t>) {
         cvfem_store_scalar_v(dst + t, cvfem_load_scalar_v(dst + t) + cvfem_load_scalar_v(src + t));
     }
 }
 
-template <bool Atomic, typename Count, typename Idx>
+template <bool Atomic, typename Count, typename Idx, typename scalar_t>
 static SFEM_INLINE void tet4_local_to_global_bsr4(const Idx *const SFEM_RESTRICT           ev,
                                                   const scalar_t *const SFEM_RESTRICT      element_matrix,
                                                   const Count *const SFEM_RESTRICT         rowptr,
@@ -853,6 +912,7 @@ static SFEM_INLINE void tet4_local_to_global_bsr4(const Idx *const SFEM_RESTRICT
     }
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void tet4_local_slots_to_bsr4(const int *const SFEM_RESTRICT      slots,
                                                  const scalar_t *const SFEM_RESTRICT element_matrix,
                                                  scalar_t *const SFEM_RESTRICT       values) {
@@ -865,6 +925,7 @@ static SFEM_INLINE void tet4_local_slots_to_bsr4(const int *const SFEM_RESTRICT 
     }
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void tet4_local_slots_to_bsr4_vec_lane(const int *const SFEM_RESTRICT      slots,
                                                           const scalar_t *const SFEM_RESTRICT element_matrix_vec,
                                                           const int                           lane,
@@ -878,10 +939,10 @@ static SFEM_INLINE void tet4_local_slots_to_bsr4_vec_lane(const int *const SFEM_
             for (int fi = 0; fi < 4; ++fi) {
                 const int row = row0 + fi;
                 scalar_t *const SFEM_RESTRICT d = block + fi * 4;
-                d[0] += element_matrix_vec[((row * 16 + col0 + 0) * SIMD_SIZE) + lane];
-                d[1] += element_matrix_vec[((row * 16 + col0 + 1) * SIMD_SIZE) + lane];
-                d[2] += element_matrix_vec[((row * 16 + col0 + 2) * SIMD_SIZE) + lane];
-                d[3] += element_matrix_vec[((row * 16 + col0 + 3) * SIMD_SIZE) + lane];
+                d[0] += element_matrix_vec[((row * 16 + col0 + 0) * cvfem_tet4_simd_size<scalar_t>) + lane];
+                d[1] += element_matrix_vec[((row * 16 + col0 + 1) * cvfem_tet4_simd_size<scalar_t>) + lane];
+                d[2] += element_matrix_vec[((row * 16 + col0 + 2) * cvfem_tet4_simd_size<scalar_t>) + lane];
+                d[3] += element_matrix_vec[((row * 16 + col0 + 3) * cvfem_tet4_simd_size<scalar_t>) + lane];
             }
         }
     }
