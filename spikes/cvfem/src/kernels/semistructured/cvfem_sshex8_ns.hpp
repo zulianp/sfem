@@ -358,6 +358,136 @@ static SFEM_INLINE Hex8BoundaryDataT<scalar_t> sscvfem_bd(
 // The default folds it into the drain as before -- one pass over the nodes saved, which is
 // the whole reason the packed path beats the scatter one -- and multiplying by an exact 1
 // otherwise, so the default path is unchanged bit for bit rather than merely equivalent.
+// THE POSITIONS OF ONE HALF OF THE CURVATURE PARTITION THAT FALL IN AN ELEMENT RANGE.
+//
+// `order` is SSMeshData::macro_order -- straight macro elements first, curved ones after -- and
+// [lo, hi) is one of those halves. Each half is in ascending element order, so the positions
+// whose element lies in [begin, end) are a CONTIGUOUS RUN and a binary search finds it. That is
+// what lets a sweep be handed a range of one kind instead of testing per element, and it is why
+// sscvfem_classify_macros keeps each half ascending.
+//
+// A null order is the identity -- a mesh with nothing curved -- and then the straight half is
+// the element range itself and the curved half is empty.
+static SFEM_INLINE cvfem_range sscvfem_order_run(const ptrdiff_t *const SFEM_RESTRICT order,
+                                                 const ptrdiff_t lo, const ptrdiff_t hi,
+                                                 const ptrdiff_t begin, const ptrdiff_t end) {
+    if (!order) return lo == 0 ? cvfem_range{begin, end} : cvfem_range{end, end};
+    ptrdiff_t b = lo, e = hi;
+    {   // lower_bound(begin)
+        ptrdiff_t first = lo, count = hi - lo;
+        while (count > 0) {
+            const ptrdiff_t half = count / 2, mid = first + half;
+            if (order[mid] < begin) { first = mid + 1; count -= half + 1; } else { count = half; }
+        }
+        b = first;
+    }
+    {   // lower_bound(end)
+        ptrdiff_t first = b, count = hi - b;
+        while (count > 0) {
+            const ptrdiff_t half = count / 2, mid = first + half;
+            if (order[mid] < end) { first = mid + 1; count -= half + 1; } else { count = half; }
+        }
+        e = first;
+    }
+    return cvfem_range{b, e};
+}
+
+// The nodal gradient reconstructs three fields where it used to carry four: the weight rode
+// along through the per-element accumulator, the scatter and the shared reduction, which is a
+// third of the traffic of each spent re-deriving a quantity that does not change.
+static constexpr int SSCVFEM_NGRAD = 3;
+
+// ONE MACRO ELEMENT OF THE PACKED NODAL GRADIENT, in the two geometry variants.
+//
+// These are element kernels and not sweeps, because the packed reconstruction cannot be split
+// into two sweeps over packs: a pack is staged once, accumulated into, and DRAINED once by
+// assignment, so a second sweep over the same packs would overwrite the first's result rather
+// than add to it. One pack sweep drives both, over the two runs of the curvature partition that
+// fall inside the pack's element range -- which is a contiguous range of macro indices, so
+// sscvfem_order_run gives each run directly and neither kernel tests what it has.
+//
+// Both read the field out of the pack-local buffer and accumulate into the pack-local
+// destination, so neither touches a global array or an atomic.
+
+// The affine variant: one geometry per macro element. Its micro cells are translates of one
+// another and share a Jacobian exactly, which is what sscvfem_macro_geom has always relied on.
+static SFEM_INLINE void sscvfem_nodal_grad_pack_element_affine(
+        // The staging object is gone; what this kernel reads out of it is what it takes.
+        geom_t **const SFEM_RESTRICT points,
+        pack_idx_t **const SFEM_RESTRICT pack_elems,
+        const idx_t *const SFEM_RESTRICT ghosts, const ptrdiff_t owned,
+        const ptrdiff_t n_contiguous, const ptrdiff_t e, const int L, const int off[8],
+        const scalar_t *const SFEM_RESTRICT pack_f,
+        scalar_t *const SFEM_RESTRICT pack_out) {
+    scalar_t ex[8], ey[8], ez[8], adj[9], det;
+    for (int a = 0; a < 8; ++a) {
+        const idx_t g = cvfem_pack_local_to_global(owned, ghosts, n_contiguous, pack_elems[off[a]][e]);
+        ex[a]                = (scalar_t)points[0][g];
+        ey[a]                = (scalar_t)points[1][g];
+        ez[a]                = (scalar_t)points[2][g];
+    }
+    sscvfem_micro_geom(ex, ey, ez, adj, &det);
+    if (std::fabs(det) < scalar_t(1e-30)) return;
+    // |det| times a gradient carrying 1/det: only the sign survives.
+    const scalar_t sgn = det > 0 ? scalar_t(1) : scalar_t(-1);
+
+    for (int zi = 0; zi < L; ++zi)
+        for (int yi = 0; yi < L; ++yi)
+            for (int xi = 0; xi < L; ++xi) {
+                const int base = sscvfem_lidx(L, xi, yi, zi);
+                scalar_t  ep[8], gx, gy, gz;
+                for (int a = 0; a < 8; ++a) ep[a] = pack_f[pack_elems[base + off[a]][e]];
+                cvfem_hex8_grad_scalar(adj, sgn, ep, gx, gy, gz);
+                for (int a = 0; a < 8; ++a) {
+                    scalar_t *const SFEM_RESTRICT o =
+                            pack_out + (ptrdiff_t)pack_elems[base + off[a]][e] * SSCVFEM_NGRAD;
+                    o[0] += gx;
+                    o[1] += gy;
+                    o[2] += gz;
+                }
+            }
+}
+
+// The isoparametric variant: every micro cell's own corners and its own Jacobian, and NO macro
+// geometry -- the branching sweep built one for every macro element and a curved one used
+// nothing of it but a degenerate-determinant guard that a curved cell carries itself.
+static SFEM_NOINLINE void sscvfem_nodal_grad_pack_element_isoparam(
+        // The staging object is gone; what this kernel reads out of it is what it takes.
+        geom_t **const SFEM_RESTRICT points,
+        pack_idx_t **const SFEM_RESTRICT pack_elems,
+        const idx_t *const SFEM_RESTRICT ghosts, const ptrdiff_t owned,
+        const ptrdiff_t n_contiguous, const ptrdiff_t e, const int L, const int off[8],
+        const scalar_t *const SFEM_RESTRICT pack_f,
+        scalar_t *const SFEM_RESTRICT pack_out) {
+    for (int zi = 0; zi < L; ++zi)
+        for (int yi = 0; yi < L; ++yi)
+            for (int xi = 0; xi < L; ++xi) {
+                const int base = sscvfem_lidx(L, xi, yi, zi);
+                scalar_t  ep[8], gx, gy, gz;
+                for (int a = 0; a < 8; ++a) ep[a] = pack_f[pack_elems[base + off[a]][e]];
+
+                scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
+                for (int a = 0; a < 8; ++a) {
+                    const idx_t gn = cvfem_pack_local_to_global(
+                            owned, ghosts, n_contiguous, pack_elems[base + off[a]][e]);
+                    cx[a] = (scalar_t)points[0][gn];
+                    cy[a] = (scalar_t)points[1][gn];
+                    cz[a] = (scalar_t)points[2][gn];
+                }
+                sscvfem_micro_geom(cx, cy, cz, cadj, &cdet);
+                if (std::fabs(cdet) < scalar_t(1e-30)) continue;
+                cvfem_hex8_grad_scalar(cadj, cdet > 0 ? scalar_t(1) : scalar_t(-1), ep, gx, gy, gz);
+
+                for (int a = 0; a < 8; ++a) {
+                    scalar_t *const SFEM_RESTRICT o =
+                            pack_out + (ptrdiff_t)pack_elems[base + off[a]][e] * SSCVFEM_NGRAD;
+                    o[0] += gx;
+                    o[1] += gy;
+                    o[2] += gz;
+                }
+            }
+}
+
 inline void sscvfem_nodal_grad_packed_sweep(
         // The range of PACKS this call is to cover. DESIGN.md: the threading is abstract
         // outside the sweep and what arrives is a range.
@@ -365,7 +495,10 @@ inline void sscvfem_nodal_grad_packed_sweep(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t *const SFEM_RESTRICT grad_w_inv,
         const int level,
-        const uint8_t *const SFEM_RESTRICT macro_curved,
+        // The curvature partition, and where its straight half ends. Null means the identity:
+        // a mesh with nothing curved. See SSMeshData::macro_order.
+        const ptrdiff_t *const SFEM_RESTRICT macro_order,
+        const ptrdiff_t n_straight,
         const ptrdiff_t nmacro,
         geom_t **const SFEM_RESTRICT points, 
         // The staging object is gone; what this sweep reads out of it is what it takes.
@@ -394,9 +527,6 @@ inline void sscvfem_nodal_grad_packed_sweep(
     const int L = level;
     int       off[8];
     sscvfem_corner_offsets(L, off);
-    const auto *const px = points[0];
-    const auto *const py = points[1];
-    const auto *const pz = points[2];
 
     {
         // Slots 7 and 8, which belong to this routine; see CVFEM_PACK_SCRATCH_SLOTS.
@@ -426,53 +556,21 @@ inline void sscvfem_nodal_grad_packed_sweep(
                 pack_f[n_contiguous + k] = src[(ptrdiff_t)ghosts[k] * stride];
             std::memset(pack_out, 0, (size_t)n_pack_nodes * 3 * sizeof(scalar_t));
 
-            for (ptrdiff_t e = e_start; e < e_end; ++e) {
-                // One geometry per macro-element: its micro-elements are translates and share
-                // a Jacobian exactly, which is what sscvfem_macro_geom has always relied on.
-                scalar_t ex[8], ey[8], ez[8], adj[9], det;
-                for (int a = 0; a < 8; ++a) {
-                    const idx_t g = cvfem_pack_local_to_global(owned, ghosts, n_contiguous, pack_elems[off[a]][e]);
-                    ex[a]                = (scalar_t)px[g];
-                    ey[a]                = (scalar_t)py[g];
-                    ez[a]                = (scalar_t)pz[g];
-                }
-                sscvfem_micro_geom(ex, ey, ez, adj, &det);
-                const bool curved_e = sscvfem_macro_curved(macro_curved, e);
-                if (!curved_e && std::fabs(det) < scalar_t(1e-30)) continue;
-                // |det| times a gradient carrying 1/det: only the sign survives.
-                const scalar_t sgn = det > 0 ? scalar_t(1) : scalar_t(-1);
-
-                for (int zi = 0; zi < L; ++zi) {
-                    for (int yi = 0; yi < L; ++yi) {
-                        for (int xi = 0; xi < L; ++xi) {
-                            const int base = sscvfem_lidx(L, xi, yi, zi);
-                            scalar_t  ep[8], gx, gy, gz;
-                            for (int a = 0; a < 8; ++a) ep[a] = pack_f[pack_elems[base + off[a]][e]];
-                            if (curved_e) {
-                                scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
-                                for (int a = 0; a < 8; ++a) {
-                                    const idx_t gn = cvfem_pack_local_to_global(
-                                            owned, ghosts, n_contiguous, pack_elems[base + off[a]][e]);
-                                    cx[a] = (scalar_t)px[gn];
-                                    cy[a] = (scalar_t)py[gn];
-                                    cz[a] = (scalar_t)pz[gn];
-                                }
-                                sscvfem_micro_geom(cx, cy, cz, cadj, &cdet);
-                                if (std::fabs(cdet) < scalar_t(1e-30)) continue;
-                                cvfem_hex8_grad_scalar(cadj, cdet > 0 ? scalar_t(1) : scalar_t(-1), ep, gx, gy, gz);
-                            } else {
-                                cvfem_hex8_grad_scalar(adj, sgn, ep, gx, gy, gz);
-                            }
-                            for (int a = 0; a < 8; ++a) {
-                                scalar_t *const SFEM_RESTRICT o =
-                                        pack_out + (ptrdiff_t)pack_elems[base + off[a]][e] * 3;
-                                o[0] += gx;
-                                o[1] += gy;
-                                o[2] += gz;
-                            }
-                        }
-                    }
-                }
+            // TWO RUNS, NOT A BRANCH. The pack's elements are the contiguous macro range
+            // [e_start, e_end), so sscvfem_order_run gives the positions of the straight ones
+            // and of the curved ones directly, and each kernel is called only for its own kind.
+            // The two write the same pack-local destination, which is why this is one sweep.
+            const cvfem_range _aff = sscvfem_order_run(macro_order, 0, n_straight, e_start, e_end);
+            for (ptrdiff_t i = _aff.begin; i < _aff.end; ++i) {
+                const ptrdiff_t e = macro_order ? macro_order[i] : i;
+                sscvfem_nodal_grad_pack_element_affine(points, pack_elems, ghosts, owned, n_contiguous,
+                                                       e, L, off, pack_f, pack_out);
+            }
+            const cvfem_range _iso = sscvfem_order_run(macro_order, n_straight, nmacro, e_start, e_end);
+            for (ptrdiff_t i = _iso.begin; i < _iso.end; ++i) {
+                const ptrdiff_t e = macro_order[i];
+                sscvfem_nodal_grad_pack_element_isoparam(points, pack_elems, ghosts, owned,
+                                                         n_contiguous, e, L, off, pack_f, pack_out);
             }
 
             for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
@@ -507,11 +605,6 @@ inline void sscvfem_nodal_grad_packed_sweep(
 // writes is additive -- exclusive nodes go straight out with +=, shared ones through the
 // staged reduce, which also accumulates -- so a partial range adds to whatever is already
 // there instead of replacing it.
-// The nodal gradient reconstructs three fields where it used to carry four: the weight rode
-// along through the per-element accumulator, the scatter and the shared reduction, which is a
-// third of the traffic of each spent re-deriving a quantity that does not change.
-static constexpr int SSCVFEM_NGRAD = 3;
-
 // One micro cell of the nodal-gradient reconstruction over macro-element buffers.
 //
 // `hadj` and `hsgn` are the macro element's geometry and the sign of its determinant; nullptr

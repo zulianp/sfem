@@ -13,7 +13,6 @@
 #include "packed_elements.hpp"   // packed_elements_matmul_nonsym: BLAS gemm, loop fallback
 #include "smesh_exchange.hpp"    // the nodal reconstruction is completed across ranks
 #include "smesh_mesh.hpp"
-#include <algorithm>  // lower_bound, for restricting the curvature partition to a range
 #include <cmath>
 #include <memory>
 #include <vector>
@@ -326,14 +325,17 @@ inline void sscvfem_unpack(SSMeshData &d, const scalar_t *const SFEM_RESTRICT x)
 //
 // With no order array -- a mesh with nothing curved -- the straight half is the element range
 // itself and the curved half is empty, so the box pays nothing for any of this.
+// The partition itself, or null where there is none.
+inline const ptrdiff_t *sscvfem_order(const SSMeshData &d) {
+    return d.macro_order.empty() ? nullptr : d.macro_order.data();
+}
+
 inline cvfem_range sscvfem_order_positions(const SSMeshData &d, const bool curved,
                                            const ptrdiff_t begin, const ptrdiff_t end) {
-    if (d.macro_order.empty()) return curved ? cvfem_range{end, end} : cvfem_range{begin, end};
-    const ptrdiff_t         lo = curved ? d.n_straight : 0;
-    const ptrdiff_t         hi = curved ? d.nmacro : d.n_straight;
-    const ptrdiff_t *const  o  = d.macro_order.data();
-    return cvfem_range{(ptrdiff_t)(std::lower_bound(o + lo, o + hi, begin) - o),
-                       (ptrdiff_t)(std::lower_bound(o + lo, o + hi, end) - o)};
+    // The search itself is sscvfem_order_run, in the kernel layer, because the packed
+    // nodal-gradient sweep needs it per pack and cannot reach into SSMeshData.
+    return sscvfem_order_run(sscvfem_order(d), curved ? d.n_straight : 0,
+                             curved ? d.nmacro : d.n_straight, begin, end);
 }
 
 // This thread's slice of one half. Called inside the parallel region, like every other
@@ -346,11 +348,6 @@ inline cvfem_range sscvfem_affine_range(const SSMeshData &d, const ptrdiff_t beg
 inline cvfem_range sscvfem_isoparam_range(const SSMeshData &d, const ptrdiff_t begin, const ptrdiff_t end) {
     const cvfem_range p = sscvfem_order_positions(d, true, begin, end);
     return cvfem_range_split(p.begin, p.end, 1, cvfem_thread_index(), cvfem_n_threads());
-}
-
-// The partition itself, or null where there is none.
-inline const ptrdiff_t *sscvfem_order(const SSMeshData &d) {
-    return d.macro_order.empty() ? nullptr : d.macro_order.data();
 }
 
 inline void sscvfem_classify_macros(SSMeshData &d) {
@@ -508,7 +505,7 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
 
     #pragma omp parallel
         sscvfem_nodal_grad_packed_sweep(
-                cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),d.grad_w_inv.data(), d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nmacro, d.points, p.elems, const_cast<scalar_t *>(p.ghost_buf.data()), p.ghost_idx, p.ghost_ptr, p.ghost_reduce_dest, p.ghost_reduce_idx, p.ghost_reduce_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.n_ghost_reduce_rows, p.n_packed_elements, p.n_packs, p.owned_nodes_ptr, src, stride, ogx.data(), ogy.data(), ogz.data(),
+                cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),d.grad_w_inv.data(), d.level, sscvfem_order(d), d.n_straight, d.nmacro, d.points, p.elems, const_cast<scalar_t *>(p.ghost_buf.data()), p.ghost_idx, p.ghost_ptr, p.ghost_reduce_dest, p.ghost_reduce_idx, p.ghost_reduce_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.n_ghost_reduce_rows, p.n_packed_elements, p.n_packs, p.owned_nodes_ptr, src, stride, ogx.data(), ogy.data(), ogz.data(),
                                     apply_weight);
     // The ghost reduction, the pack layout's second and independent loop: over the ghost
     // reduce rows rather than the packs, so it gets its own range and runs after the pack
