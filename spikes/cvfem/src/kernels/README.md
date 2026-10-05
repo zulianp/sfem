@@ -57,9 +57,31 @@ What is done, for HEX8:
   than by checking that lanes were written — a lane has several writers, so a short stride in one
   of them is covered up by the next. Measured agreement: **8.5e-08 relative**.
 
-What is still owed: the **sweeps**, which take their types through the includer's aliases; and
-`geom_t` and `idx_t` beyond `Hex8PackExtentT`, which already takes the index type because it
-holds only counts and a node pointer. TET4 and the semi-structured kernels are untouched.
+The other two families followed, each with a gate that RUNS the kernels rather than only
+compiling them -- which is the point, because adding template parameters is cheap and proves
+nothing: the bodies keep their old spelling, so anything still bound to the build's scalar
+compiles and is simply wrong at the other precision.
+
+* **semi-structured**, all 72 definitions, with `SSMacroGeomT` and `SSMacroScratchT` beside
+  `Hex8RcConfigT`. `cvfem_ss_mixed_precision` runs the residual over a macro element in four
+  type combinations, including `<double compute, float32 geometry>` -- the production build.
+  Agreement across precisions **9.56e-07**. It forced two real fixes outside the family:
+  `atomic_add` in `cvfem_scatter.hpp` bound to the build's scalar and every semi-structured sweep
+  ends in it, so no f32 instantiation could have existed; and `BdfCoeffs` was a struct of the
+  build's scalar in a header the kernel did not even include.
+* **TET4**, twenty hand-written and twenty-five generated definitions, where the lane machinery
+  was the whole problem: the pack width came from the DRIVER, and the vector type and SIMD lane
+  count from the build. They are `cvfem_tet4_vec_size<S>`, `cvfem_tet4_simd_size<S>` and
+  `scalar_v_t<S>` now. `cvfem_tet4_mixed_precision` puts identical elements in every lane so
+  every lane must equal lane 0, which is what catches the silent case: binding the kernel's lane
+  loop back to the build's width leaves the f32 lane spread at **1.05e+09** while the precision
+  comparison of lane 0 still passes. The generated half is changed in the generator and
+  regenerated, and `set_stable_pow` went on with the TET4 A/B behind it (residual -0.3%,
+  assembly -0.6%, action +0.2%, checksums identical).
+
+What is still owed: `geom_t` and `idx_t` in the FLAT packed sweeps beyond `Hex8PackExtentT`,
+which already takes the index type because it holds only counts and a node pointer. The
+semi-structured and TET4 families take all of theirs.
 
 **"Only the SIMD version is kept, the rest is moved to subpar."** DONE, and this file's survey
 was overruled. It had found that eight of the ten scalar matrix-free sweeps were verification
