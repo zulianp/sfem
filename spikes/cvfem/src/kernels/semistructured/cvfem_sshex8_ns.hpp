@@ -2035,10 +2035,20 @@ static SFEM_NOINLINE void sscvfem_residual_naive_curved_macro(
 // The residual's element pass. Everything the options decide -- which convection scheme, which
 // limiter, whether the correction is frozen, whether a nodal velocity gradient exists at all --
 // has been decided by the launcher below and reaches here as data.
-inline SFEM_NOINLINE void sscvfem_residual_sweep(
-        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
-        // sweep and what arrives is a range, so the sweep owns no parallel region.
-        const cvfem_range r,
+// One micro cell of the residual sweep.
+//
+// The geometry arrives as an SSMacroGeom reference, as in sscvfem_action_hoisted_cell, and the
+// caller decides whether it is the macro element's or this cell's own.
+//
+// (rcx, rcy, rcz) are the corners the RHIE-CHOW term takes its node distances from, and nullptr
+// asks for this cell's own. They are a separate argument from the geometry because they have to
+// agree with it: the Jacobian action takes its distances from g.dvec, which is built from the
+// same corners, and each micro cell's own coordinates agree with the hoisted ones only on an
+// affine macro element. On a curved one they did not, and the residual and its Jacobian action
+// disagreed in every continuity row -- measured on the FDA nozzle by SFEM_FD_CHECK, 6.0e-02 at
+// macro core 2 / L 2, 3.2e-02 at L 4 and 1.2e-02 at macro core 4 / L 2, and exact with
+// Rhie-Chow off.
+static SFEM_INLINE void sscvfem_residual_cell(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t box_lx,
         const scalar_t box_ly,
@@ -2051,185 +2061,118 @@ inline SFEM_NOINLINE void sscvfem_residual_sweep(
         const int conv_limiter,
         const Hex8PecletConfig<scalar_t> peclet,
         const scalar_t conv_venkat_c,
-        idx_t **const SFEM_RESTRICT elems,
-        const int level,
         Hex8LimiterStats *const limiter_stats,
-        const uint8_t *const SFEM_RESTRICT macro_curved,
         const uint8_t *const SFEM_RESTRICT face_mask,
         const uint8_t *const SFEM_RESTRICT natural_mask,
         const uint8_t *const SFEM_RESTRICT pressure_mask,
         const uint8_t *const SFEM_RESTRICT traction_mask,
-        const int nxe_src,
-        const scalar_t *const SFEM_RESTRICT pres,
-        const scalar_t *const SFEM_RESTRICT pgx_src,
-        const scalar_t *const SFEM_RESTRICT pgy_src,
-        const scalar_t *const SFEM_RESTRICT pgz_src,
-        geom_t **const SFEM_RESTRICT points,
-        const scalar_t *const SFEM_RESTRICT ugrad_f,
         const scalar_t upwind_eps,
-        const scalar_t *const SFEM_RESTRICT ux_src,
-        const scalar_t *const SFEM_RESTRICT uy_src,
-        const scalar_t *const SFEM_RESTRICT uz_src,
-        const Hex8RcConfig rcfg,
-        
-        // The staging object is gone; what this sweep reads out of it is what it takes.
-        const ptrdiff_t *const SFEM_RESTRICT red_idx,
-        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
-        const idx_t *const SFEM_RESTRICT shared_node,
-        const int *const SFEM_RESTRICT slot,
-        scalar_t *const SFEM_RESTRICT stage,
-        const ptrdiff_t n_shared, const scalar_t rho,
-                                                 const scalar_t                mu,
-                                                 scalar_t *const SFEM_RESTRICT res) {
-    const int L   = level;
-    const int nxe = nxe_src;
-    int       off[8];
-    sscvfem_corner_offsets(L, off);
-
-
-    {
-        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
-        // shared between them because only one is live inside a parallel region and
-        // they all want the same macro-element size.
-        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + (conv_ho ? (size_t)nxe * 9 : 0) + ((size_t)nxe * CVFEM_HEX8_N_FIELDS));
-        scalar_t *const SFEM_RESTRICT lx = _arena5;
-        scalar_t *const SFEM_RESTRICT ly = _arena5 + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lz = _arena5 + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lux = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT luy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT luz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lp = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lpgx = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lpgy = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lpgz = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lug = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe);
-        scalar_t *const SFEM_RESTRICT lout = _arena5 + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + ((size_t)nxe) + (conv_ho ? (size_t)nxe * 9 : 0);
-        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
-        idx_t *const SFEM_RESTRICT lg = _arena6;
-
-        for (ptrdiff_t e = r.begin; e < r.end; ++e) {
-            for (int a = 0; a < nxe; ++a) {
-                const idx_t g = elems[a][e];
-                lg[(size_t)a]        = g;
-                lx[(size_t)a]        = (scalar_t)points[0][g];
-                ly[(size_t)a]        = (scalar_t)points[1][g];
-                lz[(size_t)a]        = (scalar_t)points[2][g];
-                lux[(size_t)a]       = ux_src[(size_t)g];
-                luy[(size_t)a]       = uy_src[(size_t)g];
-                luz[(size_t)a]       = uz_src[(size_t)g];
-                lp[(size_t)a]        = pres[(size_t)g];
-                lpgx[(size_t)a]      = pgx_src[(size_t)g];
-                lpgy[(size_t)a]      = pgy_src[(size_t)g];
-                lpgz[(size_t)a]      = pgz_src[(size_t)g];
-                if (conv_ho)
-                    for (int k = 0; k < 9; ++k) lug[(size_t)a * 9 + (size_t)k] = ugrad_f[(size_t)g * 9 + (size_t)k];
-            }
-            std::fill(lout, lout + ((size_t)nxe * CVFEM_HEX8_N_FIELDS), scalar_t(0));
-
-            // Per macro element, and the curved branch below reads the same one: a call per
-            // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
-            // which then became a call in every cell of the block diagonal, 9% slower on boxes.
-            const Hex8RcConfig rc_macro = rcfg;
-            SSMacroGeom mg;
-            // The hoisted cell's corners outlive the block below, because the Rhie-Chow term
-            // takes its node distances from them -- as the Jacobian action takes them from
-            // mg.dvec, which is built from the same corners. Each micro cell's own coordinates
-            // agree with those only on an affine macro element. On a curved one they did not,
-            // and the residual and its Jacobian action disagreed in every continuity row:
-            // measured on the FDA nozzle by SFEM_FD_CHECK, 6.0e-02 at macro core 2 / L 2,
-            // 3.2e-02 at L 4 and 1.2e-02 at macro core 4 / L 2, and exact with Rhie-Chow off.
-            scalar_t ex[8], ey[8], ez[8];
-            {
-                int ext[8];
-                sscvfem_macro_corner_offsets(L, ext);
-                for (int a = 0; a < 8; ++a) {
-                    const int l = ext[a];
-                    ex[a]       = lx[(size_t)l];
-                    ey[a]       = ly[(size_t)l];
-                    ez[a]       = lz[(size_t)l];
-                }
-                sscvfem_hoisted_cell(ex, ey, ez, L, ex, ey, ez);
-                sscvfem_macro_geom(ex, ey, ez, rho, mu, rc_macro.scale, rc_macro.tau, mg);
-            }
-
-            const bool curved_e = sscvfem_macro_curved(macro_curved, e);
-            for (int zi = 0; zi < L; ++zi) {
-                for (int yi = 0; yi < L; ++yi) {
-                    for (int xi = 0; xi < L; ++xi) {
-                        const int base = sscvfem_lidx(L, xi, yi, zi);
-                        scalar_t  x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
-                        scalar_t g8[CVFEM_HEX8_N_NODES * 9];
-                        scalar_t  r[CVFEM_HEX8_N_DOF];
-                        for (int a = 0; a < 8; ++a) {
-                            const int l = base + off[a];
-                            x[a]        = lx[(size_t)l];
-                            y[a]        = ly[(size_t)l];
-                            z[a]        = lz[(size_t)l];
-                            ux[a]       = lux[(size_t)l];
-                            uy[a]       = luy[(size_t)l];
-                            uz[a]       = luz[(size_t)l];
-                            p[a]        = lp[(size_t)l];
-                            pgx[a]      = lpgx[(size_t)l];
-                            pgy[a]      = lpgy[(size_t)l];
-                            pgz[a]      = lpgz[(size_t)l];
-                            if (conv_ho)
-                                for (int k = 0; k < 9; ++k) g8[a * 9 + k] = lug[(size_t)l * 9 + (size_t)k];
-                        }
-                        // A curved macro element: this cell's own geometry, not the hoisted one.
-                        if (curved_e) {
-                            sscvfem_macro_geom_cell(x, y, z, rho, mu, rc_macro, mg);
-                            std::copy(x, x + 8, ex);
-                            std::copy(y, y + 8, ey);
-                            std::copy(z, z + 8, ez);
-                        }
-                        const Hex8RhieChow rc{ex,      ey, ez, pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
-                                              nullptr, ux, uy, uz,  rcfg.tau};
-                        // Deferred-correction convection, on the path the production solver
-                        // actually runs: FGMRES preconditioned by multigrid needs this lattice,
-                        // so a correction that existed only on the flat mesh could not be used
-                        // for anything at scale. Null when off, which is the arithmetic this
-                        // call did before.
-                        const bool ho = conv_ho != 0;
-                        cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, mg.adj, mg.det, ux, uy, uz, p, r,
-                                                             rc, upwind_eps,
-                                                             ho ? g8 : nullptr,
-                                                             ho ? x : nullptr, ho ? y : nullptr,
-                                                             ho ? z : nullptr, conv_limiter,
-                                                             conv_venkat_c, limiter_stats,
-                                                             peclet);
-                        boundary_scs_add_residual<false>(rho, mu, mg.adj, mg.det, box_lx, box_ly, box_lz, x, y, z,
-                                                  ux, uy, uz, p, r,
-                                                  !face_mask
-                                                          ? -1
-                                                          : sscvfem_micro_face_mask(
-                                                                    (int)face_mask[(size_t)e],
-                                                                    L, xi, yi, zi),
-                                                  sscvfem_micro_face_mask(
-                                                          !natural_mask ? 0
-                                                              : (int)natural_mask[(size_t)e],
-                                                          L, xi, yi, zi),
-                                                  sscvfem_bd(bc_p, bc_tx, bc_ty, bc_tz, pressure_mask, traction_mask, e, L, xi, yi, zi));
-                        for (int a = 0; a < 8; ++a) {
-                            const int l = base + off[a];
-                            for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) lout[(size_t)l * CVFEM_HEX8_N_FIELDS + c] += r[a * 4 + c];
-                        }
-                    }
-                }
-            }
-
-            if (slot)
-                sscvfem_scatter_element(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lout, res);
-            else
-                for (int a = 0; a < nxe; ++a) {
-                    const idx_t g = lg[(size_t)a];
-                    for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
-                        atomic_add(res + (ptrdiff_t)g * CVFEM_HEX8_N_FIELDS + c, 0, lout[(size_t)a * CVFEM_HEX8_N_FIELDS + c]);
-                }
-        }
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
+        const SSMacroScratch &s, const SSMacroGeom &g, const scalar_t *const rcx,
+        const scalar_t *const rcy, const scalar_t *const rcz, const ptrdiff_t e, const int L,
+        const int xi, const int yi, const int zi, const int off[8],
+        scalar_t *const SFEM_RESTRICT res) {
+    const int base = sscvfem_lidx(L, xi, yi, zi);
+    scalar_t  x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
+    scalar_t g8[CVFEM_HEX8_N_NODES * 9];
+    scalar_t  r[CVFEM_HEX8_N_DOF];
+    for (int a = 0; a < 8; ++a) {
+        const int l = base + off[a];
+        x[a]        = s.lx[(size_t)l];
+        y[a]        = s.ly[(size_t)l];
+        z[a]        = s.lz[(size_t)l];
+        ux[a]       = s.lux[(size_t)l];
+        uy[a]       = s.luy[(size_t)l];
+        uz[a]       = s.luz[(size_t)l];
+        p[a]        = s.lp[(size_t)l];
+        pgx[a]      = s.lpgx[(size_t)l];
+        pgy[a]      = s.lpgy[(size_t)l];
+        pgz[a]      = s.lpgz[(size_t)l];
+        if (conv_ho)
+            for (int k = 0; k < 9; ++k) g8[a * 9 + k] = s.lug[(size_t)l * 9 + (size_t)k];
     }
+    const scalar_t *const ex = rcx ? rcx : x;
+    const scalar_t *const ey = rcx ? rcy : y;
+    const scalar_t *const ez = rcx ? rcz : z;
 
-    // The shared reduction is the launcher's: a second, independent loop over the reduction
-    // rows, which needs its own range and runs after this sweep's threads have joined.
+    const Hex8RhieChow rc{ex,      ey, ez, pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                          nullptr, ux, uy, uz,  rcfg.tau};
+    // Deferred-correction convection, on the path the production solver actually runs: FGMRES
+    // preconditioned by multigrid needs this lattice, so a correction that existed only on the
+    // flat mesh could not be used for anything at scale. Null when off, which is the arithmetic
+    // this call did before.
+    const bool ho = conv_ho != 0;
+    cvfem_hex8_ns_upwind_residual_sumfact(rho, mu, g.adj, g.det, ux, uy, uz, p, r,
+                                         rc, upwind_eps,
+                                         ho ? g8 : nullptr,
+                                         ho ? x : nullptr, ho ? y : nullptr,
+                                         ho ? z : nullptr, conv_limiter,
+                                         conv_venkat_c, limiter_stats,
+                                         peclet);
+    boundary_scs_add_residual<false>(rho, mu, g.adj, g.det, box_lx, box_ly, box_lz, x, y, z,
+                              ux, uy, uz, p, r,
+                              !face_mask
+                                      ? -1
+                                      : sscvfem_micro_face_mask(
+                                                (int)face_mask[(size_t)e],
+                                                L, xi, yi, zi),
+                              sscvfem_micro_face_mask(
+                                      !natural_mask ? 0
+                                          : (int)natural_mask[(size_t)e],
+                                      L, xi, yi, zi),
+                              sscvfem_bd(bc_p, bc_tx, bc_ty, bc_tz, pressure_mask, traction_mask, e, L, xi, yi, zi));
+    for (int a = 0; a < 8; ++a) {
+        const int l = base + off[a];
+        for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
+            s.lout[(size_t)l * CVFEM_HEX8_N_FIELDS + c] += r[a * 4 + c];
+    }
+}
+
+// The residual's micro cells for ONE CURVED macro element, each with its own geometry and its
+// own Rhie-Chow corners. Out of line for the reason sscvfem_action_hoisted_curved_macro is.
+static SFEM_NOINLINE void sscvfem_residual_curved_macro(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const scalar_t bc_p,
+        const scalar_t bc_tx,
+        const scalar_t bc_ty,
+        const scalar_t bc_tz,
+        const int conv_ho,
+        const int conv_limiter,
+        const Hex8PecletConfig<scalar_t> peclet,
+        const scalar_t conv_venkat_c,
+        Hex8LimiterStats *const limiter_stats,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const uint8_t *const SFEM_RESTRICT natural_mask,
+        const uint8_t *const SFEM_RESTRICT pressure_mask,
+        const uint8_t *const SFEM_RESTRICT traction_mask,
+        const scalar_t upwind_eps,
+        const Hex8RcConfig rcfg, const Hex8RcConfig rc_macro, const scalar_t rho,
+        const scalar_t mu, const SSMacroScratch &s, const ptrdiff_t e, const int level,
+        const int off[8],
+        scalar_t *const SFEM_RESTRICT res) {
+    const int L = level;
+    for (int zi = 0; zi < L; ++zi)
+        for (int yi = 0; yi < L; ++yi)
+            for (int xi = 0; xi < L; ++xi) {
+                const int base = sscvfem_lidx(L, xi, yi, zi);
+                scalar_t  cx[8], cy[8], cz[8];
+                for (int a = 0; a < 8; ++a) {
+                    const int l = base + off[a];
+                    cx[a]       = s.lx[(size_t)l];
+                    cy[a]       = s.ly[(size_t)l];
+                    cz[a]       = s.lz[(size_t)l];
+                }
+                SSMacroGeom cg;
+                sscvfem_macro_geom_cell(cx, cy, cz, rho, mu, rc_macro, cg);
+                sscvfem_residual_cell(box_lx, box_ly, box_lz, bc_p, bc_tx, bc_ty, bc_tz, conv_ho,
+                                      conv_limiter, peclet, conv_venkat_c, limiter_stats, face_mask,
+                                      natural_mask, pressure_mask, traction_mask, upwind_eps, rcfg,
+                                      rho, mu, s, cg, nullptr, nullptr, nullptr, e, L, xi, yi, zi,
+                                      off, res);
+            }
 }
 
 // ---------------------------------------------------------------------------
