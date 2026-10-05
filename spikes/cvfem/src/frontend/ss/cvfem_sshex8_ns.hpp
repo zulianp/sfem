@@ -145,6 +145,26 @@ struct SSMeshData {
     // grad_w_inv is, on the node count it was built for.
     std::shared_ptr<smesh::Exchange> grad_exchange;
     ptrdiff_t                        grad_exchange_nnodes{-1};
+
+    // THE CURVATURE PARTITION: macro-element indices with the straight ones first and the curved
+    // ones after, and n_straight the boundary between them. Empty means the identity order, so a
+    // sweep indexes e == i directly and a mesh with no curved macro element pays nothing.
+    //
+    // This is what lets the geometry split be two sweeps over two ranges instead of one sweep
+    // branching per macro element. Whether a macro element is curved is mesh data, not a
+    // configuration -- one mesh has both kinds side by side -- so it cannot become a template
+    // parameter the way the flat layouts' geometry did. But it does not change between applies
+    // either, so the partition is setup work, like the pack ordering and the element colouring
+    // already are. Rebuilt with macro_curved, once per level.
+    //
+    // Both parts stay in ascending index order, which is why a mesh with nothing curved gets the
+    // identity and every fingerprint is unchanged.
+    //
+    // At the very END of the struct, and deliberately: see the note on macro_curved, where
+    // inserting a field earlier moved the fields the block diagonal reads per micro cell and
+    // cost 7-9% with its own source untouched.
+    std::vector<ptrdiff_t> macro_order;
+    ptrdiff_t              n_straight{0};
 };
 // Defined below, next to the macro-element geometry it configures; the element sweeps that
 // need it sit above.
@@ -339,7 +359,16 @@ inline void sscvfem_classify_macros(SSMeshData &d) {
     }
     if (n_curved == 0) {
         d.macro_curved.clear();
+        d.macro_order.clear();
+        d.n_straight = d.nmacro;
     } else {
+        d.macro_order.resize((size_t)d.nmacro);
+        // The two fill positions: straight from the front, curved from where the straight ones end.
+        ptrdiff_t ns = 0, nc = d.nmacro - n_curved;
+        for (ptrdiff_t e = 0; e < d.nmacro; ++e)
+            if (d.macro_curved[(size_t)e]) d.macro_order[(size_t)nc++] = e;
+            else d.macro_order[(size_t)ns++] = e;
+        d.n_straight = ns;
         std::printf("sscvfem: %td of %td macro elements are curved -- their micro cells get their own geometry\n",
                     n_curved, d.nmacro);
     }
