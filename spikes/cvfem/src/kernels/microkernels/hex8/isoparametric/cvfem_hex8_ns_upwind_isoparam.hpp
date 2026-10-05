@@ -289,11 +289,12 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_jacobian_add_slots
     }
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar_t      rho_s,
                                                                    const scalar_t      mu_s,
-                                                                   const Hex8CoordPack &xyz,
-                                                                   const Hex8InputPack &in,
-                                                                   Hex8ResidualPack    &out,
+                                                                   const Hex8CoordPackT<scalar_t> &xyz,
+                                                                   const Hex8InputPackT<scalar_t> &in,
+                                                                   Hex8ResidualPackT<scalar_t>    &out,
                                                const scalar_t ueps = scalar_t(0)) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
@@ -310,7 +311,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar
         const int d = s >> 2;
 
 #pragma omp simd
-        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
             scalar_t jx0 = 0, jx1 = 0, jx2 = 0;
             scalar_t jy0 = 0, jy1 = 0, jy2 = 0;
             scalar_t jz0 = 0, jz1 = 0, jz2 = 0;
@@ -393,12 +394,13 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_residual_isoparam_simd(const scalar
     }
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const scalar_t      rho_s,
                                                                           const scalar_t      mu_s,
-                                                                          const Hex8CoordPack &xyz,
-                                                                          const Hex8InputPack &u,
-                                                                          const Hex8InputPack &du,
-                                                                          Hex8ResidualPack    &out,
+                                                                          const Hex8CoordPackT<scalar_t> &xyz,
+                                                                          const Hex8InputPackT<scalar_t> &u,
+                                                                          const Hex8InputPackT<scalar_t> &du,
+                                                                          Hex8ResidualPackT<scalar_t>    &out,
                                                const scalar_t ueps = scalar_t(0)) {
     const scalar_t rho  = rho_s;
     const scalar_t mu   = mu_s;
@@ -416,7 +418,7 @@ static SFEM_INLINE void cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(const
         const int d = s >> 2;
 
 #pragma omp simd
-        for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        for (int lane = 0; lane < cvfem_hex8_vec_size<scalar_t>; ++lane) {
             scalar_t jx0 = 0, jx1 = 0, jx2 = 0;
             scalar_t jy0 = 0, jy1 = 0, jy2 = 0;
             scalar_t jz0 = 0, jz1 = 0, jz2 = 0;

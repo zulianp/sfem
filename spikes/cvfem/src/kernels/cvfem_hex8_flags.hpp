@@ -22,10 +22,13 @@
 // One definition for every path -- flat, packed, semi-structured, benchmark -- so none of them
 // can end up evaluating a different time scale than the others. Each caller supplies a0/dt from
 // its own transient history, which is the only part that differs.
-struct Hex8RcConfig {
-    Hex8RcTau tau;
-    scalar_t  scale{0};
+template <typename scalar_t>
+struct Hex8RcConfigT {
+    Hex8RcTauT<scalar_t> tau;
+    scalar_t             scale{0};
 };
+
+using Hex8RcConfig = Hex8RcConfigT<scalar_t>;
 
 // Which optional terms this sweep is running.
 //
