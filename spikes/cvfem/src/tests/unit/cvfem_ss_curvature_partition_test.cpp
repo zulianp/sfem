@@ -124,6 +124,37 @@ static void partition_of(sfem::Context &ctx, const int macro, const int level, c
 
     std::printf("  %s: %td macro elements, %td straight then %td curved\n", what, d.nmacro,
                 d.n_straight, d.nmacro - d.n_straight);
+
+    // THE PARTIAL RANGE, which is the subtle part. A sweep pair is usually launched over the
+    // whole mesh, but the nodal gradient hands the scatter sweep the element tail the packs do
+    // not reach on a distributed mesh. sscvfem_order_positions restricts each half of the
+    // partition to that element range with a binary search, which is only correct because each
+    // half is ascending -- so this checks the two position ranges together cover exactly the
+    // elements in [b, e), each once, and nothing outside it.
+    const ptrdiff_t cuts[] = {0, 1, d.nmacro / 3, d.n_straight, d.nmacro - 1, d.nmacro};
+    bool            exact = true;
+    for (const ptrdiff_t b : cuts)
+        for (const ptrdiff_t e : cuts) {
+            if (e < b) continue;
+            std::vector<int> hit((size_t)d.nmacro, 0);
+            for (int half = 0; half < 2 && exact; ++half) {
+                const cvfem_range p = sscvfem_order_positions(d, half == 1, b, e);
+                if (p.begin > p.end) { exact = false; break; }
+                for (ptrdiff_t i = p.begin; i < p.end; ++i) {
+                    const ptrdiff_t el = d.macro_order[(size_t)i];
+                    if (el < b || el >= e) { exact = false; break; }
+                    ++hit[(size_t)el];
+                }
+            }
+            for (ptrdiff_t el = 0; el < d.nmacro && exact; ++el)
+                if (hit[(size_t)el] != (el >= b && el < e ? 1 : 0)) exact = false;
+            if (!exact) {
+                std::printf("    restricted to [%td, %td) is wrong\n", b, e);
+                break;
+            }
+        }
+    std::snprintf(msg, sizeof(msg), "%s: a partial element range restricts exactly", what);
+    check(exact, msg);
 }
 
 int main(int argc, char **argv) {

@@ -13,6 +13,7 @@
 #include "packed_elements.hpp"   // packed_elements_matmul_nonsym: BLAS gemm, loop fallback
 #include "smesh_exchange.hpp"    // the nodal reconstruction is completed across ranks
 #include "smesh_mesh.hpp"
+#include <algorithm>  // lower_bound, for restricting the curvature partition to a range
 #include <cmath>
 #include <memory>
 #include <vector>
@@ -310,6 +311,48 @@ inline void sscvfem_unpack(SSMeshData &d, const scalar_t *const SFEM_RESTRICT x)
 // lattice, and hoisting would silently put its micro cells back on the chords. So a macro element
 // is also curved where any lattice node is off the trilinear map of its corners, at the same
 // relative tolerance.
+// THE TWO RANGES A SPLIT SWEEP PAIR IS LAUNCHED OVER, and how a partial element range is
+// restricted to each half of the curvature partition.
+//
+// A sweep pair covers macro elements [begin, end) -- usually the whole mesh, but the nodal
+// gradient hands the scatter sweep the tail the packs do not reach on a distributed mesh. The
+// sweeps iterate POSITIONS in macro_order, so what each needs is the positions whose element
+// falls in that range.
+//
+// That set is a contiguous run of positions, and only because each half of the partition is in
+// ascending element order -- which is what sscvfem_classify_macros guarantees and
+// cvfem_ss_curvature_partition_test asserts. So a binary search finds it, and no sweep has to
+// filter per element.
+//
+// With no order array -- a mesh with nothing curved -- the straight half is the element range
+// itself and the curved half is empty, so the box pays nothing for any of this.
+inline cvfem_range sscvfem_order_positions(const SSMeshData &d, const bool curved,
+                                           const ptrdiff_t begin, const ptrdiff_t end) {
+    if (d.macro_order.empty()) return curved ? cvfem_range{end, end} : cvfem_range{begin, end};
+    const ptrdiff_t         lo = curved ? d.n_straight : 0;
+    const ptrdiff_t         hi = curved ? d.nmacro : d.n_straight;
+    const ptrdiff_t *const  o  = d.macro_order.data();
+    return cvfem_range{(ptrdiff_t)(std::lower_bound(o + lo, o + hi, begin) - o),
+                       (ptrdiff_t)(std::lower_bound(o + lo, o + hi, end) - o)};
+}
+
+// This thread's slice of one half. Called inside the parallel region, like every other
+// cvfem_range_split in this file.
+inline cvfem_range sscvfem_affine_range(const SSMeshData &d, const ptrdiff_t begin, const ptrdiff_t end) {
+    const cvfem_range p = sscvfem_order_positions(d, false, begin, end);
+    return cvfem_range_split(p.begin, p.end, 1, cvfem_thread_index(), cvfem_n_threads());
+}
+
+inline cvfem_range sscvfem_isoparam_range(const SSMeshData &d, const ptrdiff_t begin, const ptrdiff_t end) {
+    const cvfem_range p = sscvfem_order_positions(d, true, begin, end);
+    return cvfem_range_split(p.begin, p.end, 1, cvfem_thread_index(), cvfem_n_threads());
+}
+
+// The partition itself, or null where there is none.
+inline const ptrdiff_t *sscvfem_order(const SSMeshData &d) {
+    return d.macro_order.empty() ? nullptr : d.macro_order.data();
+}
+
 inline void sscvfem_classify_macros(SSMeshData &d) {
     int ext[8];
     sscvfem_macro_corner_offsets(d.level, ext);
@@ -658,8 +701,13 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
                 std::fill(st, st + (size_t)sc.n_slots * 3, scalar_t(0));
             }
         #pragma omp parallel
-            sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(),
-                    cvfem_range_split(_b, _e, 1, cvfem_thread_index(), cvfem_n_threads()));
+        {
+                sscvfem_nodal_grad_scatter_affine(d.elems, d.level, d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(),
+                        sscvfem_affine_range(d, _b, _e), sscvfem_order(d));
+                sscvfem_nodal_grad_scatter_isoparam(d.elems, d.level, d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(),
+                        sscvfem_isoparam_range(d, _b, _e), sscvfem_order(d));
+        }
+
             if (d.scatter && d.scatter->ready) {
                 const SSScatter &sc = *d.scatter;
                 scalar_t *dst[3] = {ogx.data(), ogy.data(), ogz.data()};
@@ -695,8 +743,13 @@ inline void sscvfem_nodal_grad_strided(SSMeshData &d, const scalar_t *const SFEM
             std::fill(st, st + (size_t)sc.n_slots * 3, scalar_t(0));
         }
     #pragma omp parallel
-        sscvfem_nodal_grad_scatter_range(d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(),
-                cvfem_range_split(_b, _e, 1, cvfem_thread_index(), cvfem_n_threads()));
+    {
+            sscvfem_nodal_grad_scatter_affine(d.elems, d.level, d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(),
+                    sscvfem_affine_range(d, _b, _e), sscvfem_order(d));
+            sscvfem_nodal_grad_scatter_isoparam(d.elems, d.level, d.nxe, d.points, d.scatter ? d.scatter->n_slots : 0, d.scatter ? d.scatter->red_idx.empty() ? nullptr : d.scatter->red_idx.data() : nullptr, d.scatter ? d.scatter->red_ptr.empty() ? nullptr : d.scatter->red_ptr.data() : nullptr, d.scatter ? d.scatter->shared_node.empty() ? nullptr : d.scatter->shared_node.data() : nullptr, d.scatter ? d.scatter->slot.empty() ? nullptr : d.scatter->slot.data() : nullptr, d.scatter ? d.scatter->stage.empty() ? nullptr : d.scatter->stage.data() : nullptr, d.scatter ? (ptrdiff_t)d.scatter->shared_node.size() : 0, src, stride, ogx.data(), ogy.data(), ogz.data(),
+                    sscvfem_isoparam_range(d, _b, _e), sscvfem_order(d));
+    }
+
         if (d.scatter && d.scatter->ready) {
             const SSScatter &sc = *d.scatter;
             scalar_t *dst[3] = {ogx.data(), ogy.data(), ogz.data()};
@@ -1073,8 +1126,8 @@ inline void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scal
     {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
         CVFEM_TRACE_SCOPE("sscvfem::residual_naive_sweep");
         #pragma omp parallel
-            sscvfem_residual_naive_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
-            sscvfem_residual_naive_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
+            sscvfem_residual_naive_affine(sscvfem_affine_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
+            sscvfem_residual_naive_isoparam(sscvfem_isoparam_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
     }
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
@@ -1235,11 +1288,11 @@ inline void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t rho, const sc
         CVFEM_TRACE_SCOPE("sscvfem::block_diag_naive_sweep");
         #pragma omp parallel
         {
-            sscvfem_block_diag_naive_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level,
+            sscvfem_block_diag_naive_affine(sscvfem_affine_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.elems, d.level,
                                        d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
                                        d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(),
                                        sscvfem_rc_config(d), rho, mu, diag.data());
-            sscvfem_block_diag_naive_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level,
+            sscvfem_block_diag_naive_isoparam(sscvfem_isoparam_range(d, 0, d.nmacro), sscvfem_order(d), d.Lx, d.Ly, d.Lz, d.elems, d.level,
                                        d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
                                        d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(),
                                        sscvfem_rc_config(d), rho, mu, diag.data());

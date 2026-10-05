@@ -499,28 +499,6 @@ inline void sscvfem_nodal_grad_packed_sweep(
     // folded in; see sscvfem_nodal_grad_packed.
 }
 
-// Defined below, declared here because sscvfem_nodal_grad_strided calls it.
-inline void sscvfem_nodal_grad_scatter_range(
-        // The staging object is gone; what this sweep reads out of it is what it takes.
-        idx_t **const SFEM_RESTRICT elems,
-        const int level,
-        const uint8_t *const SFEM_RESTRICT macro_curved,
-        const int nxe,
-        geom_t **const SFEM_RESTRICT points,
-        
-        // The staging object is gone; what this sweep reads out of it is what it takes.
-        const ptrdiff_t n_slots,
-        const ptrdiff_t *const SFEM_RESTRICT red_idx,
-        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
-        const idx_t *const SFEM_RESTRICT shared_node,
-        const int *const SFEM_RESTRICT slot,
-        scalar_t *const SFEM_RESTRICT stage,
-        const ptrdiff_t n_shared, const scalar_t *const SFEM_RESTRICT src,
-                                             const int stride, scalar_t *const SFEM_RESTRICT ogx,
-                                             scalar_t *const SFEM_RESTRICT ogy, scalar_t *const SFEM_RESTRICT ogz,
-                                             // The element range this call covers. DESIGN.md: the
-                                             // threading is abstract outside the sweep.
-                                             const cvfem_range r);
 
 // The scatter sweep over one element range, accumulating RAW into ogx/ogy/ogz.
 //
@@ -529,134 +507,62 @@ inline void sscvfem_nodal_grad_scatter_range(
 // writes is additive -- exclusive nodes go straight out with +=, shared ones through the
 // staged reduce, which also accumulates -- so a partial range adds to whatever is already
 // there instead of replacing it.
-inline void sscvfem_nodal_grad_scatter_range(
+// The nodal gradient reconstructs three fields where it used to carry four: the weight rode
+// along through the per-element accumulator, the scatter and the shared reduction, which is a
+// third of the traffic of each spent re-deriving a quantity that does not change.
+static constexpr int SSCVFEM_NGRAD = 3;
+
+// One micro cell of the nodal-gradient reconstruction over macro-element buffers.
+//
+// `hadj` and `hsgn` are the macro element's geometry and the sign of its determinant; nullptr
+// asks for this cell's own, which is what a curved macro element needs, and a degenerate cell
+// then contributes nothing rather than dividing by it. Same convention as
+// sscvfem_apply_naive_cell.
+//
+// |det| times a gradient carrying 1/det: the determinant cancels and only its SIGN survives,
+// so the division the gradient used to do and the multiplication that undid it both disappear.
+static SFEM_INLINE void sscvfem_nodal_grad_cell(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         idx_t **const SFEM_RESTRICT elems,
-        const int level,
-        const uint8_t *const SFEM_RESTRICT macro_curved,
-        const int nxe,
         geom_t **const SFEM_RESTRICT points,
-        
-        // The staging object is gone; what this sweep reads out of it is what it takes.
-        const ptrdiff_t n_slots,
-        const ptrdiff_t *const SFEM_RESTRICT red_idx,
-        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
-        const idx_t *const SFEM_RESTRICT shared_node,
+        const scalar_t *const SFEM_RESTRICT lp,
+        const idx_t *const SFEM_RESTRICT lg,
         const int *const SFEM_RESTRICT slot,
-        scalar_t *const SFEM_RESTRICT stage,
-        const ptrdiff_t n_shared, const scalar_t *const SFEM_RESTRICT src,
-                                             const int stride, scalar_t *const SFEM_RESTRICT ogx,
-                                             scalar_t *const SFEM_RESTRICT ogy, scalar_t *const SFEM_RESTRICT ogz,
-                                             // The element range this call covers. DESIGN.md: the
-                                             // threading is abstract outside the sweep.
-                                             const cvfem_range r) {
-    if (r.begin >= r.end) return;
+        scalar_t *const SFEM_RESTRICT lacc, const ptrdiff_t e, const int L, const int xi,
+        const int yi, const int zi, const int off[8], const scalar_t *const hadj,
+        const scalar_t hsgn,
+        scalar_t *const SFEM_RESTRICT ogx,
+        scalar_t *const SFEM_RESTRICT ogy,
+        scalar_t *const SFEM_RESTRICT ogz) {
+    const int base = sscvfem_lidx(L, xi, yi, zi);
+    scalar_t  ep[8];
+    for (int a = 0; a < 8; ++a) ep[a] = lp[(size_t)(base + off[a])];
 
-    const int L = level;
-    int       off[8];
-    sscvfem_corner_offsets(L, off);
-
-    // Three fields where there were four. The weight used to ride along through the
-    // per-element accumulator, the scatter and the shared reduction, which is a third of the
-    // traffic of each spent re-deriving a quantity that does not change.
-    static constexpr int NG = 3;
-
-    // The staging buffer is pre-zeroed by the caller when this is a PARTIAL range; see
-    // sscvfem_nodal_grad_strided. It is shared work that must happen once, not per thread.
-
-    {
-        // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the semi-structured element sweeps',
-        // shared between them because only one is live inside a parallel region and
-        // they all want the same macro-element size.
-        scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe * NG));
-        scalar_t *const SFEM_RESTRICT lp = _arena5;
-        scalar_t *const SFEM_RESTRICT lacc = _arena5 + ((size_t)nxe);
-        idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
-        idx_t *const SFEM_RESTRICT lg = _arena6;
-
-        for (ptrdiff_t e = r.begin; e < r.end; ++e) {
-            if (slot) std::fill(lacc, lacc + ((size_t)nxe * NG), scalar_t(0));
-            // Only the field. The coordinates used to be gathered for every node of the
-            // macro-element -- three arrays of (L+1)^3 -- to feed a geometry computation that
-            // is the same for all of them.
-            for (int a = 0; a < nxe; ++a) {
-                const idx_t g = elems[a][e];
-                lg[(size_t)a]        = g;
-                lp[(size_t)a]        = src[(ptrdiff_t)g * stride];
-            }
-
-            // The geometry, once per macro-element rather than once per micro-element.
-            //
-            // A macro-element is subdivided uniformly, so its micro-elements are translates of
-            // one another and share a Jacobian exactly. sscvfem_macro_geom has always relied
-            // on this -- it is what the `hoisted` in apply_macro_local_hoisted means, and it
-            // computes the geometry of the first micro-element and reuses it for all L^3.
-            // This sweep did not, and paid L^3 geometry evaluations per macro-element where
-            // one is needed: eight times too many at level 2 and sixty-four at level 4.
-            scalar_t adj[9], det;
-            {
-                scalar_t ex[8], ey[8], ez[8];
-                for (int a = 0; a < 8; ++a) {
-                    const idx_t g = elems[off[a]][e];
-                    ex[a]                = (scalar_t)points[0][g];
-                    ey[a]                = (scalar_t)points[1][g];
-                    ez[a]                = (scalar_t)points[2][g];
-                }
-                sscvfem_micro_geom(ex, ey, ez, adj, &det);
-            }
-            const bool curved_e = sscvfem_macro_curved(macro_curved, e);
-            if (!curved_e && std::fabs(det) < scalar_t(1e-30)) continue;
-            // |det| * grad, where grad itself carries a 1/det. The determinant cancels and
-            // only its SIGN survives, so the division the gradient used to do and the
-            // multiplication that undid it both disappear.
-            const scalar_t sgn = det > 0 ? scalar_t(1) : scalar_t(-1);
-
-            for (int zi = 0; zi < L; ++zi) {
-                for (int yi = 0; yi < L; ++yi) {
-                    for (int xi = 0; xi < L; ++xi) {
-                        const int base = sscvfem_lidx(L, xi, yi, zi);
-                        scalar_t  ep[8];
-                        for (int a = 0; a < 8; ++a) ep[a] = lp[(size_t)(base + off[a])];
-                        scalar_t gx, gy, gz;
-                        if (curved_e) {
-                            scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
-                            sscvfem_cell_corners(elems, points, e, base, off, cx, cy, cz);
-                            sscvfem_micro_geom(cx, cy, cz, cadj, &cdet);
-                            if (std::fabs(cdet) < scalar_t(1e-30)) continue;
-                            cvfem_hex8_grad_scalar(cadj, cdet > 0 ? scalar_t(1) : scalar_t(-1), ep, gx, gy, gz);
-                        } else {
-                            cvfem_hex8_grad_scalar(adj, sgn, ep, gx, gy, gz);
-                        }
-                        for (int a = 0; a < 8; ++a) {
-                            const int l = base + off[a];
-                            if (slot) {
-                                scalar_t *const acc = lacc + (size_t)l * NG;
-                                acc[0] += gx;
-                                acc[1] += gy;
-                                acc[2] += gz;
-                            } else {
-                                const idx_t id = lg[(size_t)l];
-                                atomic_add(ogx, id, gx);
-                                atomic_add(ogy, id, gy);
-                                atomic_add(ogz, id, gz);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (slot) {
-                scalar_t *dst[NG] = {ogx, ogy, ogz};
-                sscvfem_scatter_element_soa_w<NG>(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lacc, dst);
-            }
-        }
+    scalar_t gx, gy, gz;
+    if (hadj) {
+        cvfem_hex8_grad_scalar(hadj, hsgn, ep, gx, gy, gz);
+    } else {
+        scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
+        sscvfem_cell_corners(elems, points, e, base, off, cx, cy, cz);
+        sscvfem_micro_geom(cx, cy, cz, cadj, &cdet);
+        if (std::fabs(cdet) < scalar_t(1e-30)) return;
+        cvfem_hex8_grad_scalar(cadj, cdet > 0 ? scalar_t(1) : scalar_t(-1), ep, gx, gy, gz);
     }
 
-    // The shared reduction is the caller's: a second, independent loop over the reduction
-    // rows, run after this pass's threads have joined.
-
-    // No normalisation here: the caller divides once, after whichever passes it ran. See
-    // sscvfem_nodal_grad_normalize.
+    for (int a = 0; a < 8; ++a) {
+        const int l = base + off[a];
+        if (slot) {
+            scalar_t *const acc = lacc + (size_t)l * SSCVFEM_NGRAD;
+            acc[0] += gx;
+            acc[1] += gy;
+            acc[2] += gz;
+        } else {
+            const idx_t id = lg[(size_t)l];
+            atomic_add(ogx, id, gx);
+            atomic_add(ogy, id, gy);
+            atomic_add(ogz, id, gz);
+        }
+    }
 }
 
 

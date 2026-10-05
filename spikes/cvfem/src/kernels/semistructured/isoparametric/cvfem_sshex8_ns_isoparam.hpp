@@ -191,4 +191,84 @@ inline SFEM_NOINLINE void sscvfem_block_diag_naive_isoparam(
     }
 }
 
+
+// The nodal-gradient scatter sweep over CURVED macro elements.
+//
+// IT BUILDS NO MACRO GEOMETRY AT ALL, which is more than the removed branch: the branching sweep
+// gathered the macro element's eight corners and evaluated its Jacobian for every macro element,
+// and on a curved one used neither -- the only thing it took from them was the degenerate-
+// determinant guard, and a curved cell carries its own.
+inline void sscvfem_nodal_grad_scatter_isoparam(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const int nxe,
+        geom_t **const SFEM_RESTRICT points,
+        
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const ptrdiff_t n_slots,
+        const ptrdiff_t *const SFEM_RESTRICT red_idx,
+        const ptrdiff_t *const SFEM_RESTRICT red_ptr,
+        const idx_t *const SFEM_RESTRICT shared_node,
+        const int *const SFEM_RESTRICT slot,
+        scalar_t *const SFEM_RESTRICT stage,
+        const ptrdiff_t n_shared, const scalar_t *const SFEM_RESTRICT src,
+                                             const int stride, scalar_t *const SFEM_RESTRICT ogx,
+                                             scalar_t *const SFEM_RESTRICT ogy, scalar_t *const SFEM_RESTRICT ogz,
+                                             // The element range this call covers, as positions
+                                             // in macro_order. DESIGN.md: the threading is
+                                             // abstract outside the sweep.
+                                             const cvfem_range r,
+                                             // The curvature partition; null means the identity.
+                                             // See SSMeshData::macro_order.
+                                             const ptrdiff_t *const SFEM_RESTRICT macro_order) {
+    if (r.begin >= r.end) return;
+
+    const int L = level;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+    // The staging buffer is pre-zeroed by the caller when this is a PARTIAL range; see
+    // sscvfem_nodal_grad_strided. It is shared work that must happen once, not per thread.
+
+    // Per-thread scratch from the kernels' own arena, not std::vector locals: slots 5/6 are the
+    // semi-structured element sweeps', shared between them because only one is live inside a
+    // parallel region and they all want the same macro-element size.
+    scalar_t *const SFEM_RESTRICT _arena5 = thread_scratch<scalar_t>(5, ((size_t)nxe) + ((size_t)nxe * SSCVFEM_NGRAD));
+    scalar_t *const SFEM_RESTRICT lp = _arena5;
+    scalar_t *const SFEM_RESTRICT lacc = _arena5 + ((size_t)nxe);
+    idx_t *const SFEM_RESTRICT _arena6 = thread_scratch<idx_t>(6, ((size_t)nxe));
+    idx_t *const SFEM_RESTRICT lg = _arena6;
+
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
+        const ptrdiff_t e = macro_order ? macro_order[i] : i;
+        if (slot) std::fill(lacc, lacc + ((size_t)nxe * SSCVFEM_NGRAD), scalar_t(0));
+        // Only the field. The coordinates used to be gathered for every node of the
+        // macro-element -- three arrays of (L+1)^3 -- to feed a geometry computation that
+        // is the same for all of them.
+        for (int a = 0; a < nxe; ++a) {
+            const idx_t g = elems[a][e];
+            lg[(size_t)a]        = g;
+            lp[(size_t)a]        = src[(ptrdiff_t)g * stride];
+        }
+
+        for (int zi = 0; zi < L; ++zi)
+            for (int yi = 0; yi < L; ++yi)
+                for (int xi = 0; xi < L; ++xi)
+                    sscvfem_nodal_grad_cell(elems, points, lp, lg, slot, lacc, e, L, xi, yi, zi, off,
+                                            nullptr, scalar_t(0), ogx, ogy, ogz);
+
+        if (slot) {
+            scalar_t *dst[SSCVFEM_NGRAD] = {ogx, ogy, ogz};
+            sscvfem_scatter_element_soa_w<SSCVFEM_NGRAD>(slot, const_cast<scalar_t *>(stage), nxe, e, lg, lacc, dst);
+        }
+    }
+
+    // The shared reduction is the caller's: a second, independent loop over the reduction
+    // rows, run after this pass's threads have joined.
+
+    // No normalisation here: the caller divides once, after whichever passes it ran. See
+    // sscvfem_nodal_grad_normalize.
+}
+
 #endif  // CVFEM_SSHEX8_NS_ISOPARAM_HPP
