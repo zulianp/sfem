@@ -213,31 +213,11 @@ namespace cvfem_ss {
         return std::max<ptrdiff_t>(1, std::min<ptrdiff_t>(g.nmacro, (ptrdiff_t)(cap / std::max<size_t>(1, per))));
     }
 
-    // The macro element's nodes, gathered once. Shared by the two geometry halves below, which
-    // differ in their micro-cell loop and in nothing else.
-    static SFEM_INLINE void galerkin_gather(
-            const SSMeshData &d, const int nxe, const ptrdiff_t e,
-            scalar_t *const SFEM_RESTRICT lx, scalar_t *const SFEM_RESTRICT ly,
-            scalar_t *const SFEM_RESTRICT lz, scalar_t *const SFEM_RESTRICT lux,
-            scalar_t *const SFEM_RESTRICT luy, scalar_t *const SFEM_RESTRICT luz,
-            scalar_t *const SFEM_RESTRICT lp, scalar_t *const SFEM_RESTRICT lpgx,
-            scalar_t *const SFEM_RESTRICT lpgy, scalar_t *const SFEM_RESTRICT lpgz,
-            smesh::idx_t *const SFEM_RESTRICT lg) {
-        for (int a = 0; a < nxe; ++a) {
-            const smesh::idx_t gn = d.elems[a][e];
-            lg[(size_t)a]         = gn;
-            lx[(size_t)a]         = (scalar_t)d.points[0][gn];
-            ly[(size_t)a]         = (scalar_t)d.points[1][gn];
-            lz[(size_t)a]         = (scalar_t)d.points[2][gn];
-            lux[(size_t)a]        = d.ux[(size_t)gn];
-            luy[(size_t)a]        = d.uy[(size_t)gn];
-            luz[(size_t)a]        = d.uz[(size_t)gn];
-            lp[(size_t)a]         = d.p[(size_t)gn];
-            lpgx[(size_t)a]       = d.pgx[(size_t)gn];
-            lpgy[(size_t)a]       = d.pgy[(size_t)gn];
-            lpgz[(size_t)a]       = d.pgz[(size_t)gn];
-        }
-    }
+    // The macro element's nodes are gathered by sscvfem_macro_gather and staged in the per-thread
+    // SSMacroScratch, the same two components every semi-structured sweep uses. A private gather
+    // and eleven std::vector locals stood here, reproducing exactly the no-direction case that
+    // the shared one already spells with null pointers -- and allocating the staging on the heap
+    // once per thread per chunk instead of taking it from the arena.
 
     // ONE MICRO CELL of the Galerkin assembly: the cell matrix, the transient term, the boundary
     // closure, the two-stage contraction onto the coarse patch, and the scatter into the chunk.
@@ -496,10 +476,10 @@ namespace cvfem_ss {
 #pragma omp parallel
         {
             const int nxe = d.nxe;
-            std::vector<scalar_t> lx((size_t)nxe), ly((size_t)nxe), lz((size_t)nxe);
-            std::vector<scalar_t> lux((size_t)nxe), luy((size_t)nxe), luz((size_t)nxe), lp((size_t)nxe);
-            std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
-            std::vector<smesh::idx_t> lg((size_t)nxe);
+            // n_out = 0: the macro-local destination is unused here, because each element writes
+            // its own slice of the chunk rather than scattering back to a nodal array.
+            const SSMacroScratchT<scalar_t, smesh::idx_t> ls =
+                    sscvfem_macro_scratch<scalar_t, smesh::idx_t>(nxe, 0, false, false, false);
 
             // THE TWO RANGES, not a branch per element. The chunk covers macro elements
             // [e0, e1), so sscvfem_order_positions restricts each half of the curvature
@@ -514,25 +494,33 @@ namespace cvfem_ss {
             for (ptrdiff_t i = pa.begin; i < pa.end; ++i) {
                 const ptrdiff_t e  = ord ? ord[i] : i;
                 scalar_t *const Ce = g.C.data() + (size_t)(e - e0) * (size_t)nc * 27 * 16;
-                galerkin_gather(d, nxe, e, lx.data(), ly.data(), lz.data(), lux.data(), luy.data(),
-                                luz.data(), lp.data(), lpgx.data(), lpgy.data(), lpgz.data(),
-                                lg.data());
-                galerkin_macro_affine(d, g, rho, mu, L, q, Lc, nc, off, sl, slot_ab, lx.data(),
-                                      ly.data(), lz.data(), lux.data(), luy.data(), luz.data(),
-                                      lp.data(), lpgx.data(), lpgy.data(), lpgz.data(), lg.data(), e,
-                                      Ce);
+                sscvfem_macro_gather(ls, d.elems, d.points, d.p.data(),
+                                     d.pgx.data(), d.pgy.data(), d.pgz.data(),
+                                     static_cast<const scalar_t *>(nullptr),
+                                     static_cast<const scalar_t *>(nullptr),
+                                     static_cast<const scalar_t *>(nullptr),
+                                     static_cast<const scalar_t *>(nullptr),
+                                     d.ux.data(), d.uy.data(), d.uz.data(),
+                                     static_cast<const scalar_t *>(nullptr), e, nxe, 0);
+                galerkin_macro_affine(d, g, rho, mu, L, q, Lc, nc, off, sl, slot_ab, ls.lx,
+                                      ls.ly, ls.lz, ls.lux, ls.luy, ls.luz,
+                                      ls.lp, ls.lpgx, ls.lpgy, ls.lpgz, ls.lg, e, Ce);
             }
 #pragma omp for schedule(static)
             for (ptrdiff_t i = pi.begin; i < pi.end; ++i) {
                 const ptrdiff_t e  = ord[i];
                 scalar_t *const Ce = g.C.data() + (size_t)(e - e0) * (size_t)nc * 27 * 16;
-                galerkin_gather(d, nxe, e, lx.data(), ly.data(), lz.data(), lux.data(), luy.data(),
-                                luz.data(), lp.data(), lpgx.data(), lpgy.data(), lpgz.data(),
-                                lg.data());
-                galerkin_macro_isoparam(d, g, rho, mu, L, q, Lc, nc, off, sl, slot_ab, lx.data(),
-                                        ly.data(), lz.data(), lux.data(), luy.data(), luz.data(),
-                                        lp.data(), lpgx.data(), lpgy.data(), lpgz.data(), lg.data(),
-                                        e, Ce);
+                sscvfem_macro_gather(ls, d.elems, d.points, d.p.data(),
+                                     d.pgx.data(), d.pgy.data(), d.pgz.data(),
+                                     static_cast<const scalar_t *>(nullptr),
+                                     static_cast<const scalar_t *>(nullptr),
+                                     static_cast<const scalar_t *>(nullptr),
+                                     static_cast<const scalar_t *>(nullptr),
+                                     d.ux.data(), d.uy.data(), d.uz.data(),
+                                     static_cast<const scalar_t *>(nullptr), e, nxe, 0);
+                galerkin_macro_isoparam(d, g, rho, mu, L, q, Lc, nc, off, sl, slot_ab, ls.lx,
+                                        ls.ly, ls.lz, ls.lux, ls.luy, ls.luz,
+                                        ls.lp, ls.lpgx, ls.lpgy, ls.lpgz, ls.lg, e, Ce);
             }
         }
     }
@@ -882,7 +870,9 @@ namespace cvfem_ss {
 
 #pragma omp parallel
         {
-            std::vector<scalar_t> xl((size_t)nc * N_FIELDS);
+            // Arena slot 9, not a std::vector: this is the V-cycle's coarse apply, so a local
+            // vector here allocates and frees once per thread per cycle.
+            scalar_t *const SFEM_RESTRICT xl = thread_scratch<scalar_t>(9, (size_t)nc * N_FIELDS);
 #pragma omp for schedule(static)
             for (ptrdiff_t e = 0; e < g.nmacro; ++e) {
                 for (int a = 0; a < nc; ++a) {

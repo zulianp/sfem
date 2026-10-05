@@ -326,6 +326,14 @@ if(CVFEM_REPORT_PYTHON)
     add_test(NAME cvfem_jobs_use_live_flags
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_jobs_use_live_flags.py)
+
+    # Per-thread scratch comes from the arena, never from a std::vector declared inside a
+    # parallel region, which allocates and frees once per thread per call. The arena's slot
+    # register is what makes each thread's working set visible; a vector hides it, which is how
+    # an nnodes-wide allocation ended up in the Vanka smoother.
+    add_test(NAME cvfem_no_vector_in_parallel
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_no_vector_in_parallel.py)
 endif()
 
 if(CVFEM_REPORT_PYTHON)

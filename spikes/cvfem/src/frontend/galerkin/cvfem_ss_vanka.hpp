@@ -500,9 +500,12 @@ namespace cvfem_ss {
 
 #pragma omp parallel
         {
-            std::vector<smesh::idx_t> lg((size_t)nxe);
-            std::vector<scalar_t>     lr((size_t)nxe * N_FIELDS);
-            std::vector<scalar_t>     lz((size_t)nxe * N_FIELDS);
+            // Arena slots 10 and 11. These were std::vector locals, allocated and freed once
+            // per thread per smoother application -- this is the V-cycle's inner loop.
+            scalar_t *const SFEM_RESTRICT lr =
+                    thread_scratch<scalar_t>(10, 2 * (size_t)nxe * N_FIELDS);
+            scalar_t *const SFEM_RESTRICT     lz = lr + (size_t)nxe * N_FIELDS;
+            smesh::idx_t *const SFEM_RESTRICT lg = thread_scratch<smesh::idx_t>(11, (size_t)nxe);
 
 #pragma omp for schedule(static)
             for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
@@ -512,7 +515,7 @@ namespace cvfem_ss {
                     for (int t = 0; t < N_FIELDS; ++t)
                         lr[(size_t)a * N_FIELDS + (size_t)t] = r[(size_t)g * N_FIELDS + (size_t)t];
                 }
-                std::fill(lz.begin(), lz.end(), scalar_t(0));
+                std::fill(lz, lz + (size_t)nxe * N_FIELDS, scalar_t(0));
 
                 for (int zi = 0; zi < L; ++zi)
                     for (int yi = 0; yi < L; ++yi)
@@ -553,7 +556,7 @@ namespace cvfem_ss {
                         }
 
                 if (sc)
-                    sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), lz.data(), z);
+                    sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg, lz, z);
                 else
                     for (int a = 0; a < nxe; ++a)
                         for (int t = 0; t < N_FIELDS; ++t)
@@ -629,9 +632,17 @@ namespace cvfem_ss {
         {
             // Global node -> local slot, so a row of A can be restricted to this element.
             // Entries are set and cleared per element, so the fill cost is 2 * nxe, not nnodes.
-            std::vector<int>          loc_of((size_t)d.nnodes, -1);
-            std::vector<smesh::idx_t> lg((size_t)nxe);
-            std::vector<scalar_t>     rl((size_t)nxe * N_FIELDS), zl((size_t)nxe * N_FIELDS);
+            //
+            // Arena slot 12, and it is the one that mattered: nnodes wide, once per thread, and
+            // as a std::vector it was allocated AND value-initialised to -1 on every smoother
+            // application. From the arena it is allocated once; the -1 fill stays because calloc
+            // gives zeros and this map wants -1.
+            int *const SFEM_RESTRICT loc_of = thread_scratch<int>(12, (size_t)d.nnodes);
+            for (ptrdiff_t i = 0; i < d.nnodes; ++i) loc_of[(size_t)i] = -1;
+            scalar_t *const SFEM_RESTRICT rl =
+                    thread_scratch<scalar_t>(10, 2 * (size_t)nxe * N_FIELDS);
+            scalar_t *const SFEM_RESTRICT     zl = rl + (size_t)nxe * N_FIELDS;
+            smesh::idx_t *const SFEM_RESTRICT lg = thread_scratch<smesh::idx_t>(11, (size_t)nxe);
 
 #pragma omp for schedule(static)
             for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
@@ -642,7 +653,7 @@ namespace cvfem_ss {
                     for (int t = 0; t < N_FIELDS; ++t)
                         rl[(size_t)a * N_FIELDS + (size_t)t] = r[(size_t)g * N_FIELDS + (size_t)t];
                 }
-                std::fill(zl.begin(), zl.end(), scalar_t(0));
+                std::fill(zl, zl + (size_t)nxe * N_FIELDS, scalar_t(0));
 
                 for (int colour = 0; colour < 8; ++colour) {
                     const int cx = colour & 1, cy = (colour >> 1) & 1, cz = (colour >> 2) & 1;
@@ -722,7 +733,7 @@ namespace cvfem_ss {
                 }
 
                 if (sc)
-                    sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg.data(), zl.data(), z);
+                    sscvfem_scatter_element(sc->slot.data(), const_cast<scalar_t *>(sc->stage.data()), nxe, e, lg, zl, z);
                 else
                     for (int a = 0; a < nxe; ++a)
                         for (int t = 0; t < N_FIELDS; ++t)

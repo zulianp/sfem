@@ -50,13 +50,29 @@ static SFEM_INLINE idx_t cvfem_pack_local_to_global(const ptrdiff_t             
 }
 
 // Per-thread scratch arena, CVFEM_PACK_SCRATCH_SLOTS slots, grown on demand and never shrunk.
-// Ten, not eight: the semi-structured packed gradient needs two of its own.
 //
-// It cannot share the flat gradient's slots 5 and 6. A semi-structured multigrid hierarchy
-// has semi-structured fine levels and a FLAT coarse level in the same process, and the two
-// want very different sizes from the same slot -- the scratch grows on demand and never
-// shrinks, so sharing would reallocate on every alternation rather than once.
-static constexpr int CVFEM_PACK_SCRATCH_SLOTS = 10;
+// THE SLOT REGISTER. A slot is per type as well as per number -- thread_scratch<T> holds its own
+// static array for each T -- so slot 9 for scalar_t and slot 9 for int are different storage.
+// What must not be shared is one slot between two callers that want different sizes from it: the
+// arena grows and never shrinks, so that reallocates on every alternation instead of once. That
+// is why the semi-structured packed gradient has slots 7 and 8 of its own rather than the flat
+// gradient's 5 and 6 -- a semi-structured hierarchy has semi-structured fine levels and a FLAT
+// coarse level in the same process, and the two sizes differ by orders of magnitude.
+//
+//   0-4   the flat packed sweeps' staging, element matrix and gradient
+//   5, 6  the semi-structured macro-element staging (scalar_t) and its node ids (idx_t)
+//   7, 8  the semi-structured packed gradient
+//   9     the Galerkin coarse operator's apply: the coarse lattice's local state
+//   10    the Vanka smoother's macro-element residual and correction
+//   11    the Vanka smoother's macro-element node ids (idx_t)
+//   12    the Vanka smoother's global-node-to-local-slot map (int)
+//   13    the packed block diagonal's pack-local accumulator
+//
+// Every one of 9 through 13 replaced a std::vector declared inside a `#pragma omp parallel`,
+// which allocated and freed per thread per call in the V-cycle's inner loop. Slot 12 is the one
+// that mattered most: it is nnodes wide and was being allocated once per thread per smoother
+// application.
+static constexpr int CVFEM_PACK_SCRATCH_SLOTS = 14;
 
 // Per-thread scratch, indexed by slot. An out-of-range slot used to walk straight off the
 // end of these arrays and corrupt whatever thread_local storage followed -- the symptom was

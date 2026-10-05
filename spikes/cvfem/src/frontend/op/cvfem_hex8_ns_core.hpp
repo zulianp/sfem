@@ -1050,10 +1050,13 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
 
 #pragma omp parallel
         {
-            // Allocated per thread rather than taken from the shared scratch slots: this
-            // routine runs once per Newton step, so the allocation is free at this scale and
-            // it cannot collide with a matvec's scratch.
-            std::vector<scalar_t> pack_diag((size_t)p.max_nodes_per_pack * (size_t)W, scalar_t(0));
+            // Arena slot 13 of its own. It stood here as a std::vector on the grounds that
+            // this runs once per Newton step, so the allocation is cheap at that rate, and that
+            // a slot could collide with a matvec's scratch. The first is a reason the cost is
+            // small rather than a reason to allocate inside a parallel region, and the second is
+            // answered by the slot being this routine's alone.
+            scalar_t *const SFEM_RESTRICT pack_diag =
+                    thread_scratch<scalar_t>(13, (size_t)p.max_nodes_per_pack * (size_t)W);
 #pragma omp for schedule(static)
             for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack) {
                 const ptrdiff_t owned        = p.owned_nodes_ptr[pack];
@@ -1062,18 +1065,18 @@ inline SFEM_NOINLINE void assemble_block_diag(MeshData             &d,
                 const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
                 const ptrdiff_t ghost_off    = p.ghost_ptr[pack];
 
-                std::memset(pack_diag.data(), 0, (size_t)n_pack_nodes * (size_t)W * sizeof(scalar_t));
+                std::memset(pack_diag, 0, (size_t)n_pack_nodes * (size_t)W * sizeof(scalar_t));
 
                 const ptrdiff_t e_start = pack * p.n_elements_per_pack;
                 const ptrdiff_t e_end   = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
-                for (ptrdiff_t e = e_start; e < e_end; ++e) one_element(e, pack_diag.data(), p.elems);
+                for (ptrdiff_t e = e_start; e < e_end; ++e) one_element(e, pack_diag, p.elems);
 
                 // Owned rows are this pack's alone, so they are written rather than added.
-                std::memcpy(out + owned * W, pack_diag.data(), (size_t)n_contiguous * (size_t)W * sizeof(scalar_t));
+                std::memcpy(out + owned * W, pack_diag, (size_t)n_contiguous * (size_t)W * sizeof(scalar_t));
 
                 // Field-major, matching the layout cvfem_hex8_ghost_reduce_interleaved reads.
                 for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                    const scalar_t *const SFEM_RESTRICT blk = pack_diag.data() + (n_contiguous + k) * W;
+                    const scalar_t *const SFEM_RESTRICT blk = pack_diag + (n_contiguous + k) * W;
                     for (int f = 0; f < W; ++f) gbuf[(ptrdiff_t)f * p.n_ghost_entries + ghost_off + k] = blk[f];
                 }
             }
