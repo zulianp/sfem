@@ -326,4 +326,121 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         CVFEM_PHASE_FLUSH(acc);
 }
 
+// ISO IS A TEMPLATE PARAMETER, NOT A RUNTIME ENUM. DESIGN.md asks for the affine and the
+// isoparametric kernels to be "logically separated (now they are mixed in with enum and
+// booleans)", and this was the enum: GeomKind arrived as an argument and was tested per pack,
+// inside the sweep. It also left the geometry undecided at the point where it matters -- the
+// lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
+// the vectorisation gate now refuses outright. The caller picks the instantiation.
+// The pack sweep, driven by a range. The `#pragma omp parallel` is in the launcher below; see
+// kernels/cvfem_range.hpp for why DESIGN.md wants it there. The packs of a range touch only
+// nodes this part owns -- that is what the packed layout is for -- so the parts need no
+// synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+// launcher, which is the second and independent parallel loop.
+static SFEM_NOINLINE void assemble_jacobian_packed_affine_range(
+        const cvfem_range packs,
+        // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
+        // mesh -- so what this kernel reads out of them is what it takes. DESIGN.md: only
+        // arguments that are actually used are passed.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t rhie_chow_scale,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        pack_idx_t **const SFEM_RESTRICT pack_elems,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_mat_ptr,
+        scalar_t *const SFEM_RESTRICT ghost_mat_val,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const int *const SFEM_RESTRICT local_element_slot,
+        const count_t *const *const SFEM_RESTRICT local_global_slot,
+        const int *const *const SFEM_RESTRICT local_rowptr,
+        const ptrdiff_t max_actual_nodes_per_pack,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        // BSR4 is a staging type (it owns a SharedBuffer and a graph); the kernel reads one
+        // array out of it, so that is what it takes.
+        scalar_t *const SFEM_RESTRICT gvalues,
+        const scalar_t rho,
+        const scalar_t mu,
+        const size_t u_n,
+        const size_t bsr_n,
+        const int with_rc,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg) {
+        CVFEM_PHASE_ACC(acc);
+        alignas(ALIGN_BYTES) scalar_t dense_ke[64 * 16];
+        std::memset(dense_ke, 0, sizeof(dense_ke));
+        scalar_t *const SFEM_RESTRICT pack_u          = thread_scratch<scalar_t>(0, u_n);
+        scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
+        const Hex8PackCoords pk =
+                cvfem_hex8_pack_coords(with_rc != 0, with_rc, max_actual_nodes_per_pack);
+
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
+            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+                    pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
+            const auto                             &lrowptr      = local_rowptr[(size_t)pack];
+            const auto                             &lslots       = local_global_slot[(size_t)pack];
+            // lrowptr has exactly x.n_contiguous + x.n_ghost + 1 entries -- build_pack_local_crs
+            // assigns it that length -- so back() is the last of them and the empty() guard
+            // could only fire on a pack the builder never saw. Indexed rather than called,
+            // because this becomes a raw pointer when the kernel stops taking PackedData.
+            const int                               local_nnz    = lrowptr[(size_t)(x.n_contiguous + x.n_ghost)];
+
+            CVFEM_PHASE_CLOCK(_t);
+            std::memset(local_vals_pack, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
+            CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
+
+            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
+            if (with_rc)
+                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z,
+                                               pk.pgx, pk.pgy, pk.pgz);
+            CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
+
+            for (ptrdiff_t e = x.e_start; e < x.e_end; ++e) {
+                Hex8PackElement el;
+                cvfem_hex8_stage_pack_element(pack_elems, pack_u, pk, e, with_rc, rc_cfg, el);
+                const int *const SFEM_RESTRICT slots =
+                        g_kernel_only ? g_identity_slots : local_element_slot + (size_t)e * 64;
+                scalar_t *const SFEM_RESTRICT local_vals = g_kernel_only ? dense_ke : local_vals_pack;
+                // THE GEOMETRY: one adjugate and determinant per element, read from the
+                // precomputed table. This is the whole of what distinguishes this sweep from
+                // its isoparametric twin, which derives them per sub-control surface from the
+                // staged node coordinates instead.
+                scalar_t adj[9], det;
+                load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
+                cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
+                        rho, mu, adj, det, el.ux, el.uy, el.uz, slots, local_vals, el.rc, el.rc_p);
+            }
+
+            CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
+            const int                     owned_nnz = x.n_contiguous > 0 ? lrowptr[(size_t)x.n_contiguous] : 0;
+            if (!g_kernel_only)
+                for (int t = 0; t < owned_nnz; ++t)
+                    bsr4_add16(&gvalues[(ptrdiff_t)lslots[(size_t)t] * 16], local_vals_pack + (ptrdiff_t)t * 16);
+
+            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
+                const ptrdiff_t local_i = x.n_contiguous + k;
+                const int       begin   = lrowptr[(size_t)local_i];
+                const int       end     = lrowptr[(size_t)local_i + 1];
+                const ptrdiff_t dest    = ghost_mat_ptr[(size_t)x.ghost_off + (size_t)k];
+                std::memcpy(ghost_mat_val + dest * 16,
+                            local_vals_pack + (ptrdiff_t)begin * 16,
+                            (size_t)(end - begin) * 16 * sizeof(scalar_t));
+            }
+            CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
+    }
+        CVFEM_PHASE_FLUSH(acc);
+}
+
 #endif  // CVFEM_HEX8_BEST_PACKED_AFFINE_HPP

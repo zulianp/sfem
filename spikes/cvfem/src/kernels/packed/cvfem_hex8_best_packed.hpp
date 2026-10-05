@@ -127,148 +127,51 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
 
 
 
-// ISO IS A TEMPLATE PARAMETER, NOT A RUNTIME ENUM. DESIGN.md asks for the affine and the
-// isoparametric kernels to be "logically separated (now they are mixed in with enum and
-// booleans)", and this was the enum: GeomKind arrived as an argument and was tested per pack,
-// inside the sweep. It also left the geometry undecided at the point where it matters -- the
-// lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
-// the vectorisation gate now refuses outright. The caller picks the instantiation.
-// The pack sweep, driven by a range. The `#pragma omp parallel` is in the launcher below; see
-// kernels/cvfem_range.hpp for why DESIGN.md wants it there. The packs of a range touch only
-// nodes this part owns -- that is what the packed layout is for -- so the parts need no
-// synchronisation between them, and the ghost rows they do share are reduced afterwards in the
-// launcher, which is the second and independent parallel loop.
-template <bool ISO>
-static SFEM_NOINLINE void assemble_jacobian_packed_range(
-        const cvfem_range packs,
-        // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
-        // mesh -- so what this kernel reads out of them is what it takes. DESIGN.md: only
-        // arguments that are actually used are passed.
-        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
-        const scalar_t *const SFEM_RESTRICT det_ptr,
-        const ptrdiff_t nelements,
-        const scalar_t *const SFEM_RESTRICT pres,
-        const scalar_t *const SFEM_RESTRICT pgx,
-        const scalar_t *const SFEM_RESTRICT pgy,
-        const scalar_t *const SFEM_RESTRICT pgz,
-        geom_t **const SFEM_RESTRICT points,
-        const scalar_t rhie_chow_scale,
-        const scalar_t *const SFEM_RESTRICT ux,
-        const scalar_t *const SFEM_RESTRICT uy,
-        const scalar_t *const SFEM_RESTRICT uz,
-        pack_idx_t **const SFEM_RESTRICT pack_elems,
-        const idx_t *const SFEM_RESTRICT ghost_idx,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_mat_ptr,
-        scalar_t *const SFEM_RESTRICT ghost_mat_val,
-        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
-        const int *const SFEM_RESTRICT local_element_slot,
-        const count_t *const *const SFEM_RESTRICT local_global_slot,
-        const int *const *const SFEM_RESTRICT local_rowptr,
-        const ptrdiff_t max_actual_nodes_per_pack,
-        const ptrdiff_t n_elements_per_pack,
-        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
-        // BSR4 is a staging type (it owns a SharedBuffer and a graph); the kernel reads one
-        // array out of it, so that is what it takes.
-        scalar_t *const SFEM_RESTRICT gvalues,
-        const scalar_t rho,
-        const scalar_t mu,
-        const size_t u_n,
-        const size_t bsr_n,
-        const int with_rc,
-        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
-        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
-        // the mesh, which a kernel is not meant to name.
-        const Hex8RcConfig &rc_cfg) {
-        CVFEM_PHASE_ACC(acc);
-        alignas(ALIGN_BYTES) scalar_t dense_ke[64 * 16];
-        std::memset(dense_ke, 0, sizeof(dense_ke));
-        scalar_t *const SFEM_RESTRICT pack_u          = thread_scratch<scalar_t>(0, u_n);
-        scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
-        const Hex8PackCoords pk =
-                cvfem_hex8_pack_coords(ISO || with_rc, with_rc, max_actual_nodes_per_pack);
+// ONE ELEMENT, OUT OF THE PACK. The assembly sweeps work scalar per element rather than
+// lane-blocked, so both geometries gather the same four nodal fields, pick the same slot array
+// and build the same Hex8RhieChow before they diverge -- and they diverge only in where the
+// geometry comes from and which kernel they then call.
+//
+// It is a struct rather than six out-parameters because Hex8RhieChow POINTS AT the coordinate
+// arrays: they have to outlive the kernel call, so they live here and `rc` refers to this
+// object's own storage. That makes the struct non-copyable in practice -- a copy's `rc` would
+// point at the original's arrays -- so it is built in place, by reference, and never returned
+// by value.
+struct Hex8PackElement {
+    scalar_t     ux[8], uy[8], uz[8], p[8];
+    scalar_t     rc_x[8], rc_y[8], rc_z[8], rc_pgx[8], rc_pgy[8], rc_pgz[8];
+    Hex8RhieChow rc;
+    // The pressure the Rhie-Chow term differences, or null when the term is off -- which is
+    // what makes the kernel's own branch on it fold away.
+    const scalar_t *rc_p;
+};
 
-
-    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent(
-                    pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
-            const auto                             &lrowptr      = local_rowptr[(size_t)pack];
-            const auto                             &lslots       = local_global_slot[(size_t)pack];
-            // lrowptr has exactly x.n_contiguous + x.n_ghost + 1 entries -- build_pack_local_crs
-            // assigns it that length -- so back() is the last of them and the empty() guard
-            // could only fire on a pack the builder never saw. Indexed rather than called,
-            // because this becomes a raw pointer when the kernel stops taking PackedData.
-            const int                               local_nnz    = lrowptr[(size_t)(x.n_contiguous + x.n_ghost)];
-
-            CVFEM_PHASE_CLOCK(_t);
-            std::memset(local_vals_pack, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
-            CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
-
-            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
-            if (with_rc)
-                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z,
-                                               pk.pgx, pk.pgy, pk.pgz);
-            if constexpr (ISO)
-                fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
-            CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
-
-            for (ptrdiff_t e = x.e_start; e < x.e_end; ++e) {
-                scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
-                for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                    const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * CVFEM_HEX8_N_FIELDS;
-                    ux_e[a]                              = u[0];
-                    uy_e[a]                              = u[1];
-                    uz_e[a]                              = u[2];
-                    p_e[a]                               = u[3];
-                }
-
-                const int *const SFEM_RESTRICT slots =
-                        g_kernel_only ? g_identity_slots : local_element_slot + (size_t)e * 64;
-                scalar_t *const SFEM_RESTRICT local_vals = g_kernel_only ? dense_ke : local_vals_pack;
-                scalar_t adj[9], det;
-                if constexpr (!ISO) load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
-                // The coordinates and the nodal gradient come out of the pack; the
-                // Hex8RhieChow points at these locals, so they must outlive the call, which
-                // they do.
-                scalar_t     rc_x[8], rc_y[8], rc_z[8], rc_pgx[8], rc_pgy[8], rc_pgz[8];
-                const Hex8RcConfig rcfg = rc_cfg;
-                Hex8RhieChow rc{};
-                if (with_rc) {
-                    gather_hex8_coords_from_pack(pack_elems, pk.x, pk.y, pk.z, e, rc_x, rc_y, rc_z);
-                    gather_hex8_coords_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, e, rc_pgx, rc_pgy, rc_pgz);
-                    rc = Hex8RhieChow{rc_x,    rc_y,  rc_z,  rc_pgx, rc_pgy, rc_pgz, rcfg.scale,
-                                      nullptr, nullptr, nullptr, ux_e, uy_e, uz_e, rcfg.tau};
-                }
-                const scalar_t *const rc_p = with_rc ? p_e : nullptr;
-                if constexpr (ISO) {
-                    scalar_t x[8], y[8], z[8];
-                    gather_hex8_coords_from_pack(pack_elems, pk.x, pk.y, pk.z, e, x, y, z);
-                    cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
-                            rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
-                } else {
-                    cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
-                }
-            }
-
-            CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
-            const int                     owned_nnz = x.n_contiguous > 0 ? lrowptr[(size_t)x.n_contiguous] : 0;
-            if (!g_kernel_only)
-                for (int t = 0; t < owned_nnz; ++t)
-                    bsr4_add16(&gvalues[(ptrdiff_t)lslots[(size_t)t] * 16], local_vals_pack + (ptrdiff_t)t * 16);
-
-            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
-                const ptrdiff_t local_i = x.n_contiguous + k;
-                const int       begin   = lrowptr[(size_t)local_i];
-                const int       end     = lrowptr[(size_t)local_i + 1];
-                const ptrdiff_t dest    = ghost_mat_ptr[(size_t)x.ghost_off + (size_t)k];
-                std::memcpy(ghost_mat_val + dest * 16,
-                            local_vals_pack + (ptrdiff_t)begin * 16,
-                            (size_t)(end - begin) * 16 * sizeof(scalar_t));
-            }
-            CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
+static SFEM_INLINE void cvfem_hex8_stage_pack_element(pack_idx_t **const SFEM_RESTRICT pack_elems,
+                                                      const scalar_t *const SFEM_RESTRICT pack_u,
+                                                      const Hex8PackCoords               &pk,
+                                                      const ptrdiff_t                     e,
+                                                      const int                           with_rc,
+                                                      const Hex8RcConfig                 &rc_cfg,
+                                                      Hex8PackElement                    &el) {
+    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+        const scalar_t *const SFEM_RESTRICT u =
+                pack_u + (ptrdiff_t)pack_elems[a][e] * CVFEM_HEX8_N_FIELDS;
+        el.ux[a] = u[0];
+        el.uy[a] = u[1];
+        el.uz[a] = u[2];
+        el.p[a]  = u[3];
     }
-        CVFEM_PHASE_FLUSH(acc);
+    el.rc   = Hex8RhieChow{};
+    el.rc_p = nullptr;
+    if (with_rc) {
+        gather_hex8_coords_from_pack(pack_elems, pk.x, pk.y, pk.z, e, el.rc_x, el.rc_y, el.rc_z);
+        gather_hex8_coords_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, e, el.rc_pgx, el.rc_pgy, el.rc_pgz);
+        el.rc   = Hex8RhieChow{el.rc_x, el.rc_y,  el.rc_z,  el.rc_pgx, el.rc_pgy, el.rc_pgz,
+                               rc_cfg.scale, nullptr, nullptr, nullptr, el.ux, el.uy, el.uz, rc_cfg.tau};
+        el.rc_p = el.p;
+    }
 }
+
 
 
 

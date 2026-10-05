@@ -294,6 +294,18 @@ endif()
 # thing holding its kernels together was a person remembering to pass --verify by hand. That
 # became load-bearing when thirteen micro-kernel arms were reduced to three and the packed
 # assembly changed kernel; a reduction defended by an oracle nobody runs is not defended.
+# The packed layout's determinism, which is the property that makes its throughput comparable
+# with the atomic layout's at all. It is checked by running the same configuration twice and
+# comparing the bitwise fingerprint -- a run against ITSELF, which a race cannot satisfy by
+# luck. The fingerprint sweep compares against a recorded baseline instead, so a race that
+# happened to reproduce the baseline would pass it; that is how a nested parallel region
+# survived long enough to be found by accident. Shown to fire before being committed: with the
+# stray pragma back, it failed exactly the three affected configurations and nothing else.
+add_test(NAME cvfem_packed_determinism
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/regression/cvfem_packed_determinism.sh
+                 $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+set_tests_properties(cvfem_packed_determinism PROPERTIES SKIP_RETURN_CODE 77)
+
 add_test(NAME cvfem_tet4_bench_verify
          COMMAND cvfem_tet4_ns_upwind_bench --n 10 --repeat 1 --warmup 0 --verify --verify-jac)
 

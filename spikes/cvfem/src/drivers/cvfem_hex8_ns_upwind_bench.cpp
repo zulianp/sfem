@@ -1687,7 +1687,7 @@ int main(int argc, char **argv) {
             else if (layout == "colored")
                 assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, GeomKind::Isoparam);
             else if (layout == "packed")
-                assemble_jacobian_packed<true>(d, packed, bsr, rho, mu);
+                assemble_jacobian_packed(d, packed, bsr, rho, mu, GeomKind::Isoparam);
             // THE SAME TWO-WAY CHOICE AS THE RESIDUAL ABOVE, and for the same reason.
             // Grace job 4982167, 8,586,756 dof, 72 threads: the generated kernel assembles at
             // 47.7 MDOF/s against the hand-written 21.1, a 2.26x gap -- and it carries no
@@ -1709,7 +1709,7 @@ int main(int argc, char **argv) {
         } else if (layout == "colored") {
             assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, GeomKind::Affine);
         } else if (layout == "packed") {
-            assemble_jacobian_packed<false>(d, packed, bsr, rho, mu);
+            assemble_jacobian_packed(d, packed, bsr, rho, mu, GeomKind::Affine);
         } else
             // ONE ASSEMBLY KERNEL. Six arms reached this ladder through --kernel: the
             // sum-factored one, four generated CSE arrangements, and a split that reused a

@@ -233,12 +233,13 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
     }
 }
 
-template <bool ISO>
+// The front end chooses the geometry's sweep; see apply_residual_packed above.
 static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                                                    PackedData      &p,
                                                    BSR4            &b,
                                                    const scalar_t   rho,
-                                                   const scalar_t   mu) {
+                                                   const scalar_t   mu,
+                                                   const GeomKind   geom) {
     zero_bsr4(b);
 
     const size_t u_n   = packed_scratch_n(p.max_actual_nodes_per_pack);
@@ -251,18 +252,22 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
     const int    with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 
-#pragma omp parallel
-    // Six variants, chosen here instead of tested per pack. The default carries the remaining
-    // values to the body's own final branch, which treated them alike already, so this
-    // instantiates seven bodies rather than the enum's thirteen.
-    // ONE ARM, as on the residual above. The four generated CSE arrangements and the
-    // finite-difference Jacobian this switch could select are retired: Grace measures the
-    // sum-factored assembly fastest everywhere it is the coloured or packed layout's kernel, and
-    // the generated arrangement's only win -- the atomic layout -- ties packed sumfact at 14
+    // ONE ARM PER GEOMETRY. The four generated CSE arrangements and the finite-difference
+    // Jacobian this switch could also select are retired: Grace measures the sum-factored
+    // assembly fastest everywhere it is the coloured or packed layout's kernel, and the
+    // generated arrangement's only win -- the atomic layout -- ties packed sumfact at 14
     // MELEM/s and is half the coloured rate.
-            assemble_jacobian_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+    if (geom == GeomKind::Isoparam) {
+#pragma omp parallel
+        assemble_jacobian_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+            d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
+            cvfem_hex8_rc_config_for(d));
+    } else {
+#pragma omp parallel
+        assemble_jacobian_packed_affine_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
             d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
             cvfem_hex8_rc_config_for(d));
+    }
 
     CVFEM_PHASE_CLOCK(_tg);
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();
