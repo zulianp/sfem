@@ -73,7 +73,6 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
         const count_t *const SFEM_RESTRICT rowptr,
         const scalar_t   rho,
         const scalar_t   mu,
-        const KernelKind kernel_kind,
         scalar_t *const SFEM_RESTRICT gvalues,
         const int                     with_rc,
         CVFEM_PHASE_ACC_PARAM
@@ -141,40 +140,14 @@ static SFEM_NOINLINE void assemble_jacobian_store_range(
                 } else {
                     scalar_t adj[9], det;
                     load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
-                    switch (kernel_kind) {
-                        case KernelKind::Sympy:
-                            cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(
-                                    rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
-                            break;
-                        case KernelKind::SympyBlock:
-                            cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_blockwise(
-                                    rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
-                            break;
-                        case KernelKind::SympyRow:
-                            cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(
-                                    rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
-                            break;
-                        case KernelKind::SympyFace:
-                            cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise(
-                                    rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals);
-                            break;
-                        case KernelKind::Sumfact:
-                            if (g_dense_flush) {
-                                alignas(ALIGN_BYTES) scalar_t ke[64 * 16] = {};
-                                cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                        rho, mu, adj, det, ux_e, uy_e, uz_e, g_identity_slots, ke, rc, rc_p);
-                                hex8_blocks_to_slots(slots, ke, local_vals);
-                            } else {
-                                cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                        rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
-                            }
-                            break;
-                        default: {
-                            scalar_t ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
-                            cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, ke);
-                            hex8_local_slots_to_bsr4(slots, ke, local_vals);
-                            break;
-                        }
+                    if (g_dense_flush) {
+                        alignas(ALIGN_BYTES) scalar_t ke[64 * 16] = {};
+                        cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
+                                rho, mu, adj, det, ux_e, uy_e, uz_e, g_identity_slots, ke, rc, rc_p);
+                        hex8_blocks_to_slots(slots, ke, local_vals);
+                    } else {
+                        cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
+                                rho, mu, adj, det, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
                     }
                 }
             }

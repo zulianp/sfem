@@ -498,24 +498,6 @@ int main(int argc, char **argv) {
     // Lag the Rhie-Chow pressure-gradient sensitivity in the Jacobian action, matching what
     // the assembled matrix encodes. See the --lagged-rc help text.
     int         lagged_rc    = 0;
-    // Select the SIMD-kernel packed higher-order sweep instead of the scalar one. Both compute
-    // the same residual, agreeing to 3e-18.
-    //
-    // THE SCALAR ONE IS THE DEFAULT BECAUSE IT IS FASTER, which is the opposite of what
-    // routing the correction through the 16-wide kernel was meant to achieve. Measured on
-    // Grace at 8,586,756 dof, unlimited arm: 646.7 MDOF/s scalar against 494.3 SIMD, a 1.31x
-    // loss; the laptop said 1.43x in the same direction. The reason is structural rather than
-    // incidental -- the correction needs each lane's element coordinates and its eight nodal
-    // gradients, 96 scalars, gathered INSIDE the lane loop, and that gather costs more than
-    // vectorising the flux around it returns. Making it pay would need a lane-parallel
-    // reconstruction rather than a per-lane gather, which means the reconstruction existing in
-    // a second, vector form; that is a design decision about duplicating it, not a tweak.
-    int         ho_simd      = 0;
-    // Force the hand-written SCALAR higher-order kernel. It was the default until the generated
-    // lane-blocked kernel measured 910 against its 657 MDOF/s on Grace (job 4814365); it remains
-    // selectable because it is the reference the other two are checked against, and because it is
-    // the only one of the three that carries every limiter arm.
-    int         ho_scalar    = 0;
     // Report what each representation of the mesh costs in memory, then exit. Its own mode
     // rather than a column of the timing CSV: it needs the packed mesh built and nothing else
     // run, and the numbers it prints are sizes, not rates.
@@ -604,11 +586,7 @@ int main(int argc, char **argv) {
             // Optional limiter id, so --conv-ho 2 selects Venkatakrishnan and a bare
             // --conv-ho means unlimited, which is the arm the solver defaults to.
             if (i + 1 < argc && argv[i + 1][0] != '-') conv_limiter = std::atoi(argv[++i]);
-        } else if (arg == "--ho-simd")
-            ho_simd = 1;
-        else if (arg == "--ho-scalar")
-            ho_scalar = 1;
-        else if (arg == "--lagged-rc")
+        } else if (arg == "--lagged-rc")
             lagged_rc = 1;
         else if (arg == "--boundary")
             boundary = 1;
@@ -664,11 +642,6 @@ int main(int argc, char **argv) {
                     "                           (cvfem_hex8_best_store.hpp; residual/jac-action\n"
                     "                           fall back to packed)\n"
                     "  --breakdown    per-phase timing of the assembly (thread-summed ms/call)\n"
-                    "  --ho-scalar    packed --conv-ho through the hand-written SCALAR kernel. The\n"
-                    "                 default for the unlimited no-Rhie-Chow arm is now the\n"
-                    "                 GENERATED lane-blocked kernel, which measures 1.39x it; this\n"
-                    "                 forces the reference, and is implied by any limiter or by\n"
-                    "                 --rhie-chow, which the generated kernel does not carry.\n"
                     "  --verify-ho    the two higher-order equivalence oracles alone, then exit:\n"
                     "                 the layouts against each other and the SIMD kernel against\n"
                     "                 the scalar one. Needs --conv-ho; this is the ctest gate.\n"
@@ -699,10 +672,6 @@ int main(int argc, char **argv) {
                     "                   which is 16-wide SIMD. The nodal velocity gradient is\n"
                     "                   hoisted, as the solver lags the correction one Newton\n"
                     "                   step.\n"
-                    "  --ho-simd        packed --conv-ho through the SIMD kernel instead of the\n"
-                    "                   scalar one. Same residual to 3e-18, and SLOWER by 1.31x\n"
-                    "                   on Grace -- the per-lane gather the correction needs\n"
-                    "                   costs more than vectorising the flux returns.\n"
                     "  --lagged-rc      lag the Rhie-Chow pressure-gradient sensitivity in the\n"
                     "                   Jacobian action, giving the FROZEN Jacobian that the\n"
                     "                   assembled matrix encodes. The exact action differentiates\n"
@@ -1473,10 +1442,10 @@ int main(int argc, char **argv) {
         apply_residual_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
         std::vector<scalar_t> atomic_r;
         pack_residual(d, atomic_r);
-        apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Sumfact);
+        apply_residual_packed<false>(d, packed, rho, mu);
         std::vector<scalar_t> packed_r;
         pack_residual(d, packed_r);
-        apply_residual_colored(d, packed, colors, rho, mu, KernelKind::Sumfact, GeomKind::Affine);
+        apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Affine);
         std::vector<scalar_t> colored_r;
         pack_residual(d, colored_r);
         const scalar_t packed_err  = max_abs_diff(atomic_r.data(), packed_r.data(), (ptrdiff_t)atomic_r.size());
@@ -1549,25 +1518,33 @@ int main(int argc, char **argv) {
     // because most of its comparisons are between kernels that do not all carry the term -- but the
     // generated higher-order kernel does carry it, in its own variant, and shipping that unverified
     // is exactly what these oracles exist to prevent. So this one runs here instead.
+    // The higher-order kernel WITH Rhie-Chow. The block below is gated off when Rhie-Chow is
+    // on, because most of its comparisons are between kernels that do not all carry the term --
+    // but the higher-order kernel does carry it, and shipping that unverified is what these
+    // oracles exist to prevent. So this one runs here instead.
+    //
+    // It used to compare the GENERATED lane-blocked kernel against the packed SCALAR sweep, and
+    // both of those are in subpar/ now (Grace job 4981920). The surviving pair is the one that
+    // was never compared with the term on: the packed lane-blocked kernel against the ATOMIC
+    // lane-blocked one, which isolates the layout with the kernel family held fixed.
     if (verify_ho && rhie_chow && conv_ho) {
         std::vector<scalar_t> ug;
         const scalar_t       *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
         cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, 3, ug);
 
-        apply_residual_packed_defcor_scalar(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
-        std::vector<scalar_t> rc_scalar_r;
-        pack_residual(d, rc_scalar_r);
+        apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ug.data(), conv_limiter, scalar_t(0));
+        std::vector<scalar_t> rc_atomic_r;
+        pack_residual(d, rc_atomic_r);
 
-        apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0),
-                                     /*sympy=*/true);
-        std::vector<scalar_t> rc_sympy_r;
-        pack_residual(d, rc_sympy_r);
+        apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
+        std::vector<scalar_t> rc_packed_r;
+        pack_residual(d, rc_packed_r);
 
-        const scalar_t rc_err = max_abs_diff(rc_scalar_r.data(), rc_sympy_r.data(),
-                                             (ptrdiff_t)rc_scalar_r.size());
-        std::printf("verify_packed_ho_rc_sympy_vs_scalar_abs: %.6e\n", rc_err);
+        const scalar_t rc_err = max_abs_diff(rc_atomic_r.data(), rc_packed_r.data(),
+                                             (ptrdiff_t)rc_atomic_r.size());
+        std::printf("verify_packed_ho_rc_residual_vs_atomic_abs: %.6e\n", rc_err);
         if (rc_err > 1.0e-10) {
-            std::fprintf(stderr, "HEX8 generated higher-order Rhie-Chow kernel mismatch\n");
+            std::fprintf(stderr, "HEX8 higher-order Rhie-Chow residual mismatch across layouts\n");
             if (own_mpi) MPI_Finalize();
             return 1;
         }
@@ -1625,7 +1602,7 @@ int main(int argc, char **argv) {
         }
 
         if ((layout == "packed" || verify_jac) && layout != "ecolor") {
-            apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Current);
+            apply_residual_packed<false>(d, packed, rho, mu);
             std::vector<scalar_t> packed_current_r;
             pack_residual(d, packed_current_r);
             const scalar_t packed_err =
@@ -1637,7 +1614,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Sumfact);
+            apply_residual_packed<false>(d, packed, rho, mu);
             std::vector<scalar_t> packed_sumfact_r;
             pack_residual(d, packed_sumfact_r);
             const scalar_t packed_sf_err =
@@ -1649,7 +1626,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            apply_residual_packed<true>(d, packed, rho, mu, KernelKind::Sumfact);
+            apply_residual_packed<true>(d, packed, rho, mu);
             std::vector<scalar_t> packed_iso_r;
             pack_residual(d, packed_iso_r);
             const scalar_t packed_iso_err =
@@ -1673,51 +1650,29 @@ int main(int argc, char **argv) {
             const scalar_t       *srcs[3] = {d.ux.data(), d.uy.data(), d.uz.data()};
             cvfem_hex8_assemble_nodal_grads_atomic(d, 0, srcs, 3, ug);
 
-            apply_residual_atomic_sumfact_defcor(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ug.data(), conv_limiter, scalar_t(0));
+            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ug.data(), conv_limiter, scalar_t(0));
             std::vector<scalar_t> ho_atomic_r;
             pack_residual(d, ho_atomic_r);
 
-            apply_residual_packed_defcor_scalar(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
+            apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
             std::vector<scalar_t> ho_packed_r;
             pack_residual(d, ho_packed_r);
 
-            // SAME LAYOUT, TWO KERNELS: isolates the kernel difference from everything the
-            // packed sweep does around it.
-            apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0));
-            std::vector<scalar_t> ho_packed_simd_r;
-            pack_residual(d, ho_packed_simd_r);
-            // A GATE, not a print. The two kernels agree to 1.3e-18 -- eight orders inside
-            // this bound -- and the bound is what stops a vectorisation change shipping a
-            // wrong kernel. It is deliberately 1e-10 rather than 1e-18: the two instantiations
-            // may legitimately reassociate differently, so demanding the measured value would
-            // fail on a reordering that is not a defect.
-            const scalar_t ho_kernel_err = max_abs_diff(ho_packed_r.data(), ho_packed_simd_r.data(),
-                                                        (ptrdiff_t)ho_packed_r.size());
-            std::printf("verify_packed_ho_simd_vs_packed_ho_scalar_abs: %.6e\n", ho_kernel_err);
-            if (ho_kernel_err > 1.0e-10) {
-                std::fprintf(stderr, "HEX8 packed higher-order SIMD/scalar kernel mismatch\n");
-                if (own_mpi) MPI_Finalize();
-                return 1;
-            }
-
-            // THE GENERATED KERNEL, against the same scalar reference. Every limiter arm is
-            // generated now, so this runs on all four; the checksum cannot stand in for it, as the
-            // residual of this state sums to ~1e-14 and is almost all cancellation.
-            {
-                apply_residual_packed_defcor(d, packed, rho, mu, ug.data(), conv_limiter, scalar_t(0),
-                                             /*sympy=*/true);
-                std::vector<scalar_t> ho_sympy_r;
-                pack_residual(d, ho_sympy_r);
-                const scalar_t ho_sympy_err = max_abs_diff(ho_packed_r.data(), ho_sympy_r.data(),
-                                                           (ptrdiff_t)ho_packed_r.size());
-                std::printf("verify_packed_ho_sympy_vs_packed_ho_scalar_abs: %.6e\n", ho_sympy_err);
-                if (ho_sympy_err > 1.0e-10) {
-                    std::fprintf(stderr, "HEX8 generated higher-order kernel mismatch\n");
-                    if (own_mpi) MPI_Finalize();
-                    return 1;
-                }
-            }
-
+            // ONE GATE WHERE THERE WERE THREE. The other two compared the surviving kernel
+            // against the packed SCALAR sweep and against the GENERATED lane-blocked family,
+            // and both are in subpar/ now. What remains is the layout comparison, and it is
+            // the strongest of the three: the two sweeps stage, accumulate and scatter
+            // differently -- atomics against a pack-private buffer with a ghost reduction --
+            // so an indexing or reduction error shows here and nowhere else.
+            //
+            // Run in ONE process, so the pack has been built once and both see the same node
+            // numbering: packing renumbers the mesh in place, so a comparison across two
+            // processes would not be index-comparable. Checksums cannot stand in for it
+            // either -- the residual of this state sums to ~1e-14, almost all cancellation.
+            //
+            // 1e-10 rather than the measured agreement: the two kernels may legitimately
+            // reassociate differently, so demanding the measured value would fail on a
+            // reordering that is not a defect.
             const scalar_t ho_err =
                     max_abs_diff(ho_atomic_r.data(), ho_packed_r.data(), (ptrdiff_t)ho_atomic_r.size());
             std::printf("verify_packed_ho_residual_vs_atomic_abs: %.6e\n", ho_err);
@@ -1737,7 +1692,7 @@ int main(int argc, char **argv) {
         }
 
         {
-            apply_residual_colored(d, packed, colors, rho, mu, KernelKind::Sumfact, GeomKind::Affine);
+            apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Affine);
             std::vector<scalar_t> colored_r;
             pack_residual(d, colored_r);
             const scalar_t colored_err = max_abs_diff(current_r.data(), colored_r.data(), (ptrdiff_t)current_r.size());
@@ -1748,7 +1703,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            apply_residual_colored(d, packed, colors, rho, mu, KernelKind::Sympy, GeomKind::Affine);
+            apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Affine);
             std::vector<scalar_t> colored_sympy_r;
             pack_residual(d, colored_sympy_r);
             const scalar_t colored_sympy_err =
@@ -1760,7 +1715,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            apply_residual_colored(d, packed, colors, rho, mu, KernelKind::Sumfact, GeomKind::Isoparam);
+            apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Isoparam);
             std::vector<scalar_t> colored_iso_r;
             pack_residual(d, colored_iso_r);
             const scalar_t colored_iso_err =
@@ -1774,7 +1729,7 @@ int main(int argc, char **argv) {
         }
 
         if (layout == "packed")
-            apply_residual_packed<false>(d, packed, rho, mu, KernelKind::Sympy);
+            apply_residual_packed<false>(d, packed, rho, mu);
         else
             apply_residual_atomic_sympy(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
         std::vector<scalar_t> sympy_r;
@@ -1860,9 +1815,9 @@ int main(int argc, char **argv) {
             bench_nodal_grad(d, packed, geom_kind, d.p.data(), 1, d.pgx, d.pgy, d.pgz);
         if (geom_kind == GeomKind::Isoparam) {
             if (layout == "colored")
-                apply_residual_colored(d, packed, colors, rho, mu, kernel_kind, GeomKind::Isoparam);
+                apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Isoparam);
             else if (layout == "packed" || layout == "store")
-                apply_residual_packed<true>(d, packed, rho, mu, kernel_kind);
+                apply_residual_packed<true>(d, packed, rho, mu);
             else if (kernel_kind == KernelKind::Sympy)
                 apply_residual_atomic_isoparam_sympy(d.elems, d.nelements, d.nnodes, d.p.data(), d.points, d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
             else
@@ -1871,27 +1826,19 @@ int main(int argc, char **argv) {
             apply_residual_ecolored(d, ecolors, rho, mu, conv_ho ? ugrad.data() : nullptr, conv_limiter,
                                     scalar_t(0));
         else if (layout == "colored")
-            apply_residual_colored(d, packed, colors, rho, mu, kernel_kind, GeomKind::Affine);
-        else if ((layout == "packed" || layout == "store") && conv_ho && ho_simd)
-            apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
-        else if ((layout == "packed" || layout == "store") && conv_ho && !ho_scalar)
-            // THE DEFAULT where it applies: the generated lane-blocked kernel, 1.39x the scalar one
-            // it replaced. It covers the unlimited arm with and without Rhie-Chow -- two generated
-            // variants per limiter arm, eight in all, dispatched inside the sweep. --ho-scalar
-            // forces the hand-written reference, and is required for a non-zero Venkatakrishnan
-            // eps^2, which the generated kernels do not carry and refuse rather than drop.
-            apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0),
-                                         /*sympy=*/true);
+            apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Affine);
         else if ((layout == "packed" || layout == "store") && conv_ho)
-            apply_residual_packed_defcor_scalar(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
+            // ONE HIGHER-ORDER KERNEL. Three reached this branch: the generated lane-blocked
+            // family (the default), this hand-written lane-blocked one, and a scalar sweep.
+            // Grace job 4981920 measured this one fastest in all seven pairs, so the other two
+            // are in subpar/ and --ho-simd/--ho-scalar are gone with them.
+            apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (layout == "packed" || layout == "store")
-            apply_residual_packed<false>(d, packed, rho, mu, kernel_kind);
+            apply_residual_packed<false>(d, packed, rho, mu);
         else if (kernel_uses_sympy_residual(kernel_kind))
             apply_residual_atomic_sympy(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), rho, mu);
-        else if (kernel_kind == KernelKind::Sumfact && conv_ho && !ho_scalar)
-            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact && conv_ho)
-            apply_residual_atomic_sumfact_defcor(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
+            apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (kernel_kind == KernelKind::Sumfact)
             // The lane-blocked sweep, unconditionally. The scalar one is not an option the
             // standard layout should be measured on: it issues 0.1% vector instructions where
@@ -1907,11 +1854,11 @@ int main(int argc, char **argv) {
     auto jac_fn = [&]() {
         if (geom_kind == GeomKind::Isoparam) {
             if (layout == "store")
-                assemble_jacobian_store<true>(d, packed, bsr, rho, mu, kernel_kind);
+                assemble_jacobian_store<true>(d, packed, bsr, rho, mu);
             else if (layout == "colored")
-                assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, kernel_kind, GeomKind::Isoparam);
+                assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, GeomKind::Isoparam);
             else if (layout == "packed")
-                assemble_jacobian_packed<true>(d, packed, bsr, rho, mu, kernel_kind);
+                assemble_jacobian_packed<true>(d, packed, bsr, rho, mu);
             else if (kernel_kind == KernelKind::Split)
                 assemble_jacobian_atomic_nonlinear_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu, jac_linear.data());
             else if (kernel_kind == KernelKind::Sympy)
@@ -1923,11 +1870,11 @@ int main(int argc, char **argv) {
                 // rejected during validation, so this is not a fallback.
                 assemble_jacobian_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         } else if (layout == "store") {
-            assemble_jacobian_store<false>(d, packed, bsr, rho, mu, kernel_kind);
+            assemble_jacobian_store<false>(d, packed, bsr, rho, mu);
         } else if (layout == "colored") {
-            assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, kernel_kind, GeomKind::Affine);
+            assemble_jacobian_colored(d, packed, colors, bsr, rho, mu, GeomKind::Affine);
         } else if (layout == "packed") {
-            assemble_jacobian_packed<false>(d, packed, bsr, rho, mu, kernel_kind);
+            assemble_jacobian_packed<false>(d, packed, bsr, rho, mu);
         } else if (kernel_kind == KernelKind::Sumfact)
             assemble_jacobian_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), bsr.element_slots.empty() ? nullptr : bsr.element_slots.data(), bsr.nnz, bsr.values->data(), rho, mu);
         else if (kernel_kind == KernelKind::Sympy)

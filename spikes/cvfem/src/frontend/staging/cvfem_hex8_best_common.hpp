@@ -144,6 +144,19 @@ CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise)
 // (DESIGN.md's correction: one micro-kernel per kernel), so nothing names them outside
 // subpar/ and the default build does not have to declare them to compile.
 CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual)
+// The eight generated deferred-correction kernels, which were the packed default. Grace job
+// 4981920 measured the hand-written lane-blocked kernel faster in all seven pairs (0.775x to
+// 0.976x); see subpar/README.md.
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual_defcor_lim0_simd)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual_defcor_lim1_simd)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual_defcor_lim2_simd)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual_defcor_lim3_simd)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim0_simd)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim1_simd)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim2_simd)
+CVFEM_SUBPAR_STUB(cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim3_simd)
+// The packed higher-order residual's SCALAR sweep, now subpar/cvfem_hex8_packed_defcor_scalar.hpp.
+CVFEM_SUBPAR_STUB(apply_residual_packed_defcor_scalar)
 #undef CVFEM_SUBPAR_STUB
 #endif
 

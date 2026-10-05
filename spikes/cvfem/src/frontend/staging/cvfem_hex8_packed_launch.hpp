@@ -16,6 +16,13 @@
 #include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
 
+// The scalar higher-order sweep this header used to define. It is the slower of the packed
+// layout's two higher-order kernels (Grace job 4981920) and lives in subpar/; the stub in
+// cvfem_hex8_best_common.hpp stands in its place when the flag is off.
+#ifdef CVFEM_ENABLE_SUBPAR
+#include "cvfem_hex8_packed_defcor_scalar.hpp"
+#endif
+
 static void build_pack_local_crs(PackedData               &p,
                                  const ptrdiff_t           nelements,
                                  const count_t     *rowptr_g,
@@ -135,7 +142,7 @@ static void build_pack_local_crs(PackedData               &p,
     }
 }
 
-static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
+static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
                                                        PackedData     &p,
                                                        const scalar_t  rho,
                                                        const scalar_t  mu,
@@ -150,69 +157,9 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_scalar(MeshData       &d,
     const Hex8Extras              opt = cvfem_hex8_extras_of(d);
     const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
-
-#pragma omp parallel
-    apply_residual_packed_defcor_scalar_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, opt, with_rc);
-
-    scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
-#pragma omp parallel for schedule(static)
-    for (ptrdiff_t row = 0; row < p.n_ghost_reduce_rows; ++row) {
-        const idx_t dest  = p.ghost_reduce_dest[row];
-        const ptrdiff_t    begin = p.ghost_reduce_ptr[row];
-        const ptrdiff_t    end   = p.ghost_reduce_ptr[row + 1];
-        for (int f = 0; f < CVFEM_HEX8_N_FIELDS; ++f) {
-            const scalar_t *const SFEM_RESTRICT ghost = p.ghost_buf.data() + (ptrdiff_t)f * p.n_ghost_entries;
-            scalar_t                            sum   = 0;
-            for (ptrdiff_t j = begin; j < end; ++j) sum += ghost[p.ghost_reduce_idx[j]];
-            fields[f][dest] += sum;
-        }
-    }
-}
-
-static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
-                                                       PackedData     &p,
-                                                       const scalar_t  rho,
-                                                       const scalar_t  mu,
-                                                       const scalar_t *const SFEM_RESTRICT ugrad,
-                                                       const int       limiter,
-                                                       const scalar_t  venkat_c,
-                                                       // Run the GENERATED lane-blocked kernel
-                                                       // instead of the hand-written one. Same
-                                                       // sweep, same staging, same scatter -- only
-                                                       // the kernel differs, which is what makes
-                                                       // the comparison a kernel comparison.
-                                                       const bool      sympy = false) {
-    // Every limiter arm is generated now, with and without Rhie-Chow -- eight kernels. What is NOT
-    // generated is Venkatakrishnan's eps^2 term: it is venkat_c * h^3, so carrying it would put a
-    // square root at every sub-control surface, and every caller in the tree passes zero. Refused
-    // rather than silently dropped, because a row that names a term it did not compute is worse
-    // than a row that does not exist.
-    if (sympy && venkat_c != scalar_t(0)) {
-        std::fprintf(stderr,
-                     "the generated higher-order kernels carry eps^2 = 0; a non-zero venkat_c "
-                     "needs the hand-written kernel (--ho-scalar)\n");
-        std::abort();
-    }
-    scalar_t *const SFEM_RESTRICT rx = d.rx.data();
-    scalar_t *const SFEM_RESTRICT ry = d.ry.data();
-    scalar_t *const SFEM_RESTRICT rz = d.rz.data();
-    scalar_t *const SFEM_RESTRICT rc = d.rc.data();
-    const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
-    const Hex8Extras              opt = cvfem_hex8_extras_of(d);
-    const int                     with_rc = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
-
-    // The generated Rhie-Chow kernel reads the coefficient out of the staged table instead of
-    // rebuilding it per surface, so the table has to exist. It is cached on the state stamp, so
-    // this is a no-op after the first call for a given state. The hand-written kernel computes the
-    // coefficient inline and needs none of it, which is why this is conditional.
-    if (sympy && with_rc) cvfem_hex8_build_rc_coeff(d, rho, mu);
-
-
 #pragma omp parallel
     apply_residual_packed_defcor_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, sympy, rx, ry, rz, rc, scratch_n, with_rc,
-            cvfem_hex8_rc_config_for(d));
+            d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, ugrad, limiter, venkat_c, rx, ry, rz, rc, scratch_n, with_rc);
 
     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
@@ -233,8 +180,7 @@ template <bool ISO>
 static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                                                 PackedData      &p,
                                                 const scalar_t   rho,
-                                                const scalar_t   mu,
-                                                const KernelKind kernel_kind) {
+                                                const scalar_t   mu) {
     const scalar_t *const SFEM_RESTRICT ux = d.ux.data();
     const scalar_t *const SFEM_RESTRICT uy = d.uy.data();
     const scalar_t *const SFEM_RESTRICT uz = d.uz.data();
@@ -252,37 +198,12 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
 
 
 #pragma omp parallel
-    // The variant is a template argument now, so the choice is made here rather than tested per
-    // pack. Instantiated for the values this body actually distinguishes -- Sumfact, the four
-    // generated residuals that kernel_uses_sympy_residual selects, and everything else through
-    // the default -- so the enum's thirteen values do not become thirteen copies of it. Same
-    // shape as the limiter dispatch in the higher-order lane kernels.
-    switch (kernel_kind) {
-        case KernelKind::Sumfact:
-            apply_residual_packed_range<ISO, KernelKind::Sumfact>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+    // ONE ARM. The sweep was instantiated once per micro-kernel variant and the variant chosen
+    // by a switch here; DESIGN.md's correction leaves one micro-kernel per kernel, and on Grace
+    // at 28,756k dof this one measured 639 MELEM/s against 518 and 505 for the two arms it
+    // replaced (perf/campaign_generated_arms.csv).
+            apply_residual_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
             d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
-            break;
-        case KernelKind::Sympy:
-            apply_residual_packed_range<ISO, KernelKind::Sympy>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
-            break;
-        case KernelKind::SympyBlock:
-            apply_residual_packed_range<ISO, KernelKind::SympyBlock>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
-            break;
-        case KernelKind::SympyRow:
-            apply_residual_packed_range<ISO, KernelKind::SympyRow>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
-            break;
-        case KernelKind::SympyFace:
-            apply_residual_packed_range<ISO, KernelKind::SympyFace>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
-            break;
-        default:
-            apply_residual_packed_range<ISO, KernelKind::Current>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
-            break;
-    }
 
     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
@@ -304,8 +225,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
                                                    PackedData      &p,
                                                    BSR4            &b,
                                                    const scalar_t   rho,
-                                                   const scalar_t   mu,
-                                                   const KernelKind kernel_kind) {
+                                                   const scalar_t   mu) {
     zero_bsr4(b);
 
     const size_t u_n   = packed_scratch_n(p.max_actual_nodes_per_pack);
@@ -322,43 +242,14 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
     // Six variants, chosen here instead of tested per pack. The default carries the remaining
     // values to the body's own final branch, which treated them alike already, so this
     // instantiates seven bodies rather than the enum's thirteen.
-    switch (kernel_kind) {
-        case KernelKind::Fd:
-            assemble_jacobian_packed_range<ISO, KernelKind::Fd>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+    // ONE ARM, as on the residual above. The four generated CSE arrangements and the
+    // finite-difference Jacobian this switch could select are retired: Grace measures the
+    // sum-factored assembly fastest everywhere it is the coloured or packed layout's kernel, and
+    // the generated arrangement's only win -- the atomic layout -- ties packed sumfact at 14
+    // MELEM/s and is half the coloured rate.
+            assemble_jacobian_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
             d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
             cvfem_hex8_rc_config_for(d));
-            break;
-        case KernelKind::Sumfact:
-            assemble_jacobian_packed_range<ISO, KernelKind::Sumfact>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
-            cvfem_hex8_rc_config_for(d));
-            break;
-        case KernelKind::Sympy:
-            assemble_jacobian_packed_range<ISO, KernelKind::Sympy>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
-            cvfem_hex8_rc_config_for(d));
-            break;
-        case KernelKind::SympyBlock:
-            assemble_jacobian_packed_range<ISO, KernelKind::SympyBlock>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
-            cvfem_hex8_rc_config_for(d));
-            break;
-        case KernelKind::SympyRow:
-            assemble_jacobian_packed_range<ISO, KernelKind::SympyRow>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
-            cvfem_hex8_rc_config_for(d));
-            break;
-        case KernelKind::SympyFace:
-            assemble_jacobian_packed_range<ISO, KernelKind::SympyFace>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
-            cvfem_hex8_rc_config_for(d));
-            break;
-        default:
-            assemble_jacobian_packed_range<ISO, KernelKind::Current>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_mat_ptr.data(), p.ghost_mat_val.data(), p.ghost_ptr, p.local_element_slot.data(), p.local_global_slot_ptr.data(), p.local_rowptr_ptr.data(), p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr, b.values->data(), rho, mu, u_n, bsr_n, with_rc,
-            cvfem_hex8_rc_config_for(d));
-            break;
-    }
 
     CVFEM_PHASE_CLOCK(_tg);
     scalar_t *const SFEM_RESTRICT gvalues = b.values->data();

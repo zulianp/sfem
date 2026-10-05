@@ -30,11 +30,23 @@ static SFEM_INLINE void sscvfem_scatter_element_soa(const int *const SFEM_RESTRI
     sscvfem_scatter_element_soa_w<N_FIELDS>(slot, stage, nxe, e, lg, lacc, dst);
 }
 
+// THE ROW COUNT BECAME A RANGE, and this wrapper was not followed. DESIGN.md: "the threading
+// model for atomics free kernels is abstract outside the function and what is passed from
+// outside is a range", so the sweep lost its `n_shared` bound and gained a cvfem_range; the
+// wrapper kept calling it with the old argument list and stopped compiling. It is quarantined,
+// so only -DCVFEM_ENABLE_SUBPAR builds it and the break was invisible.
+//
+// The wrapper keeps its own signature -- n_shared, not a range -- because its whole purpose is
+// to present the fixed-width reduction the way it looked before the width was a template
+// parameter. It owns the parallel region for the same reason every other launcher does.
 inline void sscvfem_reduce_shared_soa(const ptrdiff_t *const SFEM_RESTRICT red_idx,
                                       const ptrdiff_t *const SFEM_RESTRICT red_ptr,
                                       const idx_t *const SFEM_RESTRICT     shared_node,
                                       scalar_t *const SFEM_RESTRICT        stage,
                                       const ptrdiff_t                      n_shared,
                                       scalar_t *const                      dst[N_FIELDS]) {
-    sscvfem_reduce_shared_soa_w<N_FIELDS>(red_idx, red_ptr, shared_node, stage, n_shared, dst);
+#pragma omp parallel
+    sscvfem_reduce_shared_soa_w<N_FIELDS>(
+            cvfem_range_split(0, n_shared, 1, cvfem_thread_index(), cvfem_n_threads()),
+            red_idx, red_ptr, shared_node, stage, dst);
 }

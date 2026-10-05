@@ -139,50 +139,16 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
                 hop.venkat_c = venkat_c;
             }
 
-            if (with_ho && venkat_c == scalar_t(0)) {
-                // THE SAME MICRO-KERNEL THE PACKED SWEEP RUNS. The generated variants take
-                // Hex8InputPack and Hex8UGradPack -- lane packs, not pack-local storage -- so
-                // nothing about them is tied to the packed layout; it was simply their only
-                // caller. Using them here means the two layouts are compared on one kernel, and
-                // on the faster one: they are specialised per limiter, where the hand-written
-                // kernel selects inside the vector body and costs the same for every limiter.
-                //
-                // They assign rather than accumulate, so there is no zero-fill for them to add
-                // onto, and they do not carry a non-zero Venkatakrishnan eps squared -- which is
-                // why that case falls through to the hand-written kernel below rather than
-                // silently dropping the term.
-#define CVFEM_HEX8_SYMPY_HO_ARGS \
-    rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv, in, hop
-                if (opt.with_rc) {
-                    switch (limiter) {
-                        case 1: cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim1_simd(
-                                        CVFEM_HEX8_SYMPY_HO_ARGS, rcp, outp); break;
-                        case 2: cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim2_simd(
-                                        CVFEM_HEX8_SYMPY_HO_ARGS, rcp, outp); break;
-                        case 3: cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim3_simd(
-                                        CVFEM_HEX8_SYMPY_HO_ARGS, rcp, outp); break;
-                        default: cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim0_simd(
-                                         CVFEM_HEX8_SYMPY_HO_ARGS, rcp, outp); break;
-                    }
-                } else {
-                    switch (limiter) {
-                        case 1: cvfem_hex8_ns_upwind_sympy_residual_defcor_lim1_simd(
-                                        CVFEM_HEX8_SYMPY_HO_ARGS, outp); break;
-                        case 2: cvfem_hex8_ns_upwind_sympy_residual_defcor_lim2_simd(
-                                        CVFEM_HEX8_SYMPY_HO_ARGS, outp); break;
-                        case 3: cvfem_hex8_ns_upwind_sympy_residual_defcor_lim3_simd(
-                                        CVFEM_HEX8_SYMPY_HO_ARGS, outp); break;
-                        default: cvfem_hex8_ns_upwind_sympy_residual_defcor_lim0_simd(
-                                         CVFEM_HEX8_SYMPY_HO_ARGS, outp); break;
-                    }
-                }
-#undef CVFEM_HEX8_SYMPY_HO_ARGS
-            } else {
-                cvfem_hex8_ns_upwind_residual_sumfact_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5,
-                                                           cof6, cof7, cof8, detv, in, outp,
-                                                           opt.with_rc ? &rcp : nullptr, rhie_chow_scale,
-                                                           scalar_t(0), with_ho ? &hop : nullptr);
-            }
+            // ONE HIGHER-ORDER MICRO-KERNEL. The generated per-limiter variants used to run here
+            // whenever the Venkatakrishnan eps squared was zero, on the grounds that they specialise
+            // the limiter where the hand-written kernel selects inside the vector body. Grace job
+            // 4981920 measured the two against each other for the first time and the hand-written one
+            // wins all seven pairs (0.775x to 0.976x), so the generated family is in subpar/ and this
+            // is the only arm left.
+            cvfem_hex8_ns_upwind_residual_sumfact_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5,
+                                                       cof6, cof7, cof8, detv, in, outp,
+                                                       opt.with_rc ? &rcp : nullptr, rhie_chow_scale,
+                                                       scalar_t(0), with_ho ? &hop : nullptr);
 
             for (int lane = 0; lane < nlanes; ++lane) {
                 const ptrdiff_t e = e0 + lane;

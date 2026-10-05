@@ -41,6 +41,13 @@ using count_t = smesh::count_t;
 static constexpr int N_FIELDS = 4;
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+// The hand-written kernels this test compares the generated arrangements against moved into
+// the geometry folders when DESIGN.md's affine/isoparametric split landed, and this include
+// list was not followed: cvfem_hex8_affine_adj and cvfem_hex8_ns_upwind_jacobian_action are
+// here, not in the header above. The test is SKIPPED unless -DCVFEM_ENABLE_SUBPAR is on, which
+// is why the break went unnoticed -- the default build never compiles it.
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_affine_geometry.hpp"
+#include "kernels/microkernels/hex8/affine/cvfem_hex8_ns_upwind_affine.hpp"
 #include "kernels/microkernels/hex8/affine/generated/cvfem_hex8_ns_upwind_sympy_affine.hpp"
 #include "kernels/microkernels/hex8/isoparametric/generated/cvfem_hex8_ns_upwind_sympy_isoparam.hpp"
 #ifdef CVFEM_ENABLE_SUBPAR
@@ -123,7 +130,9 @@ int main() {
             compw[CVFEM_HEX8_N_DOF], facew[CVFEM_HEX8_N_DOF], geomw[CVFEM_HEX8_N_DOF],
             geomf[CVFEM_HEX8_N_DOF];
 
-    cvfem_hex8_ns_upwind_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, ref);
+    // LIM = 0, unlimited: the generated arrangements carry no limiter, so this is the one
+    // instantiation they can be compared against.
+    cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, ref);
     cvfem_hex8_ns_upwind_sympy_jacobian_action(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, flat);
     cvfem_hex8_ns_upwind_sympy_jacobian_action_nodewise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, nodew);
     cvfem_hex8_ns_upwind_sympy_jacobian_action_componentwise(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, compw);

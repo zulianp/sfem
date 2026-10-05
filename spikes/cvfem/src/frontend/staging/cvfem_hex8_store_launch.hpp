@@ -140,8 +140,7 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
                                                   PackedData      &p,
                                                   BSR4            &b,
                                                   const scalar_t   rho,
-                                                  const scalar_t   mu,
-                                                  const KernelKind kernel_kind) {
+                                                  const scalar_t   mu) {
     const size_t u_n   = packed_scratch_n(p.max_actual_nodes_per_pack);
     const size_t bsr_n = 16 * (size_t)std::max<ptrdiff_t>(p.st_max_local_nnz, 1);
 
@@ -172,7 +171,7 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
 #pragma omp for schedule(dynamic, 1)
         for (ptrdiff_t pack = 0; pack < p.n_packs; ++pack)
             assemble_jacobian_store_range<ISO>(cvfem_range{pack, pack + 1},
-                                               d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr, p.n_elements_per_pack, p.owned_nodes_ptr, p.st_element_slot.data(), p.st_ghost_ptr.data(), p.st_ghost_val.data(), p.st_local_nnz.data(), p.st_owned_nnz.data(), b.rowptr, rho, mu, kernel_kind, gvalues, with_rc,
+                                               d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr, p.n_elements_per_pack, p.owned_nodes_ptr, p.st_element_slot.data(), p.st_ghost_ptr.data(), p.st_ghost_val.data(), p.st_local_nnz.data(), p.st_owned_nnz.data(), b.rowptr, rho, mu, gvalues, with_rc,
                                                CVFEM_PHASE_ACC_ARG pack_u, local_vals, pack_x, pack_y, pack_z,
                                                pack_pgx, pack_pgy, pack_pgz,
             cvfem_hex8_rc_config_for(d));

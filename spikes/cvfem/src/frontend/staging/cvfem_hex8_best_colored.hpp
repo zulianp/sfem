@@ -107,7 +107,6 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                                                  const PackColoring &c,
                                                  const scalar_t      rho,
                                                  const scalar_t      mu,
-                                                 const KernelKind    kernel_kind,
                                                  const GeomKind      geom_kind) {
     reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 
@@ -173,7 +172,7 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                         cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp);
                         scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
                     }
-                } else if (kernel_kind == KernelKind::Sumfact) {
+                } else {
                     alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
                             cof2[CVFEM_HEX8_VEC_SIZE];
                     alignas(ALIGN_BYTES) scalar_t cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
@@ -209,32 +208,6 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                                 rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
                                 with_rc ? &rcp : nullptr, d.rhie_chow_scale);
                         scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
-                    }
-                } else {
-                    const bool sympy = kernel_uses_sympy_residual(kernel_kind);
-                    for (ptrdiff_t e = e_start; e < e_end; ++e) {
-                        scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8], r[CVFEM_HEX8_N_DOF];
-                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)p.elems[a][e] * N_FIELDS;
-                            ux_e[a]                               = u[0];
-                            uy_e[a]                               = u[1];
-                            uz_e[a]                               = u[2];
-                            p_e[a]                                = u[3];
-                        }
-                        scalar_t adj[9], det;
-                        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
-                        if (sympy)
-                            cvfem_hex8_ns_upwind_sympy_residual(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r);
-                        else
-                            cvfem_hex8_ns_upwind_residual(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, r);
-
-                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            scalar_t *const SFEM_RESTRICT out = pack_out + (ptrdiff_t)p.elems[a][e] * N_FIELDS;
-                            out[0] += r[a * 4 + 0];
-                            out[1] += r[a * 4 + 1];
-                            out[2] += r[a * 4 + 2];
-                            out[3] += r[a * 4 + 3];
-                        }
                     }
                 }
                 if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
@@ -404,7 +377,6 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
                                                     BSR4            &b,
                                                     const scalar_t   rho,
                                                     const scalar_t   mu,
-                                                    const KernelKind kernel_kind,
                                                     const GeomKind   geom_kind) {
     zero_bsr4(b);
 
@@ -444,40 +416,14 @@ static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
                     } else {
                         scalar_t adj[9], det;
                         load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
-                        switch (kernel_kind) {
-                            case KernelKind::Sympy:
-                                cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots(
-                                        rho, mu, adj, det, ux_e, uy_e, uz_e, slots, values);
-                                break;
-                            case KernelKind::SympyBlock:
-                                cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_blockwise(
-                                        rho, mu, adj, det, ux_e, uy_e, uz_e, slots, values);
-                                break;
-                            case KernelKind::SympyRow:
-                                cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(
-                                        rho, mu, adj, det, ux_e, uy_e, uz_e, slots, values);
-                                break;
-                            case KernelKind::SympyFace:
-                                cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_facewise(
-                                        rho, mu, adj, det, ux_e, uy_e, uz_e, slots, values);
-                                break;
-                            case KernelKind::Sumfact:
-                                if (g_dense_flush) {
-                                    alignas(ALIGN_BYTES) scalar_t ke[64 * 16] = {};
-                                    cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                            rho, mu, adj, det, ux_e, uy_e, uz_e, g_identity_slots, ke, ex.rc, rc_p);
-                                    hex8_blocks_to_slots(slots, ke, values);
-                                } else {
-                                    cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                            rho, mu, adj, det, ux_e, uy_e, uz_e, slots, values, ex.rc, rc_p);
-                                }
-                                break;
-                            default: {
-                                scalar_t ke[CVFEM_HEX8_N_DOF * CVFEM_HEX8_N_DOF];
-                                cvfem_hex8_ns_upwind_jacobian_fd(rho, mu, adj, det, ux_e, uy_e, uz_e, p_e, ke);
-                                hex8_local_slots_to_bsr4(slots, ke, values);
-                                break;
-                            }
+                        if (g_dense_flush) {
+                            alignas(ALIGN_BYTES) scalar_t ke[64 * 16] = {};
+                            cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
+                                    rho, mu, adj, det, ux_e, uy_e, uz_e, g_identity_slots, ke, ex.rc, rc_p);
+                            hex8_blocks_to_slots(slots, ke, values);
+                        } else {
+                            cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
+                                    rho, mu, adj, det, ux_e, uy_e, uz_e, slots, values, ex.rc, rc_p);
                         }
                     }
                 }

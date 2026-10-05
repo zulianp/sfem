@@ -19748,6 +19748,11207 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
     }
 }
 
+// ------------------------------------------------- the deferred correction, lane-blocked
+//
+// The complete element residual including the higher-order deferred correction, sixteen elements at
+// a time, reading the lane-major packs in place. One kernel per limiter arm and per Rhie-Chow state.
+//
+// Each is the whole element as ONE common-subexpression-eliminated block inside ONE lane loop, and
+// both of those matter. One block, because the eight node coordinates feed all twelve sub-control-
+// surface centroids and CSE can only see that if the twelve surfaces are emitted together -- a
+// per-face kernel, compiled twelve times, reloads them twelve times. One loop with no calls in it,
+// because the hand-written equivalent could not keep the reconstruction inlined: clang emitted an
+// out-of-line copy and gcc a .constprop clone and both CALLED it from inside the `#pragma omp simd`
+// body, which stops the loop vectorising outright. There is no function here for a compiler to
+// decline to inline.
+//
+// The upwind split is written once per surface by the flux and again by the correction; CSE unifies
+// them, so the emitted text carries it once.
+
+// unlimited reconstruction.
+static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual_defcor_lim0_simd(
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT cof0_ptr,
+        const scalar_t *const SFEM_RESTRICT cof1_ptr,
+        const scalar_t *const SFEM_RESTRICT cof2_ptr,
+        const scalar_t *const SFEM_RESTRICT cof3_ptr,
+        const scalar_t *const SFEM_RESTRICT cof4_ptr,
+        const scalar_t *const SFEM_RESTRICT cof5_ptr,
+        const scalar_t *const SFEM_RESTRICT cof6_ptr,
+        const scalar_t *const SFEM_RESTRICT cof7_ptr,
+        const scalar_t *const SFEM_RESTRICT cof8_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const Hex8InputPack &in,
+        const Hex8UGradPack &ho,
+        Hex8ResidualPack    &out) {
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t cof0 = scalar_t(cof0_ptr[lane]);
+        const scalar_t cof1 = scalar_t(cof1_ptr[lane]);
+        const scalar_t cof2 = scalar_t(cof2_ptr[lane]);
+        const scalar_t cof3 = scalar_t(cof3_ptr[lane]);
+        const scalar_t cof4 = scalar_t(cof4_ptr[lane]);
+        const scalar_t cof5 = scalar_t(cof5_ptr[lane]);
+        const scalar_t cof6 = scalar_t(cof6_ptr[lane]);
+        const scalar_t cof7 = scalar_t(cof7_ptr[lane]);
+        const scalar_t cof8 = scalar_t(cof8_ptr[lane]);
+        const scalar_t det = scalar_t(det_ptr[lane]);
+        const scalar_t ux0 = in.ux[0][lane];
+        const scalar_t ux1 = in.ux[1][lane];
+        const scalar_t ux2 = in.ux[2][lane];
+        const scalar_t ux3 = in.ux[3][lane];
+        const scalar_t ux4 = in.ux[4][lane];
+        const scalar_t ux5 = in.ux[5][lane];
+        const scalar_t ux6 = in.ux[6][lane];
+        const scalar_t ux7 = in.ux[7][lane];
+        const scalar_t uy0 = in.uy[0][lane];
+        const scalar_t uy1 = in.uy[1][lane];
+        const scalar_t uy2 = in.uy[2][lane];
+        const scalar_t uy3 = in.uy[3][lane];
+        const scalar_t uy4 = in.uy[4][lane];
+        const scalar_t uy5 = in.uy[5][lane];
+        const scalar_t uy6 = in.uy[6][lane];
+        const scalar_t uy7 = in.uy[7][lane];
+        const scalar_t uz0 = in.uz[0][lane];
+        const scalar_t uz1 = in.uz[1][lane];
+        const scalar_t uz2 = in.uz[2][lane];
+        const scalar_t uz3 = in.uz[3][lane];
+        const scalar_t uz4 = in.uz[4][lane];
+        const scalar_t uz5 = in.uz[5][lane];
+        const scalar_t uz6 = in.uz[6][lane];
+        const scalar_t uz7 = in.uz[7][lane];
+        const scalar_t p0 = in.p[0][lane];
+        const scalar_t p1 = in.p[1][lane];
+        const scalar_t p2 = in.p[2][lane];
+        const scalar_t p3 = in.p[3][lane];
+        const scalar_t p4 = in.p[4][lane];
+        const scalar_t p5 = in.p[5][lane];
+        const scalar_t p6 = in.p[6][lane];
+        const scalar_t p7 = in.p[7][lane];
+        const scalar_t x0 = ho.x[0][lane];
+        const scalar_t x1 = ho.x[1][lane];
+        const scalar_t x2 = ho.x[2][lane];
+        const scalar_t x3 = ho.x[3][lane];
+        const scalar_t x4 = ho.x[4][lane];
+        const scalar_t x5 = ho.x[5][lane];
+        const scalar_t x6 = ho.x[6][lane];
+        const scalar_t x7 = ho.x[7][lane];
+        const scalar_t y0 = ho.y[0][lane];
+        const scalar_t y1 = ho.y[1][lane];
+        const scalar_t y2 = ho.y[2][lane];
+        const scalar_t y3 = ho.y[3][lane];
+        const scalar_t y4 = ho.y[4][lane];
+        const scalar_t y5 = ho.y[5][lane];
+        const scalar_t y6 = ho.y[6][lane];
+        const scalar_t y7 = ho.y[7][lane];
+        const scalar_t z0 = ho.z[0][lane];
+        const scalar_t z1 = ho.z[1][lane];
+        const scalar_t z2 = ho.z[2][lane];
+        const scalar_t z3 = ho.z[3][lane];
+        const scalar_t z4 = ho.z[4][lane];
+        const scalar_t z5 = ho.z[5][lane];
+        const scalar_t z6 = ho.z[6][lane];
+        const scalar_t z7 = ho.z[7][lane];
+        const scalar_t g0_0 = ho.g[0][0][lane];
+        const scalar_t g0_1 = ho.g[0][1][lane];
+        const scalar_t g0_2 = ho.g[0][2][lane];
+        const scalar_t g0_3 = ho.g[0][3][lane];
+        const scalar_t g0_4 = ho.g[0][4][lane];
+        const scalar_t g0_5 = ho.g[0][5][lane];
+        const scalar_t g0_6 = ho.g[0][6][lane];
+        const scalar_t g0_7 = ho.g[0][7][lane];
+        const scalar_t g0_8 = ho.g[0][8][lane];
+        const scalar_t g1_0 = ho.g[1][0][lane];
+        const scalar_t g1_1 = ho.g[1][1][lane];
+        const scalar_t g1_2 = ho.g[1][2][lane];
+        const scalar_t g1_3 = ho.g[1][3][lane];
+        const scalar_t g1_4 = ho.g[1][4][lane];
+        const scalar_t g1_5 = ho.g[1][5][lane];
+        const scalar_t g1_6 = ho.g[1][6][lane];
+        const scalar_t g1_7 = ho.g[1][7][lane];
+        const scalar_t g1_8 = ho.g[1][8][lane];
+        const scalar_t g2_0 = ho.g[2][0][lane];
+        const scalar_t g2_1 = ho.g[2][1][lane];
+        const scalar_t g2_2 = ho.g[2][2][lane];
+        const scalar_t g2_3 = ho.g[2][3][lane];
+        const scalar_t g2_4 = ho.g[2][4][lane];
+        const scalar_t g2_5 = ho.g[2][5][lane];
+        const scalar_t g2_6 = ho.g[2][6][lane];
+        const scalar_t g2_7 = ho.g[2][7][lane];
+        const scalar_t g2_8 = ho.g[2][8][lane];
+        const scalar_t g3_0 = ho.g[3][0][lane];
+        const scalar_t g3_1 = ho.g[3][1][lane];
+        const scalar_t g3_2 = ho.g[3][2][lane];
+        const scalar_t g3_3 = ho.g[3][3][lane];
+        const scalar_t g3_4 = ho.g[3][4][lane];
+        const scalar_t g3_5 = ho.g[3][5][lane];
+        const scalar_t g3_6 = ho.g[3][6][lane];
+        const scalar_t g3_7 = ho.g[3][7][lane];
+        const scalar_t g3_8 = ho.g[3][8][lane];
+        const scalar_t g4_0 = ho.g[4][0][lane];
+        const scalar_t g4_1 = ho.g[4][1][lane];
+        const scalar_t g4_2 = ho.g[4][2][lane];
+        const scalar_t g4_3 = ho.g[4][3][lane];
+        const scalar_t g4_4 = ho.g[4][4][lane];
+        const scalar_t g4_5 = ho.g[4][5][lane];
+        const scalar_t g4_6 = ho.g[4][6][lane];
+        const scalar_t g4_7 = ho.g[4][7][lane];
+        const scalar_t g4_8 = ho.g[4][8][lane];
+        const scalar_t g5_0 = ho.g[5][0][lane];
+        const scalar_t g5_1 = ho.g[5][1][lane];
+        const scalar_t g5_2 = ho.g[5][2][lane];
+        const scalar_t g5_3 = ho.g[5][3][lane];
+        const scalar_t g5_4 = ho.g[5][4][lane];
+        const scalar_t g5_5 = ho.g[5][5][lane];
+        const scalar_t g5_6 = ho.g[5][6][lane];
+        const scalar_t g5_7 = ho.g[5][7][lane];
+        const scalar_t g5_8 = ho.g[5][8][lane];
+        const scalar_t g6_0 = ho.g[6][0][lane];
+        const scalar_t g6_1 = ho.g[6][1][lane];
+        const scalar_t g6_2 = ho.g[6][2][lane];
+        const scalar_t g6_3 = ho.g[6][3][lane];
+        const scalar_t g6_4 = ho.g[6][4][lane];
+        const scalar_t g6_5 = ho.g[6][5][lane];
+        const scalar_t g6_6 = ho.g[6][6][lane];
+        const scalar_t g6_7 = ho.g[6][7][lane];
+        const scalar_t g6_8 = ho.g[6][8][lane];
+        const scalar_t g7_0 = ho.g[7][0][lane];
+        const scalar_t g7_1 = ho.g[7][1][lane];
+        const scalar_t g7_2 = ho.g[7][2][lane];
+        const scalar_t g7_3 = ho.g[7][3][lane];
+        const scalar_t g7_4 = ho.g[7][4][lane];
+        const scalar_t g7_5 = ho.g[7][5][lane];
+        const scalar_t g7_6 = ho.g[7][6][lane];
+        const scalar_t g7_7 = ho.g[7][7][lane];
+        const scalar_t g7_8 = ho.g[7][8][lane];
+        const scalar_t mdot0 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux1) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy1) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz1));
+        const scalar_t sgn0 = mdot0 > scalar_t(0) ? scalar_t(1) : (mdot0 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot1 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn1 = mdot1 > scalar_t(0) ? scalar_t(1) : (mdot1 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot2 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn2 = mdot2 > scalar_t(0) ? scalar_t(1) : (mdot2 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot3 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux6 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy6 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz6 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn3 = mdot3 > scalar_t(0) ? scalar_t(1) : (mdot3 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot4 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn4 = mdot4 > scalar_t(0) ? scalar_t(1) : (mdot4 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot5 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux2) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy2) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz2));
+        const scalar_t sgn5 = mdot5 > scalar_t(0) ? scalar_t(1) : (mdot5 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot6 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn6 = mdot6 > scalar_t(0) ? scalar_t(1) : (mdot6 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot7 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux5 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy5 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz5 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn7 = mdot7 > scalar_t(0) ? scalar_t(1) : (mdot7 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot8 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux4) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy4) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz4));
+        const scalar_t sgn8 = mdot8 > scalar_t(0) ? scalar_t(1) : (mdot8 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot9 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn9 = mdot9 > scalar_t(0) ? scalar_t(1) : (mdot9 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot10 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn10 = mdot10 > scalar_t(0) ? scalar_t(1) : (mdot10 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot11 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux3 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy3 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz3 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn11 = mdot11 > scalar_t(0) ? scalar_t(1) : (mdot11 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t x8 = scalar_t(64)*p0 + scalar_t(64)*p1;
+        const scalar_t x9 = cof0*x8;
+        const scalar_t x10 = scalar_t(64)*p0 + scalar_t(64)*p3;
+        const scalar_t x11 = cof3*x10;
+        const scalar_t x12 = scalar_t(64)*p0 + scalar_t(64)*p4;
+        const scalar_t x13 = cof6*x12;
+        const scalar_t x14 = -scalar_t(23)*x0;
+        const scalar_t x15 = scalar_t(3)*x2 + scalar_t(3)*x4;
+        const scalar_t x16 = x15 + x6;
+        const scalar_t x17 = x14 + x16;
+        const scalar_t x18 = scalar_t(9)*x1;
+        const scalar_t x19 = scalar_t(3)*x3 + scalar_t(3)*x5;
+        const scalar_t x20 = x19 + x7;
+        const scalar_t x21 = x18 + x20;
+        const scalar_t x22 = x17 + x21;
+        const scalar_t x23 = -scalar_t(23)*y0;
+        const scalar_t x24 = scalar_t(3)*y2 + scalar_t(3)*y4;
+        const scalar_t x25 = x24 + y6;
+        const scalar_t x26 = x23 + x25;
+        const scalar_t x27 = scalar_t(9)*y1;
+        const scalar_t x28 = scalar_t(3)*y3 + scalar_t(3)*y5;
+        const scalar_t x29 = x28 + y7;
+        const scalar_t x30 = x27 + x29;
+        const scalar_t x31 = x26 + x30;
+        const scalar_t x32 = -scalar_t(23)*z0;
+        const scalar_t x33 = scalar_t(3)*z2 + scalar_t(3)*z4;
+        const scalar_t x34 = x33 + z6;
+        const scalar_t x35 = x32 + x34;
+        const scalar_t x36 = scalar_t(9)*z1;
+        const scalar_t x37 = scalar_t(3)*z3 + scalar_t(3)*z5;
+        const scalar_t x38 = x37 + z7;
+        const scalar_t x39 = x36 + x38;
+        const scalar_t x40 = x35 + x39;
+        const scalar_t x41 = ux0 + ux1;
+        const scalar_t x42 = cof0*x41;
+        const scalar_t x43 = uy0 + uy1;
+        const scalar_t x44 = cof1*x43;
+        const scalar_t x45 = uz0 + uz1;
+        const scalar_t x46 = cof2*x45;
+        const scalar_t x47 = x42 + x44 + x46;
+        const scalar_t x48 = rho*x47;
+        const scalar_t x49 = x48*(sgn0 + scalar_t(1));
+        const scalar_t x50 = x49*(g0_0*x22 + g0_1*x31 + g0_2*x40);
+        const scalar_t x51 = scalar_t(3)*x1 + scalar_t(3)*x7;
+        const scalar_t x52 = scalar_t(9)*x3 + x5;
+        const scalar_t x53 = x51 + x52;
+        const scalar_t x54 = x17 + x53;
+        const scalar_t x55 = scalar_t(3)*y1 + scalar_t(3)*y7;
+        const scalar_t x56 = scalar_t(9)*y3 + y5;
+        const scalar_t x57 = x55 + x56;
+        const scalar_t x58 = x26 + x57;
+        const scalar_t x59 = scalar_t(3)*z1 + scalar_t(3)*z7;
+        const scalar_t x60 = scalar_t(9)*z3 + z5;
+        const scalar_t x61 = x59 + x60;
+        const scalar_t x62 = x35 + x61;
+        const scalar_t x63 = ux0 + ux3;
+        const scalar_t x64 = cof3*x63;
+        const scalar_t x65 = uy0 + uy3;
+        const scalar_t x66 = cof4*x65;
+        const scalar_t x67 = uz0 + uz3;
+        const scalar_t x68 = cof5*x67;
+        const scalar_t x69 = x64 + x66 + x68;
+        const scalar_t x70 = rho*x69;
+        const scalar_t x71 = x70*(sgn4 + scalar_t(1));
+        const scalar_t x72 = x71*(g0_0*x54 + g0_1*x58 + g0_2*x62);
+        const scalar_t x73 = x2 + scalar_t(9)*x4;
+        const scalar_t x74 = x19 + x51;
+        const scalar_t x75 = x6 + x74;
+        const scalar_t x76 = x14 + x73 + x75;
+        const scalar_t x77 = y2 + scalar_t(9)*y4;
+        const scalar_t x78 = x28 + x55;
+        const scalar_t x79 = x78 + y6;
+        const scalar_t x80 = x23 + x77 + x79;
+        const scalar_t x81 = z2 + scalar_t(9)*z4;
+        const scalar_t x82 = x37 + x59;
+        const scalar_t x83 = x82 + z6;
+        const scalar_t x84 = x32 + x81 + x83;
+        const scalar_t x85 = cof6*(ux0 + ux4);
+        const scalar_t x86 = cof7*(uy0 + uy4);
+        const scalar_t x87 = cof8*(uz0 + uz4);
+        const scalar_t x88 = x85 + x86 + x87;
+        const scalar_t x89 = rho*x88;
+        const scalar_t x90 = x89*(sgn8 + scalar_t(1));
+        const scalar_t x91 = x90*(g0_0*x76 + g0_1*x80 + g0_2*x84);
+        const scalar_t x92 = scalar_t(9)*x0;
+        const scalar_t x93 = x16 + x92;
+        const scalar_t x94 = -scalar_t(23)*x1;
+        const scalar_t x95 = x20 + x94;
+        const scalar_t x96 = x93 + x95;
+        const scalar_t x97 = scalar_t(9)*y0;
+        const scalar_t x98 = x25 + x97;
+        const scalar_t x99 = -scalar_t(23)*y1;
+        const scalar_t x100 = x29 + x99;
+        const scalar_t x101 = x100 + x98;
+        const scalar_t x102 = scalar_t(9)*z0;
+        const scalar_t x103 = x102 + x34;
+        const scalar_t x104 = -scalar_t(23)*z1;
+        const scalar_t x105 = x104 + x38;
+        const scalar_t x106 = x103 + x105;
+        const scalar_t x107 = x48*(sgn0 + scalar_t(-1));
+        const scalar_t x108 = x107*(g1_0*x96 + g1_1*x101 + g1_2*x106);
+        const scalar_t x109 = -scalar_t(23)*x3 + x5;
+        const scalar_t x110 = x109 + x51;
+        const scalar_t x111 = x110 + x93;
+        const scalar_t x112 = -scalar_t(23)*y3 + y5;
+        const scalar_t x113 = x112 + x55;
+        const scalar_t x114 = x113 + x98;
+        const scalar_t x115 = -scalar_t(23)*z3 + z5;
+        const scalar_t x116 = x115 + x59;
+        const scalar_t x117 = x103 + x116;
+        const scalar_t x118 = x70*(sgn4 + scalar_t(-1));
+        const scalar_t x119 = x118*(g3_0*x111 + g3_1*x114 + g3_2*x117);
+        const scalar_t x120 = x2 - scalar_t(23)*x4;
+        const scalar_t x121 = x120 + x75 + x92;
+        const scalar_t x122 = y2 - scalar_t(23)*y4;
+        const scalar_t x123 = x122 + x79 + x97;
+        const scalar_t x124 = z2 - scalar_t(23)*z4;
+        const scalar_t x125 = x102 + x124 + x83;
+        const scalar_t x126 = x89*(sgn8 + scalar_t(-1));
+        const scalar_t x127 = x126*(g4_0*x121 + g4_1*x123 + g4_2*x125);
+        const scalar_t x128 = scalar_t(32)*x107;
+        const scalar_t x129 = ux1*x128;
+        const scalar_t x130 = scalar_t(32)*x118;
+        const scalar_t x131 = ux3*x130;
+        const scalar_t x132 = scalar_t(32)*x126;
+        const scalar_t x133 = ux4*x132;
+        const scalar_t x134 = scalar_t(32)*ux0;
+        const scalar_t x135 = x134*x49;
+        const scalar_t x136 = x134*x71;
+        const scalar_t x137 = x134*x90;
+        const scalar_t x138 = -ux5;
+        const scalar_t x139 = ux4 + ux7;
+        const scalar_t x140 = -ux6;
+        const scalar_t x141 = -ux2 + x140;
+        const scalar_t x142 = -ux1 + x138 + x139 + x141 + x63;
+        const scalar_t x143 = ux4 + ux5;
+        const scalar_t x144 = -ux7 + x41;
+        const scalar_t x145 = -ux3 + x141 + x143 + x144;
+        const scalar_t x146 = ux2 + ux3;
+        const scalar_t x147 = -ux4 + x138 + x140 + x144 + x146;
+        const scalar_t x148 = scalar_t(2)*cof0*x142 + scalar_t(2)*cof3*x145 + scalar_t(2)*cof6*x147;
+        const scalar_t x149 = -uy5;
+        const scalar_t x150 = uy4 + uy7;
+        const scalar_t x151 = -uy6;
+        const scalar_t x152 = -uy2 + x151;
+        const scalar_t x153 = -uy1 + x149 + x150 + x152 + x65;
+        const scalar_t x154 = uy4 + uy5;
+        const scalar_t x155 = -uy7 + x43;
+        const scalar_t x156 = -uy3 + x152 + x154 + x155;
+        const scalar_t x157 = uy2 + uy3;
+        const scalar_t x158 = -uy4 + x149 + x151 + x155 + x157;
+        const scalar_t x159 = cof0*x153 + cof1*x142 + cof3*x156 + cof4*x145 + cof6*x158 + cof7*x147;
+        const scalar_t x160 = -uz5;
+        const scalar_t x161 = uz4 + uz7;
+        const scalar_t x162 = -uz6;
+        const scalar_t x163 = -uz2 + x162;
+        const scalar_t x164 = -uz1 + x160 + x161 + x163 + x67;
+        const scalar_t x165 = uz4 + uz5;
+        const scalar_t x166 = -uz7 + x45;
+        const scalar_t x167 = -uz3 + x163 + x165 + x166;
+        const scalar_t x168 = uz2 + uz3;
+        const scalar_t x169 = -uz4 + x160 + x162 + x166 + x168;
+        const scalar_t x170 = cof0*x164 + cof2*x142 + cof3*x167 + cof5*x145 + cof6*x169 + cof8*x147;
+        const scalar_t x171 = scalar_t(32)*mu/det;
+        const scalar_t x172 = x171*(cof0*x148 + cof1*x159 + cof2*x170);
+        const scalar_t x173 = x171*(cof3*x148 + cof4*x159 + cof5*x170);
+        const scalar_t x174 = x171*(cof6*x148 + cof7*x159 + cof8*x170);
+        const scalar_t x175 = x173 + x174;
+        const scalar_t x176 = x172 + x175;
+        const scalar_t x177 = cof1*x8;
+        const scalar_t x178 = cof4*x10;
+        const scalar_t x179 = cof7*x12;
+        const scalar_t x180 = x49*(g0_3*x22 + g0_4*x31 + g0_5*x40);
+        const scalar_t x181 = x71*(g0_3*x54 + g0_4*x58 + g0_5*x62);
+        const scalar_t x182 = x90*(g0_3*x76 + g0_4*x80 + g0_5*x84);
+        const scalar_t x183 = x107*(g1_3*x96 + g1_4*x101 + g1_5*x106);
+        const scalar_t x184 = x118*(g3_3*x111 + g3_4*x114 + g3_5*x117);
+        const scalar_t x185 = x126*(g4_3*x121 + g4_4*x123 + g4_5*x125);
+        const scalar_t x186 = uy1*x128;
+        const scalar_t x187 = uy3*x130;
+        const scalar_t x188 = uy4*x132;
+        const scalar_t x189 = scalar_t(32)*uy0;
+        const scalar_t x190 = x189*x49;
+        const scalar_t x191 = x189*x71;
+        const scalar_t x192 = x189*x90;
+        const scalar_t x193 = scalar_t(2)*cof1*x153 + scalar_t(2)*cof4*x156 + scalar_t(2)*cof7*x158;
+        const scalar_t x194 = cof1*x164 + cof2*x153 + cof4*x167 + cof5*x156 + cof7*x169 + cof8*x158;
+        const scalar_t x195 = x171*(cof0*x159 + cof1*x193 + cof2*x194);
+        const scalar_t x196 = x171*(cof3*x159 + cof4*x193 + cof5*x194);
+        const scalar_t x197 = x171*(cof6*x159 + cof7*x193 + cof8*x194);
+        const scalar_t x198 = x196 + x197;
+        const scalar_t x199 = x195 + x198;
+        const scalar_t x200 = cof2*x8;
+        const scalar_t x201 = cof5*x10;
+        const scalar_t x202 = cof8*x12;
+        const scalar_t x203 = x49*(g0_6*x22 + g0_7*x31 + g0_8*x40);
+        const scalar_t x204 = x71*(g0_6*x54 + g0_7*x58 + g0_8*x62);
+        const scalar_t x205 = x90*(g0_6*x76 + g0_7*x80 + g0_8*x84);
+        const scalar_t x206 = x107*(g1_6*x96 + g1_7*x101 + g1_8*x106);
+        const scalar_t x207 = x118*(g3_6*x111 + g3_7*x114 + g3_8*x117);
+        const scalar_t x208 = x126*(g4_6*x121 + g4_7*x123 + g4_8*x125);
+        const scalar_t x209 = uz1*x128;
+        const scalar_t x210 = uz3*x130;
+        const scalar_t x211 = uz4*x132;
+        const scalar_t x212 = scalar_t(32)*uz0;
+        const scalar_t x213 = x212*x49;
+        const scalar_t x214 = x212*x71;
+        const scalar_t x215 = x212*x90;
+        const scalar_t x216 = scalar_t(2)*cof2*x164 + scalar_t(2)*cof5*x167 + scalar_t(2)*cof8*x169;
+        const scalar_t x217 = x171*(cof0*x170 + cof1*x194 + cof2*x216);
+        const scalar_t x218 = x171*(cof3*x170 + cof4*x194 + cof5*x216);
+        const scalar_t x219 = x171*(cof6*x170 + cof7*x194 + cof8*x216);
+        const scalar_t x220 = x218 + x219;
+        const scalar_t x221 = x217 + x220;
+        const scalar_t x222 = (scalar_t(1) / scalar_t(8))*rho;
+        const scalar_t x223 = -x172 + x175;
+        const scalar_t x224 = scalar_t(64)*p1 + scalar_t(64)*p2;
+        const scalar_t x225 = scalar_t(3)*x0 + scalar_t(3)*x6;
+        const scalar_t x226 = scalar_t(9)*x2 + x4;
+        const scalar_t x227 = x225 + x226;
+        const scalar_t x228 = x227 + x95;
+        const scalar_t x229 = scalar_t(3)*y0 + scalar_t(3)*y6;
+        const scalar_t x230 = scalar_t(9)*y2 + y4;
+        const scalar_t x231 = x229 + x230;
+        const scalar_t x232 = x100 + x231;
+        const scalar_t x233 = scalar_t(3)*z0 + scalar_t(3)*z6;
+        const scalar_t x234 = scalar_t(9)*z2 + z4;
+        const scalar_t x235 = x233 + x234;
+        const scalar_t x236 = x105 + x235;
+        const scalar_t x237 = cof3*(ux1 + ux2) + cof4*(uy1 + uy2) + cof5*(uz1 + uz2);
+        const scalar_t x238 = rho*x237;
+        const scalar_t x239 = x238*(sgn5 + scalar_t(1));
+        const scalar_t x240 = -scalar_t(23)*x2 + x4;
+        const scalar_t x241 = x225 + x240;
+        const scalar_t x242 = x21 + x241;
+        const scalar_t x243 = -scalar_t(23)*y2 + y4;
+        const scalar_t x244 = x229 + x243;
+        const scalar_t x245 = x244 + x30;
+        const scalar_t x246 = -scalar_t(23)*z2 + z4;
+        const scalar_t x247 = x233 + x246;
+        const scalar_t x248 = x247 + x39;
+        const scalar_t x249 = x238*(sgn5 + scalar_t(-1));
+        const scalar_t x250 = scalar_t(32)*x249;
+        const scalar_t x251 = scalar_t(32)*ux1;
+        const scalar_t x252 = cof3*x224 - ux2*x250 + x239*x251 + x239*(g1_0*x228 + g1_1*x232 + g1_2*x236) - x249*(g2_0*x242 + g2_1*x245 + g2_2*x248);
+        const scalar_t x253 = scalar_t(64)*p1 + scalar_t(64)*p5;
+        const scalar_t x254 = x3 + scalar_t(9)*x5;
+        const scalar_t x255 = x15 + x225;
+        const scalar_t x256 = x255 + x7;
+        const scalar_t x257 = x254 + x256 + x94;
+        const scalar_t x258 = y3 + scalar_t(9)*y5;
+        const scalar_t x259 = x229 + x24;
+        const scalar_t x260 = x259 + y7;
+        const scalar_t x261 = x258 + x260 + x99;
+        const scalar_t x262 = z3 + scalar_t(9)*z5;
+        const scalar_t x263 = x233 + x33;
+        const scalar_t x264 = x263 + z7;
+        const scalar_t x265 = x104 + x262 + x264;
+        const scalar_t x266 = cof6*(ux1 + ux5) + cof7*(uy1 + uy5) + cof8*(uz1 + uz5);
+        const scalar_t x267 = rho*x266;
+        const scalar_t x268 = x267*(sgn9 + scalar_t(1));
+        const scalar_t x269 = x3 - scalar_t(23)*x5;
+        const scalar_t x270 = x18 + x256 + x269;
+        const scalar_t x271 = y3 - scalar_t(23)*y5;
+        const scalar_t x272 = x260 + x27 + x271;
+        const scalar_t x273 = z3 - scalar_t(23)*z5;
+        const scalar_t x274 = x264 + x273 + x36;
+        const scalar_t x275 = x267*(sgn9 + scalar_t(-1));
+        const scalar_t x276 = scalar_t(32)*x275;
+        const scalar_t x277 = cof6*x253 - ux5*x276 + x251*x268 + x268*(g1_0*x257 + g1_1*x261 + g1_2*x265) - x275*(g5_0*x270 + g5_1*x272 + g5_2*x274);
+        const scalar_t x278 = -x195 + x198;
+        const scalar_t x279 = scalar_t(32)*uy1;
+        const scalar_t x280 = cof4*x224 - uy2*x250 + x239*x279 + x239*(g1_3*x228 + g1_4*x232 + g1_5*x236) - x249*(g2_3*x242 + g2_4*x245 + g2_5*x248);
+        const scalar_t x281 = cof7*x253 - uy5*x276 + x268*x279 + x268*(g1_3*x257 + g1_4*x261 + g1_5*x265) - x275*(g5_3*x270 + g5_4*x272 + g5_5*x274);
+        const scalar_t x282 = -x217 + x220;
+        const scalar_t x283 = scalar_t(32)*uz1;
+        const scalar_t x284 = cof5*x224 - uz2*x250 + x239*x283 + x239*(g1_6*x228 + g1_7*x232 + g1_8*x236) - x249*(g2_6*x242 + g2_7*x245 + g2_8*x248);
+        const scalar_t x285 = cof8*x253 - uz5*x276 + x268*x283 + x268*(g1_6*x257 + g1_7*x261 + g1_8*x265) - x275*(g5_6*x270 + g5_7*x272 + g5_8*x274);
+        const scalar_t x286 = scalar_t(64)*p2 + scalar_t(64)*p6;
+        const scalar_t x287 = cof6*x286;
+        const scalar_t x288 = -scalar_t(23)*x6;
+        const scalar_t x289 = x0 + x74;
+        const scalar_t x290 = x226 + x288 + x289;
+        const scalar_t x291 = -scalar_t(23)*y6;
+        const scalar_t x292 = x78 + y0;
+        const scalar_t x293 = x230 + x291 + x292;
+        const scalar_t x294 = -scalar_t(23)*z6;
+        const scalar_t x295 = x82 + z0;
+        const scalar_t x296 = x234 + x294 + x295;
+        const scalar_t x297 = ux2 + ux6;
+        const scalar_t x298 = uy2 + uy6;
+        const scalar_t x299 = uz2 + uz6;
+        const scalar_t x300 = cof6*x297 + cof7*x298 + cof8*x299;
+        const scalar_t x301 = rho*x300;
+        const scalar_t x302 = x301*(sgn10 + scalar_t(-1));
+        const scalar_t x303 = x302*(g6_0*x290 + g6_1*x293 + g6_2*x296);
+        const scalar_t x304 = scalar_t(9)*x6;
+        const scalar_t x305 = x240 + x289 + x304;
+        const scalar_t x306 = scalar_t(9)*y6;
+        const scalar_t x307 = x243 + x292 + x306;
+        const scalar_t x308 = scalar_t(9)*z6;
+        const scalar_t x309 = x246 + x295 + x308;
+        const scalar_t x310 = x301*(sgn10 + scalar_t(1));
+        const scalar_t x311 = x310*(g2_0*x305 + g2_1*x307 + g2_2*x309);
+        const scalar_t x312 = scalar_t(32)*ux2;
+        const scalar_t x313 = x310*x312;
+        const scalar_t x314 = scalar_t(32)*x302;
+        const scalar_t x315 = ux6*x314;
+        const scalar_t x316 = x172 + x173 - x174;
+        const scalar_t x317 = scalar_t(64)*p2 + scalar_t(64)*p3;
+        const scalar_t x318 = x110 + x227;
+        const scalar_t x319 = x113 + x231;
+        const scalar_t x320 = x116 + x235;
+        const scalar_t x321 = cof0*x146 + cof1*x157 + cof2*x168;
+        const scalar_t x322 = rho*x321;
+        const scalar_t x323 = x322*(sgn1 + scalar_t(1));
+        const scalar_t x324 = x241 + x53;
+        const scalar_t x325 = x244 + x57;
+        const scalar_t x326 = x247 + x61;
+        const scalar_t x327 = x322*(sgn1 + scalar_t(-1));
+        const scalar_t x328 = scalar_t(32)*x323;
+        const scalar_t x329 = cof0*x317 + ux3*x328 - x312*x327 + x323*(g3_0*x318 + g3_1*x319 + g3_2*x320) - x327*(g2_0*x324 + g2_1*x325 + g2_2*x326);
+        const scalar_t x330 = cof7*x286;
+        const scalar_t x331 = x302*(g6_3*x290 + g6_4*x293 + g6_5*x296);
+        const scalar_t x332 = x310*(g2_3*x305 + g2_4*x307 + g2_5*x309);
+        const scalar_t x333 = scalar_t(32)*uy2;
+        const scalar_t x334 = x310*x333;
+        const scalar_t x335 = uy6*x314;
+        const scalar_t x336 = x195 + x196 - x197;
+        const scalar_t x337 = cof1*x317 + uy3*x328 + x323*(g3_3*x318 + g3_4*x319 + g3_5*x320) - x327*x333 - x327*(g2_3*x324 + g2_4*x325 + g2_5*x326);
+        const scalar_t x338 = cof8*x286;
+        const scalar_t x339 = x302*(g6_6*x290 + g6_7*x293 + g6_8*x296);
+        const scalar_t x340 = x310*(g2_6*x305 + g2_7*x307 + g2_8*x309);
+        const scalar_t x341 = scalar_t(32)*uz2;
+        const scalar_t x342 = x310*x341;
+        const scalar_t x343 = uz6*x314;
+        const scalar_t x344 = x217 + x218 - x219;
+        const scalar_t x345 = cof2*x317 + uz3*x328 + x323*(g3_6*x318 + g3_7*x319 + g3_8*x320) - x327*x341 - x327*(g2_6*x324 + g2_7*x325 + g2_8*x326);
+        const scalar_t x346 = x172 - x173 + x174;
+        const scalar_t x347 = scalar_t(64)*p3 + scalar_t(64)*p7;
+        const scalar_t x348 = scalar_t(9)*x7;
+        const scalar_t x349 = x1 + x255;
+        const scalar_t x350 = x109 + x348 + x349;
+        const scalar_t x351 = scalar_t(9)*y7;
+        const scalar_t x352 = x259 + y1;
+        const scalar_t x353 = x112 + x351 + x352;
+        const scalar_t x354 = scalar_t(9)*z7;
+        const scalar_t x355 = x263 + z1;
+        const scalar_t x356 = x115 + x354 + x355;
+        const scalar_t x357 = cof6*(ux3 + ux7) + cof7*(uy3 + uy7) + cof8*(uz3 + uz7);
+        const scalar_t x358 = rho*x357;
+        const scalar_t x359 = x358*(sgn11 + scalar_t(1));
+        const scalar_t x360 = -scalar_t(23)*x7;
+        const scalar_t x361 = x349 + x360 + x52;
+        const scalar_t x362 = -scalar_t(23)*y7;
+        const scalar_t x363 = x352 + x362 + x56;
+        const scalar_t x364 = -scalar_t(23)*z7;
+        const scalar_t x365 = x355 + x364 + x60;
+        const scalar_t x366 = x358*(sgn11 + scalar_t(-1));
+        const scalar_t x367 = scalar_t(32)*x366;
+        const scalar_t x368 = scalar_t(32)*x359;
+        const scalar_t x369 = cof6*x347 + ux3*x368 - ux7*x367 + x359*(g3_0*x350 + g3_1*x353 + g3_2*x356) - x366*(g7_0*x361 + g7_1*x363 + g7_2*x365);
+        const scalar_t x370 = x195 - x196 + x197;
+        const scalar_t x371 = cof7*x347 + uy3*x368 - uy7*x367 + x359*(g3_3*x350 + g3_4*x353 + g3_5*x356) - x366*(g7_3*x361 + g7_4*x363 + g7_5*x365);
+        const scalar_t x372 = x217 - x218 + x219;
+        const scalar_t x373 = cof8*x347 + uz3*x368 - uz7*x367 + x359*(g3_6*x350 + g3_7*x353 + g3_8*x356) - x366*(g7_6*x361 + g7_7*x363 + g7_8*x365);
+        const scalar_t x374 = scalar_t(64)*p4 + scalar_t(64)*p5;
+        const scalar_t x375 = x120 + x225;
+        const scalar_t x376 = x254 + x51;
+        const scalar_t x377 = x375 + x376;
+        const scalar_t x378 = x122 + x229;
+        const scalar_t x379 = x258 + x55;
+        const scalar_t x380 = x378 + x379;
+        const scalar_t x381 = x124 + x233;
+        const scalar_t x382 = x262 + x59;
+        const scalar_t x383 = x381 + x382;
+        const scalar_t x384 = cof0*x143 + cof1*x154 + cof2*x165;
+        const scalar_t x385 = rho*x384;
+        const scalar_t x386 = x385*(sgn2 + scalar_t(1));
+        const scalar_t x387 = x225 + x73;
+        const scalar_t x388 = x269 + x51;
+        const scalar_t x389 = x387 + x388;
+        const scalar_t x390 = x229 + x77;
+        const scalar_t x391 = x271 + x55;
+        const scalar_t x392 = x390 + x391;
+        const scalar_t x393 = x233 + x81;
+        const scalar_t x394 = x273 + x59;
+        const scalar_t x395 = x393 + x394;
+        const scalar_t x396 = x385*(sgn2 + scalar_t(-1));
+        const scalar_t x397 = scalar_t(32)*x396;
+        const scalar_t x398 = scalar_t(32)*ux4;
+        const scalar_t x399 = cof0*x374 - ux5*x397 + x386*x398 + x386*(g4_0*x377 + g4_1*x380 + g4_2*x383) - x396*(g5_0*x389 + g5_1*x392 + g5_2*x395);
+        const scalar_t x400 = scalar_t(64)*p4 + scalar_t(64)*p7;
+        const scalar_t x401 = x1 + x19;
+        const scalar_t x402 = x348 + x401;
+        const scalar_t x403 = x375 + x402;
+        const scalar_t x404 = x28 + y1;
+        const scalar_t x405 = x351 + x404;
+        const scalar_t x406 = x378 + x405;
+        const scalar_t x407 = x37 + z1;
+        const scalar_t x408 = x354 + x407;
+        const scalar_t x409 = x381 + x408;
+        const scalar_t x410 = cof3*x139 + cof4*x150 + cof5*x161;
+        const scalar_t x411 = rho*x410;
+        const scalar_t x412 = x411*(sgn6 + scalar_t(1));
+        const scalar_t x413 = x360 + x401;
+        const scalar_t x414 = x387 + x413;
+        const scalar_t x415 = x362 + x404;
+        const scalar_t x416 = x390 + x415;
+        const scalar_t x417 = x364 + x407;
+        const scalar_t x418 = x393 + x417;
+        const scalar_t x419 = x411*(sgn6 + scalar_t(-1));
+        const scalar_t x420 = scalar_t(32)*x419;
+        const scalar_t x421 = cof3*x400 - ux7*x420 + x398*x412 + x412*(g4_0*x403 + g4_1*x406 + g4_2*x409) - x419*(g7_0*x414 + g7_1*x416 + g7_2*x418);
+        const scalar_t x422 = scalar_t(32)*uy4;
+        const scalar_t x423 = cof1*x374 - uy5*x397 + x386*x422 + x386*(g4_3*x377 + g4_4*x380 + g4_5*x383) - x396*(g5_3*x389 + g5_4*x392 + g5_5*x395);
+        const scalar_t x424 = cof4*x400 - uy7*x420 + x412*x422 + x412*(g4_3*x403 + g4_4*x406 + g4_5*x409) - x419*(g7_3*x414 + g7_4*x416 + g7_5*x418);
+        const scalar_t x425 = scalar_t(32)*uz4;
+        const scalar_t x426 = cof2*x374 - uz5*x397 + x386*x425 + x386*(g4_6*x377 + g4_7*x380 + g4_8*x383) - x396*(g5_6*x389 + g5_7*x392 + g5_8*x395);
+        const scalar_t x427 = cof5*x400 - uz7*x420 + x412*x425 + x412*(g4_6*x403 + g4_7*x406 + g4_8*x409) - x419*(g7_6*x414 + g7_7*x416 + g7_8*x418);
+        const scalar_t x428 = scalar_t(64)*p5 + scalar_t(64)*p6;
+        const scalar_t x429 = cof3*x428;
+        const scalar_t x430 = x0 + x15;
+        const scalar_t x431 = x288 + x430;
+        const scalar_t x432 = x376 + x431;
+        const scalar_t x433 = x24 + y0;
+        const scalar_t x434 = x291 + x433;
+        const scalar_t x435 = x379 + x434;
+        const scalar_t x436 = x33 + z0;
+        const scalar_t x437 = x294 + x436;
+        const scalar_t x438 = x382 + x437;
+        const scalar_t x439 = ux5 + ux6;
+        const scalar_t x440 = uy5 + uy6;
+        const scalar_t x441 = uz5 + uz6;
+        const scalar_t x442 = cof3*x439 + cof4*x440 + cof5*x441;
+        const scalar_t x443 = rho*x442;
+        const scalar_t x444 = x443*(sgn7 + scalar_t(-1));
+        const scalar_t x445 = x444*(g6_0*x432 + g6_1*x435 + g6_2*x438);
+        const scalar_t x446 = x304 + x430;
+        const scalar_t x447 = x388 + x446;
+        const scalar_t x448 = x306 + x433;
+        const scalar_t x449 = x391 + x448;
+        const scalar_t x450 = x308 + x436;
+        const scalar_t x451 = x394 + x450;
+        const scalar_t x452 = x443*(sgn7 + scalar_t(1));
+        const scalar_t x453 = x452*(g5_0*x447 + g5_1*x449 + g5_2*x451);
+        const scalar_t x454 = scalar_t(32)*x452;
+        const scalar_t x455 = ux5*x454;
+        const scalar_t x456 = scalar_t(32)*x444;
+        const scalar_t x457 = ux6*x456;
+        const scalar_t x458 = cof4*x428;
+        const scalar_t x459 = x444*(g6_3*x432 + g6_4*x435 + g6_5*x438);
+        const scalar_t x460 = x452*(g5_3*x447 + g5_4*x449 + g5_5*x451);
+        const scalar_t x461 = uy5*x454;
+        const scalar_t x462 = uy6*x456;
+        const scalar_t x463 = cof5*x428;
+        const scalar_t x464 = x444*(g6_6*x432 + g6_7*x435 + g6_8*x438);
+        const scalar_t x465 = x452*(g5_6*x447 + g5_7*x449 + g5_8*x451);
+        const scalar_t x466 = uz5*x454;
+        const scalar_t x467 = uz6*x456;
+        const scalar_t x468 = scalar_t(64)*p6 + scalar_t(64)*p7;
+        const scalar_t x469 = cof0*x468;
+        const scalar_t x470 = x413 + x446;
+        const scalar_t x471 = x415 + x448;
+        const scalar_t x472 = x417 + x450;
+        const scalar_t x473 = ux6 + ux7;
+        const scalar_t x474 = uy6 + uy7;
+        const scalar_t x475 = uz6 + uz7;
+        const scalar_t x476 = cof0*x473 + cof1*x474 + cof2*x475;
+        const scalar_t x477 = rho*x476;
+        const scalar_t x478 = x477*(sgn3 + scalar_t(1));
+        const scalar_t x479 = x478*(g7_0*x470 + g7_1*x471 + g7_2*x472);
+        const scalar_t x480 = x402 + x431;
+        const scalar_t x481 = x405 + x434;
+        const scalar_t x482 = x408 + x437;
+        const scalar_t x483 = x477*(sgn3 + scalar_t(-1));
+        const scalar_t x484 = x483*(g6_0*x480 + g6_1*x481 + g6_2*x482);
+        const scalar_t x485 = scalar_t(32)*x483;
+        const scalar_t x486 = ux6*x485;
+        const scalar_t x487 = scalar_t(32)*x478;
+        const scalar_t x488 = ux7*x487;
+        const scalar_t x489 = cof1*x468;
+        const scalar_t x490 = x478*(g7_3*x470 + g7_4*x471 + g7_5*x472);
+        const scalar_t x491 = x483*(g6_3*x480 + g6_4*x481 + g6_5*x482);
+        const scalar_t x492 = uy6*x485;
+        const scalar_t x493 = uy7*x487;
+        const scalar_t x494 = cof2*x468;
+        const scalar_t x495 = x478*(g7_6*x470 + g7_7*x471 + g7_8*x472);
+        const scalar_t x496 = x483*(g6_6*x480 + g6_7*x481 + g6_8*x482);
+        const scalar_t x497 = uz6*x485;
+        const scalar_t x498 = uz7*x487;
+        out.rx[0][lane] = -scalar_t(1) / scalar_t(512)*x108 + (scalar_t(1) / scalar_t(512))*x11 - scalar_t(1) / scalar_t(512)*x119 - scalar_t(1) / scalar_t(512)*x127 - scalar_t(1) / scalar_t(512)*x129 + (scalar_t(1) / scalar_t(512))*x13 - scalar_t(1) / scalar_t(512)*x131 - scalar_t(1) / scalar_t(512)*x133 + (scalar_t(1) / scalar_t(512))*x135 + (scalar_t(1) / scalar_t(512))*x136 + (scalar_t(1) / scalar_t(512))*x137 + (scalar_t(1) / scalar_t(512))*x176 + (scalar_t(1) / scalar_t(512))*x50 + (scalar_t(1) / scalar_t(512))*x72 + (scalar_t(1) / scalar_t(512))*x9 + (scalar_t(1) / scalar_t(512))*x91;
+        out.ry[0][lane] = (scalar_t(1) / scalar_t(512))*x177 + (scalar_t(1) / scalar_t(512))*x178 + (scalar_t(1) / scalar_t(512))*x179 + (scalar_t(1) / scalar_t(512))*x180 + (scalar_t(1) / scalar_t(512))*x181 + (scalar_t(1) / scalar_t(512))*x182 - scalar_t(1) / scalar_t(512)*x183 - scalar_t(1) / scalar_t(512)*x184 - scalar_t(1) / scalar_t(512)*x185 - scalar_t(1) / scalar_t(512)*x186 - scalar_t(1) / scalar_t(512)*x187 - scalar_t(1) / scalar_t(512)*x188 + (scalar_t(1) / scalar_t(512))*x190 + (scalar_t(1) / scalar_t(512))*x191 + (scalar_t(1) / scalar_t(512))*x192 + (scalar_t(1) / scalar_t(512))*x199;
+        out.rz[0][lane] = (scalar_t(1) / scalar_t(512))*x200 + (scalar_t(1) / scalar_t(512))*x201 + (scalar_t(1) / scalar_t(512))*x202 + (scalar_t(1) / scalar_t(512))*x203 + (scalar_t(1) / scalar_t(512))*x204 + (scalar_t(1) / scalar_t(512))*x205 - scalar_t(1) / scalar_t(512)*x206 - scalar_t(1) / scalar_t(512)*x207 - scalar_t(1) / scalar_t(512)*x208 - scalar_t(1) / scalar_t(512)*x209 - scalar_t(1) / scalar_t(512)*x210 - scalar_t(1) / scalar_t(512)*x211 + (scalar_t(1) / scalar_t(512))*x213 + (scalar_t(1) / scalar_t(512))*x214 + (scalar_t(1) / scalar_t(512))*x215 + (scalar_t(1) / scalar_t(512))*x221;
+        out.rc[0][lane] = x222*(x47 + x69 + x88);
+        out.rx[1][lane] = (scalar_t(1) / scalar_t(512))*x108 + (scalar_t(1) / scalar_t(512))*x129 - scalar_t(1) / scalar_t(512)*x135 + (scalar_t(1) / scalar_t(512))*x223 + (scalar_t(1) / scalar_t(512))*x252 + (scalar_t(1) / scalar_t(512))*x277 - scalar_t(1) / scalar_t(512)*x50 - scalar_t(1) / scalar_t(512)*x9;
+        out.ry[1][lane] = -scalar_t(1) / scalar_t(512)*x177 - scalar_t(1) / scalar_t(512)*x180 + (scalar_t(1) / scalar_t(512))*x183 + (scalar_t(1) / scalar_t(512))*x186 - scalar_t(1) / scalar_t(512)*x190 + (scalar_t(1) / scalar_t(512))*x278 + (scalar_t(1) / scalar_t(512))*x280 + (scalar_t(1) / scalar_t(512))*x281;
+        out.rz[1][lane] = -scalar_t(1) / scalar_t(512)*x200 - scalar_t(1) / scalar_t(512)*x203 + (scalar_t(1) / scalar_t(512))*x206 + (scalar_t(1) / scalar_t(512))*x209 - scalar_t(1) / scalar_t(512)*x213 + (scalar_t(1) / scalar_t(512))*x282 + (scalar_t(1) / scalar_t(512))*x284 + (scalar_t(1) / scalar_t(512))*x285;
+        out.rc[1][lane] = x222*(x237 + x266 - x42 - x44 - x46);
+        out.rx[2][lane] = -scalar_t(1) / scalar_t(512)*x252 + (scalar_t(1) / scalar_t(512))*x287 - scalar_t(1) / scalar_t(512)*x303 + (scalar_t(1) / scalar_t(512))*x311 + (scalar_t(1) / scalar_t(512))*x313 - scalar_t(1) / scalar_t(512)*x315 - scalar_t(1) / scalar_t(512)*x316 - scalar_t(1) / scalar_t(512)*x329;
+        out.ry[2][lane] = -scalar_t(1) / scalar_t(512)*x280 + (scalar_t(1) / scalar_t(512))*x330 - scalar_t(1) / scalar_t(512)*x331 + (scalar_t(1) / scalar_t(512))*x332 + (scalar_t(1) / scalar_t(512))*x334 - scalar_t(1) / scalar_t(512)*x335 - scalar_t(1) / scalar_t(512)*x336 - scalar_t(1) / scalar_t(512)*x337;
+        out.rz[2][lane] = -scalar_t(1) / scalar_t(512)*x284 + (scalar_t(1) / scalar_t(512))*x338 - scalar_t(1) / scalar_t(512)*x339 + (scalar_t(1) / scalar_t(512))*x340 + (scalar_t(1) / scalar_t(512))*x342 - scalar_t(1) / scalar_t(512)*x343 - scalar_t(1) / scalar_t(512)*x344 - scalar_t(1) / scalar_t(512)*x345;
+        out.rc[2][lane] = x222*(cof6*x297 + cof7*x298 + cof8*x299 - x237 - x321);
+        out.rx[3][lane] = -scalar_t(1) / scalar_t(512)*x11 + (scalar_t(1) / scalar_t(512))*x119 + (scalar_t(1) / scalar_t(512))*x131 - scalar_t(1) / scalar_t(512)*x136 + (scalar_t(1) / scalar_t(512))*x329 + (scalar_t(1) / scalar_t(512))*x346 + (scalar_t(1) / scalar_t(512))*x369 - scalar_t(1) / scalar_t(512)*x72;
+        out.ry[3][lane] = -scalar_t(1) / scalar_t(512)*x178 - scalar_t(1) / scalar_t(512)*x181 + (scalar_t(1) / scalar_t(512))*x184 + (scalar_t(1) / scalar_t(512))*x187 - scalar_t(1) / scalar_t(512)*x191 + (scalar_t(1) / scalar_t(512))*x337 + (scalar_t(1) / scalar_t(512))*x370 + (scalar_t(1) / scalar_t(512))*x371;
+        out.rz[3][lane] = -scalar_t(1) / scalar_t(512)*x201 - scalar_t(1) / scalar_t(512)*x204 + (scalar_t(1) / scalar_t(512))*x207 + (scalar_t(1) / scalar_t(512))*x210 - scalar_t(1) / scalar_t(512)*x214 + (scalar_t(1) / scalar_t(512))*x345 + (scalar_t(1) / scalar_t(512))*x372 + (scalar_t(1) / scalar_t(512))*x373;
+        out.rc[3][lane] = x222*(x321 + x357 - x64 - x66 - x68);
+        out.rx[4][lane] = (scalar_t(1) / scalar_t(512))*x127 - scalar_t(1) / scalar_t(512)*x13 + (scalar_t(1) / scalar_t(512))*x133 - scalar_t(1) / scalar_t(512)*x137 + (scalar_t(1) / scalar_t(512))*x316 + (scalar_t(1) / scalar_t(512))*x399 + (scalar_t(1) / scalar_t(512))*x421 - scalar_t(1) / scalar_t(512)*x91;
+        out.ry[4][lane] = -scalar_t(1) / scalar_t(512)*x179 - scalar_t(1) / scalar_t(512)*x182 + (scalar_t(1) / scalar_t(512))*x185 + (scalar_t(1) / scalar_t(512))*x188 - scalar_t(1) / scalar_t(512)*x192 + (scalar_t(1) / scalar_t(512))*x336 + (scalar_t(1) / scalar_t(512))*x423 + (scalar_t(1) / scalar_t(512))*x424;
+        out.rz[4][lane] = -scalar_t(1) / scalar_t(512)*x202 - scalar_t(1) / scalar_t(512)*x205 + (scalar_t(1) / scalar_t(512))*x208 + (scalar_t(1) / scalar_t(512))*x211 - scalar_t(1) / scalar_t(512)*x215 + (scalar_t(1) / scalar_t(512))*x344 + (scalar_t(1) / scalar_t(512))*x426 + (scalar_t(1) / scalar_t(512))*x427;
+        out.rc[4][lane] = x222*(x384 + x410 - x85 - x86 - x87);
+        out.rx[5][lane] = -scalar_t(1) / scalar_t(512)*x277 - scalar_t(1) / scalar_t(512)*x346 - scalar_t(1) / scalar_t(512)*x399 + (scalar_t(1) / scalar_t(512))*x429 - scalar_t(1) / scalar_t(512)*x445 + (scalar_t(1) / scalar_t(512))*x453 + (scalar_t(1) / scalar_t(512))*x455 - scalar_t(1) / scalar_t(512)*x457;
+        out.ry[5][lane] = -scalar_t(1) / scalar_t(512)*x281 - scalar_t(1) / scalar_t(512)*x370 - scalar_t(1) / scalar_t(512)*x423 + (scalar_t(1) / scalar_t(512))*x458 - scalar_t(1) / scalar_t(512)*x459 + (scalar_t(1) / scalar_t(512))*x460 + (scalar_t(1) / scalar_t(512))*x461 - scalar_t(1) / scalar_t(512)*x462;
+        out.rz[5][lane] = -scalar_t(1) / scalar_t(512)*x285 - scalar_t(1) / scalar_t(512)*x372 - scalar_t(1) / scalar_t(512)*x426 + (scalar_t(1) / scalar_t(512))*x463 - scalar_t(1) / scalar_t(512)*x464 + (scalar_t(1) / scalar_t(512))*x465 + (scalar_t(1) / scalar_t(512))*x466 - scalar_t(1) / scalar_t(512)*x467;
+        out.rc[5][lane] = x222*(cof3*x439 + cof4*x440 + cof5*x441 - x266 - x384);
+        out.rx[6][lane] = -scalar_t(1) / scalar_t(512)*x176 - scalar_t(1) / scalar_t(512)*x287 + (scalar_t(1) / scalar_t(512))*x303 - scalar_t(1) / scalar_t(512)*x311 - scalar_t(1) / scalar_t(512)*x313 + (scalar_t(1) / scalar_t(512))*x315 - scalar_t(1) / scalar_t(512)*x429 + (scalar_t(1) / scalar_t(512))*x445 - scalar_t(1) / scalar_t(512)*x453 - scalar_t(1) / scalar_t(512)*x455 + (scalar_t(1) / scalar_t(512))*x457 - scalar_t(1) / scalar_t(512)*x469 - scalar_t(1) / scalar_t(512)*x479 + (scalar_t(1) / scalar_t(512))*x484 + (scalar_t(1) / scalar_t(512))*x486 - scalar_t(1) / scalar_t(512)*x488;
+        out.ry[6][lane] = -scalar_t(1) / scalar_t(512)*x199 - scalar_t(1) / scalar_t(512)*x330 + (scalar_t(1) / scalar_t(512))*x331 - scalar_t(1) / scalar_t(512)*x332 - scalar_t(1) / scalar_t(512)*x334 + (scalar_t(1) / scalar_t(512))*x335 - scalar_t(1) / scalar_t(512)*x458 + (scalar_t(1) / scalar_t(512))*x459 - scalar_t(1) / scalar_t(512)*x460 - scalar_t(1) / scalar_t(512)*x461 + (scalar_t(1) / scalar_t(512))*x462 - scalar_t(1) / scalar_t(512)*x489 - scalar_t(1) / scalar_t(512)*x490 + (scalar_t(1) / scalar_t(512))*x491 + (scalar_t(1) / scalar_t(512))*x492 - scalar_t(1) / scalar_t(512)*x493;
+        out.rz[6][lane] = -scalar_t(1) / scalar_t(512)*x221 - scalar_t(1) / scalar_t(512)*x338 + (scalar_t(1) / scalar_t(512))*x339 - scalar_t(1) / scalar_t(512)*x340 - scalar_t(1) / scalar_t(512)*x342 + (scalar_t(1) / scalar_t(512))*x343 - scalar_t(1) / scalar_t(512)*x463 + (scalar_t(1) / scalar_t(512))*x464 - scalar_t(1) / scalar_t(512)*x465 - scalar_t(1) / scalar_t(512)*x466 + (scalar_t(1) / scalar_t(512))*x467 - scalar_t(1) / scalar_t(512)*x494 - scalar_t(1) / scalar_t(512)*x495 + (scalar_t(1) / scalar_t(512))*x496 + (scalar_t(1) / scalar_t(512))*x497 - scalar_t(1) / scalar_t(512)*x498;
+        out.rc[6][lane] = -x222*(x300 + x442 + x476);
+        out.rx[7][lane] = -scalar_t(1) / scalar_t(512)*x223 - scalar_t(1) / scalar_t(512)*x369 - scalar_t(1) / scalar_t(512)*x421 + (scalar_t(1) / scalar_t(512))*x469 + (scalar_t(1) / scalar_t(512))*x479 - scalar_t(1) / scalar_t(512)*x484 - scalar_t(1) / scalar_t(512)*x486 + (scalar_t(1) / scalar_t(512))*x488;
+        out.ry[7][lane] = -scalar_t(1) / scalar_t(512)*x278 - scalar_t(1) / scalar_t(512)*x371 - scalar_t(1) / scalar_t(512)*x424 + (scalar_t(1) / scalar_t(512))*x489 + (scalar_t(1) / scalar_t(512))*x490 - scalar_t(1) / scalar_t(512)*x491 - scalar_t(1) / scalar_t(512)*x492 + (scalar_t(1) / scalar_t(512))*x493;
+        out.rz[7][lane] = -scalar_t(1) / scalar_t(512)*x282 - scalar_t(1) / scalar_t(512)*x373 - scalar_t(1) / scalar_t(512)*x427 + (scalar_t(1) / scalar_t(512))*x494 + (scalar_t(1) / scalar_t(512))*x495 - scalar_t(1) / scalar_t(512)*x496 - scalar_t(1) / scalar_t(512)*x497 + (scalar_t(1) / scalar_t(512))*x498;
+        out.rc[7][lane] = x222*(cof0*x473 + cof1*x474 + cof2*x475 - x357 - x410);
+    }
+}
+
+// bounded-face clip.
+static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual_defcor_lim1_simd(
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT cof0_ptr,
+        const scalar_t *const SFEM_RESTRICT cof1_ptr,
+        const scalar_t *const SFEM_RESTRICT cof2_ptr,
+        const scalar_t *const SFEM_RESTRICT cof3_ptr,
+        const scalar_t *const SFEM_RESTRICT cof4_ptr,
+        const scalar_t *const SFEM_RESTRICT cof5_ptr,
+        const scalar_t *const SFEM_RESTRICT cof6_ptr,
+        const scalar_t *const SFEM_RESTRICT cof7_ptr,
+        const scalar_t *const SFEM_RESTRICT cof8_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const Hex8InputPack &in,
+        const Hex8UGradPack &ho,
+        Hex8ResidualPack    &out) {
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t cof0 = scalar_t(cof0_ptr[lane]);
+        const scalar_t cof1 = scalar_t(cof1_ptr[lane]);
+        const scalar_t cof2 = scalar_t(cof2_ptr[lane]);
+        const scalar_t cof3 = scalar_t(cof3_ptr[lane]);
+        const scalar_t cof4 = scalar_t(cof4_ptr[lane]);
+        const scalar_t cof5 = scalar_t(cof5_ptr[lane]);
+        const scalar_t cof6 = scalar_t(cof6_ptr[lane]);
+        const scalar_t cof7 = scalar_t(cof7_ptr[lane]);
+        const scalar_t cof8 = scalar_t(cof8_ptr[lane]);
+        const scalar_t det = scalar_t(det_ptr[lane]);
+        const scalar_t ux0 = in.ux[0][lane];
+        const scalar_t ux1 = in.ux[1][lane];
+        const scalar_t ux2 = in.ux[2][lane];
+        const scalar_t ux3 = in.ux[3][lane];
+        const scalar_t ux4 = in.ux[4][lane];
+        const scalar_t ux5 = in.ux[5][lane];
+        const scalar_t ux6 = in.ux[6][lane];
+        const scalar_t ux7 = in.ux[7][lane];
+        const scalar_t uy0 = in.uy[0][lane];
+        const scalar_t uy1 = in.uy[1][lane];
+        const scalar_t uy2 = in.uy[2][lane];
+        const scalar_t uy3 = in.uy[3][lane];
+        const scalar_t uy4 = in.uy[4][lane];
+        const scalar_t uy5 = in.uy[5][lane];
+        const scalar_t uy6 = in.uy[6][lane];
+        const scalar_t uy7 = in.uy[7][lane];
+        const scalar_t uz0 = in.uz[0][lane];
+        const scalar_t uz1 = in.uz[1][lane];
+        const scalar_t uz2 = in.uz[2][lane];
+        const scalar_t uz3 = in.uz[3][lane];
+        const scalar_t uz4 = in.uz[4][lane];
+        const scalar_t uz5 = in.uz[5][lane];
+        const scalar_t uz6 = in.uz[6][lane];
+        const scalar_t uz7 = in.uz[7][lane];
+        const scalar_t p0 = in.p[0][lane];
+        const scalar_t p1 = in.p[1][lane];
+        const scalar_t p2 = in.p[2][lane];
+        const scalar_t p3 = in.p[3][lane];
+        const scalar_t p4 = in.p[4][lane];
+        const scalar_t p5 = in.p[5][lane];
+        const scalar_t p6 = in.p[6][lane];
+        const scalar_t p7 = in.p[7][lane];
+        const scalar_t x0 = ho.x[0][lane];
+        const scalar_t x1 = ho.x[1][lane];
+        const scalar_t x2 = ho.x[2][lane];
+        const scalar_t x3 = ho.x[3][lane];
+        const scalar_t x4 = ho.x[4][lane];
+        const scalar_t x5 = ho.x[5][lane];
+        const scalar_t x6 = ho.x[6][lane];
+        const scalar_t x7 = ho.x[7][lane];
+        const scalar_t y0 = ho.y[0][lane];
+        const scalar_t y1 = ho.y[1][lane];
+        const scalar_t y2 = ho.y[2][lane];
+        const scalar_t y3 = ho.y[3][lane];
+        const scalar_t y4 = ho.y[4][lane];
+        const scalar_t y5 = ho.y[5][lane];
+        const scalar_t y6 = ho.y[6][lane];
+        const scalar_t y7 = ho.y[7][lane];
+        const scalar_t z0 = ho.z[0][lane];
+        const scalar_t z1 = ho.z[1][lane];
+        const scalar_t z2 = ho.z[2][lane];
+        const scalar_t z3 = ho.z[3][lane];
+        const scalar_t z4 = ho.z[4][lane];
+        const scalar_t z5 = ho.z[5][lane];
+        const scalar_t z6 = ho.z[6][lane];
+        const scalar_t z7 = ho.z[7][lane];
+        const scalar_t g0_0 = ho.g[0][0][lane];
+        const scalar_t g0_1 = ho.g[0][1][lane];
+        const scalar_t g0_2 = ho.g[0][2][lane];
+        const scalar_t g0_3 = ho.g[0][3][lane];
+        const scalar_t g0_4 = ho.g[0][4][lane];
+        const scalar_t g0_5 = ho.g[0][5][lane];
+        const scalar_t g0_6 = ho.g[0][6][lane];
+        const scalar_t g0_7 = ho.g[0][7][lane];
+        const scalar_t g0_8 = ho.g[0][8][lane];
+        const scalar_t g1_0 = ho.g[1][0][lane];
+        const scalar_t g1_1 = ho.g[1][1][lane];
+        const scalar_t g1_2 = ho.g[1][2][lane];
+        const scalar_t g1_3 = ho.g[1][3][lane];
+        const scalar_t g1_4 = ho.g[1][4][lane];
+        const scalar_t g1_5 = ho.g[1][5][lane];
+        const scalar_t g1_6 = ho.g[1][6][lane];
+        const scalar_t g1_7 = ho.g[1][7][lane];
+        const scalar_t g1_8 = ho.g[1][8][lane];
+        const scalar_t g2_0 = ho.g[2][0][lane];
+        const scalar_t g2_1 = ho.g[2][1][lane];
+        const scalar_t g2_2 = ho.g[2][2][lane];
+        const scalar_t g2_3 = ho.g[2][3][lane];
+        const scalar_t g2_4 = ho.g[2][4][lane];
+        const scalar_t g2_5 = ho.g[2][5][lane];
+        const scalar_t g2_6 = ho.g[2][6][lane];
+        const scalar_t g2_7 = ho.g[2][7][lane];
+        const scalar_t g2_8 = ho.g[2][8][lane];
+        const scalar_t g3_0 = ho.g[3][0][lane];
+        const scalar_t g3_1 = ho.g[3][1][lane];
+        const scalar_t g3_2 = ho.g[3][2][lane];
+        const scalar_t g3_3 = ho.g[3][3][lane];
+        const scalar_t g3_4 = ho.g[3][4][lane];
+        const scalar_t g3_5 = ho.g[3][5][lane];
+        const scalar_t g3_6 = ho.g[3][6][lane];
+        const scalar_t g3_7 = ho.g[3][7][lane];
+        const scalar_t g3_8 = ho.g[3][8][lane];
+        const scalar_t g4_0 = ho.g[4][0][lane];
+        const scalar_t g4_1 = ho.g[4][1][lane];
+        const scalar_t g4_2 = ho.g[4][2][lane];
+        const scalar_t g4_3 = ho.g[4][3][lane];
+        const scalar_t g4_4 = ho.g[4][4][lane];
+        const scalar_t g4_5 = ho.g[4][5][lane];
+        const scalar_t g4_6 = ho.g[4][6][lane];
+        const scalar_t g4_7 = ho.g[4][7][lane];
+        const scalar_t g4_8 = ho.g[4][8][lane];
+        const scalar_t g5_0 = ho.g[5][0][lane];
+        const scalar_t g5_1 = ho.g[5][1][lane];
+        const scalar_t g5_2 = ho.g[5][2][lane];
+        const scalar_t g5_3 = ho.g[5][3][lane];
+        const scalar_t g5_4 = ho.g[5][4][lane];
+        const scalar_t g5_5 = ho.g[5][5][lane];
+        const scalar_t g5_6 = ho.g[5][6][lane];
+        const scalar_t g5_7 = ho.g[5][7][lane];
+        const scalar_t g5_8 = ho.g[5][8][lane];
+        const scalar_t g6_0 = ho.g[6][0][lane];
+        const scalar_t g6_1 = ho.g[6][1][lane];
+        const scalar_t g6_2 = ho.g[6][2][lane];
+        const scalar_t g6_3 = ho.g[6][3][lane];
+        const scalar_t g6_4 = ho.g[6][4][lane];
+        const scalar_t g6_5 = ho.g[6][5][lane];
+        const scalar_t g6_6 = ho.g[6][6][lane];
+        const scalar_t g6_7 = ho.g[6][7][lane];
+        const scalar_t g6_8 = ho.g[6][8][lane];
+        const scalar_t g7_0 = ho.g[7][0][lane];
+        const scalar_t g7_1 = ho.g[7][1][lane];
+        const scalar_t g7_2 = ho.g[7][2][lane];
+        const scalar_t g7_3 = ho.g[7][3][lane];
+        const scalar_t g7_4 = ho.g[7][4][lane];
+        const scalar_t g7_5 = ho.g[7][5][lane];
+        const scalar_t g7_6 = ho.g[7][6][lane];
+        const scalar_t g7_7 = ho.g[7][7][lane];
+        const scalar_t g7_8 = ho.g[7][8][lane];
+        const scalar_t mdot0 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux1) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy1) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz1));
+        const scalar_t sgn0 = mdot0 > scalar_t(0) ? scalar_t(1) : (mdot0 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot1 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn1 = mdot1 > scalar_t(0) ? scalar_t(1) : (mdot1 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot2 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn2 = mdot2 > scalar_t(0) ? scalar_t(1) : (mdot2 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot3 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux6 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy6 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz6 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn3 = mdot3 > scalar_t(0) ? scalar_t(1) : (mdot3 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot4 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn4 = mdot4 > scalar_t(0) ? scalar_t(1) : (mdot4 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot5 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux2) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy2) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz2));
+        const scalar_t sgn5 = mdot5 > scalar_t(0) ? scalar_t(1) : (mdot5 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot6 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn6 = mdot6 > scalar_t(0) ? scalar_t(1) : (mdot6 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot7 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux5 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy5 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz5 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn7 = mdot7 > scalar_t(0) ? scalar_t(1) : (mdot7 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot8 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux4) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy4) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz4));
+        const scalar_t sgn8 = mdot8 > scalar_t(0) ? scalar_t(1) : (mdot8 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot9 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn9 = mdot9 > scalar_t(0) ? scalar_t(1) : (mdot9 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot10 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn10 = mdot10 > scalar_t(0) ? scalar_t(1) : (mdot10 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot11 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux3 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy3 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz3 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn11 = mdot11 > scalar_t(0) ? scalar_t(1) : (mdot11 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t x8 = p0 + p1;
+        const scalar_t x9 = scalar_t(2)*cof0;
+        const scalar_t x10 = x8*x9;
+        const scalar_t x11 = p0 + p3;
+        const scalar_t x12 = scalar_t(2)*cof3;
+        const scalar_t x13 = x11*x12;
+        const scalar_t x14 = p0 + p4;
+        const scalar_t x15 = scalar_t(2)*cof6;
+        const scalar_t x16 = x14*x15;
+        const scalar_t x17 = rho*ux0;
+        const scalar_t x18 = ux0 + ux1;
+        const scalar_t x19 = cof0*x18;
+        const scalar_t x20 = uy0 + uy1;
+        const scalar_t x21 = cof1*x20;
+        const scalar_t x22 = uz0 + uz1;
+        const scalar_t x23 = cof2*x22;
+        const scalar_t x24 = x19 + x21 + x23;
+        const scalar_t x25 = x24*(sgn0 + scalar_t(1));
+        const scalar_t x26 = x17*x25;
+        const scalar_t x27 = ux0 + ux3;
+        const scalar_t x28 = cof3*x27;
+        const scalar_t x29 = uy0 + uy3;
+        const scalar_t x30 = cof4*x29;
+        const scalar_t x31 = uz0 + uz3;
+        const scalar_t x32 = cof5*x31;
+        const scalar_t x33 = x28 + x30 + x32;
+        const scalar_t x34 = x33*(sgn4 + scalar_t(1));
+        const scalar_t x35 = x17*x34;
+        const scalar_t x36 = cof6*(ux0 + ux4);
+        const scalar_t x37 = cof7*(uy0 + uy4);
+        const scalar_t x38 = cof8*(uz0 + uz4);
+        const scalar_t x39 = x36 + x37 + x38;
+        const scalar_t x40 = x39*(sgn8 + scalar_t(1));
+        const scalar_t x41 = x17*x40;
+        const scalar_t x42 = fmin(ux0, ux1);
+        const scalar_t x43 = fmax(ux0, ux1);
+        const scalar_t x44 = scalar_t(9)*x0;
+        const scalar_t x45 = scalar_t(3)*x2 + scalar_t(3)*x4;
+        const scalar_t x46 = x45 + x6;
+        const scalar_t x47 = x44 + x46;
+        const scalar_t x48 = -scalar_t(23)*x1;
+        const scalar_t x49 = scalar_t(3)*x3 + scalar_t(3)*x5;
+        const scalar_t x50 = x49 + x7;
+        const scalar_t x51 = x48 + x50;
+        const scalar_t x52 = (scalar_t(1) / scalar_t(32))*x47 + (scalar_t(1) / scalar_t(32))*x51;
+        const scalar_t x53 = scalar_t(9)*y0;
+        const scalar_t x54 = scalar_t(3)*y2 + scalar_t(3)*y4;
+        const scalar_t x55 = x54 + y6;
+        const scalar_t x56 = x53 + x55;
+        const scalar_t x57 = -scalar_t(23)*y1;
+        const scalar_t x58 = scalar_t(3)*y3 + scalar_t(3)*y5;
+        const scalar_t x59 = x58 + y7;
+        const scalar_t x60 = x57 + x59;
+        const scalar_t x61 = (scalar_t(1) / scalar_t(32))*x56 + (scalar_t(1) / scalar_t(32))*x60;
+        const scalar_t x62 = scalar_t(9)*z0;
+        const scalar_t x63 = scalar_t(3)*z2 + scalar_t(3)*z4;
+        const scalar_t x64 = x63 + z6;
+        const scalar_t x65 = x62 + x64;
+        const scalar_t x66 = -scalar_t(23)*z1;
+        const scalar_t x67 = scalar_t(3)*z3 + scalar_t(3)*z5;
+        const scalar_t x68 = x67 + z7;
+        const scalar_t x69 = x66 + x68;
+        const scalar_t x70 = (scalar_t(1) / scalar_t(32))*x65 + (scalar_t(1) / scalar_t(32))*x69;
+        const scalar_t x71 = rho*x24*(sgn0 + scalar_t(-1));
+        const scalar_t x72 = x71*(ux1 - fmax(x42, fmin(x43, g1_0*x52 + g1_1*x61 + g1_2*x70 + ux1)));
+        const scalar_t x73 = fmin(ux0, ux3);
+        const scalar_t x74 = fmax(ux0, ux3);
+        const scalar_t x75 = scalar_t(3)*x1 + scalar_t(3)*x7;
+        const scalar_t x76 = -scalar_t(23)*x3 + x5;
+        const scalar_t x77 = x75 + x76;
+        const scalar_t x78 = (scalar_t(1) / scalar_t(32))*x47 + (scalar_t(1) / scalar_t(32))*x77;
+        const scalar_t x79 = scalar_t(3)*y1 + scalar_t(3)*y7;
+        const scalar_t x80 = -scalar_t(23)*y3 + y5;
+        const scalar_t x81 = x79 + x80;
+        const scalar_t x82 = (scalar_t(1) / scalar_t(32))*x56 + (scalar_t(1) / scalar_t(32))*x81;
+        const scalar_t x83 = scalar_t(3)*z1 + scalar_t(3)*z7;
+        const scalar_t x84 = -scalar_t(23)*z3 + z5;
+        const scalar_t x85 = x83 + x84;
+        const scalar_t x86 = (scalar_t(1) / scalar_t(32))*x65 + (scalar_t(1) / scalar_t(32))*x85;
+        const scalar_t x87 = rho*x33*(sgn4 + scalar_t(-1));
+        const scalar_t x88 = x87*(ux3 - fmax(x73, fmin(x74, g3_0*x78 + g3_1*x82 + g3_2*x86 + ux3)));
+        const scalar_t x89 = fmin(ux0, ux4);
+        const scalar_t x90 = fmax(ux0, ux4);
+        const scalar_t x91 = x2 - scalar_t(23)*x4;
+        const scalar_t x92 = x49 + x75;
+        const scalar_t x93 = x6 + x92;
+        const scalar_t x94 = (scalar_t(1) / scalar_t(32))*x44 + (scalar_t(1) / scalar_t(32))*x91 + (scalar_t(1) / scalar_t(32))*x93;
+        const scalar_t x95 = y2 - scalar_t(23)*y4;
+        const scalar_t x96 = x58 + x79;
+        const scalar_t x97 = x96 + y6;
+        const scalar_t x98 = (scalar_t(1) / scalar_t(32))*x53 + (scalar_t(1) / scalar_t(32))*x95 + (scalar_t(1) / scalar_t(32))*x97;
+        const scalar_t x99 = z2 - scalar_t(23)*z4;
+        const scalar_t x100 = x67 + x83;
+        const scalar_t x101 = x100 + z6;
+        const scalar_t x102 = (scalar_t(1) / scalar_t(32))*x101 + (scalar_t(1) / scalar_t(32))*x62 + (scalar_t(1) / scalar_t(32))*x99;
+        const scalar_t x103 = rho*x39*(sgn8 + scalar_t(-1));
+        const scalar_t x104 = x103*(ux4 - fmax(x89, fmin(x90, g4_0*x94 + g4_1*x98 + g4_2*x102 + ux4)));
+        const scalar_t x105 = ux1*x71;
+        const scalar_t x106 = ux3*x87;
+        const scalar_t x107 = ux4*x103;
+        const scalar_t x108 = -scalar_t(23)*x0;
+        const scalar_t x109 = x108 + x46;
+        const scalar_t x110 = scalar_t(9)*x1;
+        const scalar_t x111 = x110 + x50;
+        const scalar_t x112 = x109 + x111;
+        const scalar_t x113 = (scalar_t(1) / scalar_t(32))*g0_0;
+        const scalar_t x114 = -scalar_t(23)*y0;
+        const scalar_t x115 = x114 + x55;
+        const scalar_t x116 = scalar_t(9)*y1;
+        const scalar_t x117 = x116 + x59;
+        const scalar_t x118 = x115 + x117;
+        const scalar_t x119 = (scalar_t(1) / scalar_t(32))*g0_1;
+        const scalar_t x120 = -scalar_t(23)*z0;
+        const scalar_t x121 = x120 + x64;
+        const scalar_t x122 = scalar_t(9)*z1;
+        const scalar_t x123 = x122 + x68;
+        const scalar_t x124 = x121 + x123;
+        const scalar_t x125 = (scalar_t(1) / scalar_t(32))*g0_2;
+        const scalar_t x126 = rho*x25;
+        const scalar_t x127 = x126*(ux0 - fmax(x42, fmin(x43, ux0 + x112*x113 + x118*x119 + x124*x125)));
+        const scalar_t x128 = scalar_t(9)*x3 + x5;
+        const scalar_t x129 = x128 + x75;
+        const scalar_t x130 = x109 + x129;
+        const scalar_t x131 = scalar_t(9)*y3 + y5;
+        const scalar_t x132 = x131 + x79;
+        const scalar_t x133 = x115 + x132;
+        const scalar_t x134 = scalar_t(9)*z3 + z5;
+        const scalar_t x135 = x134 + x83;
+        const scalar_t x136 = x121 + x135;
+        const scalar_t x137 = rho*x34;
+        const scalar_t x138 = x137*(ux0 - fmax(x73, fmin(x74, ux0 + x113*x130 + x119*x133 + x125*x136)));
+        const scalar_t x139 = x2 + scalar_t(9)*x4;
+        const scalar_t x140 = x108 + x139 + x93;
+        const scalar_t x141 = y2 + scalar_t(9)*y4;
+        const scalar_t x142 = x114 + x141 + x97;
+        const scalar_t x143 = z2 + scalar_t(9)*z4;
+        const scalar_t x144 = x101 + x120 + x143;
+        const scalar_t x145 = rho*x40;
+        const scalar_t x146 = x145*(ux0 - fmax(x89, fmin(x90, ux0 + x113*x140 + x119*x142 + x125*x144)));
+        const scalar_t x147 = -ux5;
+        const scalar_t x148 = ux4 + ux7;
+        const scalar_t x149 = -ux6;
+        const scalar_t x150 = -ux2 + x149;
+        const scalar_t x151 = -ux1 + x147 + x148 + x150 + x27;
+        const scalar_t x152 = ux4 + ux5;
+        const scalar_t x153 = -ux7 + x18;
+        const scalar_t x154 = -ux3 + x150 + x152 + x153;
+        const scalar_t x155 = ux2 + ux3;
+        const scalar_t x156 = -ux4 + x147 + x149 + x153 + x155;
+        const scalar_t x157 = cof0*x151 + cof3*x154 + cof6*x156;
+        const scalar_t x158 = -uy5;
+        const scalar_t x159 = uy4 + uy7;
+        const scalar_t x160 = -uy6;
+        const scalar_t x161 = -uy2 + x160;
+        const scalar_t x162 = -uy1 + x158 + x159 + x161 + x29;
+        const scalar_t x163 = uy4 + uy5;
+        const scalar_t x164 = -uy7 + x20;
+        const scalar_t x165 = -uy3 + x161 + x163 + x164;
+        const scalar_t x166 = uy2 + uy3;
+        const scalar_t x167 = -uy4 + x158 + x160 + x164 + x166;
+        const scalar_t x168 = cof0*x162 + cof1*x151 + cof3*x165 + cof4*x154 + cof6*x167 + cof7*x156;
+        const scalar_t x169 = -uz5;
+        const scalar_t x170 = uz4 + uz7;
+        const scalar_t x171 = -uz6;
+        const scalar_t x172 = -uz2 + x171;
+        const scalar_t x173 = -uz1 + x169 + x170 + x172 + x31;
+        const scalar_t x174 = uz4 + uz5;
+        const scalar_t x175 = -uz7 + x22;
+        const scalar_t x176 = -uz3 + x172 + x174 + x175;
+        const scalar_t x177 = uz2 + uz3;
+        const scalar_t x178 = -uz4 + x169 + x171 + x175 + x177;
+        const scalar_t x179 = cof0*x173 + cof2*x151 + cof3*x176 + cof5*x154 + cof6*x178 + cof8*x156;
+        const scalar_t x180 = mu/det;
+        const scalar_t x181 = x180*(cof1*x168 + cof2*x179 + x157*x9);
+        const scalar_t x182 = x180*(cof4*x168 + cof5*x179 + x12*x157);
+        const scalar_t x183 = x180*(cof7*x168 + cof8*x179 + x15*x157);
+        const scalar_t x184 = x182 + x183;
+        const scalar_t x185 = x181 + x184;
+        const scalar_t x186 = scalar_t(2)*cof1;
+        const scalar_t x187 = x186*x8;
+        const scalar_t x188 = scalar_t(2)*cof4;
+        const scalar_t x189 = x11*x188;
+        const scalar_t x190 = scalar_t(2)*cof7;
+        const scalar_t x191 = x14*x190;
+        const scalar_t x192 = uy0*x126;
+        const scalar_t x193 = uy0*x137;
+        const scalar_t x194 = uy0*x145;
+        const scalar_t x195 = fmin(uy0, uy1);
+        const scalar_t x196 = fmax(uy0, uy1);
+        const scalar_t x197 = x71*(uy1 - fmax(x195, fmin(x196, g1_3*x52 + g1_4*x61 + g1_5*x70 + uy1)));
+        const scalar_t x198 = fmin(uy0, uy3);
+        const scalar_t x199 = fmax(uy0, uy3);
+        const scalar_t x200 = x87*(uy3 - fmax(x198, fmin(x199, g3_3*x78 + g3_4*x82 + g3_5*x86 + uy3)));
+        const scalar_t x201 = fmin(uy0, uy4);
+        const scalar_t x202 = fmax(uy0, uy4);
+        const scalar_t x203 = x103*(uy4 - fmax(x201, fmin(x202, g4_3*x94 + g4_4*x98 + g4_5*x102 + uy4)));
+        const scalar_t x204 = uy1*x71;
+        const scalar_t x205 = uy3*x87;
+        const scalar_t x206 = uy4*x103;
+        const scalar_t x207 = (scalar_t(1) / scalar_t(32))*g0_3;
+        const scalar_t x208 = (scalar_t(1) / scalar_t(32))*g0_4;
+        const scalar_t x209 = (scalar_t(1) / scalar_t(32))*g0_5;
+        const scalar_t x210 = x126*(uy0 - fmax(x195, fmin(x196, uy0 + x112*x207 + x118*x208 + x124*x209)));
+        const scalar_t x211 = x137*(uy0 - fmax(x198, fmin(x199, uy0 + x130*x207 + x133*x208 + x136*x209)));
+        const scalar_t x212 = x145*(uy0 - fmax(x201, fmin(x202, uy0 + x140*x207 + x142*x208 + x144*x209)));
+        const scalar_t x213 = cof1*x162 + cof4*x165 + cof7*x167;
+        const scalar_t x214 = cof1*x173 + cof2*x162 + cof4*x176 + cof5*x165 + cof7*x178 + cof8*x167;
+        const scalar_t x215 = x180*(cof0*x168 + cof2*x214 + x186*x213);
+        const scalar_t x216 = x180*(cof3*x168 + cof5*x214 + x188*x213);
+        const scalar_t x217 = x180*(cof6*x168 + cof8*x214 + x190*x213);
+        const scalar_t x218 = x216 + x217;
+        const scalar_t x219 = x215 + x218;
+        const scalar_t x220 = scalar_t(2)*cof2;
+        const scalar_t x221 = x220*x8;
+        const scalar_t x222 = scalar_t(2)*cof5;
+        const scalar_t x223 = x11*x222;
+        const scalar_t x224 = scalar_t(2)*cof8;
+        const scalar_t x225 = x14*x224;
+        const scalar_t x226 = uz0*x126;
+        const scalar_t x227 = uz0*x137;
+        const scalar_t x228 = uz0*x145;
+        const scalar_t x229 = fmin(uz0, uz1);
+        const scalar_t x230 = fmax(uz0, uz1);
+        const scalar_t x231 = x71*(uz1 - fmax(x229, fmin(x230, g1_6*x52 + g1_7*x61 + g1_8*x70 + uz1)));
+        const scalar_t x232 = fmin(uz0, uz3);
+        const scalar_t x233 = fmax(uz0, uz3);
+        const scalar_t x234 = x87*(uz3 - fmax(x232, fmin(x233, g3_6*x78 + g3_7*x82 + g3_8*x86 + uz3)));
+        const scalar_t x235 = fmin(uz0, uz4);
+        const scalar_t x236 = fmax(uz0, uz4);
+        const scalar_t x237 = x103*(uz4 - fmax(x235, fmin(x236, g4_6*x94 + g4_7*x98 + g4_8*x102 + uz4)));
+        const scalar_t x238 = uz1*x71;
+        const scalar_t x239 = uz3*x87;
+        const scalar_t x240 = uz4*x103;
+        const scalar_t x241 = (scalar_t(1) / scalar_t(32))*g0_6;
+        const scalar_t x242 = (scalar_t(1) / scalar_t(32))*g0_7;
+        const scalar_t x243 = (scalar_t(1) / scalar_t(32))*g0_8;
+        const scalar_t x244 = x126*(uz0 - fmax(x229, fmin(x230, uz0 + x112*x241 + x118*x242 + x124*x243)));
+        const scalar_t x245 = x137*(uz0 - fmax(x232, fmin(x233, uz0 + x130*x241 + x133*x242 + x136*x243)));
+        const scalar_t x246 = x145*(uz0 - fmax(x235, fmin(x236, uz0 + x140*x241 + x142*x242 + x144*x243)));
+        const scalar_t x247 = cof2*x173 + cof5*x176 + cof8*x178;
+        const scalar_t x248 = x180*(cof0*x179 + cof1*x214 + x220*x247);
+        const scalar_t x249 = x180*(cof3*x179 + cof4*x214 + x222*x247);
+        const scalar_t x250 = x180*(cof6*x179 + cof7*x214 + x224*x247);
+        const scalar_t x251 = x249 + x250;
+        const scalar_t x252 = x248 + x251;
+        const scalar_t x253 = (scalar_t(1) / scalar_t(8))*rho;
+        const scalar_t x254 = -x181 + x184;
+        const scalar_t x255 = p1 + p2;
+        const scalar_t x256 = rho*ux1;
+        const scalar_t x257 = cof3*(ux1 + ux2) + cof4*(uy1 + uy2) + cof5*(uz1 + uz2);
+        const scalar_t x258 = x257*(sgn5 + scalar_t(1));
+        const scalar_t x259 = fmin(ux1, ux2);
+        const scalar_t x260 = fmax(ux1, ux2);
+        const scalar_t x261 = scalar_t(3)*x0 + scalar_t(3)*x6;
+        const scalar_t x262 = -scalar_t(23)*x2 + x4;
+        const scalar_t x263 = x261 + x262;
+        const scalar_t x264 = (scalar_t(1) / scalar_t(32))*x111 + (scalar_t(1) / scalar_t(32))*x263;
+        const scalar_t x265 = scalar_t(3)*y0 + scalar_t(3)*y6;
+        const scalar_t x266 = -scalar_t(23)*y2 + y4;
+        const scalar_t x267 = x265 + x266;
+        const scalar_t x268 = (scalar_t(1) / scalar_t(32))*x117 + (scalar_t(1) / scalar_t(32))*x267;
+        const scalar_t x269 = scalar_t(3)*z0 + scalar_t(3)*z6;
+        const scalar_t x270 = -scalar_t(23)*z2 + z4;
+        const scalar_t x271 = x269 + x270;
+        const scalar_t x272 = (scalar_t(1) / scalar_t(32))*x123 + (scalar_t(1) / scalar_t(32))*x271;
+        const scalar_t x273 = rho*x257*(sgn5 + scalar_t(-1));
+        const scalar_t x274 = scalar_t(9)*x2 + x4;
+        const scalar_t x275 = x261 + x274;
+        const scalar_t x276 = x275 + x51;
+        const scalar_t x277 = (scalar_t(1) / scalar_t(32))*g1_0;
+        const scalar_t x278 = scalar_t(9)*y2 + y4;
+        const scalar_t x279 = x265 + x278;
+        const scalar_t x280 = x279 + x60;
+        const scalar_t x281 = (scalar_t(1) / scalar_t(32))*g1_1;
+        const scalar_t x282 = scalar_t(9)*z2 + z4;
+        const scalar_t x283 = x269 + x282;
+        const scalar_t x284 = x283 + x69;
+        const scalar_t x285 = (scalar_t(1) / scalar_t(32))*g1_2;
+        const scalar_t x286 = rho*x258;
+        const scalar_t x287 = -ux2*x273 + x12*x255 + x256*x258 + x273*(ux2 - fmax(x259, fmin(x260, g2_0*x264 + g2_1*x268 + g2_2*x272 + ux2))) - x286*(ux1 - fmax(x259, fmin(x260, ux1 + x276*x277 + x280*x281 + x284*x285)));
+        const scalar_t x288 = p1 + p5;
+        const scalar_t x289 = cof6*(ux1 + ux5) + cof7*(uy1 + uy5) + cof8*(uz1 + uz5);
+        const scalar_t x290 = x289*(sgn9 + scalar_t(1));
+        const scalar_t x291 = fmin(ux1, ux5);
+        const scalar_t x292 = fmax(ux1, ux5);
+        const scalar_t x293 = x3 - scalar_t(23)*x5;
+        const scalar_t x294 = x261 + x45;
+        const scalar_t x295 = x294 + x7;
+        const scalar_t x296 = (scalar_t(1) / scalar_t(32))*x110 + (scalar_t(1) / scalar_t(32))*x293 + (scalar_t(1) / scalar_t(32))*x295;
+        const scalar_t x297 = y3 - scalar_t(23)*y5;
+        const scalar_t x298 = x265 + x54;
+        const scalar_t x299 = x298 + y7;
+        const scalar_t x300 = (scalar_t(1) / scalar_t(32))*x116 + (scalar_t(1) / scalar_t(32))*x297 + (scalar_t(1) / scalar_t(32))*x299;
+        const scalar_t x301 = z3 - scalar_t(23)*z5;
+        const scalar_t x302 = x269 + x63;
+        const scalar_t x303 = x302 + z7;
+        const scalar_t x304 = (scalar_t(1) / scalar_t(32))*x122 + (scalar_t(1) / scalar_t(32))*x301 + (scalar_t(1) / scalar_t(32))*x303;
+        const scalar_t x305 = rho*x289*(sgn9 + scalar_t(-1));
+        const scalar_t x306 = x3 + scalar_t(9)*x5;
+        const scalar_t x307 = x295 + x306 + x48;
+        const scalar_t x308 = y3 + scalar_t(9)*y5;
+        const scalar_t x309 = x299 + x308 + x57;
+        const scalar_t x310 = z3 + scalar_t(9)*z5;
+        const scalar_t x311 = x303 + x310 + x66;
+        const scalar_t x312 = rho*x290;
+        const scalar_t x313 = -ux5*x305 + x15*x288 + x256*x290 + x305*(ux5 - fmax(x291, fmin(x292, g5_0*x296 + g5_1*x300 + g5_2*x304 + ux5))) - x312*(ux1 - fmax(x291, fmin(x292, ux1 + x277*x307 + x281*x309 + x285*x311)));
+        const scalar_t x314 = -x215 + x218;
+        const scalar_t x315 = fmin(uy1, uy2);
+        const scalar_t x316 = fmax(uy1, uy2);
+        const scalar_t x317 = (scalar_t(1) / scalar_t(32))*g1_3;
+        const scalar_t x318 = (scalar_t(1) / scalar_t(32))*g1_4;
+        const scalar_t x319 = (scalar_t(1) / scalar_t(32))*g1_5;
+        const scalar_t x320 = uy1*x286 - uy2*x273 + x188*x255 + x273*(uy2 - fmax(x315, fmin(x316, g2_3*x264 + g2_4*x268 + g2_5*x272 + uy2))) - x286*(uy1 - fmax(x315, fmin(x316, uy1 + x276*x317 + x280*x318 + x284*x319)));
+        const scalar_t x321 = fmin(uy1, uy5);
+        const scalar_t x322 = fmax(uy1, uy5);
+        const scalar_t x323 = uy1*x312 - uy5*x305 + x190*x288 + x305*(uy5 - fmax(x321, fmin(x322, g5_3*x296 + g5_4*x300 + g5_5*x304 + uy5))) - x312*(uy1 - fmax(x321, fmin(x322, uy1 + x307*x317 + x309*x318 + x311*x319)));
+        const scalar_t x324 = -x248 + x251;
+        const scalar_t x325 = fmin(uz1, uz2);
+        const scalar_t x326 = fmax(uz1, uz2);
+        const scalar_t x327 = (scalar_t(1) / scalar_t(32))*g1_6;
+        const scalar_t x328 = (scalar_t(1) / scalar_t(32))*g1_7;
+        const scalar_t x329 = (scalar_t(1) / scalar_t(32))*g1_8;
+        const scalar_t x330 = uz1*x286 - uz2*x273 + x222*x255 + x273*(uz2 - fmax(x325, fmin(x326, g2_6*x264 + g2_7*x268 + g2_8*x272 + uz2))) - x286*(uz1 - fmax(x325, fmin(x326, uz1 + x276*x327 + x280*x328 + x284*x329)));
+        const scalar_t x331 = fmin(uz1, uz5);
+        const scalar_t x332 = fmax(uz1, uz5);
+        const scalar_t x333 = uz1*x312 - uz5*x305 + x224*x288 + x305*(uz5 - fmax(x331, fmin(x332, g5_6*x296 + g5_7*x300 + g5_8*x304 + uz5))) - x312*(uz1 - fmax(x331, fmin(x332, uz1 + x307*x327 + x309*x328 + x311*x329)));
+        const scalar_t x334 = p2 + p6;
+        const scalar_t x335 = x15*x334;
+        const scalar_t x336 = ux2 + ux6;
+        const scalar_t x337 = uy2 + uy6;
+        const scalar_t x338 = uz2 + uz6;
+        const scalar_t x339 = cof6*x336 + cof7*x337 + cof8*x338;
+        const scalar_t x340 = rho*x339*(sgn10 + scalar_t(-1));
+        const scalar_t x341 = ux6*x340;
+        const scalar_t x342 = fmin(ux2, ux6);
+        const scalar_t x343 = fmax(ux2, ux6);
+        const scalar_t x344 = scalar_t(9)*x6;
+        const scalar_t x345 = x0 + x92;
+        const scalar_t x346 = x262 + x344 + x345;
+        const scalar_t x347 = (scalar_t(1) / scalar_t(32))*g2_0;
+        const scalar_t x348 = scalar_t(9)*y6;
+        const scalar_t x349 = x96 + y0;
+        const scalar_t x350 = x266 + x348 + x349;
+        const scalar_t x351 = (scalar_t(1) / scalar_t(32))*g2_1;
+        const scalar_t x352 = scalar_t(9)*z6;
+        const scalar_t x353 = x100 + z0;
+        const scalar_t x354 = x270 + x352 + x353;
+        const scalar_t x355 = (scalar_t(1) / scalar_t(32))*g2_2;
+        const scalar_t x356 = x339*(sgn10 + scalar_t(1));
+        const scalar_t x357 = rho*x356;
+        const scalar_t x358 = x357*(ux2 - fmax(x342, fmin(x343, ux2 + x346*x347 + x350*x351 + x354*x355)));
+        const scalar_t x359 = rho*ux2;
+        const scalar_t x360 = x356*x359;
+        const scalar_t x361 = -scalar_t(23)*x6;
+        const scalar_t x362 = (scalar_t(1) / scalar_t(32))*x274 + (scalar_t(1) / scalar_t(32))*x345 + (scalar_t(1) / scalar_t(32))*x361;
+        const scalar_t x363 = -scalar_t(23)*y6;
+        const scalar_t x364 = (scalar_t(1) / scalar_t(32))*x278 + (scalar_t(1) / scalar_t(32))*x349 + (scalar_t(1) / scalar_t(32))*x363;
+        const scalar_t x365 = -scalar_t(23)*z6;
+        const scalar_t x366 = (scalar_t(1) / scalar_t(32))*x282 + (scalar_t(1) / scalar_t(32))*x353 + (scalar_t(1) / scalar_t(32))*x365;
+        const scalar_t x367 = x340*(ux6 - fmax(x342, fmin(x343, g6_0*x362 + g6_1*x364 + g6_2*x366 + ux6)));
+        const scalar_t x368 = x181 + x182 - x183;
+        const scalar_t x369 = p2 + p3;
+        const scalar_t x370 = cof0*x155 + cof1*x166 + cof2*x177;
+        const scalar_t x371 = rho*x370*(sgn1 + scalar_t(1));
+        const scalar_t x372 = fmin(ux2, ux3);
+        const scalar_t x373 = fmax(ux2, ux3);
+        const scalar_t x374 = x129 + x263;
+        const scalar_t x375 = x132 + x267;
+        const scalar_t x376 = x135 + x271;
+        const scalar_t x377 = x370*(sgn1 + scalar_t(-1));
+        const scalar_t x378 = rho*x377;
+        const scalar_t x379 = (scalar_t(1) / scalar_t(32))*x275 + (scalar_t(1) / scalar_t(32))*x77;
+        const scalar_t x380 = (scalar_t(1) / scalar_t(32))*x279 + (scalar_t(1) / scalar_t(32))*x81;
+        const scalar_t x381 = (scalar_t(1) / scalar_t(32))*x283 + (scalar_t(1) / scalar_t(32))*x85;
+        const scalar_t x382 = ux3*x371 - x359*x377 + x369*x9 - x371*(ux3 - fmax(x372, fmin(x373, g3_0*x379 + g3_1*x380 + g3_2*x381 + ux3))) + x378*(ux2 - fmax(x372, fmin(x373, ux2 + x347*x374 + x351*x375 + x355*x376)));
+        const scalar_t x383 = x190*x334;
+        const scalar_t x384 = uy6*x340;
+        const scalar_t x385 = fmin(uy2, uy6);
+        const scalar_t x386 = fmax(uy2, uy6);
+        const scalar_t x387 = (scalar_t(1) / scalar_t(32))*g2_3;
+        const scalar_t x388 = (scalar_t(1) / scalar_t(32))*g2_4;
+        const scalar_t x389 = (scalar_t(1) / scalar_t(32))*g2_5;
+        const scalar_t x390 = x357*(uy2 - fmax(x385, fmin(x386, uy2 + x346*x387 + x350*x388 + x354*x389)));
+        const scalar_t x391 = uy2*x357;
+        const scalar_t x392 = x340*(uy6 - fmax(x385, fmin(x386, g6_3*x362 + g6_4*x364 + g6_5*x366 + uy6)));
+        const scalar_t x393 = x215 + x216 - x217;
+        const scalar_t x394 = fmin(uy2, uy3);
+        const scalar_t x395 = fmax(uy2, uy3);
+        const scalar_t x396 = -uy2*x378 + uy3*x371 + x186*x369 - x371*(uy3 - fmax(x394, fmin(x395, g3_3*x379 + g3_4*x380 + g3_5*x381 + uy3))) + x378*(uy2 - fmax(x394, fmin(x395, uy2 + x374*x387 + x375*x388 + x376*x389)));
+        const scalar_t x397 = x224*x334;
+        const scalar_t x398 = uz6*x340;
+        const scalar_t x399 = fmin(uz2, uz6);
+        const scalar_t x400 = fmax(uz2, uz6);
+        const scalar_t x401 = (scalar_t(1) / scalar_t(32))*g2_6;
+        const scalar_t x402 = (scalar_t(1) / scalar_t(32))*g2_7;
+        const scalar_t x403 = (scalar_t(1) / scalar_t(32))*g2_8;
+        const scalar_t x404 = x357*(uz2 - fmax(x399, fmin(x400, uz2 + x346*x401 + x350*x402 + x354*x403)));
+        const scalar_t x405 = uz2*x357;
+        const scalar_t x406 = x340*(uz6 - fmax(x399, fmin(x400, g6_6*x362 + g6_7*x364 + g6_8*x366 + uz6)));
+        const scalar_t x407 = x248 + x249 - x250;
+        const scalar_t x408 = fmin(uz2, uz3);
+        const scalar_t x409 = fmax(uz2, uz3);
+        const scalar_t x410 = -uz2*x378 + uz3*x371 + x220*x369 - x371*(uz3 - fmax(x408, fmin(x409, g3_6*x379 + g3_7*x380 + g3_8*x381 + uz3))) + x378*(uz2 - fmax(x408, fmin(x409, uz2 + x374*x401 + x375*x402 + x376*x403)));
+        const scalar_t x411 = x181 - x182 + x183;
+        const scalar_t x412 = p3 + p7;
+        const scalar_t x413 = cof6*(ux3 + ux7) + cof7*(uy3 + uy7) + cof8*(uz3 + uz7);
+        const scalar_t x414 = rho*x413;
+        const scalar_t x415 = x414*(sgn11 + scalar_t(1));
+        const scalar_t x416 = fmin(ux3, ux7);
+        const scalar_t x417 = fmax(ux3, ux7);
+        const scalar_t x418 = -scalar_t(23)*x7;
+        const scalar_t x419 = x1 + x294;
+        const scalar_t x420 = (scalar_t(1) / scalar_t(32))*x128 + (scalar_t(1) / scalar_t(32))*x418 + (scalar_t(1) / scalar_t(32))*x419;
+        const scalar_t x421 = -scalar_t(23)*y7;
+        const scalar_t x422 = x298 + y1;
+        const scalar_t x423 = (scalar_t(1) / scalar_t(32))*x131 + (scalar_t(1) / scalar_t(32))*x421 + (scalar_t(1) / scalar_t(32))*x422;
+        const scalar_t x424 = -scalar_t(23)*z7;
+        const scalar_t x425 = x302 + z1;
+        const scalar_t x426 = (scalar_t(1) / scalar_t(32))*x134 + (scalar_t(1) / scalar_t(32))*x424 + (scalar_t(1) / scalar_t(32))*x425;
+        const scalar_t x427 = x414*(sgn11 + scalar_t(-1));
+        const scalar_t x428 = scalar_t(9)*x7;
+        const scalar_t x429 = (scalar_t(1) / scalar_t(32))*x419 + (scalar_t(1) / scalar_t(32))*x428 + (scalar_t(1) / scalar_t(32))*x76;
+        const scalar_t x430 = scalar_t(9)*y7;
+        const scalar_t x431 = (scalar_t(1) / scalar_t(32))*x422 + (scalar_t(1) / scalar_t(32))*x430 + (scalar_t(1) / scalar_t(32))*x80;
+        const scalar_t x432 = scalar_t(9)*z7;
+        const scalar_t x433 = (scalar_t(1) / scalar_t(32))*x425 + (scalar_t(1) / scalar_t(32))*x432 + (scalar_t(1) / scalar_t(32))*x84;
+        const scalar_t x434 = ux3*x415 - ux7*x427 + x15*x412 - x415*(ux3 - fmax(x416, fmin(x417, g3_0*x429 + g3_1*x431 + g3_2*x433 + ux3))) + x427*(ux7 - fmax(x416, fmin(x417, g7_0*x420 + g7_1*x423 + g7_2*x426 + ux7)));
+        const scalar_t x435 = x215 - x216 + x217;
+        const scalar_t x436 = fmin(uy3, uy7);
+        const scalar_t x437 = fmax(uy3, uy7);
+        const scalar_t x438 = uy3*x415 - uy7*x427 + x190*x412 - x415*(uy3 - fmax(x436, fmin(x437, g3_3*x429 + g3_4*x431 + g3_5*x433 + uy3))) + x427*(uy7 - fmax(x436, fmin(x437, g7_3*x420 + g7_4*x423 + g7_5*x426 + uy7)));
+        const scalar_t x439 = x248 - x249 + x250;
+        const scalar_t x440 = fmin(uz3, uz7);
+        const scalar_t x441 = fmax(uz3, uz7);
+        const scalar_t x442 = uz3*x415 - uz7*x427 + x224*x412 - x415*(uz3 - fmax(x440, fmin(x441, g3_6*x429 + g3_7*x431 + g3_8*x433 + uz3))) + x427*(uz7 - fmax(x440, fmin(x441, g7_6*x420 + g7_7*x423 + g7_8*x426 + uz7)));
+        const scalar_t x443 = p4 + p5;
+        const scalar_t x444 = rho*ux4;
+        const scalar_t x445 = cof0*x152 + cof1*x163 + cof2*x174;
+        const scalar_t x446 = x445*(sgn2 + scalar_t(1));
+        const scalar_t x447 = fmin(ux4, ux5);
+        const scalar_t x448 = fmax(ux4, ux5);
+        const scalar_t x449 = x139 + x261;
+        const scalar_t x450 = x293 + x75;
+        const scalar_t x451 = (scalar_t(1) / scalar_t(32))*x449 + (scalar_t(1) / scalar_t(32))*x450;
+        const scalar_t x452 = x141 + x265;
+        const scalar_t x453 = x297 + x79;
+        const scalar_t x454 = (scalar_t(1) / scalar_t(32))*x452 + (scalar_t(1) / scalar_t(32))*x453;
+        const scalar_t x455 = x143 + x269;
+        const scalar_t x456 = x301 + x83;
+        const scalar_t x457 = (scalar_t(1) / scalar_t(32))*x455 + (scalar_t(1) / scalar_t(32))*x456;
+        const scalar_t x458 = rho*x445*(sgn2 + scalar_t(-1));
+        const scalar_t x459 = x261 + x91;
+        const scalar_t x460 = x306 + x75;
+        const scalar_t x461 = x459 + x460;
+        const scalar_t x462 = (scalar_t(1) / scalar_t(32))*g4_0;
+        const scalar_t x463 = x265 + x95;
+        const scalar_t x464 = x308 + x79;
+        const scalar_t x465 = x463 + x464;
+        const scalar_t x466 = (scalar_t(1) / scalar_t(32))*g4_1;
+        const scalar_t x467 = x269 + x99;
+        const scalar_t x468 = x310 + x83;
+        const scalar_t x469 = x467 + x468;
+        const scalar_t x470 = (scalar_t(1) / scalar_t(32))*g4_2;
+        const scalar_t x471 = rho*x446;
+        const scalar_t x472 = -ux5*x458 + x443*x9 + x444*x446 + x458*(ux5 - fmax(x447, fmin(x448, g5_0*x451 + g5_1*x454 + g5_2*x457 + ux5))) - x471*(ux4 - fmax(x447, fmin(x448, ux4 + x461*x462 + x465*x466 + x469*x470)));
+        const scalar_t x473 = p4 + p7;
+        const scalar_t x474 = cof3*x148 + cof4*x159 + cof5*x170;
+        const scalar_t x475 = x474*(sgn6 + scalar_t(1));
+        const scalar_t x476 = fmin(ux4, ux7);
+        const scalar_t x477 = fmax(ux4, ux7);
+        const scalar_t x478 = x1 + x49;
+        const scalar_t x479 = x418 + x478;
+        const scalar_t x480 = (scalar_t(1) / scalar_t(32))*x449 + (scalar_t(1) / scalar_t(32))*x479;
+        const scalar_t x481 = x58 + y1;
+        const scalar_t x482 = x421 + x481;
+        const scalar_t x483 = (scalar_t(1) / scalar_t(32))*x452 + (scalar_t(1) / scalar_t(32))*x482;
+        const scalar_t x484 = x67 + z1;
+        const scalar_t x485 = x424 + x484;
+        const scalar_t x486 = (scalar_t(1) / scalar_t(32))*x455 + (scalar_t(1) / scalar_t(32))*x485;
+        const scalar_t x487 = rho*x474*(sgn6 + scalar_t(-1));
+        const scalar_t x488 = x428 + x478;
+        const scalar_t x489 = x459 + x488;
+        const scalar_t x490 = x430 + x481;
+        const scalar_t x491 = x463 + x490;
+        const scalar_t x492 = x432 + x484;
+        const scalar_t x493 = x467 + x492;
+        const scalar_t x494 = rho*x475;
+        const scalar_t x495 = -ux7*x487 + x12*x473 + x444*x475 + x487*(ux7 - fmax(x476, fmin(x477, g7_0*x480 + g7_1*x483 + g7_2*x486 + ux7))) - x494*(ux4 - fmax(x476, fmin(x477, ux4 + x462*x489 + x466*x491 + x470*x493)));
+        const scalar_t x496 = fmin(uy4, uy5);
+        const scalar_t x497 = fmax(uy4, uy5);
+        const scalar_t x498 = (scalar_t(1) / scalar_t(32))*g4_3;
+        const scalar_t x499 = (scalar_t(1) / scalar_t(32))*g4_4;
+        const scalar_t x500 = (scalar_t(1) / scalar_t(32))*g4_5;
+        const scalar_t x501 = uy4*x471 - uy5*x458 + x186*x443 + x458*(uy5 - fmax(x496, fmin(x497, g5_3*x451 + g5_4*x454 + g5_5*x457 + uy5))) - x471*(uy4 - fmax(x496, fmin(x497, uy4 + x461*x498 + x465*x499 + x469*x500)));
+        const scalar_t x502 = fmin(uy4, uy7);
+        const scalar_t x503 = fmax(uy4, uy7);
+        const scalar_t x504 = uy4*x494 - uy7*x487 + x188*x473 + x487*(uy7 - fmax(x502, fmin(x503, g7_3*x480 + g7_4*x483 + g7_5*x486 + uy7))) - x494*(uy4 - fmax(x502, fmin(x503, uy4 + x489*x498 + x491*x499 + x493*x500)));
+        const scalar_t x505 = fmin(uz4, uz5);
+        const scalar_t x506 = fmax(uz4, uz5);
+        const scalar_t x507 = (scalar_t(1) / scalar_t(32))*g4_6;
+        const scalar_t x508 = (scalar_t(1) / scalar_t(32))*g4_7;
+        const scalar_t x509 = (scalar_t(1) / scalar_t(32))*g4_8;
+        const scalar_t x510 = uz4*x471 - uz5*x458 + x220*x443 + x458*(uz5 - fmax(x505, fmin(x506, g5_6*x451 + g5_7*x454 + g5_8*x457 + uz5))) - x471*(uz4 - fmax(x505, fmin(x506, uz4 + x461*x507 + x465*x508 + x469*x509)));
+        const scalar_t x511 = fmin(uz4, uz7);
+        const scalar_t x512 = fmax(uz4, uz7);
+        const scalar_t x513 = uz4*x494 - uz7*x487 + x222*x473 + x487*(uz7 - fmax(x511, fmin(x512, g7_6*x480 + g7_7*x483 + g7_8*x486 + uz7))) - x494*(uz4 - fmax(x511, fmin(x512, uz4 + x489*x507 + x491*x508 + x493*x509)));
+        const scalar_t x514 = p5 + p6;
+        const scalar_t x515 = x12*x514;
+        const scalar_t x516 = ux5 + ux6;
+        const scalar_t x517 = uy5 + uy6;
+        const scalar_t x518 = uz5 + uz6;
+        const scalar_t x519 = cof3*x516 + cof4*x517 + cof5*x518;
+        const scalar_t x520 = rho*x519;
+        const scalar_t x521 = x520*(sgn7 + scalar_t(-1));
+        const scalar_t x522 = ux6*x521;
+        const scalar_t x523 = fmin(ux5, ux6);
+        const scalar_t x524 = fmax(ux5, ux6);
+        const scalar_t x525 = x0 + x45;
+        const scalar_t x526 = x344 + x525;
+        const scalar_t x527 = (scalar_t(1) / scalar_t(32))*x450 + (scalar_t(1) / scalar_t(32))*x526;
+        const scalar_t x528 = x54 + y0;
+        const scalar_t x529 = x348 + x528;
+        const scalar_t x530 = (scalar_t(1) / scalar_t(32))*x453 + (scalar_t(1) / scalar_t(32))*x529;
+        const scalar_t x531 = x63 + z0;
+        const scalar_t x532 = x352 + x531;
+        const scalar_t x533 = (scalar_t(1) / scalar_t(32))*x456 + (scalar_t(1) / scalar_t(32))*x532;
+        const scalar_t x534 = x520*(sgn7 + scalar_t(1));
+        const scalar_t x535 = x534*(ux5 - fmax(x523, fmin(x524, g5_0*x527 + g5_1*x530 + g5_2*x533 + ux5)));
+        const scalar_t x536 = ux5*x534;
+        const scalar_t x537 = x361 + x525;
+        const scalar_t x538 = (scalar_t(1) / scalar_t(32))*x460 + (scalar_t(1) / scalar_t(32))*x537;
+        const scalar_t x539 = x363 + x528;
+        const scalar_t x540 = (scalar_t(1) / scalar_t(32))*x464 + (scalar_t(1) / scalar_t(32))*x539;
+        const scalar_t x541 = x365 + x531;
+        const scalar_t x542 = (scalar_t(1) / scalar_t(32))*x468 + (scalar_t(1) / scalar_t(32))*x541;
+        const scalar_t x543 = x521*(ux6 - fmax(x523, fmin(x524, g6_0*x538 + g6_1*x540 + g6_2*x542 + ux6)));
+        const scalar_t x544 = x188*x514;
+        const scalar_t x545 = uy6*x521;
+        const scalar_t x546 = fmin(uy5, uy6);
+        const scalar_t x547 = fmax(uy5, uy6);
+        const scalar_t x548 = x534*(uy5 - fmax(x546, fmin(x547, g5_3*x527 + g5_4*x530 + g5_5*x533 + uy5)));
+        const scalar_t x549 = uy5*x534;
+        const scalar_t x550 = x521*(uy6 - fmax(x546, fmin(x547, g6_3*x538 + g6_4*x540 + g6_5*x542 + uy6)));
+        const scalar_t x551 = x222*x514;
+        const scalar_t x552 = uz6*x521;
+        const scalar_t x553 = fmin(uz5, uz6);
+        const scalar_t x554 = fmax(uz5, uz6);
+        const scalar_t x555 = x534*(uz5 - fmax(x553, fmin(x554, g5_6*x527 + g5_7*x530 + g5_8*x533 + uz5)));
+        const scalar_t x556 = uz5*x534;
+        const scalar_t x557 = x521*(uz6 - fmax(x553, fmin(x554, g6_6*x538 + g6_7*x540 + g6_8*x542 + uz6)));
+        const scalar_t x558 = p6 + p7;
+        const scalar_t x559 = x558*x9;
+        const scalar_t x560 = ux6 + ux7;
+        const scalar_t x561 = uy6 + uy7;
+        const scalar_t x562 = uz6 + uz7;
+        const scalar_t x563 = cof0*x560 + cof1*x561 + cof2*x562;
+        const scalar_t x564 = rho*x563;
+        const scalar_t x565 = x564*(sgn3 + scalar_t(1));
+        const scalar_t x566 = ux7*x565;
+        const scalar_t x567 = fmin(ux6, ux7);
+        const scalar_t x568 = fmax(ux6, ux7);
+        const scalar_t x569 = (scalar_t(1) / scalar_t(32))*x488 + (scalar_t(1) / scalar_t(32))*x537;
+        const scalar_t x570 = (scalar_t(1) / scalar_t(32))*x490 + (scalar_t(1) / scalar_t(32))*x539;
+        const scalar_t x571 = (scalar_t(1) / scalar_t(32))*x492 + (scalar_t(1) / scalar_t(32))*x541;
+        const scalar_t x572 = x564*(sgn3 + scalar_t(-1));
+        const scalar_t x573 = x572*(ux6 - fmax(x567, fmin(x568, g6_0*x569 + g6_1*x570 + g6_2*x571 + ux6)));
+        const scalar_t x574 = ux6*x572;
+        const scalar_t x575 = (scalar_t(1) / scalar_t(32))*x479 + (scalar_t(1) / scalar_t(32))*x526;
+        const scalar_t x576 = (scalar_t(1) / scalar_t(32))*x482 + (scalar_t(1) / scalar_t(32))*x529;
+        const scalar_t x577 = (scalar_t(1) / scalar_t(32))*x485 + (scalar_t(1) / scalar_t(32))*x532;
+        const scalar_t x578 = x565*(ux7 - fmax(x567, fmin(x568, g7_0*x575 + g7_1*x576 + g7_2*x577 + ux7)));
+        const scalar_t x579 = x186*x558;
+        const scalar_t x580 = uy7*x565;
+        const scalar_t x581 = fmin(uy6, uy7);
+        const scalar_t x582 = fmax(uy6, uy7);
+        const scalar_t x583 = x572*(uy6 - fmax(x581, fmin(x582, g6_3*x569 + g6_4*x570 + g6_5*x571 + uy6)));
+        const scalar_t x584 = uy6*x572;
+        const scalar_t x585 = x565*(uy7 - fmax(x581, fmin(x582, g7_3*x575 + g7_4*x576 + g7_5*x577 + uy7)));
+        const scalar_t x586 = x220*x558;
+        const scalar_t x587 = uz7*x565;
+        const scalar_t x588 = fmin(uz6, uz7);
+        const scalar_t x589 = fmax(uz6, uz7);
+        const scalar_t x590 = x572*(uz6 - fmax(x588, fmin(x589, g6_6*x569 + g6_7*x570 + g6_8*x571 + uz6)));
+        const scalar_t x591 = uz6*x572;
+        const scalar_t x592 = x565*(uz7 - fmax(x588, fmin(x589, g7_6*x575 + g7_7*x576 + g7_8*x577 + uz7)));
+        out.rx[0][lane] = (scalar_t(1) / scalar_t(16))*x10 + (scalar_t(1) / scalar_t(16))*x104 - scalar_t(1) / scalar_t(16)*x105 - scalar_t(1) / scalar_t(16)*x106 - scalar_t(1) / scalar_t(16)*x107 - scalar_t(1) / scalar_t(16)*x127 + (scalar_t(1) / scalar_t(16))*x13 - scalar_t(1) / scalar_t(16)*x138 - scalar_t(1) / scalar_t(16)*x146 + (scalar_t(1) / scalar_t(16))*x16 + (scalar_t(1) / scalar_t(16))*x185 + (scalar_t(1) / scalar_t(16))*x26 + (scalar_t(1) / scalar_t(16))*x35 + (scalar_t(1) / scalar_t(16))*x41 + (scalar_t(1) / scalar_t(16))*x72 + (scalar_t(1) / scalar_t(16))*x88;
+        out.ry[0][lane] = (scalar_t(1) / scalar_t(16))*x187 + (scalar_t(1) / scalar_t(16))*x189 + (scalar_t(1) / scalar_t(16))*x191 + (scalar_t(1) / scalar_t(16))*x192 + (scalar_t(1) / scalar_t(16))*x193 + (scalar_t(1) / scalar_t(16))*x194 + (scalar_t(1) / scalar_t(16))*x197 + (scalar_t(1) / scalar_t(16))*x200 + (scalar_t(1) / scalar_t(16))*x203 - scalar_t(1) / scalar_t(16)*x204 - scalar_t(1) / scalar_t(16)*x205 - scalar_t(1) / scalar_t(16)*x206 - scalar_t(1) / scalar_t(16)*x210 - scalar_t(1) / scalar_t(16)*x211 - scalar_t(1) / scalar_t(16)*x212 + (scalar_t(1) / scalar_t(16))*x219;
+        out.rz[0][lane] = (scalar_t(1) / scalar_t(16))*x221 + (scalar_t(1) / scalar_t(16))*x223 + (scalar_t(1) / scalar_t(16))*x225 + (scalar_t(1) / scalar_t(16))*x226 + (scalar_t(1) / scalar_t(16))*x227 + (scalar_t(1) / scalar_t(16))*x228 + (scalar_t(1) / scalar_t(16))*x231 + (scalar_t(1) / scalar_t(16))*x234 + (scalar_t(1) / scalar_t(16))*x237 - scalar_t(1) / scalar_t(16)*x238 - scalar_t(1) / scalar_t(16)*x239 - scalar_t(1) / scalar_t(16)*x240 - scalar_t(1) / scalar_t(16)*x244 - scalar_t(1) / scalar_t(16)*x245 - scalar_t(1) / scalar_t(16)*x246 + (scalar_t(1) / scalar_t(16))*x252;
+        out.rc[0][lane] = x253*(x24 + x33 + x39);
+        out.rx[1][lane] = -scalar_t(1) / scalar_t(16)*x10 + (scalar_t(1) / scalar_t(16))*x105 + (scalar_t(1) / scalar_t(16))*x127 + (scalar_t(1) / scalar_t(16))*x254 - scalar_t(1) / scalar_t(16)*x26 + (scalar_t(1) / scalar_t(16))*x287 + (scalar_t(1) / scalar_t(16))*x313 - scalar_t(1) / scalar_t(16)*x72;
+        out.ry[1][lane] = -scalar_t(1) / scalar_t(16)*x187 - scalar_t(1) / scalar_t(16)*x192 - scalar_t(1) / scalar_t(16)*x197 + (scalar_t(1) / scalar_t(16))*x204 + (scalar_t(1) / scalar_t(16))*x210 + (scalar_t(1) / scalar_t(16))*x314 + (scalar_t(1) / scalar_t(16))*x320 + (scalar_t(1) / scalar_t(16))*x323;
+        out.rz[1][lane] = -scalar_t(1) / scalar_t(16)*x221 - scalar_t(1) / scalar_t(16)*x226 - scalar_t(1) / scalar_t(16)*x231 + (scalar_t(1) / scalar_t(16))*x238 + (scalar_t(1) / scalar_t(16))*x244 + (scalar_t(1) / scalar_t(16))*x324 + (scalar_t(1) / scalar_t(16))*x330 + (scalar_t(1) / scalar_t(16))*x333;
+        out.rc[1][lane] = x253*(-x19 - x21 - x23 + x257 + x289);
+        out.rx[2][lane] = -scalar_t(1) / scalar_t(16)*x287 + (scalar_t(1) / scalar_t(16))*x335 - scalar_t(1) / scalar_t(16)*x341 - scalar_t(1) / scalar_t(16)*x358 + (scalar_t(1) / scalar_t(16))*x360 + (scalar_t(1) / scalar_t(16))*x367 - scalar_t(1) / scalar_t(16)*x368 - scalar_t(1) / scalar_t(16)*x382;
+        out.ry[2][lane] = -scalar_t(1) / scalar_t(16)*x320 + (scalar_t(1) / scalar_t(16))*x383 - scalar_t(1) / scalar_t(16)*x384 - scalar_t(1) / scalar_t(16)*x390 + (scalar_t(1) / scalar_t(16))*x391 + (scalar_t(1) / scalar_t(16))*x392 - scalar_t(1) / scalar_t(16)*x393 - scalar_t(1) / scalar_t(16)*x396;
+        out.rz[2][lane] = -scalar_t(1) / scalar_t(16)*x330 + (scalar_t(1) / scalar_t(16))*x397 - scalar_t(1) / scalar_t(16)*x398 - scalar_t(1) / scalar_t(16)*x404 + (scalar_t(1) / scalar_t(16))*x405 + (scalar_t(1) / scalar_t(16))*x406 - scalar_t(1) / scalar_t(16)*x407 - scalar_t(1) / scalar_t(16)*x410;
+        out.rc[2][lane] = x253*(cof6*x336 + cof7*x337 + cof8*x338 - x257 - x370);
+        out.rx[3][lane] = (scalar_t(1) / scalar_t(16))*x106 - scalar_t(1) / scalar_t(16)*x13 + (scalar_t(1) / scalar_t(16))*x138 - scalar_t(1) / scalar_t(16)*x35 + (scalar_t(1) / scalar_t(16))*x382 + (scalar_t(1) / scalar_t(16))*x411 + (scalar_t(1) / scalar_t(16))*x434 - scalar_t(1) / scalar_t(16)*x88;
+        out.ry[3][lane] = -scalar_t(1) / scalar_t(16)*x189 - scalar_t(1) / scalar_t(16)*x193 - scalar_t(1) / scalar_t(16)*x200 + (scalar_t(1) / scalar_t(16))*x205 + (scalar_t(1) / scalar_t(16))*x211 + (scalar_t(1) / scalar_t(16))*x396 + (scalar_t(1) / scalar_t(16))*x435 + (scalar_t(1) / scalar_t(16))*x438;
+        out.rz[3][lane] = -scalar_t(1) / scalar_t(16)*x223 - scalar_t(1) / scalar_t(16)*x227 - scalar_t(1) / scalar_t(16)*x234 + (scalar_t(1) / scalar_t(16))*x239 + (scalar_t(1) / scalar_t(16))*x245 + (scalar_t(1) / scalar_t(16))*x410 + (scalar_t(1) / scalar_t(16))*x439 + (scalar_t(1) / scalar_t(16))*x442;
+        out.rc[3][lane] = x253*(-x28 - x30 - x32 + x370 + x413);
+        out.rx[4][lane] = -scalar_t(1) / scalar_t(16)*x104 + (scalar_t(1) / scalar_t(16))*x107 + (scalar_t(1) / scalar_t(16))*x146 - scalar_t(1) / scalar_t(16)*x16 + (scalar_t(1) / scalar_t(16))*x368 - scalar_t(1) / scalar_t(16)*x41 + (scalar_t(1) / scalar_t(16))*x472 + (scalar_t(1) / scalar_t(16))*x495;
+        out.ry[4][lane] = -scalar_t(1) / scalar_t(16)*x191 - scalar_t(1) / scalar_t(16)*x194 - scalar_t(1) / scalar_t(16)*x203 + (scalar_t(1) / scalar_t(16))*x206 + (scalar_t(1) / scalar_t(16))*x212 + (scalar_t(1) / scalar_t(16))*x393 + (scalar_t(1) / scalar_t(16))*x501 + (scalar_t(1) / scalar_t(16))*x504;
+        out.rz[4][lane] = -scalar_t(1) / scalar_t(16)*x225 - scalar_t(1) / scalar_t(16)*x228 - scalar_t(1) / scalar_t(16)*x237 + (scalar_t(1) / scalar_t(16))*x240 + (scalar_t(1) / scalar_t(16))*x246 + (scalar_t(1) / scalar_t(16))*x407 + (scalar_t(1) / scalar_t(16))*x510 + (scalar_t(1) / scalar_t(16))*x513;
+        out.rc[4][lane] = x253*(-x36 - x37 - x38 + x445 + x474);
+        out.rx[5][lane] = -scalar_t(1) / scalar_t(16)*x313 - scalar_t(1) / scalar_t(16)*x411 - scalar_t(1) / scalar_t(16)*x472 + (scalar_t(1) / scalar_t(16))*x515 - scalar_t(1) / scalar_t(16)*x522 - scalar_t(1) / scalar_t(16)*x535 + (scalar_t(1) / scalar_t(16))*x536 + (scalar_t(1) / scalar_t(16))*x543;
+        out.ry[5][lane] = -scalar_t(1) / scalar_t(16)*x323 - scalar_t(1) / scalar_t(16)*x435 - scalar_t(1) / scalar_t(16)*x501 + (scalar_t(1) / scalar_t(16))*x544 - scalar_t(1) / scalar_t(16)*x545 - scalar_t(1) / scalar_t(16)*x548 + (scalar_t(1) / scalar_t(16))*x549 + (scalar_t(1) / scalar_t(16))*x550;
+        out.rz[5][lane] = -scalar_t(1) / scalar_t(16)*x333 - scalar_t(1) / scalar_t(16)*x439 - scalar_t(1) / scalar_t(16)*x510 + (scalar_t(1) / scalar_t(16))*x551 - scalar_t(1) / scalar_t(16)*x552 - scalar_t(1) / scalar_t(16)*x555 + (scalar_t(1) / scalar_t(16))*x556 + (scalar_t(1) / scalar_t(16))*x557;
+        out.rc[5][lane] = x253*(cof3*x516 + cof4*x517 + cof5*x518 - x289 - x445);
+        out.rx[6][lane] = -scalar_t(1) / scalar_t(16)*x185 - scalar_t(1) / scalar_t(16)*x335 + (scalar_t(1) / scalar_t(16))*x341 + (scalar_t(1) / scalar_t(16))*x358 - scalar_t(1) / scalar_t(16)*x360 - scalar_t(1) / scalar_t(16)*x367 - scalar_t(1) / scalar_t(16)*x515 + (scalar_t(1) / scalar_t(16))*x522 + (scalar_t(1) / scalar_t(16))*x535 - scalar_t(1) / scalar_t(16)*x536 - scalar_t(1) / scalar_t(16)*x543 - scalar_t(1) / scalar_t(16)*x559 - scalar_t(1) / scalar_t(16)*x566 - scalar_t(1) / scalar_t(16)*x573 + (scalar_t(1) / scalar_t(16))*x574 + (scalar_t(1) / scalar_t(16))*x578;
+        out.ry[6][lane] = -scalar_t(1) / scalar_t(16)*x219 - scalar_t(1) / scalar_t(16)*x383 + (scalar_t(1) / scalar_t(16))*x384 + (scalar_t(1) / scalar_t(16))*x390 - scalar_t(1) / scalar_t(16)*x391 - scalar_t(1) / scalar_t(16)*x392 - scalar_t(1) / scalar_t(16)*x544 + (scalar_t(1) / scalar_t(16))*x545 + (scalar_t(1) / scalar_t(16))*x548 - scalar_t(1) / scalar_t(16)*x549 - scalar_t(1) / scalar_t(16)*x550 - scalar_t(1) / scalar_t(16)*x579 - scalar_t(1) / scalar_t(16)*x580 - scalar_t(1) / scalar_t(16)*x583 + (scalar_t(1) / scalar_t(16))*x584 + (scalar_t(1) / scalar_t(16))*x585;
+        out.rz[6][lane] = -scalar_t(1) / scalar_t(16)*x252 - scalar_t(1) / scalar_t(16)*x397 + (scalar_t(1) / scalar_t(16))*x398 + (scalar_t(1) / scalar_t(16))*x404 - scalar_t(1) / scalar_t(16)*x405 - scalar_t(1) / scalar_t(16)*x406 - scalar_t(1) / scalar_t(16)*x551 + (scalar_t(1) / scalar_t(16))*x552 + (scalar_t(1) / scalar_t(16))*x555 - scalar_t(1) / scalar_t(16)*x556 - scalar_t(1) / scalar_t(16)*x557 - scalar_t(1) / scalar_t(16)*x586 - scalar_t(1) / scalar_t(16)*x587 - scalar_t(1) / scalar_t(16)*x590 + (scalar_t(1) / scalar_t(16))*x591 + (scalar_t(1) / scalar_t(16))*x592;
+        out.rc[6][lane] = -x253*(x339 + x519 + x563);
+        out.rx[7][lane] = -scalar_t(1) / scalar_t(16)*x254 - scalar_t(1) / scalar_t(16)*x434 - scalar_t(1) / scalar_t(16)*x495 + (scalar_t(1) / scalar_t(16))*x559 + (scalar_t(1) / scalar_t(16))*x566 + (scalar_t(1) / scalar_t(16))*x573 - scalar_t(1) / scalar_t(16)*x574 - scalar_t(1) / scalar_t(16)*x578;
+        out.ry[7][lane] = -scalar_t(1) / scalar_t(16)*x314 - scalar_t(1) / scalar_t(16)*x438 - scalar_t(1) / scalar_t(16)*x504 + (scalar_t(1) / scalar_t(16))*x579 + (scalar_t(1) / scalar_t(16))*x580 + (scalar_t(1) / scalar_t(16))*x583 - scalar_t(1) / scalar_t(16)*x584 - scalar_t(1) / scalar_t(16)*x585;
+        out.rz[7][lane] = -scalar_t(1) / scalar_t(16)*x324 - scalar_t(1) / scalar_t(16)*x442 - scalar_t(1) / scalar_t(16)*x513 + (scalar_t(1) / scalar_t(16))*x586 + (scalar_t(1) / scalar_t(16))*x587 + (scalar_t(1) / scalar_t(16))*x590 - scalar_t(1) / scalar_t(16)*x591 - scalar_t(1) / scalar_t(16)*x592;
+        out.rc[7][lane] = x253*(cof0*x560 + cof1*x561 + cof2*x562 - x413 - x474);
+    }
+}
+
+// Venkatakrishnan's smooth bound, with eps^2 = 0.
+static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual_defcor_lim2_simd(
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT cof0_ptr,
+        const scalar_t *const SFEM_RESTRICT cof1_ptr,
+        const scalar_t *const SFEM_RESTRICT cof2_ptr,
+        const scalar_t *const SFEM_RESTRICT cof3_ptr,
+        const scalar_t *const SFEM_RESTRICT cof4_ptr,
+        const scalar_t *const SFEM_RESTRICT cof5_ptr,
+        const scalar_t *const SFEM_RESTRICT cof6_ptr,
+        const scalar_t *const SFEM_RESTRICT cof7_ptr,
+        const scalar_t *const SFEM_RESTRICT cof8_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const Hex8InputPack &in,
+        const Hex8UGradPack &ho,
+        Hex8ResidualPack    &out) {
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t cof0 = scalar_t(cof0_ptr[lane]);
+        const scalar_t cof1 = scalar_t(cof1_ptr[lane]);
+        const scalar_t cof2 = scalar_t(cof2_ptr[lane]);
+        const scalar_t cof3 = scalar_t(cof3_ptr[lane]);
+        const scalar_t cof4 = scalar_t(cof4_ptr[lane]);
+        const scalar_t cof5 = scalar_t(cof5_ptr[lane]);
+        const scalar_t cof6 = scalar_t(cof6_ptr[lane]);
+        const scalar_t cof7 = scalar_t(cof7_ptr[lane]);
+        const scalar_t cof8 = scalar_t(cof8_ptr[lane]);
+        const scalar_t det = scalar_t(det_ptr[lane]);
+        const scalar_t ux0 = in.ux[0][lane];
+        const scalar_t ux1 = in.ux[1][lane];
+        const scalar_t ux2 = in.ux[2][lane];
+        const scalar_t ux3 = in.ux[3][lane];
+        const scalar_t ux4 = in.ux[4][lane];
+        const scalar_t ux5 = in.ux[5][lane];
+        const scalar_t ux6 = in.ux[6][lane];
+        const scalar_t ux7 = in.ux[7][lane];
+        const scalar_t uy0 = in.uy[0][lane];
+        const scalar_t uy1 = in.uy[1][lane];
+        const scalar_t uy2 = in.uy[2][lane];
+        const scalar_t uy3 = in.uy[3][lane];
+        const scalar_t uy4 = in.uy[4][lane];
+        const scalar_t uy5 = in.uy[5][lane];
+        const scalar_t uy6 = in.uy[6][lane];
+        const scalar_t uy7 = in.uy[7][lane];
+        const scalar_t uz0 = in.uz[0][lane];
+        const scalar_t uz1 = in.uz[1][lane];
+        const scalar_t uz2 = in.uz[2][lane];
+        const scalar_t uz3 = in.uz[3][lane];
+        const scalar_t uz4 = in.uz[4][lane];
+        const scalar_t uz5 = in.uz[5][lane];
+        const scalar_t uz6 = in.uz[6][lane];
+        const scalar_t uz7 = in.uz[7][lane];
+        const scalar_t p0 = in.p[0][lane];
+        const scalar_t p1 = in.p[1][lane];
+        const scalar_t p2 = in.p[2][lane];
+        const scalar_t p3 = in.p[3][lane];
+        const scalar_t p4 = in.p[4][lane];
+        const scalar_t p5 = in.p[5][lane];
+        const scalar_t p6 = in.p[6][lane];
+        const scalar_t p7 = in.p[7][lane];
+        const scalar_t x0 = ho.x[0][lane];
+        const scalar_t x1 = ho.x[1][lane];
+        const scalar_t x2 = ho.x[2][lane];
+        const scalar_t x3 = ho.x[3][lane];
+        const scalar_t x4 = ho.x[4][lane];
+        const scalar_t x5 = ho.x[5][lane];
+        const scalar_t x6 = ho.x[6][lane];
+        const scalar_t x7 = ho.x[7][lane];
+        const scalar_t y0 = ho.y[0][lane];
+        const scalar_t y1 = ho.y[1][lane];
+        const scalar_t y2 = ho.y[2][lane];
+        const scalar_t y3 = ho.y[3][lane];
+        const scalar_t y4 = ho.y[4][lane];
+        const scalar_t y5 = ho.y[5][lane];
+        const scalar_t y6 = ho.y[6][lane];
+        const scalar_t y7 = ho.y[7][lane];
+        const scalar_t z0 = ho.z[0][lane];
+        const scalar_t z1 = ho.z[1][lane];
+        const scalar_t z2 = ho.z[2][lane];
+        const scalar_t z3 = ho.z[3][lane];
+        const scalar_t z4 = ho.z[4][lane];
+        const scalar_t z5 = ho.z[5][lane];
+        const scalar_t z6 = ho.z[6][lane];
+        const scalar_t z7 = ho.z[7][lane];
+        const scalar_t g0_0 = ho.g[0][0][lane];
+        const scalar_t g0_1 = ho.g[0][1][lane];
+        const scalar_t g0_2 = ho.g[0][2][lane];
+        const scalar_t g0_3 = ho.g[0][3][lane];
+        const scalar_t g0_4 = ho.g[0][4][lane];
+        const scalar_t g0_5 = ho.g[0][5][lane];
+        const scalar_t g0_6 = ho.g[0][6][lane];
+        const scalar_t g0_7 = ho.g[0][7][lane];
+        const scalar_t g0_8 = ho.g[0][8][lane];
+        const scalar_t g1_0 = ho.g[1][0][lane];
+        const scalar_t g1_1 = ho.g[1][1][lane];
+        const scalar_t g1_2 = ho.g[1][2][lane];
+        const scalar_t g1_3 = ho.g[1][3][lane];
+        const scalar_t g1_4 = ho.g[1][4][lane];
+        const scalar_t g1_5 = ho.g[1][5][lane];
+        const scalar_t g1_6 = ho.g[1][6][lane];
+        const scalar_t g1_7 = ho.g[1][7][lane];
+        const scalar_t g1_8 = ho.g[1][8][lane];
+        const scalar_t g2_0 = ho.g[2][0][lane];
+        const scalar_t g2_1 = ho.g[2][1][lane];
+        const scalar_t g2_2 = ho.g[2][2][lane];
+        const scalar_t g2_3 = ho.g[2][3][lane];
+        const scalar_t g2_4 = ho.g[2][4][lane];
+        const scalar_t g2_5 = ho.g[2][5][lane];
+        const scalar_t g2_6 = ho.g[2][6][lane];
+        const scalar_t g2_7 = ho.g[2][7][lane];
+        const scalar_t g2_8 = ho.g[2][8][lane];
+        const scalar_t g3_0 = ho.g[3][0][lane];
+        const scalar_t g3_1 = ho.g[3][1][lane];
+        const scalar_t g3_2 = ho.g[3][2][lane];
+        const scalar_t g3_3 = ho.g[3][3][lane];
+        const scalar_t g3_4 = ho.g[3][4][lane];
+        const scalar_t g3_5 = ho.g[3][5][lane];
+        const scalar_t g3_6 = ho.g[3][6][lane];
+        const scalar_t g3_7 = ho.g[3][7][lane];
+        const scalar_t g3_8 = ho.g[3][8][lane];
+        const scalar_t g4_0 = ho.g[4][0][lane];
+        const scalar_t g4_1 = ho.g[4][1][lane];
+        const scalar_t g4_2 = ho.g[4][2][lane];
+        const scalar_t g4_3 = ho.g[4][3][lane];
+        const scalar_t g4_4 = ho.g[4][4][lane];
+        const scalar_t g4_5 = ho.g[4][5][lane];
+        const scalar_t g4_6 = ho.g[4][6][lane];
+        const scalar_t g4_7 = ho.g[4][7][lane];
+        const scalar_t g4_8 = ho.g[4][8][lane];
+        const scalar_t g5_0 = ho.g[5][0][lane];
+        const scalar_t g5_1 = ho.g[5][1][lane];
+        const scalar_t g5_2 = ho.g[5][2][lane];
+        const scalar_t g5_3 = ho.g[5][3][lane];
+        const scalar_t g5_4 = ho.g[5][4][lane];
+        const scalar_t g5_5 = ho.g[5][5][lane];
+        const scalar_t g5_6 = ho.g[5][6][lane];
+        const scalar_t g5_7 = ho.g[5][7][lane];
+        const scalar_t g5_8 = ho.g[5][8][lane];
+        const scalar_t g6_0 = ho.g[6][0][lane];
+        const scalar_t g6_1 = ho.g[6][1][lane];
+        const scalar_t g6_2 = ho.g[6][2][lane];
+        const scalar_t g6_3 = ho.g[6][3][lane];
+        const scalar_t g6_4 = ho.g[6][4][lane];
+        const scalar_t g6_5 = ho.g[6][5][lane];
+        const scalar_t g6_6 = ho.g[6][6][lane];
+        const scalar_t g6_7 = ho.g[6][7][lane];
+        const scalar_t g6_8 = ho.g[6][8][lane];
+        const scalar_t g7_0 = ho.g[7][0][lane];
+        const scalar_t g7_1 = ho.g[7][1][lane];
+        const scalar_t g7_2 = ho.g[7][2][lane];
+        const scalar_t g7_3 = ho.g[7][3][lane];
+        const scalar_t g7_4 = ho.g[7][4][lane];
+        const scalar_t g7_5 = ho.g[7][5][lane];
+        const scalar_t g7_6 = ho.g[7][6][lane];
+        const scalar_t g7_7 = ho.g[7][7][lane];
+        const scalar_t g7_8 = ho.g[7][8][lane];
+        const scalar_t mdot0 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux1) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy1) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz1));
+        const scalar_t sgn0 = mdot0 > scalar_t(0) ? scalar_t(1) : (mdot0 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot1 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn1 = mdot1 > scalar_t(0) ? scalar_t(1) : (mdot1 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot2 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn2 = mdot2 > scalar_t(0) ? scalar_t(1) : (mdot2 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot3 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux6 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy6 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz6 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn3 = mdot3 > scalar_t(0) ? scalar_t(1) : (mdot3 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot4 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn4 = mdot4 > scalar_t(0) ? scalar_t(1) : (mdot4 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot5 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux2) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy2) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz2));
+        const scalar_t sgn5 = mdot5 > scalar_t(0) ? scalar_t(1) : (mdot5 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot6 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn6 = mdot6 > scalar_t(0) ? scalar_t(1) : (mdot6 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot7 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux5 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy5 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz5 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn7 = mdot7 > scalar_t(0) ? scalar_t(1) : (mdot7 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot8 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux4) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy4) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz4));
+        const scalar_t sgn8 = mdot8 > scalar_t(0) ? scalar_t(1) : (mdot8 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot9 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn9 = mdot9 > scalar_t(0) ? scalar_t(1) : (mdot9 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot10 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn10 = mdot10 > scalar_t(0) ? scalar_t(1) : (mdot10 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot11 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux3 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy3 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz3 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn11 = mdot11 > scalar_t(0) ? scalar_t(1) : (mdot11 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t x8 = p0 + p1;
+        const scalar_t x9 = scalar_t(2)*cof0;
+        const scalar_t x10 = x8*x9;
+        const scalar_t x11 = p0 + p3;
+        const scalar_t x12 = scalar_t(2)*cof3;
+        const scalar_t x13 = x11*x12;
+        const scalar_t x14 = p0 + p4;
+        const scalar_t x15 = scalar_t(2)*cof6;
+        const scalar_t x16 = x14*x15;
+        const scalar_t x17 = rho*ux0;
+        const scalar_t x18 = ux0 + ux1;
+        const scalar_t x19 = cof0*x18;
+        const scalar_t x20 = uy0 + uy1;
+        const scalar_t x21 = cof1*x20;
+        const scalar_t x22 = uz0 + uz1;
+        const scalar_t x23 = cof2*x22;
+        const scalar_t x24 = x19 + x21 + x23;
+        const scalar_t x25 = x24*(sgn0 + scalar_t(1));
+        const scalar_t x26 = x17*x25;
+        const scalar_t x27 = ux0 + ux3;
+        const scalar_t x28 = cof3*x27;
+        const scalar_t x29 = uy0 + uy3;
+        const scalar_t x30 = cof4*x29;
+        const scalar_t x31 = uz0 + uz3;
+        const scalar_t x32 = cof5*x31;
+        const scalar_t x33 = x28 + x30 + x32;
+        const scalar_t x34 = x33*(sgn4 + scalar_t(1));
+        const scalar_t x35 = x17*x34;
+        const scalar_t x36 = cof6*(ux0 + ux4);
+        const scalar_t x37 = cof7*(uy0 + uy4);
+        const scalar_t x38 = cof8*(uz0 + uz4);
+        const scalar_t x39 = x36 + x37 + x38;
+        const scalar_t x40 = x39*(sgn8 + scalar_t(1));
+        const scalar_t x41 = x17*x40;
+        const scalar_t x42 = -scalar_t(23)*x0;
+        const scalar_t x43 = scalar_t(3)*x2 + scalar_t(3)*x4;
+        const scalar_t x44 = x43 + x6;
+        const scalar_t x45 = x42 + x44;
+        const scalar_t x46 = scalar_t(9)*x1;
+        const scalar_t x47 = scalar_t(3)*x3 + scalar_t(3)*x5;
+        const scalar_t x48 = x47 + x7;
+        const scalar_t x49 = x46 + x48;
+        const scalar_t x50 = x45 + x49;
+        const scalar_t x51 = -scalar_t(23)*y0;
+        const scalar_t x52 = scalar_t(3)*y2 + scalar_t(3)*y4;
+        const scalar_t x53 = x52 + y6;
+        const scalar_t x54 = x51 + x53;
+        const scalar_t x55 = scalar_t(9)*y1;
+        const scalar_t x56 = scalar_t(3)*y3 + scalar_t(3)*y5;
+        const scalar_t x57 = x56 + y7;
+        const scalar_t x58 = x55 + x57;
+        const scalar_t x59 = x54 + x58;
+        const scalar_t x60 = -scalar_t(23)*z0;
+        const scalar_t x61 = scalar_t(3)*z2 + scalar_t(3)*z4;
+        const scalar_t x62 = x61 + z6;
+        const scalar_t x63 = x60 + x62;
+        const scalar_t x64 = scalar_t(9)*z1;
+        const scalar_t x65 = scalar_t(3)*z3 + scalar_t(3)*z5;
+        const scalar_t x66 = x65 + z7;
+        const scalar_t x67 = x64 + x66;
+        const scalar_t x68 = x63 + x67;
+        const scalar_t x69 = g0_0*x50 + g0_1*x59 + g0_2*x68;
+        const scalar_t x70 = -fmax(ux0, ux1);
+        const scalar_t x71 = ux0 + x70;
+        const scalar_t x72 = x69 >= 0;
+        const scalar_t x73 = -fmin(ux0, ux1);
+        const scalar_t x74 = ux0 + x73;
+        const scalar_t x75 = ((x72) ? (
+   pow(x71, scalar_t(2))
+)
+: (
+   pow(x74, scalar_t(2))
+));
+        const scalar_t x76 = x69*((x72) ? (
+   -x71
+)
+: (
+   -x74
+));
+        const scalar_t x77 = rho*x25;
+        const scalar_t x78 = x77*((x69 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x69*(x75 + (scalar_t(1) / scalar_t(16))*x76)/((scalar_t(1) / scalar_t(512))*pow(x69, scalar_t(2)) + x75 + (scalar_t(1) / scalar_t(32))*x76)
+)
+: (
+   0
+));
+        const scalar_t x79 = scalar_t(3)*x1 + scalar_t(3)*x7;
+        const scalar_t x80 = scalar_t(9)*x3 + x5;
+        const scalar_t x81 = x79 + x80;
+        const scalar_t x82 = x45 + x81;
+        const scalar_t x83 = scalar_t(3)*y1 + scalar_t(3)*y7;
+        const scalar_t x84 = scalar_t(9)*y3 + y5;
+        const scalar_t x85 = x83 + x84;
+        const scalar_t x86 = x54 + x85;
+        const scalar_t x87 = scalar_t(3)*z1 + scalar_t(3)*z7;
+        const scalar_t x88 = scalar_t(9)*z3 + z5;
+        const scalar_t x89 = x87 + x88;
+        const scalar_t x90 = x63 + x89;
+        const scalar_t x91 = g0_0*x82 + g0_1*x86 + g0_2*x90;
+        const scalar_t x92 = -fmax(ux0, ux3);
+        const scalar_t x93 = ux0 + x92;
+        const scalar_t x94 = x91 >= 0;
+        const scalar_t x95 = -fmin(ux0, ux3);
+        const scalar_t x96 = ux0 + x95;
+        const scalar_t x97 = ((x94) ? (
+   pow(x93, scalar_t(2))
+)
+: (
+   pow(x96, scalar_t(2))
+));
+        const scalar_t x98 = x91*((x94) ? (
+   -x93
+)
+: (
+   -x96
+));
+        const scalar_t x99 = rho*x34;
+        const scalar_t x100 = x99*((x91 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x91*(x97 + (scalar_t(1) / scalar_t(16))*x98)/((scalar_t(1) / scalar_t(512))*pow(x91, scalar_t(2)) + x97 + (scalar_t(1) / scalar_t(32))*x98)
+)
+: (
+   0
+));
+        const scalar_t x101 = x2 + scalar_t(9)*x4;
+        const scalar_t x102 = x47 + x79;
+        const scalar_t x103 = x102 + x6;
+        const scalar_t x104 = x101 + x103 + x42;
+        const scalar_t x105 = y2 + scalar_t(9)*y4;
+        const scalar_t x106 = x56 + x83;
+        const scalar_t x107 = x106 + y6;
+        const scalar_t x108 = x105 + x107 + x51;
+        const scalar_t x109 = z2 + scalar_t(9)*z4;
+        const scalar_t x110 = x65 + x87;
+        const scalar_t x111 = x110 + z6;
+        const scalar_t x112 = x109 + x111 + x60;
+        const scalar_t x113 = g0_0*x104 + g0_1*x108 + g0_2*x112;
+        const scalar_t x114 = -fmax(ux0, ux4);
+        const scalar_t x115 = ux0 + x114;
+        const scalar_t x116 = x113 >= 0;
+        const scalar_t x117 = -fmin(ux0, ux4);
+        const scalar_t x118 = ux0 + x117;
+        const scalar_t x119 = ((x116) ? (
+   pow(x115, scalar_t(2))
+)
+: (
+   pow(x118, scalar_t(2))
+));
+        const scalar_t x120 = x113*((x116) ? (
+   -x115
+)
+: (
+   -x118
+));
+        const scalar_t x121 = rho*x40;
+        const scalar_t x122 = x121*((x113 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x113*(x119 + (scalar_t(1) / scalar_t(16))*x120)/((scalar_t(1) / scalar_t(512))*pow(x113, scalar_t(2)) + x119 + (scalar_t(1) / scalar_t(32))*x120)
+)
+: (
+   0
+));
+        const scalar_t x123 = rho*ux1;
+        const scalar_t x124 = x24*(sgn0 + scalar_t(-1));
+        const scalar_t x125 = x123*x124;
+        const scalar_t x126 = rho*ux3;
+        const scalar_t x127 = x33*(sgn4 + scalar_t(-1));
+        const scalar_t x128 = x126*x127;
+        const scalar_t x129 = rho*ux4;
+        const scalar_t x130 = x39*(sgn8 + scalar_t(-1));
+        const scalar_t x131 = x129*x130;
+        const scalar_t x132 = scalar_t(9)*x0;
+        const scalar_t x133 = x132 + x44;
+        const scalar_t x134 = -scalar_t(23)*x1;
+        const scalar_t x135 = x134 + x48;
+        const scalar_t x136 = x133 + x135;
+        const scalar_t x137 = scalar_t(9)*y0;
+        const scalar_t x138 = x137 + x53;
+        const scalar_t x139 = -scalar_t(23)*y1;
+        const scalar_t x140 = x139 + x57;
+        const scalar_t x141 = x138 + x140;
+        const scalar_t x142 = scalar_t(9)*z0;
+        const scalar_t x143 = x142 + x62;
+        const scalar_t x144 = -scalar_t(23)*z1;
+        const scalar_t x145 = x144 + x66;
+        const scalar_t x146 = x143 + x145;
+        const scalar_t x147 = g1_0*x136 + g1_1*x141 + g1_2*x146;
+        const scalar_t x148 = ux1 + x70;
+        const scalar_t x149 = x147 >= 0;
+        const scalar_t x150 = ux1 + x73;
+        const scalar_t x151 = ((x149) ? (
+   pow(x148, scalar_t(2))
+)
+: (
+   pow(x150, scalar_t(2))
+));
+        const scalar_t x152 = x147*((x149) ? (
+   -x148
+)
+: (
+   -x150
+));
+        const scalar_t x153 = rho*x124;
+        const scalar_t x154 = x153*((x147 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x147*(x151 + (scalar_t(1) / scalar_t(16))*x152)/((scalar_t(1) / scalar_t(512))*pow(x147, scalar_t(2)) + x151 + (scalar_t(1) / scalar_t(32))*x152)
+)
+: (
+   0
+));
+        const scalar_t x155 = -scalar_t(23)*x3 + x5;
+        const scalar_t x156 = x155 + x79;
+        const scalar_t x157 = x133 + x156;
+        const scalar_t x158 = -scalar_t(23)*y3 + y5;
+        const scalar_t x159 = x158 + x83;
+        const scalar_t x160 = x138 + x159;
+        const scalar_t x161 = -scalar_t(23)*z3 + z5;
+        const scalar_t x162 = x161 + x87;
+        const scalar_t x163 = x143 + x162;
+        const scalar_t x164 = g3_0*x157 + g3_1*x160 + g3_2*x163;
+        const scalar_t x165 = ux3 + x92;
+        const scalar_t x166 = x164 >= 0;
+        const scalar_t x167 = ux3 + x95;
+        const scalar_t x168 = ((x166) ? (
+   pow(x165, scalar_t(2))
+)
+: (
+   pow(x167, scalar_t(2))
+));
+        const scalar_t x169 = x164*((x166) ? (
+   -x165
+)
+: (
+   -x167
+));
+        const scalar_t x170 = rho*x127;
+        const scalar_t x171 = x170*((x164 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x164*(x168 + (scalar_t(1) / scalar_t(16))*x169)/((scalar_t(1) / scalar_t(512))*pow(x164, scalar_t(2)) + x168 + (scalar_t(1) / scalar_t(32))*x169)
+)
+: (
+   0
+));
+        const scalar_t x172 = x2 - scalar_t(23)*x4;
+        const scalar_t x173 = x103 + x132 + x172;
+        const scalar_t x174 = y2 - scalar_t(23)*y4;
+        const scalar_t x175 = x107 + x137 + x174;
+        const scalar_t x176 = z2 - scalar_t(23)*z4;
+        const scalar_t x177 = x111 + x142 + x176;
+        const scalar_t x178 = g4_0*x173 + g4_1*x175 + g4_2*x177;
+        const scalar_t x179 = ux4 + x114;
+        const scalar_t x180 = x178 >= 0;
+        const scalar_t x181 = ux4 + x117;
+        const scalar_t x182 = ((x180) ? (
+   pow(x179, scalar_t(2))
+)
+: (
+   pow(x181, scalar_t(2))
+));
+        const scalar_t x183 = x178*((x180) ? (
+   -x179
+)
+: (
+   -x181
+));
+        const scalar_t x184 = rho*x130;
+        const scalar_t x185 = x184*((x178 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x178*(x182 + (scalar_t(1) / scalar_t(16))*x183)/((scalar_t(1) / scalar_t(512))*pow(x178, scalar_t(2)) + x182 + (scalar_t(1) / scalar_t(32))*x183)
+)
+: (
+   0
+));
+        const scalar_t x186 = -ux5;
+        const scalar_t x187 = ux4 + ux7;
+        const scalar_t x188 = -ux6;
+        const scalar_t x189 = -ux2 + x188;
+        const scalar_t x190 = -ux1 + x186 + x187 + x189 + x27;
+        const scalar_t x191 = ux4 + ux5;
+        const scalar_t x192 = -ux7 + x18;
+        const scalar_t x193 = -ux3 + x189 + x191 + x192;
+        const scalar_t x194 = ux2 + ux3;
+        const scalar_t x195 = -ux4 + x186 + x188 + x192 + x194;
+        const scalar_t x196 = cof0*x190 + cof3*x193 + cof6*x195;
+        const scalar_t x197 = -uy5;
+        const scalar_t x198 = uy4 + uy7;
+        const scalar_t x199 = -uy6;
+        const scalar_t x200 = -uy2 + x199;
+        const scalar_t x201 = -uy1 + x197 + x198 + x200 + x29;
+        const scalar_t x202 = uy4 + uy5;
+        const scalar_t x203 = -uy7 + x20;
+        const scalar_t x204 = -uy3 + x200 + x202 + x203;
+        const scalar_t x205 = uy2 + uy3;
+        const scalar_t x206 = -uy4 + x197 + x199 + x203 + x205;
+        const scalar_t x207 = cof0*x201 + cof1*x190 + cof3*x204 + cof4*x193 + cof6*x206 + cof7*x195;
+        const scalar_t x208 = -uz5;
+        const scalar_t x209 = uz4 + uz7;
+        const scalar_t x210 = -uz6;
+        const scalar_t x211 = -uz2 + x210;
+        const scalar_t x212 = -uz1 + x208 + x209 + x211 + x31;
+        const scalar_t x213 = uz4 + uz5;
+        const scalar_t x214 = -uz7 + x22;
+        const scalar_t x215 = -uz3 + x211 + x213 + x214;
+        const scalar_t x216 = uz2 + uz3;
+        const scalar_t x217 = -uz4 + x208 + x210 + x214 + x216;
+        const scalar_t x218 = cof0*x212 + cof2*x190 + cof3*x215 + cof5*x193 + cof6*x217 + cof8*x195;
+        const scalar_t x219 = mu/det;
+        const scalar_t x220 = x219*(cof1*x207 + cof2*x218 + x196*x9);
+        const scalar_t x221 = x219*(cof4*x207 + cof5*x218 + x12*x196);
+        const scalar_t x222 = x219*(cof7*x207 + cof8*x218 + x15*x196);
+        const scalar_t x223 = x221 + x222;
+        const scalar_t x224 = x220 + x223;
+        const scalar_t x225 = scalar_t(2)*cof1;
+        const scalar_t x226 = x225*x8;
+        const scalar_t x227 = scalar_t(2)*cof4;
+        const scalar_t x228 = x11*x227;
+        const scalar_t x229 = scalar_t(2)*cof7;
+        const scalar_t x230 = x14*x229;
+        const scalar_t x231 = uy0*x77;
+        const scalar_t x232 = uy0*x99;
+        const scalar_t x233 = uy0*x121;
+        const scalar_t x234 = g0_3*x50 + g0_4*x59 + g0_5*x68;
+        const scalar_t x235 = -fmax(uy0, uy1);
+        const scalar_t x236 = uy0 + x235;
+        const scalar_t x237 = x234 >= 0;
+        const scalar_t x238 = -fmin(uy0, uy1);
+        const scalar_t x239 = uy0 + x238;
+        const scalar_t x240 = ((x237) ? (
+   pow(x236, scalar_t(2))
+)
+: (
+   pow(x239, scalar_t(2))
+));
+        const scalar_t x241 = x234*((x237) ? (
+   -x236
+)
+: (
+   -x239
+));
+        const scalar_t x242 = x77*((x234 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x234*(x240 + (scalar_t(1) / scalar_t(16))*x241)/((scalar_t(1) / scalar_t(512))*pow(x234, scalar_t(2)) + x240 + (scalar_t(1) / scalar_t(32))*x241)
+)
+: (
+   0
+));
+        const scalar_t x243 = g0_3*x82 + g0_4*x86 + g0_5*x90;
+        const scalar_t x244 = -fmax(uy0, uy3);
+        const scalar_t x245 = uy0 + x244;
+        const scalar_t x246 = x243 >= 0;
+        const scalar_t x247 = -fmin(uy0, uy3);
+        const scalar_t x248 = uy0 + x247;
+        const scalar_t x249 = ((x246) ? (
+   pow(x245, scalar_t(2))
+)
+: (
+   pow(x248, scalar_t(2))
+));
+        const scalar_t x250 = x243*((x246) ? (
+   -x245
+)
+: (
+   -x248
+));
+        const scalar_t x251 = x99*((x243 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x243*(x249 + (scalar_t(1) / scalar_t(16))*x250)/((scalar_t(1) / scalar_t(512))*pow(x243, scalar_t(2)) + x249 + (scalar_t(1) / scalar_t(32))*x250)
+)
+: (
+   0
+));
+        const scalar_t x252 = g0_3*x104 + g0_4*x108 + g0_5*x112;
+        const scalar_t x253 = -fmax(uy0, uy4);
+        const scalar_t x254 = uy0 + x253;
+        const scalar_t x255 = x252 >= 0;
+        const scalar_t x256 = -fmin(uy0, uy4);
+        const scalar_t x257 = uy0 + x256;
+        const scalar_t x258 = ((x255) ? (
+   pow(x254, scalar_t(2))
+)
+: (
+   pow(x257, scalar_t(2))
+));
+        const scalar_t x259 = x252*((x255) ? (
+   -x254
+)
+: (
+   -x257
+));
+        const scalar_t x260 = x121*((x252 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x252*(x258 + (scalar_t(1) / scalar_t(16))*x259)/((scalar_t(1) / scalar_t(512))*pow(x252, scalar_t(2)) + x258 + (scalar_t(1) / scalar_t(32))*x259)
+)
+: (
+   0
+));
+        const scalar_t x261 = uy1*x153;
+        const scalar_t x262 = uy3*x170;
+        const scalar_t x263 = uy4*x184;
+        const scalar_t x264 = g1_3*x136 + g1_4*x141 + g1_5*x146;
+        const scalar_t x265 = uy1 + x235;
+        const scalar_t x266 = x264 >= 0;
+        const scalar_t x267 = uy1 + x238;
+        const scalar_t x268 = ((x266) ? (
+   pow(x265, scalar_t(2))
+)
+: (
+   pow(x267, scalar_t(2))
+));
+        const scalar_t x269 = x264*((x266) ? (
+   -x265
+)
+: (
+   -x267
+));
+        const scalar_t x270 = x153*((x264 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x264*(x268 + (scalar_t(1) / scalar_t(16))*x269)/((scalar_t(1) / scalar_t(512))*pow(x264, scalar_t(2)) + x268 + (scalar_t(1) / scalar_t(32))*x269)
+)
+: (
+   0
+));
+        const scalar_t x271 = g3_3*x157 + g3_4*x160 + g3_5*x163;
+        const scalar_t x272 = uy3 + x244;
+        const scalar_t x273 = x271 >= 0;
+        const scalar_t x274 = uy3 + x247;
+        const scalar_t x275 = ((x273) ? (
+   pow(x272, scalar_t(2))
+)
+: (
+   pow(x274, scalar_t(2))
+));
+        const scalar_t x276 = x271*((x273) ? (
+   -x272
+)
+: (
+   -x274
+));
+        const scalar_t x277 = x170*((x271 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x271*(x275 + (scalar_t(1) / scalar_t(16))*x276)/((scalar_t(1) / scalar_t(512))*pow(x271, scalar_t(2)) + x275 + (scalar_t(1) / scalar_t(32))*x276)
+)
+: (
+   0
+));
+        const scalar_t x278 = g4_3*x173 + g4_4*x175 + g4_5*x177;
+        const scalar_t x279 = uy4 + x253;
+        const scalar_t x280 = x278 >= 0;
+        const scalar_t x281 = uy4 + x256;
+        const scalar_t x282 = ((x280) ? (
+   pow(x279, scalar_t(2))
+)
+: (
+   pow(x281, scalar_t(2))
+));
+        const scalar_t x283 = x278*((x280) ? (
+   -x279
+)
+: (
+   -x281
+));
+        const scalar_t x284 = x184*((x278 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x278*(x282 + (scalar_t(1) / scalar_t(16))*x283)/((scalar_t(1) / scalar_t(512))*pow(x278, scalar_t(2)) + x282 + (scalar_t(1) / scalar_t(32))*x283)
+)
+: (
+   0
+));
+        const scalar_t x285 = cof1*x201 + cof4*x204 + cof7*x206;
+        const scalar_t x286 = cof1*x212 + cof2*x201 + cof4*x215 + cof5*x204 + cof7*x217 + cof8*x206;
+        const scalar_t x287 = x219*(cof0*x207 + cof2*x286 + x225*x285);
+        const scalar_t x288 = x219*(cof3*x207 + cof5*x286 + x227*x285);
+        const scalar_t x289 = x219*(cof6*x207 + cof8*x286 + x229*x285);
+        const scalar_t x290 = x288 + x289;
+        const scalar_t x291 = x287 + x290;
+        const scalar_t x292 = scalar_t(2)*cof2;
+        const scalar_t x293 = x292*x8;
+        const scalar_t x294 = scalar_t(2)*cof5;
+        const scalar_t x295 = x11*x294;
+        const scalar_t x296 = scalar_t(2)*cof8;
+        const scalar_t x297 = x14*x296;
+        const scalar_t x298 = uz0*x77;
+        const scalar_t x299 = uz0*x99;
+        const scalar_t x300 = uz0*x121;
+        const scalar_t x301 = g0_6*x50 + g0_7*x59 + g0_8*x68;
+        const scalar_t x302 = -fmax(uz0, uz1);
+        const scalar_t x303 = uz0 + x302;
+        const scalar_t x304 = x301 >= 0;
+        const scalar_t x305 = -fmin(uz0, uz1);
+        const scalar_t x306 = uz0 + x305;
+        const scalar_t x307 = ((x304) ? (
+   pow(x303, scalar_t(2))
+)
+: (
+   pow(x306, scalar_t(2))
+));
+        const scalar_t x308 = x301*((x304) ? (
+   -x303
+)
+: (
+   -x306
+));
+        const scalar_t x309 = x77*((x301 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x301*(x307 + (scalar_t(1) / scalar_t(16))*x308)/((scalar_t(1) / scalar_t(512))*pow(x301, scalar_t(2)) + x307 + (scalar_t(1) / scalar_t(32))*x308)
+)
+: (
+   0
+));
+        const scalar_t x310 = g0_6*x82 + g0_7*x86 + g0_8*x90;
+        const scalar_t x311 = -fmax(uz0, uz3);
+        const scalar_t x312 = uz0 + x311;
+        const scalar_t x313 = x310 >= 0;
+        const scalar_t x314 = -fmin(uz0, uz3);
+        const scalar_t x315 = uz0 + x314;
+        const scalar_t x316 = ((x313) ? (
+   pow(x312, scalar_t(2))
+)
+: (
+   pow(x315, scalar_t(2))
+));
+        const scalar_t x317 = x310*((x313) ? (
+   -x312
+)
+: (
+   -x315
+));
+        const scalar_t x318 = x99*((x310 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x310*(x316 + (scalar_t(1) / scalar_t(16))*x317)/((scalar_t(1) / scalar_t(512))*pow(x310, scalar_t(2)) + x316 + (scalar_t(1) / scalar_t(32))*x317)
+)
+: (
+   0
+));
+        const scalar_t x319 = g0_6*x104 + g0_7*x108 + g0_8*x112;
+        const scalar_t x320 = -fmax(uz0, uz4);
+        const scalar_t x321 = uz0 + x320;
+        const scalar_t x322 = x319 >= 0;
+        const scalar_t x323 = -fmin(uz0, uz4);
+        const scalar_t x324 = uz0 + x323;
+        const scalar_t x325 = ((x322) ? (
+   pow(x321, scalar_t(2))
+)
+: (
+   pow(x324, scalar_t(2))
+));
+        const scalar_t x326 = x319*((x322) ? (
+   -x321
+)
+: (
+   -x324
+));
+        const scalar_t x327 = x121*((x319 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x319*(x325 + (scalar_t(1) / scalar_t(16))*x326)/((scalar_t(1) / scalar_t(512))*pow(x319, scalar_t(2)) + x325 + (scalar_t(1) / scalar_t(32))*x326)
+)
+: (
+   0
+));
+        const scalar_t x328 = uz1*x153;
+        const scalar_t x329 = uz3*x170;
+        const scalar_t x330 = uz4*x184;
+        const scalar_t x331 = g1_6*x136 + g1_7*x141 + g1_8*x146;
+        const scalar_t x332 = uz1 + x302;
+        const scalar_t x333 = x331 >= 0;
+        const scalar_t x334 = uz1 + x305;
+        const scalar_t x335 = ((x333) ? (
+   pow(x332, scalar_t(2))
+)
+: (
+   pow(x334, scalar_t(2))
+));
+        const scalar_t x336 = x331*((x333) ? (
+   -x332
+)
+: (
+   -x334
+));
+        const scalar_t x337 = x153*((x331 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x331*(x335 + (scalar_t(1) / scalar_t(16))*x336)/((scalar_t(1) / scalar_t(512))*pow(x331, scalar_t(2)) + x335 + (scalar_t(1) / scalar_t(32))*x336)
+)
+: (
+   0
+));
+        const scalar_t x338 = g3_6*x157 + g3_7*x160 + g3_8*x163;
+        const scalar_t x339 = uz3 + x311;
+        const scalar_t x340 = x338 >= 0;
+        const scalar_t x341 = uz3 + x314;
+        const scalar_t x342 = ((x340) ? (
+   pow(x339, scalar_t(2))
+)
+: (
+   pow(x341, scalar_t(2))
+));
+        const scalar_t x343 = x338*((x340) ? (
+   -x339
+)
+: (
+   -x341
+));
+        const scalar_t x344 = x170*((x338 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x338*(x342 + (scalar_t(1) / scalar_t(16))*x343)/((scalar_t(1) / scalar_t(512))*pow(x338, scalar_t(2)) + x342 + (scalar_t(1) / scalar_t(32))*x343)
+)
+: (
+   0
+));
+        const scalar_t x345 = g4_6*x173 + g4_7*x175 + g4_8*x177;
+        const scalar_t x346 = uz4 + x320;
+        const scalar_t x347 = x345 >= 0;
+        const scalar_t x348 = uz4 + x323;
+        const scalar_t x349 = ((x347) ? (
+   pow(x346, scalar_t(2))
+)
+: (
+   pow(x348, scalar_t(2))
+));
+        const scalar_t x350 = x345*((x347) ? (
+   -x346
+)
+: (
+   -x348
+));
+        const scalar_t x351 = x184*((x345 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x345*(x349 + (scalar_t(1) / scalar_t(16))*x350)/((scalar_t(1) / scalar_t(512))*pow(x345, scalar_t(2)) + x349 + (scalar_t(1) / scalar_t(32))*x350)
+)
+: (
+   0
+));
+        const scalar_t x352 = cof2*x212 + cof5*x215 + cof8*x217;
+        const scalar_t x353 = x219*(cof0*x218 + cof1*x286 + x292*x352);
+        const scalar_t x354 = x219*(cof3*x218 + cof4*x286 + x294*x352);
+        const scalar_t x355 = x219*(cof6*x218 + cof7*x286 + x296*x352);
+        const scalar_t x356 = x354 + x355;
+        const scalar_t x357 = x353 + x356;
+        const scalar_t x358 = (scalar_t(1) / scalar_t(8))*rho;
+        const scalar_t x359 = -x220 + x223;
+        const scalar_t x360 = p1 + p2;
+        const scalar_t x361 = cof3*(ux1 + ux2) + cof4*(uy1 + uy2) + cof5*(uz1 + uz2);
+        const scalar_t x362 = x361*(sgn5 + scalar_t(1));
+        const scalar_t x363 = scalar_t(3)*x0 + scalar_t(3)*x6;
+        const scalar_t x364 = scalar_t(9)*x2 + x4;
+        const scalar_t x365 = x363 + x364;
+        const scalar_t x366 = x135 + x365;
+        const scalar_t x367 = scalar_t(3)*y0 + scalar_t(3)*y6;
+        const scalar_t x368 = scalar_t(9)*y2 + y4;
+        const scalar_t x369 = x367 + x368;
+        const scalar_t x370 = x140 + x369;
+        const scalar_t x371 = scalar_t(3)*z0 + scalar_t(3)*z6;
+        const scalar_t x372 = scalar_t(9)*z2 + z4;
+        const scalar_t x373 = x371 + x372;
+        const scalar_t x374 = x145 + x373;
+        const scalar_t x375 = g1_0*x366 + g1_1*x370 + g1_2*x374;
+        const scalar_t x376 = -fmax(ux1, ux2);
+        const scalar_t x377 = ux1 + x376;
+        const scalar_t x378 = x375 >= 0;
+        const scalar_t x379 = -fmin(ux1, ux2);
+        const scalar_t x380 = ux1 + x379;
+        const scalar_t x381 = ((x378) ? (
+   pow(x377, scalar_t(2))
+)
+: (
+   pow(x380, scalar_t(2))
+));
+        const scalar_t x382 = x375*((x378) ? (
+   -x377
+)
+: (
+   -x380
+));
+        const scalar_t x383 = rho*x362;
+        const scalar_t x384 = rho*ux2;
+        const scalar_t x385 = x361*(sgn5 + scalar_t(-1));
+        const scalar_t x386 = -scalar_t(23)*x2 + x4;
+        const scalar_t x387 = x363 + x386;
+        const scalar_t x388 = x387 + x49;
+        const scalar_t x389 = -scalar_t(23)*y2 + y4;
+        const scalar_t x390 = x367 + x389;
+        const scalar_t x391 = x390 + x58;
+        const scalar_t x392 = -scalar_t(23)*z2 + z4;
+        const scalar_t x393 = x371 + x392;
+        const scalar_t x394 = x393 + x67;
+        const scalar_t x395 = g2_0*x388 + g2_1*x391 + g2_2*x394;
+        const scalar_t x396 = ux2 + x376;
+        const scalar_t x397 = x395 >= 0;
+        const scalar_t x398 = ux2 + x379;
+        const scalar_t x399 = ((x397) ? (
+   pow(x396, scalar_t(2))
+)
+: (
+   pow(x398, scalar_t(2))
+));
+        const scalar_t x400 = x395*((x397) ? (
+   -x396
+)
+: (
+   -x398
+));
+        const scalar_t x401 = rho*x385;
+        const scalar_t x402 = x12*x360 + x123*x362 + x383*((x375 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x375*(x381 + (scalar_t(1) / scalar_t(16))*x382)/((scalar_t(1) / scalar_t(512))*pow(x375, scalar_t(2)) + x381 + (scalar_t(1) / scalar_t(32))*x382)
+)
+: (
+   0
+)) - x384*x385 - x401*((x395 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x395*(x399 + (scalar_t(1) / scalar_t(16))*x400)/((scalar_t(1) / scalar_t(512))*pow(x395, scalar_t(2)) + x399 + (scalar_t(1) / scalar_t(32))*x400)
+)
+: (
+   0
+));
+        const scalar_t x403 = p1 + p5;
+        const scalar_t x404 = cof6*(ux1 + ux5) + cof7*(uy1 + uy5) + cof8*(uz1 + uz5);
+        const scalar_t x405 = x404*(sgn9 + scalar_t(1));
+        const scalar_t x406 = x3 + scalar_t(9)*x5;
+        const scalar_t x407 = x363 + x43;
+        const scalar_t x408 = x407 + x7;
+        const scalar_t x409 = x134 + x406 + x408;
+        const scalar_t x410 = y3 + scalar_t(9)*y5;
+        const scalar_t x411 = x367 + x52;
+        const scalar_t x412 = x411 + y7;
+        const scalar_t x413 = x139 + x410 + x412;
+        const scalar_t x414 = z3 + scalar_t(9)*z5;
+        const scalar_t x415 = x371 + x61;
+        const scalar_t x416 = x415 + z7;
+        const scalar_t x417 = x144 + x414 + x416;
+        const scalar_t x418 = g1_0*x409 + g1_1*x413 + g1_2*x417;
+        const scalar_t x419 = -fmax(ux1, ux5);
+        const scalar_t x420 = ux1 + x419;
+        const scalar_t x421 = x418 >= 0;
+        const scalar_t x422 = -fmin(ux1, ux5);
+        const scalar_t x423 = ux1 + x422;
+        const scalar_t x424 = ((x421) ? (
+   pow(x420, scalar_t(2))
+)
+: (
+   pow(x423, scalar_t(2))
+));
+        const scalar_t x425 = x418*((x421) ? (
+   -x420
+)
+: (
+   -x423
+));
+        const scalar_t x426 = rho*x405;
+        const scalar_t x427 = rho*ux5;
+        const scalar_t x428 = x404*(sgn9 + scalar_t(-1));
+        const scalar_t x429 = x3 - scalar_t(23)*x5;
+        const scalar_t x430 = x408 + x429 + x46;
+        const scalar_t x431 = y3 - scalar_t(23)*y5;
+        const scalar_t x432 = x412 + x431 + x55;
+        const scalar_t x433 = z3 - scalar_t(23)*z5;
+        const scalar_t x434 = x416 + x433 + x64;
+        const scalar_t x435 = g5_0*x430 + g5_1*x432 + g5_2*x434;
+        const scalar_t x436 = ux5 + x419;
+        const scalar_t x437 = x435 >= 0;
+        const scalar_t x438 = ux5 + x422;
+        const scalar_t x439 = ((x437) ? (
+   pow(x436, scalar_t(2))
+)
+: (
+   pow(x438, scalar_t(2))
+));
+        const scalar_t x440 = x435*((x437) ? (
+   -x436
+)
+: (
+   -x438
+));
+        const scalar_t x441 = rho*x428;
+        const scalar_t x442 = x123*x405 + x15*x403 + x426*((x418 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x418*(x424 + (scalar_t(1) / scalar_t(16))*x425)/((scalar_t(1) / scalar_t(512))*pow(x418, scalar_t(2)) + x424 + (scalar_t(1) / scalar_t(32))*x425)
+)
+: (
+   0
+)) - x427*x428 - x441*((x435 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x435*(x439 + (scalar_t(1) / scalar_t(16))*x440)/((scalar_t(1) / scalar_t(512))*pow(x435, scalar_t(2)) + x439 + (scalar_t(1) / scalar_t(32))*x440)
+)
+: (
+   0
+));
+        const scalar_t x443 = -x287 + x290;
+        const scalar_t x444 = g1_3*x366 + g1_4*x370 + g1_5*x374;
+        const scalar_t x445 = -fmax(uy1, uy2);
+        const scalar_t x446 = uy1 + x445;
+        const scalar_t x447 = x444 >= 0;
+        const scalar_t x448 = -fmin(uy1, uy2);
+        const scalar_t x449 = uy1 + x448;
+        const scalar_t x450 = ((x447) ? (
+   pow(x446, scalar_t(2))
+)
+: (
+   pow(x449, scalar_t(2))
+));
+        const scalar_t x451 = x444*((x447) ? (
+   -x446
+)
+: (
+   -x449
+));
+        const scalar_t x452 = g2_3*x388 + g2_4*x391 + g2_5*x394;
+        const scalar_t x453 = uy2 + x445;
+        const scalar_t x454 = x452 >= 0;
+        const scalar_t x455 = uy2 + x448;
+        const scalar_t x456 = ((x454) ? (
+   pow(x453, scalar_t(2))
+)
+: (
+   pow(x455, scalar_t(2))
+));
+        const scalar_t x457 = x452*((x454) ? (
+   -x453
+)
+: (
+   -x455
+));
+        const scalar_t x458 = uy1*x383 - uy2*x401 + x227*x360 + x383*((x444 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x444*(x450 + (scalar_t(1) / scalar_t(16))*x451)/((scalar_t(1) / scalar_t(512))*pow(x444, scalar_t(2)) + x450 + (scalar_t(1) / scalar_t(32))*x451)
+)
+: (
+   0
+)) - x401*((x452 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x452*(x456 + (scalar_t(1) / scalar_t(16))*x457)/((scalar_t(1) / scalar_t(512))*pow(x452, scalar_t(2)) + x456 + (scalar_t(1) / scalar_t(32))*x457)
+)
+: (
+   0
+));
+        const scalar_t x459 = g1_3*x409 + g1_4*x413 + g1_5*x417;
+        const scalar_t x460 = -fmax(uy1, uy5);
+        const scalar_t x461 = uy1 + x460;
+        const scalar_t x462 = x459 >= 0;
+        const scalar_t x463 = -fmin(uy1, uy5);
+        const scalar_t x464 = uy1 + x463;
+        const scalar_t x465 = ((x462) ? (
+   pow(x461, scalar_t(2))
+)
+: (
+   pow(x464, scalar_t(2))
+));
+        const scalar_t x466 = x459*((x462) ? (
+   -x461
+)
+: (
+   -x464
+));
+        const scalar_t x467 = g5_3*x430 + g5_4*x432 + g5_5*x434;
+        const scalar_t x468 = uy5 + x460;
+        const scalar_t x469 = x467 >= 0;
+        const scalar_t x470 = uy5 + x463;
+        const scalar_t x471 = ((x469) ? (
+   pow(x468, scalar_t(2))
+)
+: (
+   pow(x470, scalar_t(2))
+));
+        const scalar_t x472 = x467*((x469) ? (
+   -x468
+)
+: (
+   -x470
+));
+        const scalar_t x473 = uy1*x426 - uy5*x441 + x229*x403 + x426*((x459 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x459*(x465 + (scalar_t(1) / scalar_t(16))*x466)/((scalar_t(1) / scalar_t(512))*pow(x459, scalar_t(2)) + x465 + (scalar_t(1) / scalar_t(32))*x466)
+)
+: (
+   0
+)) - x441*((x467 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x467*(x471 + (scalar_t(1) / scalar_t(16))*x472)/((scalar_t(1) / scalar_t(512))*pow(x467, scalar_t(2)) + x471 + (scalar_t(1) / scalar_t(32))*x472)
+)
+: (
+   0
+));
+        const scalar_t x474 = -x353 + x356;
+        const scalar_t x475 = g1_6*x366 + g1_7*x370 + g1_8*x374;
+        const scalar_t x476 = -fmax(uz1, uz2);
+        const scalar_t x477 = uz1 + x476;
+        const scalar_t x478 = x475 >= 0;
+        const scalar_t x479 = -fmin(uz1, uz2);
+        const scalar_t x480 = uz1 + x479;
+        const scalar_t x481 = ((x478) ? (
+   pow(x477, scalar_t(2))
+)
+: (
+   pow(x480, scalar_t(2))
+));
+        const scalar_t x482 = x475*((x478) ? (
+   -x477
+)
+: (
+   -x480
+));
+        const scalar_t x483 = g2_6*x388 + g2_7*x391 + g2_8*x394;
+        const scalar_t x484 = uz2 + x476;
+        const scalar_t x485 = x483 >= 0;
+        const scalar_t x486 = uz2 + x479;
+        const scalar_t x487 = ((x485) ? (
+   pow(x484, scalar_t(2))
+)
+: (
+   pow(x486, scalar_t(2))
+));
+        const scalar_t x488 = x483*((x485) ? (
+   -x484
+)
+: (
+   -x486
+));
+        const scalar_t x489 = uz1*x383 - uz2*x401 + x294*x360 + x383*((x475 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x475*(x481 + (scalar_t(1) / scalar_t(16))*x482)/((scalar_t(1) / scalar_t(512))*pow(x475, scalar_t(2)) + x481 + (scalar_t(1) / scalar_t(32))*x482)
+)
+: (
+   0
+)) - x401*((x483 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x483*(x487 + (scalar_t(1) / scalar_t(16))*x488)/((scalar_t(1) / scalar_t(512))*pow(x483, scalar_t(2)) + x487 + (scalar_t(1) / scalar_t(32))*x488)
+)
+: (
+   0
+));
+        const scalar_t x490 = g1_6*x409 + g1_7*x413 + g1_8*x417;
+        const scalar_t x491 = -fmax(uz1, uz5);
+        const scalar_t x492 = uz1 + x491;
+        const scalar_t x493 = x490 >= 0;
+        const scalar_t x494 = -fmin(uz1, uz5);
+        const scalar_t x495 = uz1 + x494;
+        const scalar_t x496 = ((x493) ? (
+   pow(x492, scalar_t(2))
+)
+: (
+   pow(x495, scalar_t(2))
+));
+        const scalar_t x497 = x490*((x493) ? (
+   -x492
+)
+: (
+   -x495
+));
+        const scalar_t x498 = g5_6*x430 + g5_7*x432 + g5_8*x434;
+        const scalar_t x499 = uz5 + x491;
+        const scalar_t x500 = x498 >= 0;
+        const scalar_t x501 = uz5 + x494;
+        const scalar_t x502 = ((x500) ? (
+   pow(x499, scalar_t(2))
+)
+: (
+   pow(x501, scalar_t(2))
+));
+        const scalar_t x503 = x498*((x500) ? (
+   -x499
+)
+: (
+   -x501
+));
+        const scalar_t x504 = uz1*x426 - uz5*x441 + x296*x403 + x426*((x490 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x490*(x496 + (scalar_t(1) / scalar_t(16))*x497)/((scalar_t(1) / scalar_t(512))*pow(x490, scalar_t(2)) + x496 + (scalar_t(1) / scalar_t(32))*x497)
+)
+: (
+   0
+)) - x441*((x498 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x498*(x502 + (scalar_t(1) / scalar_t(16))*x503)/((scalar_t(1) / scalar_t(512))*pow(x498, scalar_t(2)) + x502 + (scalar_t(1) / scalar_t(32))*x503)
+)
+: (
+   0
+));
+        const scalar_t x505 = p2 + p6;
+        const scalar_t x506 = x15*x505;
+        const scalar_t x507 = rho*ux6;
+        const scalar_t x508 = ux2 + ux6;
+        const scalar_t x509 = uy2 + uy6;
+        const scalar_t x510 = uz2 + uz6;
+        const scalar_t x511 = cof6*x508 + cof7*x509 + cof8*x510;
+        const scalar_t x512 = x511*(sgn10 + scalar_t(-1));
+        const scalar_t x513 = x507*x512;
+        const scalar_t x514 = -scalar_t(23)*x6;
+        const scalar_t x515 = x0 + x102;
+        const scalar_t x516 = x364 + x514 + x515;
+        const scalar_t x517 = -scalar_t(23)*y6;
+        const scalar_t x518 = x106 + y0;
+        const scalar_t x519 = x368 + x517 + x518;
+        const scalar_t x520 = -scalar_t(23)*z6;
+        const scalar_t x521 = x110 + z0;
+        const scalar_t x522 = x372 + x520 + x521;
+        const scalar_t x523 = g6_0*x516 + g6_1*x519 + g6_2*x522;
+        const scalar_t x524 = -fmax(ux2, ux6);
+        const scalar_t x525 = ux6 + x524;
+        const scalar_t x526 = x523 >= 0;
+        const scalar_t x527 = -fmin(ux2, ux6);
+        const scalar_t x528 = ux6 + x527;
+        const scalar_t x529 = ((x526) ? (
+   pow(x525, scalar_t(2))
+)
+: (
+   pow(x528, scalar_t(2))
+));
+        const scalar_t x530 = x523*((x526) ? (
+   -x525
+)
+: (
+   -x528
+));
+        const scalar_t x531 = rho*x512;
+        const scalar_t x532 = x531*((x523 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x523*(x529 + (scalar_t(1) / scalar_t(16))*x530)/((scalar_t(1) / scalar_t(512))*pow(x523, scalar_t(2)) + x529 + (scalar_t(1) / scalar_t(32))*x530)
+)
+: (
+   0
+));
+        const scalar_t x533 = x511*(sgn10 + scalar_t(1));
+        const scalar_t x534 = x384*x533;
+        const scalar_t x535 = scalar_t(9)*x6;
+        const scalar_t x536 = x386 + x515 + x535;
+        const scalar_t x537 = scalar_t(9)*y6;
+        const scalar_t x538 = x389 + x518 + x537;
+        const scalar_t x539 = scalar_t(9)*z6;
+        const scalar_t x540 = x392 + x521 + x539;
+        const scalar_t x541 = g2_0*x536 + g2_1*x538 + g2_2*x540;
+        const scalar_t x542 = ux2 + x524;
+        const scalar_t x543 = x541 >= 0;
+        const scalar_t x544 = ux2 + x527;
+        const scalar_t x545 = ((x543) ? (
+   pow(x542, scalar_t(2))
+)
+: (
+   pow(x544, scalar_t(2))
+));
+        const scalar_t x546 = x541*((x543) ? (
+   -x542
+)
+: (
+   -x544
+));
+        const scalar_t x547 = rho*x533;
+        const scalar_t x548 = x547*((x541 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x541*(x545 + (scalar_t(1) / scalar_t(16))*x546)/((scalar_t(1) / scalar_t(512))*pow(x541, scalar_t(2)) + x545 + (scalar_t(1) / scalar_t(32))*x546)
+)
+: (
+   0
+));
+        const scalar_t x549 = x220 + x221 - x222;
+        const scalar_t x550 = p2 + p3;
+        const scalar_t x551 = cof0*x194 + cof1*x205 + cof2*x216;
+        const scalar_t x552 = x551*(sgn1 + scalar_t(1));
+        const scalar_t x553 = x156 + x365;
+        const scalar_t x554 = x159 + x369;
+        const scalar_t x555 = x162 + x373;
+        const scalar_t x556 = g3_0*x553 + g3_1*x554 + g3_2*x555;
+        const scalar_t x557 = -fmax(ux2, ux3);
+        const scalar_t x558 = ux3 + x557;
+        const scalar_t x559 = x556 >= 0;
+        const scalar_t x560 = -fmin(ux2, ux3);
+        const scalar_t x561 = ux3 + x560;
+        const scalar_t x562 = ((x559) ? (
+   pow(x558, scalar_t(2))
+)
+: (
+   pow(x561, scalar_t(2))
+));
+        const scalar_t x563 = x556*((x559) ? (
+   -x558
+)
+: (
+   -x561
+));
+        const scalar_t x564 = rho*x552;
+        const scalar_t x565 = x551*(sgn1 + scalar_t(-1));
+        const scalar_t x566 = x387 + x81;
+        const scalar_t x567 = x390 + x85;
+        const scalar_t x568 = x393 + x89;
+        const scalar_t x569 = g2_0*x566 + g2_1*x567 + g2_2*x568;
+        const scalar_t x570 = ux2 + x557;
+        const scalar_t x571 = x569 >= 0;
+        const scalar_t x572 = ux2 + x560;
+        const scalar_t x573 = ((x571) ? (
+   pow(x570, scalar_t(2))
+)
+: (
+   pow(x572, scalar_t(2))
+));
+        const scalar_t x574 = x569*((x571) ? (
+   -x570
+)
+: (
+   -x572
+));
+        const scalar_t x575 = rho*x565;
+        const scalar_t x576 = x126*x552 - x384*x565 + x550*x9 + x564*((x556 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x556*(x562 + (scalar_t(1) / scalar_t(16))*x563)/((scalar_t(1) / scalar_t(512))*pow(x556, scalar_t(2)) + x562 + (scalar_t(1) / scalar_t(32))*x563)
+)
+: (
+   0
+)) - x575*((x569 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x569*(x573 + (scalar_t(1) / scalar_t(16))*x574)/((scalar_t(1) / scalar_t(512))*pow(x569, scalar_t(2)) + x573 + (scalar_t(1) / scalar_t(32))*x574)
+)
+: (
+   0
+));
+        const scalar_t x577 = x229*x505;
+        const scalar_t x578 = uy6*x531;
+        const scalar_t x579 = g6_3*x516 + g6_4*x519 + g6_5*x522;
+        const scalar_t x580 = -fmax(uy2, uy6);
+        const scalar_t x581 = uy6 + x580;
+        const scalar_t x582 = x579 >= 0;
+        const scalar_t x583 = -fmin(uy2, uy6);
+        const scalar_t x584 = uy6 + x583;
+        const scalar_t x585 = ((x582) ? (
+   pow(x581, scalar_t(2))
+)
+: (
+   pow(x584, scalar_t(2))
+));
+        const scalar_t x586 = x579*((x582) ? (
+   -x581
+)
+: (
+   -x584
+));
+        const scalar_t x587 = x531*((x579 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x579*(x585 + (scalar_t(1) / scalar_t(16))*x586)/((scalar_t(1) / scalar_t(512))*pow(x579, scalar_t(2)) + x585 + (scalar_t(1) / scalar_t(32))*x586)
+)
+: (
+   0
+));
+        const scalar_t x588 = uy2*x547;
+        const scalar_t x589 = g2_3*x536 + g2_4*x538 + g2_5*x540;
+        const scalar_t x590 = uy2 + x580;
+        const scalar_t x591 = x589 >= 0;
+        const scalar_t x592 = uy2 + x583;
+        const scalar_t x593 = ((x591) ? (
+   pow(x590, scalar_t(2))
+)
+: (
+   pow(x592, scalar_t(2))
+));
+        const scalar_t x594 = x589*((x591) ? (
+   -x590
+)
+: (
+   -x592
+));
+        const scalar_t x595 = x547*((x589 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x589*(x593 + (scalar_t(1) / scalar_t(16))*x594)/((scalar_t(1) / scalar_t(512))*pow(x589, scalar_t(2)) + x593 + (scalar_t(1) / scalar_t(32))*x594)
+)
+: (
+   0
+));
+        const scalar_t x596 = x287 + x288 - x289;
+        const scalar_t x597 = g3_3*x553 + g3_4*x554 + g3_5*x555;
+        const scalar_t x598 = -fmax(uy2, uy3);
+        const scalar_t x599 = uy3 + x598;
+        const scalar_t x600 = x597 >= 0;
+        const scalar_t x601 = -fmin(uy2, uy3);
+        const scalar_t x602 = uy3 + x601;
+        const scalar_t x603 = ((x600) ? (
+   pow(x599, scalar_t(2))
+)
+: (
+   pow(x602, scalar_t(2))
+));
+        const scalar_t x604 = x597*((x600) ? (
+   -x599
+)
+: (
+   -x602
+));
+        const scalar_t x605 = g2_3*x566 + g2_4*x567 + g2_5*x568;
+        const scalar_t x606 = uy2 + x598;
+        const scalar_t x607 = x605 >= 0;
+        const scalar_t x608 = uy2 + x601;
+        const scalar_t x609 = ((x607) ? (
+   pow(x606, scalar_t(2))
+)
+: (
+   pow(x608, scalar_t(2))
+));
+        const scalar_t x610 = x605*((x607) ? (
+   -x606
+)
+: (
+   -x608
+));
+        const scalar_t x611 = -uy2*x575 + uy3*x564 + x225*x550 + x564*((x597 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x597*(x603 + (scalar_t(1) / scalar_t(16))*x604)/((scalar_t(1) / scalar_t(512))*pow(x597, scalar_t(2)) + x603 + (scalar_t(1) / scalar_t(32))*x604)
+)
+: (
+   0
+)) - x575*((x605 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x605*(x609 + (scalar_t(1) / scalar_t(16))*x610)/((scalar_t(1) / scalar_t(512))*pow(x605, scalar_t(2)) + x609 + (scalar_t(1) / scalar_t(32))*x610)
+)
+: (
+   0
+));
+        const scalar_t x612 = x296*x505;
+        const scalar_t x613 = uz6*x531;
+        const scalar_t x614 = g6_6*x516 + g6_7*x519 + g6_8*x522;
+        const scalar_t x615 = -fmax(uz2, uz6);
+        const scalar_t x616 = uz6 + x615;
+        const scalar_t x617 = x614 >= 0;
+        const scalar_t x618 = -fmin(uz2, uz6);
+        const scalar_t x619 = uz6 + x618;
+        const scalar_t x620 = ((x617) ? (
+   pow(x616, scalar_t(2))
+)
+: (
+   pow(x619, scalar_t(2))
+));
+        const scalar_t x621 = x614*((x617) ? (
+   -x616
+)
+: (
+   -x619
+));
+        const scalar_t x622 = x531*((x614 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x614*(x620 + (scalar_t(1) / scalar_t(16))*x621)/((scalar_t(1) / scalar_t(512))*pow(x614, scalar_t(2)) + x620 + (scalar_t(1) / scalar_t(32))*x621)
+)
+: (
+   0
+));
+        const scalar_t x623 = uz2*x547;
+        const scalar_t x624 = g2_6*x536 + g2_7*x538 + g2_8*x540;
+        const scalar_t x625 = uz2 + x615;
+        const scalar_t x626 = x624 >= 0;
+        const scalar_t x627 = uz2 + x618;
+        const scalar_t x628 = ((x626) ? (
+   pow(x625, scalar_t(2))
+)
+: (
+   pow(x627, scalar_t(2))
+));
+        const scalar_t x629 = x624*((x626) ? (
+   -x625
+)
+: (
+   -x627
+));
+        const scalar_t x630 = x547*((x624 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x624*(x628 + (scalar_t(1) / scalar_t(16))*x629)/((scalar_t(1) / scalar_t(512))*pow(x624, scalar_t(2)) + x628 + (scalar_t(1) / scalar_t(32))*x629)
+)
+: (
+   0
+));
+        const scalar_t x631 = x353 + x354 - x355;
+        const scalar_t x632 = g3_6*x553 + g3_7*x554 + g3_8*x555;
+        const scalar_t x633 = -fmax(uz2, uz3);
+        const scalar_t x634 = uz3 + x633;
+        const scalar_t x635 = x632 >= 0;
+        const scalar_t x636 = -fmin(uz2, uz3);
+        const scalar_t x637 = uz3 + x636;
+        const scalar_t x638 = ((x635) ? (
+   pow(x634, scalar_t(2))
+)
+: (
+   pow(x637, scalar_t(2))
+));
+        const scalar_t x639 = x632*((x635) ? (
+   -x634
+)
+: (
+   -x637
+));
+        const scalar_t x640 = g2_6*x566 + g2_7*x567 + g2_8*x568;
+        const scalar_t x641 = uz2 + x633;
+        const scalar_t x642 = x640 >= 0;
+        const scalar_t x643 = uz2 + x636;
+        const scalar_t x644 = ((x642) ? (
+   pow(x641, scalar_t(2))
+)
+: (
+   pow(x643, scalar_t(2))
+));
+        const scalar_t x645 = x640*((x642) ? (
+   -x641
+)
+: (
+   -x643
+));
+        const scalar_t x646 = -uz2*x575 + uz3*x564 + x292*x550 + x564*((x632 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x632*(x638 + (scalar_t(1) / scalar_t(16))*x639)/((scalar_t(1) / scalar_t(512))*pow(x632, scalar_t(2)) + x638 + (scalar_t(1) / scalar_t(32))*x639)
+)
+: (
+   0
+)) - x575*((x640 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x640*(x644 + (scalar_t(1) / scalar_t(16))*x645)/((scalar_t(1) / scalar_t(512))*pow(x640, scalar_t(2)) + x644 + (scalar_t(1) / scalar_t(32))*x645)
+)
+: (
+   0
+));
+        const scalar_t x647 = x220 - x221 + x222;
+        const scalar_t x648 = p3 + p7;
+        const scalar_t x649 = cof6*(ux3 + ux7) + cof7*(uy3 + uy7) + cof8*(uz3 + uz7);
+        const scalar_t x650 = x649*(sgn11 + scalar_t(1));
+        const scalar_t x651 = scalar_t(9)*x7;
+        const scalar_t x652 = x1 + x407;
+        const scalar_t x653 = x155 + x651 + x652;
+        const scalar_t x654 = scalar_t(9)*y7;
+        const scalar_t x655 = x411 + y1;
+        const scalar_t x656 = x158 + x654 + x655;
+        const scalar_t x657 = scalar_t(9)*z7;
+        const scalar_t x658 = x415 + z1;
+        const scalar_t x659 = x161 + x657 + x658;
+        const scalar_t x660 = g3_0*x653 + g3_1*x656 + g3_2*x659;
+        const scalar_t x661 = -fmax(ux3, ux7);
+        const scalar_t x662 = ux3 + x661;
+        const scalar_t x663 = x660 >= 0;
+        const scalar_t x664 = -fmin(ux3, ux7);
+        const scalar_t x665 = ux3 + x664;
+        const scalar_t x666 = ((x663) ? (
+   pow(x662, scalar_t(2))
+)
+: (
+   pow(x665, scalar_t(2))
+));
+        const scalar_t x667 = x660*((x663) ? (
+   -x662
+)
+: (
+   -x665
+));
+        const scalar_t x668 = rho*x650;
+        const scalar_t x669 = rho*ux7;
+        const scalar_t x670 = x649*(sgn11 + scalar_t(-1));
+        const scalar_t x671 = -scalar_t(23)*x7;
+        const scalar_t x672 = x652 + x671 + x80;
+        const scalar_t x673 = -scalar_t(23)*y7;
+        const scalar_t x674 = x655 + x673 + x84;
+        const scalar_t x675 = -scalar_t(23)*z7;
+        const scalar_t x676 = x658 + x675 + x88;
+        const scalar_t x677 = g7_0*x672 + g7_1*x674 + g7_2*x676;
+        const scalar_t x678 = ux7 + x661;
+        const scalar_t x679 = x677 >= 0;
+        const scalar_t x680 = ux7 + x664;
+        const scalar_t x681 = ((x679) ? (
+   pow(x678, scalar_t(2))
+)
+: (
+   pow(x680, scalar_t(2))
+));
+        const scalar_t x682 = x677*((x679) ? (
+   -x678
+)
+: (
+   -x680
+));
+        const scalar_t x683 = rho*x670;
+        const scalar_t x684 = x126*x650 + x15*x648 + x668*((x660 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x660*(x666 + (scalar_t(1) / scalar_t(16))*x667)/((scalar_t(1) / scalar_t(512))*pow(x660, scalar_t(2)) + x666 + (scalar_t(1) / scalar_t(32))*x667)
+)
+: (
+   0
+)) - x669*x670 - x683*((x677 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x677*(x681 + (scalar_t(1) / scalar_t(16))*x682)/((scalar_t(1) / scalar_t(512))*pow(x677, scalar_t(2)) + x681 + (scalar_t(1) / scalar_t(32))*x682)
+)
+: (
+   0
+));
+        const scalar_t x685 = x287 - x288 + x289;
+        const scalar_t x686 = g3_3*x653 + g3_4*x656 + g3_5*x659;
+        const scalar_t x687 = -fmax(uy3, uy7);
+        const scalar_t x688 = uy3 + x687;
+        const scalar_t x689 = x686 >= 0;
+        const scalar_t x690 = -fmin(uy3, uy7);
+        const scalar_t x691 = uy3 + x690;
+        const scalar_t x692 = ((x689) ? (
+   pow(x688, scalar_t(2))
+)
+: (
+   pow(x691, scalar_t(2))
+));
+        const scalar_t x693 = x686*((x689) ? (
+   -x688
+)
+: (
+   -x691
+));
+        const scalar_t x694 = g7_3*x672 + g7_4*x674 + g7_5*x676;
+        const scalar_t x695 = uy7 + x687;
+        const scalar_t x696 = x694 >= 0;
+        const scalar_t x697 = uy7 + x690;
+        const scalar_t x698 = ((x696) ? (
+   pow(x695, scalar_t(2))
+)
+: (
+   pow(x697, scalar_t(2))
+));
+        const scalar_t x699 = x694*((x696) ? (
+   -x695
+)
+: (
+   -x697
+));
+        const scalar_t x700 = uy3*x668 - uy7*x683 + x229*x648 + x668*((x686 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x686*(x692 + (scalar_t(1) / scalar_t(16))*x693)/((scalar_t(1) / scalar_t(512))*pow(x686, scalar_t(2)) + x692 + (scalar_t(1) / scalar_t(32))*x693)
+)
+: (
+   0
+)) - x683*((x694 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x694*(x698 + (scalar_t(1) / scalar_t(16))*x699)/((scalar_t(1) / scalar_t(512))*pow(x694, scalar_t(2)) + x698 + (scalar_t(1) / scalar_t(32))*x699)
+)
+: (
+   0
+));
+        const scalar_t x701 = x353 - x354 + x355;
+        const scalar_t x702 = g3_6*x653 + g3_7*x656 + g3_8*x659;
+        const scalar_t x703 = -fmax(uz3, uz7);
+        const scalar_t x704 = uz3 + x703;
+        const scalar_t x705 = x702 >= 0;
+        const scalar_t x706 = -fmin(uz3, uz7);
+        const scalar_t x707 = uz3 + x706;
+        const scalar_t x708 = ((x705) ? (
+   pow(x704, scalar_t(2))
+)
+: (
+   pow(x707, scalar_t(2))
+));
+        const scalar_t x709 = x702*((x705) ? (
+   -x704
+)
+: (
+   -x707
+));
+        const scalar_t x710 = g7_6*x672 + g7_7*x674 + g7_8*x676;
+        const scalar_t x711 = uz7 + x703;
+        const scalar_t x712 = x710 >= 0;
+        const scalar_t x713 = uz7 + x706;
+        const scalar_t x714 = ((x712) ? (
+   pow(x711, scalar_t(2))
+)
+: (
+   pow(x713, scalar_t(2))
+));
+        const scalar_t x715 = x710*((x712) ? (
+   -x711
+)
+: (
+   -x713
+));
+        const scalar_t x716 = uz3*x668 - uz7*x683 + x296*x648 + x668*((x702 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x702*(x708 + (scalar_t(1) / scalar_t(16))*x709)/((scalar_t(1) / scalar_t(512))*pow(x702, scalar_t(2)) + x708 + (scalar_t(1) / scalar_t(32))*x709)
+)
+: (
+   0
+)) - x683*((x710 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x710*(x714 + (scalar_t(1) / scalar_t(16))*x715)/((scalar_t(1) / scalar_t(512))*pow(x710, scalar_t(2)) + x714 + (scalar_t(1) / scalar_t(32))*x715)
+)
+: (
+   0
+));
+        const scalar_t x717 = p4 + p5;
+        const scalar_t x718 = cof0*x191 + cof1*x202 + cof2*x213;
+        const scalar_t x719 = x718*(sgn2 + scalar_t(1));
+        const scalar_t x720 = x172 + x363;
+        const scalar_t x721 = x406 + x79;
+        const scalar_t x722 = x720 + x721;
+        const scalar_t x723 = x174 + x367;
+        const scalar_t x724 = x410 + x83;
+        const scalar_t x725 = x723 + x724;
+        const scalar_t x726 = x176 + x371;
+        const scalar_t x727 = x414 + x87;
+        const scalar_t x728 = x726 + x727;
+        const scalar_t x729 = g4_0*x722 + g4_1*x725 + g4_2*x728;
+        const scalar_t x730 = -fmax(ux4, ux5);
+        const scalar_t x731 = ux4 + x730;
+        const scalar_t x732 = x729 >= 0;
+        const scalar_t x733 = -fmin(ux4, ux5);
+        const scalar_t x734 = ux4 + x733;
+        const scalar_t x735 = ((x732) ? (
+   pow(x731, scalar_t(2))
+)
+: (
+   pow(x734, scalar_t(2))
+));
+        const scalar_t x736 = x729*((x732) ? (
+   -x731
+)
+: (
+   -x734
+));
+        const scalar_t x737 = rho*x719;
+        const scalar_t x738 = x718*(sgn2 + scalar_t(-1));
+        const scalar_t x739 = x101 + x363;
+        const scalar_t x740 = x429 + x79;
+        const scalar_t x741 = x739 + x740;
+        const scalar_t x742 = x105 + x367;
+        const scalar_t x743 = x431 + x83;
+        const scalar_t x744 = x742 + x743;
+        const scalar_t x745 = x109 + x371;
+        const scalar_t x746 = x433 + x87;
+        const scalar_t x747 = x745 + x746;
+        const scalar_t x748 = g5_0*x741 + g5_1*x744 + g5_2*x747;
+        const scalar_t x749 = ux5 + x730;
+        const scalar_t x750 = x748 >= 0;
+        const scalar_t x751 = ux5 + x733;
+        const scalar_t x752 = ((x750) ? (
+   pow(x749, scalar_t(2))
+)
+: (
+   pow(x751, scalar_t(2))
+));
+        const scalar_t x753 = x748*((x750) ? (
+   -x749
+)
+: (
+   -x751
+));
+        const scalar_t x754 = rho*x738;
+        const scalar_t x755 = x129*x719 - x427*x738 + x717*x9 + x737*((x729 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x729*(x735 + (scalar_t(1) / scalar_t(16))*x736)/((scalar_t(1) / scalar_t(512))*pow(x729, scalar_t(2)) + x735 + (scalar_t(1) / scalar_t(32))*x736)
+)
+: (
+   0
+)) - x754*((x748 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x748*(x752 + (scalar_t(1) / scalar_t(16))*x753)/((scalar_t(1) / scalar_t(512))*pow(x748, scalar_t(2)) + x752 + (scalar_t(1) / scalar_t(32))*x753)
+)
+: (
+   0
+));
+        const scalar_t x756 = p4 + p7;
+        const scalar_t x757 = cof3*x187 + cof4*x198 + cof5*x209;
+        const scalar_t x758 = x757*(sgn6 + scalar_t(1));
+        const scalar_t x759 = x1 + x47;
+        const scalar_t x760 = x651 + x759;
+        const scalar_t x761 = x720 + x760;
+        const scalar_t x762 = x56 + y1;
+        const scalar_t x763 = x654 + x762;
+        const scalar_t x764 = x723 + x763;
+        const scalar_t x765 = x65 + z1;
+        const scalar_t x766 = x657 + x765;
+        const scalar_t x767 = x726 + x766;
+        const scalar_t x768 = g4_0*x761 + g4_1*x764 + g4_2*x767;
+        const scalar_t x769 = -fmax(ux4, ux7);
+        const scalar_t x770 = ux4 + x769;
+        const scalar_t x771 = x768 >= 0;
+        const scalar_t x772 = -fmin(ux4, ux7);
+        const scalar_t x773 = ux4 + x772;
+        const scalar_t x774 = ((x771) ? (
+   pow(x770, scalar_t(2))
+)
+: (
+   pow(x773, scalar_t(2))
+));
+        const scalar_t x775 = x768*((x771) ? (
+   -x770
+)
+: (
+   -x773
+));
+        const scalar_t x776 = rho*x758;
+        const scalar_t x777 = x757*(sgn6 + scalar_t(-1));
+        const scalar_t x778 = x671 + x759;
+        const scalar_t x779 = x739 + x778;
+        const scalar_t x780 = x673 + x762;
+        const scalar_t x781 = x742 + x780;
+        const scalar_t x782 = x675 + x765;
+        const scalar_t x783 = x745 + x782;
+        const scalar_t x784 = g7_0*x779 + g7_1*x781 + g7_2*x783;
+        const scalar_t x785 = ux7 + x769;
+        const scalar_t x786 = x784 >= 0;
+        const scalar_t x787 = ux7 + x772;
+        const scalar_t x788 = ((x786) ? (
+   pow(x785, scalar_t(2))
+)
+: (
+   pow(x787, scalar_t(2))
+));
+        const scalar_t x789 = x784*((x786) ? (
+   -x785
+)
+: (
+   -x787
+));
+        const scalar_t x790 = rho*x777;
+        const scalar_t x791 = x12*x756 + x129*x758 - x669*x777 + x776*((x768 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x768*(x774 + (scalar_t(1) / scalar_t(16))*x775)/((scalar_t(1) / scalar_t(512))*pow(x768, scalar_t(2)) + x774 + (scalar_t(1) / scalar_t(32))*x775)
+)
+: (
+   0
+)) - x790*((x784 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x784*(x788 + (scalar_t(1) / scalar_t(16))*x789)/((scalar_t(1) / scalar_t(512))*pow(x784, scalar_t(2)) + x788 + (scalar_t(1) / scalar_t(32))*x789)
+)
+: (
+   0
+));
+        const scalar_t x792 = g4_3*x722 + g4_4*x725 + g4_5*x728;
+        const scalar_t x793 = -fmax(uy4, uy5);
+        const scalar_t x794 = uy4 + x793;
+        const scalar_t x795 = x792 >= 0;
+        const scalar_t x796 = -fmin(uy4, uy5);
+        const scalar_t x797 = uy4 + x796;
+        const scalar_t x798 = ((x795) ? (
+   pow(x794, scalar_t(2))
+)
+: (
+   pow(x797, scalar_t(2))
+));
+        const scalar_t x799 = x792*((x795) ? (
+   -x794
+)
+: (
+   -x797
+));
+        const scalar_t x800 = g5_3*x741 + g5_4*x744 + g5_5*x747;
+        const scalar_t x801 = uy5 + x793;
+        const scalar_t x802 = x800 >= 0;
+        const scalar_t x803 = uy5 + x796;
+        const scalar_t x804 = ((x802) ? (
+   pow(x801, scalar_t(2))
+)
+: (
+   pow(x803, scalar_t(2))
+));
+        const scalar_t x805 = x800*((x802) ? (
+   -x801
+)
+: (
+   -x803
+));
+        const scalar_t x806 = uy4*x737 - uy5*x754 + x225*x717 + x737*((x792 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x792*(x798 + (scalar_t(1) / scalar_t(16))*x799)/((scalar_t(1) / scalar_t(512))*pow(x792, scalar_t(2)) + x798 + (scalar_t(1) / scalar_t(32))*x799)
+)
+: (
+   0
+)) - x754*((x800 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x800*(x804 + (scalar_t(1) / scalar_t(16))*x805)/((scalar_t(1) / scalar_t(512))*pow(x800, scalar_t(2)) + x804 + (scalar_t(1) / scalar_t(32))*x805)
+)
+: (
+   0
+));
+        const scalar_t x807 = g4_3*x761 + g4_4*x764 + g4_5*x767;
+        const scalar_t x808 = -fmax(uy4, uy7);
+        const scalar_t x809 = uy4 + x808;
+        const scalar_t x810 = x807 >= 0;
+        const scalar_t x811 = -fmin(uy4, uy7);
+        const scalar_t x812 = uy4 + x811;
+        const scalar_t x813 = ((x810) ? (
+   pow(x809, scalar_t(2))
+)
+: (
+   pow(x812, scalar_t(2))
+));
+        const scalar_t x814 = x807*((x810) ? (
+   -x809
+)
+: (
+   -x812
+));
+        const scalar_t x815 = g7_3*x779 + g7_4*x781 + g7_5*x783;
+        const scalar_t x816 = uy7 + x808;
+        const scalar_t x817 = x815 >= 0;
+        const scalar_t x818 = uy7 + x811;
+        const scalar_t x819 = ((x817) ? (
+   pow(x816, scalar_t(2))
+)
+: (
+   pow(x818, scalar_t(2))
+));
+        const scalar_t x820 = x815*((x817) ? (
+   -x816
+)
+: (
+   -x818
+));
+        const scalar_t x821 = uy4*x776 - uy7*x790 + x227*x756 + x776*((x807 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x807*(x813 + (scalar_t(1) / scalar_t(16))*x814)/((scalar_t(1) / scalar_t(512))*pow(x807, scalar_t(2)) + x813 + (scalar_t(1) / scalar_t(32))*x814)
+)
+: (
+   0
+)) - x790*((x815 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x815*(x819 + (scalar_t(1) / scalar_t(16))*x820)/((scalar_t(1) / scalar_t(512))*pow(x815, scalar_t(2)) + x819 + (scalar_t(1) / scalar_t(32))*x820)
+)
+: (
+   0
+));
+        const scalar_t x822 = g4_6*x722 + g4_7*x725 + g4_8*x728;
+        const scalar_t x823 = -fmax(uz4, uz5);
+        const scalar_t x824 = uz4 + x823;
+        const scalar_t x825 = x822 >= 0;
+        const scalar_t x826 = -fmin(uz4, uz5);
+        const scalar_t x827 = uz4 + x826;
+        const scalar_t x828 = ((x825) ? (
+   pow(x824, scalar_t(2))
+)
+: (
+   pow(x827, scalar_t(2))
+));
+        const scalar_t x829 = x822*((x825) ? (
+   -x824
+)
+: (
+   -x827
+));
+        const scalar_t x830 = g5_6*x741 + g5_7*x744 + g5_8*x747;
+        const scalar_t x831 = uz5 + x823;
+        const scalar_t x832 = x830 >= 0;
+        const scalar_t x833 = uz5 + x826;
+        const scalar_t x834 = ((x832) ? (
+   pow(x831, scalar_t(2))
+)
+: (
+   pow(x833, scalar_t(2))
+));
+        const scalar_t x835 = x830*((x832) ? (
+   -x831
+)
+: (
+   -x833
+));
+        const scalar_t x836 = uz4*x737 - uz5*x754 + x292*x717 + x737*((x822 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x822*(x828 + (scalar_t(1) / scalar_t(16))*x829)/((scalar_t(1) / scalar_t(512))*pow(x822, scalar_t(2)) + x828 + (scalar_t(1) / scalar_t(32))*x829)
+)
+: (
+   0
+)) - x754*((x830 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x830*(x834 + (scalar_t(1) / scalar_t(16))*x835)/((scalar_t(1) / scalar_t(512))*pow(x830, scalar_t(2)) + x834 + (scalar_t(1) / scalar_t(32))*x835)
+)
+: (
+   0
+));
+        const scalar_t x837 = g4_6*x761 + g4_7*x764 + g4_8*x767;
+        const scalar_t x838 = -fmax(uz4, uz7);
+        const scalar_t x839 = uz4 + x838;
+        const scalar_t x840 = x837 >= 0;
+        const scalar_t x841 = -fmin(uz4, uz7);
+        const scalar_t x842 = uz4 + x841;
+        const scalar_t x843 = ((x840) ? (
+   pow(x839, scalar_t(2))
+)
+: (
+   pow(x842, scalar_t(2))
+));
+        const scalar_t x844 = x837*((x840) ? (
+   -x839
+)
+: (
+   -x842
+));
+        const scalar_t x845 = g7_6*x779 + g7_7*x781 + g7_8*x783;
+        const scalar_t x846 = uz7 + x838;
+        const scalar_t x847 = x845 >= 0;
+        const scalar_t x848 = uz7 + x841;
+        const scalar_t x849 = ((x847) ? (
+   pow(x846, scalar_t(2))
+)
+: (
+   pow(x848, scalar_t(2))
+));
+        const scalar_t x850 = x845*((x847) ? (
+   -x846
+)
+: (
+   -x848
+));
+        const scalar_t x851 = uz4*x776 - uz7*x790 + x294*x756 + x776*((x837 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x837*(x843 + (scalar_t(1) / scalar_t(16))*x844)/((scalar_t(1) / scalar_t(512))*pow(x837, scalar_t(2)) + x843 + (scalar_t(1) / scalar_t(32))*x844)
+)
+: (
+   0
+)) - x790*((x845 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x845*(x849 + (scalar_t(1) / scalar_t(16))*x850)/((scalar_t(1) / scalar_t(512))*pow(x845, scalar_t(2)) + x849 + (scalar_t(1) / scalar_t(32))*x850)
+)
+: (
+   0
+));
+        const scalar_t x852 = p5 + p6;
+        const scalar_t x853 = x12*x852;
+        const scalar_t x854 = ux5 + ux6;
+        const scalar_t x855 = uy5 + uy6;
+        const scalar_t x856 = uz5 + uz6;
+        const scalar_t x857 = cof3*x854 + cof4*x855 + cof5*x856;
+        const scalar_t x858 = x857*(sgn7 + scalar_t(-1));
+        const scalar_t x859 = x507*x858;
+        const scalar_t x860 = x0 + x43;
+        const scalar_t x861 = x514 + x860;
+        const scalar_t x862 = x721 + x861;
+        const scalar_t x863 = x52 + y0;
+        const scalar_t x864 = x517 + x863;
+        const scalar_t x865 = x724 + x864;
+        const scalar_t x866 = x61 + z0;
+        const scalar_t x867 = x520 + x866;
+        const scalar_t x868 = x727 + x867;
+        const scalar_t x869 = g6_0*x862 + g6_1*x865 + g6_2*x868;
+        const scalar_t x870 = -fmax(ux5, ux6);
+        const scalar_t x871 = ux6 + x870;
+        const scalar_t x872 = x869 >= 0;
+        const scalar_t x873 = -fmin(ux5, ux6);
+        const scalar_t x874 = ux6 + x873;
+        const scalar_t x875 = ((x872) ? (
+   pow(x871, scalar_t(2))
+)
+: (
+   pow(x874, scalar_t(2))
+));
+        const scalar_t x876 = x869*((x872) ? (
+   -x871
+)
+: (
+   -x874
+));
+        const scalar_t x877 = rho*x858;
+        const scalar_t x878 = x877*((x869 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x869*(x875 + (scalar_t(1) / scalar_t(16))*x876)/((scalar_t(1) / scalar_t(512))*pow(x869, scalar_t(2)) + x875 + (scalar_t(1) / scalar_t(32))*x876)
+)
+: (
+   0
+));
+        const scalar_t x879 = x857*(sgn7 + scalar_t(1));
+        const scalar_t x880 = x427*x879;
+        const scalar_t x881 = x535 + x860;
+        const scalar_t x882 = x740 + x881;
+        const scalar_t x883 = x537 + x863;
+        const scalar_t x884 = x743 + x883;
+        const scalar_t x885 = x539 + x866;
+        const scalar_t x886 = x746 + x885;
+        const scalar_t x887 = g5_0*x882 + g5_1*x884 + g5_2*x886;
+        const scalar_t x888 = ux5 + x870;
+        const scalar_t x889 = x887 >= 0;
+        const scalar_t x890 = ux5 + x873;
+        const scalar_t x891 = ((x889) ? (
+   pow(x888, scalar_t(2))
+)
+: (
+   pow(x890, scalar_t(2))
+));
+        const scalar_t x892 = x887*((x889) ? (
+   -x888
+)
+: (
+   -x890
+));
+        const scalar_t x893 = rho*x879;
+        const scalar_t x894 = x893*((x887 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x887*(x891 + (scalar_t(1) / scalar_t(16))*x892)/((scalar_t(1) / scalar_t(512))*pow(x887, scalar_t(2)) + x891 + (scalar_t(1) / scalar_t(32))*x892)
+)
+: (
+   0
+));
+        const scalar_t x895 = x227*x852;
+        const scalar_t x896 = uy6*x877;
+        const scalar_t x897 = g6_3*x862 + g6_4*x865 + g6_5*x868;
+        const scalar_t x898 = -fmax(uy5, uy6);
+        const scalar_t x899 = uy6 + x898;
+        const scalar_t x900 = x897 >= 0;
+        const scalar_t x901 = -fmin(uy5, uy6);
+        const scalar_t x902 = uy6 + x901;
+        const scalar_t x903 = ((x900) ? (
+   pow(x899, scalar_t(2))
+)
+: (
+   pow(x902, scalar_t(2))
+));
+        const scalar_t x904 = x897*((x900) ? (
+   -x899
+)
+: (
+   -x902
+));
+        const scalar_t x905 = x877*((x897 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x897*(x903 + (scalar_t(1) / scalar_t(16))*x904)/((scalar_t(1) / scalar_t(512))*pow(x897, scalar_t(2)) + x903 + (scalar_t(1) / scalar_t(32))*x904)
+)
+: (
+   0
+));
+        const scalar_t x906 = uy5*x893;
+        const scalar_t x907 = g5_3*x882 + g5_4*x884 + g5_5*x886;
+        const scalar_t x908 = uy5 + x898;
+        const scalar_t x909 = x907 >= 0;
+        const scalar_t x910 = uy5 + x901;
+        const scalar_t x911 = ((x909) ? (
+   pow(x908, scalar_t(2))
+)
+: (
+   pow(x910, scalar_t(2))
+));
+        const scalar_t x912 = x907*((x909) ? (
+   -x908
+)
+: (
+   -x910
+));
+        const scalar_t x913 = x893*((x907 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x907*(x911 + (scalar_t(1) / scalar_t(16))*x912)/((scalar_t(1) / scalar_t(512))*pow(x907, scalar_t(2)) + x911 + (scalar_t(1) / scalar_t(32))*x912)
+)
+: (
+   0
+));
+        const scalar_t x914 = x294*x852;
+        const scalar_t x915 = uz6*x877;
+        const scalar_t x916 = g6_6*x862 + g6_7*x865 + g6_8*x868;
+        const scalar_t x917 = -fmax(uz5, uz6);
+        const scalar_t x918 = uz6 + x917;
+        const scalar_t x919 = x916 >= 0;
+        const scalar_t x920 = -fmin(uz5, uz6);
+        const scalar_t x921 = uz6 + x920;
+        const scalar_t x922 = ((x919) ? (
+   pow(x918, scalar_t(2))
+)
+: (
+   pow(x921, scalar_t(2))
+));
+        const scalar_t x923 = x916*((x919) ? (
+   -x918
+)
+: (
+   -x921
+));
+        const scalar_t x924 = x877*((x916 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x916*(x922 + (scalar_t(1) / scalar_t(16))*x923)/((scalar_t(1) / scalar_t(512))*pow(x916, scalar_t(2)) + x922 + (scalar_t(1) / scalar_t(32))*x923)
+)
+: (
+   0
+));
+        const scalar_t x925 = uz5*x893;
+        const scalar_t x926 = g5_6*x882 + g5_7*x884 + g5_8*x886;
+        const scalar_t x927 = uz5 + x917;
+        const scalar_t x928 = x926 >= 0;
+        const scalar_t x929 = uz5 + x920;
+        const scalar_t x930 = ((x928) ? (
+   pow(x927, scalar_t(2))
+)
+: (
+   pow(x929, scalar_t(2))
+));
+        const scalar_t x931 = x926*((x928) ? (
+   -x927
+)
+: (
+   -x929
+));
+        const scalar_t x932 = x893*((x926 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x926*(x930 + (scalar_t(1) / scalar_t(16))*x931)/((scalar_t(1) / scalar_t(512))*pow(x926, scalar_t(2)) + x930 + (scalar_t(1) / scalar_t(32))*x931)
+)
+: (
+   0
+));
+        const scalar_t x933 = p6 + p7;
+        const scalar_t x934 = x9*x933;
+        const scalar_t x935 = ux6 + ux7;
+        const scalar_t x936 = uy6 + uy7;
+        const scalar_t x937 = uz6 + uz7;
+        const scalar_t x938 = cof0*x935 + cof1*x936 + cof2*x937;
+        const scalar_t x939 = x938*(sgn3 + scalar_t(1));
+        const scalar_t x940 = x669*x939;
+        const scalar_t x941 = x778 + x881;
+        const scalar_t x942 = x780 + x883;
+        const scalar_t x943 = x782 + x885;
+        const scalar_t x944 = g7_0*x941 + g7_1*x942 + g7_2*x943;
+        const scalar_t x945 = -fmax(ux6, ux7);
+        const scalar_t x946 = ux7 + x945;
+        const scalar_t x947 = x944 >= 0;
+        const scalar_t x948 = -fmin(ux6, ux7);
+        const scalar_t x949 = ux7 + x948;
+        const scalar_t x950 = ((x947) ? (
+   pow(x946, scalar_t(2))
+)
+: (
+   pow(x949, scalar_t(2))
+));
+        const scalar_t x951 = x944*((x947) ? (
+   -x946
+)
+: (
+   -x949
+));
+        const scalar_t x952 = rho*x939;
+        const scalar_t x953 = x952*((x944 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x944*(x950 + (scalar_t(1) / scalar_t(16))*x951)/((scalar_t(1) / scalar_t(512))*pow(x944, scalar_t(2)) + x950 + (scalar_t(1) / scalar_t(32))*x951)
+)
+: (
+   0
+));
+        const scalar_t x954 = x938*(sgn3 + scalar_t(-1));
+        const scalar_t x955 = x507*x954;
+        const scalar_t x956 = x760 + x861;
+        const scalar_t x957 = x763 + x864;
+        const scalar_t x958 = x766 + x867;
+        const scalar_t x959 = g6_0*x956 + g6_1*x957 + g6_2*x958;
+        const scalar_t x960 = ux6 + x945;
+        const scalar_t x961 = x959 >= 0;
+        const scalar_t x962 = ux6 + x948;
+        const scalar_t x963 = ((x961) ? (
+   pow(x960, scalar_t(2))
+)
+: (
+   pow(x962, scalar_t(2))
+));
+        const scalar_t x964 = x959*((x961) ? (
+   -x960
+)
+: (
+   -x962
+));
+        const scalar_t x965 = rho*x954;
+        const scalar_t x966 = x965*((x959 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x959*(x963 + (scalar_t(1) / scalar_t(16))*x964)/((scalar_t(1) / scalar_t(512))*pow(x959, scalar_t(2)) + x963 + (scalar_t(1) / scalar_t(32))*x964)
+)
+: (
+   0
+));
+        const scalar_t x967 = x225*x933;
+        const scalar_t x968 = uy7*x952;
+        const scalar_t x969 = g7_3*x941 + g7_4*x942 + g7_5*x943;
+        const scalar_t x970 = -fmax(uy6, uy7);
+        const scalar_t x971 = uy7 + x970;
+        const scalar_t x972 = x969 >= 0;
+        const scalar_t x973 = -fmin(uy6, uy7);
+        const scalar_t x974 = uy7 + x973;
+        const scalar_t x975 = ((x972) ? (
+   pow(x971, scalar_t(2))
+)
+: (
+   pow(x974, scalar_t(2))
+));
+        const scalar_t x976 = x969*((x972) ? (
+   -x971
+)
+: (
+   -x974
+));
+        const scalar_t x977 = x952*((x969 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x969*(x975 + (scalar_t(1) / scalar_t(16))*x976)/((scalar_t(1) / scalar_t(512))*pow(x969, scalar_t(2)) + x975 + (scalar_t(1) / scalar_t(32))*x976)
+)
+: (
+   0
+));
+        const scalar_t x978 = uy6*x965;
+        const scalar_t x979 = g6_3*x956 + g6_4*x957 + g6_5*x958;
+        const scalar_t x980 = uy6 + x970;
+        const scalar_t x981 = x979 >= 0;
+        const scalar_t x982 = uy6 + x973;
+        const scalar_t x983 = ((x981) ? (
+   pow(x980, scalar_t(2))
+)
+: (
+   pow(x982, scalar_t(2))
+));
+        const scalar_t x984 = x979*((x981) ? (
+   -x980
+)
+: (
+   -x982
+));
+        const scalar_t x985 = x965*((x979 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x979*(x983 + (scalar_t(1) / scalar_t(16))*x984)/((scalar_t(1) / scalar_t(512))*pow(x979, scalar_t(2)) + x983 + (scalar_t(1) / scalar_t(32))*x984)
+)
+: (
+   0
+));
+        const scalar_t x986 = x292*x933;
+        const scalar_t x987 = uz7*x952;
+        const scalar_t x988 = g7_6*x941 + g7_7*x942 + g7_8*x943;
+        const scalar_t x989 = -fmax(uz6, uz7);
+        const scalar_t x990 = uz7 + x989;
+        const scalar_t x991 = x988 >= 0;
+        const scalar_t x992 = -fmin(uz6, uz7);
+        const scalar_t x993 = uz7 + x992;
+        const scalar_t x994 = ((x991) ? (
+   pow(x990, scalar_t(2))
+)
+: (
+   pow(x993, scalar_t(2))
+));
+        const scalar_t x995 = x988*((x991) ? (
+   -x990
+)
+: (
+   -x993
+));
+        const scalar_t x996 = x952*((x988 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x988*(x994 + (scalar_t(1) / scalar_t(16))*x995)/((scalar_t(1) / scalar_t(512))*pow(x988, scalar_t(2)) + x994 + (scalar_t(1) / scalar_t(32))*x995)
+)
+: (
+   0
+));
+        const scalar_t x997 = uz6*x965;
+        const scalar_t x998 = g6_6*x956 + g6_7*x957 + g6_8*x958;
+        const scalar_t x999 = uz6 + x989;
+        const scalar_t x1000 = x998 >= 0;
+        const scalar_t x1001 = uz6 + x992;
+        const scalar_t x1002 = ((x1000) ? (
+   pow(x999, scalar_t(2))
+)
+: (
+   pow(x1001, scalar_t(2))
+));
+        const scalar_t x1003 = x998*((x1000) ? (
+   -x999
+)
+: (
+   -x1001
+));
+        const scalar_t x1004 = x965*((x998 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x998*(x1002 + (scalar_t(1) / scalar_t(16))*x1003)/(x1002 + (scalar_t(1) / scalar_t(32))*x1003 + (scalar_t(1) / scalar_t(512))*pow(x998, scalar_t(2)))
+)
+: (
+   0
+));
+        out.rx[0][lane] = (scalar_t(1) / scalar_t(16))*x10 + (scalar_t(1) / scalar_t(16))*x100 + (scalar_t(1) / scalar_t(16))*x122 - scalar_t(1) / scalar_t(16)*x125 - scalar_t(1) / scalar_t(16)*x128 + (scalar_t(1) / scalar_t(16))*x13 - scalar_t(1) / scalar_t(16)*x131 - scalar_t(1) / scalar_t(16)*x154 + (scalar_t(1) / scalar_t(16))*x16 - scalar_t(1) / scalar_t(16)*x171 - scalar_t(1) / scalar_t(16)*x185 + (scalar_t(1) / scalar_t(16))*x224 + (scalar_t(1) / scalar_t(16))*x26 + (scalar_t(1) / scalar_t(16))*x35 + (scalar_t(1) / scalar_t(16))*x41 + (scalar_t(1) / scalar_t(16))*x78;
+        out.ry[0][lane] = (scalar_t(1) / scalar_t(16))*x226 + (scalar_t(1) / scalar_t(16))*x228 + (scalar_t(1) / scalar_t(16))*x230 + (scalar_t(1) / scalar_t(16))*x231 + (scalar_t(1) / scalar_t(16))*x232 + (scalar_t(1) / scalar_t(16))*x233 + (scalar_t(1) / scalar_t(16))*x242 + (scalar_t(1) / scalar_t(16))*x251 + (scalar_t(1) / scalar_t(16))*x260 - scalar_t(1) / scalar_t(16)*x261 - scalar_t(1) / scalar_t(16)*x262 - scalar_t(1) / scalar_t(16)*x263 - scalar_t(1) / scalar_t(16)*x270 - scalar_t(1) / scalar_t(16)*x277 - scalar_t(1) / scalar_t(16)*x284 + (scalar_t(1) / scalar_t(16))*x291;
+        out.rz[0][lane] = (scalar_t(1) / scalar_t(16))*x293 + (scalar_t(1) / scalar_t(16))*x295 + (scalar_t(1) / scalar_t(16))*x297 + (scalar_t(1) / scalar_t(16))*x298 + (scalar_t(1) / scalar_t(16))*x299 + (scalar_t(1) / scalar_t(16))*x300 + (scalar_t(1) / scalar_t(16))*x309 + (scalar_t(1) / scalar_t(16))*x318 + (scalar_t(1) / scalar_t(16))*x327 - scalar_t(1) / scalar_t(16)*x328 - scalar_t(1) / scalar_t(16)*x329 - scalar_t(1) / scalar_t(16)*x330 - scalar_t(1) / scalar_t(16)*x337 - scalar_t(1) / scalar_t(16)*x344 - scalar_t(1) / scalar_t(16)*x351 + (scalar_t(1) / scalar_t(16))*x357;
+        out.rc[0][lane] = x358*(x24 + x33 + x39);
+        out.rx[1][lane] = -scalar_t(1) / scalar_t(16)*x10 + (scalar_t(1) / scalar_t(16))*x125 + (scalar_t(1) / scalar_t(16))*x154 - scalar_t(1) / scalar_t(16)*x26 + (scalar_t(1) / scalar_t(16))*x359 + (scalar_t(1) / scalar_t(16))*x402 + (scalar_t(1) / scalar_t(16))*x442 - scalar_t(1) / scalar_t(16)*x78;
+        out.ry[1][lane] = -scalar_t(1) / scalar_t(16)*x226 - scalar_t(1) / scalar_t(16)*x231 - scalar_t(1) / scalar_t(16)*x242 + (scalar_t(1) / scalar_t(16))*x261 + (scalar_t(1) / scalar_t(16))*x270 + (scalar_t(1) / scalar_t(16))*x443 + (scalar_t(1) / scalar_t(16))*x458 + (scalar_t(1) / scalar_t(16))*x473;
+        out.rz[1][lane] = -scalar_t(1) / scalar_t(16)*x293 - scalar_t(1) / scalar_t(16)*x298 - scalar_t(1) / scalar_t(16)*x309 + (scalar_t(1) / scalar_t(16))*x328 + (scalar_t(1) / scalar_t(16))*x337 + (scalar_t(1) / scalar_t(16))*x474 + (scalar_t(1) / scalar_t(16))*x489 + (scalar_t(1) / scalar_t(16))*x504;
+        out.rc[1][lane] = x358*(-x19 - x21 - x23 + x361 + x404);
+        out.rx[2][lane] = -scalar_t(1) / scalar_t(16)*x402 + (scalar_t(1) / scalar_t(16))*x506 - scalar_t(1) / scalar_t(16)*x513 - scalar_t(1) / scalar_t(16)*x532 + (scalar_t(1) / scalar_t(16))*x534 + (scalar_t(1) / scalar_t(16))*x548 - scalar_t(1) / scalar_t(16)*x549 - scalar_t(1) / scalar_t(16)*x576;
+        out.ry[2][lane] = -scalar_t(1) / scalar_t(16)*x458 + (scalar_t(1) / scalar_t(16))*x577 - scalar_t(1) / scalar_t(16)*x578 - scalar_t(1) / scalar_t(16)*x587 + (scalar_t(1) / scalar_t(16))*x588 + (scalar_t(1) / scalar_t(16))*x595 - scalar_t(1) / scalar_t(16)*x596 - scalar_t(1) / scalar_t(16)*x611;
+        out.rz[2][lane] = -scalar_t(1) / scalar_t(16)*x489 + (scalar_t(1) / scalar_t(16))*x612 - scalar_t(1) / scalar_t(16)*x613 - scalar_t(1) / scalar_t(16)*x622 + (scalar_t(1) / scalar_t(16))*x623 + (scalar_t(1) / scalar_t(16))*x630 - scalar_t(1) / scalar_t(16)*x631 - scalar_t(1) / scalar_t(16)*x646;
+        out.rc[2][lane] = x358*(cof6*x508 + cof7*x509 + cof8*x510 - x361 - x551);
+        out.rx[3][lane] = -scalar_t(1) / scalar_t(16)*x100 + (scalar_t(1) / scalar_t(16))*x128 - scalar_t(1) / scalar_t(16)*x13 + (scalar_t(1) / scalar_t(16))*x171 - scalar_t(1) / scalar_t(16)*x35 + (scalar_t(1) / scalar_t(16))*x576 + (scalar_t(1) / scalar_t(16))*x647 + (scalar_t(1) / scalar_t(16))*x684;
+        out.ry[3][lane] = -scalar_t(1) / scalar_t(16)*x228 - scalar_t(1) / scalar_t(16)*x232 - scalar_t(1) / scalar_t(16)*x251 + (scalar_t(1) / scalar_t(16))*x262 + (scalar_t(1) / scalar_t(16))*x277 + (scalar_t(1) / scalar_t(16))*x611 + (scalar_t(1) / scalar_t(16))*x685 + (scalar_t(1) / scalar_t(16))*x700;
+        out.rz[3][lane] = -scalar_t(1) / scalar_t(16)*x295 - scalar_t(1) / scalar_t(16)*x299 - scalar_t(1) / scalar_t(16)*x318 + (scalar_t(1) / scalar_t(16))*x329 + (scalar_t(1) / scalar_t(16))*x344 + (scalar_t(1) / scalar_t(16))*x646 + (scalar_t(1) / scalar_t(16))*x701 + (scalar_t(1) / scalar_t(16))*x716;
+        out.rc[3][lane] = x358*(-x28 - x30 - x32 + x551 + x649);
+        out.rx[4][lane] = -scalar_t(1) / scalar_t(16)*x122 + (scalar_t(1) / scalar_t(16))*x131 - scalar_t(1) / scalar_t(16)*x16 + (scalar_t(1) / scalar_t(16))*x185 - scalar_t(1) / scalar_t(16)*x41 + (scalar_t(1) / scalar_t(16))*x549 + (scalar_t(1) / scalar_t(16))*x755 + (scalar_t(1) / scalar_t(16))*x791;
+        out.ry[4][lane] = -scalar_t(1) / scalar_t(16)*x230 - scalar_t(1) / scalar_t(16)*x233 - scalar_t(1) / scalar_t(16)*x260 + (scalar_t(1) / scalar_t(16))*x263 + (scalar_t(1) / scalar_t(16))*x284 + (scalar_t(1) / scalar_t(16))*x596 + (scalar_t(1) / scalar_t(16))*x806 + (scalar_t(1) / scalar_t(16))*x821;
+        out.rz[4][lane] = -scalar_t(1) / scalar_t(16)*x297 - scalar_t(1) / scalar_t(16)*x300 - scalar_t(1) / scalar_t(16)*x327 + (scalar_t(1) / scalar_t(16))*x330 + (scalar_t(1) / scalar_t(16))*x351 + (scalar_t(1) / scalar_t(16))*x631 + (scalar_t(1) / scalar_t(16))*x836 + (scalar_t(1) / scalar_t(16))*x851;
+        out.rc[4][lane] = x358*(-x36 - x37 - x38 + x718 + x757);
+        out.rx[5][lane] = -scalar_t(1) / scalar_t(16)*x442 - scalar_t(1) / scalar_t(16)*x647 - scalar_t(1) / scalar_t(16)*x755 + (scalar_t(1) / scalar_t(16))*x853 - scalar_t(1) / scalar_t(16)*x859 - scalar_t(1) / scalar_t(16)*x878 + (scalar_t(1) / scalar_t(16))*x880 + (scalar_t(1) / scalar_t(16))*x894;
+        out.ry[5][lane] = -scalar_t(1) / scalar_t(16)*x473 - scalar_t(1) / scalar_t(16)*x685 - scalar_t(1) / scalar_t(16)*x806 + (scalar_t(1) / scalar_t(16))*x895 - scalar_t(1) / scalar_t(16)*x896 - scalar_t(1) / scalar_t(16)*x905 + (scalar_t(1) / scalar_t(16))*x906 + (scalar_t(1) / scalar_t(16))*x913;
+        out.rz[5][lane] = -scalar_t(1) / scalar_t(16)*x504 - scalar_t(1) / scalar_t(16)*x701 - scalar_t(1) / scalar_t(16)*x836 + (scalar_t(1) / scalar_t(16))*x914 - scalar_t(1) / scalar_t(16)*x915 - scalar_t(1) / scalar_t(16)*x924 + (scalar_t(1) / scalar_t(16))*x925 + (scalar_t(1) / scalar_t(16))*x932;
+        out.rc[5][lane] = x358*(cof3*x854 + cof4*x855 + cof5*x856 - x404 - x718);
+        out.rx[6][lane] = -scalar_t(1) / scalar_t(16)*x224 - scalar_t(1) / scalar_t(16)*x506 + (scalar_t(1) / scalar_t(16))*x513 + (scalar_t(1) / scalar_t(16))*x532 - scalar_t(1) / scalar_t(16)*x534 - scalar_t(1) / scalar_t(16)*x548 - scalar_t(1) / scalar_t(16)*x853 + (scalar_t(1) / scalar_t(16))*x859 + (scalar_t(1) / scalar_t(16))*x878 - scalar_t(1) / scalar_t(16)*x880 - scalar_t(1) / scalar_t(16)*x894 - scalar_t(1) / scalar_t(16)*x934 - scalar_t(1) / scalar_t(16)*x940 - scalar_t(1) / scalar_t(16)*x953 + (scalar_t(1) / scalar_t(16))*x955 + (scalar_t(1) / scalar_t(16))*x966;
+        out.ry[6][lane] = -scalar_t(1) / scalar_t(16)*x291 - scalar_t(1) / scalar_t(16)*x577 + (scalar_t(1) / scalar_t(16))*x578 + (scalar_t(1) / scalar_t(16))*x587 - scalar_t(1) / scalar_t(16)*x588 - scalar_t(1) / scalar_t(16)*x595 - scalar_t(1) / scalar_t(16)*x895 + (scalar_t(1) / scalar_t(16))*x896 + (scalar_t(1) / scalar_t(16))*x905 - scalar_t(1) / scalar_t(16)*x906 - scalar_t(1) / scalar_t(16)*x913 - scalar_t(1) / scalar_t(16)*x967 - scalar_t(1) / scalar_t(16)*x968 - scalar_t(1) / scalar_t(16)*x977 + (scalar_t(1) / scalar_t(16))*x978 + (scalar_t(1) / scalar_t(16))*x985;
+        out.rz[6][lane] = (scalar_t(1) / scalar_t(16))*x1004 - scalar_t(1) / scalar_t(16)*x357 - scalar_t(1) / scalar_t(16)*x612 + (scalar_t(1) / scalar_t(16))*x613 + (scalar_t(1) / scalar_t(16))*x622 - scalar_t(1) / scalar_t(16)*x623 - scalar_t(1) / scalar_t(16)*x630 - scalar_t(1) / scalar_t(16)*x914 + (scalar_t(1) / scalar_t(16))*x915 + (scalar_t(1) / scalar_t(16))*x924 - scalar_t(1) / scalar_t(16)*x925 - scalar_t(1) / scalar_t(16)*x932 - scalar_t(1) / scalar_t(16)*x986 - scalar_t(1) / scalar_t(16)*x987 - scalar_t(1) / scalar_t(16)*x996 + (scalar_t(1) / scalar_t(16))*x997;
+        out.rc[6][lane] = -x358*(x511 + x857 + x938);
+        out.rx[7][lane] = -scalar_t(1) / scalar_t(16)*x359 - scalar_t(1) / scalar_t(16)*x684 - scalar_t(1) / scalar_t(16)*x791 + (scalar_t(1) / scalar_t(16))*x934 + (scalar_t(1) / scalar_t(16))*x940 + (scalar_t(1) / scalar_t(16))*x953 - scalar_t(1) / scalar_t(16)*x955 - scalar_t(1) / scalar_t(16)*x966;
+        out.ry[7][lane] = -scalar_t(1) / scalar_t(16)*x443 - scalar_t(1) / scalar_t(16)*x700 - scalar_t(1) / scalar_t(16)*x821 + (scalar_t(1) / scalar_t(16))*x967 + (scalar_t(1) / scalar_t(16))*x968 + (scalar_t(1) / scalar_t(16))*x977 - scalar_t(1) / scalar_t(16)*x978 - scalar_t(1) / scalar_t(16)*x985;
+        out.rz[7][lane] = -scalar_t(1) / scalar_t(16)*x1004 - scalar_t(1) / scalar_t(16)*x474 - scalar_t(1) / scalar_t(16)*x716 - scalar_t(1) / scalar_t(16)*x851 + (scalar_t(1) / scalar_t(16))*x986 + (scalar_t(1) / scalar_t(16))*x987 + (scalar_t(1) / scalar_t(16))*x996 - scalar_t(1) / scalar_t(16)*x997;
+        out.rc[7][lane] = x358*(cof0*x935 + cof1*x936 + cof2*x937 - x649 - x757);
+    }
+}
+
+// Darwish-Moukalled.
+static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual_defcor_lim3_simd(
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT cof0_ptr,
+        const scalar_t *const SFEM_RESTRICT cof1_ptr,
+        const scalar_t *const SFEM_RESTRICT cof2_ptr,
+        const scalar_t *const SFEM_RESTRICT cof3_ptr,
+        const scalar_t *const SFEM_RESTRICT cof4_ptr,
+        const scalar_t *const SFEM_RESTRICT cof5_ptr,
+        const scalar_t *const SFEM_RESTRICT cof6_ptr,
+        const scalar_t *const SFEM_RESTRICT cof7_ptr,
+        const scalar_t *const SFEM_RESTRICT cof8_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const Hex8InputPack &in,
+        const Hex8UGradPack &ho,
+        Hex8ResidualPack    &out) {
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t cof0 = scalar_t(cof0_ptr[lane]);
+        const scalar_t cof1 = scalar_t(cof1_ptr[lane]);
+        const scalar_t cof2 = scalar_t(cof2_ptr[lane]);
+        const scalar_t cof3 = scalar_t(cof3_ptr[lane]);
+        const scalar_t cof4 = scalar_t(cof4_ptr[lane]);
+        const scalar_t cof5 = scalar_t(cof5_ptr[lane]);
+        const scalar_t cof6 = scalar_t(cof6_ptr[lane]);
+        const scalar_t cof7 = scalar_t(cof7_ptr[lane]);
+        const scalar_t cof8 = scalar_t(cof8_ptr[lane]);
+        const scalar_t det = scalar_t(det_ptr[lane]);
+        const scalar_t ux0 = in.ux[0][lane];
+        const scalar_t ux1 = in.ux[1][lane];
+        const scalar_t ux2 = in.ux[2][lane];
+        const scalar_t ux3 = in.ux[3][lane];
+        const scalar_t ux4 = in.ux[4][lane];
+        const scalar_t ux5 = in.ux[5][lane];
+        const scalar_t ux6 = in.ux[6][lane];
+        const scalar_t ux7 = in.ux[7][lane];
+        const scalar_t uy0 = in.uy[0][lane];
+        const scalar_t uy1 = in.uy[1][lane];
+        const scalar_t uy2 = in.uy[2][lane];
+        const scalar_t uy3 = in.uy[3][lane];
+        const scalar_t uy4 = in.uy[4][lane];
+        const scalar_t uy5 = in.uy[5][lane];
+        const scalar_t uy6 = in.uy[6][lane];
+        const scalar_t uy7 = in.uy[7][lane];
+        const scalar_t uz0 = in.uz[0][lane];
+        const scalar_t uz1 = in.uz[1][lane];
+        const scalar_t uz2 = in.uz[2][lane];
+        const scalar_t uz3 = in.uz[3][lane];
+        const scalar_t uz4 = in.uz[4][lane];
+        const scalar_t uz5 = in.uz[5][lane];
+        const scalar_t uz6 = in.uz[6][lane];
+        const scalar_t uz7 = in.uz[7][lane];
+        const scalar_t p0 = in.p[0][lane];
+        const scalar_t p1 = in.p[1][lane];
+        const scalar_t p2 = in.p[2][lane];
+        const scalar_t p3 = in.p[3][lane];
+        const scalar_t p4 = in.p[4][lane];
+        const scalar_t p5 = in.p[5][lane];
+        const scalar_t p6 = in.p[6][lane];
+        const scalar_t p7 = in.p[7][lane];
+        const scalar_t x0 = ho.x[0][lane];
+        const scalar_t x1 = ho.x[1][lane];
+        const scalar_t x2 = ho.x[2][lane];
+        const scalar_t x3 = ho.x[3][lane];
+        const scalar_t x4 = ho.x[4][lane];
+        const scalar_t x5 = ho.x[5][lane];
+        const scalar_t x6 = ho.x[6][lane];
+        const scalar_t x7 = ho.x[7][lane];
+        const scalar_t y0 = ho.y[0][lane];
+        const scalar_t y1 = ho.y[1][lane];
+        const scalar_t y2 = ho.y[2][lane];
+        const scalar_t y3 = ho.y[3][lane];
+        const scalar_t y4 = ho.y[4][lane];
+        const scalar_t y5 = ho.y[5][lane];
+        const scalar_t y6 = ho.y[6][lane];
+        const scalar_t y7 = ho.y[7][lane];
+        const scalar_t z0 = ho.z[0][lane];
+        const scalar_t z1 = ho.z[1][lane];
+        const scalar_t z2 = ho.z[2][lane];
+        const scalar_t z3 = ho.z[3][lane];
+        const scalar_t z4 = ho.z[4][lane];
+        const scalar_t z5 = ho.z[5][lane];
+        const scalar_t z6 = ho.z[6][lane];
+        const scalar_t z7 = ho.z[7][lane];
+        const scalar_t g0_0 = ho.g[0][0][lane];
+        const scalar_t g0_1 = ho.g[0][1][lane];
+        const scalar_t g0_2 = ho.g[0][2][lane];
+        const scalar_t g0_3 = ho.g[0][3][lane];
+        const scalar_t g0_4 = ho.g[0][4][lane];
+        const scalar_t g0_5 = ho.g[0][5][lane];
+        const scalar_t g0_6 = ho.g[0][6][lane];
+        const scalar_t g0_7 = ho.g[0][7][lane];
+        const scalar_t g0_8 = ho.g[0][8][lane];
+        const scalar_t g1_0 = ho.g[1][0][lane];
+        const scalar_t g1_1 = ho.g[1][1][lane];
+        const scalar_t g1_2 = ho.g[1][2][lane];
+        const scalar_t g1_3 = ho.g[1][3][lane];
+        const scalar_t g1_4 = ho.g[1][4][lane];
+        const scalar_t g1_5 = ho.g[1][5][lane];
+        const scalar_t g1_6 = ho.g[1][6][lane];
+        const scalar_t g1_7 = ho.g[1][7][lane];
+        const scalar_t g1_8 = ho.g[1][8][lane];
+        const scalar_t g2_0 = ho.g[2][0][lane];
+        const scalar_t g2_1 = ho.g[2][1][lane];
+        const scalar_t g2_2 = ho.g[2][2][lane];
+        const scalar_t g2_3 = ho.g[2][3][lane];
+        const scalar_t g2_4 = ho.g[2][4][lane];
+        const scalar_t g2_5 = ho.g[2][5][lane];
+        const scalar_t g2_6 = ho.g[2][6][lane];
+        const scalar_t g2_7 = ho.g[2][7][lane];
+        const scalar_t g2_8 = ho.g[2][8][lane];
+        const scalar_t g3_0 = ho.g[3][0][lane];
+        const scalar_t g3_1 = ho.g[3][1][lane];
+        const scalar_t g3_2 = ho.g[3][2][lane];
+        const scalar_t g3_3 = ho.g[3][3][lane];
+        const scalar_t g3_4 = ho.g[3][4][lane];
+        const scalar_t g3_5 = ho.g[3][5][lane];
+        const scalar_t g3_6 = ho.g[3][6][lane];
+        const scalar_t g3_7 = ho.g[3][7][lane];
+        const scalar_t g3_8 = ho.g[3][8][lane];
+        const scalar_t g4_0 = ho.g[4][0][lane];
+        const scalar_t g4_1 = ho.g[4][1][lane];
+        const scalar_t g4_2 = ho.g[4][2][lane];
+        const scalar_t g4_3 = ho.g[4][3][lane];
+        const scalar_t g4_4 = ho.g[4][4][lane];
+        const scalar_t g4_5 = ho.g[4][5][lane];
+        const scalar_t g4_6 = ho.g[4][6][lane];
+        const scalar_t g4_7 = ho.g[4][7][lane];
+        const scalar_t g4_8 = ho.g[4][8][lane];
+        const scalar_t g5_0 = ho.g[5][0][lane];
+        const scalar_t g5_1 = ho.g[5][1][lane];
+        const scalar_t g5_2 = ho.g[5][2][lane];
+        const scalar_t g5_3 = ho.g[5][3][lane];
+        const scalar_t g5_4 = ho.g[5][4][lane];
+        const scalar_t g5_5 = ho.g[5][5][lane];
+        const scalar_t g5_6 = ho.g[5][6][lane];
+        const scalar_t g5_7 = ho.g[5][7][lane];
+        const scalar_t g5_8 = ho.g[5][8][lane];
+        const scalar_t g6_0 = ho.g[6][0][lane];
+        const scalar_t g6_1 = ho.g[6][1][lane];
+        const scalar_t g6_2 = ho.g[6][2][lane];
+        const scalar_t g6_3 = ho.g[6][3][lane];
+        const scalar_t g6_4 = ho.g[6][4][lane];
+        const scalar_t g6_5 = ho.g[6][5][lane];
+        const scalar_t g6_6 = ho.g[6][6][lane];
+        const scalar_t g6_7 = ho.g[6][7][lane];
+        const scalar_t g6_8 = ho.g[6][8][lane];
+        const scalar_t g7_0 = ho.g[7][0][lane];
+        const scalar_t g7_1 = ho.g[7][1][lane];
+        const scalar_t g7_2 = ho.g[7][2][lane];
+        const scalar_t g7_3 = ho.g[7][3][lane];
+        const scalar_t g7_4 = ho.g[7][4][lane];
+        const scalar_t g7_5 = ho.g[7][5][lane];
+        const scalar_t g7_6 = ho.g[7][6][lane];
+        const scalar_t g7_7 = ho.g[7][7][lane];
+        const scalar_t g7_8 = ho.g[7][8][lane];
+        const scalar_t mdot0 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux1) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy1) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz1));
+        const scalar_t sgn0 = mdot0 > scalar_t(0) ? scalar_t(1) : (mdot0 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot1 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn1 = mdot1 > scalar_t(0) ? scalar_t(1) : (mdot1 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot2 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn2 = mdot2 > scalar_t(0) ? scalar_t(1) : (mdot2 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot3 = rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux6 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy6 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz6 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn3 = mdot3 > scalar_t(0) ? scalar_t(1) : (mdot3 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot4 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn4 = mdot4 > scalar_t(0) ? scalar_t(1) : (mdot4 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot5 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux2) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy2) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz2));
+        const scalar_t sgn5 = mdot5 > scalar_t(0) ? scalar_t(1) : (mdot5 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot6 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn6 = mdot6 > scalar_t(0) ? scalar_t(1) : (mdot6 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot7 = rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux5 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy5 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz5 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn7 = mdot7 > scalar_t(0) ? scalar_t(1) : (mdot7 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot8 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux4) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy4) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz4));
+        const scalar_t sgn8 = mdot8 > scalar_t(0) ? scalar_t(1) : (mdot8 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot9 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn9 = mdot9 > scalar_t(0) ? scalar_t(1) : (mdot9 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot10 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn10 = mdot10 > scalar_t(0) ? scalar_t(1) : (mdot10 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot11 = rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux3 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy3 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz3 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn11 = mdot11 > scalar_t(0) ? scalar_t(1) : (mdot11 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t x8 = p0 + p1;
+        const scalar_t x9 = scalar_t(2)*cof0;
+        const scalar_t x10 = x8*x9;
+        const scalar_t x11 = p0 + p3;
+        const scalar_t x12 = scalar_t(2)*cof3;
+        const scalar_t x13 = x11*x12;
+        const scalar_t x14 = p0 + p4;
+        const scalar_t x15 = scalar_t(2)*cof6;
+        const scalar_t x16 = x14*x15;
+        const scalar_t x17 = rho*ux0;
+        const scalar_t x18 = ux0 + ux1;
+        const scalar_t x19 = cof0*x18;
+        const scalar_t x20 = uy0 + uy1;
+        const scalar_t x21 = cof1*x20;
+        const scalar_t x22 = uz0 + uz1;
+        const scalar_t x23 = cof2*x22;
+        const scalar_t x24 = x19 + x21 + x23;
+        const scalar_t x25 = x24*(sgn0 + scalar_t(1));
+        const scalar_t x26 = x17*x25;
+        const scalar_t x27 = ux0 + ux3;
+        const scalar_t x28 = cof3*x27;
+        const scalar_t x29 = uy0 + uy3;
+        const scalar_t x30 = cof4*x29;
+        const scalar_t x31 = uz0 + uz3;
+        const scalar_t x32 = cof5*x31;
+        const scalar_t x33 = x28 + x30 + x32;
+        const scalar_t x34 = x33*(sgn4 + scalar_t(1));
+        const scalar_t x35 = x17*x34;
+        const scalar_t x36 = cof6*(ux0 + ux4);
+        const scalar_t x37 = cof7*(uy0 + uy4);
+        const scalar_t x38 = cof8*(uz0 + uz4);
+        const scalar_t x39 = x36 + x37 + x38;
+        const scalar_t x40 = x39*(sgn8 + scalar_t(1));
+        const scalar_t x41 = x17*x40;
+        const scalar_t x42 = -ux1;
+        const scalar_t x43 = ux0 + x42;
+        const scalar_t x44 = -scalar_t(23)*x0;
+        const scalar_t x45 = scalar_t(3)*x2 + scalar_t(3)*x4;
+        const scalar_t x46 = x45 + x6;
+        const scalar_t x47 = x44 + x46;
+        const scalar_t x48 = scalar_t(9)*x1;
+        const scalar_t x49 = scalar_t(3)*x3 + scalar_t(3)*x5;
+        const scalar_t x50 = x49 + x7;
+        const scalar_t x51 = x48 + x50;
+        const scalar_t x52 = x47 + x51;
+        const scalar_t x53 = -scalar_t(23)*y0;
+        const scalar_t x54 = scalar_t(3)*y2 + scalar_t(3)*y4;
+        const scalar_t x55 = x54 + y6;
+        const scalar_t x56 = x53 + x55;
+        const scalar_t x57 = scalar_t(9)*y1;
+        const scalar_t x58 = scalar_t(3)*y3 + scalar_t(3)*y5;
+        const scalar_t x59 = x58 + y7;
+        const scalar_t x60 = x57 + x59;
+        const scalar_t x61 = x56 + x60;
+        const scalar_t x62 = -scalar_t(23)*z0;
+        const scalar_t x63 = scalar_t(3)*z2 + scalar_t(3)*z4;
+        const scalar_t x64 = x63 + z6;
+        const scalar_t x65 = x62 + x64;
+        const scalar_t x66 = scalar_t(9)*z1;
+        const scalar_t x67 = scalar_t(3)*z3 + scalar_t(3)*z5;
+        const scalar_t x68 = x67 + z7;
+        const scalar_t x69 = x66 + x68;
+        const scalar_t x70 = x65 + x69;
+        const scalar_t x71 = g0_0*x52 + g0_1*x61 + g0_2*x70;
+        const scalar_t x72 = fabs(x71);
+        const scalar_t x73 = fabs(x43);
+        const scalar_t x74 = x43*x72 - x71*x73;
+        const scalar_t x75 = (scalar_t(1) / scalar_t(16))*x72 + x73;
+        const scalar_t x76 = (scalar_t(1) / scalar_t(32))/x75;
+        const scalar_t x77 = x75 != 0;
+        const scalar_t x78 = rho*x25;
+        const scalar_t x79 = -ux3;
+        const scalar_t x80 = ux0 + x79;
+        const scalar_t x81 = fabs(x80);
+        const scalar_t x82 = scalar_t(3)*x1 + scalar_t(3)*x7;
+        const scalar_t x83 = scalar_t(9)*x3 + x5;
+        const scalar_t x84 = x82 + x83;
+        const scalar_t x85 = x47 + x84;
+        const scalar_t x86 = scalar_t(3)*y1 + scalar_t(3)*y7;
+        const scalar_t x87 = scalar_t(9)*y3 + y5;
+        const scalar_t x88 = x86 + x87;
+        const scalar_t x89 = x56 + x88;
+        const scalar_t x90 = scalar_t(3)*z1 + scalar_t(3)*z7;
+        const scalar_t x91 = scalar_t(9)*z3 + z5;
+        const scalar_t x92 = x90 + x91;
+        const scalar_t x93 = x65 + x92;
+        const scalar_t x94 = g0_0*x85 + g0_1*x89 + g0_2*x93;
+        const scalar_t x95 = fabs(x94);
+        const scalar_t x96 = x81 + (scalar_t(1) / scalar_t(16))*x95;
+        const scalar_t x97 = rho*x34;
+        const scalar_t x98 = x97*((x96 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x80*x95 - x81*x94)/x96
+)
+: (
+   0
+));
+        const scalar_t x99 = -ux4;
+        const scalar_t x100 = ux0 + x99;
+        const scalar_t x101 = fabs(x100);
+        const scalar_t x102 = x2 + scalar_t(9)*x4;
+        const scalar_t x103 = x49 + x82;
+        const scalar_t x104 = x103 + x6;
+        const scalar_t x105 = x102 + x104 + x44;
+        const scalar_t x106 = y2 + scalar_t(9)*y4;
+        const scalar_t x107 = x58 + x86;
+        const scalar_t x108 = x107 + y6;
+        const scalar_t x109 = x106 + x108 + x53;
+        const scalar_t x110 = z2 + scalar_t(9)*z4;
+        const scalar_t x111 = x67 + x90;
+        const scalar_t x112 = x111 + z6;
+        const scalar_t x113 = x110 + x112 + x62;
+        const scalar_t x114 = g0_0*x105 + g0_1*x109 + g0_2*x113;
+        const scalar_t x115 = fabs(x114);
+        const scalar_t x116 = x101 + (scalar_t(1) / scalar_t(16))*x115;
+        const scalar_t x117 = rho*x40;
+        const scalar_t x118 = x117*((x116 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x100*x115 - x101*x114)/x116
+)
+: (
+   0
+));
+        const scalar_t x119 = rho*ux1;
+        const scalar_t x120 = x24*(sgn0 + scalar_t(-1));
+        const scalar_t x121 = x119*x120;
+        const scalar_t x122 = rho*ux3;
+        const scalar_t x123 = x33*(sgn4 + scalar_t(-1));
+        const scalar_t x124 = x122*x123;
+        const scalar_t x125 = rho*ux4;
+        const scalar_t x126 = x39*(sgn8 + scalar_t(-1));
+        const scalar_t x127 = x125*x126;
+        const scalar_t x128 = scalar_t(9)*x0;
+        const scalar_t x129 = x128 + x46;
+        const scalar_t x130 = -scalar_t(23)*x1;
+        const scalar_t x131 = x130 + x50;
+        const scalar_t x132 = x129 + x131;
+        const scalar_t x133 = scalar_t(9)*y0;
+        const scalar_t x134 = x133 + x55;
+        const scalar_t x135 = -scalar_t(23)*y1;
+        const scalar_t x136 = x135 + x59;
+        const scalar_t x137 = x134 + x136;
+        const scalar_t x138 = scalar_t(9)*z0;
+        const scalar_t x139 = x138 + x64;
+        const scalar_t x140 = -scalar_t(23)*z1;
+        const scalar_t x141 = x140 + x68;
+        const scalar_t x142 = x139 + x141;
+        const scalar_t x143 = g1_0*x132 + g1_1*x137 + g1_2*x142;
+        const scalar_t x144 = fabs(x143);
+        const scalar_t x145 = (scalar_t(1) / scalar_t(16))*x144 + x73;
+        const scalar_t x146 = rho*x120;
+        const scalar_t x147 = x146*((x145 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x143*x73 + x144*x43)/x145
+)
+: (
+   0
+));
+        const scalar_t x148 = -scalar_t(23)*x3 + x5;
+        const scalar_t x149 = x148 + x82;
+        const scalar_t x150 = x129 + x149;
+        const scalar_t x151 = -scalar_t(23)*y3 + y5;
+        const scalar_t x152 = x151 + x86;
+        const scalar_t x153 = x134 + x152;
+        const scalar_t x154 = -scalar_t(23)*z3 + z5;
+        const scalar_t x155 = x154 + x90;
+        const scalar_t x156 = x139 + x155;
+        const scalar_t x157 = g3_0*x150 + g3_1*x153 + g3_2*x156;
+        const scalar_t x158 = fabs(x157);
+        const scalar_t x159 = (scalar_t(1) / scalar_t(16))*x158 + x81;
+        const scalar_t x160 = rho*x123;
+        const scalar_t x161 = x160*((x159 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x157*x81 + x158*x80)/x159
+)
+: (
+   0
+));
+        const scalar_t x162 = x2 - scalar_t(23)*x4;
+        const scalar_t x163 = x104 + x128 + x162;
+        const scalar_t x164 = y2 - scalar_t(23)*y4;
+        const scalar_t x165 = x108 + x133 + x164;
+        const scalar_t x166 = z2 - scalar_t(23)*z4;
+        const scalar_t x167 = x112 + x138 + x166;
+        const scalar_t x168 = g4_0*x163 + g4_1*x165 + g4_2*x167;
+        const scalar_t x169 = fabs(x168);
+        const scalar_t x170 = x101 + (scalar_t(1) / scalar_t(16))*x169;
+        const scalar_t x171 = rho*x126;
+        const scalar_t x172 = x171*((x170 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x100*x169 + x101*x168)/x170
+)
+: (
+   0
+));
+        const scalar_t x173 = -ux5;
+        const scalar_t x174 = ux4 + ux7;
+        const scalar_t x175 = -ux2;
+        const scalar_t x176 = -ux6;
+        const scalar_t x177 = x175 + x176;
+        const scalar_t x178 = x173 + x174 + x177 + x27 + x42;
+        const scalar_t x179 = ux4 + ux5;
+        const scalar_t x180 = -ux7;
+        const scalar_t x181 = x18 + x180;
+        const scalar_t x182 = x177 + x179 + x181 + x79;
+        const scalar_t x183 = ux2 + ux3;
+        const scalar_t x184 = x173 + x176 + x181 + x183 + x99;
+        const scalar_t x185 = cof0*x178 + cof3*x182 + cof6*x184;
+        const scalar_t x186 = -uy1;
+        const scalar_t x187 = -uy5;
+        const scalar_t x188 = uy4 + uy7;
+        const scalar_t x189 = -uy2;
+        const scalar_t x190 = -uy6;
+        const scalar_t x191 = x189 + x190;
+        const scalar_t x192 = x186 + x187 + x188 + x191 + x29;
+        const scalar_t x193 = -uy3;
+        const scalar_t x194 = uy4 + uy5;
+        const scalar_t x195 = -uy7;
+        const scalar_t x196 = x195 + x20;
+        const scalar_t x197 = x191 + x193 + x194 + x196;
+        const scalar_t x198 = -uy4;
+        const scalar_t x199 = uy2 + uy3;
+        const scalar_t x200 = x187 + x190 + x196 + x198 + x199;
+        const scalar_t x201 = cof0*x192 + cof1*x178 + cof3*x197 + cof4*x182 + cof6*x200 + cof7*x184;
+        const scalar_t x202 = -uz1;
+        const scalar_t x203 = -uz5;
+        const scalar_t x204 = uz4 + uz7;
+        const scalar_t x205 = -uz2;
+        const scalar_t x206 = -uz6;
+        const scalar_t x207 = x205 + x206;
+        const scalar_t x208 = x202 + x203 + x204 + x207 + x31;
+        const scalar_t x209 = -uz3;
+        const scalar_t x210 = uz4 + uz5;
+        const scalar_t x211 = -uz7;
+        const scalar_t x212 = x211 + x22;
+        const scalar_t x213 = x207 + x209 + x210 + x212;
+        const scalar_t x214 = -uz4;
+        const scalar_t x215 = uz2 + uz3;
+        const scalar_t x216 = x203 + x206 + x212 + x214 + x215;
+        const scalar_t x217 = cof0*x208 + cof2*x178 + cof3*x213 + cof5*x182 + cof6*x216 + cof8*x184;
+        const scalar_t x218 = mu/det;
+        const scalar_t x219 = x218*(cof1*x201 + cof2*x217 + x185*x9);
+        const scalar_t x220 = x218*(cof4*x201 + cof5*x217 + x12*x185);
+        const scalar_t x221 = x218*(cof7*x201 + cof8*x217 + x15*x185);
+        const scalar_t x222 = x220 + x221;
+        const scalar_t x223 = x219 + x222;
+        const scalar_t x224 = scalar_t(2)*cof1;
+        const scalar_t x225 = x224*x8;
+        const scalar_t x226 = scalar_t(2)*cof4;
+        const scalar_t x227 = x11*x226;
+        const scalar_t x228 = scalar_t(2)*cof7;
+        const scalar_t x229 = x14*x228;
+        const scalar_t x230 = uy0*x78;
+        const scalar_t x231 = uy0*x97;
+        const scalar_t x232 = uy0*x117;
+        const scalar_t x233 = uy0 + x186;
+        const scalar_t x234 = g0_3*x52 + g0_4*x61 + g0_5*x70;
+        const scalar_t x235 = fabs(x234);
+        const scalar_t x236 = fabs(x233);
+        const scalar_t x237 = x233*x235 - x234*x236;
+        const scalar_t x238 = (scalar_t(1) / scalar_t(16))*x235 + x236;
+        const scalar_t x239 = (scalar_t(1) / scalar_t(32))/x238;
+        const scalar_t x240 = x238 != 0;
+        const scalar_t x241 = uy0 + x193;
+        const scalar_t x242 = fabs(x241);
+        const scalar_t x243 = g0_3*x85 + g0_4*x89 + g0_5*x93;
+        const scalar_t x244 = fabs(x243);
+        const scalar_t x245 = x242 + (scalar_t(1) / scalar_t(16))*x244;
+        const scalar_t x246 = x97*((x245 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x241*x244 - x242*x243)/x245
+)
+: (
+   0
+));
+        const scalar_t x247 = uy0 + x198;
+        const scalar_t x248 = fabs(x247);
+        const scalar_t x249 = g0_3*x105 + g0_4*x109 + g0_5*x113;
+        const scalar_t x250 = fabs(x249);
+        const scalar_t x251 = x248 + (scalar_t(1) / scalar_t(16))*x250;
+        const scalar_t x252 = x117*((x251 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x247*x250 - x248*x249)/x251
+)
+: (
+   0
+));
+        const scalar_t x253 = uy1*x146;
+        const scalar_t x254 = uy3*x160;
+        const scalar_t x255 = uy4*x171;
+        const scalar_t x256 = g1_3*x132 + g1_4*x137 + g1_5*x142;
+        const scalar_t x257 = fabs(x256);
+        const scalar_t x258 = x236 + (scalar_t(1) / scalar_t(16))*x257;
+        const scalar_t x259 = x146*((x258 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x233*x257 + x236*x256)/x258
+)
+: (
+   0
+));
+        const scalar_t x260 = g3_3*x150 + g3_4*x153 + g3_5*x156;
+        const scalar_t x261 = fabs(x260);
+        const scalar_t x262 = x242 + (scalar_t(1) / scalar_t(16))*x261;
+        const scalar_t x263 = x160*((x262 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x241*x261 + x242*x260)/x262
+)
+: (
+   0
+));
+        const scalar_t x264 = g4_3*x163 + g4_4*x165 + g4_5*x167;
+        const scalar_t x265 = fabs(x264);
+        const scalar_t x266 = x248 + (scalar_t(1) / scalar_t(16))*x265;
+        const scalar_t x267 = x171*((x266 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x247*x265 + x248*x264)/x266
+)
+: (
+   0
+));
+        const scalar_t x268 = cof1*x192 + cof4*x197 + cof7*x200;
+        const scalar_t x269 = cof1*x208 + cof2*x192 + cof4*x213 + cof5*x197 + cof7*x216 + cof8*x200;
+        const scalar_t x270 = x218*(cof0*x201 + cof2*x269 + x224*x268);
+        const scalar_t x271 = x218*(cof3*x201 + cof5*x269 + x226*x268);
+        const scalar_t x272 = x218*(cof6*x201 + cof8*x269 + x228*x268);
+        const scalar_t x273 = x271 + x272;
+        const scalar_t x274 = x270 + x273;
+        const scalar_t x275 = scalar_t(2)*cof2;
+        const scalar_t x276 = x275*x8;
+        const scalar_t x277 = scalar_t(2)*cof5;
+        const scalar_t x278 = x11*x277;
+        const scalar_t x279 = scalar_t(2)*cof8;
+        const scalar_t x280 = x14*x279;
+        const scalar_t x281 = uz0*x78;
+        const scalar_t x282 = uz0*x97;
+        const scalar_t x283 = uz0*x117;
+        const scalar_t x284 = uz0 + x202;
+        const scalar_t x285 = g0_6*x52 + g0_7*x61 + g0_8*x70;
+        const scalar_t x286 = fabs(x285);
+        const scalar_t x287 = fabs(x284);
+        const scalar_t x288 = x284*x286 - x285*x287;
+        const scalar_t x289 = (scalar_t(1) / scalar_t(16))*x286 + x287;
+        const scalar_t x290 = (scalar_t(1) / scalar_t(32))/x289;
+        const scalar_t x291 = x289 != 0;
+        const scalar_t x292 = uz0 + x209;
+        const scalar_t x293 = fabs(x292);
+        const scalar_t x294 = g0_6*x85 + g0_7*x89 + g0_8*x93;
+        const scalar_t x295 = fabs(x294);
+        const scalar_t x296 = x293 + (scalar_t(1) / scalar_t(16))*x295;
+        const scalar_t x297 = x97*((x296 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x292*x295 - x293*x294)/x296
+)
+: (
+   0
+));
+        const scalar_t x298 = uz0 + x214;
+        const scalar_t x299 = fabs(x298);
+        const scalar_t x300 = g0_6*x105 + g0_7*x109 + g0_8*x113;
+        const scalar_t x301 = fabs(x300);
+        const scalar_t x302 = x299 + (scalar_t(1) / scalar_t(16))*x301;
+        const scalar_t x303 = x117*((x302 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x298*x301 - x299*x300)/x302
+)
+: (
+   0
+));
+        const scalar_t x304 = uz1*x146;
+        const scalar_t x305 = uz3*x160;
+        const scalar_t x306 = uz4*x171;
+        const scalar_t x307 = g1_6*x132 + g1_7*x137 + g1_8*x142;
+        const scalar_t x308 = fabs(x307);
+        const scalar_t x309 = x287 + (scalar_t(1) / scalar_t(16))*x308;
+        const scalar_t x310 = x146*((x309 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x284*x308 + x287*x307)/x309
+)
+: (
+   0
+));
+        const scalar_t x311 = g3_6*x150 + g3_7*x153 + g3_8*x156;
+        const scalar_t x312 = fabs(x311);
+        const scalar_t x313 = x293 + (scalar_t(1) / scalar_t(16))*x312;
+        const scalar_t x314 = x160*((x313 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x292*x312 + x293*x311)/x313
+)
+: (
+   0
+));
+        const scalar_t x315 = g4_6*x163 + g4_7*x165 + g4_8*x167;
+        const scalar_t x316 = fabs(x315);
+        const scalar_t x317 = x299 + (scalar_t(1) / scalar_t(16))*x316;
+        const scalar_t x318 = x171*((x317 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x298*x316 + x299*x315)/x317
+)
+: (
+   0
+));
+        const scalar_t x319 = cof2*x208 + cof5*x213 + cof8*x216;
+        const scalar_t x320 = x218*(cof0*x217 + cof1*x269 + x275*x319);
+        const scalar_t x321 = x218*(cof3*x217 + cof4*x269 + x277*x319);
+        const scalar_t x322 = x218*(cof6*x217 + cof7*x269 + x279*x319);
+        const scalar_t x323 = x321 + x322;
+        const scalar_t x324 = x320 + x323;
+        const scalar_t x325 = (scalar_t(1) / scalar_t(8))*rho;
+        const scalar_t x326 = -x219 + x222;
+        const scalar_t x327 = p1 + p2;
+        const scalar_t x328 = cof3*(ux1 + ux2) + cof4*(uy1 + uy2) + cof5*(uz1 + uz2);
+        const scalar_t x329 = x328*(sgn5 + scalar_t(1));
+        const scalar_t x330 = ux1 + x175;
+        const scalar_t x331 = fabs(x330);
+        const scalar_t x332 = scalar_t(3)*x0 + scalar_t(3)*x6;
+        const scalar_t x333 = scalar_t(9)*x2 + x4;
+        const scalar_t x334 = x332 + x333;
+        const scalar_t x335 = x131 + x334;
+        const scalar_t x336 = scalar_t(3)*y0 + scalar_t(3)*y6;
+        const scalar_t x337 = scalar_t(9)*y2 + y4;
+        const scalar_t x338 = x336 + x337;
+        const scalar_t x339 = x136 + x338;
+        const scalar_t x340 = scalar_t(3)*z0 + scalar_t(3)*z6;
+        const scalar_t x341 = scalar_t(9)*z2 + z4;
+        const scalar_t x342 = x340 + x341;
+        const scalar_t x343 = x141 + x342;
+        const scalar_t x344 = g1_0*x335 + g1_1*x339 + g1_2*x343;
+        const scalar_t x345 = fabs(x344);
+        const scalar_t x346 = x331 + (scalar_t(1) / scalar_t(16))*x345;
+        const scalar_t x347 = rho*x329;
+        const scalar_t x348 = rho*ux2;
+        const scalar_t x349 = x328*(sgn5 + scalar_t(-1));
+        const scalar_t x350 = -scalar_t(23)*x2 + x4;
+        const scalar_t x351 = x332 + x350;
+        const scalar_t x352 = x351 + x51;
+        const scalar_t x353 = -scalar_t(23)*y2 + y4;
+        const scalar_t x354 = x336 + x353;
+        const scalar_t x355 = x354 + x60;
+        const scalar_t x356 = -scalar_t(23)*z2 + z4;
+        const scalar_t x357 = x340 + x356;
+        const scalar_t x358 = x357 + x69;
+        const scalar_t x359 = g2_0*x352 + g2_1*x355 + g2_2*x358;
+        const scalar_t x360 = fabs(x359);
+        const scalar_t x361 = x331 + (scalar_t(1) / scalar_t(16))*x360;
+        const scalar_t x362 = rho*x349;
+        const scalar_t x363 = x119*x329 + x12*x327 + x347*((x346 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x330*x345 + x331*x344)/x346
+)
+: (
+   0
+)) - x348*x349 - x362*((x361 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x330*x360 + x331*x359)/x361
+)
+: (
+   0
+));
+        const scalar_t x364 = p1 + p5;
+        const scalar_t x365 = cof6*(ux1 + ux5) + cof7*(uy1 + uy5) + cof8*(uz1 + uz5);
+        const scalar_t x366 = x365*(sgn9 + scalar_t(1));
+        const scalar_t x367 = ux1 + x173;
+        const scalar_t x368 = fabs(x367);
+        const scalar_t x369 = x3 + scalar_t(9)*x5;
+        const scalar_t x370 = x332 + x45;
+        const scalar_t x371 = x370 + x7;
+        const scalar_t x372 = x130 + x369 + x371;
+        const scalar_t x373 = y3 + scalar_t(9)*y5;
+        const scalar_t x374 = x336 + x54;
+        const scalar_t x375 = x374 + y7;
+        const scalar_t x376 = x135 + x373 + x375;
+        const scalar_t x377 = z3 + scalar_t(9)*z5;
+        const scalar_t x378 = x340 + x63;
+        const scalar_t x379 = x378 + z7;
+        const scalar_t x380 = x140 + x377 + x379;
+        const scalar_t x381 = g1_0*x372 + g1_1*x376 + g1_2*x380;
+        const scalar_t x382 = fabs(x381);
+        const scalar_t x383 = x368 + (scalar_t(1) / scalar_t(16))*x382;
+        const scalar_t x384 = rho*x366;
+        const scalar_t x385 = rho*ux5;
+        const scalar_t x386 = x365*(sgn9 + scalar_t(-1));
+        const scalar_t x387 = x3 - scalar_t(23)*x5;
+        const scalar_t x388 = x371 + x387 + x48;
+        const scalar_t x389 = y3 - scalar_t(23)*y5;
+        const scalar_t x390 = x375 + x389 + x57;
+        const scalar_t x391 = z3 - scalar_t(23)*z5;
+        const scalar_t x392 = x379 + x391 + x66;
+        const scalar_t x393 = g5_0*x388 + g5_1*x390 + g5_2*x392;
+        const scalar_t x394 = fabs(x393);
+        const scalar_t x395 = x368 + (scalar_t(1) / scalar_t(16))*x394;
+        const scalar_t x396 = rho*x386;
+        const scalar_t x397 = x119*x366 + x15*x364 + x384*((x383 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x367*x382 + x368*x381)/x383
+)
+: (
+   0
+)) - x385*x386 - x396*((x395 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x367*x394 + x368*x393)/x395
+)
+: (
+   0
+));
+        const scalar_t x398 = -x270 + x273;
+        const scalar_t x399 = uy1 + x189;
+        const scalar_t x400 = fabs(x399);
+        const scalar_t x401 = g1_3*x335 + g1_4*x339 + g1_5*x343;
+        const scalar_t x402 = fabs(x401);
+        const scalar_t x403 = x400 + (scalar_t(1) / scalar_t(16))*x402;
+        const scalar_t x404 = g2_3*x352 + g2_4*x355 + g2_5*x358;
+        const scalar_t x405 = fabs(x404);
+        const scalar_t x406 = x400 + (scalar_t(1) / scalar_t(16))*x405;
+        const scalar_t x407 = uy1*x347 - uy2*x362 + x226*x327 + x347*((x403 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x399*x402 + x400*x401)/x403
+)
+: (
+   0
+)) - x362*((x406 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x399*x405 + x400*x404)/x406
+)
+: (
+   0
+));
+        const scalar_t x408 = uy1 + x187;
+        const scalar_t x409 = fabs(x408);
+        const scalar_t x410 = g1_3*x372 + g1_4*x376 + g1_5*x380;
+        const scalar_t x411 = fabs(x410);
+        const scalar_t x412 = x409 + (scalar_t(1) / scalar_t(16))*x411;
+        const scalar_t x413 = g5_3*x388 + g5_4*x390 + g5_5*x392;
+        const scalar_t x414 = fabs(x413);
+        const scalar_t x415 = x409 + (scalar_t(1) / scalar_t(16))*x414;
+        const scalar_t x416 = uy1*x384 - uy5*x396 + x228*x364 + x384*((x412 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x408*x411 + x409*x410)/x412
+)
+: (
+   0
+)) - x396*((x415 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x408*x414 + x409*x413)/x415
+)
+: (
+   0
+));
+        const scalar_t x417 = -x320 + x323;
+        const scalar_t x418 = uz1 + x205;
+        const scalar_t x419 = fabs(x418);
+        const scalar_t x420 = g1_6*x335 + g1_7*x339 + g1_8*x343;
+        const scalar_t x421 = fabs(x420);
+        const scalar_t x422 = x419 + (scalar_t(1) / scalar_t(16))*x421;
+        const scalar_t x423 = g2_6*x352 + g2_7*x355 + g2_8*x358;
+        const scalar_t x424 = fabs(x423);
+        const scalar_t x425 = x419 + (scalar_t(1) / scalar_t(16))*x424;
+        const scalar_t x426 = uz1*x347 - uz2*x362 + x277*x327 + x347*((x422 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x418*x421 + x419*x420)/x422
+)
+: (
+   0
+)) - x362*((x425 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x418*x424 + x419*x423)/x425
+)
+: (
+   0
+));
+        const scalar_t x427 = uz1 + x203;
+        const scalar_t x428 = fabs(x427);
+        const scalar_t x429 = g1_6*x372 + g1_7*x376 + g1_8*x380;
+        const scalar_t x430 = fabs(x429);
+        const scalar_t x431 = x428 + (scalar_t(1) / scalar_t(16))*x430;
+        const scalar_t x432 = g5_6*x388 + g5_7*x390 + g5_8*x392;
+        const scalar_t x433 = fabs(x432);
+        const scalar_t x434 = x428 + (scalar_t(1) / scalar_t(16))*x433;
+        const scalar_t x435 = uz1*x384 - uz5*x396 + x279*x364 + x384*((x431 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x427*x430 + x428*x429)/x431
+)
+: (
+   0
+)) - x396*((x434 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x427*x433 + x428*x432)/x434
+)
+: (
+   0
+));
+        const scalar_t x436 = p2 + p6;
+        const scalar_t x437 = x15*x436;
+        const scalar_t x438 = rho*ux6;
+        const scalar_t x439 = ux2 + ux6;
+        const scalar_t x440 = uy2 + uy6;
+        const scalar_t x441 = uz2 + uz6;
+        const scalar_t x442 = cof6*x439 + cof7*x440 + cof8*x441;
+        const scalar_t x443 = x442*(sgn10 + scalar_t(-1));
+        const scalar_t x444 = x438*x443;
+        const scalar_t x445 = ux2 + x176;
+        const scalar_t x446 = fabs(x445);
+        const scalar_t x447 = -scalar_t(23)*x6;
+        const scalar_t x448 = x0 + x103;
+        const scalar_t x449 = x333 + x447 + x448;
+        const scalar_t x450 = -scalar_t(23)*y6;
+        const scalar_t x451 = x107 + y0;
+        const scalar_t x452 = x337 + x450 + x451;
+        const scalar_t x453 = -scalar_t(23)*z6;
+        const scalar_t x454 = x111 + z0;
+        const scalar_t x455 = x341 + x453 + x454;
+        const scalar_t x456 = g6_0*x449 + g6_1*x452 + g6_2*x455;
+        const scalar_t x457 = fabs(x456);
+        const scalar_t x458 = x446 + (scalar_t(1) / scalar_t(16))*x457;
+        const scalar_t x459 = rho*x443;
+        const scalar_t x460 = x459*((x458 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x445*x457 + x446*x456)/x458
+)
+: (
+   0
+));
+        const scalar_t x461 = x442*(sgn10 + scalar_t(1));
+        const scalar_t x462 = x348*x461;
+        const scalar_t x463 = scalar_t(9)*x6;
+        const scalar_t x464 = x350 + x448 + x463;
+        const scalar_t x465 = scalar_t(9)*y6;
+        const scalar_t x466 = x353 + x451 + x465;
+        const scalar_t x467 = scalar_t(9)*z6;
+        const scalar_t x468 = x356 + x454 + x467;
+        const scalar_t x469 = g2_0*x464 + g2_1*x466 + g2_2*x468;
+        const scalar_t x470 = fabs(x469);
+        const scalar_t x471 = x446 + (scalar_t(1) / scalar_t(16))*x470;
+        const scalar_t x472 = rho*x461;
+        const scalar_t x473 = x472*((x471 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x445*x470 + x446*x469)/x471
+)
+: (
+   0
+));
+        const scalar_t x474 = sgn1 + scalar_t(-1);
+        const scalar_t x475 = cof0*x183 + cof1*x199 + cof2*x215;
+        const scalar_t x476 = ux2 + x79;
+        const scalar_t x477 = x351 + x84;
+        const scalar_t x478 = x354 + x88;
+        const scalar_t x479 = x357 + x92;
+        const scalar_t x480 = g2_0*x477 + g2_1*x478 + g2_2*x479;
+        const scalar_t x481 = fabs(x480);
+        const scalar_t x482 = fabs(x476);
+        const scalar_t x483 = x476*x481 - x480*x482;
+        const scalar_t x484 = (scalar_t(1) / scalar_t(16))*x481 + x482;
+        const scalar_t x485 = (scalar_t(1) / scalar_t(32))/x484;
+        const scalar_t x486 = x484 != 0;
+        const scalar_t x487 = x219 + x220 - x221;
+        const scalar_t x488 = p2 + p3;
+        const scalar_t x489 = x475*(sgn1 + scalar_t(1));
+        const scalar_t x490 = x149 + x334;
+        const scalar_t x491 = x152 + x338;
+        const scalar_t x492 = x155 + x342;
+        const scalar_t x493 = g3_0*x490 + g3_1*x491 + g3_2*x492;
+        const scalar_t x494 = fabs(x493);
+        const scalar_t x495 = x482 + (scalar_t(1) / scalar_t(16))*x494;
+        const scalar_t x496 = rho*x489;
+        const scalar_t x497 = x474*x475;
+        const scalar_t x498 = x122*x489 - x348*x497 + x488*x9 + x496*((x495 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x476*x494 + x482*x493)/x495
+)
+: (
+   0
+));
+        const scalar_t x499 = x228*x436;
+        const scalar_t x500 = uy6*x459;
+        const scalar_t x501 = uy2 + x190;
+        const scalar_t x502 = fabs(x501);
+        const scalar_t x503 = g6_3*x449 + g6_4*x452 + g6_5*x455;
+        const scalar_t x504 = fabs(x503);
+        const scalar_t x505 = x502 + (scalar_t(1) / scalar_t(16))*x504;
+        const scalar_t x506 = x459*((x505 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x501*x504 + x502*x503)/x505
+)
+: (
+   0
+));
+        const scalar_t x507 = uy2*x472;
+        const scalar_t x508 = g2_3*x464 + g2_4*x466 + g2_5*x468;
+        const scalar_t x509 = fabs(x508);
+        const scalar_t x510 = x502 + (scalar_t(1) / scalar_t(16))*x509;
+        const scalar_t x511 = x472*((x510 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x501*x509 + x502*x508)/x510
+)
+: (
+   0
+));
+        const scalar_t x512 = uy2 + x193;
+        const scalar_t x513 = g2_3*x477 + g2_4*x478 + g2_5*x479;
+        const scalar_t x514 = fabs(x513);
+        const scalar_t x515 = fabs(x512);
+        const scalar_t x516 = x512*x514 - x513*x515;
+        const scalar_t x517 = (scalar_t(1) / scalar_t(16))*x514 + x515;
+        const scalar_t x518 = (scalar_t(1) / scalar_t(32))/x517;
+        const scalar_t x519 = x517 != 0;
+        const scalar_t x520 = x270 + x271 - x272;
+        const scalar_t x521 = g3_3*x490 + g3_4*x491 + g3_5*x492;
+        const scalar_t x522 = fabs(x521);
+        const scalar_t x523 = x515 + (scalar_t(1) / scalar_t(16))*x522;
+        const scalar_t x524 = rho*x497;
+        const scalar_t x525 = -uy2*x524 + uy3*x496 + x224*x488 + x496*((x523 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x512*x522 + x515*x521)/x523
+)
+: (
+   0
+));
+        const scalar_t x526 = x279*x436;
+        const scalar_t x527 = uz6*x459;
+        const scalar_t x528 = uz2 + x206;
+        const scalar_t x529 = fabs(x528);
+        const scalar_t x530 = g6_6*x449 + g6_7*x452 + g6_8*x455;
+        const scalar_t x531 = fabs(x530);
+        const scalar_t x532 = x529 + (scalar_t(1) / scalar_t(16))*x531;
+        const scalar_t x533 = x459*((x532 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x528*x531 + x529*x530)/x532
+)
+: (
+   0
+));
+        const scalar_t x534 = uz2*x472;
+        const scalar_t x535 = g2_6*x464 + g2_7*x466 + g2_8*x468;
+        const scalar_t x536 = fabs(x535);
+        const scalar_t x537 = x529 + (scalar_t(1) / scalar_t(16))*x536;
+        const scalar_t x538 = x472*((x537 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x528*x536 + x529*x535)/x537
+)
+: (
+   0
+));
+        const scalar_t x539 = uz2 + x209;
+        const scalar_t x540 = g2_6*x477 + g2_7*x478 + g2_8*x479;
+        const scalar_t x541 = fabs(x540);
+        const scalar_t x542 = fabs(x539);
+        const scalar_t x543 = x539*x541 - x540*x542;
+        const scalar_t x544 = (scalar_t(1) / scalar_t(16))*x541 + x542;
+        const scalar_t x545 = (scalar_t(1) / scalar_t(32))/x544;
+        const scalar_t x546 = x544 != 0;
+        const scalar_t x547 = x320 + x321 - x322;
+        const scalar_t x548 = g3_6*x490 + g3_7*x491 + g3_8*x492;
+        const scalar_t x549 = fabs(x548);
+        const scalar_t x550 = x542 + (scalar_t(1) / scalar_t(16))*x549;
+        const scalar_t x551 = -uz2*x524 + uz3*x496 + x275*x488 + x496*((x550 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x539*x549 + x542*x548)/x550
+)
+: (
+   0
+));
+        const scalar_t x552 = ux3 + x180;
+        const scalar_t x553 = scalar_t(9)*x7;
+        const scalar_t x554 = x1 + x370;
+        const scalar_t x555 = x148 + x553 + x554;
+        const scalar_t x556 = scalar_t(9)*y7;
+        const scalar_t x557 = x374 + y1;
+        const scalar_t x558 = x151 + x556 + x557;
+        const scalar_t x559 = scalar_t(9)*z7;
+        const scalar_t x560 = x378 + z1;
+        const scalar_t x561 = x154 + x559 + x560;
+        const scalar_t x562 = g3_0*x555 + g3_1*x558 + g3_2*x561;
+        const scalar_t x563 = fabs(x562);
+        const scalar_t x564 = fabs(x552);
+        const scalar_t x565 = x552*x563 - x562*x564;
+        const scalar_t x566 = (scalar_t(1) / scalar_t(16))*x563 + x564;
+        const scalar_t x567 = (scalar_t(1) / scalar_t(32))/x566;
+        const scalar_t x568 = x566 != 0;
+        const scalar_t x569 = cof6*(ux3 + ux7) + cof7*(uy3 + uy7) + cof8*(uz3 + uz7);
+        const scalar_t x570 = x569*(sgn11 + scalar_t(1));
+        const scalar_t x571 = rho*x570;
+        const scalar_t x572 = x219 - x220 + x221;
+        const scalar_t x573 = p3 + p7;
+        const scalar_t x574 = rho*ux7;
+        const scalar_t x575 = x569*(sgn11 + scalar_t(-1));
+        const scalar_t x576 = -scalar_t(23)*x7;
+        const scalar_t x577 = x554 + x576 + x83;
+        const scalar_t x578 = -scalar_t(23)*y7;
+        const scalar_t x579 = x557 + x578 + x87;
+        const scalar_t x580 = -scalar_t(23)*z7;
+        const scalar_t x581 = x560 + x580 + x91;
+        const scalar_t x582 = g7_0*x577 + g7_1*x579 + g7_2*x581;
+        const scalar_t x583 = fabs(x582);
+        const scalar_t x584 = x564 + (scalar_t(1) / scalar_t(16))*x583;
+        const scalar_t x585 = rho*x575;
+        const scalar_t x586 = x122*x570 + x15*x573 - x574*x575 - x585*((x584 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x552*x583 + x564*x582)/x584
+)
+: (
+   0
+));
+        const scalar_t x587 = uy3 + x195;
+        const scalar_t x588 = g3_3*x555 + g3_4*x558 + g3_5*x561;
+        const scalar_t x589 = fabs(x588);
+        const scalar_t x590 = fabs(x587);
+        const scalar_t x591 = x587*x589 - x588*x590;
+        const scalar_t x592 = (scalar_t(1) / scalar_t(16))*x589 + x590;
+        const scalar_t x593 = (scalar_t(1) / scalar_t(32))/x592;
+        const scalar_t x594 = x592 != 0;
+        const scalar_t x595 = x270 - x271 + x272;
+        const scalar_t x596 = g7_3*x577 + g7_4*x579 + g7_5*x581;
+        const scalar_t x597 = fabs(x596);
+        const scalar_t x598 = x590 + (scalar_t(1) / scalar_t(16))*x597;
+        const scalar_t x599 = uy3*x571 - uy7*x585 + x228*x573 - x585*((x598 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x587*x597 + x590*x596)/x598
+)
+: (
+   0
+));
+        const scalar_t x600 = uz3 + x211;
+        const scalar_t x601 = g3_6*x555 + g3_7*x558 + g3_8*x561;
+        const scalar_t x602 = fabs(x601);
+        const scalar_t x603 = fabs(x600);
+        const scalar_t x604 = x600*x602 - x601*x603;
+        const scalar_t x605 = (scalar_t(1) / scalar_t(16))*x602 + x603;
+        const scalar_t x606 = (scalar_t(1) / scalar_t(32))/x605;
+        const scalar_t x607 = x605 != 0;
+        const scalar_t x608 = x320 - x321 + x322;
+        const scalar_t x609 = g7_6*x577 + g7_7*x579 + g7_8*x581;
+        const scalar_t x610 = fabs(x609);
+        const scalar_t x611 = x603 + (scalar_t(1) / scalar_t(16))*x610;
+        const scalar_t x612 = uz3*x571 - uz7*x585 + x279*x573 - x585*((x611 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x600*x610 + x603*x609)/x611
+)
+: (
+   0
+));
+        const scalar_t x613 = ux4 + x173;
+        const scalar_t x614 = x162 + x332;
+        const scalar_t x615 = x369 + x82;
+        const scalar_t x616 = x614 + x615;
+        const scalar_t x617 = x164 + x336;
+        const scalar_t x618 = x373 + x86;
+        const scalar_t x619 = x617 + x618;
+        const scalar_t x620 = x166 + x340;
+        const scalar_t x621 = x377 + x90;
+        const scalar_t x622 = x620 + x621;
+        const scalar_t x623 = g4_0*x616 + g4_1*x619 + g4_2*x622;
+        const scalar_t x624 = fabs(x623);
+        const scalar_t x625 = fabs(x613);
+        const scalar_t x626 = x613*x624 - x623*x625;
+        const scalar_t x627 = (scalar_t(1) / scalar_t(16))*x624 + x625;
+        const scalar_t x628 = (scalar_t(1) / scalar_t(32))/x627;
+        const scalar_t x629 = x627 != 0;
+        const scalar_t x630 = cof0*x179 + cof1*x194 + cof2*x210;
+        const scalar_t x631 = x630*(sgn2 + scalar_t(1));
+        const scalar_t x632 = rho*x631;
+        const scalar_t x633 = ux4 + x180;
+        const scalar_t x634 = x1 + x49;
+        const scalar_t x635 = x553 + x634;
+        const scalar_t x636 = x614 + x635;
+        const scalar_t x637 = x58 + y1;
+        const scalar_t x638 = x556 + x637;
+        const scalar_t x639 = x617 + x638;
+        const scalar_t x640 = x67 + z1;
+        const scalar_t x641 = x559 + x640;
+        const scalar_t x642 = x620 + x641;
+        const scalar_t x643 = g4_0*x636 + g4_1*x639 + g4_2*x642;
+        const scalar_t x644 = fabs(x643);
+        const scalar_t x645 = fabs(x633);
+        const scalar_t x646 = x633*x644 - x643*x645;
+        const scalar_t x647 = (scalar_t(1) / scalar_t(16))*x644 + x645;
+        const scalar_t x648 = (scalar_t(1) / scalar_t(32))/x647;
+        const scalar_t x649 = x647 != 0;
+        const scalar_t x650 = cof3*x174 + cof4*x188 + cof5*x204;
+        const scalar_t x651 = x650*(sgn6 + scalar_t(1));
+        const scalar_t x652 = rho*x651;
+        const scalar_t x653 = p4 + p5;
+        const scalar_t x654 = x630*(sgn2 + scalar_t(-1));
+        const scalar_t x655 = x102 + x332;
+        const scalar_t x656 = x387 + x82;
+        const scalar_t x657 = x655 + x656;
+        const scalar_t x658 = x106 + x336;
+        const scalar_t x659 = x389 + x86;
+        const scalar_t x660 = x658 + x659;
+        const scalar_t x661 = x110 + x340;
+        const scalar_t x662 = x391 + x90;
+        const scalar_t x663 = x661 + x662;
+        const scalar_t x664 = g5_0*x657 + g5_1*x660 + g5_2*x663;
+        const scalar_t x665 = fabs(x664);
+        const scalar_t x666 = x625 + (scalar_t(1) / scalar_t(16))*x665;
+        const scalar_t x667 = rho*x654;
+        const scalar_t x668 = x125*x631 - x385*x654 + x653*x9 - x667*((x666 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x613*x665 + x625*x664)/x666
+)
+: (
+   0
+));
+        const scalar_t x669 = p4 + p7;
+        const scalar_t x670 = x650*(sgn6 + scalar_t(-1));
+        const scalar_t x671 = x576 + x634;
+        const scalar_t x672 = x655 + x671;
+        const scalar_t x673 = x578 + x637;
+        const scalar_t x674 = x658 + x673;
+        const scalar_t x675 = x580 + x640;
+        const scalar_t x676 = x661 + x675;
+        const scalar_t x677 = g7_0*x672 + g7_1*x674 + g7_2*x676;
+        const scalar_t x678 = fabs(x677);
+        const scalar_t x679 = x645 + (scalar_t(1) / scalar_t(16))*x678;
+        const scalar_t x680 = rho*x670;
+        const scalar_t x681 = x12*x669 + x125*x651 - x574*x670 - x680*((x679 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x633*x678 + x645*x677)/x679
+)
+: (
+   0
+));
+        const scalar_t x682 = uy4 + x187;
+        const scalar_t x683 = g4_3*x616 + g4_4*x619 + g4_5*x622;
+        const scalar_t x684 = fabs(x683);
+        const scalar_t x685 = fabs(x682);
+        const scalar_t x686 = x682*x684 - x683*x685;
+        const scalar_t x687 = (scalar_t(1) / scalar_t(16))*x684 + x685;
+        const scalar_t x688 = (scalar_t(1) / scalar_t(32))/x687;
+        const scalar_t x689 = x687 != 0;
+        const scalar_t x690 = uy4 + x195;
+        const scalar_t x691 = g4_3*x636 + g4_4*x639 + g4_5*x642;
+        const scalar_t x692 = fabs(x691);
+        const scalar_t x693 = fabs(x690);
+        const scalar_t x694 = x690*x692 - x691*x693;
+        const scalar_t x695 = (scalar_t(1) / scalar_t(16))*x692 + x693;
+        const scalar_t x696 = (scalar_t(1) / scalar_t(32))/x695;
+        const scalar_t x697 = x695 != 0;
+        const scalar_t x698 = g5_3*x657 + g5_4*x660 + g5_5*x663;
+        const scalar_t x699 = fabs(x698);
+        const scalar_t x700 = x685 + (scalar_t(1) / scalar_t(16))*x699;
+        const scalar_t x701 = uy4*x632 - uy5*x667 + x224*x653 - x667*((x700 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x682*x699 + x685*x698)/x700
+)
+: (
+   0
+));
+        const scalar_t x702 = g7_3*x672 + g7_4*x674 + g7_5*x676;
+        const scalar_t x703 = fabs(x702);
+        const scalar_t x704 = x693 + (scalar_t(1) / scalar_t(16))*x703;
+        const scalar_t x705 = uy4*x652 - uy7*x680 + x226*x669 - x680*((x704 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x690*x703 + x693*x702)/x704
+)
+: (
+   0
+));
+        const scalar_t x706 = uz4 + x203;
+        const scalar_t x707 = g4_6*x616 + g4_7*x619 + g4_8*x622;
+        const scalar_t x708 = fabs(x707);
+        const scalar_t x709 = fabs(x706);
+        const scalar_t x710 = x706*x708 - x707*x709;
+        const scalar_t x711 = (scalar_t(1) / scalar_t(16))*x708 + x709;
+        const scalar_t x712 = (scalar_t(1) / scalar_t(32))/x711;
+        const scalar_t x713 = x711 != 0;
+        const scalar_t x714 = uz4 + x211;
+        const scalar_t x715 = g4_6*x636 + g4_7*x639 + g4_8*x642;
+        const scalar_t x716 = fabs(x715);
+        const scalar_t x717 = fabs(x714);
+        const scalar_t x718 = x714*x716 - x715*x717;
+        const scalar_t x719 = (scalar_t(1) / scalar_t(16))*x716 + x717;
+        const scalar_t x720 = (scalar_t(1) / scalar_t(32))/x719;
+        const scalar_t x721 = x719 != 0;
+        const scalar_t x722 = g5_6*x657 + g5_7*x660 + g5_8*x663;
+        const scalar_t x723 = fabs(x722);
+        const scalar_t x724 = x709 + (scalar_t(1) / scalar_t(16))*x723;
+        const scalar_t x725 = uz4*x632 - uz5*x667 + x275*x653 - x667*((x724 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x706*x723 + x709*x722)/x724
+)
+: (
+   0
+));
+        const scalar_t x726 = g7_6*x672 + g7_7*x674 + g7_8*x676;
+        const scalar_t x727 = fabs(x726);
+        const scalar_t x728 = x717 + (scalar_t(1) / scalar_t(16))*x727;
+        const scalar_t x729 = uz4*x652 - uz7*x680 + x277*x669 - x680*((x728 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x714*x727 + x717*x726)/x728
+)
+: (
+   0
+));
+        const scalar_t x730 = p5 + p6;
+        const scalar_t x731 = x12*x730;
+        const scalar_t x732 = ux5 + ux6;
+        const scalar_t x733 = uy5 + uy6;
+        const scalar_t x734 = uz5 + uz6;
+        const scalar_t x735 = cof3*x732 + cof4*x733 + cof5*x734;
+        const scalar_t x736 = x735*(sgn7 + scalar_t(-1));
+        const scalar_t x737 = x438*x736;
+        const scalar_t x738 = ux5 + x176;
+        const scalar_t x739 = fabs(x738);
+        const scalar_t x740 = x0 + x45;
+        const scalar_t x741 = x447 + x740;
+        const scalar_t x742 = x615 + x741;
+        const scalar_t x743 = x54 + y0;
+        const scalar_t x744 = x450 + x743;
+        const scalar_t x745 = x618 + x744;
+        const scalar_t x746 = x63 + z0;
+        const scalar_t x747 = x453 + x746;
+        const scalar_t x748 = x621 + x747;
+        const scalar_t x749 = g6_0*x742 + g6_1*x745 + g6_2*x748;
+        const scalar_t x750 = fabs(x749);
+        const scalar_t x751 = x739 + (scalar_t(1) / scalar_t(16))*x750;
+        const scalar_t x752 = rho*x736;
+        const scalar_t x753 = x752*((x751 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x738*x750 + x739*x749)/x751
+)
+: (
+   0
+));
+        const scalar_t x754 = x735*(sgn7 + scalar_t(1));
+        const scalar_t x755 = x385*x754;
+        const scalar_t x756 = x463 + x740;
+        const scalar_t x757 = x656 + x756;
+        const scalar_t x758 = x465 + x743;
+        const scalar_t x759 = x659 + x758;
+        const scalar_t x760 = x467 + x746;
+        const scalar_t x761 = x662 + x760;
+        const scalar_t x762 = g5_0*x757 + g5_1*x759 + g5_2*x761;
+        const scalar_t x763 = fabs(x762);
+        const scalar_t x764 = x739 + (scalar_t(1) / scalar_t(16))*x763;
+        const scalar_t x765 = rho*x754;
+        const scalar_t x766 = x765*((x764 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x738*x763 + x739*x762)/x764
+)
+: (
+   0
+));
+        const scalar_t x767 = x226*x730;
+        const scalar_t x768 = uy6*x752;
+        const scalar_t x769 = uy5 + x190;
+        const scalar_t x770 = fabs(x769);
+        const scalar_t x771 = g6_3*x742 + g6_4*x745 + g6_5*x748;
+        const scalar_t x772 = fabs(x771);
+        const scalar_t x773 = x770 + (scalar_t(1) / scalar_t(16))*x772;
+        const scalar_t x774 = x752*((x773 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x769*x772 + x770*x771)/x773
+)
+: (
+   0
+));
+        const scalar_t x775 = uy5*x765;
+        const scalar_t x776 = g5_3*x757 + g5_4*x759 + g5_5*x761;
+        const scalar_t x777 = fabs(x776);
+        const scalar_t x778 = x770 + (scalar_t(1) / scalar_t(16))*x777;
+        const scalar_t x779 = x765*((x778 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x769*x777 + x770*x776)/x778
+)
+: (
+   0
+));
+        const scalar_t x780 = x277*x730;
+        const scalar_t x781 = uz6*x752;
+        const scalar_t x782 = uz5 + x206;
+        const scalar_t x783 = fabs(x782);
+        const scalar_t x784 = g6_6*x742 + g6_7*x745 + g6_8*x748;
+        const scalar_t x785 = fabs(x784);
+        const scalar_t x786 = x783 + (scalar_t(1) / scalar_t(16))*x785;
+        const scalar_t x787 = x752*((x786 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x782*x785 + x783*x784)/x786
+)
+: (
+   0
+));
+        const scalar_t x788 = uz5*x765;
+        const scalar_t x789 = g5_6*x757 + g5_7*x759 + g5_8*x761;
+        const scalar_t x790 = fabs(x789);
+        const scalar_t x791 = x783 + (scalar_t(1) / scalar_t(16))*x790;
+        const scalar_t x792 = x765*((x791 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x782*x790 + x783*x789)/x791
+)
+: (
+   0
+));
+        const scalar_t x793 = p6 + p7;
+        const scalar_t x794 = x793*x9;
+        const scalar_t x795 = ux6 + ux7;
+        const scalar_t x796 = uy6 + uy7;
+        const scalar_t x797 = uz6 + uz7;
+        const scalar_t x798 = cof0*x795 + cof1*x796 + cof2*x797;
+        const scalar_t x799 = x798*(sgn3 + scalar_t(1));
+        const scalar_t x800 = x574*x799;
+        const scalar_t x801 = ux6 + x180;
+        const scalar_t x802 = fabs(x801);
+        const scalar_t x803 = x671 + x756;
+        const scalar_t x804 = x673 + x758;
+        const scalar_t x805 = x675 + x760;
+        const scalar_t x806 = g7_0*x803 + g7_1*x804 + g7_2*x805;
+        const scalar_t x807 = fabs(x806);
+        const scalar_t x808 = x802 + (scalar_t(1) / scalar_t(16))*x807;
+        const scalar_t x809 = rho*x799;
+        const scalar_t x810 = x809*((x808 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x801*x807 + x802*x806)/x808
+)
+: (
+   0
+));
+        const scalar_t x811 = x798*(sgn3 + scalar_t(-1));
+        const scalar_t x812 = x438*x811;
+        const scalar_t x813 = x635 + x741;
+        const scalar_t x814 = x638 + x744;
+        const scalar_t x815 = x641 + x747;
+        const scalar_t x816 = g6_0*x813 + g6_1*x814 + g6_2*x815;
+        const scalar_t x817 = fabs(x816);
+        const scalar_t x818 = x802 + (scalar_t(1) / scalar_t(16))*x817;
+        const scalar_t x819 = rho*x811;
+        const scalar_t x820 = x819*((x818 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x801*x817 + x802*x816)/x818
+)
+: (
+   0
+));
+        const scalar_t x821 = x224*x793;
+        const scalar_t x822 = uy7*x809;
+        const scalar_t x823 = uy6 + x195;
+        const scalar_t x824 = fabs(x823);
+        const scalar_t x825 = g7_3*x803 + g7_4*x804 + g7_5*x805;
+        const scalar_t x826 = fabs(x825);
+        const scalar_t x827 = x824 + (scalar_t(1) / scalar_t(16))*x826;
+        const scalar_t x828 = x809*((x827 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x823*x826 + x824*x825)/x827
+)
+: (
+   0
+));
+        const scalar_t x829 = uy6*x819;
+        const scalar_t x830 = g6_3*x813 + g6_4*x814 + g6_5*x815;
+        const scalar_t x831 = fabs(x830);
+        const scalar_t x832 = x824 + (scalar_t(1) / scalar_t(16))*x831;
+        const scalar_t x833 = x819*((x832 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x823*x831 + x824*x830)/x832
+)
+: (
+   0
+));
+        const scalar_t x834 = x275*x793;
+        const scalar_t x835 = uz7*x809;
+        const scalar_t x836 = uz6 + x211;
+        const scalar_t x837 = fabs(x836);
+        const scalar_t x838 = g7_6*x803 + g7_7*x804 + g7_8*x805;
+        const scalar_t x839 = fabs(x838);
+        const scalar_t x840 = x837 + (scalar_t(1) / scalar_t(16))*x839;
+        const scalar_t x841 = x809*((x840 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x836*x839 + x837*x838)/x840
+)
+: (
+   0
+));
+        const scalar_t x842 = uz6*x819;
+        const scalar_t x843 = g6_6*x813 + g6_7*x814 + g6_8*x815;
+        const scalar_t x844 = fabs(x843);
+        const scalar_t x845 = x837 + (scalar_t(1) / scalar_t(16))*x844;
+        const scalar_t x846 = x819*((x845 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x836*x844 + x837*x843)/x845
+)
+: (
+   0
+));
+        out.rx[0][lane] = (scalar_t(1) / scalar_t(16))*x10 + (scalar_t(1) / scalar_t(16))*x118 - scalar_t(1) / scalar_t(16)*x121 - scalar_t(1) / scalar_t(16)*x124 - scalar_t(1) / scalar_t(16)*x127 + (scalar_t(1) / scalar_t(16))*x13 - scalar_t(1) / scalar_t(16)*x147 + (scalar_t(1) / scalar_t(16))*x16 - scalar_t(1) / scalar_t(16)*x161 - scalar_t(1) / scalar_t(16)*x172 + (scalar_t(1) / scalar_t(16))*x223 + (scalar_t(1) / scalar_t(16))*x26 + (scalar_t(1) / scalar_t(16))*x35 + (scalar_t(1) / scalar_t(16))*x41 + (scalar_t(1) / scalar_t(16))*x78*((x77) ? (
+   -x74*x76
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x98;
+        out.ry[0][lane] = (scalar_t(1) / scalar_t(16))*x225 + (scalar_t(1) / scalar_t(16))*x227 + (scalar_t(1) / scalar_t(16))*x229 + (scalar_t(1) / scalar_t(16))*x230 + (scalar_t(1) / scalar_t(16))*x231 + (scalar_t(1) / scalar_t(16))*x232 + (scalar_t(1) / scalar_t(16))*x246 + (scalar_t(1) / scalar_t(16))*x252 - scalar_t(1) / scalar_t(16)*x253 - scalar_t(1) / scalar_t(16)*x254 - scalar_t(1) / scalar_t(16)*x255 - scalar_t(1) / scalar_t(16)*x259 - scalar_t(1) / scalar_t(16)*x263 - scalar_t(1) / scalar_t(16)*x267 + (scalar_t(1) / scalar_t(16))*x274 + (scalar_t(1) / scalar_t(16))*x78*((x240) ? (
+   -x237*x239
+)
+: (
+   0
+));
+        out.rz[0][lane] = (scalar_t(1) / scalar_t(16))*x276 + (scalar_t(1) / scalar_t(16))*x278 + (scalar_t(1) / scalar_t(16))*x280 + (scalar_t(1) / scalar_t(16))*x281 + (scalar_t(1) / scalar_t(16))*x282 + (scalar_t(1) / scalar_t(16))*x283 + (scalar_t(1) / scalar_t(16))*x297 + (scalar_t(1) / scalar_t(16))*x303 - scalar_t(1) / scalar_t(16)*x304 - scalar_t(1) / scalar_t(16)*x305 - scalar_t(1) / scalar_t(16)*x306 - scalar_t(1) / scalar_t(16)*x310 - scalar_t(1) / scalar_t(16)*x314 - scalar_t(1) / scalar_t(16)*x318 + (scalar_t(1) / scalar_t(16))*x324 + (scalar_t(1) / scalar_t(16))*x78*((x291) ? (
+   -x288*x290
+)
+: (
+   0
+));
+        out.rc[0][lane] = x325*(x24 + x33 + x39);
+        out.rx[1][lane] = -scalar_t(1) / scalar_t(16)*x10 + (scalar_t(1) / scalar_t(16))*x121 + (scalar_t(1) / scalar_t(16))*x147 - scalar_t(1) / scalar_t(16)*x26 + (scalar_t(1) / scalar_t(16))*x326 + (scalar_t(1) / scalar_t(16))*x363 + (scalar_t(1) / scalar_t(16))*x397 - scalar_t(1) / scalar_t(16)*x78*((x77) ? (
+   -x74*x76
+)
+: (
+   0
+));
+        out.ry[1][lane] = -scalar_t(1) / scalar_t(16)*x225 - scalar_t(1) / scalar_t(16)*x230 + (scalar_t(1) / scalar_t(16))*x253 + (scalar_t(1) / scalar_t(16))*x259 + (scalar_t(1) / scalar_t(16))*x398 + (scalar_t(1) / scalar_t(16))*x407 + (scalar_t(1) / scalar_t(16))*x416 - scalar_t(1) / scalar_t(16)*x78*((x240) ? (
+   -x237*x239
+)
+: (
+   0
+));
+        out.rz[1][lane] = -scalar_t(1) / scalar_t(16)*x276 - scalar_t(1) / scalar_t(16)*x281 + (scalar_t(1) / scalar_t(16))*x304 + (scalar_t(1) / scalar_t(16))*x310 + (scalar_t(1) / scalar_t(16))*x417 + (scalar_t(1) / scalar_t(16))*x426 + (scalar_t(1) / scalar_t(16))*x435 - scalar_t(1) / scalar_t(16)*x78*((x291) ? (
+   -x288*x290
+)
+: (
+   0
+));
+        out.rc[1][lane] = x325*(-x19 - x21 - x23 + x328 + x365);
+        out.rx[2][lane] = (scalar_t(1) / scalar_t(16))*rho*x474*x475*((x486) ? (
+   -x483*x485
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x363 + (scalar_t(1) / scalar_t(16))*x437 - scalar_t(1) / scalar_t(16)*x444 - scalar_t(1) / scalar_t(16)*x460 + (scalar_t(1) / scalar_t(16))*x462 + (scalar_t(1) / scalar_t(16))*x473 - scalar_t(1) / scalar_t(16)*x487 - scalar_t(1) / scalar_t(16)*x498;
+        out.ry[2][lane] = (scalar_t(1) / scalar_t(16))*rho*x474*x475*((x519) ? (
+   -x516*x518
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x407 + (scalar_t(1) / scalar_t(16))*x499 - scalar_t(1) / scalar_t(16)*x500 - scalar_t(1) / scalar_t(16)*x506 + (scalar_t(1) / scalar_t(16))*x507 + (scalar_t(1) / scalar_t(16))*x511 - scalar_t(1) / scalar_t(16)*x520 - scalar_t(1) / scalar_t(16)*x525;
+        out.rz[2][lane] = (scalar_t(1) / scalar_t(16))*rho*x474*x475*((x546) ? (
+   -x543*x545
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x426 + (scalar_t(1) / scalar_t(16))*x526 - scalar_t(1) / scalar_t(16)*x527 - scalar_t(1) / scalar_t(16)*x533 + (scalar_t(1) / scalar_t(16))*x534 + (scalar_t(1) / scalar_t(16))*x538 - scalar_t(1) / scalar_t(16)*x547 - scalar_t(1) / scalar_t(16)*x551;
+        out.rc[2][lane] = x325*(cof6*x439 + cof7*x440 + cof8*x441 - x328 - x475);
+        out.rx[3][lane] = (scalar_t(1) / scalar_t(16))*x124 - scalar_t(1) / scalar_t(16)*x13 + (scalar_t(1) / scalar_t(16))*x161 - scalar_t(1) / scalar_t(16)*x35 + (scalar_t(1) / scalar_t(16))*x498 - scalar_t(1) / scalar_t(16)*x524*((x486) ? (
+   -x483*x485
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x571*((x568) ? (
+   -x565*x567
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x572 + (scalar_t(1) / scalar_t(16))*x586 - scalar_t(1) / scalar_t(16)*x98;
+        out.ry[3][lane] = -scalar_t(1) / scalar_t(16)*x227 - scalar_t(1) / scalar_t(16)*x231 - scalar_t(1) / scalar_t(16)*x246 + (scalar_t(1) / scalar_t(16))*x254 + (scalar_t(1) / scalar_t(16))*x263 - scalar_t(1) / scalar_t(16)*x524*((x519) ? (
+   -x516*x518
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x525 + (scalar_t(1) / scalar_t(16))*x571*((x594) ? (
+   -x591*x593
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x595 + (scalar_t(1) / scalar_t(16))*x599;
+        out.rz[3][lane] = -scalar_t(1) / scalar_t(16)*x278 - scalar_t(1) / scalar_t(16)*x282 - scalar_t(1) / scalar_t(16)*x297 + (scalar_t(1) / scalar_t(16))*x305 + (scalar_t(1) / scalar_t(16))*x314 - scalar_t(1) / scalar_t(16)*x524*((x546) ? (
+   -x543*x545
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x551 + (scalar_t(1) / scalar_t(16))*x571*((x607) ? (
+   -x604*x606
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x608 + (scalar_t(1) / scalar_t(16))*x612;
+        out.rc[3][lane] = x325*(-x28 - x30 - x32 + x475 + x569);
+        out.rx[4][lane] = -scalar_t(1) / scalar_t(16)*x118 + (scalar_t(1) / scalar_t(16))*x127 - scalar_t(1) / scalar_t(16)*x16 + (scalar_t(1) / scalar_t(16))*x172 - scalar_t(1) / scalar_t(16)*x41 + (scalar_t(1) / scalar_t(16))*x487 + (scalar_t(1) / scalar_t(16))*x632*((x629) ? (
+   -x626*x628
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x652*((x649) ? (
+   -x646*x648
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x668 + (scalar_t(1) / scalar_t(16))*x681;
+        out.ry[4][lane] = -scalar_t(1) / scalar_t(16)*x229 - scalar_t(1) / scalar_t(16)*x232 - scalar_t(1) / scalar_t(16)*x252 + (scalar_t(1) / scalar_t(16))*x255 + (scalar_t(1) / scalar_t(16))*x267 + (scalar_t(1) / scalar_t(16))*x520 + (scalar_t(1) / scalar_t(16))*x632*((x689) ? (
+   -x686*x688
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x652*((x697) ? (
+   -x694*x696
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x701 + (scalar_t(1) / scalar_t(16))*x705;
+        out.rz[4][lane] = -scalar_t(1) / scalar_t(16)*x280 - scalar_t(1) / scalar_t(16)*x283 - scalar_t(1) / scalar_t(16)*x303 + (scalar_t(1) / scalar_t(16))*x306 + (scalar_t(1) / scalar_t(16))*x318 + (scalar_t(1) / scalar_t(16))*x547 + (scalar_t(1) / scalar_t(16))*x632*((x713) ? (
+   -x710*x712
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x652*((x721) ? (
+   -x718*x720
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x725 + (scalar_t(1) / scalar_t(16))*x729;
+        out.rc[4][lane] = x325*(-x36 - x37 - x38 + x630 + x650);
+        out.rx[5][lane] = -scalar_t(1) / scalar_t(16)*x397 - scalar_t(1) / scalar_t(16)*x572 - scalar_t(1) / scalar_t(16)*x632*((x629) ? (
+   -x626*x628
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x668 + (scalar_t(1) / scalar_t(16))*x731 - scalar_t(1) / scalar_t(16)*x737 - scalar_t(1) / scalar_t(16)*x753 + (scalar_t(1) / scalar_t(16))*x755 + (scalar_t(1) / scalar_t(16))*x766;
+        out.ry[5][lane] = -scalar_t(1) / scalar_t(16)*x416 - scalar_t(1) / scalar_t(16)*x595 - scalar_t(1) / scalar_t(16)*x632*((x689) ? (
+   -x686*x688
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x701 + (scalar_t(1) / scalar_t(16))*x767 - scalar_t(1) / scalar_t(16)*x768 - scalar_t(1) / scalar_t(16)*x774 + (scalar_t(1) / scalar_t(16))*x775 + (scalar_t(1) / scalar_t(16))*x779;
+        out.rz[5][lane] = -scalar_t(1) / scalar_t(16)*x435 - scalar_t(1) / scalar_t(16)*x608 - scalar_t(1) / scalar_t(16)*x632*((x713) ? (
+   -x710*x712
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x725 + (scalar_t(1) / scalar_t(16))*x780 - scalar_t(1) / scalar_t(16)*x781 - scalar_t(1) / scalar_t(16)*x787 + (scalar_t(1) / scalar_t(16))*x788 + (scalar_t(1) / scalar_t(16))*x792;
+        out.rc[5][lane] = x325*(cof3*x732 + cof4*x733 + cof5*x734 - x365 - x630);
+        out.rx[6][lane] = -scalar_t(1) / scalar_t(16)*x223 - scalar_t(1) / scalar_t(16)*x437 + (scalar_t(1) / scalar_t(16))*x444 + (scalar_t(1) / scalar_t(16))*x460 - scalar_t(1) / scalar_t(16)*x462 - scalar_t(1) / scalar_t(16)*x473 - scalar_t(1) / scalar_t(16)*x731 + (scalar_t(1) / scalar_t(16))*x737 + (scalar_t(1) / scalar_t(16))*x753 - scalar_t(1) / scalar_t(16)*x755 - scalar_t(1) / scalar_t(16)*x766 - scalar_t(1) / scalar_t(16)*x794 - scalar_t(1) / scalar_t(16)*x800 - scalar_t(1) / scalar_t(16)*x810 + (scalar_t(1) / scalar_t(16))*x812 + (scalar_t(1) / scalar_t(16))*x820;
+        out.ry[6][lane] = -scalar_t(1) / scalar_t(16)*x274 - scalar_t(1) / scalar_t(16)*x499 + (scalar_t(1) / scalar_t(16))*x500 + (scalar_t(1) / scalar_t(16))*x506 - scalar_t(1) / scalar_t(16)*x507 - scalar_t(1) / scalar_t(16)*x511 - scalar_t(1) / scalar_t(16)*x767 + (scalar_t(1) / scalar_t(16))*x768 + (scalar_t(1) / scalar_t(16))*x774 - scalar_t(1) / scalar_t(16)*x775 - scalar_t(1) / scalar_t(16)*x779 - scalar_t(1) / scalar_t(16)*x821 - scalar_t(1) / scalar_t(16)*x822 - scalar_t(1) / scalar_t(16)*x828 + (scalar_t(1) / scalar_t(16))*x829 + (scalar_t(1) / scalar_t(16))*x833;
+        out.rz[6][lane] = -scalar_t(1) / scalar_t(16)*x324 - scalar_t(1) / scalar_t(16)*x526 + (scalar_t(1) / scalar_t(16))*x527 + (scalar_t(1) / scalar_t(16))*x533 - scalar_t(1) / scalar_t(16)*x534 - scalar_t(1) / scalar_t(16)*x538 - scalar_t(1) / scalar_t(16)*x780 + (scalar_t(1) / scalar_t(16))*x781 + (scalar_t(1) / scalar_t(16))*x787 - scalar_t(1) / scalar_t(16)*x788 - scalar_t(1) / scalar_t(16)*x792 - scalar_t(1) / scalar_t(16)*x834 - scalar_t(1) / scalar_t(16)*x835 - scalar_t(1) / scalar_t(16)*x841 + (scalar_t(1) / scalar_t(16))*x842 + (scalar_t(1) / scalar_t(16))*x846;
+        out.rc[6][lane] = -x325*(x442 + x735 + x798);
+        out.rx[7][lane] = -scalar_t(1) / scalar_t(16)*x326 - scalar_t(1) / scalar_t(16)*x571*((x568) ? (
+   -x565*x567
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x586 - scalar_t(1) / scalar_t(16)*x652*((x649) ? (
+   -x646*x648
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x681 + (scalar_t(1) / scalar_t(16))*x794 + (scalar_t(1) / scalar_t(16))*x800 + (scalar_t(1) / scalar_t(16))*x810 - scalar_t(1) / scalar_t(16)*x812 - scalar_t(1) / scalar_t(16)*x820;
+        out.ry[7][lane] = -scalar_t(1) / scalar_t(16)*x398 - scalar_t(1) / scalar_t(16)*x571*((x594) ? (
+   -x591*x593
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x599 - scalar_t(1) / scalar_t(16)*x652*((x697) ? (
+   -x694*x696
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x705 + (scalar_t(1) / scalar_t(16))*x821 + (scalar_t(1) / scalar_t(16))*x822 + (scalar_t(1) / scalar_t(16))*x828 - scalar_t(1) / scalar_t(16)*x829 - scalar_t(1) / scalar_t(16)*x833;
+        out.rz[7][lane] = -scalar_t(1) / scalar_t(16)*x417 - scalar_t(1) / scalar_t(16)*x571*((x607) ? (
+   -x604*x606
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x612 - scalar_t(1) / scalar_t(16)*x652*((x721) ? (
+   -x718*x720
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x729 + (scalar_t(1) / scalar_t(16))*x834 + (scalar_t(1) / scalar_t(16))*x835 + (scalar_t(1) / scalar_t(16))*x841 - scalar_t(1) / scalar_t(16)*x842 - scalar_t(1) / scalar_t(16)*x846;
+        out.rc[7][lane] = x325*(cof0*x795 + cof1*x796 + cof2*x797 - x569 - x650);
+    }
+}
+
+// unlimited reconstruction, with Rhie-Chow.
+static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim0_simd(
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT cof0_ptr,
+        const scalar_t *const SFEM_RESTRICT cof1_ptr,
+        const scalar_t *const SFEM_RESTRICT cof2_ptr,
+        const scalar_t *const SFEM_RESTRICT cof3_ptr,
+        const scalar_t *const SFEM_RESTRICT cof4_ptr,
+        const scalar_t *const SFEM_RESTRICT cof5_ptr,
+        const scalar_t *const SFEM_RESTRICT cof6_ptr,
+        const scalar_t *const SFEM_RESTRICT cof7_ptr,
+        const scalar_t *const SFEM_RESTRICT cof8_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const Hex8InputPack &in,
+        const Hex8UGradPack &ho,
+        const Hex8RhieChowPack &rc,
+        Hex8ResidualPack    &out) {
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t cof0 = scalar_t(cof0_ptr[lane]);
+        const scalar_t cof1 = scalar_t(cof1_ptr[lane]);
+        const scalar_t cof2 = scalar_t(cof2_ptr[lane]);
+        const scalar_t cof3 = scalar_t(cof3_ptr[lane]);
+        const scalar_t cof4 = scalar_t(cof4_ptr[lane]);
+        const scalar_t cof5 = scalar_t(cof5_ptr[lane]);
+        const scalar_t cof6 = scalar_t(cof6_ptr[lane]);
+        const scalar_t cof7 = scalar_t(cof7_ptr[lane]);
+        const scalar_t cof8 = scalar_t(cof8_ptr[lane]);
+        const scalar_t det = scalar_t(det_ptr[lane]);
+        const scalar_t ux0 = in.ux[0][lane];
+        const scalar_t ux1 = in.ux[1][lane];
+        const scalar_t ux2 = in.ux[2][lane];
+        const scalar_t ux3 = in.ux[3][lane];
+        const scalar_t ux4 = in.ux[4][lane];
+        const scalar_t ux5 = in.ux[5][lane];
+        const scalar_t ux6 = in.ux[6][lane];
+        const scalar_t ux7 = in.ux[7][lane];
+        const scalar_t uy0 = in.uy[0][lane];
+        const scalar_t uy1 = in.uy[1][lane];
+        const scalar_t uy2 = in.uy[2][lane];
+        const scalar_t uy3 = in.uy[3][lane];
+        const scalar_t uy4 = in.uy[4][lane];
+        const scalar_t uy5 = in.uy[5][lane];
+        const scalar_t uy6 = in.uy[6][lane];
+        const scalar_t uy7 = in.uy[7][lane];
+        const scalar_t uz0 = in.uz[0][lane];
+        const scalar_t uz1 = in.uz[1][lane];
+        const scalar_t uz2 = in.uz[2][lane];
+        const scalar_t uz3 = in.uz[3][lane];
+        const scalar_t uz4 = in.uz[4][lane];
+        const scalar_t uz5 = in.uz[5][lane];
+        const scalar_t uz6 = in.uz[6][lane];
+        const scalar_t uz7 = in.uz[7][lane];
+        const scalar_t p0 = in.p[0][lane];
+        const scalar_t p1 = in.p[1][lane];
+        const scalar_t p2 = in.p[2][lane];
+        const scalar_t p3 = in.p[3][lane];
+        const scalar_t p4 = in.p[4][lane];
+        const scalar_t p5 = in.p[5][lane];
+        const scalar_t p6 = in.p[6][lane];
+        const scalar_t p7 = in.p[7][lane];
+        const scalar_t x0 = ho.x[0][lane];
+        const scalar_t x1 = ho.x[1][lane];
+        const scalar_t x2 = ho.x[2][lane];
+        const scalar_t x3 = ho.x[3][lane];
+        const scalar_t x4 = ho.x[4][lane];
+        const scalar_t x5 = ho.x[5][lane];
+        const scalar_t x6 = ho.x[6][lane];
+        const scalar_t x7 = ho.x[7][lane];
+        const scalar_t y0 = ho.y[0][lane];
+        const scalar_t y1 = ho.y[1][lane];
+        const scalar_t y2 = ho.y[2][lane];
+        const scalar_t y3 = ho.y[3][lane];
+        const scalar_t y4 = ho.y[4][lane];
+        const scalar_t y5 = ho.y[5][lane];
+        const scalar_t y6 = ho.y[6][lane];
+        const scalar_t y7 = ho.y[7][lane];
+        const scalar_t z0 = ho.z[0][lane];
+        const scalar_t z1 = ho.z[1][lane];
+        const scalar_t z2 = ho.z[2][lane];
+        const scalar_t z3 = ho.z[3][lane];
+        const scalar_t z4 = ho.z[4][lane];
+        const scalar_t z5 = ho.z[5][lane];
+        const scalar_t z6 = ho.z[6][lane];
+        const scalar_t z7 = ho.z[7][lane];
+        const scalar_t g0_0 = ho.g[0][0][lane];
+        const scalar_t g0_1 = ho.g[0][1][lane];
+        const scalar_t g0_2 = ho.g[0][2][lane];
+        const scalar_t g0_3 = ho.g[0][3][lane];
+        const scalar_t g0_4 = ho.g[0][4][lane];
+        const scalar_t g0_5 = ho.g[0][5][lane];
+        const scalar_t g0_6 = ho.g[0][6][lane];
+        const scalar_t g0_7 = ho.g[0][7][lane];
+        const scalar_t g0_8 = ho.g[0][8][lane];
+        const scalar_t g1_0 = ho.g[1][0][lane];
+        const scalar_t g1_1 = ho.g[1][1][lane];
+        const scalar_t g1_2 = ho.g[1][2][lane];
+        const scalar_t g1_3 = ho.g[1][3][lane];
+        const scalar_t g1_4 = ho.g[1][4][lane];
+        const scalar_t g1_5 = ho.g[1][5][lane];
+        const scalar_t g1_6 = ho.g[1][6][lane];
+        const scalar_t g1_7 = ho.g[1][7][lane];
+        const scalar_t g1_8 = ho.g[1][8][lane];
+        const scalar_t g2_0 = ho.g[2][0][lane];
+        const scalar_t g2_1 = ho.g[2][1][lane];
+        const scalar_t g2_2 = ho.g[2][2][lane];
+        const scalar_t g2_3 = ho.g[2][3][lane];
+        const scalar_t g2_4 = ho.g[2][4][lane];
+        const scalar_t g2_5 = ho.g[2][5][lane];
+        const scalar_t g2_6 = ho.g[2][6][lane];
+        const scalar_t g2_7 = ho.g[2][7][lane];
+        const scalar_t g2_8 = ho.g[2][8][lane];
+        const scalar_t g3_0 = ho.g[3][0][lane];
+        const scalar_t g3_1 = ho.g[3][1][lane];
+        const scalar_t g3_2 = ho.g[3][2][lane];
+        const scalar_t g3_3 = ho.g[3][3][lane];
+        const scalar_t g3_4 = ho.g[3][4][lane];
+        const scalar_t g3_5 = ho.g[3][5][lane];
+        const scalar_t g3_6 = ho.g[3][6][lane];
+        const scalar_t g3_7 = ho.g[3][7][lane];
+        const scalar_t g3_8 = ho.g[3][8][lane];
+        const scalar_t g4_0 = ho.g[4][0][lane];
+        const scalar_t g4_1 = ho.g[4][1][lane];
+        const scalar_t g4_2 = ho.g[4][2][lane];
+        const scalar_t g4_3 = ho.g[4][3][lane];
+        const scalar_t g4_4 = ho.g[4][4][lane];
+        const scalar_t g4_5 = ho.g[4][5][lane];
+        const scalar_t g4_6 = ho.g[4][6][lane];
+        const scalar_t g4_7 = ho.g[4][7][lane];
+        const scalar_t g4_8 = ho.g[4][8][lane];
+        const scalar_t g5_0 = ho.g[5][0][lane];
+        const scalar_t g5_1 = ho.g[5][1][lane];
+        const scalar_t g5_2 = ho.g[5][2][lane];
+        const scalar_t g5_3 = ho.g[5][3][lane];
+        const scalar_t g5_4 = ho.g[5][4][lane];
+        const scalar_t g5_5 = ho.g[5][5][lane];
+        const scalar_t g5_6 = ho.g[5][6][lane];
+        const scalar_t g5_7 = ho.g[5][7][lane];
+        const scalar_t g5_8 = ho.g[5][8][lane];
+        const scalar_t g6_0 = ho.g[6][0][lane];
+        const scalar_t g6_1 = ho.g[6][1][lane];
+        const scalar_t g6_2 = ho.g[6][2][lane];
+        const scalar_t g6_3 = ho.g[6][3][lane];
+        const scalar_t g6_4 = ho.g[6][4][lane];
+        const scalar_t g6_5 = ho.g[6][5][lane];
+        const scalar_t g6_6 = ho.g[6][6][lane];
+        const scalar_t g6_7 = ho.g[6][7][lane];
+        const scalar_t g6_8 = ho.g[6][8][lane];
+        const scalar_t g7_0 = ho.g[7][0][lane];
+        const scalar_t g7_1 = ho.g[7][1][lane];
+        const scalar_t g7_2 = ho.g[7][2][lane];
+        const scalar_t g7_3 = ho.g[7][3][lane];
+        const scalar_t g7_4 = ho.g[7][4][lane];
+        const scalar_t g7_5 = ho.g[7][5][lane];
+        const scalar_t g7_6 = ho.g[7][6][lane];
+        const scalar_t g7_7 = ho.g[7][7][lane];
+        const scalar_t g7_8 = ho.g[7][8][lane];
+        const scalar_t rcoef0 = rc.coeff[0][lane];
+        const scalar_t rcoef1 = rc.coeff[1][lane];
+        const scalar_t rcoef2 = rc.coeff[2][lane];
+        const scalar_t rcoef3 = rc.coeff[3][lane];
+        const scalar_t rcoef4 = rc.coeff[4][lane];
+        const scalar_t rcoef5 = rc.coeff[5][lane];
+        const scalar_t rcoef6 = rc.coeff[6][lane];
+        const scalar_t rcoef7 = rc.coeff[7][lane];
+        const scalar_t rcoef8 = rc.coeff[8][lane];
+        const scalar_t rcoef9 = rc.coeff[9][lane];
+        const scalar_t rcoef10 = rc.coeff[10][lane];
+        const scalar_t rcoef11 = rc.coeff[11][lane];
+        const scalar_t pgx0 = rc.pgx[0][lane];
+        const scalar_t pgx1 = rc.pgx[1][lane];
+        const scalar_t pgx2 = rc.pgx[2][lane];
+        const scalar_t pgx3 = rc.pgx[3][lane];
+        const scalar_t pgx4 = rc.pgx[4][lane];
+        const scalar_t pgx5 = rc.pgx[5][lane];
+        const scalar_t pgx6 = rc.pgx[6][lane];
+        const scalar_t pgx7 = rc.pgx[7][lane];
+        const scalar_t pgy0 = rc.pgy[0][lane];
+        const scalar_t pgy1 = rc.pgy[1][lane];
+        const scalar_t pgy2 = rc.pgy[2][lane];
+        const scalar_t pgy3 = rc.pgy[3][lane];
+        const scalar_t pgy4 = rc.pgy[4][lane];
+        const scalar_t pgy5 = rc.pgy[5][lane];
+        const scalar_t pgy6 = rc.pgy[6][lane];
+        const scalar_t pgy7 = rc.pgy[7][lane];
+        const scalar_t pgz0 = rc.pgz[0][lane];
+        const scalar_t pgz1 = rc.pgz[1][lane];
+        const scalar_t pgz2 = rc.pgz[2][lane];
+        const scalar_t pgz3 = rc.pgz[3][lane];
+        const scalar_t pgz4 = rc.pgz[4][lane];
+        const scalar_t pgz5 = rc.pgz[5][lane];
+        const scalar_t pgz6 = rc.pgz[6][lane];
+        const scalar_t pgz7 = rc.pgz[7][lane];
+        const scalar_t mdot0 = -rcoef0*(-p0 + p1 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx1)*(-x0 + x1) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy1)*(-y0 + y1) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz1)*(-z0 + z1)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux1) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy1) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz1));
+        const scalar_t sgn0 = mdot0 > scalar_t(0) ? scalar_t(1) : (mdot0 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot1 = -rcoef1*(p2 - p3 - ((scalar_t(1) / scalar_t(2))*pgx2 + (scalar_t(1) / scalar_t(2))*pgx3)*(x2 - x3) - ((scalar_t(1) / scalar_t(2))*pgy2 + (scalar_t(1) / scalar_t(2))*pgy3)*(y2 - y3) - ((scalar_t(1) / scalar_t(2))*pgz2 + (scalar_t(1) / scalar_t(2))*pgz3)*(z2 - z3)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn1 = mdot1 > scalar_t(0) ? scalar_t(1) : (mdot1 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot2 = -rcoef2*(-p4 + p5 - ((scalar_t(1) / scalar_t(2))*pgx4 + (scalar_t(1) / scalar_t(2))*pgx5)*(-x4 + x5) - ((scalar_t(1) / scalar_t(2))*pgy4 + (scalar_t(1) / scalar_t(2))*pgy5)*(-y4 + y5) - ((scalar_t(1) / scalar_t(2))*pgz4 + (scalar_t(1) / scalar_t(2))*pgz5)*(-z4 + z5)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn2 = mdot2 > scalar_t(0) ? scalar_t(1) : (mdot2 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot3 = -rcoef3*(p6 - p7 - ((scalar_t(1) / scalar_t(2))*pgx6 + (scalar_t(1) / scalar_t(2))*pgx7)*(x6 - x7) - ((scalar_t(1) / scalar_t(2))*pgy6 + (scalar_t(1) / scalar_t(2))*pgy7)*(y6 - y7) - ((scalar_t(1) / scalar_t(2))*pgz6 + (scalar_t(1) / scalar_t(2))*pgz7)*(z6 - z7)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux6 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy6 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz6 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn3 = mdot3 > scalar_t(0) ? scalar_t(1) : (mdot3 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot4 = -rcoef4*(-p0 + p3 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx3)*(-x0 + x3) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy3)*(-y0 + y3) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz3)*(-z0 + z3)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn4 = mdot4 > scalar_t(0) ? scalar_t(1) : (mdot4 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot5 = -rcoef5*(-p1 + p2 - ((scalar_t(1) / scalar_t(2))*pgx1 + (scalar_t(1) / scalar_t(2))*pgx2)*(-x1 + x2) - ((scalar_t(1) / scalar_t(2))*pgy1 + (scalar_t(1) / scalar_t(2))*pgy2)*(-y1 + y2) - ((scalar_t(1) / scalar_t(2))*pgz1 + (scalar_t(1) / scalar_t(2))*pgz2)*(-z1 + z2)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux2) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy2) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz2));
+        const scalar_t sgn5 = mdot5 > scalar_t(0) ? scalar_t(1) : (mdot5 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot6 = -rcoef6*(-p4 + p7 - ((scalar_t(1) / scalar_t(2))*pgx4 + (scalar_t(1) / scalar_t(2))*pgx7)*(-x4 + x7) - ((scalar_t(1) / scalar_t(2))*pgy4 + (scalar_t(1) / scalar_t(2))*pgy7)*(-y4 + y7) - ((scalar_t(1) / scalar_t(2))*pgz4 + (scalar_t(1) / scalar_t(2))*pgz7)*(-z4 + z7)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn6 = mdot6 > scalar_t(0) ? scalar_t(1) : (mdot6 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot7 = -rcoef7*(-p5 + p6 - ((scalar_t(1) / scalar_t(2))*pgx5 + (scalar_t(1) / scalar_t(2))*pgx6)*(-x5 + x6) - ((scalar_t(1) / scalar_t(2))*pgy5 + (scalar_t(1) / scalar_t(2))*pgy6)*(-y5 + y6) - ((scalar_t(1) / scalar_t(2))*pgz5 + (scalar_t(1) / scalar_t(2))*pgz6)*(-z5 + z6)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux5 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy5 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz5 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn7 = mdot7 > scalar_t(0) ? scalar_t(1) : (mdot7 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot8 = -rcoef8*(-p0 + p4 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx4)*(-x0 + x4) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy4)*(-y0 + y4) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz4)*(-z0 + z4)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux4) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy4) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz4));
+        const scalar_t sgn8 = mdot8 > scalar_t(0) ? scalar_t(1) : (mdot8 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot9 = -rcoef9*(-p1 + p5 - ((scalar_t(1) / scalar_t(2))*pgx1 + (scalar_t(1) / scalar_t(2))*pgx5)*(-x1 + x5) - ((scalar_t(1) / scalar_t(2))*pgy1 + (scalar_t(1) / scalar_t(2))*pgy5)*(-y1 + y5) - ((scalar_t(1) / scalar_t(2))*pgz1 + (scalar_t(1) / scalar_t(2))*pgz5)*(-z1 + z5)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn9 = mdot9 > scalar_t(0) ? scalar_t(1) : (mdot9 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot10 = -rcoef10*(-p2 + p6 - ((scalar_t(1) / scalar_t(2))*pgx2 + (scalar_t(1) / scalar_t(2))*pgx6)*(-x2 + x6) - ((scalar_t(1) / scalar_t(2))*pgy2 + (scalar_t(1) / scalar_t(2))*pgy6)*(-y2 + y6) - ((scalar_t(1) / scalar_t(2))*pgz2 + (scalar_t(1) / scalar_t(2))*pgz6)*(-z2 + z6)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn10 = mdot10 > scalar_t(0) ? scalar_t(1) : (mdot10 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot11 = -rcoef11*(-p3 + p7 - ((scalar_t(1) / scalar_t(2))*pgx3 + (scalar_t(1) / scalar_t(2))*pgx7)*(-x3 + x7) - ((scalar_t(1) / scalar_t(2))*pgy3 + (scalar_t(1) / scalar_t(2))*pgy7)*(-y3 + y7) - ((scalar_t(1) / scalar_t(2))*pgz3 + (scalar_t(1) / scalar_t(2))*pgz7)*(-z3 + z7)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux3 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy3 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz3 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn11 = mdot11 > scalar_t(0) ? scalar_t(1) : (mdot11 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t x8 = -scalar_t(23)*x0;
+        const scalar_t x9 = scalar_t(3)*x3 + scalar_t(3)*x5;
+        const scalar_t x10 = x6 + x9;
+        const scalar_t x11 = x10 + x8;
+        const scalar_t x12 = scalar_t(9)*x4;
+        const scalar_t x13 = scalar_t(3)*x1 + scalar_t(3)*x7;
+        const scalar_t x14 = x13 + x2;
+        const scalar_t x15 = x12 + x14;
+        const scalar_t x16 = x11 + x15;
+        const scalar_t x17 = -scalar_t(23)*y0;
+        const scalar_t x18 = scalar_t(3)*y3 + scalar_t(3)*y5;
+        const scalar_t x19 = x18 + y6;
+        const scalar_t x20 = x17 + x19;
+        const scalar_t x21 = scalar_t(9)*y4;
+        const scalar_t x22 = scalar_t(3)*y1 + scalar_t(3)*y7;
+        const scalar_t x23 = x22 + y2;
+        const scalar_t x24 = x21 + x23;
+        const scalar_t x25 = x20 + x24;
+        const scalar_t x26 = -scalar_t(23)*z0;
+        const scalar_t x27 = scalar_t(3)*z3 + scalar_t(3)*z5;
+        const scalar_t x28 = x27 + z6;
+        const scalar_t x29 = x26 + x28;
+        const scalar_t x30 = scalar_t(9)*z4;
+        const scalar_t x31 = scalar_t(3)*z1 + scalar_t(3)*z7;
+        const scalar_t x32 = x31 + z2;
+        const scalar_t x33 = x30 + x32;
+        const scalar_t x34 = x29 + x33;
+        const scalar_t x35 = ux0 + ux4;
+        const scalar_t x36 = uy0 + uy4;
+        const scalar_t x37 = uz0 + uz4;
+        const scalar_t x38 = rho*(cof6*x35 + cof7*x36 + cof8*x37);
+        const scalar_t x39 = scalar_t(2)*p0;
+        const scalar_t x40 = -x39;
+        const scalar_t x41 = scalar_t(2)*p4;
+        const scalar_t x42 = pgx0 + pgx4;
+        const scalar_t x43 = x0 - x4;
+        const scalar_t x44 = pgy0 + pgy4;
+        const scalar_t x45 = y0 - y4;
+        const scalar_t x46 = pgz0 + pgz4;
+        const scalar_t x47 = z0 - z4;
+        const scalar_t x48 = scalar_t(4)*rcoef8;
+        const scalar_t x49 = -x41;
+        const scalar_t x50 = x39 - x42*x43 - x44*x45 - x46*x47 + x49;
+        const scalar_t x51 = x48*x50;
+        const scalar_t x52 = x38 + x51;
+        const scalar_t x53 = sgn8*x52 + x38 + x48*(-x40 - x41 - x42*x43 - x44*x45 - x46*x47);
+        const scalar_t x54 = x53*(g0_0*x16 + g0_1*x25 + g0_2*x34);
+        const scalar_t x55 = scalar_t(9)*x3;
+        const scalar_t x56 = x13 + x5;
+        const scalar_t x57 = x55 + x56;
+        const scalar_t x58 = scalar_t(3)*x2 + scalar_t(3)*x4;
+        const scalar_t x59 = x58 + x6;
+        const scalar_t x60 = x57 + x59 + x8;
+        const scalar_t x61 = scalar_t(9)*y3;
+        const scalar_t x62 = x22 + y5;
+        const scalar_t x63 = x61 + x62;
+        const scalar_t x64 = scalar_t(3)*y2 + scalar_t(3)*y4;
+        const scalar_t x65 = x64 + y6;
+        const scalar_t x66 = x17 + x63 + x65;
+        const scalar_t x67 = scalar_t(9)*z3;
+        const scalar_t x68 = x31 + z5;
+        const scalar_t x69 = x67 + x68;
+        const scalar_t x70 = scalar_t(3)*z2 + scalar_t(3)*z4;
+        const scalar_t x71 = x70 + z6;
+        const scalar_t x72 = x26 + x69 + x71;
+        const scalar_t x73 = ux0 + ux3;
+        const scalar_t x74 = uy0 + uy3;
+        const scalar_t x75 = uz0 + uz3;
+        const scalar_t x76 = rho*(cof3*x73 + cof4*x74 + cof5*x75);
+        const scalar_t x77 = scalar_t(2)*p3;
+        const scalar_t x78 = pgx0 + pgx3;
+        const scalar_t x79 = -x3;
+        const scalar_t x80 = x0 + x79;
+        const scalar_t x81 = pgy0 + pgy3;
+        const scalar_t x82 = -y3;
+        const scalar_t x83 = x82 + y0;
+        const scalar_t x84 = pgz0 + pgz3;
+        const scalar_t x85 = -z3;
+        const scalar_t x86 = x85 + z0;
+        const scalar_t x87 = scalar_t(4)*rcoef4;
+        const scalar_t x88 = -x77;
+        const scalar_t x89 = x39 - x78*x80 - x81*x83 - x84*x86 + x88;
+        const scalar_t x90 = x87*x89;
+        const scalar_t x91 = x76 + x90;
+        const scalar_t x92 = sgn4*x91 + x76 + x87*(-x40 - x77 - x78*x80 - x81*x83 - x84*x86);
+        const scalar_t x93 = x92*(g0_0*x60 + g0_1*x66 + g0_2*x72);
+        const scalar_t x94 = scalar_t(9)*x1;
+        const scalar_t x95 = x58 + x7;
+        const scalar_t x96 = x94 + x95;
+        const scalar_t x97 = x11 + x96;
+        const scalar_t x98 = scalar_t(9)*y1;
+        const scalar_t x99 = x64 + y7;
+        const scalar_t x100 = x98 + x99;
+        const scalar_t x101 = x100 + x20;
+        const scalar_t x102 = scalar_t(9)*z1;
+        const scalar_t x103 = x70 + z7;
+        const scalar_t x104 = x102 + x103;
+        const scalar_t x105 = x104 + x29;
+        const scalar_t x106 = g0_0*x97 + g0_1*x101 + g0_2*x105;
+        const scalar_t x107 = rho*(cof0*(ux0 + ux1) + cof1*(uy0 + uy1) + cof2*(uz0 + uz1));
+        const scalar_t x108 = scalar_t(2)*p1;
+        const scalar_t x109 = pgx0 + pgx1;
+        const scalar_t x110 = x0 - x1;
+        const scalar_t x111 = pgy0 + pgy1;
+        const scalar_t x112 = y0 - y1;
+        const scalar_t x113 = pgz0 + pgz1;
+        const scalar_t x114 = z0 - z1;
+        const scalar_t x115 = scalar_t(4)*rcoef0;
+        const scalar_t x116 = x115*(-x108 - x109*x110 - x111*x112 - x113*x114 - x40);
+        const scalar_t x117 = -x108;
+        const scalar_t x118 = -x109*x110 - x111*x112 - x113*x114 + x117 + x39;
+        const scalar_t x119 = x107 + x115*x118;
+        const scalar_t x120 = sgn0*x119 + x107 + x116;
+        const scalar_t x121 = scalar_t(9)*x0;
+        const scalar_t x122 = x10 + x121;
+        const scalar_t x123 = -scalar_t(23)*x1;
+        const scalar_t x124 = x123 + x95;
+        const scalar_t x125 = x122 + x124;
+        const scalar_t x126 = scalar_t(9)*y0;
+        const scalar_t x127 = x126 + x19;
+        const scalar_t x128 = -scalar_t(23)*y1;
+        const scalar_t x129 = x128 + x99;
+        const scalar_t x130 = x127 + x129;
+        const scalar_t x131 = scalar_t(9)*z0;
+        const scalar_t x132 = x131 + x28;
+        const scalar_t x133 = -scalar_t(23)*z1;
+        const scalar_t x134 = x103 + x133;
+        const scalar_t x135 = x132 + x134;
+        const scalar_t x136 = g1_0*x125 + g1_1*x130 + g1_2*x135;
+        const scalar_t x137 = -x107;
+        const scalar_t x138 = -x115*x118 + x137;
+        const scalar_t x139 = sgn0*x138;
+        const scalar_t x140 = x119 + x139;
+        const scalar_t x141 = -scalar_t(23)*x3;
+        const scalar_t x142 = x141 + x56;
+        const scalar_t x143 = x121 + x142 + x59;
+        const scalar_t x144 = -scalar_t(23)*y3;
+        const scalar_t x145 = x144 + x62;
+        const scalar_t x146 = x126 + x145 + x65;
+        const scalar_t x147 = -scalar_t(23)*z3;
+        const scalar_t x148 = x147 + x68;
+        const scalar_t x149 = x131 + x148 + x71;
+        const scalar_t x150 = -x76;
+        const scalar_t x151 = sgn4*(x150 - x87*x89) + x91;
+        const scalar_t x152 = x151*(g3_0*x143 + g3_1*x146 + g3_2*x149);
+        const scalar_t x153 = -scalar_t(23)*x4;
+        const scalar_t x154 = x14 + x153;
+        const scalar_t x155 = x122 + x154;
+        const scalar_t x156 = -scalar_t(23)*y4;
+        const scalar_t x157 = x156 + x23;
+        const scalar_t x158 = x127 + x157;
+        const scalar_t x159 = -scalar_t(23)*z4;
+        const scalar_t x160 = x159 + x32;
+        const scalar_t x161 = x132 + x160;
+        const scalar_t x162 = -x38;
+        const scalar_t x163 = sgn8*(x162 - x48*x50) + x52;
+        const scalar_t x164 = x163*(g4_0*x155 + g4_1*x158 + g4_2*x161);
+        const scalar_t x165 = scalar_t(32)*ux0;
+        const scalar_t x166 = x165*x92;
+        const scalar_t x167 = x165*x53;
+        const scalar_t x168 = scalar_t(32)*x140;
+        const scalar_t x169 = scalar_t(32)*x151;
+        const scalar_t x170 = ux3*x169;
+        const scalar_t x171 = scalar_t(32)*x163;
+        const scalar_t x172 = ux4*x171;
+        const scalar_t x173 = scalar_t(64)*p0 + scalar_t(64)*p1;
+        const scalar_t x174 = cof0*x173;
+        const scalar_t x175 = scalar_t(64)*p0 + scalar_t(64)*p3;
+        const scalar_t x176 = cof3*x175;
+        const scalar_t x177 = scalar_t(64)*p0 + scalar_t(64)*p4;
+        const scalar_t x178 = cof6*x177;
+        const scalar_t x179 = ux3 + ux7;
+        const scalar_t x180 = -ux6;
+        const scalar_t x181 = -ux5 + x180;
+        const scalar_t x182 = -ux2 + x35;
+        const scalar_t x183 = -ux1 + x179 + x181 + x182;
+        const scalar_t x184 = -ux7;
+        const scalar_t x185 = ux1 + ux5;
+        const scalar_t x186 = -ux3 + x180 + x182 + x184 + x185;
+        const scalar_t x187 = ux1 + ux2;
+        const scalar_t x188 = -ux4 + x181 + x184 + x187 + x73;
+        const scalar_t x189 = scalar_t(2)*cof0*x183 + scalar_t(2)*cof3*x186 + scalar_t(2)*cof6*x188;
+        const scalar_t x190 = uy3 + uy7;
+        const scalar_t x191 = -uy6;
+        const scalar_t x192 = -uy5 + x191;
+        const scalar_t x193 = -uy2 + x36;
+        const scalar_t x194 = -uy1 + x190 + x192 + x193;
+        const scalar_t x195 = -uy7;
+        const scalar_t x196 = uy1 + uy5;
+        const scalar_t x197 = -uy3 + x191 + x193 + x195 + x196;
+        const scalar_t x198 = uy1 + uy2;
+        const scalar_t x199 = -uy4 + x192 + x195 + x198 + x74;
+        const scalar_t x200 = cof0*x194 + cof1*x183 + cof3*x197 + cof4*x186 + cof6*x199 + cof7*x188;
+        const scalar_t x201 = uz3 + uz7;
+        const scalar_t x202 = -uz6;
+        const scalar_t x203 = -uz5 + x202;
+        const scalar_t x204 = -uz2 + x37;
+        const scalar_t x205 = -uz1 + x201 + x203 + x204;
+        const scalar_t x206 = -uz7;
+        const scalar_t x207 = uz1 + uz5;
+        const scalar_t x208 = -uz3 + x202 + x204 + x206 + x207;
+        const scalar_t x209 = uz1 + uz2;
+        const scalar_t x210 = -uz4 + x203 + x206 + x209 + x75;
+        const scalar_t x211 = cof0*x205 + cof2*x183 + cof3*x208 + cof5*x186 + cof6*x210 + cof8*x188;
+        const scalar_t x212 = scalar_t(32)*mu/det;
+        const scalar_t x213 = x212*(cof0*x189 + cof1*x200 + cof2*x211);
+        const scalar_t x214 = x212*(cof3*x189 + cof4*x200 + cof5*x211);
+        const scalar_t x215 = x212*(cof6*x189 + cof7*x200 + cof8*x211);
+        const scalar_t x216 = x214 + x215;
+        const scalar_t x217 = x213 + x216;
+        const scalar_t x218 = x53*(g0_3*x16 + g0_4*x25 + g0_5*x34);
+        const scalar_t x219 = x92*(g0_3*x60 + g0_4*x66 + g0_5*x72);
+        const scalar_t x220 = g0_3*x97 + g0_4*x101 + g0_5*x105;
+        const scalar_t x221 = g1_3*x125 + g1_4*x130 + g1_5*x135;
+        const scalar_t x222 = x151*(g3_3*x143 + g3_4*x146 + g3_5*x149);
+        const scalar_t x223 = x163*(g4_3*x155 + g4_4*x158 + g4_5*x161);
+        const scalar_t x224 = scalar_t(32)*uy0;
+        const scalar_t x225 = x224*x92;
+        const scalar_t x226 = x224*x53;
+        const scalar_t x227 = uy3*x169;
+        const scalar_t x228 = uy4*x171;
+        const scalar_t x229 = cof1*x173;
+        const scalar_t x230 = cof4*x175;
+        const scalar_t x231 = cof7*x177;
+        const scalar_t x232 = scalar_t(2)*cof1*x194 + scalar_t(2)*cof4*x197 + scalar_t(2)*cof7*x199;
+        const scalar_t x233 = cof1*x205 + cof2*x194 + cof4*x208 + cof5*x197 + cof7*x210 + cof8*x199;
+        const scalar_t x234 = x212*(cof0*x200 + cof1*x232 + cof2*x233);
+        const scalar_t x235 = x212*(cof3*x200 + cof4*x232 + cof5*x233);
+        const scalar_t x236 = x212*(cof6*x200 + cof7*x232 + cof8*x233);
+        const scalar_t x237 = x235 + x236;
+        const scalar_t x238 = x234 + x237;
+        const scalar_t x239 = x53*(g0_6*x16 + g0_7*x25 + g0_8*x34);
+        const scalar_t x240 = x92*(g0_6*x60 + g0_7*x66 + g0_8*x72);
+        const scalar_t x241 = g0_6*x97 + g0_7*x101 + g0_8*x105;
+        const scalar_t x242 = g1_6*x125 + g1_7*x130 + g1_8*x135;
+        const scalar_t x243 = x151*(g3_6*x143 + g3_7*x146 + g3_8*x149);
+        const scalar_t x244 = x163*(g4_6*x155 + g4_7*x158 + g4_8*x161);
+        const scalar_t x245 = scalar_t(32)*uz0;
+        const scalar_t x246 = x245*x92;
+        const scalar_t x247 = x245*x53;
+        const scalar_t x248 = uz3*x169;
+        const scalar_t x249 = uz4*x171;
+        const scalar_t x250 = cof2*x173;
+        const scalar_t x251 = cof5*x175;
+        const scalar_t x252 = cof8*x177;
+        const scalar_t x253 = scalar_t(2)*cof2*x205 + scalar_t(2)*cof5*x208 + scalar_t(2)*cof8*x210;
+        const scalar_t x254 = x212*(cof0*x211 + cof1*x233 + cof2*x253);
+        const scalar_t x255 = x212*(cof3*x211 + cof4*x233 + cof5*x253);
+        const scalar_t x256 = x212*(cof6*x211 + cof7*x233 + cof8*x253);
+        const scalar_t x257 = x255 + x256;
+        const scalar_t x258 = x254 + x257;
+        const scalar_t x259 = -sgn0*x138 + x138;
+        const scalar_t x260 = x119 - x139;
+        const scalar_t x261 = scalar_t(32)*ux1;
+        const scalar_t x262 = -x213 + x216;
+        const scalar_t x263 = scalar_t(9)*x2;
+        const scalar_t x264 = scalar_t(3)*x0 + scalar_t(3)*x6;
+        const scalar_t x265 = x263 + x264;
+        const scalar_t x266 = x4 + x9;
+        const scalar_t x267 = x266 + x7;
+        const scalar_t x268 = x123 + x265 + x267;
+        const scalar_t x269 = scalar_t(9)*y2;
+        const scalar_t x270 = scalar_t(3)*y0 + scalar_t(3)*y6;
+        const scalar_t x271 = x269 + x270;
+        const scalar_t x272 = x18 + y4;
+        const scalar_t x273 = x272 + y7;
+        const scalar_t x274 = x128 + x271 + x273;
+        const scalar_t x275 = scalar_t(9)*z2;
+        const scalar_t x276 = scalar_t(3)*z0 + scalar_t(3)*z6;
+        const scalar_t x277 = x275 + x276;
+        const scalar_t x278 = x27 + z4;
+        const scalar_t x279 = x278 + z7;
+        const scalar_t x280 = x133 + x277 + x279;
+        const scalar_t x281 = rho*(cof3*x187 + cof4*x198 + cof5*x209);
+        const scalar_t x282 = scalar_t(2)*p2;
+        const scalar_t x283 = -x282;
+        const scalar_t x284 = pgx1 + pgx2;
+        const scalar_t x285 = x1 - x2;
+        const scalar_t x286 = pgy1 + pgy2;
+        const scalar_t x287 = y1 - y2;
+        const scalar_t x288 = pgz1 + pgz2;
+        const scalar_t x289 = z1 - z2;
+        const scalar_t x290 = x108 + x283 - x284*x285 - x286*x287 - x288*x289;
+        const scalar_t x291 = scalar_t(4)*rcoef5;
+        const scalar_t x292 = -x281 - x290*x291;
+        const scalar_t x293 = x281 + x290*x291;
+        const scalar_t x294 = -sgn5*x292 + x293;
+        const scalar_t x295 = -scalar_t(23)*x2;
+        const scalar_t x296 = x264 + x295;
+        const scalar_t x297 = x267 + x296 + x94;
+        const scalar_t x298 = -scalar_t(23)*y2;
+        const scalar_t x299 = x270 + x298;
+        const scalar_t x300 = x273 + x299 + x98;
+        const scalar_t x301 = -scalar_t(23)*z2;
+        const scalar_t x302 = x276 + x301;
+        const scalar_t x303 = x102 + x279 + x302;
+        const scalar_t x304 = -sgn5*x292 + x292;
+        const scalar_t x305 = scalar_t(32)*x304;
+        const scalar_t x306 = scalar_t(64)*p1 + scalar_t(64)*p2;
+        const scalar_t x307 = cof3*x306 - ux2*x305 + x261*x294 + x294*(g1_0*x268 + g1_1*x274 + g1_2*x280) - x304*(g2_0*x297 + g2_1*x300 + g2_2*x303);
+        const scalar_t x308 = x3 + scalar_t(9)*x5;
+        const scalar_t x309 = x264 + x308;
+        const scalar_t x310 = x124 + x309;
+        const scalar_t x311 = y3 + scalar_t(9)*y5;
+        const scalar_t x312 = x270 + x311;
+        const scalar_t x313 = x129 + x312;
+        const scalar_t x314 = z3 + scalar_t(9)*z5;
+        const scalar_t x315 = x276 + x314;
+        const scalar_t x316 = x134 + x315;
+        const scalar_t x317 = rho*(cof6*x185 + cof7*x196 + cof8*x207);
+        const scalar_t x318 = scalar_t(2)*p5;
+        const scalar_t x319 = -x318;
+        const scalar_t x320 = pgx1 + pgx5;
+        const scalar_t x321 = -x5;
+        const scalar_t x322 = x1 + x321;
+        const scalar_t x323 = pgy1 + pgy5;
+        const scalar_t x324 = -y5;
+        const scalar_t x325 = x324 + y1;
+        const scalar_t x326 = pgz1 + pgz5;
+        const scalar_t x327 = -z5;
+        const scalar_t x328 = x327 + z1;
+        const scalar_t x329 = x108 + x319 - x320*x322 - x323*x325 - x326*x328;
+        const scalar_t x330 = scalar_t(4)*rcoef9;
+        const scalar_t x331 = -x317 - x329*x330;
+        const scalar_t x332 = x317 + x329*x330;
+        const scalar_t x333 = -sgn9*x331 + x332;
+        const scalar_t x334 = x3 - scalar_t(23)*x5;
+        const scalar_t x335 = x264 + x334;
+        const scalar_t x336 = x335 + x96;
+        const scalar_t x337 = y3 - scalar_t(23)*y5;
+        const scalar_t x338 = x270 + x337;
+        const scalar_t x339 = x100 + x338;
+        const scalar_t x340 = z3 - scalar_t(23)*z5;
+        const scalar_t x341 = x276 + x340;
+        const scalar_t x342 = x104 + x341;
+        const scalar_t x343 = -sgn9*x331 + x331;
+        const scalar_t x344 = scalar_t(32)*x343;
+        const scalar_t x345 = scalar_t(64)*p1 + scalar_t(64)*p5;
+        const scalar_t x346 = cof6*x345 - ux5*x344 + x261*x333 + x333*(g1_0*x310 + g1_1*x313 + g1_2*x316) - x343*(g5_0*x336 + g5_1*x339 + g5_2*x342);
+        const scalar_t x347 = scalar_t(32)*uy1;
+        const scalar_t x348 = -x234 + x237;
+        const scalar_t x349 = cof4*x306 - uy2*x305 + x294*x347 + x294*(g1_3*x268 + g1_4*x274 + g1_5*x280) - x304*(g2_3*x297 + g2_4*x300 + g2_5*x303);
+        const scalar_t x350 = cof7*x345 - uy5*x344 + x333*x347 + x333*(g1_3*x310 + g1_4*x313 + g1_5*x316) - x343*(g5_3*x336 + g5_4*x339 + g5_5*x342);
+        const scalar_t x351 = scalar_t(32)*uz1;
+        const scalar_t x352 = -x254 + x257;
+        const scalar_t x353 = cof5*x306 - uz2*x305 + x294*x351 + x294*(g1_6*x268 + g1_7*x274 + g1_8*x280) - x304*(g2_6*x297 + g2_7*x300 + g2_8*x303);
+        const scalar_t x354 = cof8*x345 - uz5*x344 + x333*x351 + x333*(g1_6*x310 + g1_7*x313 + g1_8*x316) - x343*(g5_6*x336 + g5_7*x339 + g5_8*x342);
+        const scalar_t x355 = x142 + x265 + x4;
+        const scalar_t x356 = x145 + x271 + y4;
+        const scalar_t x357 = x148 + x277 + z4;
+        const scalar_t x358 = g3_0*x355 + g3_1*x356 + g3_2*x357;
+        const scalar_t x359 = rho*(cof0*(ux2 + ux3) + cof1*(uy2 + uy3) + cof2*(uz2 + uz3));
+        const scalar_t x360 = x283 + x77 + (pgx2 + pgx3)*(x2 + x79) + (pgy2 + pgy3)*(x82 + y2) + (pgz2 + pgz3)*(x85 + z2);
+        const scalar_t x361 = scalar_t(4)*rcoef1;
+        const scalar_t x362 = -x359 - x360*x361;
+        const scalar_t x363 = sgn1*x362;
+        const scalar_t x364 = x359 + x360*x361;
+        const scalar_t x365 = -x363 + x364;
+        const scalar_t x366 = -scalar_t(23)*x6;
+        const scalar_t x367 = x0 + x13;
+        const scalar_t x368 = x266 + x367;
+        const scalar_t x369 = x263 + x366 + x368;
+        const scalar_t x370 = -scalar_t(23)*y6;
+        const scalar_t x371 = x22 + y0;
+        const scalar_t x372 = x272 + x371;
+        const scalar_t x373 = x269 + x370 + x372;
+        const scalar_t x374 = -scalar_t(23)*z6;
+        const scalar_t x375 = x31 + z0;
+        const scalar_t x376 = x278 + x375;
+        const scalar_t x377 = x275 + x374 + x376;
+        const scalar_t x378 = rho*(cof6*(ux2 + ux6) + cof7*(uy2 + uy6) + cof8*(uz2 + uz6));
+        const scalar_t x379 = -x378;
+        const scalar_t x380 = -scalar_t(2)*p6;
+        const scalar_t x381 = -x6;
+        const scalar_t x382 = -y6;
+        const scalar_t x383 = -z6;
+        const scalar_t x384 = x282 + x380 + (pgx2 + pgx6)*(-x2 - x381) + (pgy2 + pgy6)*(-x382 - y2) + (pgz2 + pgz6)*(-x383 - z2);
+        const scalar_t x385 = scalar_t(4)*rcoef10;
+        const scalar_t x386 = x379 - x384*x385;
+        const scalar_t x387 = -sgn10*x386 + x386;
+        const scalar_t x388 = x387*(g6_0*x369 + g6_1*x373 + g6_2*x377);
+        const scalar_t x389 = scalar_t(9)*x6;
+        const scalar_t x390 = x295 + x368 + x389;
+        const scalar_t x391 = scalar_t(9)*y6;
+        const scalar_t x392 = x298 + x372 + x391;
+        const scalar_t x393 = scalar_t(9)*z6;
+        const scalar_t x394 = x301 + x376 + x393;
+        const scalar_t x395 = x378 + x384*x385;
+        const scalar_t x396 = -sgn10*x386 + x395;
+        const scalar_t x397 = x396*(g2_0*x390 + g2_1*x392 + g2_2*x394);
+        const scalar_t x398 = x296 + x4 + x57;
+        const scalar_t x399 = x299 + x63 + y4;
+        const scalar_t x400 = x302 + x69 + z4;
+        const scalar_t x401 = g2_0*x398 + g2_1*x399 + g2_2*x400;
+        const scalar_t x402 = -sgn1*x362 + x362;
+        const scalar_t x403 = scalar_t(64)*p2 + scalar_t(64)*p6;
+        const scalar_t x404 = cof6*x403;
+        const scalar_t x405 = scalar_t(32)*ux2;
+        const scalar_t x406 = x396*x405;
+        const scalar_t x407 = scalar_t(32)*x365;
+        const scalar_t x408 = scalar_t(32)*x387;
+        const scalar_t x409 = ux6*x408;
+        const scalar_t x410 = scalar_t(64)*p2 + scalar_t(64)*p3;
+        const scalar_t x411 = cof0*x410 + x213;
+        const scalar_t x412 = x214 - x215;
+        const scalar_t x413 = g3_3*x355 + g3_4*x356 + g3_5*x357;
+        const scalar_t x414 = x387*(g6_3*x369 + g6_4*x373 + g6_5*x377);
+        const scalar_t x415 = x396*(g2_3*x390 + g2_4*x392 + g2_5*x394);
+        const scalar_t x416 = g2_3*x398 + g2_4*x399 + g2_5*x400;
+        const scalar_t x417 = cof7*x403;
+        const scalar_t x418 = scalar_t(32)*uy2;
+        const scalar_t x419 = x396*x418;
+        const scalar_t x420 = uy6*x408;
+        const scalar_t x421 = cof1*x410 + x234;
+        const scalar_t x422 = x235 - x236;
+        const scalar_t x423 = g3_6*x355 + g3_7*x356 + g3_8*x357;
+        const scalar_t x424 = x387*(g6_6*x369 + g6_7*x373 + g6_8*x377);
+        const scalar_t x425 = x396*(g2_6*x390 + g2_7*x392 + g2_8*x394);
+        const scalar_t x426 = g2_6*x398 + g2_7*x399 + g2_8*x400;
+        const scalar_t x427 = cof8*x403;
+        const scalar_t x428 = scalar_t(32)*uz2;
+        const scalar_t x429 = x396*x428;
+        const scalar_t x430 = uz6*x408;
+        const scalar_t x431 = cof2*x410 + x254;
+        const scalar_t x432 = x255 - x256;
+        const scalar_t x433 = x363 + x364;
+        const scalar_t x434 = scalar_t(9)*x7;
+        const scalar_t x435 = x1 + x264;
+        const scalar_t x436 = x434 + x435;
+        const scalar_t x437 = x5 + x58;
+        const scalar_t x438 = x141 + x436 + x437;
+        const scalar_t x439 = scalar_t(9)*y7;
+        const scalar_t x440 = x270 + y1;
+        const scalar_t x441 = x439 + x440;
+        const scalar_t x442 = x64 + y5;
+        const scalar_t x443 = x144 + x441 + x442;
+        const scalar_t x444 = scalar_t(9)*z7;
+        const scalar_t x445 = x276 + z1;
+        const scalar_t x446 = x444 + x445;
+        const scalar_t x447 = x70 + z5;
+        const scalar_t x448 = x147 + x446 + x447;
+        const scalar_t x449 = g3_0*x438 + g3_1*x443 + g3_2*x448;
+        const scalar_t x450 = rho*(cof6*x179 + cof7*x190 + cof8*x201);
+        const scalar_t x451 = scalar_t(2)*p7;
+        const scalar_t x452 = pgx3 + pgx7;
+        const scalar_t x453 = -x7;
+        const scalar_t x454 = x3 + x453;
+        const scalar_t x455 = pgy3 + pgy7;
+        const scalar_t x456 = -y7;
+        const scalar_t x457 = x456 + y3;
+        const scalar_t x458 = pgz3 + pgz7;
+        const scalar_t x459 = -z7;
+        const scalar_t x460 = x459 + z3;
+        const scalar_t x461 = scalar_t(4)*rcoef11;
+        const scalar_t x462 = -x451;
+        const scalar_t x463 = -x452*x454 - x455*x457 - x458*x460 + x462 + x77;
+        const scalar_t x464 = x450 + x461*x463;
+        const scalar_t x465 = sgn11*x464 + x450 + x461*(-x451 - x452*x454 - x455*x457 - x458*x460 - x88);
+        const scalar_t x466 = sgn1*x364 + x364;
+        const scalar_t x467 = -scalar_t(23)*x7;
+        const scalar_t x468 = x435 + x467;
+        const scalar_t x469 = x437 + x468 + x55;
+        const scalar_t x470 = -scalar_t(23)*y7;
+        const scalar_t x471 = x440 + x470;
+        const scalar_t x472 = x442 + x471 + x61;
+        const scalar_t x473 = -scalar_t(23)*z7;
+        const scalar_t x474 = x445 + x473;
+        const scalar_t x475 = x447 + x474 + x67;
+        const scalar_t x476 = g7_0*x469 + g7_1*x472 + g7_2*x475;
+        const scalar_t x477 = -x450 - x461*x463;
+        const scalar_t x478 = sgn11*x477;
+        const scalar_t x479 = x464 + x478;
+        const scalar_t x480 = scalar_t(32)*ux3;
+        const scalar_t x481 = scalar_t(32)*x479;
+        const scalar_t x482 = scalar_t(64)*p3 + scalar_t(64)*p7;
+        const scalar_t x483 = cof6*x482;
+        const scalar_t x484 = -x214 + x215;
+        const scalar_t x485 = g3_3*x438 + g3_4*x443 + g3_5*x448;
+        const scalar_t x486 = g7_3*x469 + g7_4*x472 + g7_5*x475;
+        const scalar_t x487 = scalar_t(32)*uy3;
+        const scalar_t x488 = cof7*x482;
+        const scalar_t x489 = -x235 + x236;
+        const scalar_t x490 = g3_6*x438 + g3_7*x443 + g3_8*x448;
+        const scalar_t x491 = g7_6*x469 + g7_7*x472 + g7_8*x475;
+        const scalar_t x492 = scalar_t(32)*uz3;
+        const scalar_t x493 = cof8*x482;
+        const scalar_t x494 = -x255 + x256;
+        const scalar_t x495 = x2 + x9;
+        const scalar_t x496 = x153 + x436 + x495;
+        const scalar_t x497 = x18 + y2;
+        const scalar_t x498 = x156 + x441 + x497;
+        const scalar_t x499 = x27 + z2;
+        const scalar_t x500 = x159 + x446 + x499;
+        const scalar_t x501 = g4_0*x496 + g4_1*x498 + g4_2*x500;
+        const scalar_t x502 = rho*(cof3*(ux4 + ux7) + cof4*(uy4 + uy7) + cof5*(uz4 + uz7));
+        const scalar_t x503 = pgx4 + pgx7;
+        const scalar_t x504 = x4 + x453;
+        const scalar_t x505 = pgy4 + pgy7;
+        const scalar_t x506 = x456 + y4;
+        const scalar_t x507 = pgz4 + pgz7;
+        const scalar_t x508 = x459 + z4;
+        const scalar_t x509 = scalar_t(4)*rcoef6;
+        const scalar_t x510 = x41 + x462 - x503*x504 - x505*x506 - x507*x508;
+        const scalar_t x511 = x502 + x509*x510;
+        const scalar_t x512 = sgn6*x511 + x502 + x509*(-x451 - x49 - x503*x504 - x505*x506 - x507*x508);
+        const scalar_t x513 = x154 + x309;
+        const scalar_t x514 = x157 + x312;
+        const scalar_t x515 = x160 + x315;
+        const scalar_t x516 = g4_0*x513 + g4_1*x514 + g4_2*x515;
+        const scalar_t x517 = rho*(cof0*(ux4 + ux5) + cof1*(uy4 + uy5) + cof2*(uz4 + uz5));
+        const scalar_t x518 = pgx4 + pgx5;
+        const scalar_t x519 = x321 + x4;
+        const scalar_t x520 = pgy4 + pgy5;
+        const scalar_t x521 = x324 + y4;
+        const scalar_t x522 = pgz4 + pgz5;
+        const scalar_t x523 = x327 + z4;
+        const scalar_t x524 = scalar_t(4)*rcoef2;
+        const scalar_t x525 = x319 + x41 - x518*x519 - x520*x521 - x522*x523;
+        const scalar_t x526 = x517 + x524*x525;
+        const scalar_t x527 = sgn2*x526 + x517 + x524*(-x318 - x49 - x518*x519 - x520*x521 - x522*x523);
+        const scalar_t x528 = x15 + x335;
+        const scalar_t x529 = x24 + x338;
+        const scalar_t x530 = x33 + x341;
+        const scalar_t x531 = g5_0*x528 + g5_1*x529 + g5_2*x530;
+        const scalar_t x532 = -x517 - x524*x525;
+        const scalar_t x533 = sgn2*x532;
+        const scalar_t x534 = x526 + x533;
+        const scalar_t x535 = x12 + x468 + x495;
+        const scalar_t x536 = x21 + x471 + x497;
+        const scalar_t x537 = x30 + x474 + x499;
+        const scalar_t x538 = g7_0*x535 + g7_1*x536 + g7_2*x537;
+        const scalar_t x539 = -x502 - x509*x510;
+        const scalar_t x540 = sgn6*x539;
+        const scalar_t x541 = x511 + x540;
+        const scalar_t x542 = scalar_t(32)*ux4;
+        const scalar_t x543 = scalar_t(32)*x534;
+        const scalar_t x544 = scalar_t(32)*x541;
+        const scalar_t x545 = scalar_t(64)*p4 + scalar_t(64)*p7;
+        const scalar_t x546 = cof3*x545;
+        const scalar_t x547 = scalar_t(64)*p4 + scalar_t(64)*p5;
+        const scalar_t x548 = cof0*x547 + x213;
+        const scalar_t x549 = g4_3*x496 + g4_4*x498 + g4_5*x500;
+        const scalar_t x550 = g4_3*x513 + g4_4*x514 + g4_5*x515;
+        const scalar_t x551 = g5_3*x528 + g5_4*x529 + g5_5*x530;
+        const scalar_t x552 = g7_3*x535 + g7_4*x536 + g7_5*x537;
+        const scalar_t x553 = scalar_t(32)*uy4;
+        const scalar_t x554 = cof4*x545;
+        const scalar_t x555 = cof1*x547 + x234;
+        const scalar_t x556 = g4_6*x496 + g4_7*x498 + g4_8*x500;
+        const scalar_t x557 = g4_6*x513 + g4_7*x514 + g4_8*x515;
+        const scalar_t x558 = g5_6*x528 + g5_7*x529 + g5_8*x530;
+        const scalar_t x559 = g7_6*x535 + g7_7*x536 + g7_8*x537;
+        const scalar_t x560 = scalar_t(32)*uz4;
+        const scalar_t x561 = cof5*x545;
+        const scalar_t x562 = cof2*x547 + x254;
+        const scalar_t x563 = x526 - x533;
+        const scalar_t x564 = x367 + x58;
+        const scalar_t x565 = x308 + x366 + x564;
+        const scalar_t x566 = x371 + x64;
+        const scalar_t x567 = x311 + x370 + x566;
+        const scalar_t x568 = x375 + x70;
+        const scalar_t x569 = x314 + x374 + x568;
+        const scalar_t x570 = rho*(cof3*(ux5 + ux6) + cof4*(uy5 + uy6) + cof5*(uz5 + uz6));
+        const scalar_t x571 = -x570;
+        const scalar_t x572 = x318 + x380 + (pgx5 + pgx6)*(-x381 - x5) + (pgy5 + pgy6)*(-x382 - y5) + (pgz5 + pgz6)*(-x383 - z5);
+        const scalar_t x573 = scalar_t(4)*rcoef7;
+        const scalar_t x574 = x571 - x572*x573;
+        const scalar_t x575 = -sgn7*x574 + x574;
+        const scalar_t x576 = x575*(g6_0*x565 + g6_1*x567 + g6_2*x569);
+        const scalar_t x577 = x334 + x389 + x564;
+        const scalar_t x578 = x337 + x391 + x566;
+        const scalar_t x579 = x340 + x393 + x568;
+        const scalar_t x580 = x570 + x572*x573;
+        const scalar_t x581 = -sgn7*x574 + x580;
+        const scalar_t x582 = x581*(g5_0*x577 + g5_1*x578 + g5_2*x579);
+        const scalar_t x583 = -sgn2*x532 + x532;
+        const scalar_t x584 = scalar_t(64)*p5 + scalar_t(64)*p6;
+        const scalar_t x585 = cof3*x584;
+        const scalar_t x586 = scalar_t(32)*ux5*x581;
+        const scalar_t x587 = scalar_t(32)*x575;
+        const scalar_t x588 = ux6*x587;
+        const scalar_t x589 = x575*(g6_3*x565 + g6_4*x567 + g6_5*x569);
+        const scalar_t x590 = x581*(g5_3*x577 + g5_4*x578 + g5_5*x579);
+        const scalar_t x591 = cof4*x584;
+        const scalar_t x592 = scalar_t(32)*uy5*x581;
+        const scalar_t x593 = uy6*x587;
+        const scalar_t x594 = x575*(g6_6*x565 + g6_7*x567 + g6_8*x569);
+        const scalar_t x595 = x581*(g5_6*x577 + g5_7*x578 + g5_8*x579);
+        const scalar_t x596 = cof5*x584;
+        const scalar_t x597 = scalar_t(32)*uz5*x581;
+        const scalar_t x598 = uz6*x587;
+        const scalar_t x599 = x0 + x1 + x58 + x9;
+        const scalar_t x600 = x389 + x467 + x599;
+        const scalar_t x601 = x18 + x64 + y0 + y1;
+        const scalar_t x602 = x391 + x470 + x601;
+        const scalar_t x603 = x27 + x70 + z0 + z1;
+        const scalar_t x604 = x393 + x473 + x603;
+        const scalar_t x605 = rho*(cof0*(ux6 + ux7) + cof1*(uy6 + uy7) + cof2*(uz6 + uz7));
+        const scalar_t x606 = -x605;
+        const scalar_t x607 = x380 + x451 + (pgx6 + pgx7)*(x453 + x6) + (pgy6 + pgy7)*(x456 + y6) + (pgz6 + pgz7)*(x459 + z6);
+        const scalar_t x608 = scalar_t(4)*rcoef3;
+        const scalar_t x609 = x606 - x607*x608;
+        const scalar_t x610 = x605 + x607*x608;
+        const scalar_t x611 = -sgn3*x609 + x610;
+        const scalar_t x612 = x611*(g7_0*x600 + g7_1*x602 + g7_2*x604);
+        const scalar_t x613 = x366 + x434 + x599;
+        const scalar_t x614 = x370 + x439 + x601;
+        const scalar_t x615 = x374 + x444 + x603;
+        const scalar_t x616 = -sgn3*x609 + x609;
+        const scalar_t x617 = x616*(g6_0*x613 + g6_1*x614 + g6_2*x615);
+        const scalar_t x618 = scalar_t(32)*x616;
+        const scalar_t x619 = ux6*x618;
+        const scalar_t x620 = scalar_t(32)*x611;
+        const scalar_t x621 = ux7*x620;
+        const scalar_t x622 = scalar_t(64)*p6 + scalar_t(64)*p7;
+        const scalar_t x623 = cof0*x622;
+        const scalar_t x624 = x611*(g7_3*x600 + g7_4*x602 + g7_5*x604);
+        const scalar_t x625 = x616*(g6_3*x613 + g6_4*x614 + g6_5*x615);
+        const scalar_t x626 = uy6*x618;
+        const scalar_t x627 = uy7*x620;
+        const scalar_t x628 = cof1*x622;
+        const scalar_t x629 = x611*(g7_6*x600 + g7_7*x602 + g7_8*x604);
+        const scalar_t x630 = x616*(g6_6*x613 + g6_7*x614 + g6_8*x615);
+        const scalar_t x631 = uz6*x618;
+        const scalar_t x632 = uz7*x620;
+        const scalar_t x633 = cof2*x622;
+        const scalar_t x634 = x464 - x478;
+        const scalar_t x635 = x511 - x540;
+        const scalar_t x636 = -sgn6*x539 + x539;
+        const scalar_t x637 = -sgn11*x477 + x477;
+        out.rx[0][lane] = (scalar_t(1) / scalar_t(512))*ux1*x168 + (scalar_t(1) / scalar_t(512))*x106*x120 + (scalar_t(1) / scalar_t(512))*x120*x165 + (scalar_t(1) / scalar_t(512))*x136*x140 + (scalar_t(1) / scalar_t(512))*x152 + (scalar_t(1) / scalar_t(512))*x164 + (scalar_t(1) / scalar_t(512))*x166 + (scalar_t(1) / scalar_t(512))*x167 + (scalar_t(1) / scalar_t(512))*x170 + (scalar_t(1) / scalar_t(512))*x172 + (scalar_t(1) / scalar_t(512))*x174 + (scalar_t(1) / scalar_t(512))*x176 + (scalar_t(1) / scalar_t(512))*x178 + (scalar_t(1) / scalar_t(512))*x217 + (scalar_t(1) / scalar_t(512))*x54 + (scalar_t(1) / scalar_t(512))*x93;
+        out.ry[0][lane] = (scalar_t(1) / scalar_t(512))*uy1*x168 + (scalar_t(1) / scalar_t(512))*x120*x220 + (scalar_t(1) / scalar_t(512))*x120*x224 + (scalar_t(1) / scalar_t(512))*x140*x221 + (scalar_t(1) / scalar_t(512))*x218 + (scalar_t(1) / scalar_t(512))*x219 + (scalar_t(1) / scalar_t(512))*x222 + (scalar_t(1) / scalar_t(512))*x223 + (scalar_t(1) / scalar_t(512))*x225 + (scalar_t(1) / scalar_t(512))*x226 + (scalar_t(1) / scalar_t(512))*x227 + (scalar_t(1) / scalar_t(512))*x228 + (scalar_t(1) / scalar_t(512))*x229 + (scalar_t(1) / scalar_t(512))*x230 + (scalar_t(1) / scalar_t(512))*x231 + (scalar_t(1) / scalar_t(512))*x238;
+        out.rz[0][lane] = (scalar_t(1) / scalar_t(512))*uz1*x168 + (scalar_t(1) / scalar_t(512))*x120*x241 + (scalar_t(1) / scalar_t(512))*x120*x245 + (scalar_t(1) / scalar_t(512))*x140*x242 + (scalar_t(1) / scalar_t(512))*x239 + (scalar_t(1) / scalar_t(512))*x240 + (scalar_t(1) / scalar_t(512))*x243 + (scalar_t(1) / scalar_t(512))*x244 + (scalar_t(1) / scalar_t(512))*x246 + (scalar_t(1) / scalar_t(512))*x247 + (scalar_t(1) / scalar_t(512))*x248 + (scalar_t(1) / scalar_t(512))*x249 + (scalar_t(1) / scalar_t(512))*x250 + (scalar_t(1) / scalar_t(512))*x251 + (scalar_t(1) / scalar_t(512))*x252 + (scalar_t(1) / scalar_t(512))*x258;
+        out.rc[0][lane] = (scalar_t(1) / scalar_t(8))*x119 + (scalar_t(1) / scalar_t(8))*x52 + (scalar_t(1) / scalar_t(8))*x91;
+        out.rx[1][lane] = -scalar_t(1) / scalar_t(512)*x106*x260 + (scalar_t(1) / scalar_t(512))*x136*x259 - scalar_t(1) / scalar_t(512)*x165*x260 - scalar_t(1) / scalar_t(512)*x174 + (scalar_t(1) / scalar_t(512))*x259*x261 + (scalar_t(1) / scalar_t(512))*x262 + (scalar_t(1) / scalar_t(512))*x307 + (scalar_t(1) / scalar_t(512))*x346;
+        out.ry[1][lane] = -scalar_t(1) / scalar_t(512)*x220*x260 + (scalar_t(1) / scalar_t(512))*x221*x259 - scalar_t(1) / scalar_t(512)*x224*x260 - scalar_t(1) / scalar_t(512)*x229 + (scalar_t(1) / scalar_t(512))*x259*x347 + (scalar_t(1) / scalar_t(512))*x348 + (scalar_t(1) / scalar_t(512))*x349 + (scalar_t(1) / scalar_t(512))*x350;
+        out.rz[1][lane] = -scalar_t(1) / scalar_t(512)*x241*x260 + (scalar_t(1) / scalar_t(512))*x242*x259 - scalar_t(1) / scalar_t(512)*x245*x260 - scalar_t(1) / scalar_t(512)*x250 + (scalar_t(1) / scalar_t(512))*x259*x351 + (scalar_t(1) / scalar_t(512))*x352 + (scalar_t(1) / scalar_t(512))*x353 + (scalar_t(1) / scalar_t(512))*x354;
+        out.rc[1][lane] = -scalar_t(1) / scalar_t(8)*x116 + (scalar_t(1) / scalar_t(8))*x137 + (scalar_t(1) / scalar_t(8))*x281 + (scalar_t(1) / scalar_t(8))*x291*(-x117 - x282 - x284*x285 - x286*x287 - x288*x289) + (scalar_t(1) / scalar_t(8))*x317 + (scalar_t(1) / scalar_t(8))*x330*(-x117 - x318 - x320*x322 - x323*x325 - x326*x328);
+        out.rx[2][lane] = (scalar_t(1) / scalar_t(16))*ux2*x402 - scalar_t(1) / scalar_t(512)*ux3*x407 - scalar_t(1) / scalar_t(512)*x307 - scalar_t(1) / scalar_t(512)*x358*x365 - scalar_t(1) / scalar_t(512)*x388 + (scalar_t(1) / scalar_t(512))*x397 + (scalar_t(1) / scalar_t(512))*x401*x402 + (scalar_t(1) / scalar_t(512))*x404 + (scalar_t(1) / scalar_t(512))*x406 - scalar_t(1) / scalar_t(512)*x409 - scalar_t(1) / scalar_t(512)*x411 - scalar_t(1) / scalar_t(512)*x412;
+        out.ry[2][lane] = (scalar_t(1) / scalar_t(16))*uy2*x402 - scalar_t(1) / scalar_t(512)*uy3*x407 - scalar_t(1) / scalar_t(512)*x349 - scalar_t(1) / scalar_t(512)*x365*x413 + (scalar_t(1) / scalar_t(512))*x402*x416 - scalar_t(1) / scalar_t(512)*x414 + (scalar_t(1) / scalar_t(512))*x415 + (scalar_t(1) / scalar_t(512))*x417 + (scalar_t(1) / scalar_t(512))*x419 - scalar_t(1) / scalar_t(512)*x420 - scalar_t(1) / scalar_t(512)*x421 - scalar_t(1) / scalar_t(512)*x422;
+        out.rz[2][lane] = (scalar_t(1) / scalar_t(16))*uz2*x402 - scalar_t(1) / scalar_t(512)*uz3*x407 - scalar_t(1) / scalar_t(512)*x353 - scalar_t(1) / scalar_t(512)*x365*x423 + (scalar_t(1) / scalar_t(512))*x402*x426 - scalar_t(1) / scalar_t(512)*x424 + (scalar_t(1) / scalar_t(512))*x425 + (scalar_t(1) / scalar_t(512))*x427 + (scalar_t(1) / scalar_t(512))*x429 - scalar_t(1) / scalar_t(512)*x430 - scalar_t(1) / scalar_t(512)*x431 - scalar_t(1) / scalar_t(512)*x432;
+        out.rc[2][lane] = (scalar_t(1) / scalar_t(2))*rcoef10*x384 - scalar_t(1) / scalar_t(8)*x293 - scalar_t(1) / scalar_t(8)*x364 - scalar_t(1) / scalar_t(8)*x379;
+        out.rx[3][lane] = (scalar_t(1) / scalar_t(512))*ux7*x481 - scalar_t(1) / scalar_t(512)*x152 - scalar_t(1) / scalar_t(512)*x166 - scalar_t(1) / scalar_t(512)*x170 - scalar_t(1) / scalar_t(512)*x176 + (scalar_t(1) / scalar_t(512))*x358*x466 + (scalar_t(1) / scalar_t(512))*x401*x433 + (scalar_t(1) / scalar_t(512))*x405*x433 + (scalar_t(1) / scalar_t(512))*x411 + (scalar_t(1) / scalar_t(512))*x449*x465 + (scalar_t(1) / scalar_t(512))*x465*x480 + (scalar_t(1) / scalar_t(512))*x466*x480 + (scalar_t(1) / scalar_t(512))*x476*x479 + (scalar_t(1) / scalar_t(512))*x483 + (scalar_t(1) / scalar_t(512))*x484 - scalar_t(1) / scalar_t(512)*x93;
+        out.ry[3][lane] = (scalar_t(1) / scalar_t(512))*uy7*x481 - scalar_t(1) / scalar_t(512)*x219 - scalar_t(1) / scalar_t(512)*x222 - scalar_t(1) / scalar_t(512)*x225 - scalar_t(1) / scalar_t(512)*x227 - scalar_t(1) / scalar_t(512)*x230 + (scalar_t(1) / scalar_t(512))*x413*x466 + (scalar_t(1) / scalar_t(512))*x416*x433 + (scalar_t(1) / scalar_t(512))*x418*x433 + (scalar_t(1) / scalar_t(512))*x421 + (scalar_t(1) / scalar_t(512))*x465*x485 + (scalar_t(1) / scalar_t(512))*x465*x487 + (scalar_t(1) / scalar_t(512))*x466*x487 + (scalar_t(1) / scalar_t(512))*x479*x486 + (scalar_t(1) / scalar_t(512))*x488 + (scalar_t(1) / scalar_t(512))*x489;
+        out.rz[3][lane] = (scalar_t(1) / scalar_t(512))*uz7*x481 - scalar_t(1) / scalar_t(512)*x240 - scalar_t(1) / scalar_t(512)*x243 - scalar_t(1) / scalar_t(512)*x246 - scalar_t(1) / scalar_t(512)*x248 - scalar_t(1) / scalar_t(512)*x251 + (scalar_t(1) / scalar_t(512))*x423*x466 + (scalar_t(1) / scalar_t(512))*x426*x433 + (scalar_t(1) / scalar_t(512))*x428*x433 + (scalar_t(1) / scalar_t(512))*x431 + (scalar_t(1) / scalar_t(512))*x465*x490 + (scalar_t(1) / scalar_t(512))*x465*x492 + (scalar_t(1) / scalar_t(512))*x466*x492 + (scalar_t(1) / scalar_t(512))*x479*x491 + (scalar_t(1) / scalar_t(512))*x493 + (scalar_t(1) / scalar_t(512))*x494;
+        out.rc[3][lane] = (scalar_t(1) / scalar_t(8))*x150 + (scalar_t(1) / scalar_t(8))*x364 + (scalar_t(1) / scalar_t(8))*x464 - scalar_t(1) / scalar_t(8)*x90;
+        out.rx[4][lane] = (scalar_t(1) / scalar_t(512))*ux5*x543 + (scalar_t(1) / scalar_t(512))*ux7*x544 - scalar_t(1) / scalar_t(512)*x164 - scalar_t(1) / scalar_t(512)*x167 - scalar_t(1) / scalar_t(512)*x172 - scalar_t(1) / scalar_t(512)*x178 + (scalar_t(1) / scalar_t(512))*x412 + (scalar_t(1) / scalar_t(512))*x501*x512 + (scalar_t(1) / scalar_t(512))*x512*x542 + (scalar_t(1) / scalar_t(512))*x516*x527 + (scalar_t(1) / scalar_t(512))*x527*x542 + (scalar_t(1) / scalar_t(512))*x531*x534 + (scalar_t(1) / scalar_t(512))*x538*x541 - scalar_t(1) / scalar_t(512)*x54 + (scalar_t(1) / scalar_t(512))*x546 + (scalar_t(1) / scalar_t(512))*x548;
+        out.ry[4][lane] = (scalar_t(1) / scalar_t(512))*uy5*x543 + (scalar_t(1) / scalar_t(512))*uy7*x544 - scalar_t(1) / scalar_t(512)*x218 - scalar_t(1) / scalar_t(512)*x223 - scalar_t(1) / scalar_t(512)*x226 - scalar_t(1) / scalar_t(512)*x228 - scalar_t(1) / scalar_t(512)*x231 + (scalar_t(1) / scalar_t(512))*x422 + (scalar_t(1) / scalar_t(512))*x512*x549 + (scalar_t(1) / scalar_t(512))*x512*x553 + (scalar_t(1) / scalar_t(512))*x527*x550 + (scalar_t(1) / scalar_t(512))*x527*x553 + (scalar_t(1) / scalar_t(512))*x534*x551 + (scalar_t(1) / scalar_t(512))*x541*x552 + (scalar_t(1) / scalar_t(512))*x554 + (scalar_t(1) / scalar_t(512))*x555;
+        out.rz[4][lane] = (scalar_t(1) / scalar_t(512))*uz5*x543 + (scalar_t(1) / scalar_t(512))*uz7*x544 - scalar_t(1) / scalar_t(512)*x239 - scalar_t(1) / scalar_t(512)*x244 - scalar_t(1) / scalar_t(512)*x247 - scalar_t(1) / scalar_t(512)*x249 - scalar_t(1) / scalar_t(512)*x252 + (scalar_t(1) / scalar_t(512))*x432 + (scalar_t(1) / scalar_t(512))*x512*x556 + (scalar_t(1) / scalar_t(512))*x512*x560 + (scalar_t(1) / scalar_t(512))*x527*x557 + (scalar_t(1) / scalar_t(512))*x527*x560 + (scalar_t(1) / scalar_t(512))*x534*x558 + (scalar_t(1) / scalar_t(512))*x541*x559 + (scalar_t(1) / scalar_t(512))*x561 + (scalar_t(1) / scalar_t(512))*x562;
+        out.rc[4][lane] = (scalar_t(1) / scalar_t(8))*x162 - scalar_t(1) / scalar_t(8)*x51 + (scalar_t(1) / scalar_t(8))*x511 + (scalar_t(1) / scalar_t(8))*x526;
+        out.rx[5][lane] = (scalar_t(1) / scalar_t(16))*ux5*x583 - scalar_t(1) / scalar_t(512)*x346 - scalar_t(1) / scalar_t(512)*x484 - scalar_t(1) / scalar_t(512)*x516*x563 + (scalar_t(1) / scalar_t(512))*x531*x583 - scalar_t(1) / scalar_t(512)*x542*x563 - scalar_t(1) / scalar_t(512)*x548 - scalar_t(1) / scalar_t(512)*x576 + (scalar_t(1) / scalar_t(512))*x582 + (scalar_t(1) / scalar_t(512))*x585 + (scalar_t(1) / scalar_t(512))*x586 - scalar_t(1) / scalar_t(512)*x588;
+        out.ry[5][lane] = (scalar_t(1) / scalar_t(16))*uy5*x583 - scalar_t(1) / scalar_t(512)*x350 - scalar_t(1) / scalar_t(512)*x489 - scalar_t(1) / scalar_t(512)*x550*x563 + (scalar_t(1) / scalar_t(512))*x551*x583 - scalar_t(1) / scalar_t(512)*x553*x563 - scalar_t(1) / scalar_t(512)*x555 - scalar_t(1) / scalar_t(512)*x589 + (scalar_t(1) / scalar_t(512))*x590 + (scalar_t(1) / scalar_t(512))*x591 + (scalar_t(1) / scalar_t(512))*x592 - scalar_t(1) / scalar_t(512)*x593;
+        out.rz[5][lane] = (scalar_t(1) / scalar_t(16))*uz5*x583 - scalar_t(1) / scalar_t(512)*x354 - scalar_t(1) / scalar_t(512)*x494 - scalar_t(1) / scalar_t(512)*x557*x563 + (scalar_t(1) / scalar_t(512))*x558*x583 - scalar_t(1) / scalar_t(512)*x560*x563 - scalar_t(1) / scalar_t(512)*x562 - scalar_t(1) / scalar_t(512)*x594 + (scalar_t(1) / scalar_t(512))*x595 + (scalar_t(1) / scalar_t(512))*x596 + (scalar_t(1) / scalar_t(512))*x597 - scalar_t(1) / scalar_t(512)*x598;
+        out.rc[5][lane] = (scalar_t(1) / scalar_t(2))*rcoef7*x572 - scalar_t(1) / scalar_t(8)*x332 - scalar_t(1) / scalar_t(8)*x526 - scalar_t(1) / scalar_t(8)*x571;
+        out.rx[6][lane] = -scalar_t(1) / scalar_t(512)*x217 + (scalar_t(1) / scalar_t(512))*x388 - scalar_t(1) / scalar_t(512)*x397 - scalar_t(1) / scalar_t(512)*x404 - scalar_t(1) / scalar_t(512)*x406 + (scalar_t(1) / scalar_t(512))*x409 + (scalar_t(1) / scalar_t(512))*x576 - scalar_t(1) / scalar_t(512)*x582 - scalar_t(1) / scalar_t(512)*x585 - scalar_t(1) / scalar_t(512)*x586 + (scalar_t(1) / scalar_t(512))*x588 - scalar_t(1) / scalar_t(512)*x612 + (scalar_t(1) / scalar_t(512))*x617 + (scalar_t(1) / scalar_t(512))*x619 - scalar_t(1) / scalar_t(512)*x621 - scalar_t(1) / scalar_t(512)*x623;
+        out.ry[6][lane] = -scalar_t(1) / scalar_t(512)*x238 + (scalar_t(1) / scalar_t(512))*x414 - scalar_t(1) / scalar_t(512)*x415 - scalar_t(1) / scalar_t(512)*x417 - scalar_t(1) / scalar_t(512)*x419 + (scalar_t(1) / scalar_t(512))*x420 + (scalar_t(1) / scalar_t(512))*x589 - scalar_t(1) / scalar_t(512)*x590 - scalar_t(1) / scalar_t(512)*x591 - scalar_t(1) / scalar_t(512)*x592 + (scalar_t(1) / scalar_t(512))*x593 - scalar_t(1) / scalar_t(512)*x624 + (scalar_t(1) / scalar_t(512))*x625 + (scalar_t(1) / scalar_t(512))*x626 - scalar_t(1) / scalar_t(512)*x627 - scalar_t(1) / scalar_t(512)*x628;
+        out.rz[6][lane] = -scalar_t(1) / scalar_t(512)*x258 + (scalar_t(1) / scalar_t(512))*x424 - scalar_t(1) / scalar_t(512)*x425 - scalar_t(1) / scalar_t(512)*x427 - scalar_t(1) / scalar_t(512)*x429 + (scalar_t(1) / scalar_t(512))*x430 + (scalar_t(1) / scalar_t(512))*x594 - scalar_t(1) / scalar_t(512)*x595 - scalar_t(1) / scalar_t(512)*x596 - scalar_t(1) / scalar_t(512)*x597 + (scalar_t(1) / scalar_t(512))*x598 - scalar_t(1) / scalar_t(512)*x629 + (scalar_t(1) / scalar_t(512))*x630 + (scalar_t(1) / scalar_t(512))*x631 - scalar_t(1) / scalar_t(512)*x632 - scalar_t(1) / scalar_t(512)*x633;
+        out.rc[6][lane] = -scalar_t(1) / scalar_t(8)*x395 - scalar_t(1) / scalar_t(8)*x580 - scalar_t(1) / scalar_t(8)*x610;
+        out.rx[7][lane] = (scalar_t(1) / scalar_t(16))*ux7*x636 + (scalar_t(1) / scalar_t(16))*ux7*x637 - scalar_t(1) / scalar_t(512)*x262 - scalar_t(1) / scalar_t(512)*x449*x634 + (scalar_t(1) / scalar_t(512))*x476*x637 - scalar_t(1) / scalar_t(512)*x480*x634 - scalar_t(1) / scalar_t(512)*x483 - scalar_t(1) / scalar_t(512)*x501*x635 + (scalar_t(1) / scalar_t(512))*x538*x636 - scalar_t(1) / scalar_t(512)*x542*x635 - scalar_t(1) / scalar_t(512)*x546 + (scalar_t(1) / scalar_t(512))*x612 - scalar_t(1) / scalar_t(512)*x617 - scalar_t(1) / scalar_t(512)*x619 + (scalar_t(1) / scalar_t(512))*x621 + (scalar_t(1) / scalar_t(512))*x623;
+        out.ry[7][lane] = (scalar_t(1) / scalar_t(16))*uy7*x636 + (scalar_t(1) / scalar_t(16))*uy7*x637 - scalar_t(1) / scalar_t(512)*x348 - scalar_t(1) / scalar_t(512)*x485*x634 + (scalar_t(1) / scalar_t(512))*x486*x637 - scalar_t(1) / scalar_t(512)*x487*x634 - scalar_t(1) / scalar_t(512)*x488 - scalar_t(1) / scalar_t(512)*x549*x635 + (scalar_t(1) / scalar_t(512))*x552*x636 - scalar_t(1) / scalar_t(512)*x553*x635 - scalar_t(1) / scalar_t(512)*x554 + (scalar_t(1) / scalar_t(512))*x624 - scalar_t(1) / scalar_t(512)*x625 - scalar_t(1) / scalar_t(512)*x626 + (scalar_t(1) / scalar_t(512))*x627 + (scalar_t(1) / scalar_t(512))*x628;
+        out.rz[7][lane] = (scalar_t(1) / scalar_t(16))*uz7*x636 + (scalar_t(1) / scalar_t(16))*uz7*x637 - scalar_t(1) / scalar_t(512)*x352 - scalar_t(1) / scalar_t(512)*x490*x634 + (scalar_t(1) / scalar_t(512))*x491*x637 - scalar_t(1) / scalar_t(512)*x492*x634 - scalar_t(1) / scalar_t(512)*x493 - scalar_t(1) / scalar_t(512)*x556*x635 + (scalar_t(1) / scalar_t(512))*x559*x636 - scalar_t(1) / scalar_t(512)*x560*x635 - scalar_t(1) / scalar_t(512)*x561 + (scalar_t(1) / scalar_t(512))*x629 - scalar_t(1) / scalar_t(512)*x630 - scalar_t(1) / scalar_t(512)*x631 + (scalar_t(1) / scalar_t(512))*x632 + (scalar_t(1) / scalar_t(512))*x633;
+        out.rc[7][lane] = (scalar_t(1) / scalar_t(2))*rcoef3*x607 - scalar_t(1) / scalar_t(8)*x464 - scalar_t(1) / scalar_t(8)*x511 - scalar_t(1) / scalar_t(8)*x606;
+    }
+}
+
+// bounded-face clip, with Rhie-Chow.
+static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim1_simd(
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT cof0_ptr,
+        const scalar_t *const SFEM_RESTRICT cof1_ptr,
+        const scalar_t *const SFEM_RESTRICT cof2_ptr,
+        const scalar_t *const SFEM_RESTRICT cof3_ptr,
+        const scalar_t *const SFEM_RESTRICT cof4_ptr,
+        const scalar_t *const SFEM_RESTRICT cof5_ptr,
+        const scalar_t *const SFEM_RESTRICT cof6_ptr,
+        const scalar_t *const SFEM_RESTRICT cof7_ptr,
+        const scalar_t *const SFEM_RESTRICT cof8_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const Hex8InputPack &in,
+        const Hex8UGradPack &ho,
+        const Hex8RhieChowPack &rc,
+        Hex8ResidualPack    &out) {
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t cof0 = scalar_t(cof0_ptr[lane]);
+        const scalar_t cof1 = scalar_t(cof1_ptr[lane]);
+        const scalar_t cof2 = scalar_t(cof2_ptr[lane]);
+        const scalar_t cof3 = scalar_t(cof3_ptr[lane]);
+        const scalar_t cof4 = scalar_t(cof4_ptr[lane]);
+        const scalar_t cof5 = scalar_t(cof5_ptr[lane]);
+        const scalar_t cof6 = scalar_t(cof6_ptr[lane]);
+        const scalar_t cof7 = scalar_t(cof7_ptr[lane]);
+        const scalar_t cof8 = scalar_t(cof8_ptr[lane]);
+        const scalar_t det = scalar_t(det_ptr[lane]);
+        const scalar_t ux0 = in.ux[0][lane];
+        const scalar_t ux1 = in.ux[1][lane];
+        const scalar_t ux2 = in.ux[2][lane];
+        const scalar_t ux3 = in.ux[3][lane];
+        const scalar_t ux4 = in.ux[4][lane];
+        const scalar_t ux5 = in.ux[5][lane];
+        const scalar_t ux6 = in.ux[6][lane];
+        const scalar_t ux7 = in.ux[7][lane];
+        const scalar_t uy0 = in.uy[0][lane];
+        const scalar_t uy1 = in.uy[1][lane];
+        const scalar_t uy2 = in.uy[2][lane];
+        const scalar_t uy3 = in.uy[3][lane];
+        const scalar_t uy4 = in.uy[4][lane];
+        const scalar_t uy5 = in.uy[5][lane];
+        const scalar_t uy6 = in.uy[6][lane];
+        const scalar_t uy7 = in.uy[7][lane];
+        const scalar_t uz0 = in.uz[0][lane];
+        const scalar_t uz1 = in.uz[1][lane];
+        const scalar_t uz2 = in.uz[2][lane];
+        const scalar_t uz3 = in.uz[3][lane];
+        const scalar_t uz4 = in.uz[4][lane];
+        const scalar_t uz5 = in.uz[5][lane];
+        const scalar_t uz6 = in.uz[6][lane];
+        const scalar_t uz7 = in.uz[7][lane];
+        const scalar_t p0 = in.p[0][lane];
+        const scalar_t p1 = in.p[1][lane];
+        const scalar_t p2 = in.p[2][lane];
+        const scalar_t p3 = in.p[3][lane];
+        const scalar_t p4 = in.p[4][lane];
+        const scalar_t p5 = in.p[5][lane];
+        const scalar_t p6 = in.p[6][lane];
+        const scalar_t p7 = in.p[7][lane];
+        const scalar_t x0 = ho.x[0][lane];
+        const scalar_t x1 = ho.x[1][lane];
+        const scalar_t x2 = ho.x[2][lane];
+        const scalar_t x3 = ho.x[3][lane];
+        const scalar_t x4 = ho.x[4][lane];
+        const scalar_t x5 = ho.x[5][lane];
+        const scalar_t x6 = ho.x[6][lane];
+        const scalar_t x7 = ho.x[7][lane];
+        const scalar_t y0 = ho.y[0][lane];
+        const scalar_t y1 = ho.y[1][lane];
+        const scalar_t y2 = ho.y[2][lane];
+        const scalar_t y3 = ho.y[3][lane];
+        const scalar_t y4 = ho.y[4][lane];
+        const scalar_t y5 = ho.y[5][lane];
+        const scalar_t y6 = ho.y[6][lane];
+        const scalar_t y7 = ho.y[7][lane];
+        const scalar_t z0 = ho.z[0][lane];
+        const scalar_t z1 = ho.z[1][lane];
+        const scalar_t z2 = ho.z[2][lane];
+        const scalar_t z3 = ho.z[3][lane];
+        const scalar_t z4 = ho.z[4][lane];
+        const scalar_t z5 = ho.z[5][lane];
+        const scalar_t z6 = ho.z[6][lane];
+        const scalar_t z7 = ho.z[7][lane];
+        const scalar_t g0_0 = ho.g[0][0][lane];
+        const scalar_t g0_1 = ho.g[0][1][lane];
+        const scalar_t g0_2 = ho.g[0][2][lane];
+        const scalar_t g0_3 = ho.g[0][3][lane];
+        const scalar_t g0_4 = ho.g[0][4][lane];
+        const scalar_t g0_5 = ho.g[0][5][lane];
+        const scalar_t g0_6 = ho.g[0][6][lane];
+        const scalar_t g0_7 = ho.g[0][7][lane];
+        const scalar_t g0_8 = ho.g[0][8][lane];
+        const scalar_t g1_0 = ho.g[1][0][lane];
+        const scalar_t g1_1 = ho.g[1][1][lane];
+        const scalar_t g1_2 = ho.g[1][2][lane];
+        const scalar_t g1_3 = ho.g[1][3][lane];
+        const scalar_t g1_4 = ho.g[1][4][lane];
+        const scalar_t g1_5 = ho.g[1][5][lane];
+        const scalar_t g1_6 = ho.g[1][6][lane];
+        const scalar_t g1_7 = ho.g[1][7][lane];
+        const scalar_t g1_8 = ho.g[1][8][lane];
+        const scalar_t g2_0 = ho.g[2][0][lane];
+        const scalar_t g2_1 = ho.g[2][1][lane];
+        const scalar_t g2_2 = ho.g[2][2][lane];
+        const scalar_t g2_3 = ho.g[2][3][lane];
+        const scalar_t g2_4 = ho.g[2][4][lane];
+        const scalar_t g2_5 = ho.g[2][5][lane];
+        const scalar_t g2_6 = ho.g[2][6][lane];
+        const scalar_t g2_7 = ho.g[2][7][lane];
+        const scalar_t g2_8 = ho.g[2][8][lane];
+        const scalar_t g3_0 = ho.g[3][0][lane];
+        const scalar_t g3_1 = ho.g[3][1][lane];
+        const scalar_t g3_2 = ho.g[3][2][lane];
+        const scalar_t g3_3 = ho.g[3][3][lane];
+        const scalar_t g3_4 = ho.g[3][4][lane];
+        const scalar_t g3_5 = ho.g[3][5][lane];
+        const scalar_t g3_6 = ho.g[3][6][lane];
+        const scalar_t g3_7 = ho.g[3][7][lane];
+        const scalar_t g3_8 = ho.g[3][8][lane];
+        const scalar_t g4_0 = ho.g[4][0][lane];
+        const scalar_t g4_1 = ho.g[4][1][lane];
+        const scalar_t g4_2 = ho.g[4][2][lane];
+        const scalar_t g4_3 = ho.g[4][3][lane];
+        const scalar_t g4_4 = ho.g[4][4][lane];
+        const scalar_t g4_5 = ho.g[4][5][lane];
+        const scalar_t g4_6 = ho.g[4][6][lane];
+        const scalar_t g4_7 = ho.g[4][7][lane];
+        const scalar_t g4_8 = ho.g[4][8][lane];
+        const scalar_t g5_0 = ho.g[5][0][lane];
+        const scalar_t g5_1 = ho.g[5][1][lane];
+        const scalar_t g5_2 = ho.g[5][2][lane];
+        const scalar_t g5_3 = ho.g[5][3][lane];
+        const scalar_t g5_4 = ho.g[5][4][lane];
+        const scalar_t g5_5 = ho.g[5][5][lane];
+        const scalar_t g5_6 = ho.g[5][6][lane];
+        const scalar_t g5_7 = ho.g[5][7][lane];
+        const scalar_t g5_8 = ho.g[5][8][lane];
+        const scalar_t g6_0 = ho.g[6][0][lane];
+        const scalar_t g6_1 = ho.g[6][1][lane];
+        const scalar_t g6_2 = ho.g[6][2][lane];
+        const scalar_t g6_3 = ho.g[6][3][lane];
+        const scalar_t g6_4 = ho.g[6][4][lane];
+        const scalar_t g6_5 = ho.g[6][5][lane];
+        const scalar_t g6_6 = ho.g[6][6][lane];
+        const scalar_t g6_7 = ho.g[6][7][lane];
+        const scalar_t g6_8 = ho.g[6][8][lane];
+        const scalar_t g7_0 = ho.g[7][0][lane];
+        const scalar_t g7_1 = ho.g[7][1][lane];
+        const scalar_t g7_2 = ho.g[7][2][lane];
+        const scalar_t g7_3 = ho.g[7][3][lane];
+        const scalar_t g7_4 = ho.g[7][4][lane];
+        const scalar_t g7_5 = ho.g[7][5][lane];
+        const scalar_t g7_6 = ho.g[7][6][lane];
+        const scalar_t g7_7 = ho.g[7][7][lane];
+        const scalar_t g7_8 = ho.g[7][8][lane];
+        const scalar_t rcoef0 = rc.coeff[0][lane];
+        const scalar_t rcoef1 = rc.coeff[1][lane];
+        const scalar_t rcoef2 = rc.coeff[2][lane];
+        const scalar_t rcoef3 = rc.coeff[3][lane];
+        const scalar_t rcoef4 = rc.coeff[4][lane];
+        const scalar_t rcoef5 = rc.coeff[5][lane];
+        const scalar_t rcoef6 = rc.coeff[6][lane];
+        const scalar_t rcoef7 = rc.coeff[7][lane];
+        const scalar_t rcoef8 = rc.coeff[8][lane];
+        const scalar_t rcoef9 = rc.coeff[9][lane];
+        const scalar_t rcoef10 = rc.coeff[10][lane];
+        const scalar_t rcoef11 = rc.coeff[11][lane];
+        const scalar_t pgx0 = rc.pgx[0][lane];
+        const scalar_t pgx1 = rc.pgx[1][lane];
+        const scalar_t pgx2 = rc.pgx[2][lane];
+        const scalar_t pgx3 = rc.pgx[3][lane];
+        const scalar_t pgx4 = rc.pgx[4][lane];
+        const scalar_t pgx5 = rc.pgx[5][lane];
+        const scalar_t pgx6 = rc.pgx[6][lane];
+        const scalar_t pgx7 = rc.pgx[7][lane];
+        const scalar_t pgy0 = rc.pgy[0][lane];
+        const scalar_t pgy1 = rc.pgy[1][lane];
+        const scalar_t pgy2 = rc.pgy[2][lane];
+        const scalar_t pgy3 = rc.pgy[3][lane];
+        const scalar_t pgy4 = rc.pgy[4][lane];
+        const scalar_t pgy5 = rc.pgy[5][lane];
+        const scalar_t pgy6 = rc.pgy[6][lane];
+        const scalar_t pgy7 = rc.pgy[7][lane];
+        const scalar_t pgz0 = rc.pgz[0][lane];
+        const scalar_t pgz1 = rc.pgz[1][lane];
+        const scalar_t pgz2 = rc.pgz[2][lane];
+        const scalar_t pgz3 = rc.pgz[3][lane];
+        const scalar_t pgz4 = rc.pgz[4][lane];
+        const scalar_t pgz5 = rc.pgz[5][lane];
+        const scalar_t pgz6 = rc.pgz[6][lane];
+        const scalar_t pgz7 = rc.pgz[7][lane];
+        const scalar_t mdot0 = -rcoef0*(-p0 + p1 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx1)*(-x0 + x1) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy1)*(-y0 + y1) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz1)*(-z0 + z1)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux1) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy1) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz1));
+        const scalar_t sgn0 = mdot0 > scalar_t(0) ? scalar_t(1) : (mdot0 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot1 = -rcoef1*(p2 - p3 - ((scalar_t(1) / scalar_t(2))*pgx2 + (scalar_t(1) / scalar_t(2))*pgx3)*(x2 - x3) - ((scalar_t(1) / scalar_t(2))*pgy2 + (scalar_t(1) / scalar_t(2))*pgy3)*(y2 - y3) - ((scalar_t(1) / scalar_t(2))*pgz2 + (scalar_t(1) / scalar_t(2))*pgz3)*(z2 - z3)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn1 = mdot1 > scalar_t(0) ? scalar_t(1) : (mdot1 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot2 = -rcoef2*(-p4 + p5 - ((scalar_t(1) / scalar_t(2))*pgx4 + (scalar_t(1) / scalar_t(2))*pgx5)*(-x4 + x5) - ((scalar_t(1) / scalar_t(2))*pgy4 + (scalar_t(1) / scalar_t(2))*pgy5)*(-y4 + y5) - ((scalar_t(1) / scalar_t(2))*pgz4 + (scalar_t(1) / scalar_t(2))*pgz5)*(-z4 + z5)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn2 = mdot2 > scalar_t(0) ? scalar_t(1) : (mdot2 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot3 = -rcoef3*(p6 - p7 - ((scalar_t(1) / scalar_t(2))*pgx6 + (scalar_t(1) / scalar_t(2))*pgx7)*(x6 - x7) - ((scalar_t(1) / scalar_t(2))*pgy6 + (scalar_t(1) / scalar_t(2))*pgy7)*(y6 - y7) - ((scalar_t(1) / scalar_t(2))*pgz6 + (scalar_t(1) / scalar_t(2))*pgz7)*(z6 - z7)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux6 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy6 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz6 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn3 = mdot3 > scalar_t(0) ? scalar_t(1) : (mdot3 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot4 = -rcoef4*(-p0 + p3 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx3)*(-x0 + x3) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy3)*(-y0 + y3) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz3)*(-z0 + z3)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn4 = mdot4 > scalar_t(0) ? scalar_t(1) : (mdot4 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot5 = -rcoef5*(-p1 + p2 - ((scalar_t(1) / scalar_t(2))*pgx1 + (scalar_t(1) / scalar_t(2))*pgx2)*(-x1 + x2) - ((scalar_t(1) / scalar_t(2))*pgy1 + (scalar_t(1) / scalar_t(2))*pgy2)*(-y1 + y2) - ((scalar_t(1) / scalar_t(2))*pgz1 + (scalar_t(1) / scalar_t(2))*pgz2)*(-z1 + z2)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux2) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy2) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz2));
+        const scalar_t sgn5 = mdot5 > scalar_t(0) ? scalar_t(1) : (mdot5 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot6 = -rcoef6*(-p4 + p7 - ((scalar_t(1) / scalar_t(2))*pgx4 + (scalar_t(1) / scalar_t(2))*pgx7)*(-x4 + x7) - ((scalar_t(1) / scalar_t(2))*pgy4 + (scalar_t(1) / scalar_t(2))*pgy7)*(-y4 + y7) - ((scalar_t(1) / scalar_t(2))*pgz4 + (scalar_t(1) / scalar_t(2))*pgz7)*(-z4 + z7)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn6 = mdot6 > scalar_t(0) ? scalar_t(1) : (mdot6 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot7 = -rcoef7*(-p5 + p6 - ((scalar_t(1) / scalar_t(2))*pgx5 + (scalar_t(1) / scalar_t(2))*pgx6)*(-x5 + x6) - ((scalar_t(1) / scalar_t(2))*pgy5 + (scalar_t(1) / scalar_t(2))*pgy6)*(-y5 + y6) - ((scalar_t(1) / scalar_t(2))*pgz5 + (scalar_t(1) / scalar_t(2))*pgz6)*(-z5 + z6)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux5 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy5 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz5 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn7 = mdot7 > scalar_t(0) ? scalar_t(1) : (mdot7 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot8 = -rcoef8*(-p0 + p4 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx4)*(-x0 + x4) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy4)*(-y0 + y4) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz4)*(-z0 + z4)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux4) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy4) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz4));
+        const scalar_t sgn8 = mdot8 > scalar_t(0) ? scalar_t(1) : (mdot8 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot9 = -rcoef9*(-p1 + p5 - ((scalar_t(1) / scalar_t(2))*pgx1 + (scalar_t(1) / scalar_t(2))*pgx5)*(-x1 + x5) - ((scalar_t(1) / scalar_t(2))*pgy1 + (scalar_t(1) / scalar_t(2))*pgy5)*(-y1 + y5) - ((scalar_t(1) / scalar_t(2))*pgz1 + (scalar_t(1) / scalar_t(2))*pgz5)*(-z1 + z5)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn9 = mdot9 > scalar_t(0) ? scalar_t(1) : (mdot9 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot10 = -rcoef10*(-p2 + p6 - ((scalar_t(1) / scalar_t(2))*pgx2 + (scalar_t(1) / scalar_t(2))*pgx6)*(-x2 + x6) - ((scalar_t(1) / scalar_t(2))*pgy2 + (scalar_t(1) / scalar_t(2))*pgy6)*(-y2 + y6) - ((scalar_t(1) / scalar_t(2))*pgz2 + (scalar_t(1) / scalar_t(2))*pgz6)*(-z2 + z6)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn10 = mdot10 > scalar_t(0) ? scalar_t(1) : (mdot10 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot11 = -rcoef11*(-p3 + p7 - ((scalar_t(1) / scalar_t(2))*pgx3 + (scalar_t(1) / scalar_t(2))*pgx7)*(-x3 + x7) - ((scalar_t(1) / scalar_t(2))*pgy3 + (scalar_t(1) / scalar_t(2))*pgy7)*(-y3 + y7) - ((scalar_t(1) / scalar_t(2))*pgz3 + (scalar_t(1) / scalar_t(2))*pgz7)*(-z3 + z7)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux3 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy3 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz3 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn11 = mdot11 > scalar_t(0) ? scalar_t(1) : (mdot11 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t x8 = ux0 + ux1;
+        const scalar_t x9 = uy0 + uy1;
+        const scalar_t x10 = uz0 + uz1;
+        const scalar_t x11 = rho*(cof0*x8 + cof1*x9 + cof2*x10);
+        const scalar_t x12 = scalar_t(2)*p0;
+        const scalar_t x13 = -x12;
+        const scalar_t x14 = scalar_t(2)*p1;
+        const scalar_t x15 = pgx0 + pgx1;
+        const scalar_t x16 = x0 - x1;
+        const scalar_t x17 = pgy0 + pgy1;
+        const scalar_t x18 = y0 - y1;
+        const scalar_t x19 = pgz0 + pgz1;
+        const scalar_t x20 = z0 - z1;
+        const scalar_t x21 = scalar_t(4)*rcoef0;
+        const scalar_t x22 = x21*(-x13 - x14 - x15*x16 - x17*x18 - x19*x20);
+        const scalar_t x23 = -x14;
+        const scalar_t x24 = x12 - x15*x16 - x17*x18 - x19*x20 + x23;
+        const scalar_t x25 = x11 + x21*x24;
+        const scalar_t x26 = sgn0*x25 + x11 + x22;
+        const scalar_t x27 = ux0 + ux3;
+        const scalar_t x28 = uy0 + uy3;
+        const scalar_t x29 = uz0 + uz3;
+        const scalar_t x30 = rho*(cof3*x27 + cof4*x28 + cof5*x29);
+        const scalar_t x31 = scalar_t(2)*p3;
+        const scalar_t x32 = pgx0 + pgx3;
+        const scalar_t x33 = -x3;
+        const scalar_t x34 = x0 + x33;
+        const scalar_t x35 = pgy0 + pgy3;
+        const scalar_t x36 = -y3;
+        const scalar_t x37 = x36 + y0;
+        const scalar_t x38 = pgz0 + pgz3;
+        const scalar_t x39 = -z3;
+        const scalar_t x40 = x39 + z0;
+        const scalar_t x41 = scalar_t(4)*rcoef4;
+        const scalar_t x42 = -x31;
+        const scalar_t x43 = x12 - x32*x34 - x35*x37 - x38*x40 + x42;
+        const scalar_t x44 = x41*x43;
+        const scalar_t x45 = x30 + x44;
+        const scalar_t x46 = sgn4*x45 + x30 + x41*(-x13 - x31 - x32*x34 - x35*x37 - x38*x40);
+        const scalar_t x47 = ux0*x46;
+        const scalar_t x48 = rho*(cof6*(ux0 + ux4) + cof7*(uy0 + uy4) + cof8*(uz0 + uz4));
+        const scalar_t x49 = scalar_t(2)*p4;
+        const scalar_t x50 = pgx0 + pgx4;
+        const scalar_t x51 = x0 - x4;
+        const scalar_t x52 = pgy0 + pgy4;
+        const scalar_t x53 = y0 - y4;
+        const scalar_t x54 = pgz0 + pgz4;
+        const scalar_t x55 = z0 - z4;
+        const scalar_t x56 = scalar_t(4)*rcoef8;
+        const scalar_t x57 = -x49;
+        const scalar_t x58 = x12 - x50*x51 - x52*x53 - x54*x55 + x57;
+        const scalar_t x59 = x56*x58;
+        const scalar_t x60 = x48 + x59;
+        const scalar_t x61 = sgn8*x60 + x48 + x56*(-x13 - x49 - x50*x51 - x52*x53 - x54*x55);
+        const scalar_t x62 = ux0*x61;
+        const scalar_t x63 = -x11;
+        const scalar_t x64 = -x21*x24 + x63;
+        const scalar_t x65 = sgn0*x64;
+        const scalar_t x66 = x25 + x65;
+        const scalar_t x67 = -x30;
+        const scalar_t x68 = sgn4*(-x41*x43 + x67) + x45;
+        const scalar_t x69 = ux3*x68;
+        const scalar_t x70 = -x48;
+        const scalar_t x71 = sgn8*(-x56*x58 + x70) + x60;
+        const scalar_t x72 = ux4*x71;
+        const scalar_t x73 = fmin(ux0, ux1);
+        const scalar_t x74 = fmax(ux0, ux1);
+        const scalar_t x75 = -scalar_t(23)*x0;
+        const scalar_t x76 = scalar_t(3)*x2 + scalar_t(3)*x4;
+        const scalar_t x77 = x6 + x76;
+        const scalar_t x78 = x75 + x77;
+        const scalar_t x79 = scalar_t(9)*x1;
+        const scalar_t x80 = scalar_t(3)*x3 + scalar_t(3)*x5;
+        const scalar_t x81 = x7 + x80;
+        const scalar_t x82 = x79 + x81;
+        const scalar_t x83 = x78 + x82;
+        const scalar_t x84 = (scalar_t(1) / scalar_t(32))*g0_0;
+        const scalar_t x85 = -scalar_t(23)*y0;
+        const scalar_t x86 = scalar_t(3)*y2 + scalar_t(3)*y4;
+        const scalar_t x87 = x86 + y6;
+        const scalar_t x88 = x85 + x87;
+        const scalar_t x89 = scalar_t(9)*y1;
+        const scalar_t x90 = scalar_t(3)*y3 + scalar_t(3)*y5;
+        const scalar_t x91 = x90 + y7;
+        const scalar_t x92 = x89 + x91;
+        const scalar_t x93 = x88 + x92;
+        const scalar_t x94 = (scalar_t(1) / scalar_t(32))*g0_1;
+        const scalar_t x95 = -scalar_t(23)*z0;
+        const scalar_t x96 = scalar_t(3)*z2 + scalar_t(3)*z4;
+        const scalar_t x97 = x96 + z6;
+        const scalar_t x98 = x95 + x97;
+        const scalar_t x99 = scalar_t(9)*z1;
+        const scalar_t x100 = scalar_t(3)*z3 + scalar_t(3)*z5;
+        const scalar_t x101 = x100 + z7;
+        const scalar_t x102 = x101 + x99;
+        const scalar_t x103 = x102 + x98;
+        const scalar_t x104 = (scalar_t(1) / scalar_t(32))*g0_2;
+        const scalar_t x105 = ux0 - fmax(x73, fmin(x74, ux0 + x103*x104 + x83*x84 + x93*x94));
+        const scalar_t x106 = fmin(ux0, ux3);
+        const scalar_t x107 = fmax(ux0, ux3);
+        const scalar_t x108 = scalar_t(3)*x1 + scalar_t(3)*x7;
+        const scalar_t x109 = scalar_t(9)*x3 + x5;
+        const scalar_t x110 = x108 + x109;
+        const scalar_t x111 = x110 + x78;
+        const scalar_t x112 = scalar_t(3)*y1 + scalar_t(3)*y7;
+        const scalar_t x113 = scalar_t(9)*y3 + y5;
+        const scalar_t x114 = x112 + x113;
+        const scalar_t x115 = x114 + x88;
+        const scalar_t x116 = scalar_t(3)*z1 + scalar_t(3)*z7;
+        const scalar_t x117 = scalar_t(9)*z3 + z5;
+        const scalar_t x118 = x116 + x117;
+        const scalar_t x119 = x118 + x98;
+        const scalar_t x120 = x46*(ux0 - fmax(x106, fmin(x107, ux0 + x104*x119 + x111*x84 + x115*x94)));
+        const scalar_t x121 = fmin(ux0, ux4);
+        const scalar_t x122 = fmax(ux0, ux4);
+        const scalar_t x123 = x2 + scalar_t(9)*x4;
+        const scalar_t x124 = x108 + x80;
+        const scalar_t x125 = x124 + x6;
+        const scalar_t x126 = x123 + x125 + x75;
+        const scalar_t x127 = y2 + scalar_t(9)*y4;
+        const scalar_t x128 = x112 + x90;
+        const scalar_t x129 = x128 + y6;
+        const scalar_t x130 = x127 + x129 + x85;
+        const scalar_t x131 = z2 + scalar_t(9)*z4;
+        const scalar_t x132 = x100 + x116;
+        const scalar_t x133 = x132 + z6;
+        const scalar_t x134 = x131 + x133 + x95;
+        const scalar_t x135 = x61*(ux0 - fmax(x121, fmin(x122, ux0 + x104*x134 + x126*x84 + x130*x94)));
+        const scalar_t x136 = scalar_t(9)*x0;
+        const scalar_t x137 = x136 + x77;
+        const scalar_t x138 = -scalar_t(23)*x1;
+        const scalar_t x139 = x138 + x81;
+        const scalar_t x140 = (scalar_t(1) / scalar_t(32))*x137 + (scalar_t(1) / scalar_t(32))*x139;
+        const scalar_t x141 = scalar_t(9)*y0;
+        const scalar_t x142 = x141 + x87;
+        const scalar_t x143 = -scalar_t(23)*y1;
+        const scalar_t x144 = x143 + x91;
+        const scalar_t x145 = (scalar_t(1) / scalar_t(32))*x142 + (scalar_t(1) / scalar_t(32))*x144;
+        const scalar_t x146 = scalar_t(9)*z0;
+        const scalar_t x147 = x146 + x97;
+        const scalar_t x148 = -scalar_t(23)*z1;
+        const scalar_t x149 = x101 + x148;
+        const scalar_t x150 = (scalar_t(1) / scalar_t(32))*x147 + (scalar_t(1) / scalar_t(32))*x149;
+        const scalar_t x151 = ux1 - fmax(x73, fmin(x74, g1_0*x140 + g1_1*x145 + g1_2*x150 + ux1));
+        const scalar_t x152 = -scalar_t(23)*x3 + x5;
+        const scalar_t x153 = x108 + x152;
+        const scalar_t x154 = (scalar_t(1) / scalar_t(32))*x137 + (scalar_t(1) / scalar_t(32))*x153;
+        const scalar_t x155 = -scalar_t(23)*y3 + y5;
+        const scalar_t x156 = x112 + x155;
+        const scalar_t x157 = (scalar_t(1) / scalar_t(32))*x142 + (scalar_t(1) / scalar_t(32))*x156;
+        const scalar_t x158 = -scalar_t(23)*z3 + z5;
+        const scalar_t x159 = x116 + x158;
+        const scalar_t x160 = (scalar_t(1) / scalar_t(32))*x147 + (scalar_t(1) / scalar_t(32))*x159;
+        const scalar_t x161 = x68*(ux3 - fmax(x106, fmin(x107, g3_0*x154 + g3_1*x157 + g3_2*x160 + ux3)));
+        const scalar_t x162 = x2 - scalar_t(23)*x4;
+        const scalar_t x163 = (scalar_t(1) / scalar_t(32))*x125 + (scalar_t(1) / scalar_t(32))*x136 + (scalar_t(1) / scalar_t(32))*x162;
+        const scalar_t x164 = y2 - scalar_t(23)*y4;
+        const scalar_t x165 = (scalar_t(1) / scalar_t(32))*x129 + (scalar_t(1) / scalar_t(32))*x141 + (scalar_t(1) / scalar_t(32))*x164;
+        const scalar_t x166 = z2 - scalar_t(23)*z4;
+        const scalar_t x167 = (scalar_t(1) / scalar_t(32))*x133 + (scalar_t(1) / scalar_t(32))*x146 + (scalar_t(1) / scalar_t(32))*x166;
+        const scalar_t x168 = x71*(ux4 - fmax(x121, fmin(x122, g4_0*x163 + g4_1*x165 + g4_2*x167 + ux4)));
+        const scalar_t x169 = p0 + p1;
+        const scalar_t x170 = scalar_t(2)*cof0;
+        const scalar_t x171 = x169*x170;
+        const scalar_t x172 = p0 + p3;
+        const scalar_t x173 = scalar_t(2)*cof3;
+        const scalar_t x174 = x172*x173;
+        const scalar_t x175 = p0 + p4;
+        const scalar_t x176 = scalar_t(2)*cof6;
+        const scalar_t x177 = x175*x176;
+        const scalar_t x178 = -ux5;
+        const scalar_t x179 = ux4 + ux7;
+        const scalar_t x180 = -ux6;
+        const scalar_t x181 = -ux2 + x180;
+        const scalar_t x182 = -ux1 + x178 + x179 + x181 + x27;
+        const scalar_t x183 = ux4 + ux5;
+        const scalar_t x184 = -ux7 + x8;
+        const scalar_t x185 = -ux3 + x181 + x183 + x184;
+        const scalar_t x186 = ux2 + ux3;
+        const scalar_t x187 = -ux4 + x178 + x180 + x184 + x186;
+        const scalar_t x188 = cof0*x182 + cof3*x185 + cof6*x187;
+        const scalar_t x189 = -uy5;
+        const scalar_t x190 = uy4 + uy7;
+        const scalar_t x191 = -uy6;
+        const scalar_t x192 = -uy2 + x191;
+        const scalar_t x193 = -uy1 + x189 + x190 + x192 + x28;
+        const scalar_t x194 = uy4 + uy5;
+        const scalar_t x195 = -uy7 + x9;
+        const scalar_t x196 = -uy3 + x192 + x194 + x195;
+        const scalar_t x197 = uy2 + uy3;
+        const scalar_t x198 = -uy4 + x189 + x191 + x195 + x197;
+        const scalar_t x199 = cof0*x193 + cof1*x182 + cof3*x196 + cof4*x185 + cof6*x198 + cof7*x187;
+        const scalar_t x200 = -uz5;
+        const scalar_t x201 = uz4 + uz7;
+        const scalar_t x202 = -uz6;
+        const scalar_t x203 = -uz2 + x202;
+        const scalar_t x204 = -uz1 + x200 + x201 + x203 + x29;
+        const scalar_t x205 = uz4 + uz5;
+        const scalar_t x206 = -uz7 + x10;
+        const scalar_t x207 = -uz3 + x203 + x205 + x206;
+        const scalar_t x208 = uz2 + uz3;
+        const scalar_t x209 = -uz4 + x200 + x202 + x206 + x208;
+        const scalar_t x210 = cof0*x204 + cof2*x182 + cof3*x207 + cof5*x185 + cof6*x209 + cof8*x187;
+        const scalar_t x211 = mu/det;
+        const scalar_t x212 = x211*(cof1*x199 + cof2*x210 + x170*x188);
+        const scalar_t x213 = x211*(cof4*x199 + cof5*x210 + x173*x188);
+        const scalar_t x214 = x211*(cof7*x199 + cof8*x210 + x176*x188);
+        const scalar_t x215 = x213 + x214;
+        const scalar_t x216 = x212 + x215;
+        const scalar_t x217 = uy0*x46;
+        const scalar_t x218 = uy0*x61;
+        const scalar_t x219 = uy3*x68;
+        const scalar_t x220 = uy4*x71;
+        const scalar_t x221 = fmin(uy0, uy1);
+        const scalar_t x222 = fmax(uy0, uy1);
+        const scalar_t x223 = (scalar_t(1) / scalar_t(32))*g0_3;
+        const scalar_t x224 = (scalar_t(1) / scalar_t(32))*g0_4;
+        const scalar_t x225 = (scalar_t(1) / scalar_t(32))*g0_5;
+        const scalar_t x226 = uy0 - fmax(x221, fmin(x222, uy0 + x103*x225 + x223*x83 + x224*x93));
+        const scalar_t x227 = fmin(uy0, uy3);
+        const scalar_t x228 = fmax(uy0, uy3);
+        const scalar_t x229 = x46*(uy0 - fmax(x227, fmin(x228, uy0 + x111*x223 + x115*x224 + x119*x225)));
+        const scalar_t x230 = fmin(uy0, uy4);
+        const scalar_t x231 = fmax(uy0, uy4);
+        const scalar_t x232 = x61*(uy0 - fmax(x230, fmin(x231, uy0 + x126*x223 + x130*x224 + x134*x225)));
+        const scalar_t x233 = uy1 - fmax(x221, fmin(x222, g1_3*x140 + g1_4*x145 + g1_5*x150 + uy1));
+        const scalar_t x234 = x68*(uy3 - fmax(x227, fmin(x228, g3_3*x154 + g3_4*x157 + g3_5*x160 + uy3)));
+        const scalar_t x235 = x71*(uy4 - fmax(x230, fmin(x231, g4_3*x163 + g4_4*x165 + g4_5*x167 + uy4)));
+        const scalar_t x236 = scalar_t(2)*cof1;
+        const scalar_t x237 = x169*x236;
+        const scalar_t x238 = scalar_t(2)*cof4;
+        const scalar_t x239 = x172*x238;
+        const scalar_t x240 = scalar_t(2)*cof7;
+        const scalar_t x241 = x175*x240;
+        const scalar_t x242 = cof1*x193 + cof4*x196 + cof7*x198;
+        const scalar_t x243 = cof1*x204 + cof2*x193 + cof4*x207 + cof5*x196 + cof7*x209 + cof8*x198;
+        const scalar_t x244 = x211*(cof0*x199 + cof2*x243 + x236*x242);
+        const scalar_t x245 = x211*(cof3*x199 + cof5*x243 + x238*x242);
+        const scalar_t x246 = x211*(cof6*x199 + cof8*x243 + x240*x242);
+        const scalar_t x247 = x245 + x246;
+        const scalar_t x248 = x244 + x247;
+        const scalar_t x249 = uz0*x46;
+        const scalar_t x250 = uz0*x61;
+        const scalar_t x251 = uz3*x68;
+        const scalar_t x252 = uz4*x71;
+        const scalar_t x253 = fmin(uz0, uz1);
+        const scalar_t x254 = fmax(uz0, uz1);
+        const scalar_t x255 = (scalar_t(1) / scalar_t(32))*g0_6;
+        const scalar_t x256 = (scalar_t(1) / scalar_t(32))*g0_7;
+        const scalar_t x257 = (scalar_t(1) / scalar_t(32))*g0_8;
+        const scalar_t x258 = uz0 - fmax(x253, fmin(x254, uz0 + x103*x257 + x255*x83 + x256*x93));
+        const scalar_t x259 = fmin(uz0, uz3);
+        const scalar_t x260 = fmax(uz0, uz3);
+        const scalar_t x261 = x46*(uz0 - fmax(x259, fmin(x260, uz0 + x111*x255 + x115*x256 + x119*x257)));
+        const scalar_t x262 = fmin(uz0, uz4);
+        const scalar_t x263 = fmax(uz0, uz4);
+        const scalar_t x264 = x61*(uz0 - fmax(x262, fmin(x263, uz0 + x126*x255 + x130*x256 + x134*x257)));
+        const scalar_t x265 = uz1 - fmax(x253, fmin(x254, g1_6*x140 + g1_7*x145 + g1_8*x150 + uz1));
+        const scalar_t x266 = x68*(uz3 - fmax(x259, fmin(x260, g3_6*x154 + g3_7*x157 + g3_8*x160 + uz3)));
+        const scalar_t x267 = x71*(uz4 - fmax(x262, fmin(x263, g4_6*x163 + g4_7*x165 + g4_8*x167 + uz4)));
+        const scalar_t x268 = scalar_t(2)*cof2;
+        const scalar_t x269 = x169*x268;
+        const scalar_t x270 = scalar_t(2)*cof5;
+        const scalar_t x271 = x172*x270;
+        const scalar_t x272 = scalar_t(2)*cof8;
+        const scalar_t x273 = x175*x272;
+        const scalar_t x274 = cof2*x204 + cof5*x207 + cof8*x209;
+        const scalar_t x275 = x211*(cof0*x210 + cof1*x243 + x268*x274);
+        const scalar_t x276 = x211*(cof3*x210 + cof4*x243 + x270*x274);
+        const scalar_t x277 = x211*(cof6*x210 + cof7*x243 + x272*x274);
+        const scalar_t x278 = x276 + x277;
+        const scalar_t x279 = x275 + x278;
+        const scalar_t x280 = -sgn0*x64 + x64;
+        const scalar_t x281 = x25 - x65;
+        const scalar_t x282 = -x212 + x215;
+        const scalar_t x283 = rho*(cof3*(ux1 + ux2) + cof4*(uy1 + uy2) + cof5*(uz1 + uz2));
+        const scalar_t x284 = scalar_t(2)*p2;
+        const scalar_t x285 = -x284;
+        const scalar_t x286 = pgx1 + pgx2;
+        const scalar_t x287 = x1 - x2;
+        const scalar_t x288 = pgy1 + pgy2;
+        const scalar_t x289 = y1 - y2;
+        const scalar_t x290 = pgz1 + pgz2;
+        const scalar_t x291 = z1 - z2;
+        const scalar_t x292 = x14 + x285 - x286*x287 - x288*x289 - x290*x291;
+        const scalar_t x293 = scalar_t(4)*rcoef5;
+        const scalar_t x294 = -x283 - x292*x293;
+        const scalar_t x295 = x283 + x292*x293;
+        const scalar_t x296 = -sgn5*x294 + x295;
+        const scalar_t x297 = fmin(ux1, ux2);
+        const scalar_t x298 = fmax(ux1, ux2);
+        const scalar_t x299 = scalar_t(3)*x0 + scalar_t(3)*x6;
+        const scalar_t x300 = -scalar_t(23)*x2 + x4;
+        const scalar_t x301 = x299 + x300;
+        const scalar_t x302 = (scalar_t(1) / scalar_t(32))*x301 + (scalar_t(1) / scalar_t(32))*x82;
+        const scalar_t x303 = scalar_t(3)*y0 + scalar_t(3)*y6;
+        const scalar_t x304 = -scalar_t(23)*y2 + y4;
+        const scalar_t x305 = x303 + x304;
+        const scalar_t x306 = (scalar_t(1) / scalar_t(32))*x305 + (scalar_t(1) / scalar_t(32))*x92;
+        const scalar_t x307 = scalar_t(3)*z0 + scalar_t(3)*z6;
+        const scalar_t x308 = -scalar_t(23)*z2 + z4;
+        const scalar_t x309 = x307 + x308;
+        const scalar_t x310 = (scalar_t(1) / scalar_t(32))*x102 + (scalar_t(1) / scalar_t(32))*x309;
+        const scalar_t x311 = -sgn5*x294 + x294;
+        const scalar_t x312 = scalar_t(9)*x2 + x4;
+        const scalar_t x313 = x299 + x312;
+        const scalar_t x314 = x139 + x313;
+        const scalar_t x315 = (scalar_t(1) / scalar_t(32))*g1_0;
+        const scalar_t x316 = scalar_t(9)*y2 + y4;
+        const scalar_t x317 = x303 + x316;
+        const scalar_t x318 = x144 + x317;
+        const scalar_t x319 = (scalar_t(1) / scalar_t(32))*g1_1;
+        const scalar_t x320 = scalar_t(9)*z2 + z4;
+        const scalar_t x321 = x307 + x320;
+        const scalar_t x322 = x149 + x321;
+        const scalar_t x323 = (scalar_t(1) / scalar_t(32))*g1_2;
+        const scalar_t x324 = p1 + p2;
+        const scalar_t x325 = ux1*x296 - ux2*x311 + x173*x324 - x296*(ux1 - fmax(x297, fmin(x298, ux1 + x314*x315 + x318*x319 + x322*x323))) + x311*(ux2 - fmax(x297, fmin(x298, g2_0*x302 + g2_1*x306 + g2_2*x310 + ux2)));
+        const scalar_t x326 = rho*(cof6*(ux1 + ux5) + cof7*(uy1 + uy5) + cof8*(uz1 + uz5));
+        const scalar_t x327 = scalar_t(2)*p5;
+        const scalar_t x328 = -x327;
+        const scalar_t x329 = pgx1 + pgx5;
+        const scalar_t x330 = -x5;
+        const scalar_t x331 = x1 + x330;
+        const scalar_t x332 = pgy1 + pgy5;
+        const scalar_t x333 = -y5;
+        const scalar_t x334 = x333 + y1;
+        const scalar_t x335 = pgz1 + pgz5;
+        const scalar_t x336 = -z5;
+        const scalar_t x337 = x336 + z1;
+        const scalar_t x338 = x14 + x328 - x329*x331 - x332*x334 - x335*x337;
+        const scalar_t x339 = scalar_t(4)*rcoef9;
+        const scalar_t x340 = -x326 - x338*x339;
+        const scalar_t x341 = x326 + x338*x339;
+        const scalar_t x342 = -sgn9*x340 + x341;
+        const scalar_t x343 = fmin(ux1, ux5);
+        const scalar_t x344 = fmax(ux1, ux5);
+        const scalar_t x345 = x3 - scalar_t(23)*x5;
+        const scalar_t x346 = x299 + x76;
+        const scalar_t x347 = x346 + x7;
+        const scalar_t x348 = (scalar_t(1) / scalar_t(32))*x345 + (scalar_t(1) / scalar_t(32))*x347 + (scalar_t(1) / scalar_t(32))*x79;
+        const scalar_t x349 = y3 - scalar_t(23)*y5;
+        const scalar_t x350 = x303 + x86;
+        const scalar_t x351 = x350 + y7;
+        const scalar_t x352 = (scalar_t(1) / scalar_t(32))*x349 + (scalar_t(1) / scalar_t(32))*x351 + (scalar_t(1) / scalar_t(32))*x89;
+        const scalar_t x353 = z3 - scalar_t(23)*z5;
+        const scalar_t x354 = x307 + x96;
+        const scalar_t x355 = x354 + z7;
+        const scalar_t x356 = (scalar_t(1) / scalar_t(32))*x353 + (scalar_t(1) / scalar_t(32))*x355 + (scalar_t(1) / scalar_t(32))*x99;
+        const scalar_t x357 = -sgn9*x340 + x340;
+        const scalar_t x358 = x3 + scalar_t(9)*x5;
+        const scalar_t x359 = x138 + x347 + x358;
+        const scalar_t x360 = y3 + scalar_t(9)*y5;
+        const scalar_t x361 = x143 + x351 + x360;
+        const scalar_t x362 = z3 + scalar_t(9)*z5;
+        const scalar_t x363 = x148 + x355 + x362;
+        const scalar_t x364 = p1 + p5;
+        const scalar_t x365 = ux1*x342 - ux5*x357 + x176*x364 - x342*(ux1 - fmax(x343, fmin(x344, ux1 + x315*x359 + x319*x361 + x323*x363))) + x357*(ux5 - fmax(x343, fmin(x344, g5_0*x348 + g5_1*x352 + g5_2*x356 + ux5)));
+        const scalar_t x366 = -x244 + x247;
+        const scalar_t x367 = fmin(uy1, uy2);
+        const scalar_t x368 = fmax(uy1, uy2);
+        const scalar_t x369 = (scalar_t(1) / scalar_t(32))*g1_3;
+        const scalar_t x370 = (scalar_t(1) / scalar_t(32))*g1_4;
+        const scalar_t x371 = (scalar_t(1) / scalar_t(32))*g1_5;
+        const scalar_t x372 = uy1*x296 - uy2*x311 + x238*x324 - x296*(uy1 - fmax(x367, fmin(x368, uy1 + x314*x369 + x318*x370 + x322*x371))) + x311*(uy2 - fmax(x367, fmin(x368, g2_3*x302 + g2_4*x306 + g2_5*x310 + uy2)));
+        const scalar_t x373 = fmin(uy1, uy5);
+        const scalar_t x374 = fmax(uy1, uy5);
+        const scalar_t x375 = uy1*x342 - uy5*x357 + x240*x364 - x342*(uy1 - fmax(x373, fmin(x374, uy1 + x359*x369 + x361*x370 + x363*x371))) + x357*(uy5 - fmax(x373, fmin(x374, g5_3*x348 + g5_4*x352 + g5_5*x356 + uy5)));
+        const scalar_t x376 = -x275 + x278;
+        const scalar_t x377 = fmin(uz1, uz2);
+        const scalar_t x378 = fmax(uz1, uz2);
+        const scalar_t x379 = (scalar_t(1) / scalar_t(32))*g1_6;
+        const scalar_t x380 = (scalar_t(1) / scalar_t(32))*g1_7;
+        const scalar_t x381 = (scalar_t(1) / scalar_t(32))*g1_8;
+        const scalar_t x382 = uz1*x296 - uz2*x311 + x270*x324 - x296*(uz1 - fmax(x377, fmin(x378, uz1 + x314*x379 + x318*x380 + x322*x381))) + x311*(uz2 - fmax(x377, fmin(x378, g2_6*x302 + g2_7*x306 + g2_8*x310 + uz2)));
+        const scalar_t x383 = fmin(uz1, uz5);
+        const scalar_t x384 = fmax(uz1, uz5);
+        const scalar_t x385 = uz1*x342 - uz5*x357 + x272*x364 - x342*(uz1 - fmax(x383, fmin(x384, uz1 + x359*x379 + x361*x380 + x363*x381))) + x357*(uz5 - fmax(x383, fmin(x384, g5_6*x348 + g5_7*x352 + g5_8*x356 + uz5)));
+        const scalar_t x386 = rho*(cof0*x186 + cof1*x197 + cof2*x208);
+        const scalar_t x387 = x285 + x31 + (pgx2 + pgx3)*(x2 + x33) + (pgy2 + pgy3)*(x36 + y2) + (pgz2 + pgz3)*(x39 + z2);
+        const scalar_t x388 = scalar_t(4)*rcoef1;
+        const scalar_t x389 = -x386 - x387*x388;
+        const scalar_t x390 = sgn1*x389;
+        const scalar_t x391 = x386 + x387*x388;
+        const scalar_t x392 = -x390 + x391;
+        const scalar_t x393 = rho*(cof6*(ux2 + ux6) + cof7*(uy2 + uy6) + cof8*(uz2 + uz6));
+        const scalar_t x394 = -x393;
+        const scalar_t x395 = -scalar_t(2)*p6;
+        const scalar_t x396 = -x6;
+        const scalar_t x397 = -y6;
+        const scalar_t x398 = -z6;
+        const scalar_t x399 = x284 + x395 + (pgx2 + pgx6)*(-x2 - x396) + (pgy2 + pgy6)*(-x397 - y2) + (pgz2 + pgz6)*(-x398 - z2);
+        const scalar_t x400 = scalar_t(4)*rcoef10;
+        const scalar_t x401 = x394 - x399*x400;
+        const scalar_t x402 = -sgn10*x401 + x401;
+        const scalar_t x403 = ux6*x402;
+        const scalar_t x404 = fmin(ux2, ux3);
+        const scalar_t x405 = fmax(ux2, ux3);
+        const scalar_t x406 = x110 + x301;
+        const scalar_t x407 = (scalar_t(1) / scalar_t(32))*g2_0;
+        const scalar_t x408 = x114 + x305;
+        const scalar_t x409 = (scalar_t(1) / scalar_t(32))*g2_1;
+        const scalar_t x410 = x118 + x309;
+        const scalar_t x411 = (scalar_t(1) / scalar_t(32))*g2_2;
+        const scalar_t x412 = ux2 - fmax(x404, fmin(x405, ux2 + x406*x407 + x408*x409 + x410*x411));
+        const scalar_t x413 = -sgn1*x389 + x389;
+        const scalar_t x414 = fmin(ux2, ux6);
+        const scalar_t x415 = fmax(ux2, ux6);
+        const scalar_t x416 = scalar_t(9)*x6;
+        const scalar_t x417 = x0 + x124;
+        const scalar_t x418 = x300 + x416 + x417;
+        const scalar_t x419 = scalar_t(9)*y6;
+        const scalar_t x420 = x128 + y0;
+        const scalar_t x421 = x304 + x419 + x420;
+        const scalar_t x422 = scalar_t(9)*z6;
+        const scalar_t x423 = x132 + z0;
+        const scalar_t x424 = x308 + x422 + x423;
+        const scalar_t x425 = x393 + x399*x400;
+        const scalar_t x426 = -sgn10*x401 + x425;
+        const scalar_t x427 = x426*(ux2 - fmax(x414, fmin(x415, ux2 + x407*x418 + x409*x421 + x411*x424)));
+        const scalar_t x428 = ux2*x426;
+        const scalar_t x429 = (scalar_t(1) / scalar_t(32))*x153 + (scalar_t(1) / scalar_t(32))*x313;
+        const scalar_t x430 = (scalar_t(1) / scalar_t(32))*x156 + (scalar_t(1) / scalar_t(32))*x317;
+        const scalar_t x431 = (scalar_t(1) / scalar_t(32))*x159 + (scalar_t(1) / scalar_t(32))*x321;
+        const scalar_t x432 = ux3 - fmax(x404, fmin(x405, g3_0*x429 + g3_1*x430 + g3_2*x431 + ux3));
+        const scalar_t x433 = -scalar_t(23)*x6;
+        const scalar_t x434 = (scalar_t(1) / scalar_t(32))*x312 + (scalar_t(1) / scalar_t(32))*x417 + (scalar_t(1) / scalar_t(32))*x433;
+        const scalar_t x435 = -scalar_t(23)*y6;
+        const scalar_t x436 = (scalar_t(1) / scalar_t(32))*x316 + (scalar_t(1) / scalar_t(32))*x420 + (scalar_t(1) / scalar_t(32))*x435;
+        const scalar_t x437 = -scalar_t(23)*z6;
+        const scalar_t x438 = (scalar_t(1) / scalar_t(32))*x320 + (scalar_t(1) / scalar_t(32))*x423 + (scalar_t(1) / scalar_t(32))*x437;
+        const scalar_t x439 = x402*(ux6 - fmax(x414, fmin(x415, g6_0*x434 + g6_1*x436 + g6_2*x438 + ux6)));
+        const scalar_t x440 = p2 + p6;
+        const scalar_t x441 = x176*x440;
+        const scalar_t x442 = p2 + p3;
+        const scalar_t x443 = x170*x442 + x212;
+        const scalar_t x444 = x213 - x214;
+        const scalar_t x445 = uy6*x402;
+        const scalar_t x446 = fmin(uy2, uy3);
+        const scalar_t x447 = fmax(uy2, uy3);
+        const scalar_t x448 = (scalar_t(1) / scalar_t(32))*g2_3;
+        const scalar_t x449 = (scalar_t(1) / scalar_t(32))*g2_4;
+        const scalar_t x450 = (scalar_t(1) / scalar_t(32))*g2_5;
+        const scalar_t x451 = uy2 - fmax(x446, fmin(x447, uy2 + x406*x448 + x408*x449 + x410*x450));
+        const scalar_t x452 = fmin(uy2, uy6);
+        const scalar_t x453 = fmax(uy2, uy6);
+        const scalar_t x454 = x426*(uy2 - fmax(x452, fmin(x453, uy2 + x418*x448 + x421*x449 + x424*x450)));
+        const scalar_t x455 = uy2*x426;
+        const scalar_t x456 = uy3 - fmax(x446, fmin(x447, g3_3*x429 + g3_4*x430 + g3_5*x431 + uy3));
+        const scalar_t x457 = x402*(uy6 - fmax(x452, fmin(x453, g6_3*x434 + g6_4*x436 + g6_5*x438 + uy6)));
+        const scalar_t x458 = x240*x440;
+        const scalar_t x459 = x236*x442 + x244;
+        const scalar_t x460 = x245 - x246;
+        const scalar_t x461 = uz6*x402;
+        const scalar_t x462 = fmin(uz2, uz3);
+        const scalar_t x463 = fmax(uz2, uz3);
+        const scalar_t x464 = (scalar_t(1) / scalar_t(32))*g2_6;
+        const scalar_t x465 = (scalar_t(1) / scalar_t(32))*g2_7;
+        const scalar_t x466 = (scalar_t(1) / scalar_t(32))*g2_8;
+        const scalar_t x467 = uz2 - fmax(x462, fmin(x463, uz2 + x406*x464 + x408*x465 + x410*x466));
+        const scalar_t x468 = fmin(uz2, uz6);
+        const scalar_t x469 = fmax(uz2, uz6);
+        const scalar_t x470 = x426*(uz2 - fmax(x468, fmin(x469, uz2 + x418*x464 + x421*x465 + x424*x466)));
+        const scalar_t x471 = uz2*x426;
+        const scalar_t x472 = uz3 - fmax(x462, fmin(x463, g3_6*x429 + g3_7*x430 + g3_8*x431 + uz3));
+        const scalar_t x473 = x402*(uz6 - fmax(x468, fmin(x469, g6_6*x434 + g6_7*x436 + g6_8*x438 + uz6)));
+        const scalar_t x474 = x272*x440;
+        const scalar_t x475 = x268*x442 + x275;
+        const scalar_t x476 = x276 - x277;
+        const scalar_t x477 = x390 + x391;
+        const scalar_t x478 = sgn1*x391 + x391;
+        const scalar_t x479 = rho*(cof6*(ux3 + ux7) + cof7*(uy3 + uy7) + cof8*(uz3 + uz7));
+        const scalar_t x480 = scalar_t(2)*p7;
+        const scalar_t x481 = pgx3 + pgx7;
+        const scalar_t x482 = -x7;
+        const scalar_t x483 = x3 + x482;
+        const scalar_t x484 = pgy3 + pgy7;
+        const scalar_t x485 = -y7;
+        const scalar_t x486 = x485 + y3;
+        const scalar_t x487 = pgz3 + pgz7;
+        const scalar_t x488 = -z7;
+        const scalar_t x489 = x488 + z3;
+        const scalar_t x490 = scalar_t(4)*rcoef11;
+        const scalar_t x491 = -x480;
+        const scalar_t x492 = x31 - x481*x483 - x484*x486 - x487*x489 + x491;
+        const scalar_t x493 = x479 + x490*x492;
+        const scalar_t x494 = sgn11*x493 + x479 + x490*(-x42 - x480 - x481*x483 - x484*x486 - x487*x489);
+        const scalar_t x495 = -x479 - x490*x492;
+        const scalar_t x496 = sgn11*x495;
+        const scalar_t x497 = x493 + x496;
+        const scalar_t x498 = fmin(ux3, ux7);
+        const scalar_t x499 = fmax(ux3, ux7);
+        const scalar_t x500 = scalar_t(9)*x7;
+        const scalar_t x501 = x1 + x346;
+        const scalar_t x502 = (scalar_t(1) / scalar_t(32))*x152 + (scalar_t(1) / scalar_t(32))*x500 + (scalar_t(1) / scalar_t(32))*x501;
+        const scalar_t x503 = scalar_t(9)*y7;
+        const scalar_t x504 = x350 + y1;
+        const scalar_t x505 = (scalar_t(1) / scalar_t(32))*x155 + (scalar_t(1) / scalar_t(32))*x503 + (scalar_t(1) / scalar_t(32))*x504;
+        const scalar_t x506 = scalar_t(9)*z7;
+        const scalar_t x507 = x354 + z1;
+        const scalar_t x508 = (scalar_t(1) / scalar_t(32))*x158 + (scalar_t(1) / scalar_t(32))*x506 + (scalar_t(1) / scalar_t(32))*x507;
+        const scalar_t x509 = ux3 - fmax(x498, fmin(x499, g3_0*x502 + g3_1*x505 + g3_2*x508 + ux3));
+        const scalar_t x510 = -scalar_t(23)*x7;
+        const scalar_t x511 = (scalar_t(1) / scalar_t(32))*x109 + (scalar_t(1) / scalar_t(32))*x501 + (scalar_t(1) / scalar_t(32))*x510;
+        const scalar_t x512 = -scalar_t(23)*y7;
+        const scalar_t x513 = (scalar_t(1) / scalar_t(32))*x113 + (scalar_t(1) / scalar_t(32))*x504 + (scalar_t(1) / scalar_t(32))*x512;
+        const scalar_t x514 = -scalar_t(23)*z7;
+        const scalar_t x515 = (scalar_t(1) / scalar_t(32))*x117 + (scalar_t(1) / scalar_t(32))*x507 + (scalar_t(1) / scalar_t(32))*x514;
+        const scalar_t x516 = ux7 - fmax(x498, fmin(x499, g7_0*x511 + g7_1*x513 + g7_2*x515 + ux7));
+        const scalar_t x517 = p3 + p7;
+        const scalar_t x518 = x176*x517;
+        const scalar_t x519 = -x213 + x214;
+        const scalar_t x520 = fmin(uy3, uy7);
+        const scalar_t x521 = fmax(uy3, uy7);
+        const scalar_t x522 = uy3 - fmax(x520, fmin(x521, g3_3*x502 + g3_4*x505 + g3_5*x508 + uy3));
+        const scalar_t x523 = uy7 - fmax(x520, fmin(x521, g7_3*x511 + g7_4*x513 + g7_5*x515 + uy7));
+        const scalar_t x524 = x240*x517;
+        const scalar_t x525 = -x245 + x246;
+        const scalar_t x526 = fmin(uz3, uz7);
+        const scalar_t x527 = fmax(uz3, uz7);
+        const scalar_t x528 = uz3 - fmax(x526, fmin(x527, g3_6*x502 + g3_7*x505 + g3_8*x508 + uz3));
+        const scalar_t x529 = uz7 - fmax(x526, fmin(x527, g7_6*x511 + g7_7*x513 + g7_8*x515 + uz7));
+        const scalar_t x530 = x272*x517;
+        const scalar_t x531 = -x276 + x277;
+        const scalar_t x532 = rho*(cof0*x183 + cof1*x194 + cof2*x205);
+        const scalar_t x533 = pgx4 + pgx5;
+        const scalar_t x534 = x330 + x4;
+        const scalar_t x535 = pgy4 + pgy5;
+        const scalar_t x536 = x333 + y4;
+        const scalar_t x537 = pgz4 + pgz5;
+        const scalar_t x538 = x336 + z4;
+        const scalar_t x539 = scalar_t(4)*rcoef2;
+        const scalar_t x540 = x328 + x49 - x533*x534 - x535*x536 - x537*x538;
+        const scalar_t x541 = x532 + x539*x540;
+        const scalar_t x542 = sgn2*x541 + x532 + x539*(-x327 - x533*x534 - x535*x536 - x537*x538 - x57);
+        const scalar_t x543 = rho*(cof3*x179 + cof4*x190 + cof5*x201);
+        const scalar_t x544 = pgx4 + pgx7;
+        const scalar_t x545 = x4 + x482;
+        const scalar_t x546 = pgy4 + pgy7;
+        const scalar_t x547 = x485 + y4;
+        const scalar_t x548 = pgz4 + pgz7;
+        const scalar_t x549 = x488 + z4;
+        const scalar_t x550 = scalar_t(4)*rcoef6;
+        const scalar_t x551 = x49 + x491 - x544*x545 - x546*x547 - x548*x549;
+        const scalar_t x552 = x543 + x550*x551;
+        const scalar_t x553 = sgn6*x552 + x543 + x550*(-x480 - x544*x545 - x546*x547 - x548*x549 - x57);
+        const scalar_t x554 = -x532 - x539*x540;
+        const scalar_t x555 = sgn2*x554;
+        const scalar_t x556 = x541 + x555;
+        const scalar_t x557 = -x543 - x550*x551;
+        const scalar_t x558 = sgn6*x557;
+        const scalar_t x559 = x552 + x558;
+        const scalar_t x560 = fmin(ux4, ux5);
+        const scalar_t x561 = fmax(ux4, ux5);
+        const scalar_t x562 = x162 + x299;
+        const scalar_t x563 = x108 + x358;
+        const scalar_t x564 = x562 + x563;
+        const scalar_t x565 = (scalar_t(1) / scalar_t(32))*g4_0;
+        const scalar_t x566 = x164 + x303;
+        const scalar_t x567 = x112 + x360;
+        const scalar_t x568 = x566 + x567;
+        const scalar_t x569 = (scalar_t(1) / scalar_t(32))*g4_1;
+        const scalar_t x570 = x166 + x307;
+        const scalar_t x571 = x116 + x362;
+        const scalar_t x572 = x570 + x571;
+        const scalar_t x573 = (scalar_t(1) / scalar_t(32))*g4_2;
+        const scalar_t x574 = ux4 - fmax(x560, fmin(x561, ux4 + x564*x565 + x568*x569 + x572*x573));
+        const scalar_t x575 = fmin(ux4, ux7);
+        const scalar_t x576 = fmax(ux4, ux7);
+        const scalar_t x577 = x1 + x80;
+        const scalar_t x578 = x500 + x577;
+        const scalar_t x579 = x562 + x578;
+        const scalar_t x580 = x90 + y1;
+        const scalar_t x581 = x503 + x580;
+        const scalar_t x582 = x566 + x581;
+        const scalar_t x583 = x100 + z1;
+        const scalar_t x584 = x506 + x583;
+        const scalar_t x585 = x570 + x584;
+        const scalar_t x586 = ux4 - fmax(x575, fmin(x576, ux4 + x565*x579 + x569*x582 + x573*x585));
+        const scalar_t x587 = x123 + x299;
+        const scalar_t x588 = x108 + x345;
+        const scalar_t x589 = (scalar_t(1) / scalar_t(32))*x587 + (scalar_t(1) / scalar_t(32))*x588;
+        const scalar_t x590 = x127 + x303;
+        const scalar_t x591 = x112 + x349;
+        const scalar_t x592 = (scalar_t(1) / scalar_t(32))*x590 + (scalar_t(1) / scalar_t(32))*x591;
+        const scalar_t x593 = x131 + x307;
+        const scalar_t x594 = x116 + x353;
+        const scalar_t x595 = (scalar_t(1) / scalar_t(32))*x593 + (scalar_t(1) / scalar_t(32))*x594;
+        const scalar_t x596 = ux5 - fmax(x560, fmin(x561, g5_0*x589 + g5_1*x592 + g5_2*x595 + ux5));
+        const scalar_t x597 = x510 + x577;
+        const scalar_t x598 = (scalar_t(1) / scalar_t(32))*x587 + (scalar_t(1) / scalar_t(32))*x597;
+        const scalar_t x599 = x512 + x580;
+        const scalar_t x600 = (scalar_t(1) / scalar_t(32))*x590 + (scalar_t(1) / scalar_t(32))*x599;
+        const scalar_t x601 = x514 + x583;
+        const scalar_t x602 = (scalar_t(1) / scalar_t(32))*x593 + (scalar_t(1) / scalar_t(32))*x601;
+        const scalar_t x603 = ux7 - fmax(x575, fmin(x576, g7_0*x598 + g7_1*x600 + g7_2*x602 + ux7));
+        const scalar_t x604 = p4 + p7;
+        const scalar_t x605 = x173*x604;
+        const scalar_t x606 = p4 + p5;
+        const scalar_t x607 = x170*x606 + x212;
+        const scalar_t x608 = fmin(uy4, uy5);
+        const scalar_t x609 = fmax(uy4, uy5);
+        const scalar_t x610 = (scalar_t(1) / scalar_t(32))*g4_3;
+        const scalar_t x611 = (scalar_t(1) / scalar_t(32))*g4_4;
+        const scalar_t x612 = (scalar_t(1) / scalar_t(32))*g4_5;
+        const scalar_t x613 = uy4 - fmax(x608, fmin(x609, uy4 + x564*x610 + x568*x611 + x572*x612));
+        const scalar_t x614 = fmin(uy4, uy7);
+        const scalar_t x615 = fmax(uy4, uy7);
+        const scalar_t x616 = uy4 - fmax(x614, fmin(x615, uy4 + x579*x610 + x582*x611 + x585*x612));
+        const scalar_t x617 = uy5 - fmax(x608, fmin(x609, g5_3*x589 + g5_4*x592 + g5_5*x595 + uy5));
+        const scalar_t x618 = uy7 - fmax(x614, fmin(x615, g7_3*x598 + g7_4*x600 + g7_5*x602 + uy7));
+        const scalar_t x619 = x238*x604;
+        const scalar_t x620 = x236*x606 + x244;
+        const scalar_t x621 = fmin(uz4, uz5);
+        const scalar_t x622 = fmax(uz4, uz5);
+        const scalar_t x623 = (scalar_t(1) / scalar_t(32))*g4_6;
+        const scalar_t x624 = (scalar_t(1) / scalar_t(32))*g4_7;
+        const scalar_t x625 = (scalar_t(1) / scalar_t(32))*g4_8;
+        const scalar_t x626 = uz4 - fmax(x621, fmin(x622, uz4 + x564*x623 + x568*x624 + x572*x625));
+        const scalar_t x627 = fmin(uz4, uz7);
+        const scalar_t x628 = fmax(uz4, uz7);
+        const scalar_t x629 = uz4 - fmax(x627, fmin(x628, uz4 + x579*x623 + x582*x624 + x585*x625));
+        const scalar_t x630 = uz5 - fmax(x621, fmin(x622, g5_6*x589 + g5_7*x592 + g5_8*x595 + uz5));
+        const scalar_t x631 = uz7 - fmax(x627, fmin(x628, g7_6*x598 + g7_7*x600 + g7_8*x602 + uz7));
+        const scalar_t x632 = x270*x604;
+        const scalar_t x633 = x268*x606 + x275;
+        const scalar_t x634 = x541 - x555;
+        const scalar_t x635 = rho*(cof3*(ux5 + ux6) + cof4*(uy5 + uy6) + cof5*(uz5 + uz6));
+        const scalar_t x636 = -x635;
+        const scalar_t x637 = x327 + x395 + (pgx5 + pgx6)*(-x396 - x5) + (pgy5 + pgy6)*(-x397 - y5) + (pgz5 + pgz6)*(-x398 - z5);
+        const scalar_t x638 = scalar_t(4)*rcoef7;
+        const scalar_t x639 = x636 - x637*x638;
+        const scalar_t x640 = -sgn7*x639 + x639;
+        const scalar_t x641 = ux6*x640;
+        const scalar_t x642 = -sgn2*x554 + x554;
+        const scalar_t x643 = fmin(ux5, ux6);
+        const scalar_t x644 = fmax(ux5, ux6);
+        const scalar_t x645 = x0 + x76;
+        const scalar_t x646 = x416 + x645;
+        const scalar_t x647 = (scalar_t(1) / scalar_t(32))*x588 + (scalar_t(1) / scalar_t(32))*x646;
+        const scalar_t x648 = x86 + y0;
+        const scalar_t x649 = x419 + x648;
+        const scalar_t x650 = (scalar_t(1) / scalar_t(32))*x591 + (scalar_t(1) / scalar_t(32))*x649;
+        const scalar_t x651 = x96 + z0;
+        const scalar_t x652 = x422 + x651;
+        const scalar_t x653 = (scalar_t(1) / scalar_t(32))*x594 + (scalar_t(1) / scalar_t(32))*x652;
+        const scalar_t x654 = x635 + x637*x638;
+        const scalar_t x655 = -sgn7*x639 + x654;
+        const scalar_t x656 = x655*(ux5 - fmax(x643, fmin(x644, g5_0*x647 + g5_1*x650 + g5_2*x653 + ux5)));
+        const scalar_t x657 = ux5*x655;
+        const scalar_t x658 = x433 + x645;
+        const scalar_t x659 = (scalar_t(1) / scalar_t(32))*x563 + (scalar_t(1) / scalar_t(32))*x658;
+        const scalar_t x660 = x435 + x648;
+        const scalar_t x661 = (scalar_t(1) / scalar_t(32))*x567 + (scalar_t(1) / scalar_t(32))*x660;
+        const scalar_t x662 = x437 + x651;
+        const scalar_t x663 = (scalar_t(1) / scalar_t(32))*x571 + (scalar_t(1) / scalar_t(32))*x662;
+        const scalar_t x664 = x640*(ux6 - fmax(x643, fmin(x644, g6_0*x659 + g6_1*x661 + g6_2*x663 + ux6)));
+        const scalar_t x665 = p5 + p6;
+        const scalar_t x666 = x173*x665;
+        const scalar_t x667 = uy6*x640;
+        const scalar_t x668 = fmin(uy5, uy6);
+        const scalar_t x669 = fmax(uy5, uy6);
+        const scalar_t x670 = x655*(uy5 - fmax(x668, fmin(x669, g5_3*x647 + g5_4*x650 + g5_5*x653 + uy5)));
+        const scalar_t x671 = uy5*x655;
+        const scalar_t x672 = x640*(uy6 - fmax(x668, fmin(x669, g6_3*x659 + g6_4*x661 + g6_5*x663 + uy6)));
+        const scalar_t x673 = x238*x665;
+        const scalar_t x674 = uz6*x640;
+        const scalar_t x675 = fmin(uz5, uz6);
+        const scalar_t x676 = fmax(uz5, uz6);
+        const scalar_t x677 = x655*(uz5 - fmax(x675, fmin(x676, g5_6*x647 + g5_7*x650 + g5_8*x653 + uz5)));
+        const scalar_t x678 = uz5*x655;
+        const scalar_t x679 = x640*(uz6 - fmax(x675, fmin(x676, g6_6*x659 + g6_7*x661 + g6_8*x663 + uz6)));
+        const scalar_t x680 = x270*x665;
+        const scalar_t x681 = rho*(cof0*(ux6 + ux7) + cof1*(uy6 + uy7) + cof2*(uz6 + uz7));
+        const scalar_t x682 = -x681;
+        const scalar_t x683 = x395 + x480 + (pgx6 + pgx7)*(x482 + x6) + (pgy6 + pgy7)*(x485 + y6) + (pgz6 + pgz7)*(x488 + z6);
+        const scalar_t x684 = scalar_t(4)*rcoef3;
+        const scalar_t x685 = x682 - x683*x684;
+        const scalar_t x686 = x681 + x683*x684;
+        const scalar_t x687 = -sgn3*x685 + x686;
+        const scalar_t x688 = ux7*x687;
+        const scalar_t x689 = fmin(ux6, ux7);
+        const scalar_t x690 = fmax(ux6, ux7);
+        const scalar_t x691 = (scalar_t(1) / scalar_t(32))*x578 + (scalar_t(1) / scalar_t(32))*x658;
+        const scalar_t x692 = (scalar_t(1) / scalar_t(32))*x581 + (scalar_t(1) / scalar_t(32))*x660;
+        const scalar_t x693 = (scalar_t(1) / scalar_t(32))*x584 + (scalar_t(1) / scalar_t(32))*x662;
+        const scalar_t x694 = -sgn3*x685 + x685;
+        const scalar_t x695 = x694*(ux6 - fmax(x689, fmin(x690, g6_0*x691 + g6_1*x692 + g6_2*x693 + ux6)));
+        const scalar_t x696 = ux6*x694;
+        const scalar_t x697 = (scalar_t(1) / scalar_t(32))*x597 + (scalar_t(1) / scalar_t(32))*x646;
+        const scalar_t x698 = (scalar_t(1) / scalar_t(32))*x599 + (scalar_t(1) / scalar_t(32))*x649;
+        const scalar_t x699 = (scalar_t(1) / scalar_t(32))*x601 + (scalar_t(1) / scalar_t(32))*x652;
+        const scalar_t x700 = x687*(ux7 - fmax(x689, fmin(x690, g7_0*x697 + g7_1*x698 + g7_2*x699 + ux7)));
+        const scalar_t x701 = p6 + p7;
+        const scalar_t x702 = x170*x701;
+        const scalar_t x703 = uy7*x687;
+        const scalar_t x704 = fmin(uy6, uy7);
+        const scalar_t x705 = fmax(uy6, uy7);
+        const scalar_t x706 = x694*(uy6 - fmax(x704, fmin(x705, g6_3*x691 + g6_4*x692 + g6_5*x693 + uy6)));
+        const scalar_t x707 = uy6*x694;
+        const scalar_t x708 = x687*(uy7 - fmax(x704, fmin(x705, g7_3*x697 + g7_4*x698 + g7_5*x699 + uy7)));
+        const scalar_t x709 = x236*x701;
+        const scalar_t x710 = uz7*x687;
+        const scalar_t x711 = fmin(uz6, uz7);
+        const scalar_t x712 = fmax(uz6, uz7);
+        const scalar_t x713 = x694*(uz6 - fmax(x711, fmin(x712, g6_6*x691 + g6_7*x692 + g6_8*x693 + uz6)));
+        const scalar_t x714 = uz6*x694;
+        const scalar_t x715 = x687*(uz7 - fmax(x711, fmin(x712, g7_6*x697 + g7_7*x698 + g7_8*x699 + uz7)));
+        const scalar_t x716 = x268*x701;
+        const scalar_t x717 = x493 - x496;
+        const scalar_t x718 = x552 - x558;
+        const scalar_t x719 = -sgn11*x495 + x495;
+        const scalar_t x720 = -sgn6*x557 + x557;
+        out.rx[0][lane] = (scalar_t(1) / scalar_t(16))*ux0*x26 + (scalar_t(1) / scalar_t(16))*ux1*x66 - scalar_t(1) / scalar_t(16)*x105*x26 - scalar_t(1) / scalar_t(16)*x120 - scalar_t(1) / scalar_t(16)*x135 - scalar_t(1) / scalar_t(16)*x151*x66 - scalar_t(1) / scalar_t(16)*x161 - scalar_t(1) / scalar_t(16)*x168 + (scalar_t(1) / scalar_t(16))*x171 + (scalar_t(1) / scalar_t(16))*x174 + (scalar_t(1) / scalar_t(16))*x177 + (scalar_t(1) / scalar_t(16))*x216 + (scalar_t(1) / scalar_t(16))*x47 + (scalar_t(1) / scalar_t(16))*x62 + (scalar_t(1) / scalar_t(16))*x69 + (scalar_t(1) / scalar_t(16))*x72;
+        out.ry[0][lane] = (scalar_t(1) / scalar_t(16))*uy0*x26 + (scalar_t(1) / scalar_t(16))*uy1*x66 + (scalar_t(1) / scalar_t(16))*x217 + (scalar_t(1) / scalar_t(16))*x218 + (scalar_t(1) / scalar_t(16))*x219 + (scalar_t(1) / scalar_t(16))*x220 - scalar_t(1) / scalar_t(16)*x226*x26 - scalar_t(1) / scalar_t(16)*x229 - scalar_t(1) / scalar_t(16)*x232 - scalar_t(1) / scalar_t(16)*x233*x66 - scalar_t(1) / scalar_t(16)*x234 - scalar_t(1) / scalar_t(16)*x235 + (scalar_t(1) / scalar_t(16))*x237 + (scalar_t(1) / scalar_t(16))*x239 + (scalar_t(1) / scalar_t(16))*x241 + (scalar_t(1) / scalar_t(16))*x248;
+        out.rz[0][lane] = (scalar_t(1) / scalar_t(16))*uz0*x26 + (scalar_t(1) / scalar_t(16))*uz1*x66 + (scalar_t(1) / scalar_t(16))*x249 + (scalar_t(1) / scalar_t(16))*x250 + (scalar_t(1) / scalar_t(16))*x251 + (scalar_t(1) / scalar_t(16))*x252 - scalar_t(1) / scalar_t(16)*x258*x26 - scalar_t(1) / scalar_t(16)*x261 - scalar_t(1) / scalar_t(16)*x264 - scalar_t(1) / scalar_t(16)*x265*x66 - scalar_t(1) / scalar_t(16)*x266 - scalar_t(1) / scalar_t(16)*x267 + (scalar_t(1) / scalar_t(16))*x269 + (scalar_t(1) / scalar_t(16))*x271 + (scalar_t(1) / scalar_t(16))*x273 + (scalar_t(1) / scalar_t(16))*x279;
+        out.rc[0][lane] = (scalar_t(1) / scalar_t(8))*x25 + (scalar_t(1) / scalar_t(8))*x45 + (scalar_t(1) / scalar_t(8))*x60;
+        out.rx[1][lane] = -scalar_t(1) / scalar_t(16)*ux0*x281 + (scalar_t(1) / scalar_t(16))*ux1*x280 + (scalar_t(1) / scalar_t(16))*x105*x281 - scalar_t(1) / scalar_t(16)*x151*x280 - scalar_t(1) / scalar_t(16)*x171 + (scalar_t(1) / scalar_t(16))*x282 + (scalar_t(1) / scalar_t(16))*x325 + (scalar_t(1) / scalar_t(16))*x365;
+        out.ry[1][lane] = -scalar_t(1) / scalar_t(16)*uy0*x281 + (scalar_t(1) / scalar_t(16))*uy1*x280 + (scalar_t(1) / scalar_t(16))*x226*x281 - scalar_t(1) / scalar_t(16)*x233*x280 - scalar_t(1) / scalar_t(16)*x237 + (scalar_t(1) / scalar_t(16))*x366 + (scalar_t(1) / scalar_t(16))*x372 + (scalar_t(1) / scalar_t(16))*x375;
+        out.rz[1][lane] = -scalar_t(1) / scalar_t(16)*uz0*x281 + (scalar_t(1) / scalar_t(16))*uz1*x280 + (scalar_t(1) / scalar_t(16))*x258*x281 - scalar_t(1) / scalar_t(16)*x265*x280 - scalar_t(1) / scalar_t(16)*x269 + (scalar_t(1) / scalar_t(16))*x376 + (scalar_t(1) / scalar_t(16))*x382 + (scalar_t(1) / scalar_t(16))*x385;
+        out.rc[1][lane] = -scalar_t(1) / scalar_t(8)*x22 + (scalar_t(1) / scalar_t(8))*x283 + (scalar_t(1) / scalar_t(8))*x293*(-x23 - x284 - x286*x287 - x288*x289 - x290*x291) + (scalar_t(1) / scalar_t(8))*x326 + (scalar_t(1) / scalar_t(8))*x339*(-x23 - x327 - x329*x331 - x332*x334 - x335*x337) + (scalar_t(1) / scalar_t(8))*x63;
+        out.rx[2][lane] = (scalar_t(1) / scalar_t(16))*ux2*x413 - scalar_t(1) / scalar_t(16)*ux3*x392 - scalar_t(1) / scalar_t(16)*x325 + (scalar_t(1) / scalar_t(16))*x392*x432 - scalar_t(1) / scalar_t(16)*x403 - scalar_t(1) / scalar_t(16)*x412*x413 - scalar_t(1) / scalar_t(16)*x427 + (scalar_t(1) / scalar_t(16))*x428 + (scalar_t(1) / scalar_t(16))*x439 + (scalar_t(1) / scalar_t(16))*x441 - scalar_t(1) / scalar_t(16)*x443 - scalar_t(1) / scalar_t(16)*x444;
+        out.ry[2][lane] = (scalar_t(1) / scalar_t(16))*uy2*x413 - scalar_t(1) / scalar_t(16)*uy3*x392 - scalar_t(1) / scalar_t(16)*x372 + (scalar_t(1) / scalar_t(16))*x392*x456 - scalar_t(1) / scalar_t(16)*x413*x451 - scalar_t(1) / scalar_t(16)*x445 - scalar_t(1) / scalar_t(16)*x454 + (scalar_t(1) / scalar_t(16))*x455 + (scalar_t(1) / scalar_t(16))*x457 + (scalar_t(1) / scalar_t(16))*x458 - scalar_t(1) / scalar_t(16)*x459 - scalar_t(1) / scalar_t(16)*x460;
+        out.rz[2][lane] = (scalar_t(1) / scalar_t(16))*uz2*x413 - scalar_t(1) / scalar_t(16)*uz3*x392 - scalar_t(1) / scalar_t(16)*x382 + (scalar_t(1) / scalar_t(16))*x392*x472 - scalar_t(1) / scalar_t(16)*x413*x467 - scalar_t(1) / scalar_t(16)*x461 - scalar_t(1) / scalar_t(16)*x470 + (scalar_t(1) / scalar_t(16))*x471 + (scalar_t(1) / scalar_t(16))*x473 + (scalar_t(1) / scalar_t(16))*x474 - scalar_t(1) / scalar_t(16)*x475 - scalar_t(1) / scalar_t(16)*x476;
+        out.rc[2][lane] = (scalar_t(1) / scalar_t(2))*rcoef10*x399 - scalar_t(1) / scalar_t(8)*x295 - scalar_t(1) / scalar_t(8)*x391 - scalar_t(1) / scalar_t(8)*x394;
+        out.rx[3][lane] = (scalar_t(1) / scalar_t(16))*ux2*x477 + (scalar_t(1) / scalar_t(16))*ux3*x478 + (scalar_t(1) / scalar_t(16))*ux3*x494 + (scalar_t(1) / scalar_t(16))*ux7*x497 + (scalar_t(1) / scalar_t(16))*x120 + (scalar_t(1) / scalar_t(16))*x161 - scalar_t(1) / scalar_t(16)*x174 - scalar_t(1) / scalar_t(16)*x412*x477 - scalar_t(1) / scalar_t(16)*x432*x478 + (scalar_t(1) / scalar_t(16))*x443 - scalar_t(1) / scalar_t(16)*x47 - scalar_t(1) / scalar_t(16)*x494*x509 - scalar_t(1) / scalar_t(16)*x497*x516 + (scalar_t(1) / scalar_t(16))*x518 + (scalar_t(1) / scalar_t(16))*x519 - scalar_t(1) / scalar_t(16)*x69;
+        out.ry[3][lane] = (scalar_t(1) / scalar_t(16))*uy2*x477 + (scalar_t(1) / scalar_t(16))*uy3*x478 + (scalar_t(1) / scalar_t(16))*uy3*x494 + (scalar_t(1) / scalar_t(16))*uy7*x497 - scalar_t(1) / scalar_t(16)*x217 - scalar_t(1) / scalar_t(16)*x219 + (scalar_t(1) / scalar_t(16))*x229 + (scalar_t(1) / scalar_t(16))*x234 - scalar_t(1) / scalar_t(16)*x239 - scalar_t(1) / scalar_t(16)*x451*x477 - scalar_t(1) / scalar_t(16)*x456*x478 + (scalar_t(1) / scalar_t(16))*x459 - scalar_t(1) / scalar_t(16)*x494*x522 - scalar_t(1) / scalar_t(16)*x497*x523 + (scalar_t(1) / scalar_t(16))*x524 + (scalar_t(1) / scalar_t(16))*x525;
+        out.rz[3][lane] = (scalar_t(1) / scalar_t(16))*uz2*x477 + (scalar_t(1) / scalar_t(16))*uz3*x478 + (scalar_t(1) / scalar_t(16))*uz3*x494 + (scalar_t(1) / scalar_t(16))*uz7*x497 - scalar_t(1) / scalar_t(16)*x249 - scalar_t(1) / scalar_t(16)*x251 + (scalar_t(1) / scalar_t(16))*x261 + (scalar_t(1) / scalar_t(16))*x266 - scalar_t(1) / scalar_t(16)*x271 - scalar_t(1) / scalar_t(16)*x467*x477 - scalar_t(1) / scalar_t(16)*x472*x478 + (scalar_t(1) / scalar_t(16))*x475 - scalar_t(1) / scalar_t(16)*x494*x528 - scalar_t(1) / scalar_t(16)*x497*x529 + (scalar_t(1) / scalar_t(16))*x530 + (scalar_t(1) / scalar_t(16))*x531;
+        out.rc[3][lane] = (scalar_t(1) / scalar_t(8))*x391 - scalar_t(1) / scalar_t(8)*x44 + (scalar_t(1) / scalar_t(8))*x493 + (scalar_t(1) / scalar_t(8))*x67;
+        out.rx[4][lane] = (scalar_t(1) / scalar_t(16))*ux4*x542 + (scalar_t(1) / scalar_t(16))*ux4*x553 + (scalar_t(1) / scalar_t(16))*ux5*x556 + (scalar_t(1) / scalar_t(16))*ux7*x559 + (scalar_t(1) / scalar_t(16))*x135 + (scalar_t(1) / scalar_t(16))*x168 - scalar_t(1) / scalar_t(16)*x177 + (scalar_t(1) / scalar_t(16))*x444 - scalar_t(1) / scalar_t(16)*x542*x574 - scalar_t(1) / scalar_t(16)*x553*x586 - scalar_t(1) / scalar_t(16)*x556*x596 - scalar_t(1) / scalar_t(16)*x559*x603 + (scalar_t(1) / scalar_t(16))*x605 + (scalar_t(1) / scalar_t(16))*x607 - scalar_t(1) / scalar_t(16)*x62 - scalar_t(1) / scalar_t(16)*x72;
+        out.ry[4][lane] = (scalar_t(1) / scalar_t(16))*uy4*x542 + (scalar_t(1) / scalar_t(16))*uy4*x553 + (scalar_t(1) / scalar_t(16))*uy5*x556 + (scalar_t(1) / scalar_t(16))*uy7*x559 - scalar_t(1) / scalar_t(16)*x218 - scalar_t(1) / scalar_t(16)*x220 + (scalar_t(1) / scalar_t(16))*x232 + (scalar_t(1) / scalar_t(16))*x235 - scalar_t(1) / scalar_t(16)*x241 + (scalar_t(1) / scalar_t(16))*x460 - scalar_t(1) / scalar_t(16)*x542*x613 - scalar_t(1) / scalar_t(16)*x553*x616 - scalar_t(1) / scalar_t(16)*x556*x617 - scalar_t(1) / scalar_t(16)*x559*x618 + (scalar_t(1) / scalar_t(16))*x619 + (scalar_t(1) / scalar_t(16))*x620;
+        out.rz[4][lane] = (scalar_t(1) / scalar_t(16))*uz4*x542 + (scalar_t(1) / scalar_t(16))*uz4*x553 + (scalar_t(1) / scalar_t(16))*uz5*x556 + (scalar_t(1) / scalar_t(16))*uz7*x559 - scalar_t(1) / scalar_t(16)*x250 - scalar_t(1) / scalar_t(16)*x252 + (scalar_t(1) / scalar_t(16))*x264 + (scalar_t(1) / scalar_t(16))*x267 - scalar_t(1) / scalar_t(16)*x273 + (scalar_t(1) / scalar_t(16))*x476 - scalar_t(1) / scalar_t(16)*x542*x626 - scalar_t(1) / scalar_t(16)*x553*x629 - scalar_t(1) / scalar_t(16)*x556*x630 - scalar_t(1) / scalar_t(16)*x559*x631 + (scalar_t(1) / scalar_t(16))*x632 + (scalar_t(1) / scalar_t(16))*x633;
+        out.rc[4][lane] = (scalar_t(1) / scalar_t(8))*x541 + (scalar_t(1) / scalar_t(8))*x552 - scalar_t(1) / scalar_t(8)*x59 + (scalar_t(1) / scalar_t(8))*x70;
+        out.rx[5][lane] = -scalar_t(1) / scalar_t(16)*ux4*x634 + (scalar_t(1) / scalar_t(16))*ux5*x642 - scalar_t(1) / scalar_t(16)*x365 - scalar_t(1) / scalar_t(16)*x519 + (scalar_t(1) / scalar_t(16))*x574*x634 - scalar_t(1) / scalar_t(16)*x596*x642 - scalar_t(1) / scalar_t(16)*x607 - scalar_t(1) / scalar_t(16)*x641 - scalar_t(1) / scalar_t(16)*x656 + (scalar_t(1) / scalar_t(16))*x657 + (scalar_t(1) / scalar_t(16))*x664 + (scalar_t(1) / scalar_t(16))*x666;
+        out.ry[5][lane] = -scalar_t(1) / scalar_t(16)*uy4*x634 + (scalar_t(1) / scalar_t(16))*uy5*x642 - scalar_t(1) / scalar_t(16)*x375 - scalar_t(1) / scalar_t(16)*x525 + (scalar_t(1) / scalar_t(16))*x613*x634 - scalar_t(1) / scalar_t(16)*x617*x642 - scalar_t(1) / scalar_t(16)*x620 - scalar_t(1) / scalar_t(16)*x667 - scalar_t(1) / scalar_t(16)*x670 + (scalar_t(1) / scalar_t(16))*x671 + (scalar_t(1) / scalar_t(16))*x672 + (scalar_t(1) / scalar_t(16))*x673;
+        out.rz[5][lane] = -scalar_t(1) / scalar_t(16)*uz4*x634 + (scalar_t(1) / scalar_t(16))*uz5*x642 - scalar_t(1) / scalar_t(16)*x385 - scalar_t(1) / scalar_t(16)*x531 + (scalar_t(1) / scalar_t(16))*x626*x634 - scalar_t(1) / scalar_t(16)*x630*x642 - scalar_t(1) / scalar_t(16)*x633 - scalar_t(1) / scalar_t(16)*x674 - scalar_t(1) / scalar_t(16)*x677 + (scalar_t(1) / scalar_t(16))*x678 + (scalar_t(1) / scalar_t(16))*x679 + (scalar_t(1) / scalar_t(16))*x680;
+        out.rc[5][lane] = (scalar_t(1) / scalar_t(2))*rcoef7*x637 - scalar_t(1) / scalar_t(8)*x341 - scalar_t(1) / scalar_t(8)*x541 - scalar_t(1) / scalar_t(8)*x636;
+        out.rx[6][lane] = -scalar_t(1) / scalar_t(16)*x216 + (scalar_t(1) / scalar_t(16))*x403 + (scalar_t(1) / scalar_t(16))*x427 - scalar_t(1) / scalar_t(16)*x428 - scalar_t(1) / scalar_t(16)*x439 - scalar_t(1) / scalar_t(16)*x441 + (scalar_t(1) / scalar_t(16))*x641 + (scalar_t(1) / scalar_t(16))*x656 - scalar_t(1) / scalar_t(16)*x657 - scalar_t(1) / scalar_t(16)*x664 - scalar_t(1) / scalar_t(16)*x666 - scalar_t(1) / scalar_t(16)*x688 - scalar_t(1) / scalar_t(16)*x695 + (scalar_t(1) / scalar_t(16))*x696 + (scalar_t(1) / scalar_t(16))*x700 - scalar_t(1) / scalar_t(16)*x702;
+        out.ry[6][lane] = -scalar_t(1) / scalar_t(16)*x248 + (scalar_t(1) / scalar_t(16))*x445 + (scalar_t(1) / scalar_t(16))*x454 - scalar_t(1) / scalar_t(16)*x455 - scalar_t(1) / scalar_t(16)*x457 - scalar_t(1) / scalar_t(16)*x458 + (scalar_t(1) / scalar_t(16))*x667 + (scalar_t(1) / scalar_t(16))*x670 - scalar_t(1) / scalar_t(16)*x671 - scalar_t(1) / scalar_t(16)*x672 - scalar_t(1) / scalar_t(16)*x673 - scalar_t(1) / scalar_t(16)*x703 - scalar_t(1) / scalar_t(16)*x706 + (scalar_t(1) / scalar_t(16))*x707 + (scalar_t(1) / scalar_t(16))*x708 - scalar_t(1) / scalar_t(16)*x709;
+        out.rz[6][lane] = -scalar_t(1) / scalar_t(16)*x279 + (scalar_t(1) / scalar_t(16))*x461 + (scalar_t(1) / scalar_t(16))*x470 - scalar_t(1) / scalar_t(16)*x471 - scalar_t(1) / scalar_t(16)*x473 - scalar_t(1) / scalar_t(16)*x474 + (scalar_t(1) / scalar_t(16))*x674 + (scalar_t(1) / scalar_t(16))*x677 - scalar_t(1) / scalar_t(16)*x678 - scalar_t(1) / scalar_t(16)*x679 - scalar_t(1) / scalar_t(16)*x680 - scalar_t(1) / scalar_t(16)*x710 - scalar_t(1) / scalar_t(16)*x713 + (scalar_t(1) / scalar_t(16))*x714 + (scalar_t(1) / scalar_t(16))*x715 - scalar_t(1) / scalar_t(16)*x716;
+        out.rc[6][lane] = -scalar_t(1) / scalar_t(8)*x425 - scalar_t(1) / scalar_t(8)*x654 - scalar_t(1) / scalar_t(8)*x686;
+        out.rx[7][lane] = -scalar_t(1) / scalar_t(16)*ux3*x717 - scalar_t(1) / scalar_t(16)*ux4*x718 + (scalar_t(1) / scalar_t(16))*ux7*x719 + (scalar_t(1) / scalar_t(16))*ux7*x720 - scalar_t(1) / scalar_t(16)*x282 + (scalar_t(1) / scalar_t(16))*x509*x717 - scalar_t(1) / scalar_t(16)*x516*x719 - scalar_t(1) / scalar_t(16)*x518 + (scalar_t(1) / scalar_t(16))*x586*x718 - scalar_t(1) / scalar_t(16)*x603*x720 - scalar_t(1) / scalar_t(16)*x605 + (scalar_t(1) / scalar_t(16))*x688 + (scalar_t(1) / scalar_t(16))*x695 - scalar_t(1) / scalar_t(16)*x696 - scalar_t(1) / scalar_t(16)*x700 + (scalar_t(1) / scalar_t(16))*x702;
+        out.ry[7][lane] = -scalar_t(1) / scalar_t(16)*uy3*x717 - scalar_t(1) / scalar_t(16)*uy4*x718 + (scalar_t(1) / scalar_t(16))*uy7*x719 + (scalar_t(1) / scalar_t(16))*uy7*x720 - scalar_t(1) / scalar_t(16)*x366 + (scalar_t(1) / scalar_t(16))*x522*x717 - scalar_t(1) / scalar_t(16)*x523*x719 - scalar_t(1) / scalar_t(16)*x524 + (scalar_t(1) / scalar_t(16))*x616*x718 - scalar_t(1) / scalar_t(16)*x618*x720 - scalar_t(1) / scalar_t(16)*x619 + (scalar_t(1) / scalar_t(16))*x703 + (scalar_t(1) / scalar_t(16))*x706 - scalar_t(1) / scalar_t(16)*x707 - scalar_t(1) / scalar_t(16)*x708 + (scalar_t(1) / scalar_t(16))*x709;
+        out.rz[7][lane] = -scalar_t(1) / scalar_t(16)*uz3*x717 - scalar_t(1) / scalar_t(16)*uz4*x718 + (scalar_t(1) / scalar_t(16))*uz7*x719 + (scalar_t(1) / scalar_t(16))*uz7*x720 - scalar_t(1) / scalar_t(16)*x376 + (scalar_t(1) / scalar_t(16))*x528*x717 - scalar_t(1) / scalar_t(16)*x529*x719 - scalar_t(1) / scalar_t(16)*x530 + (scalar_t(1) / scalar_t(16))*x629*x718 - scalar_t(1) / scalar_t(16)*x631*x720 - scalar_t(1) / scalar_t(16)*x632 + (scalar_t(1) / scalar_t(16))*x710 + (scalar_t(1) / scalar_t(16))*x713 - scalar_t(1) / scalar_t(16)*x714 - scalar_t(1) / scalar_t(16)*x715 + (scalar_t(1) / scalar_t(16))*x716;
+        out.rc[7][lane] = (scalar_t(1) / scalar_t(2))*rcoef3*x683 - scalar_t(1) / scalar_t(8)*x493 - scalar_t(1) / scalar_t(8)*x552 - scalar_t(1) / scalar_t(8)*x682;
+    }
+}
+
+// Venkatakrishnan's smooth bound, with eps^2 = 0, with Rhie-Chow.
+static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim2_simd(
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT cof0_ptr,
+        const scalar_t *const SFEM_RESTRICT cof1_ptr,
+        const scalar_t *const SFEM_RESTRICT cof2_ptr,
+        const scalar_t *const SFEM_RESTRICT cof3_ptr,
+        const scalar_t *const SFEM_RESTRICT cof4_ptr,
+        const scalar_t *const SFEM_RESTRICT cof5_ptr,
+        const scalar_t *const SFEM_RESTRICT cof6_ptr,
+        const scalar_t *const SFEM_RESTRICT cof7_ptr,
+        const scalar_t *const SFEM_RESTRICT cof8_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const Hex8InputPack &in,
+        const Hex8UGradPack &ho,
+        const Hex8RhieChowPack &rc,
+        Hex8ResidualPack    &out) {
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t cof0 = scalar_t(cof0_ptr[lane]);
+        const scalar_t cof1 = scalar_t(cof1_ptr[lane]);
+        const scalar_t cof2 = scalar_t(cof2_ptr[lane]);
+        const scalar_t cof3 = scalar_t(cof3_ptr[lane]);
+        const scalar_t cof4 = scalar_t(cof4_ptr[lane]);
+        const scalar_t cof5 = scalar_t(cof5_ptr[lane]);
+        const scalar_t cof6 = scalar_t(cof6_ptr[lane]);
+        const scalar_t cof7 = scalar_t(cof7_ptr[lane]);
+        const scalar_t cof8 = scalar_t(cof8_ptr[lane]);
+        const scalar_t det = scalar_t(det_ptr[lane]);
+        const scalar_t ux0 = in.ux[0][lane];
+        const scalar_t ux1 = in.ux[1][lane];
+        const scalar_t ux2 = in.ux[2][lane];
+        const scalar_t ux3 = in.ux[3][lane];
+        const scalar_t ux4 = in.ux[4][lane];
+        const scalar_t ux5 = in.ux[5][lane];
+        const scalar_t ux6 = in.ux[6][lane];
+        const scalar_t ux7 = in.ux[7][lane];
+        const scalar_t uy0 = in.uy[0][lane];
+        const scalar_t uy1 = in.uy[1][lane];
+        const scalar_t uy2 = in.uy[2][lane];
+        const scalar_t uy3 = in.uy[3][lane];
+        const scalar_t uy4 = in.uy[4][lane];
+        const scalar_t uy5 = in.uy[5][lane];
+        const scalar_t uy6 = in.uy[6][lane];
+        const scalar_t uy7 = in.uy[7][lane];
+        const scalar_t uz0 = in.uz[0][lane];
+        const scalar_t uz1 = in.uz[1][lane];
+        const scalar_t uz2 = in.uz[2][lane];
+        const scalar_t uz3 = in.uz[3][lane];
+        const scalar_t uz4 = in.uz[4][lane];
+        const scalar_t uz5 = in.uz[5][lane];
+        const scalar_t uz6 = in.uz[6][lane];
+        const scalar_t uz7 = in.uz[7][lane];
+        const scalar_t p0 = in.p[0][lane];
+        const scalar_t p1 = in.p[1][lane];
+        const scalar_t p2 = in.p[2][lane];
+        const scalar_t p3 = in.p[3][lane];
+        const scalar_t p4 = in.p[4][lane];
+        const scalar_t p5 = in.p[5][lane];
+        const scalar_t p6 = in.p[6][lane];
+        const scalar_t p7 = in.p[7][lane];
+        const scalar_t x0 = ho.x[0][lane];
+        const scalar_t x1 = ho.x[1][lane];
+        const scalar_t x2 = ho.x[2][lane];
+        const scalar_t x3 = ho.x[3][lane];
+        const scalar_t x4 = ho.x[4][lane];
+        const scalar_t x5 = ho.x[5][lane];
+        const scalar_t x6 = ho.x[6][lane];
+        const scalar_t x7 = ho.x[7][lane];
+        const scalar_t y0 = ho.y[0][lane];
+        const scalar_t y1 = ho.y[1][lane];
+        const scalar_t y2 = ho.y[2][lane];
+        const scalar_t y3 = ho.y[3][lane];
+        const scalar_t y4 = ho.y[4][lane];
+        const scalar_t y5 = ho.y[5][lane];
+        const scalar_t y6 = ho.y[6][lane];
+        const scalar_t y7 = ho.y[7][lane];
+        const scalar_t z0 = ho.z[0][lane];
+        const scalar_t z1 = ho.z[1][lane];
+        const scalar_t z2 = ho.z[2][lane];
+        const scalar_t z3 = ho.z[3][lane];
+        const scalar_t z4 = ho.z[4][lane];
+        const scalar_t z5 = ho.z[5][lane];
+        const scalar_t z6 = ho.z[6][lane];
+        const scalar_t z7 = ho.z[7][lane];
+        const scalar_t g0_0 = ho.g[0][0][lane];
+        const scalar_t g0_1 = ho.g[0][1][lane];
+        const scalar_t g0_2 = ho.g[0][2][lane];
+        const scalar_t g0_3 = ho.g[0][3][lane];
+        const scalar_t g0_4 = ho.g[0][4][lane];
+        const scalar_t g0_5 = ho.g[0][5][lane];
+        const scalar_t g0_6 = ho.g[0][6][lane];
+        const scalar_t g0_7 = ho.g[0][7][lane];
+        const scalar_t g0_8 = ho.g[0][8][lane];
+        const scalar_t g1_0 = ho.g[1][0][lane];
+        const scalar_t g1_1 = ho.g[1][1][lane];
+        const scalar_t g1_2 = ho.g[1][2][lane];
+        const scalar_t g1_3 = ho.g[1][3][lane];
+        const scalar_t g1_4 = ho.g[1][4][lane];
+        const scalar_t g1_5 = ho.g[1][5][lane];
+        const scalar_t g1_6 = ho.g[1][6][lane];
+        const scalar_t g1_7 = ho.g[1][7][lane];
+        const scalar_t g1_8 = ho.g[1][8][lane];
+        const scalar_t g2_0 = ho.g[2][0][lane];
+        const scalar_t g2_1 = ho.g[2][1][lane];
+        const scalar_t g2_2 = ho.g[2][2][lane];
+        const scalar_t g2_3 = ho.g[2][3][lane];
+        const scalar_t g2_4 = ho.g[2][4][lane];
+        const scalar_t g2_5 = ho.g[2][5][lane];
+        const scalar_t g2_6 = ho.g[2][6][lane];
+        const scalar_t g2_7 = ho.g[2][7][lane];
+        const scalar_t g2_8 = ho.g[2][8][lane];
+        const scalar_t g3_0 = ho.g[3][0][lane];
+        const scalar_t g3_1 = ho.g[3][1][lane];
+        const scalar_t g3_2 = ho.g[3][2][lane];
+        const scalar_t g3_3 = ho.g[3][3][lane];
+        const scalar_t g3_4 = ho.g[3][4][lane];
+        const scalar_t g3_5 = ho.g[3][5][lane];
+        const scalar_t g3_6 = ho.g[3][6][lane];
+        const scalar_t g3_7 = ho.g[3][7][lane];
+        const scalar_t g3_8 = ho.g[3][8][lane];
+        const scalar_t g4_0 = ho.g[4][0][lane];
+        const scalar_t g4_1 = ho.g[4][1][lane];
+        const scalar_t g4_2 = ho.g[4][2][lane];
+        const scalar_t g4_3 = ho.g[4][3][lane];
+        const scalar_t g4_4 = ho.g[4][4][lane];
+        const scalar_t g4_5 = ho.g[4][5][lane];
+        const scalar_t g4_6 = ho.g[4][6][lane];
+        const scalar_t g4_7 = ho.g[4][7][lane];
+        const scalar_t g4_8 = ho.g[4][8][lane];
+        const scalar_t g5_0 = ho.g[5][0][lane];
+        const scalar_t g5_1 = ho.g[5][1][lane];
+        const scalar_t g5_2 = ho.g[5][2][lane];
+        const scalar_t g5_3 = ho.g[5][3][lane];
+        const scalar_t g5_4 = ho.g[5][4][lane];
+        const scalar_t g5_5 = ho.g[5][5][lane];
+        const scalar_t g5_6 = ho.g[5][6][lane];
+        const scalar_t g5_7 = ho.g[5][7][lane];
+        const scalar_t g5_8 = ho.g[5][8][lane];
+        const scalar_t g6_0 = ho.g[6][0][lane];
+        const scalar_t g6_1 = ho.g[6][1][lane];
+        const scalar_t g6_2 = ho.g[6][2][lane];
+        const scalar_t g6_3 = ho.g[6][3][lane];
+        const scalar_t g6_4 = ho.g[6][4][lane];
+        const scalar_t g6_5 = ho.g[6][5][lane];
+        const scalar_t g6_6 = ho.g[6][6][lane];
+        const scalar_t g6_7 = ho.g[6][7][lane];
+        const scalar_t g6_8 = ho.g[6][8][lane];
+        const scalar_t g7_0 = ho.g[7][0][lane];
+        const scalar_t g7_1 = ho.g[7][1][lane];
+        const scalar_t g7_2 = ho.g[7][2][lane];
+        const scalar_t g7_3 = ho.g[7][3][lane];
+        const scalar_t g7_4 = ho.g[7][4][lane];
+        const scalar_t g7_5 = ho.g[7][5][lane];
+        const scalar_t g7_6 = ho.g[7][6][lane];
+        const scalar_t g7_7 = ho.g[7][7][lane];
+        const scalar_t g7_8 = ho.g[7][8][lane];
+        const scalar_t rcoef0 = rc.coeff[0][lane];
+        const scalar_t rcoef1 = rc.coeff[1][lane];
+        const scalar_t rcoef2 = rc.coeff[2][lane];
+        const scalar_t rcoef3 = rc.coeff[3][lane];
+        const scalar_t rcoef4 = rc.coeff[4][lane];
+        const scalar_t rcoef5 = rc.coeff[5][lane];
+        const scalar_t rcoef6 = rc.coeff[6][lane];
+        const scalar_t rcoef7 = rc.coeff[7][lane];
+        const scalar_t rcoef8 = rc.coeff[8][lane];
+        const scalar_t rcoef9 = rc.coeff[9][lane];
+        const scalar_t rcoef10 = rc.coeff[10][lane];
+        const scalar_t rcoef11 = rc.coeff[11][lane];
+        const scalar_t pgx0 = rc.pgx[0][lane];
+        const scalar_t pgx1 = rc.pgx[1][lane];
+        const scalar_t pgx2 = rc.pgx[2][lane];
+        const scalar_t pgx3 = rc.pgx[3][lane];
+        const scalar_t pgx4 = rc.pgx[4][lane];
+        const scalar_t pgx5 = rc.pgx[5][lane];
+        const scalar_t pgx6 = rc.pgx[6][lane];
+        const scalar_t pgx7 = rc.pgx[7][lane];
+        const scalar_t pgy0 = rc.pgy[0][lane];
+        const scalar_t pgy1 = rc.pgy[1][lane];
+        const scalar_t pgy2 = rc.pgy[2][lane];
+        const scalar_t pgy3 = rc.pgy[3][lane];
+        const scalar_t pgy4 = rc.pgy[4][lane];
+        const scalar_t pgy5 = rc.pgy[5][lane];
+        const scalar_t pgy6 = rc.pgy[6][lane];
+        const scalar_t pgy7 = rc.pgy[7][lane];
+        const scalar_t pgz0 = rc.pgz[0][lane];
+        const scalar_t pgz1 = rc.pgz[1][lane];
+        const scalar_t pgz2 = rc.pgz[2][lane];
+        const scalar_t pgz3 = rc.pgz[3][lane];
+        const scalar_t pgz4 = rc.pgz[4][lane];
+        const scalar_t pgz5 = rc.pgz[5][lane];
+        const scalar_t pgz6 = rc.pgz[6][lane];
+        const scalar_t pgz7 = rc.pgz[7][lane];
+        const scalar_t mdot0 = -rcoef0*(-p0 + p1 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx1)*(-x0 + x1) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy1)*(-y0 + y1) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz1)*(-z0 + z1)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux1) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy1) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz1));
+        const scalar_t sgn0 = mdot0 > scalar_t(0) ? scalar_t(1) : (mdot0 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot1 = -rcoef1*(p2 - p3 - ((scalar_t(1) / scalar_t(2))*pgx2 + (scalar_t(1) / scalar_t(2))*pgx3)*(x2 - x3) - ((scalar_t(1) / scalar_t(2))*pgy2 + (scalar_t(1) / scalar_t(2))*pgy3)*(y2 - y3) - ((scalar_t(1) / scalar_t(2))*pgz2 + (scalar_t(1) / scalar_t(2))*pgz3)*(z2 - z3)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn1 = mdot1 > scalar_t(0) ? scalar_t(1) : (mdot1 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot2 = -rcoef2*(-p4 + p5 - ((scalar_t(1) / scalar_t(2))*pgx4 + (scalar_t(1) / scalar_t(2))*pgx5)*(-x4 + x5) - ((scalar_t(1) / scalar_t(2))*pgy4 + (scalar_t(1) / scalar_t(2))*pgy5)*(-y4 + y5) - ((scalar_t(1) / scalar_t(2))*pgz4 + (scalar_t(1) / scalar_t(2))*pgz5)*(-z4 + z5)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn2 = mdot2 > scalar_t(0) ? scalar_t(1) : (mdot2 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot3 = -rcoef3*(p6 - p7 - ((scalar_t(1) / scalar_t(2))*pgx6 + (scalar_t(1) / scalar_t(2))*pgx7)*(x6 - x7) - ((scalar_t(1) / scalar_t(2))*pgy6 + (scalar_t(1) / scalar_t(2))*pgy7)*(y6 - y7) - ((scalar_t(1) / scalar_t(2))*pgz6 + (scalar_t(1) / scalar_t(2))*pgz7)*(z6 - z7)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux6 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy6 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz6 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn3 = mdot3 > scalar_t(0) ? scalar_t(1) : (mdot3 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot4 = -rcoef4*(-p0 + p3 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx3)*(-x0 + x3) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy3)*(-y0 + y3) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz3)*(-z0 + z3)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn4 = mdot4 > scalar_t(0) ? scalar_t(1) : (mdot4 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot5 = -rcoef5*(-p1 + p2 - ((scalar_t(1) / scalar_t(2))*pgx1 + (scalar_t(1) / scalar_t(2))*pgx2)*(-x1 + x2) - ((scalar_t(1) / scalar_t(2))*pgy1 + (scalar_t(1) / scalar_t(2))*pgy2)*(-y1 + y2) - ((scalar_t(1) / scalar_t(2))*pgz1 + (scalar_t(1) / scalar_t(2))*pgz2)*(-z1 + z2)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux2) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy2) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz2));
+        const scalar_t sgn5 = mdot5 > scalar_t(0) ? scalar_t(1) : (mdot5 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot6 = -rcoef6*(-p4 + p7 - ((scalar_t(1) / scalar_t(2))*pgx4 + (scalar_t(1) / scalar_t(2))*pgx7)*(-x4 + x7) - ((scalar_t(1) / scalar_t(2))*pgy4 + (scalar_t(1) / scalar_t(2))*pgy7)*(-y4 + y7) - ((scalar_t(1) / scalar_t(2))*pgz4 + (scalar_t(1) / scalar_t(2))*pgz7)*(-z4 + z7)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn6 = mdot6 > scalar_t(0) ? scalar_t(1) : (mdot6 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot7 = -rcoef7*(-p5 + p6 - ((scalar_t(1) / scalar_t(2))*pgx5 + (scalar_t(1) / scalar_t(2))*pgx6)*(-x5 + x6) - ((scalar_t(1) / scalar_t(2))*pgy5 + (scalar_t(1) / scalar_t(2))*pgy6)*(-y5 + y6) - ((scalar_t(1) / scalar_t(2))*pgz5 + (scalar_t(1) / scalar_t(2))*pgz6)*(-z5 + z6)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux5 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy5 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz5 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn7 = mdot7 > scalar_t(0) ? scalar_t(1) : (mdot7 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot8 = -rcoef8*(-p0 + p4 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx4)*(-x0 + x4) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy4)*(-y0 + y4) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz4)*(-z0 + z4)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux4) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy4) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz4));
+        const scalar_t sgn8 = mdot8 > scalar_t(0) ? scalar_t(1) : (mdot8 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot9 = -rcoef9*(-p1 + p5 - ((scalar_t(1) / scalar_t(2))*pgx1 + (scalar_t(1) / scalar_t(2))*pgx5)*(-x1 + x5) - ((scalar_t(1) / scalar_t(2))*pgy1 + (scalar_t(1) / scalar_t(2))*pgy5)*(-y1 + y5) - ((scalar_t(1) / scalar_t(2))*pgz1 + (scalar_t(1) / scalar_t(2))*pgz5)*(-z1 + z5)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn9 = mdot9 > scalar_t(0) ? scalar_t(1) : (mdot9 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot10 = -rcoef10*(-p2 + p6 - ((scalar_t(1) / scalar_t(2))*pgx2 + (scalar_t(1) / scalar_t(2))*pgx6)*(-x2 + x6) - ((scalar_t(1) / scalar_t(2))*pgy2 + (scalar_t(1) / scalar_t(2))*pgy6)*(-y2 + y6) - ((scalar_t(1) / scalar_t(2))*pgz2 + (scalar_t(1) / scalar_t(2))*pgz6)*(-z2 + z6)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn10 = mdot10 > scalar_t(0) ? scalar_t(1) : (mdot10 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot11 = -rcoef11*(-p3 + p7 - ((scalar_t(1) / scalar_t(2))*pgx3 + (scalar_t(1) / scalar_t(2))*pgx7)*(-x3 + x7) - ((scalar_t(1) / scalar_t(2))*pgy3 + (scalar_t(1) / scalar_t(2))*pgy7)*(-y3 + y7) - ((scalar_t(1) / scalar_t(2))*pgz3 + (scalar_t(1) / scalar_t(2))*pgz7)*(-z3 + z7)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux3 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy3 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz3 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn11 = mdot11 > scalar_t(0) ? scalar_t(1) : (mdot11 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t x8 = ux0 + ux1;
+        const scalar_t x9 = uy0 + uy1;
+        const scalar_t x10 = uz0 + uz1;
+        const scalar_t x11 = rho*(cof0*x8 + cof1*x9 + cof2*x10);
+        const scalar_t x12 = scalar_t(2)*p0;
+        const scalar_t x13 = -x12;
+        const scalar_t x14 = scalar_t(2)*p1;
+        const scalar_t x15 = pgx0 + pgx1;
+        const scalar_t x16 = x0 - x1;
+        const scalar_t x17 = pgy0 + pgy1;
+        const scalar_t x18 = y0 - y1;
+        const scalar_t x19 = pgz0 + pgz1;
+        const scalar_t x20 = z0 - z1;
+        const scalar_t x21 = scalar_t(4)*rcoef0;
+        const scalar_t x22 = x21*(-x13 - x14 - x15*x16 - x17*x18 - x19*x20);
+        const scalar_t x23 = -x14;
+        const scalar_t x24 = x12 - x15*x16 - x17*x18 - x19*x20 + x23;
+        const scalar_t x25 = x11 + x21*x24;
+        const scalar_t x26 = sgn0*x25 + x11 + x22;
+        const scalar_t x27 = ux0 + ux3;
+        const scalar_t x28 = uy0 + uy3;
+        const scalar_t x29 = uz0 + uz3;
+        const scalar_t x30 = rho*(cof3*x27 + cof4*x28 + cof5*x29);
+        const scalar_t x31 = scalar_t(2)*p3;
+        const scalar_t x32 = pgx0 + pgx3;
+        const scalar_t x33 = -x3;
+        const scalar_t x34 = x0 + x33;
+        const scalar_t x35 = pgy0 + pgy3;
+        const scalar_t x36 = -y3;
+        const scalar_t x37 = x36 + y0;
+        const scalar_t x38 = pgz0 + pgz3;
+        const scalar_t x39 = -z3;
+        const scalar_t x40 = x39 + z0;
+        const scalar_t x41 = scalar_t(4)*rcoef4;
+        const scalar_t x42 = -x31;
+        const scalar_t x43 = x12 - x32*x34 - x35*x37 - x38*x40 + x42;
+        const scalar_t x44 = x41*x43;
+        const scalar_t x45 = x30 + x44;
+        const scalar_t x46 = sgn4*x45 + x30 + x41*(-x13 - x31 - x32*x34 - x35*x37 - x38*x40);
+        const scalar_t x47 = ux0*x46;
+        const scalar_t x48 = rho*(cof6*(ux0 + ux4) + cof7*(uy0 + uy4) + cof8*(uz0 + uz4));
+        const scalar_t x49 = scalar_t(2)*p4;
+        const scalar_t x50 = pgx0 + pgx4;
+        const scalar_t x51 = x0 - x4;
+        const scalar_t x52 = pgy0 + pgy4;
+        const scalar_t x53 = y0 - y4;
+        const scalar_t x54 = pgz0 + pgz4;
+        const scalar_t x55 = z0 - z4;
+        const scalar_t x56 = scalar_t(4)*rcoef8;
+        const scalar_t x57 = -x49;
+        const scalar_t x58 = x12 - x50*x51 - x52*x53 - x54*x55 + x57;
+        const scalar_t x59 = x56*x58;
+        const scalar_t x60 = x48 + x59;
+        const scalar_t x61 = sgn8*x60 + x48 + x56*(-x13 - x49 - x50*x51 - x52*x53 - x54*x55);
+        const scalar_t x62 = ux0*x61;
+        const scalar_t x63 = -x11;
+        const scalar_t x64 = -x21*x24 + x63;
+        const scalar_t x65 = sgn0*x64;
+        const scalar_t x66 = x25 + x65;
+        const scalar_t x67 = -x30;
+        const scalar_t x68 = sgn4*(-x41*x43 + x67) + x45;
+        const scalar_t x69 = ux3*x68;
+        const scalar_t x70 = -x48;
+        const scalar_t x71 = sgn8*(-x56*x58 + x70) + x60;
+        const scalar_t x72 = ux4*x71;
+        const scalar_t x73 = -scalar_t(23)*x0;
+        const scalar_t x74 = scalar_t(3)*x2 + scalar_t(3)*x4;
+        const scalar_t x75 = x6 + x74;
+        const scalar_t x76 = x73 + x75;
+        const scalar_t x77 = scalar_t(9)*x1;
+        const scalar_t x78 = scalar_t(3)*x3 + scalar_t(3)*x5;
+        const scalar_t x79 = x7 + x78;
+        const scalar_t x80 = x77 + x79;
+        const scalar_t x81 = x76 + x80;
+        const scalar_t x82 = -scalar_t(23)*y0;
+        const scalar_t x83 = scalar_t(3)*y2 + scalar_t(3)*y4;
+        const scalar_t x84 = x83 + y6;
+        const scalar_t x85 = x82 + x84;
+        const scalar_t x86 = scalar_t(9)*y1;
+        const scalar_t x87 = scalar_t(3)*y3 + scalar_t(3)*y5;
+        const scalar_t x88 = x87 + y7;
+        const scalar_t x89 = x86 + x88;
+        const scalar_t x90 = x85 + x89;
+        const scalar_t x91 = -scalar_t(23)*z0;
+        const scalar_t x92 = scalar_t(3)*z2 + scalar_t(3)*z4;
+        const scalar_t x93 = x92 + z6;
+        const scalar_t x94 = x91 + x93;
+        const scalar_t x95 = scalar_t(9)*z1;
+        const scalar_t x96 = scalar_t(3)*z3 + scalar_t(3)*z5;
+        const scalar_t x97 = x96 + z7;
+        const scalar_t x98 = x95 + x97;
+        const scalar_t x99 = x94 + x98;
+        const scalar_t x100 = g0_0*x81 + g0_1*x90 + g0_2*x99;
+        const scalar_t x101 = -fmax(ux0, ux1);
+        const scalar_t x102 = ux0 + x101;
+        const scalar_t x103 = x100 >= 0;
+        const scalar_t x104 = -fmin(ux0, ux1);
+        const scalar_t x105 = ux0 + x104;
+        const scalar_t x106 = ((x103) ? (
+   pow(x102, scalar_t(2))
+)
+: (
+   pow(x105, scalar_t(2))
+));
+        const scalar_t x107 = x100*((x103) ? (
+   -x102
+)
+: (
+   -x105
+));
+        const scalar_t x108 = ((x100 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x100*(x106 + (scalar_t(1) / scalar_t(16))*x107)/((scalar_t(1) / scalar_t(512))*pow(x100, scalar_t(2)) + x106 + (scalar_t(1) / scalar_t(32))*x107)
+)
+: (
+   0
+));
+        const scalar_t x109 = scalar_t(9)*x0;
+        const scalar_t x110 = x109 + x75;
+        const scalar_t x111 = -scalar_t(23)*x1;
+        const scalar_t x112 = x111 + x79;
+        const scalar_t x113 = x110 + x112;
+        const scalar_t x114 = scalar_t(9)*y0;
+        const scalar_t x115 = x114 + x84;
+        const scalar_t x116 = -scalar_t(23)*y1;
+        const scalar_t x117 = x116 + x88;
+        const scalar_t x118 = x115 + x117;
+        const scalar_t x119 = scalar_t(9)*z0;
+        const scalar_t x120 = x119 + x93;
+        const scalar_t x121 = -scalar_t(23)*z1;
+        const scalar_t x122 = x121 + x97;
+        const scalar_t x123 = x120 + x122;
+        const scalar_t x124 = g1_0*x113 + g1_1*x118 + g1_2*x123;
+        const scalar_t x125 = ux1 + x101;
+        const scalar_t x126 = x124 >= 0;
+        const scalar_t x127 = ux1 + x104;
+        const scalar_t x128 = ((x126) ? (
+   pow(x125, scalar_t(2))
+)
+: (
+   pow(x127, scalar_t(2))
+));
+        const scalar_t x129 = x124*((x126) ? (
+   -x125
+)
+: (
+   -x127
+));
+        const scalar_t x130 = ((x124 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x124*(x128 + (scalar_t(1) / scalar_t(16))*x129)/((scalar_t(1) / scalar_t(512))*pow(x124, scalar_t(2)) + x128 + (scalar_t(1) / scalar_t(32))*x129)
+)
+: (
+   0
+));
+        const scalar_t x131 = scalar_t(3)*x1 + scalar_t(3)*x7;
+        const scalar_t x132 = scalar_t(9)*x3 + x5;
+        const scalar_t x133 = x131 + x132;
+        const scalar_t x134 = x133 + x76;
+        const scalar_t x135 = scalar_t(3)*y1 + scalar_t(3)*y7;
+        const scalar_t x136 = scalar_t(9)*y3 + y5;
+        const scalar_t x137 = x135 + x136;
+        const scalar_t x138 = x137 + x85;
+        const scalar_t x139 = scalar_t(3)*z1 + scalar_t(3)*z7;
+        const scalar_t x140 = scalar_t(9)*z3 + z5;
+        const scalar_t x141 = x139 + x140;
+        const scalar_t x142 = x141 + x94;
+        const scalar_t x143 = g0_0*x134 + g0_1*x138 + g0_2*x142;
+        const scalar_t x144 = -fmax(ux0, ux3);
+        const scalar_t x145 = ux0 + x144;
+        const scalar_t x146 = x143 >= 0;
+        const scalar_t x147 = -fmin(ux0, ux3);
+        const scalar_t x148 = ux0 + x147;
+        const scalar_t x149 = ((x146) ? (
+   pow(x145, scalar_t(2))
+)
+: (
+   pow(x148, scalar_t(2))
+));
+        const scalar_t x150 = x143*((x146) ? (
+   -x145
+)
+: (
+   -x148
+));
+        const scalar_t x151 = x46*((x143 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x143*(x149 + (scalar_t(1) / scalar_t(16))*x150)/((scalar_t(1) / scalar_t(512))*pow(x143, scalar_t(2)) + x149 + (scalar_t(1) / scalar_t(32))*x150)
+)
+: (
+   0
+));
+        const scalar_t x152 = -scalar_t(23)*x3 + x5;
+        const scalar_t x153 = x131 + x152;
+        const scalar_t x154 = x110 + x153;
+        const scalar_t x155 = -scalar_t(23)*y3 + y5;
+        const scalar_t x156 = x135 + x155;
+        const scalar_t x157 = x115 + x156;
+        const scalar_t x158 = -scalar_t(23)*z3 + z5;
+        const scalar_t x159 = x139 + x158;
+        const scalar_t x160 = x120 + x159;
+        const scalar_t x161 = g3_0*x154 + g3_1*x157 + g3_2*x160;
+        const scalar_t x162 = ux3 + x144;
+        const scalar_t x163 = x161 >= 0;
+        const scalar_t x164 = ux3 + x147;
+        const scalar_t x165 = ((x163) ? (
+   pow(x162, scalar_t(2))
+)
+: (
+   pow(x164, scalar_t(2))
+));
+        const scalar_t x166 = x161*((x163) ? (
+   -x162
+)
+: (
+   -x164
+));
+        const scalar_t x167 = x68*((x161 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x161*(x165 + (scalar_t(1) / scalar_t(16))*x166)/((scalar_t(1) / scalar_t(512))*pow(x161, scalar_t(2)) + x165 + (scalar_t(1) / scalar_t(32))*x166)
+)
+: (
+   0
+));
+        const scalar_t x168 = x2 + scalar_t(9)*x4;
+        const scalar_t x169 = x131 + x78;
+        const scalar_t x170 = x169 + x6;
+        const scalar_t x171 = x168 + x170 + x73;
+        const scalar_t x172 = y2 + scalar_t(9)*y4;
+        const scalar_t x173 = x135 + x87;
+        const scalar_t x174 = x173 + y6;
+        const scalar_t x175 = x172 + x174 + x82;
+        const scalar_t x176 = z2 + scalar_t(9)*z4;
+        const scalar_t x177 = x139 + x96;
+        const scalar_t x178 = x177 + z6;
+        const scalar_t x179 = x176 + x178 + x91;
+        const scalar_t x180 = g0_0*x171 + g0_1*x175 + g0_2*x179;
+        const scalar_t x181 = -fmax(ux0, ux4);
+        const scalar_t x182 = ux0 + x181;
+        const scalar_t x183 = x180 >= 0;
+        const scalar_t x184 = -fmin(ux0, ux4);
+        const scalar_t x185 = ux0 + x184;
+        const scalar_t x186 = ((x183) ? (
+   pow(x182, scalar_t(2))
+)
+: (
+   pow(x185, scalar_t(2))
+));
+        const scalar_t x187 = x180*((x183) ? (
+   -x182
+)
+: (
+   -x185
+));
+        const scalar_t x188 = x61*((x180 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x180*(x186 + (scalar_t(1) / scalar_t(16))*x187)/((scalar_t(1) / scalar_t(512))*pow(x180, scalar_t(2)) + x186 + (scalar_t(1) / scalar_t(32))*x187)
+)
+: (
+   0
+));
+        const scalar_t x189 = x2 - scalar_t(23)*x4;
+        const scalar_t x190 = x109 + x170 + x189;
+        const scalar_t x191 = y2 - scalar_t(23)*y4;
+        const scalar_t x192 = x114 + x174 + x191;
+        const scalar_t x193 = z2 - scalar_t(23)*z4;
+        const scalar_t x194 = x119 + x178 + x193;
+        const scalar_t x195 = g4_0*x190 + g4_1*x192 + g4_2*x194;
+        const scalar_t x196 = ux4 + x181;
+        const scalar_t x197 = x195 >= 0;
+        const scalar_t x198 = ux4 + x184;
+        const scalar_t x199 = ((x197) ? (
+   pow(x196, scalar_t(2))
+)
+: (
+   pow(x198, scalar_t(2))
+));
+        const scalar_t x200 = x195*((x197) ? (
+   -x196
+)
+: (
+   -x198
+));
+        const scalar_t x201 = x71*((x195 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x195*(x199 + (scalar_t(1) / scalar_t(16))*x200)/((scalar_t(1) / scalar_t(512))*pow(x195, scalar_t(2)) + x199 + (scalar_t(1) / scalar_t(32))*x200)
+)
+: (
+   0
+));
+        const scalar_t x202 = p0 + p1;
+        const scalar_t x203 = scalar_t(2)*cof0;
+        const scalar_t x204 = x202*x203;
+        const scalar_t x205 = p0 + p3;
+        const scalar_t x206 = scalar_t(2)*cof3;
+        const scalar_t x207 = x205*x206;
+        const scalar_t x208 = p0 + p4;
+        const scalar_t x209 = scalar_t(2)*cof6;
+        const scalar_t x210 = x208*x209;
+        const scalar_t x211 = -ux5;
+        const scalar_t x212 = ux4 + ux7;
+        const scalar_t x213 = -ux6;
+        const scalar_t x214 = -ux2 + x213;
+        const scalar_t x215 = -ux1 + x211 + x212 + x214 + x27;
+        const scalar_t x216 = ux4 + ux5;
+        const scalar_t x217 = -ux7 + x8;
+        const scalar_t x218 = -ux3 + x214 + x216 + x217;
+        const scalar_t x219 = ux2 + ux3;
+        const scalar_t x220 = -ux4 + x211 + x213 + x217 + x219;
+        const scalar_t x221 = cof0*x215 + cof3*x218 + cof6*x220;
+        const scalar_t x222 = -uy5;
+        const scalar_t x223 = uy4 + uy7;
+        const scalar_t x224 = -uy6;
+        const scalar_t x225 = -uy2 + x224;
+        const scalar_t x226 = -uy1 + x222 + x223 + x225 + x28;
+        const scalar_t x227 = uy4 + uy5;
+        const scalar_t x228 = -uy7 + x9;
+        const scalar_t x229 = -uy3 + x225 + x227 + x228;
+        const scalar_t x230 = uy2 + uy3;
+        const scalar_t x231 = -uy4 + x222 + x224 + x228 + x230;
+        const scalar_t x232 = cof0*x226 + cof1*x215 + cof3*x229 + cof4*x218 + cof6*x231 + cof7*x220;
+        const scalar_t x233 = -uz5;
+        const scalar_t x234 = uz4 + uz7;
+        const scalar_t x235 = -uz6;
+        const scalar_t x236 = -uz2 + x235;
+        const scalar_t x237 = -uz1 + x233 + x234 + x236 + x29;
+        const scalar_t x238 = uz4 + uz5;
+        const scalar_t x239 = -uz7 + x10;
+        const scalar_t x240 = -uz3 + x236 + x238 + x239;
+        const scalar_t x241 = uz2 + uz3;
+        const scalar_t x242 = -uz4 + x233 + x235 + x239 + x241;
+        const scalar_t x243 = cof0*x237 + cof2*x215 + cof3*x240 + cof5*x218 + cof6*x242 + cof8*x220;
+        const scalar_t x244 = mu/det;
+        const scalar_t x245 = x244*(cof1*x232 + cof2*x243 + x203*x221);
+        const scalar_t x246 = x244*(cof4*x232 + cof5*x243 + x206*x221);
+        const scalar_t x247 = x244*(cof7*x232 + cof8*x243 + x209*x221);
+        const scalar_t x248 = x246 + x247;
+        const scalar_t x249 = x245 + x248;
+        const scalar_t x250 = uy0*x46;
+        const scalar_t x251 = uy0*x61;
+        const scalar_t x252 = uy3*x68;
+        const scalar_t x253 = uy4*x71;
+        const scalar_t x254 = g0_3*x81 + g0_4*x90 + g0_5*x99;
+        const scalar_t x255 = -fmax(uy0, uy1);
+        const scalar_t x256 = uy0 + x255;
+        const scalar_t x257 = x254 >= 0;
+        const scalar_t x258 = -fmin(uy0, uy1);
+        const scalar_t x259 = uy0 + x258;
+        const scalar_t x260 = ((x257) ? (
+   pow(x256, scalar_t(2))
+)
+: (
+   pow(x259, scalar_t(2))
+));
+        const scalar_t x261 = x254*((x257) ? (
+   -x256
+)
+: (
+   -x259
+));
+        const scalar_t x262 = ((x254 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x254*(x260 + (scalar_t(1) / scalar_t(16))*x261)/((scalar_t(1) / scalar_t(512))*pow(x254, scalar_t(2)) + x260 + (scalar_t(1) / scalar_t(32))*x261)
+)
+: (
+   0
+));
+        const scalar_t x263 = g1_3*x113 + g1_4*x118 + g1_5*x123;
+        const scalar_t x264 = uy1 + x255;
+        const scalar_t x265 = x263 >= 0;
+        const scalar_t x266 = uy1 + x258;
+        const scalar_t x267 = ((x265) ? (
+   pow(x264, scalar_t(2))
+)
+: (
+   pow(x266, scalar_t(2))
+));
+        const scalar_t x268 = x263*((x265) ? (
+   -x264
+)
+: (
+   -x266
+));
+        const scalar_t x269 = ((x263 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x263*(x267 + (scalar_t(1) / scalar_t(16))*x268)/((scalar_t(1) / scalar_t(512))*pow(x263, scalar_t(2)) + x267 + (scalar_t(1) / scalar_t(32))*x268)
+)
+: (
+   0
+));
+        const scalar_t x270 = g0_3*x134 + g0_4*x138 + g0_5*x142;
+        const scalar_t x271 = -fmax(uy0, uy3);
+        const scalar_t x272 = uy0 + x271;
+        const scalar_t x273 = x270 >= 0;
+        const scalar_t x274 = -fmin(uy0, uy3);
+        const scalar_t x275 = uy0 + x274;
+        const scalar_t x276 = ((x273) ? (
+   pow(x272, scalar_t(2))
+)
+: (
+   pow(x275, scalar_t(2))
+));
+        const scalar_t x277 = x270*((x273) ? (
+   -x272
+)
+: (
+   -x275
+));
+        const scalar_t x278 = x46*((x270 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x270*(x276 + (scalar_t(1) / scalar_t(16))*x277)/((scalar_t(1) / scalar_t(512))*pow(x270, scalar_t(2)) + x276 + (scalar_t(1) / scalar_t(32))*x277)
+)
+: (
+   0
+));
+        const scalar_t x279 = g3_3*x154 + g3_4*x157 + g3_5*x160;
+        const scalar_t x280 = uy3 + x271;
+        const scalar_t x281 = x279 >= 0;
+        const scalar_t x282 = uy3 + x274;
+        const scalar_t x283 = ((x281) ? (
+   pow(x280, scalar_t(2))
+)
+: (
+   pow(x282, scalar_t(2))
+));
+        const scalar_t x284 = x279*((x281) ? (
+   -x280
+)
+: (
+   -x282
+));
+        const scalar_t x285 = x68*((x279 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x279*(x283 + (scalar_t(1) / scalar_t(16))*x284)/((scalar_t(1) / scalar_t(512))*pow(x279, scalar_t(2)) + x283 + (scalar_t(1) / scalar_t(32))*x284)
+)
+: (
+   0
+));
+        const scalar_t x286 = g0_3*x171 + g0_4*x175 + g0_5*x179;
+        const scalar_t x287 = -fmax(uy0, uy4);
+        const scalar_t x288 = uy0 + x287;
+        const scalar_t x289 = x286 >= 0;
+        const scalar_t x290 = -fmin(uy0, uy4);
+        const scalar_t x291 = uy0 + x290;
+        const scalar_t x292 = ((x289) ? (
+   pow(x288, scalar_t(2))
+)
+: (
+   pow(x291, scalar_t(2))
+));
+        const scalar_t x293 = x286*((x289) ? (
+   -x288
+)
+: (
+   -x291
+));
+        const scalar_t x294 = x61*((x286 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x286*(x292 + (scalar_t(1) / scalar_t(16))*x293)/((scalar_t(1) / scalar_t(512))*pow(x286, scalar_t(2)) + x292 + (scalar_t(1) / scalar_t(32))*x293)
+)
+: (
+   0
+));
+        const scalar_t x295 = g4_3*x190 + g4_4*x192 + g4_5*x194;
+        const scalar_t x296 = uy4 + x287;
+        const scalar_t x297 = x295 >= 0;
+        const scalar_t x298 = uy4 + x290;
+        const scalar_t x299 = ((x297) ? (
+   pow(x296, scalar_t(2))
+)
+: (
+   pow(x298, scalar_t(2))
+));
+        const scalar_t x300 = x295*((x297) ? (
+   -x296
+)
+: (
+   -x298
+));
+        const scalar_t x301 = x71*((x295 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x295*(x299 + (scalar_t(1) / scalar_t(16))*x300)/((scalar_t(1) / scalar_t(512))*pow(x295, scalar_t(2)) + x299 + (scalar_t(1) / scalar_t(32))*x300)
+)
+: (
+   0
+));
+        const scalar_t x302 = scalar_t(2)*cof1;
+        const scalar_t x303 = x202*x302;
+        const scalar_t x304 = scalar_t(2)*cof4;
+        const scalar_t x305 = x205*x304;
+        const scalar_t x306 = scalar_t(2)*cof7;
+        const scalar_t x307 = x208*x306;
+        const scalar_t x308 = cof1*x226 + cof4*x229 + cof7*x231;
+        const scalar_t x309 = cof1*x237 + cof2*x226 + cof4*x240 + cof5*x229 + cof7*x242 + cof8*x231;
+        const scalar_t x310 = x244*(cof0*x232 + cof2*x309 + x302*x308);
+        const scalar_t x311 = x244*(cof3*x232 + cof5*x309 + x304*x308);
+        const scalar_t x312 = x244*(cof6*x232 + cof8*x309 + x306*x308);
+        const scalar_t x313 = x311 + x312;
+        const scalar_t x314 = x310 + x313;
+        const scalar_t x315 = uz0*x46;
+        const scalar_t x316 = uz0*x61;
+        const scalar_t x317 = uz3*x68;
+        const scalar_t x318 = uz4*x71;
+        const scalar_t x319 = g0_6*x81 + g0_7*x90 + g0_8*x99;
+        const scalar_t x320 = -fmax(uz0, uz1);
+        const scalar_t x321 = uz0 + x320;
+        const scalar_t x322 = x319 >= 0;
+        const scalar_t x323 = -fmin(uz0, uz1);
+        const scalar_t x324 = uz0 + x323;
+        const scalar_t x325 = ((x322) ? (
+   pow(x321, scalar_t(2))
+)
+: (
+   pow(x324, scalar_t(2))
+));
+        const scalar_t x326 = x319*((x322) ? (
+   -x321
+)
+: (
+   -x324
+));
+        const scalar_t x327 = ((x319 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x319*(x325 + (scalar_t(1) / scalar_t(16))*x326)/((scalar_t(1) / scalar_t(512))*pow(x319, scalar_t(2)) + x325 + (scalar_t(1) / scalar_t(32))*x326)
+)
+: (
+   0
+));
+        const scalar_t x328 = g1_6*x113 + g1_7*x118 + g1_8*x123;
+        const scalar_t x329 = uz1 + x320;
+        const scalar_t x330 = x328 >= 0;
+        const scalar_t x331 = uz1 + x323;
+        const scalar_t x332 = ((x330) ? (
+   pow(x329, scalar_t(2))
+)
+: (
+   pow(x331, scalar_t(2))
+));
+        const scalar_t x333 = x328*((x330) ? (
+   -x329
+)
+: (
+   -x331
+));
+        const scalar_t x334 = ((x328 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x328*(x332 + (scalar_t(1) / scalar_t(16))*x333)/((scalar_t(1) / scalar_t(512))*pow(x328, scalar_t(2)) + x332 + (scalar_t(1) / scalar_t(32))*x333)
+)
+: (
+   0
+));
+        const scalar_t x335 = g0_6*x134 + g0_7*x138 + g0_8*x142;
+        const scalar_t x336 = -fmax(uz0, uz3);
+        const scalar_t x337 = uz0 + x336;
+        const scalar_t x338 = x335 >= 0;
+        const scalar_t x339 = -fmin(uz0, uz3);
+        const scalar_t x340 = uz0 + x339;
+        const scalar_t x341 = ((x338) ? (
+   pow(x337, scalar_t(2))
+)
+: (
+   pow(x340, scalar_t(2))
+));
+        const scalar_t x342 = x335*((x338) ? (
+   -x337
+)
+: (
+   -x340
+));
+        const scalar_t x343 = x46*((x335 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x335*(x341 + (scalar_t(1) / scalar_t(16))*x342)/((scalar_t(1) / scalar_t(512))*pow(x335, scalar_t(2)) + x341 + (scalar_t(1) / scalar_t(32))*x342)
+)
+: (
+   0
+));
+        const scalar_t x344 = g3_6*x154 + g3_7*x157 + g3_8*x160;
+        const scalar_t x345 = uz3 + x336;
+        const scalar_t x346 = x344 >= 0;
+        const scalar_t x347 = uz3 + x339;
+        const scalar_t x348 = ((x346) ? (
+   pow(x345, scalar_t(2))
+)
+: (
+   pow(x347, scalar_t(2))
+));
+        const scalar_t x349 = x344*((x346) ? (
+   -x345
+)
+: (
+   -x347
+));
+        const scalar_t x350 = x68*((x344 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x344*(x348 + (scalar_t(1) / scalar_t(16))*x349)/((scalar_t(1) / scalar_t(512))*pow(x344, scalar_t(2)) + x348 + (scalar_t(1) / scalar_t(32))*x349)
+)
+: (
+   0
+));
+        const scalar_t x351 = g0_6*x171 + g0_7*x175 + g0_8*x179;
+        const scalar_t x352 = -fmax(uz0, uz4);
+        const scalar_t x353 = uz0 + x352;
+        const scalar_t x354 = x351 >= 0;
+        const scalar_t x355 = -fmin(uz0, uz4);
+        const scalar_t x356 = uz0 + x355;
+        const scalar_t x357 = ((x354) ? (
+   pow(x353, scalar_t(2))
+)
+: (
+   pow(x356, scalar_t(2))
+));
+        const scalar_t x358 = x351*((x354) ? (
+   -x353
+)
+: (
+   -x356
+));
+        const scalar_t x359 = x61*((x351 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x351*(x357 + (scalar_t(1) / scalar_t(16))*x358)/((scalar_t(1) / scalar_t(512))*pow(x351, scalar_t(2)) + x357 + (scalar_t(1) / scalar_t(32))*x358)
+)
+: (
+   0
+));
+        const scalar_t x360 = g4_6*x190 + g4_7*x192 + g4_8*x194;
+        const scalar_t x361 = uz4 + x352;
+        const scalar_t x362 = x360 >= 0;
+        const scalar_t x363 = uz4 + x355;
+        const scalar_t x364 = ((x362) ? (
+   pow(x361, scalar_t(2))
+)
+: (
+   pow(x363, scalar_t(2))
+));
+        const scalar_t x365 = x360*((x362) ? (
+   -x361
+)
+: (
+   -x363
+));
+        const scalar_t x366 = x71*((x360 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x360*(x364 + (scalar_t(1) / scalar_t(16))*x365)/((scalar_t(1) / scalar_t(512))*pow(x360, scalar_t(2)) + x364 + (scalar_t(1) / scalar_t(32))*x365)
+)
+: (
+   0
+));
+        const scalar_t x367 = scalar_t(2)*cof2;
+        const scalar_t x368 = x202*x367;
+        const scalar_t x369 = scalar_t(2)*cof5;
+        const scalar_t x370 = x205*x369;
+        const scalar_t x371 = scalar_t(2)*cof8;
+        const scalar_t x372 = x208*x371;
+        const scalar_t x373 = cof2*x237 + cof5*x240 + cof8*x242;
+        const scalar_t x374 = x244*(cof0*x243 + cof1*x309 + x367*x373);
+        const scalar_t x375 = x244*(cof3*x243 + cof4*x309 + x369*x373);
+        const scalar_t x376 = x244*(cof6*x243 + cof7*x309 + x371*x373);
+        const scalar_t x377 = x375 + x376;
+        const scalar_t x378 = x374 + x377;
+        const scalar_t x379 = -sgn0*x64 + x64;
+        const scalar_t x380 = x25 - x65;
+        const scalar_t x381 = -x245 + x248;
+        const scalar_t x382 = rho*(cof3*(ux1 + ux2) + cof4*(uy1 + uy2) + cof5*(uz1 + uz2));
+        const scalar_t x383 = scalar_t(2)*p2;
+        const scalar_t x384 = -x383;
+        const scalar_t x385 = pgx1 + pgx2;
+        const scalar_t x386 = x1 - x2;
+        const scalar_t x387 = pgy1 + pgy2;
+        const scalar_t x388 = y1 - y2;
+        const scalar_t x389 = pgz1 + pgz2;
+        const scalar_t x390 = z1 - z2;
+        const scalar_t x391 = x14 + x384 - x385*x386 - x387*x388 - x389*x390;
+        const scalar_t x392 = scalar_t(4)*rcoef5;
+        const scalar_t x393 = -x382 - x391*x392;
+        const scalar_t x394 = x382 + x391*x392;
+        const scalar_t x395 = -sgn5*x393 + x394;
+        const scalar_t x396 = scalar_t(3)*x0 + scalar_t(3)*x6;
+        const scalar_t x397 = scalar_t(9)*x2 + x4;
+        const scalar_t x398 = x396 + x397;
+        const scalar_t x399 = x112 + x398;
+        const scalar_t x400 = scalar_t(3)*y0 + scalar_t(3)*y6;
+        const scalar_t x401 = scalar_t(9)*y2 + y4;
+        const scalar_t x402 = x400 + x401;
+        const scalar_t x403 = x117 + x402;
+        const scalar_t x404 = scalar_t(3)*z0 + scalar_t(3)*z6;
+        const scalar_t x405 = scalar_t(9)*z2 + z4;
+        const scalar_t x406 = x404 + x405;
+        const scalar_t x407 = x122 + x406;
+        const scalar_t x408 = g1_0*x399 + g1_1*x403 + g1_2*x407;
+        const scalar_t x409 = -fmax(ux1, ux2);
+        const scalar_t x410 = ux1 + x409;
+        const scalar_t x411 = x408 >= 0;
+        const scalar_t x412 = -fmin(ux1, ux2);
+        const scalar_t x413 = ux1 + x412;
+        const scalar_t x414 = ((x411) ? (
+   pow(x410, scalar_t(2))
+)
+: (
+   pow(x413, scalar_t(2))
+));
+        const scalar_t x415 = x408*((x411) ? (
+   -x410
+)
+: (
+   -x413
+));
+        const scalar_t x416 = -sgn5*x393 + x393;
+        const scalar_t x417 = -scalar_t(23)*x2 + x4;
+        const scalar_t x418 = x396 + x417;
+        const scalar_t x419 = x418 + x80;
+        const scalar_t x420 = -scalar_t(23)*y2 + y4;
+        const scalar_t x421 = x400 + x420;
+        const scalar_t x422 = x421 + x89;
+        const scalar_t x423 = -scalar_t(23)*z2 + z4;
+        const scalar_t x424 = x404 + x423;
+        const scalar_t x425 = x424 + x98;
+        const scalar_t x426 = g2_0*x419 + g2_1*x422 + g2_2*x425;
+        const scalar_t x427 = ux2 + x409;
+        const scalar_t x428 = x426 >= 0;
+        const scalar_t x429 = ux2 + x412;
+        const scalar_t x430 = ((x428) ? (
+   pow(x427, scalar_t(2))
+)
+: (
+   pow(x429, scalar_t(2))
+));
+        const scalar_t x431 = x426*((x428) ? (
+   -x427
+)
+: (
+   -x429
+));
+        const scalar_t x432 = p1 + p2;
+        const scalar_t x433 = ux1*x395 - ux2*x416 + x206*x432 + x395*((x408 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x408*(x414 + (scalar_t(1) / scalar_t(16))*x415)/((scalar_t(1) / scalar_t(512))*pow(x408, scalar_t(2)) + x414 + (scalar_t(1) / scalar_t(32))*x415)
+)
+: (
+   0
+)) - x416*((x426 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x426*(x430 + (scalar_t(1) / scalar_t(16))*x431)/((scalar_t(1) / scalar_t(512))*pow(x426, scalar_t(2)) + x430 + (scalar_t(1) / scalar_t(32))*x431)
+)
+: (
+   0
+));
+        const scalar_t x434 = rho*(cof6*(ux1 + ux5) + cof7*(uy1 + uy5) + cof8*(uz1 + uz5));
+        const scalar_t x435 = scalar_t(2)*p5;
+        const scalar_t x436 = -x435;
+        const scalar_t x437 = pgx1 + pgx5;
+        const scalar_t x438 = -x5;
+        const scalar_t x439 = x1 + x438;
+        const scalar_t x440 = pgy1 + pgy5;
+        const scalar_t x441 = -y5;
+        const scalar_t x442 = x441 + y1;
+        const scalar_t x443 = pgz1 + pgz5;
+        const scalar_t x444 = -z5;
+        const scalar_t x445 = x444 + z1;
+        const scalar_t x446 = x14 + x436 - x437*x439 - x440*x442 - x443*x445;
+        const scalar_t x447 = scalar_t(4)*rcoef9;
+        const scalar_t x448 = -x434 - x446*x447;
+        const scalar_t x449 = x434 + x446*x447;
+        const scalar_t x450 = -sgn9*x448 + x449;
+        const scalar_t x451 = x3 + scalar_t(9)*x5;
+        const scalar_t x452 = x396 + x74;
+        const scalar_t x453 = x452 + x7;
+        const scalar_t x454 = x111 + x451 + x453;
+        const scalar_t x455 = y3 + scalar_t(9)*y5;
+        const scalar_t x456 = x400 + x83;
+        const scalar_t x457 = x456 + y7;
+        const scalar_t x458 = x116 + x455 + x457;
+        const scalar_t x459 = z3 + scalar_t(9)*z5;
+        const scalar_t x460 = x404 + x92;
+        const scalar_t x461 = x460 + z7;
+        const scalar_t x462 = x121 + x459 + x461;
+        const scalar_t x463 = g1_0*x454 + g1_1*x458 + g1_2*x462;
+        const scalar_t x464 = -fmax(ux1, ux5);
+        const scalar_t x465 = ux1 + x464;
+        const scalar_t x466 = x463 >= 0;
+        const scalar_t x467 = -fmin(ux1, ux5);
+        const scalar_t x468 = ux1 + x467;
+        const scalar_t x469 = ((x466) ? (
+   pow(x465, scalar_t(2))
+)
+: (
+   pow(x468, scalar_t(2))
+));
+        const scalar_t x470 = x463*((x466) ? (
+   -x465
+)
+: (
+   -x468
+));
+        const scalar_t x471 = -sgn9*x448 + x448;
+        const scalar_t x472 = x3 - scalar_t(23)*x5;
+        const scalar_t x473 = x453 + x472 + x77;
+        const scalar_t x474 = y3 - scalar_t(23)*y5;
+        const scalar_t x475 = x457 + x474 + x86;
+        const scalar_t x476 = z3 - scalar_t(23)*z5;
+        const scalar_t x477 = x461 + x476 + x95;
+        const scalar_t x478 = g5_0*x473 + g5_1*x475 + g5_2*x477;
+        const scalar_t x479 = ux5 + x464;
+        const scalar_t x480 = x478 >= 0;
+        const scalar_t x481 = ux5 + x467;
+        const scalar_t x482 = ((x480) ? (
+   pow(x479, scalar_t(2))
+)
+: (
+   pow(x481, scalar_t(2))
+));
+        const scalar_t x483 = x478*((x480) ? (
+   -x479
+)
+: (
+   -x481
+));
+        const scalar_t x484 = p1 + p5;
+        const scalar_t x485 = ux1*x450 - ux5*x471 + x209*x484 + x450*((x463 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x463*(x469 + (scalar_t(1) / scalar_t(16))*x470)/((scalar_t(1) / scalar_t(512))*pow(x463, scalar_t(2)) + x469 + (scalar_t(1) / scalar_t(32))*x470)
+)
+: (
+   0
+)) - x471*((x478 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x478*(x482 + (scalar_t(1) / scalar_t(16))*x483)/((scalar_t(1) / scalar_t(512))*pow(x478, scalar_t(2)) + x482 + (scalar_t(1) / scalar_t(32))*x483)
+)
+: (
+   0
+));
+        const scalar_t x486 = -x310 + x313;
+        const scalar_t x487 = g1_3*x399 + g1_4*x403 + g1_5*x407;
+        const scalar_t x488 = -fmax(uy1, uy2);
+        const scalar_t x489 = uy1 + x488;
+        const scalar_t x490 = x487 >= 0;
+        const scalar_t x491 = -fmin(uy1, uy2);
+        const scalar_t x492 = uy1 + x491;
+        const scalar_t x493 = ((x490) ? (
+   pow(x489, scalar_t(2))
+)
+: (
+   pow(x492, scalar_t(2))
+));
+        const scalar_t x494 = x487*((x490) ? (
+   -x489
+)
+: (
+   -x492
+));
+        const scalar_t x495 = g2_3*x419 + g2_4*x422 + g2_5*x425;
+        const scalar_t x496 = uy2 + x488;
+        const scalar_t x497 = x495 >= 0;
+        const scalar_t x498 = uy2 + x491;
+        const scalar_t x499 = ((x497) ? (
+   pow(x496, scalar_t(2))
+)
+: (
+   pow(x498, scalar_t(2))
+));
+        const scalar_t x500 = x495*((x497) ? (
+   -x496
+)
+: (
+   -x498
+));
+        const scalar_t x501 = uy1*x395 - uy2*x416 + x304*x432 + x395*((x487 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x487*(x493 + (scalar_t(1) / scalar_t(16))*x494)/((scalar_t(1) / scalar_t(512))*pow(x487, scalar_t(2)) + x493 + (scalar_t(1) / scalar_t(32))*x494)
+)
+: (
+   0
+)) - x416*((x495 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x495*(x499 + (scalar_t(1) / scalar_t(16))*x500)/((scalar_t(1) / scalar_t(512))*pow(x495, scalar_t(2)) + x499 + (scalar_t(1) / scalar_t(32))*x500)
+)
+: (
+   0
+));
+        const scalar_t x502 = g1_3*x454 + g1_4*x458 + g1_5*x462;
+        const scalar_t x503 = -fmax(uy1, uy5);
+        const scalar_t x504 = uy1 + x503;
+        const scalar_t x505 = x502 >= 0;
+        const scalar_t x506 = -fmin(uy1, uy5);
+        const scalar_t x507 = uy1 + x506;
+        const scalar_t x508 = ((x505) ? (
+   pow(x504, scalar_t(2))
+)
+: (
+   pow(x507, scalar_t(2))
+));
+        const scalar_t x509 = x502*((x505) ? (
+   -x504
+)
+: (
+   -x507
+));
+        const scalar_t x510 = g5_3*x473 + g5_4*x475 + g5_5*x477;
+        const scalar_t x511 = uy5 + x503;
+        const scalar_t x512 = x510 >= 0;
+        const scalar_t x513 = uy5 + x506;
+        const scalar_t x514 = ((x512) ? (
+   pow(x511, scalar_t(2))
+)
+: (
+   pow(x513, scalar_t(2))
+));
+        const scalar_t x515 = x510*((x512) ? (
+   -x511
+)
+: (
+   -x513
+));
+        const scalar_t x516 = uy1*x450 - uy5*x471 + x306*x484 + x450*((x502 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x502*(x508 + (scalar_t(1) / scalar_t(16))*x509)/((scalar_t(1) / scalar_t(512))*pow(x502, scalar_t(2)) + x508 + (scalar_t(1) / scalar_t(32))*x509)
+)
+: (
+   0
+)) - x471*((x510 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x510*(x514 + (scalar_t(1) / scalar_t(16))*x515)/((scalar_t(1) / scalar_t(512))*pow(x510, scalar_t(2)) + x514 + (scalar_t(1) / scalar_t(32))*x515)
+)
+: (
+   0
+));
+        const scalar_t x517 = -x374 + x377;
+        const scalar_t x518 = g1_6*x399 + g1_7*x403 + g1_8*x407;
+        const scalar_t x519 = -fmax(uz1, uz2);
+        const scalar_t x520 = uz1 + x519;
+        const scalar_t x521 = x518 >= 0;
+        const scalar_t x522 = -fmin(uz1, uz2);
+        const scalar_t x523 = uz1 + x522;
+        const scalar_t x524 = ((x521) ? (
+   pow(x520, scalar_t(2))
+)
+: (
+   pow(x523, scalar_t(2))
+));
+        const scalar_t x525 = x518*((x521) ? (
+   -x520
+)
+: (
+   -x523
+));
+        const scalar_t x526 = g2_6*x419 + g2_7*x422 + g2_8*x425;
+        const scalar_t x527 = uz2 + x519;
+        const scalar_t x528 = x526 >= 0;
+        const scalar_t x529 = uz2 + x522;
+        const scalar_t x530 = ((x528) ? (
+   pow(x527, scalar_t(2))
+)
+: (
+   pow(x529, scalar_t(2))
+));
+        const scalar_t x531 = x526*((x528) ? (
+   -x527
+)
+: (
+   -x529
+));
+        const scalar_t x532 = uz1*x395 - uz2*x416 + x369*x432 + x395*((x518 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x518*(x524 + (scalar_t(1) / scalar_t(16))*x525)/((scalar_t(1) / scalar_t(512))*pow(x518, scalar_t(2)) + x524 + (scalar_t(1) / scalar_t(32))*x525)
+)
+: (
+   0
+)) - x416*((x526 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x526*(x530 + (scalar_t(1) / scalar_t(16))*x531)/((scalar_t(1) / scalar_t(512))*pow(x526, scalar_t(2)) + x530 + (scalar_t(1) / scalar_t(32))*x531)
+)
+: (
+   0
+));
+        const scalar_t x533 = g1_6*x454 + g1_7*x458 + g1_8*x462;
+        const scalar_t x534 = -fmax(uz1, uz5);
+        const scalar_t x535 = uz1 + x534;
+        const scalar_t x536 = x533 >= 0;
+        const scalar_t x537 = -fmin(uz1, uz5);
+        const scalar_t x538 = uz1 + x537;
+        const scalar_t x539 = ((x536) ? (
+   pow(x535, scalar_t(2))
+)
+: (
+   pow(x538, scalar_t(2))
+));
+        const scalar_t x540 = x533*((x536) ? (
+   -x535
+)
+: (
+   -x538
+));
+        const scalar_t x541 = g5_6*x473 + g5_7*x475 + g5_8*x477;
+        const scalar_t x542 = uz5 + x534;
+        const scalar_t x543 = x541 >= 0;
+        const scalar_t x544 = uz5 + x537;
+        const scalar_t x545 = ((x543) ? (
+   pow(x542, scalar_t(2))
+)
+: (
+   pow(x544, scalar_t(2))
+));
+        const scalar_t x546 = x541*((x543) ? (
+   -x542
+)
+: (
+   -x544
+));
+        const scalar_t x547 = uz1*x450 - uz5*x471 + x371*x484 + x450*((x533 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x533*(x539 + (scalar_t(1) / scalar_t(16))*x540)/((scalar_t(1) / scalar_t(512))*pow(x533, scalar_t(2)) + x539 + (scalar_t(1) / scalar_t(32))*x540)
+)
+: (
+   0
+)) - x471*((x541 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x541*(x545 + (scalar_t(1) / scalar_t(16))*x546)/((scalar_t(1) / scalar_t(512))*pow(x541, scalar_t(2)) + x545 + (scalar_t(1) / scalar_t(32))*x546)
+)
+: (
+   0
+));
+        const scalar_t x548 = rho*(cof0*x219 + cof1*x230 + cof2*x241);
+        const scalar_t x549 = x31 + x384 + (pgx2 + pgx3)*(x2 + x33) + (pgy2 + pgy3)*(x36 + y2) + (pgz2 + pgz3)*(x39 + z2);
+        const scalar_t x550 = scalar_t(4)*rcoef1;
+        const scalar_t x551 = -x548 - x549*x550;
+        const scalar_t x552 = sgn1*x551;
+        const scalar_t x553 = x548 + x549*x550;
+        const scalar_t x554 = -x552 + x553;
+        const scalar_t x555 = rho*(cof6*(ux2 + ux6) + cof7*(uy2 + uy6) + cof8*(uz2 + uz6));
+        const scalar_t x556 = -x555;
+        const scalar_t x557 = -scalar_t(2)*p6;
+        const scalar_t x558 = -x6;
+        const scalar_t x559 = -y6;
+        const scalar_t x560 = -z6;
+        const scalar_t x561 = x383 + x557 + (pgx2 + pgx6)*(-x2 - x558) + (pgy2 + pgy6)*(-x559 - y2) + (pgz2 + pgz6)*(-x560 - z2);
+        const scalar_t x562 = scalar_t(4)*rcoef10;
+        const scalar_t x563 = x556 - x561*x562;
+        const scalar_t x564 = -sgn10*x563 + x563;
+        const scalar_t x565 = ux6*x564;
+        const scalar_t x566 = x153 + x398;
+        const scalar_t x567 = x156 + x402;
+        const scalar_t x568 = x159 + x406;
+        const scalar_t x569 = g3_0*x566 + g3_1*x567 + g3_2*x568;
+        const scalar_t x570 = -fmax(ux2, ux3);
+        const scalar_t x571 = ux3 + x570;
+        const scalar_t x572 = x569 >= 0;
+        const scalar_t x573 = -fmin(ux2, ux3);
+        const scalar_t x574 = ux3 + x573;
+        const scalar_t x575 = ((x572) ? (
+   pow(x571, scalar_t(2))
+)
+: (
+   pow(x574, scalar_t(2))
+));
+        const scalar_t x576 = x569*((x572) ? (
+   -x571
+)
+: (
+   -x574
+));
+        const scalar_t x577 = ((x569 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x569*(x575 + (scalar_t(1) / scalar_t(16))*x576)/((scalar_t(1) / scalar_t(512))*pow(x569, scalar_t(2)) + x575 + (scalar_t(1) / scalar_t(32))*x576)
+)
+: (
+   0
+));
+        const scalar_t x578 = -scalar_t(23)*x6;
+        const scalar_t x579 = x0 + x169;
+        const scalar_t x580 = x397 + x578 + x579;
+        const scalar_t x581 = -scalar_t(23)*y6;
+        const scalar_t x582 = x173 + y0;
+        const scalar_t x583 = x401 + x581 + x582;
+        const scalar_t x584 = -scalar_t(23)*z6;
+        const scalar_t x585 = x177 + z0;
+        const scalar_t x586 = x405 + x584 + x585;
+        const scalar_t x587 = g6_0*x580 + g6_1*x583 + g6_2*x586;
+        const scalar_t x588 = -fmax(ux2, ux6);
+        const scalar_t x589 = ux6 + x588;
+        const scalar_t x590 = x587 >= 0;
+        const scalar_t x591 = -fmin(ux2, ux6);
+        const scalar_t x592 = ux6 + x591;
+        const scalar_t x593 = ((x590) ? (
+   pow(x589, scalar_t(2))
+)
+: (
+   pow(x592, scalar_t(2))
+));
+        const scalar_t x594 = x587*((x590) ? (
+   -x589
+)
+: (
+   -x592
+));
+        const scalar_t x595 = x564*((x587 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x587*(x593 + (scalar_t(1) / scalar_t(16))*x594)/((scalar_t(1) / scalar_t(512))*pow(x587, scalar_t(2)) + x593 + (scalar_t(1) / scalar_t(32))*x594)
+)
+: (
+   0
+));
+        const scalar_t x596 = x555 + x561*x562;
+        const scalar_t x597 = -sgn10*x563 + x596;
+        const scalar_t x598 = ux2*x597;
+        const scalar_t x599 = -sgn1*x551 + x551;
+        const scalar_t x600 = scalar_t(9)*x6;
+        const scalar_t x601 = x417 + x579 + x600;
+        const scalar_t x602 = scalar_t(9)*y6;
+        const scalar_t x603 = x420 + x582 + x602;
+        const scalar_t x604 = scalar_t(9)*z6;
+        const scalar_t x605 = x423 + x585 + x604;
+        const scalar_t x606 = g2_0*x601 + g2_1*x603 + g2_2*x605;
+        const scalar_t x607 = ux2 + x588;
+        const scalar_t x608 = x606 >= 0;
+        const scalar_t x609 = ux2 + x591;
+        const scalar_t x610 = ((x608) ? (
+   pow(x607, scalar_t(2))
+)
+: (
+   pow(x609, scalar_t(2))
+));
+        const scalar_t x611 = x606*((x608) ? (
+   -x607
+)
+: (
+   -x609
+));
+        const scalar_t x612 = x597*((x606 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x606*(x610 + (scalar_t(1) / scalar_t(16))*x611)/((scalar_t(1) / scalar_t(512))*pow(x606, scalar_t(2)) + x610 + (scalar_t(1) / scalar_t(32))*x611)
+)
+: (
+   0
+));
+        const scalar_t x613 = x133 + x418;
+        const scalar_t x614 = x137 + x421;
+        const scalar_t x615 = x141 + x424;
+        const scalar_t x616 = g2_0*x613 + g2_1*x614 + g2_2*x615;
+        const scalar_t x617 = ux2 + x570;
+        const scalar_t x618 = x616 >= 0;
+        const scalar_t x619 = ux2 + x573;
+        const scalar_t x620 = ((x618) ? (
+   pow(x617, scalar_t(2))
+)
+: (
+   pow(x619, scalar_t(2))
+));
+        const scalar_t x621 = x616*((x618) ? (
+   -x617
+)
+: (
+   -x619
+));
+        const scalar_t x622 = ((x616 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x616*(x620 + (scalar_t(1) / scalar_t(16))*x621)/((scalar_t(1) / scalar_t(512))*pow(x616, scalar_t(2)) + x620 + (scalar_t(1) / scalar_t(32))*x621)
+)
+: (
+   0
+));
+        const scalar_t x623 = p2 + p6;
+        const scalar_t x624 = x209*x623;
+        const scalar_t x625 = p2 + p3;
+        const scalar_t x626 = x203*x625 + x245;
+        const scalar_t x627 = x246 - x247;
+        const scalar_t x628 = uy6*x564;
+        const scalar_t x629 = g3_3*x566 + g3_4*x567 + g3_5*x568;
+        const scalar_t x630 = -fmax(uy2, uy3);
+        const scalar_t x631 = uy3 + x630;
+        const scalar_t x632 = x629 >= 0;
+        const scalar_t x633 = -fmin(uy2, uy3);
+        const scalar_t x634 = uy3 + x633;
+        const scalar_t x635 = ((x632) ? (
+   pow(x631, scalar_t(2))
+)
+: (
+   pow(x634, scalar_t(2))
+));
+        const scalar_t x636 = x629*((x632) ? (
+   -x631
+)
+: (
+   -x634
+));
+        const scalar_t x637 = ((x629 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x629*(x635 + (scalar_t(1) / scalar_t(16))*x636)/((scalar_t(1) / scalar_t(512))*pow(x629, scalar_t(2)) + x635 + (scalar_t(1) / scalar_t(32))*x636)
+)
+: (
+   0
+));
+        const scalar_t x638 = g6_3*x580 + g6_4*x583 + g6_5*x586;
+        const scalar_t x639 = -fmax(uy2, uy6);
+        const scalar_t x640 = uy6 + x639;
+        const scalar_t x641 = x638 >= 0;
+        const scalar_t x642 = -fmin(uy2, uy6);
+        const scalar_t x643 = uy6 + x642;
+        const scalar_t x644 = ((x641) ? (
+   pow(x640, scalar_t(2))
+)
+: (
+   pow(x643, scalar_t(2))
+));
+        const scalar_t x645 = x638*((x641) ? (
+   -x640
+)
+: (
+   -x643
+));
+        const scalar_t x646 = x564*((x638 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x638*(x644 + (scalar_t(1) / scalar_t(16))*x645)/((scalar_t(1) / scalar_t(512))*pow(x638, scalar_t(2)) + x644 + (scalar_t(1) / scalar_t(32))*x645)
+)
+: (
+   0
+));
+        const scalar_t x647 = uy2*x597;
+        const scalar_t x648 = g2_3*x601 + g2_4*x603 + g2_5*x605;
+        const scalar_t x649 = uy2 + x639;
+        const scalar_t x650 = x648 >= 0;
+        const scalar_t x651 = uy2 + x642;
+        const scalar_t x652 = ((x650) ? (
+   pow(x649, scalar_t(2))
+)
+: (
+   pow(x651, scalar_t(2))
+));
+        const scalar_t x653 = x648*((x650) ? (
+   -x649
+)
+: (
+   -x651
+));
+        const scalar_t x654 = x597*((x648 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x648*(x652 + (scalar_t(1) / scalar_t(16))*x653)/((scalar_t(1) / scalar_t(512))*pow(x648, scalar_t(2)) + x652 + (scalar_t(1) / scalar_t(32))*x653)
+)
+: (
+   0
+));
+        const scalar_t x655 = g2_3*x613 + g2_4*x614 + g2_5*x615;
+        const scalar_t x656 = uy2 + x630;
+        const scalar_t x657 = x655 >= 0;
+        const scalar_t x658 = uy2 + x633;
+        const scalar_t x659 = ((x657) ? (
+   pow(x656, scalar_t(2))
+)
+: (
+   pow(x658, scalar_t(2))
+));
+        const scalar_t x660 = x655*((x657) ? (
+   -x656
+)
+: (
+   -x658
+));
+        const scalar_t x661 = ((x655 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x655*(x659 + (scalar_t(1) / scalar_t(16))*x660)/((scalar_t(1) / scalar_t(512))*pow(x655, scalar_t(2)) + x659 + (scalar_t(1) / scalar_t(32))*x660)
+)
+: (
+   0
+));
+        const scalar_t x662 = x306*x623;
+        const scalar_t x663 = x302*x625 + x310;
+        const scalar_t x664 = x311 - x312;
+        const scalar_t x665 = uz6*x564;
+        const scalar_t x666 = g3_6*x566 + g3_7*x567 + g3_8*x568;
+        const scalar_t x667 = -fmax(uz2, uz3);
+        const scalar_t x668 = uz3 + x667;
+        const scalar_t x669 = x666 >= 0;
+        const scalar_t x670 = -fmin(uz2, uz3);
+        const scalar_t x671 = uz3 + x670;
+        const scalar_t x672 = ((x669) ? (
+   pow(x668, scalar_t(2))
+)
+: (
+   pow(x671, scalar_t(2))
+));
+        const scalar_t x673 = x666*((x669) ? (
+   -x668
+)
+: (
+   -x671
+));
+        const scalar_t x674 = ((x666 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x666*(x672 + (scalar_t(1) / scalar_t(16))*x673)/((scalar_t(1) / scalar_t(512))*pow(x666, scalar_t(2)) + x672 + (scalar_t(1) / scalar_t(32))*x673)
+)
+: (
+   0
+));
+        const scalar_t x675 = g6_6*x580 + g6_7*x583 + g6_8*x586;
+        const scalar_t x676 = -fmax(uz2, uz6);
+        const scalar_t x677 = uz6 + x676;
+        const scalar_t x678 = x675 >= 0;
+        const scalar_t x679 = -fmin(uz2, uz6);
+        const scalar_t x680 = uz6 + x679;
+        const scalar_t x681 = ((x678) ? (
+   pow(x677, scalar_t(2))
+)
+: (
+   pow(x680, scalar_t(2))
+));
+        const scalar_t x682 = x675*((x678) ? (
+   -x677
+)
+: (
+   -x680
+));
+        const scalar_t x683 = x564*((x675 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x675*(x681 + (scalar_t(1) / scalar_t(16))*x682)/((scalar_t(1) / scalar_t(512))*pow(x675, scalar_t(2)) + x681 + (scalar_t(1) / scalar_t(32))*x682)
+)
+: (
+   0
+));
+        const scalar_t x684 = uz2*x597;
+        const scalar_t x685 = g2_6*x601 + g2_7*x603 + g2_8*x605;
+        const scalar_t x686 = uz2 + x676;
+        const scalar_t x687 = x685 >= 0;
+        const scalar_t x688 = uz2 + x679;
+        const scalar_t x689 = ((x687) ? (
+   pow(x686, scalar_t(2))
+)
+: (
+   pow(x688, scalar_t(2))
+));
+        const scalar_t x690 = x685*((x687) ? (
+   -x686
+)
+: (
+   -x688
+));
+        const scalar_t x691 = x597*((x685 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x685*(x689 + (scalar_t(1) / scalar_t(16))*x690)/((scalar_t(1) / scalar_t(512))*pow(x685, scalar_t(2)) + x689 + (scalar_t(1) / scalar_t(32))*x690)
+)
+: (
+   0
+));
+        const scalar_t x692 = g2_6*x613 + g2_7*x614 + g2_8*x615;
+        const scalar_t x693 = uz2 + x667;
+        const scalar_t x694 = x692 >= 0;
+        const scalar_t x695 = uz2 + x670;
+        const scalar_t x696 = ((x694) ? (
+   pow(x693, scalar_t(2))
+)
+: (
+   pow(x695, scalar_t(2))
+));
+        const scalar_t x697 = x692*((x694) ? (
+   -x693
+)
+: (
+   -x695
+));
+        const scalar_t x698 = ((x692 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x692*(x696 + (scalar_t(1) / scalar_t(16))*x697)/((scalar_t(1) / scalar_t(512))*pow(x692, scalar_t(2)) + x696 + (scalar_t(1) / scalar_t(32))*x697)
+)
+: (
+   0
+));
+        const scalar_t x699 = x371*x623;
+        const scalar_t x700 = x367*x625 + x374;
+        const scalar_t x701 = x375 - x376;
+        const scalar_t x702 = x552 + x553;
+        const scalar_t x703 = sgn1*x553 + x553;
+        const scalar_t x704 = rho*(cof6*(ux3 + ux7) + cof7*(uy3 + uy7) + cof8*(uz3 + uz7));
+        const scalar_t x705 = scalar_t(2)*p7;
+        const scalar_t x706 = pgx3 + pgx7;
+        const scalar_t x707 = -x7;
+        const scalar_t x708 = x3 + x707;
+        const scalar_t x709 = pgy3 + pgy7;
+        const scalar_t x710 = -y7;
+        const scalar_t x711 = x710 + y3;
+        const scalar_t x712 = pgz3 + pgz7;
+        const scalar_t x713 = -z7;
+        const scalar_t x714 = x713 + z3;
+        const scalar_t x715 = scalar_t(4)*rcoef11;
+        const scalar_t x716 = -x705;
+        const scalar_t x717 = x31 - x706*x708 - x709*x711 - x712*x714 + x716;
+        const scalar_t x718 = x704 + x715*x717;
+        const scalar_t x719 = sgn11*x718 + x704 + x715*(-x42 - x705 - x706*x708 - x709*x711 - x712*x714);
+        const scalar_t x720 = -x704 - x715*x717;
+        const scalar_t x721 = sgn11*x720;
+        const scalar_t x722 = x718 + x721;
+        const scalar_t x723 = scalar_t(9)*x7;
+        const scalar_t x724 = x1 + x452;
+        const scalar_t x725 = x152 + x723 + x724;
+        const scalar_t x726 = scalar_t(9)*y7;
+        const scalar_t x727 = x456 + y1;
+        const scalar_t x728 = x155 + x726 + x727;
+        const scalar_t x729 = scalar_t(9)*z7;
+        const scalar_t x730 = x460 + z1;
+        const scalar_t x731 = x158 + x729 + x730;
+        const scalar_t x732 = g3_0*x725 + g3_1*x728 + g3_2*x731;
+        const scalar_t x733 = -fmax(ux3, ux7);
+        const scalar_t x734 = ux3 + x733;
+        const scalar_t x735 = x732 >= 0;
+        const scalar_t x736 = -fmin(ux3, ux7);
+        const scalar_t x737 = ux3 + x736;
+        const scalar_t x738 = ((x735) ? (
+   pow(x734, scalar_t(2))
+)
+: (
+   pow(x737, scalar_t(2))
+));
+        const scalar_t x739 = x732*((x735) ? (
+   -x734
+)
+: (
+   -x737
+));
+        const scalar_t x740 = ((x732 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x732*(x738 + (scalar_t(1) / scalar_t(16))*x739)/((scalar_t(1) / scalar_t(512))*pow(x732, scalar_t(2)) + x738 + (scalar_t(1) / scalar_t(32))*x739)
+)
+: (
+   0
+));
+        const scalar_t x741 = -scalar_t(23)*x7;
+        const scalar_t x742 = x132 + x724 + x741;
+        const scalar_t x743 = -scalar_t(23)*y7;
+        const scalar_t x744 = x136 + x727 + x743;
+        const scalar_t x745 = -scalar_t(23)*z7;
+        const scalar_t x746 = x140 + x730 + x745;
+        const scalar_t x747 = g7_0*x742 + g7_1*x744 + g7_2*x746;
+        const scalar_t x748 = ux7 + x733;
+        const scalar_t x749 = x747 >= 0;
+        const scalar_t x750 = ux7 + x736;
+        const scalar_t x751 = ((x749) ? (
+   pow(x748, scalar_t(2))
+)
+: (
+   pow(x750, scalar_t(2))
+));
+        const scalar_t x752 = x747*((x749) ? (
+   -x748
+)
+: (
+   -x750
+));
+        const scalar_t x753 = ((x747 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x747*(x751 + (scalar_t(1) / scalar_t(16))*x752)/((scalar_t(1) / scalar_t(512))*pow(x747, scalar_t(2)) + x751 + (scalar_t(1) / scalar_t(32))*x752)
+)
+: (
+   0
+));
+        const scalar_t x754 = p3 + p7;
+        const scalar_t x755 = x209*x754;
+        const scalar_t x756 = -x246 + x247;
+        const scalar_t x757 = g3_3*x725 + g3_4*x728 + g3_5*x731;
+        const scalar_t x758 = -fmax(uy3, uy7);
+        const scalar_t x759 = uy3 + x758;
+        const scalar_t x760 = x757 >= 0;
+        const scalar_t x761 = -fmin(uy3, uy7);
+        const scalar_t x762 = uy3 + x761;
+        const scalar_t x763 = ((x760) ? (
+   pow(x759, scalar_t(2))
+)
+: (
+   pow(x762, scalar_t(2))
+));
+        const scalar_t x764 = x757*((x760) ? (
+   -x759
+)
+: (
+   -x762
+));
+        const scalar_t x765 = ((x757 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x757*(x763 + (scalar_t(1) / scalar_t(16))*x764)/((scalar_t(1) / scalar_t(512))*pow(x757, scalar_t(2)) + x763 + (scalar_t(1) / scalar_t(32))*x764)
+)
+: (
+   0
+));
+        const scalar_t x766 = g7_3*x742 + g7_4*x744 + g7_5*x746;
+        const scalar_t x767 = uy7 + x758;
+        const scalar_t x768 = x766 >= 0;
+        const scalar_t x769 = uy7 + x761;
+        const scalar_t x770 = ((x768) ? (
+   pow(x767, scalar_t(2))
+)
+: (
+   pow(x769, scalar_t(2))
+));
+        const scalar_t x771 = x766*((x768) ? (
+   -x767
+)
+: (
+   -x769
+));
+        const scalar_t x772 = ((x766 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x766*(x770 + (scalar_t(1) / scalar_t(16))*x771)/((scalar_t(1) / scalar_t(512))*pow(x766, scalar_t(2)) + x770 + (scalar_t(1) / scalar_t(32))*x771)
+)
+: (
+   0
+));
+        const scalar_t x773 = x306*x754;
+        const scalar_t x774 = -x311 + x312;
+        const scalar_t x775 = g3_6*x725 + g3_7*x728 + g3_8*x731;
+        const scalar_t x776 = -fmax(uz3, uz7);
+        const scalar_t x777 = uz3 + x776;
+        const scalar_t x778 = x775 >= 0;
+        const scalar_t x779 = -fmin(uz3, uz7);
+        const scalar_t x780 = uz3 + x779;
+        const scalar_t x781 = ((x778) ? (
+   pow(x777, scalar_t(2))
+)
+: (
+   pow(x780, scalar_t(2))
+));
+        const scalar_t x782 = x775*((x778) ? (
+   -x777
+)
+: (
+   -x780
+));
+        const scalar_t x783 = ((x775 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x775*(x781 + (scalar_t(1) / scalar_t(16))*x782)/((scalar_t(1) / scalar_t(512))*pow(x775, scalar_t(2)) + x781 + (scalar_t(1) / scalar_t(32))*x782)
+)
+: (
+   0
+));
+        const scalar_t x784 = g7_6*x742 + g7_7*x744 + g7_8*x746;
+        const scalar_t x785 = uz7 + x776;
+        const scalar_t x786 = x784 >= 0;
+        const scalar_t x787 = uz7 + x779;
+        const scalar_t x788 = ((x786) ? (
+   pow(x785, scalar_t(2))
+)
+: (
+   pow(x787, scalar_t(2))
+));
+        const scalar_t x789 = x784*((x786) ? (
+   -x785
+)
+: (
+   -x787
+));
+        const scalar_t x790 = ((x784 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x784*(x788 + (scalar_t(1) / scalar_t(16))*x789)/((scalar_t(1) / scalar_t(512))*pow(x784, scalar_t(2)) + x788 + (scalar_t(1) / scalar_t(32))*x789)
+)
+: (
+   0
+));
+        const scalar_t x791 = x371*x754;
+        const scalar_t x792 = -x375 + x376;
+        const scalar_t x793 = rho*(cof0*x216 + cof1*x227 + cof2*x238);
+        const scalar_t x794 = pgx4 + pgx5;
+        const scalar_t x795 = x4 + x438;
+        const scalar_t x796 = pgy4 + pgy5;
+        const scalar_t x797 = x441 + y4;
+        const scalar_t x798 = pgz4 + pgz5;
+        const scalar_t x799 = x444 + z4;
+        const scalar_t x800 = scalar_t(4)*rcoef2;
+        const scalar_t x801 = x436 + x49 - x794*x795 - x796*x797 - x798*x799;
+        const scalar_t x802 = x793 + x800*x801;
+        const scalar_t x803 = sgn2*x802 + x793 + x800*(-x435 - x57 - x794*x795 - x796*x797 - x798*x799);
+        const scalar_t x804 = rho*(cof3*x212 + cof4*x223 + cof5*x234);
+        const scalar_t x805 = pgx4 + pgx7;
+        const scalar_t x806 = x4 + x707;
+        const scalar_t x807 = pgy4 + pgy7;
+        const scalar_t x808 = x710 + y4;
+        const scalar_t x809 = pgz4 + pgz7;
+        const scalar_t x810 = x713 + z4;
+        const scalar_t x811 = scalar_t(4)*rcoef6;
+        const scalar_t x812 = x49 + x716 - x805*x806 - x807*x808 - x809*x810;
+        const scalar_t x813 = x804 + x811*x812;
+        const scalar_t x814 = sgn6*x813 + x804 + x811*(-x57 - x705 - x805*x806 - x807*x808 - x809*x810);
+        const scalar_t x815 = -x793 - x800*x801;
+        const scalar_t x816 = sgn2*x815;
+        const scalar_t x817 = x802 + x816;
+        const scalar_t x818 = -x804 - x811*x812;
+        const scalar_t x819 = sgn6*x818;
+        const scalar_t x820 = x813 + x819;
+        const scalar_t x821 = x131 + x396;
+        const scalar_t x822 = x189 + x451 + x821;
+        const scalar_t x823 = x135 + x400;
+        const scalar_t x824 = x191 + x455 + x823;
+        const scalar_t x825 = x139 + x404;
+        const scalar_t x826 = x193 + x459 + x825;
+        const scalar_t x827 = g4_0*x822 + g4_1*x824 + g4_2*x826;
+        const scalar_t x828 = -fmax(ux4, ux5);
+        const scalar_t x829 = ux4 + x828;
+        const scalar_t x830 = x827 >= 0;
+        const scalar_t x831 = -fmin(ux4, ux5);
+        const scalar_t x832 = ux4 + x831;
+        const scalar_t x833 = ((x830) ? (
+   pow(x829, scalar_t(2))
+)
+: (
+   pow(x832, scalar_t(2))
+));
+        const scalar_t x834 = x827*((x830) ? (
+   -x829
+)
+: (
+   -x832
+));
+        const scalar_t x835 = ((x827 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x827*(x833 + (scalar_t(1) / scalar_t(16))*x834)/((scalar_t(1) / scalar_t(512))*pow(x827, scalar_t(2)) + x833 + (scalar_t(1) / scalar_t(32))*x834)
+)
+: (
+   0
+));
+        const scalar_t x836 = x168 + x472 + x821;
+        const scalar_t x837 = x172 + x474 + x823;
+        const scalar_t x838 = x176 + x476 + x825;
+        const scalar_t x839 = g5_0*x836 + g5_1*x837 + g5_2*x838;
+        const scalar_t x840 = ux5 + x828;
+        const scalar_t x841 = x839 >= 0;
+        const scalar_t x842 = ux5 + x831;
+        const scalar_t x843 = ((x841) ? (
+   pow(x840, scalar_t(2))
+)
+: (
+   pow(x842, scalar_t(2))
+));
+        const scalar_t x844 = x839*((x841) ? (
+   -x840
+)
+: (
+   -x842
+));
+        const scalar_t x845 = ((x839 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x839*(x843 + (scalar_t(1) / scalar_t(16))*x844)/((scalar_t(1) / scalar_t(512))*pow(x839, scalar_t(2)) + x843 + (scalar_t(1) / scalar_t(32))*x844)
+)
+: (
+   0
+));
+        const scalar_t x846 = x1 + x78;
+        const scalar_t x847 = x396 + x846;
+        const scalar_t x848 = x189 + x723 + x847;
+        const scalar_t x849 = x87 + y1;
+        const scalar_t x850 = x400 + x849;
+        const scalar_t x851 = x191 + x726 + x850;
+        const scalar_t x852 = x96 + z1;
+        const scalar_t x853 = x404 + x852;
+        const scalar_t x854 = x193 + x729 + x853;
+        const scalar_t x855 = g4_0*x848 + g4_1*x851 + g4_2*x854;
+        const scalar_t x856 = -fmax(ux4, ux7);
+        const scalar_t x857 = ux4 + x856;
+        const scalar_t x858 = x855 >= 0;
+        const scalar_t x859 = -fmin(ux4, ux7);
+        const scalar_t x860 = ux4 + x859;
+        const scalar_t x861 = ((x858) ? (
+   pow(x857, scalar_t(2))
+)
+: (
+   pow(x860, scalar_t(2))
+));
+        const scalar_t x862 = x855*((x858) ? (
+   -x857
+)
+: (
+   -x860
+));
+        const scalar_t x863 = ((x855 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x855*(x861 + (scalar_t(1) / scalar_t(16))*x862)/((scalar_t(1) / scalar_t(512))*pow(x855, scalar_t(2)) + x861 + (scalar_t(1) / scalar_t(32))*x862)
+)
+: (
+   0
+));
+        const scalar_t x864 = x168 + x741 + x847;
+        const scalar_t x865 = x172 + x743 + x850;
+        const scalar_t x866 = x176 + x745 + x853;
+        const scalar_t x867 = g7_0*x864 + g7_1*x865 + g7_2*x866;
+        const scalar_t x868 = ux7 + x856;
+        const scalar_t x869 = x867 >= 0;
+        const scalar_t x870 = ux7 + x859;
+        const scalar_t x871 = ((x869) ? (
+   pow(x868, scalar_t(2))
+)
+: (
+   pow(x870, scalar_t(2))
+));
+        const scalar_t x872 = x867*((x869) ? (
+   -x868
+)
+: (
+   -x870
+));
+        const scalar_t x873 = ((x867 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x867*(x871 + (scalar_t(1) / scalar_t(16))*x872)/((scalar_t(1) / scalar_t(512))*pow(x867, scalar_t(2)) + x871 + (scalar_t(1) / scalar_t(32))*x872)
+)
+: (
+   0
+));
+        const scalar_t x874 = p4 + p7;
+        const scalar_t x875 = x206*x874;
+        const scalar_t x876 = p4 + p5;
+        const scalar_t x877 = x203*x876 + x245;
+        const scalar_t x878 = g4_3*x822 + g4_4*x824 + g4_5*x826;
+        const scalar_t x879 = -fmax(uy4, uy5);
+        const scalar_t x880 = uy4 + x879;
+        const scalar_t x881 = x878 >= 0;
+        const scalar_t x882 = -fmin(uy4, uy5);
+        const scalar_t x883 = uy4 + x882;
+        const scalar_t x884 = ((x881) ? (
+   pow(x880, scalar_t(2))
+)
+: (
+   pow(x883, scalar_t(2))
+));
+        const scalar_t x885 = x878*((x881) ? (
+   -x880
+)
+: (
+   -x883
+));
+        const scalar_t x886 = ((x878 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x878*(x884 + (scalar_t(1) / scalar_t(16))*x885)/((scalar_t(1) / scalar_t(512))*pow(x878, scalar_t(2)) + x884 + (scalar_t(1) / scalar_t(32))*x885)
+)
+: (
+   0
+));
+        const scalar_t x887 = g5_3*x836 + g5_4*x837 + g5_5*x838;
+        const scalar_t x888 = uy5 + x879;
+        const scalar_t x889 = x887 >= 0;
+        const scalar_t x890 = uy5 + x882;
+        const scalar_t x891 = ((x889) ? (
+   pow(x888, scalar_t(2))
+)
+: (
+   pow(x890, scalar_t(2))
+));
+        const scalar_t x892 = x887*((x889) ? (
+   -x888
+)
+: (
+   -x890
+));
+        const scalar_t x893 = ((x887 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x887*(x891 + (scalar_t(1) / scalar_t(16))*x892)/((scalar_t(1) / scalar_t(512))*pow(x887, scalar_t(2)) + x891 + (scalar_t(1) / scalar_t(32))*x892)
+)
+: (
+   0
+));
+        const scalar_t x894 = g4_3*x848 + g4_4*x851 + g4_5*x854;
+        const scalar_t x895 = -fmax(uy4, uy7);
+        const scalar_t x896 = uy4 + x895;
+        const scalar_t x897 = x894 >= 0;
+        const scalar_t x898 = -fmin(uy4, uy7);
+        const scalar_t x899 = uy4 + x898;
+        const scalar_t x900 = ((x897) ? (
+   pow(x896, scalar_t(2))
+)
+: (
+   pow(x899, scalar_t(2))
+));
+        const scalar_t x901 = x894*((x897) ? (
+   -x896
+)
+: (
+   -x899
+));
+        const scalar_t x902 = ((x894 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x894*(x900 + (scalar_t(1) / scalar_t(16))*x901)/((scalar_t(1) / scalar_t(512))*pow(x894, scalar_t(2)) + x900 + (scalar_t(1) / scalar_t(32))*x901)
+)
+: (
+   0
+));
+        const scalar_t x903 = g7_3*x864 + g7_4*x865 + g7_5*x866;
+        const scalar_t x904 = uy7 + x895;
+        const scalar_t x905 = x903 >= 0;
+        const scalar_t x906 = uy7 + x898;
+        const scalar_t x907 = ((x905) ? (
+   pow(x904, scalar_t(2))
+)
+: (
+   pow(x906, scalar_t(2))
+));
+        const scalar_t x908 = x903*((x905) ? (
+   -x904
+)
+: (
+   -x906
+));
+        const scalar_t x909 = ((x903 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x903*(x907 + (scalar_t(1) / scalar_t(16))*x908)/((scalar_t(1) / scalar_t(512))*pow(x903, scalar_t(2)) + x907 + (scalar_t(1) / scalar_t(32))*x908)
+)
+: (
+   0
+));
+        const scalar_t x910 = x304*x874;
+        const scalar_t x911 = x302*x876 + x310;
+        const scalar_t x912 = g4_6*x822 + g4_7*x824 + g4_8*x826;
+        const scalar_t x913 = -fmax(uz4, uz5);
+        const scalar_t x914 = uz4 + x913;
+        const scalar_t x915 = x912 >= 0;
+        const scalar_t x916 = -fmin(uz4, uz5);
+        const scalar_t x917 = uz4 + x916;
+        const scalar_t x918 = ((x915) ? (
+   pow(x914, scalar_t(2))
+)
+: (
+   pow(x917, scalar_t(2))
+));
+        const scalar_t x919 = x912*((x915) ? (
+   -x914
+)
+: (
+   -x917
+));
+        const scalar_t x920 = ((x912 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x912*(x918 + (scalar_t(1) / scalar_t(16))*x919)/((scalar_t(1) / scalar_t(512))*pow(x912, scalar_t(2)) + x918 + (scalar_t(1) / scalar_t(32))*x919)
+)
+: (
+   0
+));
+        const scalar_t x921 = g5_6*x836 + g5_7*x837 + g5_8*x838;
+        const scalar_t x922 = uz5 + x913;
+        const scalar_t x923 = x921 >= 0;
+        const scalar_t x924 = uz5 + x916;
+        const scalar_t x925 = ((x923) ? (
+   pow(x922, scalar_t(2))
+)
+: (
+   pow(x924, scalar_t(2))
+));
+        const scalar_t x926 = x921*((x923) ? (
+   -x922
+)
+: (
+   -x924
+));
+        const scalar_t x927 = ((x921 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x921*(x925 + (scalar_t(1) / scalar_t(16))*x926)/((scalar_t(1) / scalar_t(512))*pow(x921, scalar_t(2)) + x925 + (scalar_t(1) / scalar_t(32))*x926)
+)
+: (
+   0
+));
+        const scalar_t x928 = g4_6*x848 + g4_7*x851 + g4_8*x854;
+        const scalar_t x929 = -fmax(uz4, uz7);
+        const scalar_t x930 = uz4 + x929;
+        const scalar_t x931 = x928 >= 0;
+        const scalar_t x932 = -fmin(uz4, uz7);
+        const scalar_t x933 = uz4 + x932;
+        const scalar_t x934 = ((x931) ? (
+   pow(x930, scalar_t(2))
+)
+: (
+   pow(x933, scalar_t(2))
+));
+        const scalar_t x935 = x928*((x931) ? (
+   -x930
+)
+: (
+   -x933
+));
+        const scalar_t x936 = ((x928 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x928*(x934 + (scalar_t(1) / scalar_t(16))*x935)/((scalar_t(1) / scalar_t(512))*pow(x928, scalar_t(2)) + x934 + (scalar_t(1) / scalar_t(32))*x935)
+)
+: (
+   0
+));
+        const scalar_t x937 = g7_6*x864 + g7_7*x865 + g7_8*x866;
+        const scalar_t x938 = uz7 + x929;
+        const scalar_t x939 = x937 >= 0;
+        const scalar_t x940 = uz7 + x932;
+        const scalar_t x941 = ((x939) ? (
+   pow(x938, scalar_t(2))
+)
+: (
+   pow(x940, scalar_t(2))
+));
+        const scalar_t x942 = x937*((x939) ? (
+   -x938
+)
+: (
+   -x940
+));
+        const scalar_t x943 = ((x937 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x937*(x941 + (scalar_t(1) / scalar_t(16))*x942)/((scalar_t(1) / scalar_t(512))*pow(x937, scalar_t(2)) + x941 + (scalar_t(1) / scalar_t(32))*x942)
+)
+: (
+   0
+));
+        const scalar_t x944 = x369*x874;
+        const scalar_t x945 = x367*x876 + x374;
+        const scalar_t x946 = x802 - x816;
+        const scalar_t x947 = rho*(cof3*(ux5 + ux6) + cof4*(uy5 + uy6) + cof5*(uz5 + uz6));
+        const scalar_t x948 = -x947;
+        const scalar_t x949 = x435 + x557 + (pgx5 + pgx6)*(-x5 - x558) + (pgy5 + pgy6)*(-x559 - y5) + (pgz5 + pgz6)*(-x560 - z5);
+        const scalar_t x950 = scalar_t(4)*rcoef7;
+        const scalar_t x951 = x948 - x949*x950;
+        const scalar_t x952 = -sgn7*x951 + x951;
+        const scalar_t x953 = ux6*x952;
+        const scalar_t x954 = x0 + x74;
+        const scalar_t x955 = x131 + x954;
+        const scalar_t x956 = x451 + x578 + x955;
+        const scalar_t x957 = x83 + y0;
+        const scalar_t x958 = x135 + x957;
+        const scalar_t x959 = x455 + x581 + x958;
+        const scalar_t x960 = x92 + z0;
+        const scalar_t x961 = x139 + x960;
+        const scalar_t x962 = x459 + x584 + x961;
+        const scalar_t x963 = g6_0*x956 + g6_1*x959 + g6_2*x962;
+        const scalar_t x964 = -fmax(ux5, ux6);
+        const scalar_t x965 = ux6 + x964;
+        const scalar_t x966 = x963 >= 0;
+        const scalar_t x967 = -fmin(ux5, ux6);
+        const scalar_t x968 = ux6 + x967;
+        const scalar_t x969 = ((x966) ? (
+   pow(x965, scalar_t(2))
+)
+: (
+   pow(x968, scalar_t(2))
+));
+        const scalar_t x970 = x963*((x966) ? (
+   -x965
+)
+: (
+   -x968
+));
+        const scalar_t x971 = x952*((x963 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x963*(x969 + (scalar_t(1) / scalar_t(16))*x970)/((scalar_t(1) / scalar_t(512))*pow(x963, scalar_t(2)) + x969 + (scalar_t(1) / scalar_t(32))*x970)
+)
+: (
+   0
+));
+        const scalar_t x972 = x947 + x949*x950;
+        const scalar_t x973 = -sgn7*x951 + x972;
+        const scalar_t x974 = ux5*x973;
+        const scalar_t x975 = -sgn2*x815 + x815;
+        const scalar_t x976 = x472 + x600 + x955;
+        const scalar_t x977 = x474 + x602 + x958;
+        const scalar_t x978 = x476 + x604 + x961;
+        const scalar_t x979 = g5_0*x976 + g5_1*x977 + g5_2*x978;
+        const scalar_t x980 = ux5 + x964;
+        const scalar_t x981 = x979 >= 0;
+        const scalar_t x982 = ux5 + x967;
+        const scalar_t x983 = ((x981) ? (
+   pow(x980, scalar_t(2))
+)
+: (
+   pow(x982, scalar_t(2))
+));
+        const scalar_t x984 = x979*((x981) ? (
+   -x980
+)
+: (
+   -x982
+));
+        const scalar_t x985 = x973*((x979 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x979*(x983 + (scalar_t(1) / scalar_t(16))*x984)/((scalar_t(1) / scalar_t(512))*pow(x979, scalar_t(2)) + x983 + (scalar_t(1) / scalar_t(32))*x984)
+)
+: (
+   0
+));
+        const scalar_t x986 = p5 + p6;
+        const scalar_t x987 = x206*x986;
+        const scalar_t x988 = uy6*x952;
+        const scalar_t x989 = g6_3*x956 + g6_4*x959 + g6_5*x962;
+        const scalar_t x990 = -fmax(uy5, uy6);
+        const scalar_t x991 = uy6 + x990;
+        const scalar_t x992 = x989 >= 0;
+        const scalar_t x993 = -fmin(uy5, uy6);
+        const scalar_t x994 = uy6 + x993;
+        const scalar_t x995 = ((x992) ? (
+   pow(x991, scalar_t(2))
+)
+: (
+   pow(x994, scalar_t(2))
+));
+        const scalar_t x996 = x989*((x992) ? (
+   -x991
+)
+: (
+   -x994
+));
+        const scalar_t x997 = x952*((x989 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x989*(x995 + (scalar_t(1) / scalar_t(16))*x996)/((scalar_t(1) / scalar_t(512))*pow(x989, scalar_t(2)) + x995 + (scalar_t(1) / scalar_t(32))*x996)
+)
+: (
+   0
+));
+        const scalar_t x998 = uy5*x973;
+        const scalar_t x999 = g5_3*x976 + g5_4*x977 + g5_5*x978;
+        const scalar_t x1000 = uy5 + x990;
+        const scalar_t x1001 = x999 >= 0;
+        const scalar_t x1002 = uy5 + x993;
+        const scalar_t x1003 = ((x1001) ? (
+   pow(x1000, scalar_t(2))
+)
+: (
+   pow(x1002, scalar_t(2))
+));
+        const scalar_t x1004 = x999*((x1001) ? (
+   -x1000
+)
+: (
+   -x1002
+));
+        const scalar_t x1005 = x973*((x999 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x999*(x1003 + (scalar_t(1) / scalar_t(16))*x1004)/(x1003 + (scalar_t(1) / scalar_t(32))*x1004 + (scalar_t(1) / scalar_t(512))*pow(x999, scalar_t(2)))
+)
+: (
+   0
+));
+        const scalar_t x1006 = x304*x986;
+        const scalar_t x1007 = uz6*x952;
+        const scalar_t x1008 = g6_6*x956 + g6_7*x959 + g6_8*x962;
+        const scalar_t x1009 = -fmax(uz5, uz6);
+        const scalar_t x1010 = uz6 + x1009;
+        const scalar_t x1011 = x1008 >= 0;
+        const scalar_t x1012 = -fmin(uz5, uz6);
+        const scalar_t x1013 = uz6 + x1012;
+        const scalar_t x1014 = ((x1011) ? (
+   pow(x1010, scalar_t(2))
+)
+: (
+   pow(x1013, scalar_t(2))
+));
+        const scalar_t x1015 = x1008*((x1011) ? (
+   -x1010
+)
+: (
+   -x1013
+));
+        const scalar_t x1016 = x952*((x1008 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x1008*(x1014 + (scalar_t(1) / scalar_t(16))*x1015)/((scalar_t(1) / scalar_t(512))*pow(x1008, scalar_t(2)) + x1014 + (scalar_t(1) / scalar_t(32))*x1015)
+)
+: (
+   0
+));
+        const scalar_t x1017 = uz5*x973;
+        const scalar_t x1018 = g5_6*x976 + g5_7*x977 + g5_8*x978;
+        const scalar_t x1019 = uz5 + x1009;
+        const scalar_t x1020 = x1018 >= 0;
+        const scalar_t x1021 = uz5 + x1012;
+        const scalar_t x1022 = ((x1020) ? (
+   pow(x1019, scalar_t(2))
+)
+: (
+   pow(x1021, scalar_t(2))
+));
+        const scalar_t x1023 = x1018*((x1020) ? (
+   -x1019
+)
+: (
+   -x1021
+));
+        const scalar_t x1024 = x973*((x1018 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x1018*(x1022 + (scalar_t(1) / scalar_t(16))*x1023)/((scalar_t(1) / scalar_t(512))*pow(x1018, scalar_t(2)) + x1022 + (scalar_t(1) / scalar_t(32))*x1023)
+)
+: (
+   0
+));
+        const scalar_t x1025 = x369*x986;
+        const scalar_t x1026 = rho*(cof0*(ux6 + ux7) + cof1*(uy6 + uy7) + cof2*(uz6 + uz7));
+        const scalar_t x1027 = -x1026;
+        const scalar_t x1028 = x557 + x705 + (pgx6 + pgx7)*(x6 + x707) + (pgy6 + pgy7)*(x710 + y6) + (pgz6 + pgz7)*(x713 + z6);
+        const scalar_t x1029 = scalar_t(4)*rcoef3;
+        const scalar_t x1030 = x1027 - x1028*x1029;
+        const scalar_t x1031 = x1026 + x1028*x1029;
+        const scalar_t x1032 = -sgn3*x1030 + x1031;
+        const scalar_t x1033 = ux7*x1032;
+        const scalar_t x1034 = x846 + x954;
+        const scalar_t x1035 = x1034 + x600 + x741;
+        const scalar_t x1036 = x849 + x957;
+        const scalar_t x1037 = x1036 + x602 + x743;
+        const scalar_t x1038 = x852 + x960;
+        const scalar_t x1039 = x1038 + x604 + x745;
+        const scalar_t x1040 = g7_0*x1035 + g7_1*x1037 + g7_2*x1039;
+        const scalar_t x1041 = -fmax(ux6, ux7);
+        const scalar_t x1042 = ux7 + x1041;
+        const scalar_t x1043 = x1040 >= 0;
+        const scalar_t x1044 = -fmin(ux6, ux7);
+        const scalar_t x1045 = ux7 + x1044;
+        const scalar_t x1046 = ((x1043) ? (
+   pow(x1042, scalar_t(2))
+)
+: (
+   pow(x1045, scalar_t(2))
+));
+        const scalar_t x1047 = x1040*((x1043) ? (
+   -x1042
+)
+: (
+   -x1045
+));
+        const scalar_t x1048 = x1032*((x1040 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x1040*(x1046 + (scalar_t(1) / scalar_t(16))*x1047)/((scalar_t(1) / scalar_t(512))*pow(x1040, scalar_t(2)) + x1046 + (scalar_t(1) / scalar_t(32))*x1047)
+)
+: (
+   0
+));
+        const scalar_t x1049 = -sgn3*x1030 + x1030;
+        const scalar_t x1050 = ux6*x1049;
+        const scalar_t x1051 = x1034 + x578 + x723;
+        const scalar_t x1052 = x1036 + x581 + x726;
+        const scalar_t x1053 = x1038 + x584 + x729;
+        const scalar_t x1054 = g6_0*x1051 + g6_1*x1052 + g6_2*x1053;
+        const scalar_t x1055 = ux6 + x1041;
+        const scalar_t x1056 = x1054 >= 0;
+        const scalar_t x1057 = ux6 + x1044;
+        const scalar_t x1058 = ((x1056) ? (
+   pow(x1055, scalar_t(2))
+)
+: (
+   pow(x1057, scalar_t(2))
+));
+        const scalar_t x1059 = x1054*((x1056) ? (
+   -x1055
+)
+: (
+   -x1057
+));
+        const scalar_t x1060 = x1049*((x1054 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x1054*(x1058 + (scalar_t(1) / scalar_t(16))*x1059)/((scalar_t(1) / scalar_t(512))*pow(x1054, scalar_t(2)) + x1058 + (scalar_t(1) / scalar_t(32))*x1059)
+)
+: (
+   0
+));
+        const scalar_t x1061 = p6 + p7;
+        const scalar_t x1062 = x1061*x203;
+        const scalar_t x1063 = uy7*x1032;
+        const scalar_t x1064 = g7_3*x1035 + g7_4*x1037 + g7_5*x1039;
+        const scalar_t x1065 = -fmax(uy6, uy7);
+        const scalar_t x1066 = uy7 + x1065;
+        const scalar_t x1067 = x1064 >= 0;
+        const scalar_t x1068 = -fmin(uy6, uy7);
+        const scalar_t x1069 = uy7 + x1068;
+        const scalar_t x1070 = ((x1067) ? (
+   pow(x1066, scalar_t(2))
+)
+: (
+   pow(x1069, scalar_t(2))
+));
+        const scalar_t x1071 = x1064*((x1067) ? (
+   -x1066
+)
+: (
+   -x1069
+));
+        const scalar_t x1072 = x1032*((x1064 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x1064*(x1070 + (scalar_t(1) / scalar_t(16))*x1071)/((scalar_t(1) / scalar_t(512))*pow(x1064, scalar_t(2)) + x1070 + (scalar_t(1) / scalar_t(32))*x1071)
+)
+: (
+   0
+));
+        const scalar_t x1073 = uy6*x1049;
+        const scalar_t x1074 = g6_3*x1051 + g6_4*x1052 + g6_5*x1053;
+        const scalar_t x1075 = uy6 + x1065;
+        const scalar_t x1076 = x1074 >= 0;
+        const scalar_t x1077 = uy6 + x1068;
+        const scalar_t x1078 = ((x1076) ? (
+   pow(x1075, scalar_t(2))
+)
+: (
+   pow(x1077, scalar_t(2))
+));
+        const scalar_t x1079 = x1074*((x1076) ? (
+   -x1075
+)
+: (
+   -x1077
+));
+        const scalar_t x1080 = x1049*((x1074 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x1074*(x1078 + (scalar_t(1) / scalar_t(16))*x1079)/((scalar_t(1) / scalar_t(512))*pow(x1074, scalar_t(2)) + x1078 + (scalar_t(1) / scalar_t(32))*x1079)
+)
+: (
+   0
+));
+        const scalar_t x1081 = x1061*x302;
+        const scalar_t x1082 = uz7*x1032;
+        const scalar_t x1083 = g7_6*x1035 + g7_7*x1037 + g7_8*x1039;
+        const scalar_t x1084 = -fmax(uz6, uz7);
+        const scalar_t x1085 = uz7 + x1084;
+        const scalar_t x1086 = x1083 >= 0;
+        const scalar_t x1087 = -fmin(uz6, uz7);
+        const scalar_t x1088 = uz7 + x1087;
+        const scalar_t x1089 = ((x1086) ? (
+   pow(x1085, scalar_t(2))
+)
+: (
+   pow(x1088, scalar_t(2))
+));
+        const scalar_t x1090 = x1083*((x1086) ? (
+   -x1085
+)
+: (
+   -x1088
+));
+        const scalar_t x1091 = x1032*((x1083 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x1083*(x1089 + (scalar_t(1) / scalar_t(16))*x1090)/((scalar_t(1) / scalar_t(512))*pow(x1083, scalar_t(2)) + x1089 + (scalar_t(1) / scalar_t(32))*x1090)
+)
+: (
+   0
+));
+        const scalar_t x1092 = uz6*x1049;
+        const scalar_t x1093 = g6_6*x1051 + g6_7*x1052 + g6_8*x1053;
+        const scalar_t x1094 = uz6 + x1084;
+        const scalar_t x1095 = x1093 >= 0;
+        const scalar_t x1096 = uz6 + x1087;
+        const scalar_t x1097 = ((x1095) ? (
+   pow(x1094, scalar_t(2))
+)
+: (
+   pow(x1096, scalar_t(2))
+));
+        const scalar_t x1098 = x1093*((x1095) ? (
+   -x1094
+)
+: (
+   -x1096
+));
+        const scalar_t x1099 = x1049*((x1093 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*x1093*(x1097 + (scalar_t(1) / scalar_t(16))*x1098)/((scalar_t(1) / scalar_t(512))*pow(x1093, scalar_t(2)) + x1097 + (scalar_t(1) / scalar_t(32))*x1098)
+)
+: (
+   0
+));
+        const scalar_t x1100 = x1061*x367;
+        const scalar_t x1101 = x718 - x721;
+        const scalar_t x1102 = x813 - x819;
+        const scalar_t x1103 = -sgn11*x720 + x720;
+        const scalar_t x1104 = -sgn6*x818 + x818;
+        out.rx[0][lane] = (scalar_t(1) / scalar_t(16))*ux0*x26 + (scalar_t(1) / scalar_t(16))*ux1*x66 + (scalar_t(1) / scalar_t(16))*x108*x26 + (scalar_t(1) / scalar_t(16))*x130*x66 + (scalar_t(1) / scalar_t(16))*x151 + (scalar_t(1) / scalar_t(16))*x167 + (scalar_t(1) / scalar_t(16))*x188 + (scalar_t(1) / scalar_t(16))*x201 + (scalar_t(1) / scalar_t(16))*x204 + (scalar_t(1) / scalar_t(16))*x207 + (scalar_t(1) / scalar_t(16))*x210 + (scalar_t(1) / scalar_t(16))*x249 + (scalar_t(1) / scalar_t(16))*x47 + (scalar_t(1) / scalar_t(16))*x62 + (scalar_t(1) / scalar_t(16))*x69 + (scalar_t(1) / scalar_t(16))*x72;
+        out.ry[0][lane] = (scalar_t(1) / scalar_t(16))*uy0*x26 + (scalar_t(1) / scalar_t(16))*uy1*x66 + (scalar_t(1) / scalar_t(16))*x250 + (scalar_t(1) / scalar_t(16))*x251 + (scalar_t(1) / scalar_t(16))*x252 + (scalar_t(1) / scalar_t(16))*x253 + (scalar_t(1) / scalar_t(16))*x26*x262 + (scalar_t(1) / scalar_t(16))*x269*x66 + (scalar_t(1) / scalar_t(16))*x278 + (scalar_t(1) / scalar_t(16))*x285 + (scalar_t(1) / scalar_t(16))*x294 + (scalar_t(1) / scalar_t(16))*x301 + (scalar_t(1) / scalar_t(16))*x303 + (scalar_t(1) / scalar_t(16))*x305 + (scalar_t(1) / scalar_t(16))*x307 + (scalar_t(1) / scalar_t(16))*x314;
+        out.rz[0][lane] = (scalar_t(1) / scalar_t(16))*uz0*x26 + (scalar_t(1) / scalar_t(16))*uz1*x66 + (scalar_t(1) / scalar_t(16))*x26*x327 + (scalar_t(1) / scalar_t(16))*x315 + (scalar_t(1) / scalar_t(16))*x316 + (scalar_t(1) / scalar_t(16))*x317 + (scalar_t(1) / scalar_t(16))*x318 + (scalar_t(1) / scalar_t(16))*x334*x66 + (scalar_t(1) / scalar_t(16))*x343 + (scalar_t(1) / scalar_t(16))*x350 + (scalar_t(1) / scalar_t(16))*x359 + (scalar_t(1) / scalar_t(16))*x366 + (scalar_t(1) / scalar_t(16))*x368 + (scalar_t(1) / scalar_t(16))*x370 + (scalar_t(1) / scalar_t(16))*x372 + (scalar_t(1) / scalar_t(16))*x378;
+        out.rc[0][lane] = (scalar_t(1) / scalar_t(8))*x25 + (scalar_t(1) / scalar_t(8))*x45 + (scalar_t(1) / scalar_t(8))*x60;
+        out.rx[1][lane] = -scalar_t(1) / scalar_t(16)*ux0*x380 + (scalar_t(1) / scalar_t(16))*ux1*x379 - scalar_t(1) / scalar_t(16)*x108*x380 + (scalar_t(1) / scalar_t(16))*x130*x379 - scalar_t(1) / scalar_t(16)*x204 + (scalar_t(1) / scalar_t(16))*x381 + (scalar_t(1) / scalar_t(16))*x433 + (scalar_t(1) / scalar_t(16))*x485;
+        out.ry[1][lane] = -scalar_t(1) / scalar_t(16)*uy0*x380 + (scalar_t(1) / scalar_t(16))*uy1*x379 - scalar_t(1) / scalar_t(16)*x262*x380 + (scalar_t(1) / scalar_t(16))*x269*x379 - scalar_t(1) / scalar_t(16)*x303 + (scalar_t(1) / scalar_t(16))*x486 + (scalar_t(1) / scalar_t(16))*x501 + (scalar_t(1) / scalar_t(16))*x516;
+        out.rz[1][lane] = -scalar_t(1) / scalar_t(16)*uz0*x380 + (scalar_t(1) / scalar_t(16))*uz1*x379 - scalar_t(1) / scalar_t(16)*x327*x380 + (scalar_t(1) / scalar_t(16))*x334*x379 - scalar_t(1) / scalar_t(16)*x368 + (scalar_t(1) / scalar_t(16))*x517 + (scalar_t(1) / scalar_t(16))*x532 + (scalar_t(1) / scalar_t(16))*x547;
+        out.rc[1][lane] = -scalar_t(1) / scalar_t(8)*x22 + (scalar_t(1) / scalar_t(8))*x382 + (scalar_t(1) / scalar_t(8))*x392*(-x23 - x383 - x385*x386 - x387*x388 - x389*x390) + (scalar_t(1) / scalar_t(8))*x434 + (scalar_t(1) / scalar_t(8))*x447*(-x23 - x435 - x437*x439 - x440*x442 - x443*x445) + (scalar_t(1) / scalar_t(8))*x63;
+        out.rx[2][lane] = (scalar_t(1) / scalar_t(16))*ux2*x599 - scalar_t(1) / scalar_t(16)*ux3*x554 - scalar_t(1) / scalar_t(16)*x433 - scalar_t(1) / scalar_t(16)*x554*x577 - scalar_t(1) / scalar_t(16)*x565 - scalar_t(1) / scalar_t(16)*x595 + (scalar_t(1) / scalar_t(16))*x598 + (scalar_t(1) / scalar_t(16))*x599*x622 + (scalar_t(1) / scalar_t(16))*x612 + (scalar_t(1) / scalar_t(16))*x624 - scalar_t(1) / scalar_t(16)*x626 - scalar_t(1) / scalar_t(16)*x627;
+        out.ry[2][lane] = (scalar_t(1) / scalar_t(16))*uy2*x599 - scalar_t(1) / scalar_t(16)*uy3*x554 - scalar_t(1) / scalar_t(16)*x501 - scalar_t(1) / scalar_t(16)*x554*x637 + (scalar_t(1) / scalar_t(16))*x599*x661 - scalar_t(1) / scalar_t(16)*x628 - scalar_t(1) / scalar_t(16)*x646 + (scalar_t(1) / scalar_t(16))*x647 + (scalar_t(1) / scalar_t(16))*x654 + (scalar_t(1) / scalar_t(16))*x662 - scalar_t(1) / scalar_t(16)*x663 - scalar_t(1) / scalar_t(16)*x664;
+        out.rz[2][lane] = (scalar_t(1) / scalar_t(16))*uz2*x599 - scalar_t(1) / scalar_t(16)*uz3*x554 - scalar_t(1) / scalar_t(16)*x532 - scalar_t(1) / scalar_t(16)*x554*x674 + (scalar_t(1) / scalar_t(16))*x599*x698 - scalar_t(1) / scalar_t(16)*x665 - scalar_t(1) / scalar_t(16)*x683 + (scalar_t(1) / scalar_t(16))*x684 + (scalar_t(1) / scalar_t(16))*x691 + (scalar_t(1) / scalar_t(16))*x699 - scalar_t(1) / scalar_t(16)*x700 - scalar_t(1) / scalar_t(16)*x701;
+        out.rc[2][lane] = (scalar_t(1) / scalar_t(2))*rcoef10*x561 - scalar_t(1) / scalar_t(8)*x394 - scalar_t(1) / scalar_t(8)*x553 - scalar_t(1) / scalar_t(8)*x556;
+        out.rx[3][lane] = (scalar_t(1) / scalar_t(16))*ux2*x702 + (scalar_t(1) / scalar_t(16))*ux3*x703 + (scalar_t(1) / scalar_t(16))*ux3*x719 + (scalar_t(1) / scalar_t(16))*ux7*x722 - scalar_t(1) / scalar_t(16)*x151 - scalar_t(1) / scalar_t(16)*x167 - scalar_t(1) / scalar_t(16)*x207 - scalar_t(1) / scalar_t(16)*x47 + (scalar_t(1) / scalar_t(16))*x577*x703 + (scalar_t(1) / scalar_t(16))*x622*x702 + (scalar_t(1) / scalar_t(16))*x626 - scalar_t(1) / scalar_t(16)*x69 + (scalar_t(1) / scalar_t(16))*x719*x740 + (scalar_t(1) / scalar_t(16))*x722*x753 + (scalar_t(1) / scalar_t(16))*x755 + (scalar_t(1) / scalar_t(16))*x756;
+        out.ry[3][lane] = (scalar_t(1) / scalar_t(16))*uy2*x702 + (scalar_t(1) / scalar_t(16))*uy3*x703 + (scalar_t(1) / scalar_t(16))*uy3*x719 + (scalar_t(1) / scalar_t(16))*uy7*x722 - scalar_t(1) / scalar_t(16)*x250 - scalar_t(1) / scalar_t(16)*x252 - scalar_t(1) / scalar_t(16)*x278 - scalar_t(1) / scalar_t(16)*x285 - scalar_t(1) / scalar_t(16)*x305 + (scalar_t(1) / scalar_t(16))*x637*x703 + (scalar_t(1) / scalar_t(16))*x661*x702 + (scalar_t(1) / scalar_t(16))*x663 + (scalar_t(1) / scalar_t(16))*x719*x765 + (scalar_t(1) / scalar_t(16))*x722*x772 + (scalar_t(1) / scalar_t(16))*x773 + (scalar_t(1) / scalar_t(16))*x774;
+        out.rz[3][lane] = (scalar_t(1) / scalar_t(16))*uz2*x702 + (scalar_t(1) / scalar_t(16))*uz3*x703 + (scalar_t(1) / scalar_t(16))*uz3*x719 + (scalar_t(1) / scalar_t(16))*uz7*x722 - scalar_t(1) / scalar_t(16)*x315 - scalar_t(1) / scalar_t(16)*x317 - scalar_t(1) / scalar_t(16)*x343 - scalar_t(1) / scalar_t(16)*x350 - scalar_t(1) / scalar_t(16)*x370 + (scalar_t(1) / scalar_t(16))*x674*x703 + (scalar_t(1) / scalar_t(16))*x698*x702 + (scalar_t(1) / scalar_t(16))*x700 + (scalar_t(1) / scalar_t(16))*x719*x783 + (scalar_t(1) / scalar_t(16))*x722*x790 + (scalar_t(1) / scalar_t(16))*x791 + (scalar_t(1) / scalar_t(16))*x792;
+        out.rc[3][lane] = -scalar_t(1) / scalar_t(8)*x44 + (scalar_t(1) / scalar_t(8))*x553 + (scalar_t(1) / scalar_t(8))*x67 + (scalar_t(1) / scalar_t(8))*x718;
+        out.rx[4][lane] = (scalar_t(1) / scalar_t(16))*ux4*x803 + (scalar_t(1) / scalar_t(16))*ux4*x814 + (scalar_t(1) / scalar_t(16))*ux5*x817 + (scalar_t(1) / scalar_t(16))*ux7*x820 - scalar_t(1) / scalar_t(16)*x188 - scalar_t(1) / scalar_t(16)*x201 - scalar_t(1) / scalar_t(16)*x210 - scalar_t(1) / scalar_t(16)*x62 + (scalar_t(1) / scalar_t(16))*x627 - scalar_t(1) / scalar_t(16)*x72 + (scalar_t(1) / scalar_t(16))*x803*x835 + (scalar_t(1) / scalar_t(16))*x814*x863 + (scalar_t(1) / scalar_t(16))*x817*x845 + (scalar_t(1) / scalar_t(16))*x820*x873 + (scalar_t(1) / scalar_t(16))*x875 + (scalar_t(1) / scalar_t(16))*x877;
+        out.ry[4][lane] = (scalar_t(1) / scalar_t(16))*uy4*x803 + (scalar_t(1) / scalar_t(16))*uy4*x814 + (scalar_t(1) / scalar_t(16))*uy5*x817 + (scalar_t(1) / scalar_t(16))*uy7*x820 - scalar_t(1) / scalar_t(16)*x251 - scalar_t(1) / scalar_t(16)*x253 - scalar_t(1) / scalar_t(16)*x294 - scalar_t(1) / scalar_t(16)*x301 - scalar_t(1) / scalar_t(16)*x307 + (scalar_t(1) / scalar_t(16))*x664 + (scalar_t(1) / scalar_t(16))*x803*x886 + (scalar_t(1) / scalar_t(16))*x814*x902 + (scalar_t(1) / scalar_t(16))*x817*x893 + (scalar_t(1) / scalar_t(16))*x820*x909 + (scalar_t(1) / scalar_t(16))*x910 + (scalar_t(1) / scalar_t(16))*x911;
+        out.rz[4][lane] = (scalar_t(1) / scalar_t(16))*uz4*x803 + (scalar_t(1) / scalar_t(16))*uz4*x814 + (scalar_t(1) / scalar_t(16))*uz5*x817 + (scalar_t(1) / scalar_t(16))*uz7*x820 - scalar_t(1) / scalar_t(16)*x316 - scalar_t(1) / scalar_t(16)*x318 - scalar_t(1) / scalar_t(16)*x359 - scalar_t(1) / scalar_t(16)*x366 - scalar_t(1) / scalar_t(16)*x372 + (scalar_t(1) / scalar_t(16))*x701 + (scalar_t(1) / scalar_t(16))*x803*x920 + (scalar_t(1) / scalar_t(16))*x814*x936 + (scalar_t(1) / scalar_t(16))*x817*x927 + (scalar_t(1) / scalar_t(16))*x820*x943 + (scalar_t(1) / scalar_t(16))*x944 + (scalar_t(1) / scalar_t(16))*x945;
+        out.rc[4][lane] = -scalar_t(1) / scalar_t(8)*x59 + (scalar_t(1) / scalar_t(8))*x70 + (scalar_t(1) / scalar_t(8))*x802 + (scalar_t(1) / scalar_t(8))*x813;
+        out.rx[5][lane] = -scalar_t(1) / scalar_t(16)*ux4*x946 + (scalar_t(1) / scalar_t(16))*ux5*x975 - scalar_t(1) / scalar_t(16)*x485 - scalar_t(1) / scalar_t(16)*x756 - scalar_t(1) / scalar_t(16)*x835*x946 + (scalar_t(1) / scalar_t(16))*x845*x975 - scalar_t(1) / scalar_t(16)*x877 - scalar_t(1) / scalar_t(16)*x953 - scalar_t(1) / scalar_t(16)*x971 + (scalar_t(1) / scalar_t(16))*x974 + (scalar_t(1) / scalar_t(16))*x985 + (scalar_t(1) / scalar_t(16))*x987;
+        out.ry[5][lane] = -scalar_t(1) / scalar_t(16)*uy4*x946 + (scalar_t(1) / scalar_t(16))*uy5*x975 + (scalar_t(1) / scalar_t(16))*x1005 + (scalar_t(1) / scalar_t(16))*x1006 - scalar_t(1) / scalar_t(16)*x516 - scalar_t(1) / scalar_t(16)*x774 - scalar_t(1) / scalar_t(16)*x886*x946 + (scalar_t(1) / scalar_t(16))*x893*x975 - scalar_t(1) / scalar_t(16)*x911 - scalar_t(1) / scalar_t(16)*x988 - scalar_t(1) / scalar_t(16)*x997 + (scalar_t(1) / scalar_t(16))*x998;
+        out.rz[5][lane] = -scalar_t(1) / scalar_t(16)*uz4*x946 + (scalar_t(1) / scalar_t(16))*uz5*x975 - scalar_t(1) / scalar_t(16)*x1007 - scalar_t(1) / scalar_t(16)*x1016 + (scalar_t(1) / scalar_t(16))*x1017 + (scalar_t(1) / scalar_t(16))*x1024 + (scalar_t(1) / scalar_t(16))*x1025 - scalar_t(1) / scalar_t(16)*x547 - scalar_t(1) / scalar_t(16)*x792 - scalar_t(1) / scalar_t(16)*x920*x946 + (scalar_t(1) / scalar_t(16))*x927*x975 - scalar_t(1) / scalar_t(16)*x945;
+        out.rc[5][lane] = (scalar_t(1) / scalar_t(2))*rcoef7*x949 - scalar_t(1) / scalar_t(8)*x449 - scalar_t(1) / scalar_t(8)*x802 - scalar_t(1) / scalar_t(8)*x948;
+        out.rx[6][lane] = -scalar_t(1) / scalar_t(16)*x1033 - scalar_t(1) / scalar_t(16)*x1048 + (scalar_t(1) / scalar_t(16))*x1050 + (scalar_t(1) / scalar_t(16))*x1060 - scalar_t(1) / scalar_t(16)*x1062 - scalar_t(1) / scalar_t(16)*x249 + (scalar_t(1) / scalar_t(16))*x565 + (scalar_t(1) / scalar_t(16))*x595 - scalar_t(1) / scalar_t(16)*x598 - scalar_t(1) / scalar_t(16)*x612 - scalar_t(1) / scalar_t(16)*x624 + (scalar_t(1) / scalar_t(16))*x953 + (scalar_t(1) / scalar_t(16))*x971 - scalar_t(1) / scalar_t(16)*x974 - scalar_t(1) / scalar_t(16)*x985 - scalar_t(1) / scalar_t(16)*x987;
+        out.ry[6][lane] = -scalar_t(1) / scalar_t(16)*x1005 - scalar_t(1) / scalar_t(16)*x1006 - scalar_t(1) / scalar_t(16)*x1063 - scalar_t(1) / scalar_t(16)*x1072 + (scalar_t(1) / scalar_t(16))*x1073 + (scalar_t(1) / scalar_t(16))*x1080 - scalar_t(1) / scalar_t(16)*x1081 - scalar_t(1) / scalar_t(16)*x314 + (scalar_t(1) / scalar_t(16))*x628 + (scalar_t(1) / scalar_t(16))*x646 - scalar_t(1) / scalar_t(16)*x647 - scalar_t(1) / scalar_t(16)*x654 - scalar_t(1) / scalar_t(16)*x662 + (scalar_t(1) / scalar_t(16))*x988 + (scalar_t(1) / scalar_t(16))*x997 - scalar_t(1) / scalar_t(16)*x998;
+        out.rz[6][lane] = (scalar_t(1) / scalar_t(16))*x1007 + (scalar_t(1) / scalar_t(16))*x1016 - scalar_t(1) / scalar_t(16)*x1017 - scalar_t(1) / scalar_t(16)*x1024 - scalar_t(1) / scalar_t(16)*x1025 - scalar_t(1) / scalar_t(16)*x1082 - scalar_t(1) / scalar_t(16)*x1091 + (scalar_t(1) / scalar_t(16))*x1092 + (scalar_t(1) / scalar_t(16))*x1099 - scalar_t(1) / scalar_t(16)*x1100 - scalar_t(1) / scalar_t(16)*x378 + (scalar_t(1) / scalar_t(16))*x665 + (scalar_t(1) / scalar_t(16))*x683 - scalar_t(1) / scalar_t(16)*x684 - scalar_t(1) / scalar_t(16)*x691 - scalar_t(1) / scalar_t(16)*x699;
+        out.rc[6][lane] = -scalar_t(1) / scalar_t(8)*x1031 - scalar_t(1) / scalar_t(8)*x596 - scalar_t(1) / scalar_t(8)*x972;
+        out.rx[7][lane] = -scalar_t(1) / scalar_t(16)*ux3*x1101 - scalar_t(1) / scalar_t(16)*ux4*x1102 + (scalar_t(1) / scalar_t(16))*ux7*x1103 + (scalar_t(1) / scalar_t(16))*ux7*x1104 + (scalar_t(1) / scalar_t(16))*x1033 + (scalar_t(1) / scalar_t(16))*x1048 - scalar_t(1) / scalar_t(16)*x1050 - scalar_t(1) / scalar_t(16)*x1060 + (scalar_t(1) / scalar_t(16))*x1062 - scalar_t(1) / scalar_t(16)*x1101*x740 - scalar_t(1) / scalar_t(16)*x1102*x863 + (scalar_t(1) / scalar_t(16))*x1103*x753 + (scalar_t(1) / scalar_t(16))*x1104*x873 - scalar_t(1) / scalar_t(16)*x381 - scalar_t(1) / scalar_t(16)*x755 - scalar_t(1) / scalar_t(16)*x875;
+        out.ry[7][lane] = -scalar_t(1) / scalar_t(16)*uy3*x1101 - scalar_t(1) / scalar_t(16)*uy4*x1102 + (scalar_t(1) / scalar_t(16))*uy7*x1103 + (scalar_t(1) / scalar_t(16))*uy7*x1104 + (scalar_t(1) / scalar_t(16))*x1063 + (scalar_t(1) / scalar_t(16))*x1072 - scalar_t(1) / scalar_t(16)*x1073 - scalar_t(1) / scalar_t(16)*x1080 + (scalar_t(1) / scalar_t(16))*x1081 - scalar_t(1) / scalar_t(16)*x1101*x765 - scalar_t(1) / scalar_t(16)*x1102*x902 + (scalar_t(1) / scalar_t(16))*x1103*x772 + (scalar_t(1) / scalar_t(16))*x1104*x909 - scalar_t(1) / scalar_t(16)*x486 - scalar_t(1) / scalar_t(16)*x773 - scalar_t(1) / scalar_t(16)*x910;
+        out.rz[7][lane] = -scalar_t(1) / scalar_t(16)*uz3*x1101 - scalar_t(1) / scalar_t(16)*uz4*x1102 + (scalar_t(1) / scalar_t(16))*uz7*x1103 + (scalar_t(1) / scalar_t(16))*uz7*x1104 + (scalar_t(1) / scalar_t(16))*x1082 + (scalar_t(1) / scalar_t(16))*x1091 - scalar_t(1) / scalar_t(16)*x1092 - scalar_t(1) / scalar_t(16)*x1099 + (scalar_t(1) / scalar_t(16))*x1100 - scalar_t(1) / scalar_t(16)*x1101*x783 - scalar_t(1) / scalar_t(16)*x1102*x936 + (scalar_t(1) / scalar_t(16))*x1103*x790 + (scalar_t(1) / scalar_t(16))*x1104*x943 - scalar_t(1) / scalar_t(16)*x517 - scalar_t(1) / scalar_t(16)*x791 - scalar_t(1) / scalar_t(16)*x944;
+        out.rc[7][lane] = (scalar_t(1) / scalar_t(2))*rcoef3*x1028 - scalar_t(1) / scalar_t(8)*x1027 - scalar_t(1) / scalar_t(8)*x718 - scalar_t(1) / scalar_t(8)*x813;
+    }
+}
+
+// Darwish-Moukalled, with Rhie-Chow.
+static SFEM_INLINE void cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim3_simd(
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const SFEM_RESTRICT cof0_ptr,
+        const scalar_t *const SFEM_RESTRICT cof1_ptr,
+        const scalar_t *const SFEM_RESTRICT cof2_ptr,
+        const scalar_t *const SFEM_RESTRICT cof3_ptr,
+        const scalar_t *const SFEM_RESTRICT cof4_ptr,
+        const scalar_t *const SFEM_RESTRICT cof5_ptr,
+        const scalar_t *const SFEM_RESTRICT cof6_ptr,
+        const scalar_t *const SFEM_RESTRICT cof7_ptr,
+        const scalar_t *const SFEM_RESTRICT cof8_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const Hex8InputPack &in,
+        const Hex8UGradPack &ho,
+        const Hex8RhieChowPack &rc,
+        Hex8ResidualPack    &out) {
+#pragma omp simd aligned(cof0_ptr, cof1_ptr, cof2_ptr, cof3_ptr, cof4_ptr, cof5_ptr, cof6_ptr, cof7_ptr, cof8_ptr, det_ptr : 64)
+    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+        const scalar_t cof0 = scalar_t(cof0_ptr[lane]);
+        const scalar_t cof1 = scalar_t(cof1_ptr[lane]);
+        const scalar_t cof2 = scalar_t(cof2_ptr[lane]);
+        const scalar_t cof3 = scalar_t(cof3_ptr[lane]);
+        const scalar_t cof4 = scalar_t(cof4_ptr[lane]);
+        const scalar_t cof5 = scalar_t(cof5_ptr[lane]);
+        const scalar_t cof6 = scalar_t(cof6_ptr[lane]);
+        const scalar_t cof7 = scalar_t(cof7_ptr[lane]);
+        const scalar_t cof8 = scalar_t(cof8_ptr[lane]);
+        const scalar_t det = scalar_t(det_ptr[lane]);
+        const scalar_t ux0 = in.ux[0][lane];
+        const scalar_t ux1 = in.ux[1][lane];
+        const scalar_t ux2 = in.ux[2][lane];
+        const scalar_t ux3 = in.ux[3][lane];
+        const scalar_t ux4 = in.ux[4][lane];
+        const scalar_t ux5 = in.ux[5][lane];
+        const scalar_t ux6 = in.ux[6][lane];
+        const scalar_t ux7 = in.ux[7][lane];
+        const scalar_t uy0 = in.uy[0][lane];
+        const scalar_t uy1 = in.uy[1][lane];
+        const scalar_t uy2 = in.uy[2][lane];
+        const scalar_t uy3 = in.uy[3][lane];
+        const scalar_t uy4 = in.uy[4][lane];
+        const scalar_t uy5 = in.uy[5][lane];
+        const scalar_t uy6 = in.uy[6][lane];
+        const scalar_t uy7 = in.uy[7][lane];
+        const scalar_t uz0 = in.uz[0][lane];
+        const scalar_t uz1 = in.uz[1][lane];
+        const scalar_t uz2 = in.uz[2][lane];
+        const scalar_t uz3 = in.uz[3][lane];
+        const scalar_t uz4 = in.uz[4][lane];
+        const scalar_t uz5 = in.uz[5][lane];
+        const scalar_t uz6 = in.uz[6][lane];
+        const scalar_t uz7 = in.uz[7][lane];
+        const scalar_t p0 = in.p[0][lane];
+        const scalar_t p1 = in.p[1][lane];
+        const scalar_t p2 = in.p[2][lane];
+        const scalar_t p3 = in.p[3][lane];
+        const scalar_t p4 = in.p[4][lane];
+        const scalar_t p5 = in.p[5][lane];
+        const scalar_t p6 = in.p[6][lane];
+        const scalar_t p7 = in.p[7][lane];
+        const scalar_t x0 = ho.x[0][lane];
+        const scalar_t x1 = ho.x[1][lane];
+        const scalar_t x2 = ho.x[2][lane];
+        const scalar_t x3 = ho.x[3][lane];
+        const scalar_t x4 = ho.x[4][lane];
+        const scalar_t x5 = ho.x[5][lane];
+        const scalar_t x6 = ho.x[6][lane];
+        const scalar_t x7 = ho.x[7][lane];
+        const scalar_t y0 = ho.y[0][lane];
+        const scalar_t y1 = ho.y[1][lane];
+        const scalar_t y2 = ho.y[2][lane];
+        const scalar_t y3 = ho.y[3][lane];
+        const scalar_t y4 = ho.y[4][lane];
+        const scalar_t y5 = ho.y[5][lane];
+        const scalar_t y6 = ho.y[6][lane];
+        const scalar_t y7 = ho.y[7][lane];
+        const scalar_t z0 = ho.z[0][lane];
+        const scalar_t z1 = ho.z[1][lane];
+        const scalar_t z2 = ho.z[2][lane];
+        const scalar_t z3 = ho.z[3][lane];
+        const scalar_t z4 = ho.z[4][lane];
+        const scalar_t z5 = ho.z[5][lane];
+        const scalar_t z6 = ho.z[6][lane];
+        const scalar_t z7 = ho.z[7][lane];
+        const scalar_t g0_0 = ho.g[0][0][lane];
+        const scalar_t g0_1 = ho.g[0][1][lane];
+        const scalar_t g0_2 = ho.g[0][2][lane];
+        const scalar_t g0_3 = ho.g[0][3][lane];
+        const scalar_t g0_4 = ho.g[0][4][lane];
+        const scalar_t g0_5 = ho.g[0][5][lane];
+        const scalar_t g0_6 = ho.g[0][6][lane];
+        const scalar_t g0_7 = ho.g[0][7][lane];
+        const scalar_t g0_8 = ho.g[0][8][lane];
+        const scalar_t g1_0 = ho.g[1][0][lane];
+        const scalar_t g1_1 = ho.g[1][1][lane];
+        const scalar_t g1_2 = ho.g[1][2][lane];
+        const scalar_t g1_3 = ho.g[1][3][lane];
+        const scalar_t g1_4 = ho.g[1][4][lane];
+        const scalar_t g1_5 = ho.g[1][5][lane];
+        const scalar_t g1_6 = ho.g[1][6][lane];
+        const scalar_t g1_7 = ho.g[1][7][lane];
+        const scalar_t g1_8 = ho.g[1][8][lane];
+        const scalar_t g2_0 = ho.g[2][0][lane];
+        const scalar_t g2_1 = ho.g[2][1][lane];
+        const scalar_t g2_2 = ho.g[2][2][lane];
+        const scalar_t g2_3 = ho.g[2][3][lane];
+        const scalar_t g2_4 = ho.g[2][4][lane];
+        const scalar_t g2_5 = ho.g[2][5][lane];
+        const scalar_t g2_6 = ho.g[2][6][lane];
+        const scalar_t g2_7 = ho.g[2][7][lane];
+        const scalar_t g2_8 = ho.g[2][8][lane];
+        const scalar_t g3_0 = ho.g[3][0][lane];
+        const scalar_t g3_1 = ho.g[3][1][lane];
+        const scalar_t g3_2 = ho.g[3][2][lane];
+        const scalar_t g3_3 = ho.g[3][3][lane];
+        const scalar_t g3_4 = ho.g[3][4][lane];
+        const scalar_t g3_5 = ho.g[3][5][lane];
+        const scalar_t g3_6 = ho.g[3][6][lane];
+        const scalar_t g3_7 = ho.g[3][7][lane];
+        const scalar_t g3_8 = ho.g[3][8][lane];
+        const scalar_t g4_0 = ho.g[4][0][lane];
+        const scalar_t g4_1 = ho.g[4][1][lane];
+        const scalar_t g4_2 = ho.g[4][2][lane];
+        const scalar_t g4_3 = ho.g[4][3][lane];
+        const scalar_t g4_4 = ho.g[4][4][lane];
+        const scalar_t g4_5 = ho.g[4][5][lane];
+        const scalar_t g4_6 = ho.g[4][6][lane];
+        const scalar_t g4_7 = ho.g[4][7][lane];
+        const scalar_t g4_8 = ho.g[4][8][lane];
+        const scalar_t g5_0 = ho.g[5][0][lane];
+        const scalar_t g5_1 = ho.g[5][1][lane];
+        const scalar_t g5_2 = ho.g[5][2][lane];
+        const scalar_t g5_3 = ho.g[5][3][lane];
+        const scalar_t g5_4 = ho.g[5][4][lane];
+        const scalar_t g5_5 = ho.g[5][5][lane];
+        const scalar_t g5_6 = ho.g[5][6][lane];
+        const scalar_t g5_7 = ho.g[5][7][lane];
+        const scalar_t g5_8 = ho.g[5][8][lane];
+        const scalar_t g6_0 = ho.g[6][0][lane];
+        const scalar_t g6_1 = ho.g[6][1][lane];
+        const scalar_t g6_2 = ho.g[6][2][lane];
+        const scalar_t g6_3 = ho.g[6][3][lane];
+        const scalar_t g6_4 = ho.g[6][4][lane];
+        const scalar_t g6_5 = ho.g[6][5][lane];
+        const scalar_t g6_6 = ho.g[6][6][lane];
+        const scalar_t g6_7 = ho.g[6][7][lane];
+        const scalar_t g6_8 = ho.g[6][8][lane];
+        const scalar_t g7_0 = ho.g[7][0][lane];
+        const scalar_t g7_1 = ho.g[7][1][lane];
+        const scalar_t g7_2 = ho.g[7][2][lane];
+        const scalar_t g7_3 = ho.g[7][3][lane];
+        const scalar_t g7_4 = ho.g[7][4][lane];
+        const scalar_t g7_5 = ho.g[7][5][lane];
+        const scalar_t g7_6 = ho.g[7][6][lane];
+        const scalar_t g7_7 = ho.g[7][7][lane];
+        const scalar_t g7_8 = ho.g[7][8][lane];
+        const scalar_t rcoef0 = rc.coeff[0][lane];
+        const scalar_t rcoef1 = rc.coeff[1][lane];
+        const scalar_t rcoef2 = rc.coeff[2][lane];
+        const scalar_t rcoef3 = rc.coeff[3][lane];
+        const scalar_t rcoef4 = rc.coeff[4][lane];
+        const scalar_t rcoef5 = rc.coeff[5][lane];
+        const scalar_t rcoef6 = rc.coeff[6][lane];
+        const scalar_t rcoef7 = rc.coeff[7][lane];
+        const scalar_t rcoef8 = rc.coeff[8][lane];
+        const scalar_t rcoef9 = rc.coeff[9][lane];
+        const scalar_t rcoef10 = rc.coeff[10][lane];
+        const scalar_t rcoef11 = rc.coeff[11][lane];
+        const scalar_t pgx0 = rc.pgx[0][lane];
+        const scalar_t pgx1 = rc.pgx[1][lane];
+        const scalar_t pgx2 = rc.pgx[2][lane];
+        const scalar_t pgx3 = rc.pgx[3][lane];
+        const scalar_t pgx4 = rc.pgx[4][lane];
+        const scalar_t pgx5 = rc.pgx[5][lane];
+        const scalar_t pgx6 = rc.pgx[6][lane];
+        const scalar_t pgx7 = rc.pgx[7][lane];
+        const scalar_t pgy0 = rc.pgy[0][lane];
+        const scalar_t pgy1 = rc.pgy[1][lane];
+        const scalar_t pgy2 = rc.pgy[2][lane];
+        const scalar_t pgy3 = rc.pgy[3][lane];
+        const scalar_t pgy4 = rc.pgy[4][lane];
+        const scalar_t pgy5 = rc.pgy[5][lane];
+        const scalar_t pgy6 = rc.pgy[6][lane];
+        const scalar_t pgy7 = rc.pgy[7][lane];
+        const scalar_t pgz0 = rc.pgz[0][lane];
+        const scalar_t pgz1 = rc.pgz[1][lane];
+        const scalar_t pgz2 = rc.pgz[2][lane];
+        const scalar_t pgz3 = rc.pgz[3][lane];
+        const scalar_t pgz4 = rc.pgz[4][lane];
+        const scalar_t pgz5 = rc.pgz[5][lane];
+        const scalar_t pgz6 = rc.pgz[6][lane];
+        const scalar_t pgz7 = rc.pgz[7][lane];
+        const scalar_t mdot0 = -rcoef0*(-p0 + p1 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx1)*(-x0 + x1) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy1)*(-y0 + y1) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz1)*(-z0 + z1)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux1) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy1) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz1));
+        const scalar_t sgn0 = mdot0 > scalar_t(0) ? scalar_t(1) : (mdot0 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot1 = -rcoef1*(p2 - p3 - ((scalar_t(1) / scalar_t(2))*pgx2 + (scalar_t(1) / scalar_t(2))*pgx3)*(x2 - x3) - ((scalar_t(1) / scalar_t(2))*pgy2 + (scalar_t(1) / scalar_t(2))*pgy3)*(y2 - y3) - ((scalar_t(1) / scalar_t(2))*pgz2 + (scalar_t(1) / scalar_t(2))*pgz3)*(z2 - z3)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn1 = mdot1 > scalar_t(0) ? scalar_t(1) : (mdot1 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot2 = -rcoef2*(-p4 + p5 - ((scalar_t(1) / scalar_t(2))*pgx4 + (scalar_t(1) / scalar_t(2))*pgx5)*(-x4 + x5) - ((scalar_t(1) / scalar_t(2))*pgy4 + (scalar_t(1) / scalar_t(2))*pgy5)*(-y4 + y5) - ((scalar_t(1) / scalar_t(2))*pgz4 + (scalar_t(1) / scalar_t(2))*pgz5)*(-z4 + z5)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn2 = mdot2 > scalar_t(0) ? scalar_t(1) : (mdot2 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot3 = -rcoef3*(p6 - p7 - ((scalar_t(1) / scalar_t(2))*pgx6 + (scalar_t(1) / scalar_t(2))*pgx7)*(x6 - x7) - ((scalar_t(1) / scalar_t(2))*pgy6 + (scalar_t(1) / scalar_t(2))*pgy7)*(y6 - y7) - ((scalar_t(1) / scalar_t(2))*pgz6 + (scalar_t(1) / scalar_t(2))*pgz7)*(z6 - z7)) + rho*((scalar_t(1) / scalar_t(4))*cof0*((scalar_t(1) / scalar_t(2))*ux6 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof1*((scalar_t(1) / scalar_t(2))*uy6 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof2*((scalar_t(1) / scalar_t(2))*uz6 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn3 = mdot3 > scalar_t(0) ? scalar_t(1) : (mdot3 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot4 = -rcoef4*(-p0 + p3 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx3)*(-x0 + x3) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy3)*(-y0 + y3) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz3)*(-z0 + z3)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux3) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy3) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz3));
+        const scalar_t sgn4 = mdot4 > scalar_t(0) ? scalar_t(1) : (mdot4 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot5 = -rcoef5*(-p1 + p2 - ((scalar_t(1) / scalar_t(2))*pgx1 + (scalar_t(1) / scalar_t(2))*pgx2)*(-x1 + x2) - ((scalar_t(1) / scalar_t(2))*pgy1 + (scalar_t(1) / scalar_t(2))*pgy2)*(-y1 + y2) - ((scalar_t(1) / scalar_t(2))*pgz1 + (scalar_t(1) / scalar_t(2))*pgz2)*(-z1 + z2)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux2) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy2) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz2));
+        const scalar_t sgn5 = mdot5 > scalar_t(0) ? scalar_t(1) : (mdot5 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot6 = -rcoef6*(-p4 + p7 - ((scalar_t(1) / scalar_t(2))*pgx4 + (scalar_t(1) / scalar_t(2))*pgx7)*(-x4 + x7) - ((scalar_t(1) / scalar_t(2))*pgy4 + (scalar_t(1) / scalar_t(2))*pgy7)*(-y4 + y7) - ((scalar_t(1) / scalar_t(2))*pgz4 + (scalar_t(1) / scalar_t(2))*pgz7)*(-z4 + z7)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux4 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy4 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz4 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn6 = mdot6 > scalar_t(0) ? scalar_t(1) : (mdot6 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot7 = -rcoef7*(-p5 + p6 - ((scalar_t(1) / scalar_t(2))*pgx5 + (scalar_t(1) / scalar_t(2))*pgx6)*(-x5 + x6) - ((scalar_t(1) / scalar_t(2))*pgy5 + (scalar_t(1) / scalar_t(2))*pgy6)*(-y5 + y6) - ((scalar_t(1) / scalar_t(2))*pgz5 + (scalar_t(1) / scalar_t(2))*pgz6)*(-z5 + z6)) + rho*((scalar_t(1) / scalar_t(4))*cof3*((scalar_t(1) / scalar_t(2))*ux5 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof4*((scalar_t(1) / scalar_t(2))*uy5 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof5*((scalar_t(1) / scalar_t(2))*uz5 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn7 = mdot7 > scalar_t(0) ? scalar_t(1) : (mdot7 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot8 = -rcoef8*(-p0 + p4 - ((scalar_t(1) / scalar_t(2))*pgx0 + (scalar_t(1) / scalar_t(2))*pgx4)*(-x0 + x4) - ((scalar_t(1) / scalar_t(2))*pgy0 + (scalar_t(1) / scalar_t(2))*pgy4)*(-y0 + y4) - ((scalar_t(1) / scalar_t(2))*pgz0 + (scalar_t(1) / scalar_t(2))*pgz4)*(-z0 + z4)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux0 + (scalar_t(1) / scalar_t(2))*ux4) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy0 + (scalar_t(1) / scalar_t(2))*uy4) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz0 + (scalar_t(1) / scalar_t(2))*uz4));
+        const scalar_t sgn8 = mdot8 > scalar_t(0) ? scalar_t(1) : (mdot8 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot9 = -rcoef9*(-p1 + p5 - ((scalar_t(1) / scalar_t(2))*pgx1 + (scalar_t(1) / scalar_t(2))*pgx5)*(-x1 + x5) - ((scalar_t(1) / scalar_t(2))*pgy1 + (scalar_t(1) / scalar_t(2))*pgy5)*(-y1 + y5) - ((scalar_t(1) / scalar_t(2))*pgz1 + (scalar_t(1) / scalar_t(2))*pgz5)*(-z1 + z5)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux1 + (scalar_t(1) / scalar_t(2))*ux5) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy1 + (scalar_t(1) / scalar_t(2))*uy5) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz1 + (scalar_t(1) / scalar_t(2))*uz5));
+        const scalar_t sgn9 = mdot9 > scalar_t(0) ? scalar_t(1) : (mdot9 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot10 = -rcoef10*(-p2 + p6 - ((scalar_t(1) / scalar_t(2))*pgx2 + (scalar_t(1) / scalar_t(2))*pgx6)*(-x2 + x6) - ((scalar_t(1) / scalar_t(2))*pgy2 + (scalar_t(1) / scalar_t(2))*pgy6)*(-y2 + y6) - ((scalar_t(1) / scalar_t(2))*pgz2 + (scalar_t(1) / scalar_t(2))*pgz6)*(-z2 + z6)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux2 + (scalar_t(1) / scalar_t(2))*ux6) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy2 + (scalar_t(1) / scalar_t(2))*uy6) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz2 + (scalar_t(1) / scalar_t(2))*uz6));
+        const scalar_t sgn10 = mdot10 > scalar_t(0) ? scalar_t(1) : (mdot10 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t mdot11 = -rcoef11*(-p3 + p7 - ((scalar_t(1) / scalar_t(2))*pgx3 + (scalar_t(1) / scalar_t(2))*pgx7)*(-x3 + x7) - ((scalar_t(1) / scalar_t(2))*pgy3 + (scalar_t(1) / scalar_t(2))*pgy7)*(-y3 + y7) - ((scalar_t(1) / scalar_t(2))*pgz3 + (scalar_t(1) / scalar_t(2))*pgz7)*(-z3 + z7)) + rho*((scalar_t(1) / scalar_t(4))*cof6*((scalar_t(1) / scalar_t(2))*ux3 + (scalar_t(1) / scalar_t(2))*ux7) + (scalar_t(1) / scalar_t(4))*cof7*((scalar_t(1) / scalar_t(2))*uy3 + (scalar_t(1) / scalar_t(2))*uy7) + (scalar_t(1) / scalar_t(4))*cof8*((scalar_t(1) / scalar_t(2))*uz3 + (scalar_t(1) / scalar_t(2))*uz7));
+        const scalar_t sgn11 = mdot11 > scalar_t(0) ? scalar_t(1) : (mdot11 < scalar_t(0) ? scalar_t(-1) : scalar_t(0));
+        const scalar_t x8 = ux0 + ux1;
+        const scalar_t x9 = uy0 + uy1;
+        const scalar_t x10 = uz0 + uz1;
+        const scalar_t x11 = rho*(cof0*x8 + cof1*x9 + cof2*x10);
+        const scalar_t x12 = scalar_t(2)*p0;
+        const scalar_t x13 = -x12;
+        const scalar_t x14 = scalar_t(2)*p1;
+        const scalar_t x15 = pgx0 + pgx1;
+        const scalar_t x16 = x0 - x1;
+        const scalar_t x17 = pgy0 + pgy1;
+        const scalar_t x18 = y0 - y1;
+        const scalar_t x19 = pgz0 + pgz1;
+        const scalar_t x20 = z0 - z1;
+        const scalar_t x21 = scalar_t(4)*rcoef0;
+        const scalar_t x22 = x21*(-x13 - x14 - x15*x16 - x17*x18 - x19*x20);
+        const scalar_t x23 = -x14;
+        const scalar_t x24 = x12 - x15*x16 - x17*x18 - x19*x20 + x23;
+        const scalar_t x25 = x11 + x21*x24;
+        const scalar_t x26 = sgn0*x25 + x11 + x22;
+        const scalar_t x27 = ux0 + ux3;
+        const scalar_t x28 = uy0 + uy3;
+        const scalar_t x29 = uz0 + uz3;
+        const scalar_t x30 = rho*(cof3*x27 + cof4*x28 + cof5*x29);
+        const scalar_t x31 = scalar_t(2)*p3;
+        const scalar_t x32 = pgx0 + pgx3;
+        const scalar_t x33 = -x3;
+        const scalar_t x34 = x0 + x33;
+        const scalar_t x35 = pgy0 + pgy3;
+        const scalar_t x36 = -y3;
+        const scalar_t x37 = x36 + y0;
+        const scalar_t x38 = pgz0 + pgz3;
+        const scalar_t x39 = -z3;
+        const scalar_t x40 = x39 + z0;
+        const scalar_t x41 = scalar_t(4)*rcoef4;
+        const scalar_t x42 = -x31;
+        const scalar_t x43 = x12 - x32*x34 - x35*x37 - x38*x40 + x42;
+        const scalar_t x44 = x41*x43;
+        const scalar_t x45 = x30 + x44;
+        const scalar_t x46 = sgn4*x45 + x30 + x41*(-x13 - x31 - x32*x34 - x35*x37 - x38*x40);
+        const scalar_t x47 = ux0*x46;
+        const scalar_t x48 = rho*(cof6*(ux0 + ux4) + cof7*(uy0 + uy4) + cof8*(uz0 + uz4));
+        const scalar_t x49 = scalar_t(2)*p4;
+        const scalar_t x50 = pgx0 + pgx4;
+        const scalar_t x51 = x0 - x4;
+        const scalar_t x52 = pgy0 + pgy4;
+        const scalar_t x53 = y0 - y4;
+        const scalar_t x54 = pgz0 + pgz4;
+        const scalar_t x55 = z0 - z4;
+        const scalar_t x56 = scalar_t(4)*rcoef8;
+        const scalar_t x57 = -x49;
+        const scalar_t x58 = x12 - x50*x51 - x52*x53 - x54*x55 + x57;
+        const scalar_t x59 = x56*x58;
+        const scalar_t x60 = x48 + x59;
+        const scalar_t x61 = sgn8*x60 + x48 + x56*(-x13 - x49 - x50*x51 - x52*x53 - x54*x55);
+        const scalar_t x62 = ux0*x61;
+        const scalar_t x63 = -x11;
+        const scalar_t x64 = -x21*x24 + x63;
+        const scalar_t x65 = sgn0*x64;
+        const scalar_t x66 = x25 + x65;
+        const scalar_t x67 = -x30;
+        const scalar_t x68 = sgn4*(-x41*x43 + x67) + x45;
+        const scalar_t x69 = ux3*x68;
+        const scalar_t x70 = -x48;
+        const scalar_t x71 = sgn8*(-x56*x58 + x70) + x60;
+        const scalar_t x72 = ux4*x71;
+        const scalar_t x73 = -ux1;
+        const scalar_t x74 = ux0 + x73;
+        const scalar_t x75 = -scalar_t(23)*x0;
+        const scalar_t x76 = scalar_t(3)*x2 + scalar_t(3)*x4;
+        const scalar_t x77 = x6 + x76;
+        const scalar_t x78 = x75 + x77;
+        const scalar_t x79 = scalar_t(9)*x1;
+        const scalar_t x80 = scalar_t(3)*x3 + scalar_t(3)*x5;
+        const scalar_t x81 = x7 + x80;
+        const scalar_t x82 = x79 + x81;
+        const scalar_t x83 = x78 + x82;
+        const scalar_t x84 = -scalar_t(23)*y0;
+        const scalar_t x85 = scalar_t(3)*y2 + scalar_t(3)*y4;
+        const scalar_t x86 = x85 + y6;
+        const scalar_t x87 = x84 + x86;
+        const scalar_t x88 = scalar_t(9)*y1;
+        const scalar_t x89 = scalar_t(3)*y3 + scalar_t(3)*y5;
+        const scalar_t x90 = x89 + y7;
+        const scalar_t x91 = x88 + x90;
+        const scalar_t x92 = x87 + x91;
+        const scalar_t x93 = -scalar_t(23)*z0;
+        const scalar_t x94 = scalar_t(3)*z2 + scalar_t(3)*z4;
+        const scalar_t x95 = x94 + z6;
+        const scalar_t x96 = x93 + x95;
+        const scalar_t x97 = scalar_t(9)*z1;
+        const scalar_t x98 = scalar_t(3)*z3 + scalar_t(3)*z5;
+        const scalar_t x99 = x98 + z7;
+        const scalar_t x100 = x97 + x99;
+        const scalar_t x101 = x100 + x96;
+        const scalar_t x102 = g0_0*x83 + g0_1*x92 + g0_2*x101;
+        const scalar_t x103 = fabs(x102);
+        const scalar_t x104 = fabs(x74);
+        const scalar_t x105 = -x102*x104 + x103*x74;
+        const scalar_t x106 = (scalar_t(1) / scalar_t(16))*x103 + x104;
+        const scalar_t x107 = (scalar_t(1) / scalar_t(32))/x106;
+        const scalar_t x108 = x106 != 0;
+        const scalar_t x109 = scalar_t(9)*x0;
+        const scalar_t x110 = x109 + x77;
+        const scalar_t x111 = -scalar_t(23)*x1;
+        const scalar_t x112 = x111 + x81;
+        const scalar_t x113 = x110 + x112;
+        const scalar_t x114 = scalar_t(9)*y0;
+        const scalar_t x115 = x114 + x86;
+        const scalar_t x116 = -scalar_t(23)*y1;
+        const scalar_t x117 = x116 + x90;
+        const scalar_t x118 = x115 + x117;
+        const scalar_t x119 = scalar_t(9)*z0;
+        const scalar_t x120 = x119 + x95;
+        const scalar_t x121 = -scalar_t(23)*z1;
+        const scalar_t x122 = x121 + x99;
+        const scalar_t x123 = x120 + x122;
+        const scalar_t x124 = g1_0*x113 + g1_1*x118 + g1_2*x123;
+        const scalar_t x125 = fabs(x124);
+        const scalar_t x126 = x104 + (scalar_t(1) / scalar_t(16))*x125;
+        const scalar_t x127 = ((x126 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x104*x124 + x125*x74)/x126
+)
+: (
+   0
+));
+        const scalar_t x128 = -ux3;
+        const scalar_t x129 = ux0 + x128;
+        const scalar_t x130 = fabs(x129);
+        const scalar_t x131 = scalar_t(3)*x1 + scalar_t(3)*x7;
+        const scalar_t x132 = scalar_t(9)*x3 + x5;
+        const scalar_t x133 = x131 + x132;
+        const scalar_t x134 = x133 + x78;
+        const scalar_t x135 = scalar_t(3)*y1 + scalar_t(3)*y7;
+        const scalar_t x136 = scalar_t(9)*y3 + y5;
+        const scalar_t x137 = x135 + x136;
+        const scalar_t x138 = x137 + x87;
+        const scalar_t x139 = scalar_t(3)*z1 + scalar_t(3)*z7;
+        const scalar_t x140 = scalar_t(9)*z3 + z5;
+        const scalar_t x141 = x139 + x140;
+        const scalar_t x142 = x141 + x96;
+        const scalar_t x143 = g0_0*x134 + g0_1*x138 + g0_2*x142;
+        const scalar_t x144 = fabs(x143);
+        const scalar_t x145 = x130 + (scalar_t(1) / scalar_t(16))*x144;
+        const scalar_t x146 = x46*((x145 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x129*x144 - x130*x143)/x145
+)
+: (
+   0
+));
+        const scalar_t x147 = -scalar_t(23)*x3 + x5;
+        const scalar_t x148 = x131 + x147;
+        const scalar_t x149 = x110 + x148;
+        const scalar_t x150 = -scalar_t(23)*y3 + y5;
+        const scalar_t x151 = x135 + x150;
+        const scalar_t x152 = x115 + x151;
+        const scalar_t x153 = -scalar_t(23)*z3 + z5;
+        const scalar_t x154 = x139 + x153;
+        const scalar_t x155 = x120 + x154;
+        const scalar_t x156 = g3_0*x149 + g3_1*x152 + g3_2*x155;
+        const scalar_t x157 = fabs(x156);
+        const scalar_t x158 = x130 + (scalar_t(1) / scalar_t(16))*x157;
+        const scalar_t x159 = x68*((x158 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x129*x157 + x130*x156)/x158
+)
+: (
+   0
+));
+        const scalar_t x160 = -ux4;
+        const scalar_t x161 = ux0 + x160;
+        const scalar_t x162 = fabs(x161);
+        const scalar_t x163 = x2 + scalar_t(9)*x4;
+        const scalar_t x164 = x131 + x80;
+        const scalar_t x165 = x164 + x6;
+        const scalar_t x166 = x163 + x165 + x75;
+        const scalar_t x167 = y2 + scalar_t(9)*y4;
+        const scalar_t x168 = x135 + x89;
+        const scalar_t x169 = x168 + y6;
+        const scalar_t x170 = x167 + x169 + x84;
+        const scalar_t x171 = z2 + scalar_t(9)*z4;
+        const scalar_t x172 = x139 + x98;
+        const scalar_t x173 = x172 + z6;
+        const scalar_t x174 = x171 + x173 + x93;
+        const scalar_t x175 = g0_0*x166 + g0_1*x170 + g0_2*x174;
+        const scalar_t x176 = fabs(x175);
+        const scalar_t x177 = x162 + (scalar_t(1) / scalar_t(16))*x176;
+        const scalar_t x178 = x61*((x177 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x161*x176 - x162*x175)/x177
+)
+: (
+   0
+));
+        const scalar_t x179 = x2 - scalar_t(23)*x4;
+        const scalar_t x180 = x109 + x165 + x179;
+        const scalar_t x181 = y2 - scalar_t(23)*y4;
+        const scalar_t x182 = x114 + x169 + x181;
+        const scalar_t x183 = z2 - scalar_t(23)*z4;
+        const scalar_t x184 = x119 + x173 + x183;
+        const scalar_t x185 = g4_0*x180 + g4_1*x182 + g4_2*x184;
+        const scalar_t x186 = fabs(x185);
+        const scalar_t x187 = x162 + (scalar_t(1) / scalar_t(16))*x186;
+        const scalar_t x188 = x71*((x187 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x161*x186 + x162*x185)/x187
+)
+: (
+   0
+));
+        const scalar_t x189 = p0 + p1;
+        const scalar_t x190 = scalar_t(2)*cof0;
+        const scalar_t x191 = x189*x190;
+        const scalar_t x192 = p0 + p3;
+        const scalar_t x193 = scalar_t(2)*cof3;
+        const scalar_t x194 = x192*x193;
+        const scalar_t x195 = p0 + p4;
+        const scalar_t x196 = scalar_t(2)*cof6;
+        const scalar_t x197 = x195*x196;
+        const scalar_t x198 = -ux5;
+        const scalar_t x199 = ux4 + ux7;
+        const scalar_t x200 = -ux2;
+        const scalar_t x201 = -ux6;
+        const scalar_t x202 = x200 + x201;
+        const scalar_t x203 = x198 + x199 + x202 + x27 + x73;
+        const scalar_t x204 = ux4 + ux5;
+        const scalar_t x205 = -ux7;
+        const scalar_t x206 = x205 + x8;
+        const scalar_t x207 = x128 + x202 + x204 + x206;
+        const scalar_t x208 = ux2 + ux3;
+        const scalar_t x209 = x160 + x198 + x201 + x206 + x208;
+        const scalar_t x210 = cof0*x203 + cof3*x207 + cof6*x209;
+        const scalar_t x211 = -uy1;
+        const scalar_t x212 = -uy5;
+        const scalar_t x213 = uy4 + uy7;
+        const scalar_t x214 = -uy2;
+        const scalar_t x215 = -uy6;
+        const scalar_t x216 = x214 + x215;
+        const scalar_t x217 = x211 + x212 + x213 + x216 + x28;
+        const scalar_t x218 = -uy3;
+        const scalar_t x219 = uy4 + uy5;
+        const scalar_t x220 = -uy7;
+        const scalar_t x221 = x220 + x9;
+        const scalar_t x222 = x216 + x218 + x219 + x221;
+        const scalar_t x223 = -uy4;
+        const scalar_t x224 = uy2 + uy3;
+        const scalar_t x225 = x212 + x215 + x221 + x223 + x224;
+        const scalar_t x226 = cof0*x217 + cof1*x203 + cof3*x222 + cof4*x207 + cof6*x225 + cof7*x209;
+        const scalar_t x227 = -uz1;
+        const scalar_t x228 = -uz5;
+        const scalar_t x229 = uz4 + uz7;
+        const scalar_t x230 = -uz2;
+        const scalar_t x231 = -uz6;
+        const scalar_t x232 = x230 + x231;
+        const scalar_t x233 = x227 + x228 + x229 + x232 + x29;
+        const scalar_t x234 = -uz3;
+        const scalar_t x235 = uz4 + uz5;
+        const scalar_t x236 = -uz7;
+        const scalar_t x237 = x10 + x236;
+        const scalar_t x238 = x232 + x234 + x235 + x237;
+        const scalar_t x239 = -uz4;
+        const scalar_t x240 = uz2 + uz3;
+        const scalar_t x241 = x228 + x231 + x237 + x239 + x240;
+        const scalar_t x242 = cof0*x233 + cof2*x203 + cof3*x238 + cof5*x207 + cof6*x241 + cof8*x209;
+        const scalar_t x243 = mu/det;
+        const scalar_t x244 = x243*(cof1*x226 + cof2*x242 + x190*x210);
+        const scalar_t x245 = x243*(cof4*x226 + cof5*x242 + x193*x210);
+        const scalar_t x246 = x243*(cof7*x226 + cof8*x242 + x196*x210);
+        const scalar_t x247 = x245 + x246;
+        const scalar_t x248 = x244 + x247;
+        const scalar_t x249 = uy0*x46;
+        const scalar_t x250 = uy0*x61;
+        const scalar_t x251 = uy3*x68;
+        const scalar_t x252 = uy4*x71;
+        const scalar_t x253 = uy0 + x211;
+        const scalar_t x254 = g0_3*x83 + g0_4*x92 + g0_5*x101;
+        const scalar_t x255 = fabs(x254);
+        const scalar_t x256 = fabs(x253);
+        const scalar_t x257 = x253*x255 - x254*x256;
+        const scalar_t x258 = (scalar_t(1) / scalar_t(16))*x255 + x256;
+        const scalar_t x259 = (scalar_t(1) / scalar_t(32))/x258;
+        const scalar_t x260 = x258 != 0;
+        const scalar_t x261 = g1_3*x113 + g1_4*x118 + g1_5*x123;
+        const scalar_t x262 = fabs(x261);
+        const scalar_t x263 = x256 + (scalar_t(1) / scalar_t(16))*x262;
+        const scalar_t x264 = ((x263 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x253*x262 + x256*x261)/x263
+)
+: (
+   0
+));
+        const scalar_t x265 = uy0 + x218;
+        const scalar_t x266 = fabs(x265);
+        const scalar_t x267 = g0_3*x134 + g0_4*x138 + g0_5*x142;
+        const scalar_t x268 = fabs(x267);
+        const scalar_t x269 = x266 + (scalar_t(1) / scalar_t(16))*x268;
+        const scalar_t x270 = x46*((x269 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x265*x268 - x266*x267)/x269
+)
+: (
+   0
+));
+        const scalar_t x271 = g3_3*x149 + g3_4*x152 + g3_5*x155;
+        const scalar_t x272 = fabs(x271);
+        const scalar_t x273 = x266 + (scalar_t(1) / scalar_t(16))*x272;
+        const scalar_t x274 = x68*((x273 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x265*x272 + x266*x271)/x273
+)
+: (
+   0
+));
+        const scalar_t x275 = uy0 + x223;
+        const scalar_t x276 = fabs(x275);
+        const scalar_t x277 = g0_3*x166 + g0_4*x170 + g0_5*x174;
+        const scalar_t x278 = fabs(x277);
+        const scalar_t x279 = x276 + (scalar_t(1) / scalar_t(16))*x278;
+        const scalar_t x280 = x61*((x279 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x275*x278 - x276*x277)/x279
+)
+: (
+   0
+));
+        const scalar_t x281 = g4_3*x180 + g4_4*x182 + g4_5*x184;
+        const scalar_t x282 = fabs(x281);
+        const scalar_t x283 = x276 + (scalar_t(1) / scalar_t(16))*x282;
+        const scalar_t x284 = x71*((x283 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x275*x282 + x276*x281)/x283
+)
+: (
+   0
+));
+        const scalar_t x285 = scalar_t(2)*cof1;
+        const scalar_t x286 = x189*x285;
+        const scalar_t x287 = scalar_t(2)*cof4;
+        const scalar_t x288 = x192*x287;
+        const scalar_t x289 = scalar_t(2)*cof7;
+        const scalar_t x290 = x195*x289;
+        const scalar_t x291 = cof1*x217 + cof4*x222 + cof7*x225;
+        const scalar_t x292 = cof1*x233 + cof2*x217 + cof4*x238 + cof5*x222 + cof7*x241 + cof8*x225;
+        const scalar_t x293 = x243*(cof0*x226 + cof2*x292 + x285*x291);
+        const scalar_t x294 = x243*(cof3*x226 + cof5*x292 + x287*x291);
+        const scalar_t x295 = x243*(cof6*x226 + cof8*x292 + x289*x291);
+        const scalar_t x296 = x294 + x295;
+        const scalar_t x297 = x293 + x296;
+        const scalar_t x298 = uz0*x46;
+        const scalar_t x299 = uz0*x61;
+        const scalar_t x300 = uz3*x68;
+        const scalar_t x301 = uz4*x71;
+        const scalar_t x302 = uz0 + x227;
+        const scalar_t x303 = g0_6*x83 + g0_7*x92 + g0_8*x101;
+        const scalar_t x304 = fabs(x303);
+        const scalar_t x305 = fabs(x302);
+        const scalar_t x306 = x302*x304 - x303*x305;
+        const scalar_t x307 = (scalar_t(1) / scalar_t(16))*x304 + x305;
+        const scalar_t x308 = (scalar_t(1) / scalar_t(32))/x307;
+        const scalar_t x309 = x307 != 0;
+        const scalar_t x310 = g1_6*x113 + g1_7*x118 + g1_8*x123;
+        const scalar_t x311 = fabs(x310);
+        const scalar_t x312 = x305 + (scalar_t(1) / scalar_t(16))*x311;
+        const scalar_t x313 = ((x312 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x302*x311 + x305*x310)/x312
+)
+: (
+   0
+));
+        const scalar_t x314 = uz0 + x234;
+        const scalar_t x315 = fabs(x314);
+        const scalar_t x316 = g0_6*x134 + g0_7*x138 + g0_8*x142;
+        const scalar_t x317 = fabs(x316);
+        const scalar_t x318 = x315 + (scalar_t(1) / scalar_t(16))*x317;
+        const scalar_t x319 = x46*((x318 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x314*x317 - x315*x316)/x318
+)
+: (
+   0
+));
+        const scalar_t x320 = g3_6*x149 + g3_7*x152 + g3_8*x155;
+        const scalar_t x321 = fabs(x320);
+        const scalar_t x322 = x315 + (scalar_t(1) / scalar_t(16))*x321;
+        const scalar_t x323 = x68*((x322 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x314*x321 + x315*x320)/x322
+)
+: (
+   0
+));
+        const scalar_t x324 = uz0 + x239;
+        const scalar_t x325 = fabs(x324);
+        const scalar_t x326 = g0_6*x166 + g0_7*x170 + g0_8*x174;
+        const scalar_t x327 = fabs(x326);
+        const scalar_t x328 = x325 + (scalar_t(1) / scalar_t(16))*x327;
+        const scalar_t x329 = x61*((x328 != 0) ? (
+   -scalar_t(1) / scalar_t(32)*(x324*x327 - x325*x326)/x328
+)
+: (
+   0
+));
+        const scalar_t x330 = g4_6*x180 + g4_7*x182 + g4_8*x184;
+        const scalar_t x331 = fabs(x330);
+        const scalar_t x332 = x325 + (scalar_t(1) / scalar_t(16))*x331;
+        const scalar_t x333 = x71*((x332 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x324*x331 + x325*x330)/x332
+)
+: (
+   0
+));
+        const scalar_t x334 = scalar_t(2)*cof2;
+        const scalar_t x335 = x189*x334;
+        const scalar_t x336 = scalar_t(2)*cof5;
+        const scalar_t x337 = x192*x336;
+        const scalar_t x338 = scalar_t(2)*cof8;
+        const scalar_t x339 = x195*x338;
+        const scalar_t x340 = cof2*x233 + cof5*x238 + cof8*x241;
+        const scalar_t x341 = x243*(cof0*x242 + cof1*x292 + x334*x340);
+        const scalar_t x342 = x243*(cof3*x242 + cof4*x292 + x336*x340);
+        const scalar_t x343 = x243*(cof6*x242 + cof7*x292 + x338*x340);
+        const scalar_t x344 = x342 + x343;
+        const scalar_t x345 = x341 + x344;
+        const scalar_t x346 = -sgn0*x64 + x64;
+        const scalar_t x347 = x25 - x65;
+        const scalar_t x348 = -x244 + x247;
+        const scalar_t x349 = rho*(cof3*(ux1 + ux2) + cof4*(uy1 + uy2) + cof5*(uz1 + uz2));
+        const scalar_t x350 = scalar_t(2)*p2;
+        const scalar_t x351 = -x350;
+        const scalar_t x352 = pgx1 + pgx2;
+        const scalar_t x353 = x1 - x2;
+        const scalar_t x354 = pgy1 + pgy2;
+        const scalar_t x355 = y1 - y2;
+        const scalar_t x356 = pgz1 + pgz2;
+        const scalar_t x357 = z1 - z2;
+        const scalar_t x358 = x14 + x351 - x352*x353 - x354*x355 - x356*x357;
+        const scalar_t x359 = scalar_t(4)*rcoef5;
+        const scalar_t x360 = -x349 - x358*x359;
+        const scalar_t x361 = x349 + x358*x359;
+        const scalar_t x362 = -sgn5*x360 + x361;
+        const scalar_t x363 = ux1 + x200;
+        const scalar_t x364 = fabs(x363);
+        const scalar_t x365 = scalar_t(3)*x0 + scalar_t(3)*x6;
+        const scalar_t x366 = scalar_t(9)*x2 + x4;
+        const scalar_t x367 = x365 + x366;
+        const scalar_t x368 = x112 + x367;
+        const scalar_t x369 = scalar_t(3)*y0 + scalar_t(3)*y6;
+        const scalar_t x370 = scalar_t(9)*y2 + y4;
+        const scalar_t x371 = x369 + x370;
+        const scalar_t x372 = x117 + x371;
+        const scalar_t x373 = scalar_t(3)*z0 + scalar_t(3)*z6;
+        const scalar_t x374 = scalar_t(9)*z2 + z4;
+        const scalar_t x375 = x373 + x374;
+        const scalar_t x376 = x122 + x375;
+        const scalar_t x377 = g1_0*x368 + g1_1*x372 + g1_2*x376;
+        const scalar_t x378 = fabs(x377);
+        const scalar_t x379 = x364 + (scalar_t(1) / scalar_t(16))*x378;
+        const scalar_t x380 = -sgn5*x360 + x360;
+        const scalar_t x381 = -scalar_t(23)*x2 + x4;
+        const scalar_t x382 = x365 + x381;
+        const scalar_t x383 = x382 + x82;
+        const scalar_t x384 = -scalar_t(23)*y2 + y4;
+        const scalar_t x385 = x369 + x384;
+        const scalar_t x386 = x385 + x91;
+        const scalar_t x387 = -scalar_t(23)*z2 + z4;
+        const scalar_t x388 = x373 + x387;
+        const scalar_t x389 = x100 + x388;
+        const scalar_t x390 = g2_0*x383 + g2_1*x386 + g2_2*x389;
+        const scalar_t x391 = fabs(x390);
+        const scalar_t x392 = x364 + (scalar_t(1) / scalar_t(16))*x391;
+        const scalar_t x393 = p1 + p2;
+        const scalar_t x394 = ux1*x362 - ux2*x380 + x193*x393 + x362*((x379 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x363*x378 + x364*x377)/x379
+)
+: (
+   0
+)) - x380*((x392 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x363*x391 + x364*x390)/x392
+)
+: (
+   0
+));
+        const scalar_t x395 = rho*(cof6*(ux1 + ux5) + cof7*(uy1 + uy5) + cof8*(uz1 + uz5));
+        const scalar_t x396 = scalar_t(2)*p5;
+        const scalar_t x397 = -x396;
+        const scalar_t x398 = pgx1 + pgx5;
+        const scalar_t x399 = -x5;
+        const scalar_t x400 = x1 + x399;
+        const scalar_t x401 = pgy1 + pgy5;
+        const scalar_t x402 = -y5;
+        const scalar_t x403 = x402 + y1;
+        const scalar_t x404 = pgz1 + pgz5;
+        const scalar_t x405 = -z5;
+        const scalar_t x406 = x405 + z1;
+        const scalar_t x407 = x14 + x397 - x398*x400 - x401*x403 - x404*x406;
+        const scalar_t x408 = scalar_t(4)*rcoef9;
+        const scalar_t x409 = -x395 - x407*x408;
+        const scalar_t x410 = x395 + x407*x408;
+        const scalar_t x411 = -sgn9*x409 + x410;
+        const scalar_t x412 = ux1 + x198;
+        const scalar_t x413 = fabs(x412);
+        const scalar_t x414 = x3 + scalar_t(9)*x5;
+        const scalar_t x415 = x365 + x76;
+        const scalar_t x416 = x415 + x7;
+        const scalar_t x417 = x111 + x414 + x416;
+        const scalar_t x418 = y3 + scalar_t(9)*y5;
+        const scalar_t x419 = x369 + x85;
+        const scalar_t x420 = x419 + y7;
+        const scalar_t x421 = x116 + x418 + x420;
+        const scalar_t x422 = z3 + scalar_t(9)*z5;
+        const scalar_t x423 = x373 + x94;
+        const scalar_t x424 = x423 + z7;
+        const scalar_t x425 = x121 + x422 + x424;
+        const scalar_t x426 = g1_0*x417 + g1_1*x421 + g1_2*x425;
+        const scalar_t x427 = fabs(x426);
+        const scalar_t x428 = x413 + (scalar_t(1) / scalar_t(16))*x427;
+        const scalar_t x429 = -sgn9*x409 + x409;
+        const scalar_t x430 = x3 - scalar_t(23)*x5;
+        const scalar_t x431 = x416 + x430 + x79;
+        const scalar_t x432 = y3 - scalar_t(23)*y5;
+        const scalar_t x433 = x420 + x432 + x88;
+        const scalar_t x434 = z3 - scalar_t(23)*z5;
+        const scalar_t x435 = x424 + x434 + x97;
+        const scalar_t x436 = g5_0*x431 + g5_1*x433 + g5_2*x435;
+        const scalar_t x437 = fabs(x436);
+        const scalar_t x438 = x413 + (scalar_t(1) / scalar_t(16))*x437;
+        const scalar_t x439 = p1 + p5;
+        const scalar_t x440 = ux1*x411 - ux5*x429 + x196*x439 + x411*((x428 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x412*x427 + x413*x426)/x428
+)
+: (
+   0
+)) - x429*((x438 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x412*x437 + x413*x436)/x438
+)
+: (
+   0
+));
+        const scalar_t x441 = -x293 + x296;
+        const scalar_t x442 = uy1 + x214;
+        const scalar_t x443 = fabs(x442);
+        const scalar_t x444 = g1_3*x368 + g1_4*x372 + g1_5*x376;
+        const scalar_t x445 = fabs(x444);
+        const scalar_t x446 = x443 + (scalar_t(1) / scalar_t(16))*x445;
+        const scalar_t x447 = g2_3*x383 + g2_4*x386 + g2_5*x389;
+        const scalar_t x448 = fabs(x447);
+        const scalar_t x449 = x443 + (scalar_t(1) / scalar_t(16))*x448;
+        const scalar_t x450 = uy1*x362 - uy2*x380 + x287*x393 + x362*((x446 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x442*x445 + x443*x444)/x446
+)
+: (
+   0
+)) - x380*((x449 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x442*x448 + x443*x447)/x449
+)
+: (
+   0
+));
+        const scalar_t x451 = uy1 + x212;
+        const scalar_t x452 = fabs(x451);
+        const scalar_t x453 = g1_3*x417 + g1_4*x421 + g1_5*x425;
+        const scalar_t x454 = fabs(x453);
+        const scalar_t x455 = x452 + (scalar_t(1) / scalar_t(16))*x454;
+        const scalar_t x456 = g5_3*x431 + g5_4*x433 + g5_5*x435;
+        const scalar_t x457 = fabs(x456);
+        const scalar_t x458 = x452 + (scalar_t(1) / scalar_t(16))*x457;
+        const scalar_t x459 = uy1*x411 - uy5*x429 + x289*x439 + x411*((x455 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x451*x454 + x452*x453)/x455
+)
+: (
+   0
+)) - x429*((x458 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x451*x457 + x452*x456)/x458
+)
+: (
+   0
+));
+        const scalar_t x460 = -x341 + x344;
+        const scalar_t x461 = uz1 + x230;
+        const scalar_t x462 = fabs(x461);
+        const scalar_t x463 = g1_6*x368 + g1_7*x372 + g1_8*x376;
+        const scalar_t x464 = fabs(x463);
+        const scalar_t x465 = x462 + (scalar_t(1) / scalar_t(16))*x464;
+        const scalar_t x466 = g2_6*x383 + g2_7*x386 + g2_8*x389;
+        const scalar_t x467 = fabs(x466);
+        const scalar_t x468 = x462 + (scalar_t(1) / scalar_t(16))*x467;
+        const scalar_t x469 = uz1*x362 - uz2*x380 + x336*x393 + x362*((x465 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x461*x464 + x462*x463)/x465
+)
+: (
+   0
+)) - x380*((x468 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x461*x467 + x462*x466)/x468
+)
+: (
+   0
+));
+        const scalar_t x470 = uz1 + x228;
+        const scalar_t x471 = fabs(x470);
+        const scalar_t x472 = g1_6*x417 + g1_7*x421 + g1_8*x425;
+        const scalar_t x473 = fabs(x472);
+        const scalar_t x474 = x471 + (scalar_t(1) / scalar_t(16))*x473;
+        const scalar_t x475 = g5_6*x431 + g5_7*x433 + g5_8*x435;
+        const scalar_t x476 = fabs(x475);
+        const scalar_t x477 = x471 + (scalar_t(1) / scalar_t(16))*x476;
+        const scalar_t x478 = uz1*x411 - uz5*x429 + x338*x439 + x411*((x474 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x470*x473 + x471*x472)/x474
+)
+: (
+   0
+)) - x429*((x477 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x470*x476 + x471*x475)/x477
+)
+: (
+   0
+));
+        const scalar_t x479 = rho*(cof0*x208 + cof1*x224 + cof2*x240);
+        const scalar_t x480 = x31 + x351 + (pgx2 + pgx3)*(x2 + x33) + (pgy2 + pgy3)*(x36 + y2) + (pgz2 + pgz3)*(x39 + z2);
+        const scalar_t x481 = scalar_t(4)*rcoef1;
+        const scalar_t x482 = -x479 - x480*x481;
+        const scalar_t x483 = sgn1*x482;
+        const scalar_t x484 = x479 + x480*x481;
+        const scalar_t x485 = -x483 + x484;
+        const scalar_t x486 = rho*(cof6*(ux2 + ux6) + cof7*(uy2 + uy6) + cof8*(uz2 + uz6));
+        const scalar_t x487 = -x486;
+        const scalar_t x488 = -scalar_t(2)*p6;
+        const scalar_t x489 = -x6;
+        const scalar_t x490 = -y6;
+        const scalar_t x491 = -z6;
+        const scalar_t x492 = x350 + x488 + (pgx2 + pgx6)*(-x2 - x489) + (pgy2 + pgy6)*(-x490 - y2) + (pgz2 + pgz6)*(-x491 - z2);
+        const scalar_t x493 = scalar_t(4)*rcoef10;
+        const scalar_t x494 = x487 - x492*x493;
+        const scalar_t x495 = -sgn10*x494 + x494;
+        const scalar_t x496 = ux6*x495;
+        const scalar_t x497 = ux2 + x128;
+        const scalar_t x498 = fabs(x497);
+        const scalar_t x499 = x148 + x367;
+        const scalar_t x500 = x151 + x371;
+        const scalar_t x501 = x154 + x375;
+        const scalar_t x502 = g3_0*x499 + g3_1*x500 + g3_2*x501;
+        const scalar_t x503 = fabs(x502);
+        const scalar_t x504 = x498 + (scalar_t(1) / scalar_t(16))*x503;
+        const scalar_t x505 = ((x504 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x497*x503 + x498*x502)/x504
+)
+: (
+   0
+));
+        const scalar_t x506 = ux2 + x201;
+        const scalar_t x507 = fabs(x506);
+        const scalar_t x508 = -scalar_t(23)*x6;
+        const scalar_t x509 = x0 + x164;
+        const scalar_t x510 = x366 + x508 + x509;
+        const scalar_t x511 = -scalar_t(23)*y6;
+        const scalar_t x512 = x168 + y0;
+        const scalar_t x513 = x370 + x511 + x512;
+        const scalar_t x514 = -scalar_t(23)*z6;
+        const scalar_t x515 = x172 + z0;
+        const scalar_t x516 = x374 + x514 + x515;
+        const scalar_t x517 = g6_0*x510 + g6_1*x513 + g6_2*x516;
+        const scalar_t x518 = fabs(x517);
+        const scalar_t x519 = x507 + (scalar_t(1) / scalar_t(16))*x518;
+        const scalar_t x520 = x495*((x519 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x506*x518 + x507*x517)/x519
+)
+: (
+   0
+));
+        const scalar_t x521 = x486 + x492*x493;
+        const scalar_t x522 = -sgn10*x494 + x521;
+        const scalar_t x523 = ux2*x522;
+        const scalar_t x524 = -sgn1*x482 + x482;
+        const scalar_t x525 = scalar_t(9)*x6;
+        const scalar_t x526 = x381 + x509 + x525;
+        const scalar_t x527 = scalar_t(9)*y6;
+        const scalar_t x528 = x384 + x512 + x527;
+        const scalar_t x529 = scalar_t(9)*z6;
+        const scalar_t x530 = x387 + x515 + x529;
+        const scalar_t x531 = g2_0*x526 + g2_1*x528 + g2_2*x530;
+        const scalar_t x532 = fabs(x531);
+        const scalar_t x533 = x507 + (scalar_t(1) / scalar_t(16))*x532;
+        const scalar_t x534 = x522*((x533 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x506*x532 + x507*x531)/x533
+)
+: (
+   0
+));
+        const scalar_t x535 = x133 + x382;
+        const scalar_t x536 = x137 + x385;
+        const scalar_t x537 = x141 + x388;
+        const scalar_t x538 = g2_0*x535 + g2_1*x536 + g2_2*x537;
+        const scalar_t x539 = fabs(x538);
+        const scalar_t x540 = x497*x539 - x498*x538;
+        const scalar_t x541 = x498 + (scalar_t(1) / scalar_t(16))*x539;
+        const scalar_t x542 = (scalar_t(1) / scalar_t(32))/x541;
+        const scalar_t x543 = x541 != 0;
+        const scalar_t x544 = p2 + p6;
+        const scalar_t x545 = x196*x544;
+        const scalar_t x546 = p2 + p3;
+        const scalar_t x547 = x190*x546 + x244;
+        const scalar_t x548 = x245 - x246;
+        const scalar_t x549 = uy6*x495;
+        const scalar_t x550 = uy2 + x218;
+        const scalar_t x551 = fabs(x550);
+        const scalar_t x552 = g3_3*x499 + g3_4*x500 + g3_5*x501;
+        const scalar_t x553 = fabs(x552);
+        const scalar_t x554 = x551 + (scalar_t(1) / scalar_t(16))*x553;
+        const scalar_t x555 = ((x554 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x550*x553 + x551*x552)/x554
+)
+: (
+   0
+));
+        const scalar_t x556 = uy2 + x215;
+        const scalar_t x557 = fabs(x556);
+        const scalar_t x558 = g6_3*x510 + g6_4*x513 + g6_5*x516;
+        const scalar_t x559 = fabs(x558);
+        const scalar_t x560 = x557 + (scalar_t(1) / scalar_t(16))*x559;
+        const scalar_t x561 = x495*((x560 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x556*x559 + x557*x558)/x560
+)
+: (
+   0
+));
+        const scalar_t x562 = uy2*x522;
+        const scalar_t x563 = g2_3*x526 + g2_4*x528 + g2_5*x530;
+        const scalar_t x564 = fabs(x563);
+        const scalar_t x565 = x557 + (scalar_t(1) / scalar_t(16))*x564;
+        const scalar_t x566 = x522*((x565 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x556*x564 + x557*x563)/x565
+)
+: (
+   0
+));
+        const scalar_t x567 = g2_3*x535 + g2_4*x536 + g2_5*x537;
+        const scalar_t x568 = fabs(x567);
+        const scalar_t x569 = x550*x568 - x551*x567;
+        const scalar_t x570 = x551 + (scalar_t(1) / scalar_t(16))*x568;
+        const scalar_t x571 = (scalar_t(1) / scalar_t(32))/x570;
+        const scalar_t x572 = x570 != 0;
+        const scalar_t x573 = x289*x544;
+        const scalar_t x574 = x285*x546 + x293;
+        const scalar_t x575 = x294 - x295;
+        const scalar_t x576 = uz6*x495;
+        const scalar_t x577 = uz2 + x234;
+        const scalar_t x578 = fabs(x577);
+        const scalar_t x579 = g3_6*x499 + g3_7*x500 + g3_8*x501;
+        const scalar_t x580 = fabs(x579);
+        const scalar_t x581 = x578 + (scalar_t(1) / scalar_t(16))*x580;
+        const scalar_t x582 = ((x581 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x577*x580 + x578*x579)/x581
+)
+: (
+   0
+));
+        const scalar_t x583 = uz2 + x231;
+        const scalar_t x584 = fabs(x583);
+        const scalar_t x585 = g6_6*x510 + g6_7*x513 + g6_8*x516;
+        const scalar_t x586 = fabs(x585);
+        const scalar_t x587 = x584 + (scalar_t(1) / scalar_t(16))*x586;
+        const scalar_t x588 = x495*((x587 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x583*x586 + x584*x585)/x587
+)
+: (
+   0
+));
+        const scalar_t x589 = uz2*x522;
+        const scalar_t x590 = g2_6*x526 + g2_7*x528 + g2_8*x530;
+        const scalar_t x591 = fabs(x590);
+        const scalar_t x592 = x584 + (scalar_t(1) / scalar_t(16))*x591;
+        const scalar_t x593 = x522*((x592 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x583*x591 + x584*x590)/x592
+)
+: (
+   0
+));
+        const scalar_t x594 = g2_6*x535 + g2_7*x536 + g2_8*x537;
+        const scalar_t x595 = fabs(x594);
+        const scalar_t x596 = x577*x595 - x578*x594;
+        const scalar_t x597 = x578 + (scalar_t(1) / scalar_t(16))*x595;
+        const scalar_t x598 = (scalar_t(1) / scalar_t(32))/x597;
+        const scalar_t x599 = x597 != 0;
+        const scalar_t x600 = x338*x544;
+        const scalar_t x601 = x334*x546 + x341;
+        const scalar_t x602 = x342 - x343;
+        const scalar_t x603 = x483 + x484;
+        const scalar_t x604 = sgn1*x484 + x484;
+        const scalar_t x605 = rho*(cof6*(ux3 + ux7) + cof7*(uy3 + uy7) + cof8*(uz3 + uz7));
+        const scalar_t x606 = scalar_t(2)*p7;
+        const scalar_t x607 = pgx3 + pgx7;
+        const scalar_t x608 = -x7;
+        const scalar_t x609 = x3 + x608;
+        const scalar_t x610 = pgy3 + pgy7;
+        const scalar_t x611 = -y7;
+        const scalar_t x612 = x611 + y3;
+        const scalar_t x613 = pgz3 + pgz7;
+        const scalar_t x614 = -z7;
+        const scalar_t x615 = x614 + z3;
+        const scalar_t x616 = scalar_t(4)*rcoef11;
+        const scalar_t x617 = -x606;
+        const scalar_t x618 = x31 - x607*x609 - x610*x612 - x613*x615 + x617;
+        const scalar_t x619 = x605 + x616*x618;
+        const scalar_t x620 = sgn11*x619 + x605 + x616*(-x42 - x606 - x607*x609 - x610*x612 - x613*x615);
+        const scalar_t x621 = -x605 - x616*x618;
+        const scalar_t x622 = sgn11*x621;
+        const scalar_t x623 = x619 + x622;
+        const scalar_t x624 = ux3 + x205;
+        const scalar_t x625 = scalar_t(9)*x7;
+        const scalar_t x626 = x1 + x415;
+        const scalar_t x627 = x147 + x625 + x626;
+        const scalar_t x628 = scalar_t(9)*y7;
+        const scalar_t x629 = x419 + y1;
+        const scalar_t x630 = x150 + x628 + x629;
+        const scalar_t x631 = scalar_t(9)*z7;
+        const scalar_t x632 = x423 + z1;
+        const scalar_t x633 = x153 + x631 + x632;
+        const scalar_t x634 = g3_0*x627 + g3_1*x630 + g3_2*x633;
+        const scalar_t x635 = fabs(x634);
+        const scalar_t x636 = fabs(x624);
+        const scalar_t x637 = x624*x635 - x634*x636;
+        const scalar_t x638 = (scalar_t(1) / scalar_t(16))*x635 + x636;
+        const scalar_t x639 = (scalar_t(1) / scalar_t(32))/x638;
+        const scalar_t x640 = x638 != 0;
+        const scalar_t x641 = -scalar_t(23)*x7;
+        const scalar_t x642 = x132 + x626 + x641;
+        const scalar_t x643 = -scalar_t(23)*y7;
+        const scalar_t x644 = x136 + x629 + x643;
+        const scalar_t x645 = -scalar_t(23)*z7;
+        const scalar_t x646 = x140 + x632 + x645;
+        const scalar_t x647 = g7_0*x642 + g7_1*x644 + g7_2*x646;
+        const scalar_t x648 = fabs(x647);
+        const scalar_t x649 = x636 + (scalar_t(1) / scalar_t(16))*x648;
+        const scalar_t x650 = ((x649 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x624*x648 + x636*x647)/x649
+)
+: (
+   0
+));
+        const scalar_t x651 = p3 + p7;
+        const scalar_t x652 = x196*x651;
+        const scalar_t x653 = -x245 + x246;
+        const scalar_t x654 = uy3 + x220;
+        const scalar_t x655 = g3_3*x627 + g3_4*x630 + g3_5*x633;
+        const scalar_t x656 = fabs(x655);
+        const scalar_t x657 = fabs(x654);
+        const scalar_t x658 = x654*x656 - x655*x657;
+        const scalar_t x659 = (scalar_t(1) / scalar_t(16))*x656 + x657;
+        const scalar_t x660 = (scalar_t(1) / scalar_t(32))/x659;
+        const scalar_t x661 = x659 != 0;
+        const scalar_t x662 = g7_3*x642 + g7_4*x644 + g7_5*x646;
+        const scalar_t x663 = fabs(x662);
+        const scalar_t x664 = x657 + (scalar_t(1) / scalar_t(16))*x663;
+        const scalar_t x665 = ((x664 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x654*x663 + x657*x662)/x664
+)
+: (
+   0
+));
+        const scalar_t x666 = x289*x651;
+        const scalar_t x667 = -x294 + x295;
+        const scalar_t x668 = uz3 + x236;
+        const scalar_t x669 = g3_6*x627 + g3_7*x630 + g3_8*x633;
+        const scalar_t x670 = fabs(x669);
+        const scalar_t x671 = fabs(x668);
+        const scalar_t x672 = x668*x670 - x669*x671;
+        const scalar_t x673 = (scalar_t(1) / scalar_t(16))*x670 + x671;
+        const scalar_t x674 = (scalar_t(1) / scalar_t(32))/x673;
+        const scalar_t x675 = x673 != 0;
+        const scalar_t x676 = g7_6*x642 + g7_7*x644 + g7_8*x646;
+        const scalar_t x677 = fabs(x676);
+        const scalar_t x678 = x671 + (scalar_t(1) / scalar_t(16))*x677;
+        const scalar_t x679 = ((x678 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x668*x677 + x671*x676)/x678
+)
+: (
+   0
+));
+        const scalar_t x680 = x338*x651;
+        const scalar_t x681 = -x342 + x343;
+        const scalar_t x682 = rho*(cof0*x204 + cof1*x219 + cof2*x235);
+        const scalar_t x683 = pgx4 + pgx5;
+        const scalar_t x684 = x399 + x4;
+        const scalar_t x685 = pgy4 + pgy5;
+        const scalar_t x686 = x402 + y4;
+        const scalar_t x687 = pgz4 + pgz5;
+        const scalar_t x688 = x405 + z4;
+        const scalar_t x689 = scalar_t(4)*rcoef2;
+        const scalar_t x690 = x397 + x49 - x683*x684 - x685*x686 - x687*x688;
+        const scalar_t x691 = x682 + x689*x690;
+        const scalar_t x692 = sgn2*x691 + x682 + x689*(-x396 - x57 - x683*x684 - x685*x686 - x687*x688);
+        const scalar_t x693 = rho*(cof3*x199 + cof4*x213 + cof5*x229);
+        const scalar_t x694 = pgx4 + pgx7;
+        const scalar_t x695 = x4 + x608;
+        const scalar_t x696 = pgy4 + pgy7;
+        const scalar_t x697 = x611 + y4;
+        const scalar_t x698 = pgz4 + pgz7;
+        const scalar_t x699 = x614 + z4;
+        const scalar_t x700 = scalar_t(4)*rcoef6;
+        const scalar_t x701 = x49 + x617 - x694*x695 - x696*x697 - x698*x699;
+        const scalar_t x702 = x693 + x700*x701;
+        const scalar_t x703 = sgn6*x702 + x693 + x700*(-x57 - x606 - x694*x695 - x696*x697 - x698*x699);
+        const scalar_t x704 = -x682 - x689*x690;
+        const scalar_t x705 = sgn2*x704;
+        const scalar_t x706 = x691 + x705;
+        const scalar_t x707 = -x693 - x700*x701;
+        const scalar_t x708 = sgn6*x707;
+        const scalar_t x709 = x702 + x708;
+        const scalar_t x710 = ux4 + x198;
+        const scalar_t x711 = x131 + x365;
+        const scalar_t x712 = x179 + x414 + x711;
+        const scalar_t x713 = x135 + x369;
+        const scalar_t x714 = x181 + x418 + x713;
+        const scalar_t x715 = x139 + x373;
+        const scalar_t x716 = x183 + x422 + x715;
+        const scalar_t x717 = g4_0*x712 + g4_1*x714 + g4_2*x716;
+        const scalar_t x718 = fabs(x717);
+        const scalar_t x719 = fabs(x710);
+        const scalar_t x720 = x710*x718 - x717*x719;
+        const scalar_t x721 = (scalar_t(1) / scalar_t(16))*x718 + x719;
+        const scalar_t x722 = (scalar_t(1) / scalar_t(32))/x721;
+        const scalar_t x723 = x721 != 0;
+        const scalar_t x724 = x163 + x430 + x711;
+        const scalar_t x725 = x167 + x432 + x713;
+        const scalar_t x726 = x171 + x434 + x715;
+        const scalar_t x727 = g5_0*x724 + g5_1*x725 + g5_2*x726;
+        const scalar_t x728 = fabs(x727);
+        const scalar_t x729 = x719 + (scalar_t(1) / scalar_t(16))*x728;
+        const scalar_t x730 = ((x729 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x710*x728 + x719*x727)/x729
+)
+: (
+   0
+));
+        const scalar_t x731 = ux4 + x205;
+        const scalar_t x732 = x1 + x80;
+        const scalar_t x733 = x365 + x732;
+        const scalar_t x734 = x179 + x625 + x733;
+        const scalar_t x735 = x89 + y1;
+        const scalar_t x736 = x369 + x735;
+        const scalar_t x737 = x181 + x628 + x736;
+        const scalar_t x738 = x98 + z1;
+        const scalar_t x739 = x373 + x738;
+        const scalar_t x740 = x183 + x631 + x739;
+        const scalar_t x741 = g4_0*x734 + g4_1*x737 + g4_2*x740;
+        const scalar_t x742 = fabs(x741);
+        const scalar_t x743 = fabs(x731);
+        const scalar_t x744 = x731*x742 - x741*x743;
+        const scalar_t x745 = (scalar_t(1) / scalar_t(16))*x742 + x743;
+        const scalar_t x746 = (scalar_t(1) / scalar_t(32))/x745;
+        const scalar_t x747 = x745 != 0;
+        const scalar_t x748 = x163 + x641 + x733;
+        const scalar_t x749 = x167 + x643 + x736;
+        const scalar_t x750 = x171 + x645 + x739;
+        const scalar_t x751 = g7_0*x748 + g7_1*x749 + g7_2*x750;
+        const scalar_t x752 = fabs(x751);
+        const scalar_t x753 = x743 + (scalar_t(1) / scalar_t(16))*x752;
+        const scalar_t x754 = ((x753 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x731*x752 + x743*x751)/x753
+)
+: (
+   0
+));
+        const scalar_t x755 = p4 + p7;
+        const scalar_t x756 = x193*x755;
+        const scalar_t x757 = p4 + p5;
+        const scalar_t x758 = x190*x757 + x244;
+        const scalar_t x759 = uy4 + x212;
+        const scalar_t x760 = g4_3*x712 + g4_4*x714 + g4_5*x716;
+        const scalar_t x761 = fabs(x760);
+        const scalar_t x762 = fabs(x759);
+        const scalar_t x763 = x759*x761 - x760*x762;
+        const scalar_t x764 = (scalar_t(1) / scalar_t(16))*x761 + x762;
+        const scalar_t x765 = (scalar_t(1) / scalar_t(32))/x764;
+        const scalar_t x766 = x764 != 0;
+        const scalar_t x767 = g5_3*x724 + g5_4*x725 + g5_5*x726;
+        const scalar_t x768 = fabs(x767);
+        const scalar_t x769 = x762 + (scalar_t(1) / scalar_t(16))*x768;
+        const scalar_t x770 = ((x769 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x759*x768 + x762*x767)/x769
+)
+: (
+   0
+));
+        const scalar_t x771 = uy4 + x220;
+        const scalar_t x772 = g4_3*x734 + g4_4*x737 + g4_5*x740;
+        const scalar_t x773 = fabs(x772);
+        const scalar_t x774 = fabs(x771);
+        const scalar_t x775 = x771*x773 - x772*x774;
+        const scalar_t x776 = (scalar_t(1) / scalar_t(16))*x773 + x774;
+        const scalar_t x777 = (scalar_t(1) / scalar_t(32))/x776;
+        const scalar_t x778 = x776 != 0;
+        const scalar_t x779 = g7_3*x748 + g7_4*x749 + g7_5*x750;
+        const scalar_t x780 = fabs(x779);
+        const scalar_t x781 = x774 + (scalar_t(1) / scalar_t(16))*x780;
+        const scalar_t x782 = ((x781 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x771*x780 + x774*x779)/x781
+)
+: (
+   0
+));
+        const scalar_t x783 = x287*x755;
+        const scalar_t x784 = x285*x757 + x293;
+        const scalar_t x785 = uz4 + x228;
+        const scalar_t x786 = g4_6*x712 + g4_7*x714 + g4_8*x716;
+        const scalar_t x787 = fabs(x786);
+        const scalar_t x788 = fabs(x785);
+        const scalar_t x789 = x785*x787 - x786*x788;
+        const scalar_t x790 = (scalar_t(1) / scalar_t(16))*x787 + x788;
+        const scalar_t x791 = (scalar_t(1) / scalar_t(32))/x790;
+        const scalar_t x792 = x790 != 0;
+        const scalar_t x793 = g5_6*x724 + g5_7*x725 + g5_8*x726;
+        const scalar_t x794 = fabs(x793);
+        const scalar_t x795 = x788 + (scalar_t(1) / scalar_t(16))*x794;
+        const scalar_t x796 = ((x795 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x785*x794 + x788*x793)/x795
+)
+: (
+   0
+));
+        const scalar_t x797 = uz4 + x236;
+        const scalar_t x798 = g4_6*x734 + g4_7*x737 + g4_8*x740;
+        const scalar_t x799 = fabs(x798);
+        const scalar_t x800 = fabs(x797);
+        const scalar_t x801 = x797*x799 - x798*x800;
+        const scalar_t x802 = (scalar_t(1) / scalar_t(16))*x799 + x800;
+        const scalar_t x803 = (scalar_t(1) / scalar_t(32))/x802;
+        const scalar_t x804 = x802 != 0;
+        const scalar_t x805 = g7_6*x748 + g7_7*x749 + g7_8*x750;
+        const scalar_t x806 = fabs(x805);
+        const scalar_t x807 = x800 + (scalar_t(1) / scalar_t(16))*x806;
+        const scalar_t x808 = ((x807 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x797*x806 + x800*x805)/x807
+)
+: (
+   0
+));
+        const scalar_t x809 = x336*x755;
+        const scalar_t x810 = x334*x757 + x341;
+        const scalar_t x811 = x691 - x705;
+        const scalar_t x812 = rho*(cof3*(ux5 + ux6) + cof4*(uy5 + uy6) + cof5*(uz5 + uz6));
+        const scalar_t x813 = -x812;
+        const scalar_t x814 = x396 + x488 + (pgx5 + pgx6)*(-x489 - x5) + (pgy5 + pgy6)*(-x490 - y5) + (pgz5 + pgz6)*(-x491 - z5);
+        const scalar_t x815 = scalar_t(4)*rcoef7;
+        const scalar_t x816 = x813 - x814*x815;
+        const scalar_t x817 = -sgn7*x816 + x816;
+        const scalar_t x818 = ux6*x817;
+        const scalar_t x819 = ux5 + x201;
+        const scalar_t x820 = fabs(x819);
+        const scalar_t x821 = x0 + x76;
+        const scalar_t x822 = x131 + x821;
+        const scalar_t x823 = x414 + x508 + x822;
+        const scalar_t x824 = x85 + y0;
+        const scalar_t x825 = x135 + x824;
+        const scalar_t x826 = x418 + x511 + x825;
+        const scalar_t x827 = x94 + z0;
+        const scalar_t x828 = x139 + x827;
+        const scalar_t x829 = x422 + x514 + x828;
+        const scalar_t x830 = g6_0*x823 + g6_1*x826 + g6_2*x829;
+        const scalar_t x831 = fabs(x830);
+        const scalar_t x832 = x820 + (scalar_t(1) / scalar_t(16))*x831;
+        const scalar_t x833 = x817*((x832 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x819*x831 + x820*x830)/x832
+)
+: (
+   0
+));
+        const scalar_t x834 = x812 + x814*x815;
+        const scalar_t x835 = -sgn7*x816 + x834;
+        const scalar_t x836 = ux5*x835;
+        const scalar_t x837 = -sgn2*x704 + x704;
+        const scalar_t x838 = x430 + x525 + x822;
+        const scalar_t x839 = x432 + x527 + x825;
+        const scalar_t x840 = x434 + x529 + x828;
+        const scalar_t x841 = g5_0*x838 + g5_1*x839 + g5_2*x840;
+        const scalar_t x842 = fabs(x841);
+        const scalar_t x843 = x820 + (scalar_t(1) / scalar_t(16))*x842;
+        const scalar_t x844 = x835*((x843 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x819*x842 + x820*x841)/x843
+)
+: (
+   0
+));
+        const scalar_t x845 = p5 + p6;
+        const scalar_t x846 = x193*x845;
+        const scalar_t x847 = uy6*x817;
+        const scalar_t x848 = uy5 + x215;
+        const scalar_t x849 = fabs(x848);
+        const scalar_t x850 = g6_3*x823 + g6_4*x826 + g6_5*x829;
+        const scalar_t x851 = fabs(x850);
+        const scalar_t x852 = x849 + (scalar_t(1) / scalar_t(16))*x851;
+        const scalar_t x853 = x817*((x852 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x848*x851 + x849*x850)/x852
+)
+: (
+   0
+));
+        const scalar_t x854 = uy5*x835;
+        const scalar_t x855 = g5_3*x838 + g5_4*x839 + g5_5*x840;
+        const scalar_t x856 = fabs(x855);
+        const scalar_t x857 = x849 + (scalar_t(1) / scalar_t(16))*x856;
+        const scalar_t x858 = x835*((x857 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x848*x856 + x849*x855)/x857
+)
+: (
+   0
+));
+        const scalar_t x859 = x287*x845;
+        const scalar_t x860 = uz6*x817;
+        const scalar_t x861 = uz5 + x231;
+        const scalar_t x862 = fabs(x861);
+        const scalar_t x863 = g6_6*x823 + g6_7*x826 + g6_8*x829;
+        const scalar_t x864 = fabs(x863);
+        const scalar_t x865 = x862 + (scalar_t(1) / scalar_t(16))*x864;
+        const scalar_t x866 = x817*((x865 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x861*x864 + x862*x863)/x865
+)
+: (
+   0
+));
+        const scalar_t x867 = uz5*x835;
+        const scalar_t x868 = g5_6*x838 + g5_7*x839 + g5_8*x840;
+        const scalar_t x869 = fabs(x868);
+        const scalar_t x870 = x862 + (scalar_t(1) / scalar_t(16))*x869;
+        const scalar_t x871 = x835*((x870 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x861*x869 + x862*x868)/x870
+)
+: (
+   0
+));
+        const scalar_t x872 = x336*x845;
+        const scalar_t x873 = rho*(cof0*(ux6 + ux7) + cof1*(uy6 + uy7) + cof2*(uz6 + uz7));
+        const scalar_t x874 = -x873;
+        const scalar_t x875 = x488 + x606 + (pgx6 + pgx7)*(x6 + x608) + (pgy6 + pgy7)*(x611 + y6) + (pgz6 + pgz7)*(x614 + z6);
+        const scalar_t x876 = scalar_t(4)*rcoef3;
+        const scalar_t x877 = x874 - x875*x876;
+        const scalar_t x878 = x873 + x875*x876;
+        const scalar_t x879 = -sgn3*x877 + x878;
+        const scalar_t x880 = ux7*x879;
+        const scalar_t x881 = ux6 + x205;
+        const scalar_t x882 = fabs(x881);
+        const scalar_t x883 = x732 + x821;
+        const scalar_t x884 = x525 + x641 + x883;
+        const scalar_t x885 = x735 + x824;
+        const scalar_t x886 = x527 + x643 + x885;
+        const scalar_t x887 = x738 + x827;
+        const scalar_t x888 = x529 + x645 + x887;
+        const scalar_t x889 = g7_0*x884 + g7_1*x886 + g7_2*x888;
+        const scalar_t x890 = fabs(x889);
+        const scalar_t x891 = x882 + (scalar_t(1) / scalar_t(16))*x890;
+        const scalar_t x892 = x879*((x891 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x881*x890 + x882*x889)/x891
+)
+: (
+   0
+));
+        const scalar_t x893 = -sgn3*x877 + x877;
+        const scalar_t x894 = ux6*x893;
+        const scalar_t x895 = x508 + x625 + x883;
+        const scalar_t x896 = x511 + x628 + x885;
+        const scalar_t x897 = x514 + x631 + x887;
+        const scalar_t x898 = g6_0*x895 + g6_1*x896 + g6_2*x897;
+        const scalar_t x899 = fabs(x898);
+        const scalar_t x900 = x882 + (scalar_t(1) / scalar_t(16))*x899;
+        const scalar_t x901 = x893*((x900 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x881*x899 + x882*x898)/x900
+)
+: (
+   0
+));
+        const scalar_t x902 = p6 + p7;
+        const scalar_t x903 = x190*x902;
+        const scalar_t x904 = uy7*x879;
+        const scalar_t x905 = uy6 + x220;
+        const scalar_t x906 = fabs(x905);
+        const scalar_t x907 = g7_3*x884 + g7_4*x886 + g7_5*x888;
+        const scalar_t x908 = fabs(x907);
+        const scalar_t x909 = x906 + (scalar_t(1) / scalar_t(16))*x908;
+        const scalar_t x910 = x879*((x909 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x905*x908 + x906*x907)/x909
+)
+: (
+   0
+));
+        const scalar_t x911 = uy6*x893;
+        const scalar_t x912 = g6_3*x895 + g6_4*x896 + g6_5*x897;
+        const scalar_t x913 = fabs(x912);
+        const scalar_t x914 = x906 + (scalar_t(1) / scalar_t(16))*x913;
+        const scalar_t x915 = x893*((x914 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x905*x913 + x906*x912)/x914
+)
+: (
+   0
+));
+        const scalar_t x916 = x285*x902;
+        const scalar_t x917 = uz7*x879;
+        const scalar_t x918 = uz6 + x236;
+        const scalar_t x919 = fabs(x918);
+        const scalar_t x920 = g7_6*x884 + g7_7*x886 + g7_8*x888;
+        const scalar_t x921 = fabs(x920);
+        const scalar_t x922 = x919 + (scalar_t(1) / scalar_t(16))*x921;
+        const scalar_t x923 = x879*((x922 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(x918*x921 + x919*x920)/x922
+)
+: (
+   0
+));
+        const scalar_t x924 = uz6*x893;
+        const scalar_t x925 = g6_6*x895 + g6_7*x896 + g6_8*x897;
+        const scalar_t x926 = fabs(x925);
+        const scalar_t x927 = x919 + (scalar_t(1) / scalar_t(16))*x926;
+        const scalar_t x928 = x893*((x927 != 0) ? (
+   (scalar_t(1) / scalar_t(32))*(-x918*x926 + x919*x925)/x927
+)
+: (
+   0
+));
+        const scalar_t x929 = x334*x902;
+        const scalar_t x930 = x619 - x622;
+        const scalar_t x931 = x702 - x708;
+        const scalar_t x932 = -sgn11*x621 + x621;
+        const scalar_t x933 = -sgn6*x707 + x707;
+        out.rx[0][lane] = (scalar_t(1) / scalar_t(16))*ux0*x26 + (scalar_t(1) / scalar_t(16))*ux1*x66 + (scalar_t(1) / scalar_t(16))*x127*x66 + (scalar_t(1) / scalar_t(16))*x146 + (scalar_t(1) / scalar_t(16))*x159 + (scalar_t(1) / scalar_t(16))*x178 + (scalar_t(1) / scalar_t(16))*x188 + (scalar_t(1) / scalar_t(16))*x191 + (scalar_t(1) / scalar_t(16))*x194 + (scalar_t(1) / scalar_t(16))*x197 + (scalar_t(1) / scalar_t(16))*x248 + (scalar_t(1) / scalar_t(16))*x26*((x108) ? (
+   -x105*x107
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x47 + (scalar_t(1) / scalar_t(16))*x62 + (scalar_t(1) / scalar_t(16))*x69 + (scalar_t(1) / scalar_t(16))*x72;
+        out.ry[0][lane] = (scalar_t(1) / scalar_t(16))*uy0*x26 + (scalar_t(1) / scalar_t(16))*uy1*x66 + (scalar_t(1) / scalar_t(16))*x249 + (scalar_t(1) / scalar_t(16))*x250 + (scalar_t(1) / scalar_t(16))*x251 + (scalar_t(1) / scalar_t(16))*x252 + (scalar_t(1) / scalar_t(16))*x26*((x260) ? (
+   -x257*x259
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x264*x66 + (scalar_t(1) / scalar_t(16))*x270 + (scalar_t(1) / scalar_t(16))*x274 + (scalar_t(1) / scalar_t(16))*x280 + (scalar_t(1) / scalar_t(16))*x284 + (scalar_t(1) / scalar_t(16))*x286 + (scalar_t(1) / scalar_t(16))*x288 + (scalar_t(1) / scalar_t(16))*x290 + (scalar_t(1) / scalar_t(16))*x297;
+        out.rz[0][lane] = (scalar_t(1) / scalar_t(16))*uz0*x26 + (scalar_t(1) / scalar_t(16))*uz1*x66 + (scalar_t(1) / scalar_t(16))*x26*((x309) ? (
+   -x306*x308
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x298 + (scalar_t(1) / scalar_t(16))*x299 + (scalar_t(1) / scalar_t(16))*x300 + (scalar_t(1) / scalar_t(16))*x301 + (scalar_t(1) / scalar_t(16))*x313*x66 + (scalar_t(1) / scalar_t(16))*x319 + (scalar_t(1) / scalar_t(16))*x323 + (scalar_t(1) / scalar_t(16))*x329 + (scalar_t(1) / scalar_t(16))*x333 + (scalar_t(1) / scalar_t(16))*x335 + (scalar_t(1) / scalar_t(16))*x337 + (scalar_t(1) / scalar_t(16))*x339 + (scalar_t(1) / scalar_t(16))*x345;
+        out.rc[0][lane] = (scalar_t(1) / scalar_t(8))*x25 + (scalar_t(1) / scalar_t(8))*x45 + (scalar_t(1) / scalar_t(8))*x60;
+        out.rx[1][lane] = -scalar_t(1) / scalar_t(16)*ux0*x347 + (scalar_t(1) / scalar_t(16))*ux1*x346 + (scalar_t(1) / scalar_t(16))*x127*x346 - scalar_t(1) / scalar_t(16)*x191 - scalar_t(1) / scalar_t(16)*x347*((x108) ? (
+   -x105*x107
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x348 + (scalar_t(1) / scalar_t(16))*x394 + (scalar_t(1) / scalar_t(16))*x440;
+        out.ry[1][lane] = -scalar_t(1) / scalar_t(16)*uy0*x347 + (scalar_t(1) / scalar_t(16))*uy1*x346 + (scalar_t(1) / scalar_t(16))*x264*x346 - scalar_t(1) / scalar_t(16)*x286 - scalar_t(1) / scalar_t(16)*x347*((x260) ? (
+   -x257*x259
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x441 + (scalar_t(1) / scalar_t(16))*x450 + (scalar_t(1) / scalar_t(16))*x459;
+        out.rz[1][lane] = -scalar_t(1) / scalar_t(16)*uz0*x347 + (scalar_t(1) / scalar_t(16))*uz1*x346 + (scalar_t(1) / scalar_t(16))*x313*x346 - scalar_t(1) / scalar_t(16)*x335 - scalar_t(1) / scalar_t(16)*x347*((x309) ? (
+   -x306*x308
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x460 + (scalar_t(1) / scalar_t(16))*x469 + (scalar_t(1) / scalar_t(16))*x478;
+        out.rc[1][lane] = -scalar_t(1) / scalar_t(8)*x22 + (scalar_t(1) / scalar_t(8))*x349 + (scalar_t(1) / scalar_t(8))*x359*(-x23 - x350 - x352*x353 - x354*x355 - x356*x357) + (scalar_t(1) / scalar_t(8))*x395 + (scalar_t(1) / scalar_t(8))*x408*(-x23 - x396 - x398*x400 - x401*x403 - x404*x406) + (scalar_t(1) / scalar_t(8))*x63;
+        out.rx[2][lane] = (scalar_t(1) / scalar_t(16))*ux2*x524 - scalar_t(1) / scalar_t(16)*ux3*x485 - scalar_t(1) / scalar_t(16)*x394 - scalar_t(1) / scalar_t(16)*x485*x505 - scalar_t(1) / scalar_t(16)*x496 - scalar_t(1) / scalar_t(16)*x520 + (scalar_t(1) / scalar_t(16))*x523 + (scalar_t(1) / scalar_t(16))*x524*((x543) ? (
+   -x540*x542
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x534 + (scalar_t(1) / scalar_t(16))*x545 - scalar_t(1) / scalar_t(16)*x547 - scalar_t(1) / scalar_t(16)*x548;
+        out.ry[2][lane] = (scalar_t(1) / scalar_t(16))*uy2*x524 - scalar_t(1) / scalar_t(16)*uy3*x485 - scalar_t(1) / scalar_t(16)*x450 - scalar_t(1) / scalar_t(16)*x485*x555 + (scalar_t(1) / scalar_t(16))*x524*((x572) ? (
+   -x569*x571
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x549 - scalar_t(1) / scalar_t(16)*x561 + (scalar_t(1) / scalar_t(16))*x562 + (scalar_t(1) / scalar_t(16))*x566 + (scalar_t(1) / scalar_t(16))*x573 - scalar_t(1) / scalar_t(16)*x574 - scalar_t(1) / scalar_t(16)*x575;
+        out.rz[2][lane] = (scalar_t(1) / scalar_t(16))*uz2*x524 - scalar_t(1) / scalar_t(16)*uz3*x485 - scalar_t(1) / scalar_t(16)*x469 - scalar_t(1) / scalar_t(16)*x485*x582 + (scalar_t(1) / scalar_t(16))*x524*((x599) ? (
+   -x596*x598
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x576 - scalar_t(1) / scalar_t(16)*x588 + (scalar_t(1) / scalar_t(16))*x589 + (scalar_t(1) / scalar_t(16))*x593 + (scalar_t(1) / scalar_t(16))*x600 - scalar_t(1) / scalar_t(16)*x601 - scalar_t(1) / scalar_t(16)*x602;
+        out.rc[2][lane] = (scalar_t(1) / scalar_t(2))*rcoef10*x492 - scalar_t(1) / scalar_t(8)*x361 - scalar_t(1) / scalar_t(8)*x484 - scalar_t(1) / scalar_t(8)*x487;
+        out.rx[3][lane] = (scalar_t(1) / scalar_t(16))*ux2*x603 + (scalar_t(1) / scalar_t(16))*ux3*x604 + (scalar_t(1) / scalar_t(16))*ux3*x620 + (scalar_t(1) / scalar_t(16))*ux7*x623 - scalar_t(1) / scalar_t(16)*x146 - scalar_t(1) / scalar_t(16)*x159 - scalar_t(1) / scalar_t(16)*x194 - scalar_t(1) / scalar_t(16)*x47 + (scalar_t(1) / scalar_t(16))*x505*x604 + (scalar_t(1) / scalar_t(16))*x547 + (scalar_t(1) / scalar_t(16))*x603*((x543) ? (
+   -x540*x542
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x620*((x640) ? (
+   -x637*x639
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x623*x650 + (scalar_t(1) / scalar_t(16))*x652 + (scalar_t(1) / scalar_t(16))*x653 - scalar_t(1) / scalar_t(16)*x69;
+        out.ry[3][lane] = (scalar_t(1) / scalar_t(16))*uy2*x603 + (scalar_t(1) / scalar_t(16))*uy3*x604 + (scalar_t(1) / scalar_t(16))*uy3*x620 + (scalar_t(1) / scalar_t(16))*uy7*x623 - scalar_t(1) / scalar_t(16)*x249 - scalar_t(1) / scalar_t(16)*x251 - scalar_t(1) / scalar_t(16)*x270 - scalar_t(1) / scalar_t(16)*x274 - scalar_t(1) / scalar_t(16)*x288 + (scalar_t(1) / scalar_t(16))*x555*x604 + (scalar_t(1) / scalar_t(16))*x574 + (scalar_t(1) / scalar_t(16))*x603*((x572) ? (
+   -x569*x571
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x620*((x661) ? (
+   -x658*x660
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x623*x665 + (scalar_t(1) / scalar_t(16))*x666 + (scalar_t(1) / scalar_t(16))*x667;
+        out.rz[3][lane] = (scalar_t(1) / scalar_t(16))*uz2*x603 + (scalar_t(1) / scalar_t(16))*uz3*x604 + (scalar_t(1) / scalar_t(16))*uz3*x620 + (scalar_t(1) / scalar_t(16))*uz7*x623 - scalar_t(1) / scalar_t(16)*x298 - scalar_t(1) / scalar_t(16)*x300 - scalar_t(1) / scalar_t(16)*x319 - scalar_t(1) / scalar_t(16)*x323 - scalar_t(1) / scalar_t(16)*x337 + (scalar_t(1) / scalar_t(16))*x582*x604 + (scalar_t(1) / scalar_t(16))*x601 + (scalar_t(1) / scalar_t(16))*x603*((x599) ? (
+   -x596*x598
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x620*((x675) ? (
+   -x672*x674
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x623*x679 + (scalar_t(1) / scalar_t(16))*x680 + (scalar_t(1) / scalar_t(16))*x681;
+        out.rc[3][lane] = -scalar_t(1) / scalar_t(8)*x44 + (scalar_t(1) / scalar_t(8))*x484 + (scalar_t(1) / scalar_t(8))*x619 + (scalar_t(1) / scalar_t(8))*x67;
+        out.rx[4][lane] = (scalar_t(1) / scalar_t(16))*ux4*x692 + (scalar_t(1) / scalar_t(16))*ux4*x703 + (scalar_t(1) / scalar_t(16))*ux5*x706 + (scalar_t(1) / scalar_t(16))*ux7*x709 - scalar_t(1) / scalar_t(16)*x178 - scalar_t(1) / scalar_t(16)*x188 - scalar_t(1) / scalar_t(16)*x197 + (scalar_t(1) / scalar_t(16))*x548 - scalar_t(1) / scalar_t(16)*x62 + (scalar_t(1) / scalar_t(16))*x692*((x723) ? (
+   -x720*x722
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x703*((x747) ? (
+   -x744*x746
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x706*x730 + (scalar_t(1) / scalar_t(16))*x709*x754 - scalar_t(1) / scalar_t(16)*x72 + (scalar_t(1) / scalar_t(16))*x756 + (scalar_t(1) / scalar_t(16))*x758;
+        out.ry[4][lane] = (scalar_t(1) / scalar_t(16))*uy4*x692 + (scalar_t(1) / scalar_t(16))*uy4*x703 + (scalar_t(1) / scalar_t(16))*uy5*x706 + (scalar_t(1) / scalar_t(16))*uy7*x709 - scalar_t(1) / scalar_t(16)*x250 - scalar_t(1) / scalar_t(16)*x252 - scalar_t(1) / scalar_t(16)*x280 - scalar_t(1) / scalar_t(16)*x284 - scalar_t(1) / scalar_t(16)*x290 + (scalar_t(1) / scalar_t(16))*x575 + (scalar_t(1) / scalar_t(16))*x692*((x766) ? (
+   -x763*x765
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x703*((x778) ? (
+   -x775*x777
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x706*x770 + (scalar_t(1) / scalar_t(16))*x709*x782 + (scalar_t(1) / scalar_t(16))*x783 + (scalar_t(1) / scalar_t(16))*x784;
+        out.rz[4][lane] = (scalar_t(1) / scalar_t(16))*uz4*x692 + (scalar_t(1) / scalar_t(16))*uz4*x703 + (scalar_t(1) / scalar_t(16))*uz5*x706 + (scalar_t(1) / scalar_t(16))*uz7*x709 - scalar_t(1) / scalar_t(16)*x299 - scalar_t(1) / scalar_t(16)*x301 - scalar_t(1) / scalar_t(16)*x329 - scalar_t(1) / scalar_t(16)*x333 - scalar_t(1) / scalar_t(16)*x339 + (scalar_t(1) / scalar_t(16))*x602 + (scalar_t(1) / scalar_t(16))*x692*((x792) ? (
+   -x789*x791
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x703*((x804) ? (
+   -x801*x803
+)
+: (
+   0
+)) + (scalar_t(1) / scalar_t(16))*x706*x796 + (scalar_t(1) / scalar_t(16))*x709*x808 + (scalar_t(1) / scalar_t(16))*x809 + (scalar_t(1) / scalar_t(16))*x810;
+        out.rc[4][lane] = -scalar_t(1) / scalar_t(8)*x59 + (scalar_t(1) / scalar_t(8))*x691 + (scalar_t(1) / scalar_t(8))*x70 + (scalar_t(1) / scalar_t(8))*x702;
+        out.rx[5][lane] = -scalar_t(1) / scalar_t(16)*ux4*x811 + (scalar_t(1) / scalar_t(16))*ux5*x837 - scalar_t(1) / scalar_t(16)*x440 - scalar_t(1) / scalar_t(16)*x653 + (scalar_t(1) / scalar_t(16))*x730*x837 - scalar_t(1) / scalar_t(16)*x758 - scalar_t(1) / scalar_t(16)*x811*((x723) ? (
+   -x720*x722
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x818 - scalar_t(1) / scalar_t(16)*x833 + (scalar_t(1) / scalar_t(16))*x836 + (scalar_t(1) / scalar_t(16))*x844 + (scalar_t(1) / scalar_t(16))*x846;
+        out.ry[5][lane] = -scalar_t(1) / scalar_t(16)*uy4*x811 + (scalar_t(1) / scalar_t(16))*uy5*x837 - scalar_t(1) / scalar_t(16)*x459 - scalar_t(1) / scalar_t(16)*x667 + (scalar_t(1) / scalar_t(16))*x770*x837 - scalar_t(1) / scalar_t(16)*x784 - scalar_t(1) / scalar_t(16)*x811*((x766) ? (
+   -x763*x765
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x847 - scalar_t(1) / scalar_t(16)*x853 + (scalar_t(1) / scalar_t(16))*x854 + (scalar_t(1) / scalar_t(16))*x858 + (scalar_t(1) / scalar_t(16))*x859;
+        out.rz[5][lane] = -scalar_t(1) / scalar_t(16)*uz4*x811 + (scalar_t(1) / scalar_t(16))*uz5*x837 - scalar_t(1) / scalar_t(16)*x478 - scalar_t(1) / scalar_t(16)*x681 + (scalar_t(1) / scalar_t(16))*x796*x837 - scalar_t(1) / scalar_t(16)*x810 - scalar_t(1) / scalar_t(16)*x811*((x792) ? (
+   -x789*x791
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x860 - scalar_t(1) / scalar_t(16)*x866 + (scalar_t(1) / scalar_t(16))*x867 + (scalar_t(1) / scalar_t(16))*x871 + (scalar_t(1) / scalar_t(16))*x872;
+        out.rc[5][lane] = (scalar_t(1) / scalar_t(2))*rcoef7*x814 - scalar_t(1) / scalar_t(8)*x410 - scalar_t(1) / scalar_t(8)*x691 - scalar_t(1) / scalar_t(8)*x813;
+        out.rx[6][lane] = -scalar_t(1) / scalar_t(16)*x248 + (scalar_t(1) / scalar_t(16))*x496 + (scalar_t(1) / scalar_t(16))*x520 - scalar_t(1) / scalar_t(16)*x523 - scalar_t(1) / scalar_t(16)*x534 - scalar_t(1) / scalar_t(16)*x545 + (scalar_t(1) / scalar_t(16))*x818 + (scalar_t(1) / scalar_t(16))*x833 - scalar_t(1) / scalar_t(16)*x836 - scalar_t(1) / scalar_t(16)*x844 - scalar_t(1) / scalar_t(16)*x846 - scalar_t(1) / scalar_t(16)*x880 - scalar_t(1) / scalar_t(16)*x892 + (scalar_t(1) / scalar_t(16))*x894 + (scalar_t(1) / scalar_t(16))*x901 - scalar_t(1) / scalar_t(16)*x903;
+        out.ry[6][lane] = -scalar_t(1) / scalar_t(16)*x297 + (scalar_t(1) / scalar_t(16))*x549 + (scalar_t(1) / scalar_t(16))*x561 - scalar_t(1) / scalar_t(16)*x562 - scalar_t(1) / scalar_t(16)*x566 - scalar_t(1) / scalar_t(16)*x573 + (scalar_t(1) / scalar_t(16))*x847 + (scalar_t(1) / scalar_t(16))*x853 - scalar_t(1) / scalar_t(16)*x854 - scalar_t(1) / scalar_t(16)*x858 - scalar_t(1) / scalar_t(16)*x859 - scalar_t(1) / scalar_t(16)*x904 - scalar_t(1) / scalar_t(16)*x910 + (scalar_t(1) / scalar_t(16))*x911 + (scalar_t(1) / scalar_t(16))*x915 - scalar_t(1) / scalar_t(16)*x916;
+        out.rz[6][lane] = -scalar_t(1) / scalar_t(16)*x345 + (scalar_t(1) / scalar_t(16))*x576 + (scalar_t(1) / scalar_t(16))*x588 - scalar_t(1) / scalar_t(16)*x589 - scalar_t(1) / scalar_t(16)*x593 - scalar_t(1) / scalar_t(16)*x600 + (scalar_t(1) / scalar_t(16))*x860 + (scalar_t(1) / scalar_t(16))*x866 - scalar_t(1) / scalar_t(16)*x867 - scalar_t(1) / scalar_t(16)*x871 - scalar_t(1) / scalar_t(16)*x872 - scalar_t(1) / scalar_t(16)*x917 - scalar_t(1) / scalar_t(16)*x923 + (scalar_t(1) / scalar_t(16))*x924 + (scalar_t(1) / scalar_t(16))*x928 - scalar_t(1) / scalar_t(16)*x929;
+        out.rc[6][lane] = -scalar_t(1) / scalar_t(8)*x521 - scalar_t(1) / scalar_t(8)*x834 - scalar_t(1) / scalar_t(8)*x878;
+        out.rx[7][lane] = -scalar_t(1) / scalar_t(16)*ux3*x930 - scalar_t(1) / scalar_t(16)*ux4*x931 + (scalar_t(1) / scalar_t(16))*ux7*x932 + (scalar_t(1) / scalar_t(16))*ux7*x933 - scalar_t(1) / scalar_t(16)*x348 + (scalar_t(1) / scalar_t(16))*x650*x932 - scalar_t(1) / scalar_t(16)*x652 + (scalar_t(1) / scalar_t(16))*x754*x933 - scalar_t(1) / scalar_t(16)*x756 + (scalar_t(1) / scalar_t(16))*x880 + (scalar_t(1) / scalar_t(16))*x892 - scalar_t(1) / scalar_t(16)*x894 - scalar_t(1) / scalar_t(16)*x901 + (scalar_t(1) / scalar_t(16))*x903 - scalar_t(1) / scalar_t(16)*x930*((x640) ? (
+   -x637*x639
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x931*((x747) ? (
+   -x744*x746
+)
+: (
+   0
+));
+        out.ry[7][lane] = -scalar_t(1) / scalar_t(16)*uy3*x930 - scalar_t(1) / scalar_t(16)*uy4*x931 + (scalar_t(1) / scalar_t(16))*uy7*x932 + (scalar_t(1) / scalar_t(16))*uy7*x933 - scalar_t(1) / scalar_t(16)*x441 + (scalar_t(1) / scalar_t(16))*x665*x932 - scalar_t(1) / scalar_t(16)*x666 + (scalar_t(1) / scalar_t(16))*x782*x933 - scalar_t(1) / scalar_t(16)*x783 + (scalar_t(1) / scalar_t(16))*x904 + (scalar_t(1) / scalar_t(16))*x910 - scalar_t(1) / scalar_t(16)*x911 - scalar_t(1) / scalar_t(16)*x915 + (scalar_t(1) / scalar_t(16))*x916 - scalar_t(1) / scalar_t(16)*x930*((x661) ? (
+   -x658*x660
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x931*((x778) ? (
+   -x775*x777
+)
+: (
+   0
+));
+        out.rz[7][lane] = -scalar_t(1) / scalar_t(16)*uz3*x930 - scalar_t(1) / scalar_t(16)*uz4*x931 + (scalar_t(1) / scalar_t(16))*uz7*x932 + (scalar_t(1) / scalar_t(16))*uz7*x933 - scalar_t(1) / scalar_t(16)*x460 + (scalar_t(1) / scalar_t(16))*x679*x932 - scalar_t(1) / scalar_t(16)*x680 + (scalar_t(1) / scalar_t(16))*x808*x933 - scalar_t(1) / scalar_t(16)*x809 + (scalar_t(1) / scalar_t(16))*x917 + (scalar_t(1) / scalar_t(16))*x923 - scalar_t(1) / scalar_t(16)*x924 - scalar_t(1) / scalar_t(16)*x928 + (scalar_t(1) / scalar_t(16))*x929 - scalar_t(1) / scalar_t(16)*x930*((x675) ? (
+   -x672*x674
+)
+: (
+   0
+)) - scalar_t(1) / scalar_t(16)*x931*((x804) ? (
+   -x801*x803
+)
+: (
+   0
+));
+        out.rc[7][lane] = (scalar_t(1) / scalar_t(2))*rcoef3*x875 - scalar_t(1) / scalar_t(8)*x619 - scalar_t(1) / scalar_t(8)*x702 - scalar_t(1) / scalar_t(8)*x874;
+    }
+}
+
 template <typename scalar_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_local_slots_rowwise(const scalar_t rho,
                                                                                     const scalar_t mu,

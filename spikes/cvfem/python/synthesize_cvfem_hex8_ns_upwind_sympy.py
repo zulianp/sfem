@@ -1317,7 +1317,33 @@ SUBPAR_MARKERS = (
                   # _residual_isoparam is deliberately absent: it is the isoparametric scalar
                   # winner and this campaign measured affine geometry only, so there is no
                   # fresh evidence about it and it is not being retired on old evidence.
-                  "cvfem_hex8_ns_upwind_sympy_residual")
+                  "cvfem_hex8_ns_upwind_sympy_residual",
+                  # The eight generated deferred-correction kernels -- four limiter arms, with
+                  # and without Rhie-Chow. They were the DEFAULT higher-order kernel on the
+                  # packed layout, chosen because they measured 1.39x the hand-written SCALAR
+                  # sweep; the comparison that decides the question is against the hand-written
+                  # LANE-BLOCKED kernel beside them, and it had never been run.
+                  #
+                  # Grace job 4981920, 8,586,756 dof, 72 threads, packed, best of three
+                  # (generated / hand-written MDOF/s, ratio):
+                  #
+                  #   lim0     1012.9 / 1059.3  0.956     rc_lim0   732.1 /  944.9  0.775
+                  #   lim1      836.8 /  857.5  0.976     rc_lim2   583.3 /  638.5  0.914
+                  #   lim2      706.6 /  763.7  0.925     rc_lim3   592.1 /  686.1  0.863
+                  #   lim3      729.7 /  797.1  0.916
+                  #
+                  # The generated arm loses all seven pairs, and loses worst exactly where it
+                  # was meant to pay off: the Rhie-Chow arm it reads a staged coefficient table
+                  # for, at 0.775x. So the whole family is quarantined, and with it the staged
+                  # table the hand-written kernel does not need.
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_lim0_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_lim1_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_lim2_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_lim3_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim0_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim1_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim2_simd",
+                  "cvfem_hex8_ns_upwind_sympy_residual_defcor_rc_lim3_simd")
 
 SUBPAR_OUT = SPIKE_ROOT / "subpar" / "cvfem_hex8_ns_upwind_sympy_subpar.hpp"
 

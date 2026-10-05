@@ -96,6 +96,27 @@ ok_ho_rc() {
 # A configuration the driver must still refuse, because no kernel behind it carries the term
 # the flags asked for. A refusal is a feature: the alternative is a row that names a term it
 # did not compute.
+# A REFUSAL THAT THE SUBPAR BUILD LIFTS. Everything quarantined in subpar/ is refused by name
+# in the default build and ACCEPTED under -DCVFEM_ENABLE_SUBPAR=ON, which is the whole point of
+# the flag -- so an unconditional `refused` assertion is wrong in exactly that build. This was
+# invisible for as long as the subpar build did not compile at all; once it did, the PA case
+# below failed for being accepted, which is the correct behaviour there.
+#
+# CVFEM_HAS_SUBPAR is set by CMake from the option, so the script is told which build it is in
+# rather than guessing from the binary.
+refused_unless_subpar() {
+    if [ "${CVFEM_HAS_SUBPAR:-0}" = "1" ]; then
+        desc="$1"; shift
+        if "$BENCH" --n 8 --repeat 1 --warmup 0 --layout atomic "$@" >/dev/null 2>&1; then
+            printf '%-62s OK   accepted (subpar build)\n' "$desc"
+        else
+            printf '%-62s FAIL (refused in a build that enables it)\n' "$desc"
+            FAIL=$((FAIL + 1))
+        fi
+        return
+    fi
+    refused "$@"
+}
 refused() {
     desc="$1"; shift
     if "$BENCH" --n 8 --repeat 1 --warmup 0 --layout atomic "$@" >/dev/null 2>&1; then
@@ -291,7 +312,7 @@ echo "== the partially assembled Jacobian action"
 # default build refuses it by name, the way it refuses --kernel sympy_row and sympy_face.
 # Its correctness is still covered, by cvfem_pa_tangent_test, which calls the kernels
 # directly and so keeps the quarantined path from rotting.
-refused "PA (quarantined, needs -DCVFEM_ENABLE_SUBPAR=ON)"  --jac-action --layout packed --rhie-chow --partial-assembly
+refused_unless_subpar "PA (quarantined, needs -DCVFEM_ENABLE_SUBPAR=ON)"  --jac-action --layout packed --rhie-chow --partial-assembly
 
 echo "== still refused, and must stay so"
 # No generated kernel carries Rhie-Chow: the term was never put into the SymPy expressions.

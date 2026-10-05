@@ -283,6 +283,12 @@ endif()
 add_test(NAME cvfem_bench_staging
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
+# The script asserts that every quarantined configuration is REFUSED, which is true of the
+# default build and false of this one -- the flag exists to make them reachable. So it is told
+# which build it is in rather than inferring it.
+if(CVFEM_ENABLE_SUBPAR)
+    set_tests_properties(cvfem_bench_staging PROPERTIES ENVIRONMENT CVFEM_HAS_SUBPAR=1)
+endif()
 
 # ------------------------------------------------- the geometry gate, on a NON-AFFINE mesh
 #
