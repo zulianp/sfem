@@ -40,6 +40,7 @@ using pack_idx_t = uint16_t;
 // It takes the pack's own two values rather than the pack table and an index into it, which
 // removes a double indirection the caller has already done: every sweep that needs this has
 // `owned` and `ghosts` in hand before the element loop.
+template <typename idx_t, typename pack_idx_t>
 static SFEM_INLINE idx_t cvfem_pack_local_to_global(const ptrdiff_t                  owned_begin,
                                                     const idx_t *const SFEM_RESTRICT ghosts,
                                                     const ptrdiff_t                  n_contiguous,

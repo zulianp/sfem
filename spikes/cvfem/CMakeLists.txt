@@ -300,6 +300,23 @@ if(CVFEM_REPORT_PYTHON)
     add_test(NAME cvfem_parallel_region_pairs
              COMMAND ${CVFEM_REPORT_PYTHON}
                      ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_parallel_region_pairs.py)
+
+    # EVERY KERNEL THAT NAMES A COMPUTATION TYPE DECLARES IT, which the mixed-precision gates
+    # cannot say. Those three show that the templated kernels run at single precision and agree;
+    # they cannot show that nothing was missed, because a definition still spelling the build's
+    # scalar_t compiles perfectly and is only ever reached at the other precision if some f32
+    # test happens to instantiate it -- and most of src/kernels/ is not reached by them.
+    #
+    # It found four boundary-closure kernels, two partial-assembly convective kernels, two
+    # generated BSR-slot kernels and four generated TET4 kernels after all three families had
+    # been converted and all three mixed-precision gates were passing.
+    #
+    # The shared constant tables are the one listed exception: an accessor returning a reference
+    # to a `const double[...]` table promotes an f32 chain, and templating it means a copy per
+    # precision -- a decision about storage, not a missing parameter.
+    add_test(NAME cvfem_kernels_are_templated
+             COMMAND ${CVFEM_REPORT_PYTHON}
+                     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/compile/cvfem_kernels_are_templated.py)
 endif()
 
 if(CVFEM_REPORT_PYTHON)

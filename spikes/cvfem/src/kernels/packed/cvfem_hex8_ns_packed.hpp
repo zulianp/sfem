@@ -32,6 +32,7 @@
 
 // A thin alias for gather_hex8_adj_soa under this family's name; it takes the affine geometry
 // rather than the mesh for the same reason the function it forwards to does.
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const scalar_t *const *const SFEM_RESTRICT adj_ptr,
                                                   const scalar_t *const SFEM_RESTRICT        det_ptr,
                                                   const ptrdiff_t               begin,
@@ -49,13 +50,14 @@ static SFEM_INLINE void cvfem_hex8_gather_adj_soa(const scalar_t *const *const S
     gather_hex8_adj_soa(adj_ptr, det_ptr, begin, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
 }
 
+template <typename scalar_t, typename pack_idx_t>
 static SFEM_INLINE void cvfem_hex8_gather_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
                                                          const scalar_t *const SFEM_RESTRICT pack_u,
                                                          const scalar_t *const *const SFEM_RESTRICT adj_ptr,
                                                          const scalar_t *const SFEM_RESTRICT        det_ptr,
                                                          const ptrdiff_t                     begin,
                                                          const int                           nlanes,
-                                                         Hex8InputPack                      &in,
+                                                         Hex8InputPackT<scalar_t>                      &in,
                                                          scalar_t *const SFEM_RESTRICT       cof0,
                                                          scalar_t *const SFEM_RESTRICT       cof1,
                                                          scalar_t *const SFEM_RESTRICT       cof2,
@@ -85,6 +87,7 @@ static SFEM_INLINE void cvfem_hex8_gather_simd_from_pack(pack_idx_t **const SFEM
     }
 }
 
+template <typename scalar_t, typename pack_idx_t>
 static SFEM_INLINE void cvfem_hex8_gather_action_simd_from_pack(pack_idx_t **const SFEM_RESTRICT   elems,
                                                                 const scalar_t *const SFEM_RESTRICT pack_u,
                                                                 const scalar_t *const SFEM_RESTRICT pack_dir,
@@ -92,8 +95,8 @@ static SFEM_INLINE void cvfem_hex8_gather_action_simd_from_pack(pack_idx_t **con
                                                                 const scalar_t *const SFEM_RESTRICT        det_ptr,
                                                                 const ptrdiff_t                     begin,
                                                                 const int                           nlanes,
-                                                                Hex8InputPack                      &u,
-                                                                Hex8InputPack                      &du,
+                                                                Hex8InputPackT<scalar_t>                      &u,
+                                                                Hex8InputPackT<scalar_t>                      &du,
                                                                 scalar_t *const SFEM_RESTRICT       cof0,
                                                                 scalar_t *const SFEM_RESTRICT       cof1,
                                                                 scalar_t *const SFEM_RESTRICT       cof2,
@@ -127,6 +130,7 @@ static SFEM_INLINE void cvfem_hex8_gather_action_simd_from_pack(pack_idx_t **con
 // Takes the arrays, not the staging objects, for the reason its bench twin does: it is called
 // from inside the pack sweeps, and naming PackedData or MeshData here is what makes
 // src/kernels/ depend on them.
+template <typename scalar_t, typename idx_t>
 static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
                                                     const scalar_t *const SFEM_RESTRICT  ux,
                                                     const scalar_t *const SFEM_RESTRICT  uy,
@@ -178,7 +182,7 @@ static SFEM_INLINE void cvfem_hex8_fill_pack_fields(const ptrdiff_t *const SFEM_
 // unnormalised. A template parameter and not an argument, so the matvec's reduction -- which
 // scales nothing -- compiles to exactly the body it had. Inside the scaled branch a null factor
 // means unity, which is how the gradient's two-pass path asks for raw sums.
-template <int W, bool SCALED = false>
+template <int W, bool SCALED = false, typename scalar_t, typename idx_t>
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa_range(const cvfem_range rows,
         const idx_t *const SFEM_RESTRICT     ghost_reduce_dest,
         const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
@@ -221,6 +225,7 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa_range(const cvfem_range rows
 // passed". PackedData is a staging object -- it owns std::vectors and a shared_ptr<smesh::Mesh> --
 // so naming it in a kernel signature is what keeps src/kernels/ dependent on a library. These
 // four arrays and one count are the whole of what the reduction reads; the launcher resolves them.
+template <typename scalar_t, typename idx_t>
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide_range(const cvfem_range rows,
         const idx_t *const SFEM_RESTRICT     ghost_reduce_dest,
         const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
@@ -255,6 +260,7 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide_range(const cvfem_range row
 // passed". PackedData is a staging object -- it owns std::vectors and a shared_ptr<smesh::Mesh> --
 // so naming it in a kernel signature is what keeps src/kernels/ dependent on a library. These
 // four arrays and one count are the whole of what the reduction reads; the launcher resolves them.
+template <typename scalar_t, typename idx_t>
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved_range(const cvfem_range rows,
         const idx_t *const SFEM_RESTRICT     ghost_reduce_dest,
         const ptrdiff_t *const SFEM_RESTRICT ghost_reduce_ptr,
@@ -281,6 +287,7 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_interleaved_range(const cvfem_ra
 // The pack sweep, driven by a range; the `#pragma omp parallel` is in the launcher below. See
 // kernels/cvfem_range.hpp. A pack writes only the nodes it owns, so the parts need no
 // synchronisation and the shared ghost rows are reduced afterwards.
+template <typename scalar_t, typename geom_t, typename idx_t, typename pack_idx_t>
 static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -421,6 +428,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_residual_packed_range(
 // The pack sweep, driven by a range; the `#pragma omp parallel` is in the launcher below. See
 // kernels/cvfem_range.hpp. A pack writes only the nodes it owns, so the parts need no
 // synchronisation and the shared ghost rows are reduced afterwards.
+template <typename scalar_t, typename geom_t, typename idx_t, typename pack_idx_t>
 static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
         const cvfem_range packs,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -470,7 +478,7 @@ static SFEM_NOINLINE void cvfem_hex8_apply_jacobian_action_packed_range(
         // Resolved once per solve, in the launcher, not per element here. This parameter replaced
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
-        const Hex8RcConfig &rc_cfg) {
+        const Hex8RcConfigT<scalar_t> &rc_cfg) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);

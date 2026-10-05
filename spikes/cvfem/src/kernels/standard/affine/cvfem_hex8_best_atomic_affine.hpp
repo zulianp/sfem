@@ -21,6 +21,7 @@
 // null is the lagged one. The atomic path exists here so the layouts can be compared on the same
 // operator -- a packed row carrying the correction against an atomic row that silently dropped it
 // would not be a layout comparison.
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_jacobian_action_atomic(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -145,6 +146,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic(
 //
 // Global gather through d.elems, wide index, untouched element order, per-lane atomic scatter --
 // everything that makes this the standard layout is kept.
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -303,6 +305,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_simd(
     }
 }
 
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_residual_atomic(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -355,6 +358,7 @@ static SFEM_NOINLINE void apply_residual_atomic(
     }
 }
 
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_residual_atomic_sumfact(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -427,6 +431,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact(
 // another layout. Measured at n=128 on Grace, bare and with Rhie-Chow: lane-blocking the atomic
 // sweep alone is worth 1.29x and 1.37x, and what remains between the layouts -- 2.45x and 1.76x
 // -- is the format.
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -575,6 +580,7 @@ static SFEM_NOINLINE void apply_residual_atomic_sumfact_simd(
 // `linear` is a buffer of the same shape as b.values. The pair is exact, not an
 // approximation: linear + nonlinear reproduces assemble_jacobian_atomic_sumfact
 // bit-for-bit, because they are the two halves of the same kernel.
+template <typename scalar_t, typename count_t>
 static SFEM_NOINLINE void assemble_jacobian_atomic_linear(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -598,6 +604,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_linear(
     }
 }
 
+template <typename scalar_t, typename geom_t, typename idx_t, typename count_t>
 static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -650,6 +657,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_nonlinear(
     }
 }
 
+template <typename scalar_t, typename geom_t, typename idx_t, typename count_t>
 static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -705,6 +713,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(
 // entry of every block is structurally zero, which is the degenerate saddle point that
 // block-Jacobi cannot invert. A diagonal measured without it is a preconditioner that
 // could never be used.
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void assemble_diag_atomic(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t box_lx,

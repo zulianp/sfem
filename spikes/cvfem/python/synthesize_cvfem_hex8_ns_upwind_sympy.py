@@ -1090,7 +1090,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_act
 {cse_action_geom_code(action, sym, facewise_jacs=face_jacs)}
 }}
 
-template <typename scalar_t>
+template <typename scalar_t, typename count_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
                                                                           const scalar_t mu,
                                                                           const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
@@ -1105,7 +1105,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
 {cse_add_bsr_slots_code(jac, "flat", atomic=True)}
 }}
 
-template <typename scalar_t>
+template <typename scalar_t, typename count_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(const scalar_t rho,
                                                                                     const scalar_t mu,
                                                                                     const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,

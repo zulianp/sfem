@@ -16,6 +16,7 @@
 #include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 
 
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -73,6 +74,7 @@ static SFEM_NOINLINE void apply_jacobian_action_atomic_isoparam(
     }
 }
 
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_residual_atomic_isoparam(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -122,6 +124,7 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam(
     }
 }
 
+template <typename scalar_t, typename geom_t, typename idx_t, typename count_t>
 static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t *const *const SFEM_RESTRICT adj_ptr,
@@ -166,6 +169,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(
 // hand-written ones because all twelve faces share one adjugate, so CSE has a great deal
 // to factor out. Isoparametrically each face carries its own geometry and there is much
 // less to share -- these exist to measure how much of the advantage survives.
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_residual_atomic_isoparam_sympy(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         idx_t **const SFEM_RESTRICT mesh_elems,
@@ -199,6 +203,7 @@ static SFEM_NOINLINE void apply_residual_atomic_isoparam_sympy(
     }
 }
 
+template <typename scalar_t, typename geom_t, typename idx_t, typename count_t>
 static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         idx_t **const SFEM_RESTRICT mesh_elems,
@@ -232,6 +237,7 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam_sympy(
     }
 }
 
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void assemble_diag_atomic_isoparam(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t box_lx,

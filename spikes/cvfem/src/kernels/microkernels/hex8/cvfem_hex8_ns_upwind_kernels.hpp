@@ -550,6 +550,7 @@ static constexpr double CVFEM_HEX8_ISOPARAM_JAC_ACTION_FLOPS_PER_ELEMENT =
         CVFEM_HEX8_ISOPARAM_RESIDUAL_FLOPS_PER_ELEMENT + 12.0 * (144.0 + 55.0 + 8.0);
 static constexpr double CVFEM_HEX8_ISOPARAM_ASSEMBLE_FLOPS_PER_ELEMENT = 9216.0;
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_zero_scalars(scalar_t *const SFEM_RESTRICT p, const ptrdiff_t n) {
 #ifdef _OPENMP
 #pragma omp parallel
@@ -2387,6 +2388,7 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_all_simd(const 
     }
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                      rho,
                                                  const scalar_t                      half,
                                                  const scalar_t *const SFEM_RESTRICT Ax0,
@@ -2426,7 +2428,8 @@ static SFEM_INLINE void cvfem_hex8_conv_all_simd(const scalar_t                 
 //
 // Not bit-identical to the kernel it replaces, and it cannot be: dpos*u_I + dneg*u_J
 // reassociates into dmdot*uup. The difference is one rounding.
-template <int S, int I, int J, bool RC = false, bool QG = false>
+template <int S, int I, int J, bool RC = false, bool QG = false,
+          typename scalar_t = ::scalar_t>
 static SFEM_INLINE void cvfem_hex8_conv_face_jv_pa_simd(const scalar_t                      rho,
                                                         const scalar_t                      half,
                                                         const scalar_t *const SFEM_RESTRICT Ax,
@@ -2494,7 +2497,7 @@ static SFEM_INLINE void cvfem_hex8_conv_face_jv_pa_simd(const scalar_t          
     }
 }
 
-template <bool RC = false, bool QG = false>
+template <bool RC = false, bool QG = false, typename scalar_t = ::scalar_t>
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_pa_simd(const scalar_t                      rho,
                                                        const scalar_t                      half,
                                                        const scalar_t *const SFEM_RESTRICT Ax0,
@@ -2575,6 +2578,7 @@ static SFEM_INLINE __attribute__((flatten)) void cvfem_hex8_conv_all_jv_simd(con
     cvfem_hex8_conv_face_jv_simd<11, 3, 7, RC, QG, EPS, HO, LIM>(rho, half, one, Ax2, Ay2, Az2, u, du, rc, out, ueps, ho, hov, cenx, ceny, cenz, edx, edy, edz);
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void cvfem_hex8_conv_all_jv_simd(const scalar_t                      rho,
                                                     const scalar_t                      half,
                                                     const scalar_t                      one,

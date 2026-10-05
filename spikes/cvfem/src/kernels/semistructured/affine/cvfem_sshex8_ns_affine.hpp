@@ -737,6 +737,7 @@ inline SFEM_NOINLINE void sscvfem_apply_blocks_affine(
 // Flattened, because the micro-cell kernel has a second call site in the isoparametric sweep's
 // out-of-line loop: gcc outlines the Jacobian slot and boundary kernels once they have two
 // callers, and the per-micro-cell call measured 3% slower on the box.
+template <typename scalar_t, typename geom_t, typename idx_t>
 inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_affine(
         // The range this call is to cover, as positions in macro_order. DESIGN.md: the
         // threading is abstract outside the sweep and what arrives is a range, so the sweep

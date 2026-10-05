@@ -641,7 +641,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_residual_dense(const scalar_t
 {cse_code(residual, residual_outputs)}
 }}
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_residual_simd_microkernel(
         const scalar_t                        rho,
         const scalar_t                        mu,
@@ -664,7 +664,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_residual_simd_microkernel(
     }}
 }}
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microkernel(
         const scalar_t                        rho,
         const scalar_t                        mu,
@@ -695,7 +695,7 @@ static SFEM_INLINE void cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microker
     }}
 }}
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_run_jacobian_action_sympy_kernel(const scalar_t                        rho,
                                                                const scalar_t                        mu,
                                                                const jacobian_t *const SFEM_RESTRICT adj0,
@@ -736,7 +736,7 @@ static SFEM_INLINE void cvfem_run_jacobian_action_sympy_kernel(const scalar_t   
     cvfem_tet4_ns_upwind_sympy_jacobian_action_simd_microkernel(rho, mu, a0, a1, a2, a3, a4, a5, a6, a7, a8, detp, u, du, out);
 }}
 
-template <typename scalar_t>
+template <typename scalar_t, typename jacobian_t>
 static SFEM_INLINE void cvfem_run_residual_sympy_kernel(const scalar_t                        rho,
                                                         const scalar_t                        mu,
                                                         const jacobian_t *const SFEM_RESTRICT adj0,

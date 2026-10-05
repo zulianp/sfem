@@ -513,7 +513,7 @@ inline void sscvfem_nodal_grad_packed(SSMeshData &d, PackedData &p,
                                   cvfem_n_threads()),
                 p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx,
                 p.n_ghost_entries, p.ghost_buf.data(),
-                apply_weight ? d.grad_w_inv.data() : nullptr, g3);
+                apply_weight ? d.grad_w_inv.data() : static_cast<const scalar_t *>(nullptr), g3);
     }
 }
 

@@ -183,7 +183,7 @@ static void cvfem_hex8_compact_boundary_elems(MeshT &d) {
 // this directory: `force_atomic` was one, tested per boundary element. The caller picks the
 // instantiation now, so the choice is made once per pass instead of once per element, and the
 // staged path's dead code is not even compiled into the atomic one.
-template <bool ATOMIC>
+template <bool ATOMIC, typename scalar_t, typename idx_t>
 static SFEM_INLINE void cvfem_hex8_bnd_commit(idx_t **const SFEM_RESTRICT elems,
                                               scalar_t *const SFEM_RESTRICT bnd_stage,
                                               const ptrdiff_t i, const ptrdiff_t e,
@@ -209,7 +209,7 @@ static SFEM_INLINE void cvfem_hex8_bnd_commit(idx_t **const SFEM_RESTRICT elems,
 }
 
 // The same, for a destination that interleaves the four fields per node.
-template <bool ATOMIC>
+template <bool ATOMIC, typename scalar_t, typename idx_t>
 static SFEM_INLINE void cvfem_hex8_bnd_commit_interleaved(idx_t **const SFEM_RESTRICT elems,
                                                           scalar_t *const SFEM_RESTRICT bnd_stage,
                                                           const ptrdiff_t i, const ptrdiff_t e,
@@ -239,7 +239,7 @@ static SFEM_INLINE void cvfem_hex8_bnd_commit_interleaved(idx_t **const SFEM_RES
 // And this is an atomics-free kernel by construction: the gather map exists precisely so the
 // boundary closure does not scatter with atomics, which is what DESIGN.md's threading rule is
 // about. So it takes what it reads and the range it is to cover.
-template <int W>
+template <int W, typename scalar_t, typename idx_t>
 static SFEM_INLINE void cvfem_hex8_bnd_gather_w(
         const cvfem_range r,
         const idx_t *const SFEM_RESTRICT     gather_dest,
@@ -260,6 +260,7 @@ static SFEM_INLINE void cvfem_hex8_bnd_gather_w(
 
 // The same gather into a destination that INTERLEAVES the four fields per node. Separate rather
 // than a flag, because the addressing is the difference and it is in the inner loop.
+template <typename scalar_t, typename idx_t>
 static SFEM_INLINE void cvfem_hex8_bnd_gather_interleaved_range(
         const cvfem_range r,
         const idx_t *const SFEM_RESTRICT     gather_dest,

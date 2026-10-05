@@ -30,7 +30,7 @@ static SFEM_INLINE void cvfem_hex8_ghost_reduce_soa(PackedData &p, scalar_t *con
     cvfem_hex8_ghost_reduce_soa_range<CVFEM_HEX8_N_FIELDS>(cvfem_range_split(0, p.n_ghost_reduce_rows, 1,
                                    cvfem_thread_index(), cvfem_n_threads()),
             p.ghost_reduce_dest, p.ghost_reduce_ptr, p.ghost_reduce_idx,
-            p.n_ghost_entries, p.ghost_buf.data(), nullptr, fields);
+            p.n_ghost_entries, p.ghost_buf.data(), static_cast<const scalar_t *>(nullptr), fields);
 }
 
 static SFEM_INLINE void cvfem_hex8_ghost_reduce_wide(PackedData                         &p,

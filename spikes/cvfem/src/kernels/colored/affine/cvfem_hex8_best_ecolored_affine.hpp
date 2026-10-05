@@ -33,6 +33,7 @@
 // The scratch comes in as arguments rather than being declared inside the kernel, which is what
 // DESIGN.md's "only arguments that are actually used" asks for and what removes the hidden
 // per-thread state: the launcher owns one set per thread, in its parallel region, and passes it.
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_residual_ecolored_range(
         const cvfem_range r,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -71,10 +72,10 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
         scalar_t *const SFEM_RESTRICT cof7,
         scalar_t *const SFEM_RESTRICT cof8,
         scalar_t *const SFEM_RESTRICT detv,
-        Hex8InputPack    &in,
-        Hex8ResidualPack &outp,
-        Hex8RhieChowPack &rcp,
-        Hex8UGradPack    &hop) {
+        Hex8InputPackT<scalar_t>    &in,
+        Hex8ResidualPackT<scalar_t> &outp,
+        Hex8RhieChowPackT<scalar_t> &rcp,
+        Hex8UGradPackT<scalar_t>    &hop) {
     for (ptrdiff_t e0 = r.begin; e0 < r.end; e0 += CVFEM_HEX8_VEC_SIZE) {
             const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, r.end - e0);
             gather_hex8_adj_soa(adj_ptr, det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
@@ -166,6 +167,7 @@ static SFEM_NOINLINE void apply_residual_ecolored_range(
 
 // The Jacobian action, split the same way and for the same reasons. See
 // apply_residual_ecolored_range above.
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
         const cvfem_range r,
         // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
@@ -209,16 +211,16 @@ static SFEM_NOINLINE void apply_jacobian_action_ecolored_range(
         scalar_t *const SFEM_RESTRICT cof7,
         scalar_t *const SFEM_RESTRICT cof8,
         scalar_t *const SFEM_RESTRICT detv,
-        Hex8InputPack    &u_pack,
-        Hex8InputPack    &du_pack,
-        Hex8ResidualPack &outp,
-        Hex8RhieChowPack &rcp,
-        Hex8UGradPack    &hop,
-        Hex8UGradPack    &hovp,
+        Hex8InputPackT<scalar_t>    &u_pack,
+        Hex8InputPackT<scalar_t>    &du_pack,
+        Hex8ResidualPackT<scalar_t> &outp,
+        Hex8RhieChowPackT<scalar_t> &rcp,
+        Hex8UGradPackT<scalar_t>    &hop,
+        Hex8UGradPackT<scalar_t>    &hovp,
         // Resolved once per solve, in the launcher, not per element here. This parameter replaced
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
-        const Hex8RcConfig &rc_cfg) {
+        const Hex8RcConfigT<scalar_t> &rc_cfg) {
     for (ptrdiff_t e0 = r.begin; e0 < r.end; e0 += CVFEM_HEX8_VEC_SIZE) {
             const int nlanes = (int)MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, r.end - e0);
             gather_hex8_adj_soa(adj_ptr, det_ptr, e0, nlanes, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);

@@ -32,6 +32,7 @@
 
 // The masked slot array for one element: -1 everywhere but the diagonal, where it is the
 // global node index into the node-indexed destination.
+template <typename idx_t>
 static SFEM_INLINE void diag_node_slots(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         idx_t **const SFEM_RESTRICT mesh_elems, const ptrdiff_t e, ptrdiff_t sl[64]) {
@@ -52,6 +53,7 @@ static SFEM_INLINE void diag_node_slots(
 // boundary shell -- the same arrangement assemble_boundary_scs_jacobian_pass uses for the
 // full matrix, and for the same reason: the closure is a per-face term that neither
 // geometry nor kernel choice changes, so it does not belong inside the element loops.
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(
         // The staging objects are gone; what this sweep reads out of them is what it takes.
         const scalar_t box_lx,

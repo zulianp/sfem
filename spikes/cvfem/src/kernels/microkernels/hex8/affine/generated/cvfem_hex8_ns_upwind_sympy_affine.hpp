@@ -13,7 +13,7 @@
 // CVFEM_HEX8_N_DOF. Accumulation goes through CVFEM_ATOMIC_ADD.
 #include "kernels/cvfem_portability.hpp"
 
-template <typename scalar_t>
+template <typename scalar_t, typename count_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots(const scalar_t rho,
                                                                           const scalar_t mu,
                                                                           const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,
@@ -2876,7 +2876,7 @@ static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add
     CVFEM_ATOMIC_ADD(values[(ptrdiff_t)slots[63] * 16 + 14], add767);
 }
 
-template <typename scalar_t>
+template <typename scalar_t, typename count_t>
 static SFEM_INLINE SFEM_HOST_DEVICE void cvfem_hex8_ns_upwind_sympy_jacobian_add_bsr_slots_blockwise(const scalar_t rho,
                                                                                     const scalar_t mu,
                                                                                     const scalar_t *const SFEM_RESTRICT adj, const scalar_t det,

@@ -22,6 +22,7 @@
 
 // The affine geometry, out of the arrays MeshData publishes. These took the mesh until the
 // cascade reached them; with only arrays left they are kernel helpers like the two above.
+template <typename scalar_t>
 static SFEM_INLINE void load_hex8_adj(const scalar_t *const *const SFEM_RESTRICT adj_ptr,
                                       const scalar_t *const SFEM_RESTRICT        det_ptr,
                                       const ptrdiff_t e, scalar_t adj[9], scalar_t *det) {
@@ -29,6 +30,7 @@ static SFEM_INLINE void load_hex8_adj(const scalar_t *const *const SFEM_RESTRICT
     *det = det_ptr[(size_t)e];
 }
 
+template <typename scalar_t>
 static SFEM_INLINE void gather_hex8_adj_soa(const scalar_t *const *const SFEM_RESTRICT adj_ptr,
                                             const scalar_t *const SFEM_RESTRICT        det_ptr,
                                             const ptrdiff_t               begin,
@@ -70,6 +72,7 @@ static SFEM_INLINE void gather_hex8_adj_soa(const scalar_t *const *const SFEM_RE
 }
 
 
+template <typename scalar_t, typename idx_t>
 static SFEM_INLINE void gather_element_fields(idx_t **const SFEM_RESTRICT elems,
                                               const scalar_t *const SFEM_RESTRICT ux_src,
                                               const scalar_t *const SFEM_RESTRICT uy_src,
@@ -89,6 +92,7 @@ static SFEM_INLINE void gather_element_fields(idx_t **const SFEM_RESTRICT elems,
     }
 }
 
+template <typename scalar_t, typename geom_t, typename idx_t>
 static SFEM_INLINE void gather_element_coords(idx_t **const SFEM_RESTRICT elems,
                                               geom_t **const SFEM_RESTRICT points,
                                               const ptrdiff_t               e,
