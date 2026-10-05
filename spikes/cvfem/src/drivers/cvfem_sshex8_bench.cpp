@@ -168,7 +168,8 @@ int main(int argc, char **argv) {
             {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
                 CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
                 #pragma omp parallel
-                    sscvfem_apply_macro_local(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                    sscvfem_apply_macro_local_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                    sscvfem_apply_macro_local_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
             }
             {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
                 CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local_affine");
@@ -287,7 +288,8 @@ int main(int argc, char **argv) {
                 {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
                     CVFEM_TRACE_SCOPE("sscvfem::apply_macro_local");
                     #pragma omp parallel
-                        sscvfem_apply_macro_local(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                        sscvfem_apply_macro_local_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
+                        sscvfem_apply_macro_local_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level, d.nxe, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.upwind_eps, d.ux.data(), d.uy.data(), d.uz.data(), sscvfem_rc_config(d), rho, mu, dir.data(), y_macro.data());
                 }
             });
 

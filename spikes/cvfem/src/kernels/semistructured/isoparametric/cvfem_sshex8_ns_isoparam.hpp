@@ -54,4 +54,53 @@ inline SFEM_NOINLINE void sscvfem_apply_naive_isoparam(
     }
 }
 
+
+// The macro-local apply over CURVED macro elements: every micro cell derives its own geometry,
+// and nothing hoists.
+inline SFEM_NOINLINE void sscvfem_apply_macro_local_isoparam(
+        // The range this call is to cover, as positions in macro_order. DESIGN.md: the
+        // threading is abstract outside the sweep and what arrives is a range, so the sweep
+        // owns no parallel region.
+        const cvfem_range r,
+        // The curvature partition; null means the identity, which is a mesh with nothing
+        // curved. See SSMeshData::macro_order.
+        const ptrdiff_t *const SFEM_RESTRICT macro_order,
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const int nxe_src,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
+                                                    const scalar_t *const SFEM_RESTRICT dir,
+                                                    scalar_t *const SFEM_RESTRICT       jv) {
+    const int L   = level;
+    const int nxe = nxe_src;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+    const SSMacroScratch s = sscvfem_macro_scratch(nxe, CVFEM_HEX8_N_FIELDS, true, false, false);
+
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
+        const ptrdiff_t e = macro_order ? macro_order[i] : i;
+        sscvfem_macro_gather(s, elems, points, pres, pgx_src, pgy_src, pgz_src, nullptr, nullptr,
+                             nullptr, nullptr, ux_src, uy_src, uz_src, dir, e, nxe,
+                             CVFEM_HEX8_N_FIELDS);
+
+        sscvfem_apply_macro_local_curved_macro(box_lx, box_ly, box_lz, rcfg, rho, mu, upwind_eps, s,
+                                               level, off);
+        sscvfem_macro_drain(s, nullptr, nullptr, nxe, e, jv);
+    }
+}
+
 #endif  // CVFEM_SSHEX8_NS_ISOPARAM_HPP
