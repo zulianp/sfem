@@ -10,6 +10,9 @@
 #include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/cvfem_scatter.hpp"
 #include "kernels/cvfem_phases.hpp"
+// Hex8ExtraScratch and the element gathers the shared assembly bodies below use.
+#include "kernels/cvfem_hex8_element_gather.hpp"
+#include "kernels/microkernels/hex8/cvfem_hex8_boundary_scs.hpp"
 // NOTHING FROM OUTSIDE THIS DIRECTORY. The include that used to sit here --
 // frontend/staging/cvfem_hex8_best_common.hpp, the bench's staging header -- is gone, because after the 27
 // sweeps in this file stopped taking MeshData and BSR4 the only names left were the ones the
@@ -101,5 +104,95 @@ static SFEM_NOINLINE void assemble_diag_boundary_scs_pass(
         (void)p;
     }
 }
+
+// ONE ELEMENT'S ASSEMBLY CONTRIBUTION, affine. Shared by the atomic assembly and the
+// pack-coloured one, which differ in exactly one thing: whether the accumulation into the
+// global matrix needs an atomic. That is already a template parameter of the element kernel, so
+// it is one here -- and it is a property of the LAYOUT, not an option a caller chooses.
+//
+// Colouring is what makes `false` safe: no two elements of a colour share a node, so a plain
+// `+=` cannot race. The atomic layout has no such guarantee and pays for it per entry.
+template <bool ATOMIC, typename scalar_t, typename idx_t, typename geom_t>
+static SFEM_INLINE void cvfem_hex8_assemble_element_affine(
+        idx_t **const SFEM_RESTRICT         mesh_elems,
+        geom_t **const SFEM_RESTRICT        points,
+        const uint8_t *const SFEM_RESTRICT  face_mask,
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8Extras                   &opt,
+        const int *const SFEM_RESTRICT      slots,
+        const ptrdiff_t                     e,
+        const scalar_t                      rho,
+        const scalar_t                      mu,
+        scalar_t *const SFEM_RESTRICT       values) {
+    scalar_t ux[8], uy[8], uz[8], p[8];
+    gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
+    Hex8ExtraScratch ex;
+    ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src,
+            adj_ptr, det_ptr, opt, e);
+    scalar_t adj[9], det;
+    load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
+    // rc and p go through the same upwind switch the residual uses, so this matches the
+    // matrix-free action. Without --rhie-chow the pressure-pressure block of this matrix is
+    // structurally zero, which is the saddle-point structure the solver's block-Jacobi cannot
+    // invert -- see cvfem_hex8_ns_core.hpp on why the benchmark's assembly is a different
+    // operator from the solver's.
+    cvfem_hex8_ns_upwind_jacobian_add_slots<ATOMIC>(
+            rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
+}
+
+
+// ONE ELEMENT'S ASSEMBLY CONTRIBUTION, isoparametric. The affine twin's reasoning applies; the
+// geometry comes per sub-control surface from the element's node coordinates instead of from the
+// adjugate table.
+//
+// It follows the ATOMIC sweep's buffer reuse rather than the coloured one's: Hex8ExtraScratch
+// gathers the coordinates when the Rhie-Chow term or the boundary closure gives it a reason to,
+// and this gathers into the same buffers only when it did not. The coloured sweep gathered into
+// its own locals unconditionally, which is one redundant gather per element whenever either term
+// is on.
+template <bool ATOMIC, typename scalar_t, typename idx_t, typename geom_t>
+static SFEM_INLINE void cvfem_hex8_assemble_element_isoparam(
+        idx_t **const SFEM_RESTRICT         mesh_elems,
+        geom_t **const SFEM_RESTRICT        points,
+        const uint8_t *const SFEM_RESTRICT  face_mask,
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8Extras                   &opt,
+        const int *const SFEM_RESTRICT      slots,
+        const ptrdiff_t                     e,
+        const scalar_t                      rho,
+        const scalar_t                      mu,
+        scalar_t *const SFEM_RESTRICT       values) {
+    scalar_t         ux[8], uy[8], uz[8], p[8];
+    Hex8ExtraScratch ex;
+    ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src,
+            adj_ptr, det_ptr, opt, e);
+    if (!opt.with_rc && !opt.with_bnd) gather_element_coords(mesh_elems, points, e, ex.x, ex.y, ex.z);
+    gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
+    cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<ATOMIC>(
+            rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
+}
+
 
 #endif  // CVFEM_HEX8_BEST_ATOMIC_HPP

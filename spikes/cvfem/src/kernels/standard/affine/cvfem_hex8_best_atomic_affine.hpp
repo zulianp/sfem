@@ -684,21 +684,10 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_sumfact(
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < nelements; ++e) {
-        scalar_t ux[8], uy[8], uz[8], p[8];
-        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
-        Hex8ExtraScratch ex;
-        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
-        scalar_t adj[9], det;
-        load_hex8_adj(adj_ptr, det_ptr, e, adj, &det);
-        // rc and p go through the same upwind switch the residual uses, so this matches
-        // the matrix-free action. Without --rhie-chow the pressure-pressure block of this
-        // matrix is structurally zero, which is the saddle-point structure the solver's
-        // block-Jacobi cannot invert -- see cvfem_hex8_ns_core.hpp on why the benchmark's
-        // assembly is a different operator from the solver's.
-        cvfem_hex8_ns_upwind_jacobian_add_slots<true>(
-                rho, mu, adj, det, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
-    }
+    for (ptrdiff_t e = 0; e < nelements; ++e)
+        cvfem_hex8_assemble_element_affine<true>(mesh_elems, points, face_mask, adj_ptr, det_ptr,
+                                                 pres, pgx, pgy, pgz, qgx, qgy, qgz, ux_src,
+                                                 uy_src, uz_src, opt, slots, e, rho, mu, values);
     // The boundary closure used to be an `if (ex.fmask)` inside this loop, which is why it
     // reached this kernel and no other. It is now assemble_boundary_scs_jacobian_pass, one
     // sweep over the compacted boundary shell that every assembly entry point shares --

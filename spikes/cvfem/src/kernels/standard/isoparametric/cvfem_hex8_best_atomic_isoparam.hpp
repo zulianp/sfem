@@ -156,17 +156,10 @@ static SFEM_NOINLINE void assemble_jacobian_atomic_isoparam(
     CVFEM_PHASE_GLOBAL(_tz, PH_ZERO);
 
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < nelements; ++e) {
-        scalar_t         ux[8], uy[8], uz[8], p[8];
-        Hex8ExtraScratch ex;
-        ex.load(mesh_elems, points, face_mask, pgx, pgy, pgz, qgx, qgy, qgz, ux_src, uy_src, uz_src, adj_ptr, det_ptr, opt, e);
-        // load() gathers the coordinates only when it has a reason to. This kernel always
-        // needs them, so gather into the same buffers when it did not.
-        if (!opt.with_rc && !opt.with_bnd) gather_element_coords(mesh_elems, points, e, ex.x, ex.y, ex.z);
-        gather_element_fields(mesh_elems, ux_src, uy_src, uz_src, pres, e, ux, uy, uz, p);
-        cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<true>(
-                rho, mu, ex.x, ex.y, ex.z, ux, uy, uz, slots + (size_t)e * 64, values, ex.rc, p);
-    }
+    for (ptrdiff_t e = 0; e < nelements; ++e)
+        cvfem_hex8_assemble_element_isoparam<true>(mesh_elems, points, face_mask, adj_ptr, det_ptr,
+                                                   pres, pgx, pgy, pgz, qgx, qgy, qgz, ux_src,
+                                                   uy_src, uz_src, opt, slots, e, rho, mu, values);
 }
 
 // Generated (CSE) kernels on isoparametric geometry. The affine SymPy kernels beat the

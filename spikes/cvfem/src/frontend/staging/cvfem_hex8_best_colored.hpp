@@ -180,69 +180,52 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
 // Jacobian assembly
 // ---------------------------------------------------------------------------
 
-// Colored assembly: elements are visited pack by pack, one color at a time, and
-// the element kernel accumulates straight into the global BSR values. No local
-// pack matrix, no local->global copy, no ghost reduction, no atomics.
-static SFEM_NOINLINE void assemble_jacobian_colored(MeshData        &d,
-                                                    PackedData      &p,
+// THE PACK-COLOURED ASSEMBLY. A launcher, like the two above: one parallel region, a slice of
+// one colour per thread, a barrier between colours.
+//
+// Its sweeps are the odd ones out among the three coloured operations -- element-indexed with
+// global gathers rather than pack-staged -- because this is the ATOMIC assembly's element body
+// with the colouring standing in for the atomics. The pack supplies the element range and the
+// colour ordering, nothing else, which is why the sweeps take no scratch and no pack arrays.
+static SFEM_NOINLINE void assemble_jacobian_colored(MeshData           &d,
+                                                    PackedData         &p,
                                                     const PackColoring &c,
-                                                    BSR4            &b,
-                                                    const scalar_t   rho,
-                                                    const scalar_t   mu,
-                                                    const GeomKind   geom_kind) {
+                                                    BSR4               &b,
+                                                    const scalar_t      rho,
+                                                    const scalar_t      mu,
+                                                    const GeomKind      geom) {
     zero_bsr4(b);
 
-    scalar_t *const SFEM_RESTRICT       values = b.values->data();
-    const int *const SFEM_RESTRICT      gslots = reinterpret_cast<const int *>(b.element_slots.data());
+    scalar_t *const SFEM_RESTRICT  values = b.values->data();
+    const int *const SFEM_RESTRICT gslots = reinterpret_cast<const int *>(b.element_slots.data());
     // This assembly reads the mesh directly rather than a staged pack, so Rhie-Chow enters
-    // exactly as it does on the atomic layout -- through Hex8ExtraScratch. Only the two
-    // hand-written kernels take the term.
-    const Hex8Extras                    opt = cvfem_hex8_extras_of(d);
+    // exactly as it does on the atomic layout -- through Hex8ExtraScratch.
+    const Hex8Extras               opt    = cvfem_hex8_extras_of(d);
 
 #pragma omp parallel
     {
-        PhaseAcc acc;
+        const int n_parts = cvfem_n_threads();
+        const int part    = cvfem_thread_index();
         for (int color = 0; color < c.n_colors; ++color) {
-            const ptrdiff_t cbegin = c.color_ptr[(size_t)color];
-            const ptrdiff_t cend   = c.color_ptr[(size_t)color + 1];
-#pragma omp for schedule(dynamic, 1)
-            for (ptrdiff_t i = cbegin; i < cend; ++i) {
-                const ptrdiff_t pack    = c.pack_order[(size_t)i];
-                const ptrdiff_t e_start = pack * p.n_elements_per_pack;
-                const ptrdiff_t e_end   = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
-                const double    _t      = phase_now();
-
-                for (ptrdiff_t e = e_start; e < e_end; ++e) {
-                    scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
-                    gather_element_fields(d.elems, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), e, ux_e, uy_e, uz_e, p_e);
-                    Hex8ExtraScratch ex;
-                    ex.load(d.elems, d.points, d.face_mask.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), d.adj_ptr, d.det_ptr, opt, e);
-                    const scalar_t *const          rc_p  = opt.with_rc ? p_e : nullptr;
-                    const int *const SFEM_RESTRICT slots = gslots + (size_t)e * 64;
-
-                    if (geom_kind == GeomKind::Isoparam) {
-                        scalar_t x[8], y[8], z[8];
-                        gather_element_coords(d.elems, d.points, e, x, y, z);
-                        cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
-                                rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, values, ex.rc, rc_p);
-                    } else {
-                        scalar_t adj[9], det;
-                        load_hex8_adj(d.adj_ptr, d.det_ptr, e, adj, &det);
-                        if (g_dense_flush) {
-                            alignas(ALIGN_BYTES) scalar_t ke[64 * 16] = {};
-                            cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                    rho, mu, adj, det, ux_e, uy_e, uz_e, g_identity_slots, ke, ex.rc, rc_p);
-                            hex8_blocks_to_slots(slots, ke, values);
-                        } else {
-                            cvfem_hex8_ns_upwind_jacobian_add_slots<false>(
-                                    rho, mu, adj, det, ux_e, uy_e, uz_e, slots, values, ex.rc, rc_p);
-                        }
-                    }
-                }
-                if (g_breakdown) acc.t[PH_KERNEL] += wall_time() - _t;
-            }
+            const cvfem_range r = cvfem_range_split(c.color_ptr[(size_t)color],
+                                                    c.color_ptr[(size_t)color + 1], 1,
+                                                    part, n_parts);
+            if (geom == GeomKind::Isoparam)
+                assemble_jacobian_packcolored_isoparam_range(
+                        r, c.pack_order.data(), d.elems, d.points, d.face_mask.data(), d.adj_ptr,
+                        d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(),
+                        d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(),
+                        d.uy.data(), d.uz.data(), opt, gslots, p.n_elements_per_pack, rho, mu,
+                        values);
+            else
+                assemble_jacobian_packcolored_affine_range(
+                        r, c.pack_order.data(), d.elems, d.points, d.face_mask.data(), d.adj_ptr,
+                        d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(),
+                        d.pgz.data(), d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(),
+                        d.uy.data(), d.uz.data(), opt, gslots, p.n_elements_per_pack, rho, mu,
+                        values);
+            cvfem_thread_barrier();
         }
-        acc.flush();
     }
 }
 

@@ -19,6 +19,7 @@
 
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
 #include "kernels/packed/cvfem_hex8_best_store.hpp"
+#include "kernels/standard/cvfem_hex8_best_atomic.hpp"
 
 // A SEPARATE SWEEP, NOT A TEMPLATE PARAMETER. This note used to argue that `template <bool ISO>`
 // already satisfied DESIGN.md's "logically separated (now they are mixed in with enum and
@@ -826,6 +827,52 @@ static SFEM_NOINLINE void apply_jacobian_action_packcolored_affine_range(
                                        /*with_ho=*/false, rc_cfg, 0, scalar_t(0));
 
         cvfem_hex8_flush_pack_to_global_aos(x, pack_out, jv);
+    }
+}
+
+// PACK COLOURING, the assembled Jacobian. Unlike the coloured residual and action, this sweep
+// is ELEMENT-indexed with global gathers -- it is the atomic assembly's element body with the
+// colouring standing in for the atomics, not a packed sweep with a different drain. The pack
+// supplies only the element RANGE and the colour ordering.
+//
+// So what it shares is cvfem_hex8_assemble_element_affine, with ATOMIC false: no two elements
+// of a colour share a node, so the accumulation into the global matrix is a plain `+=`. The
+// atomic sweep calls the same body with ATOMIC true and pays per entry.
+template <typename scalar_t, typename idx_t, typename geom_t>
+static SFEM_NOINLINE void assemble_jacobian_packcolored_affine_range(
+        // The packs of ONE COLOUR, as indices into pack_order.
+        const cvfem_range packs,
+        const ptrdiff_t *const SFEM_RESTRICT pack_order,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        geom_t **const SFEM_RESTRICT points,
+        const uint8_t *const SFEM_RESTRICT face_mask,
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8Extras &opt,
+        const int *const SFEM_RESTRICT slots,
+        const ptrdiff_t n_elements_per_pack,
+        const scalar_t rho,
+        const scalar_t mu,
+        scalar_t *const SFEM_RESTRICT values) {
+    for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
+        const ptrdiff_t pack    = pack_order[i];
+        const ptrdiff_t e_start = pack * n_elements_per_pack;
+        const ptrdiff_t e_end   = MIN(nelements, (pack + 1) * n_elements_per_pack);
+        for (ptrdiff_t e = e_start; e < e_end; ++e)
+            cvfem_hex8_assemble_element_affine<false>(
+                    mesh_elems, points, face_mask, adj_ptr, det_ptr, pres, pgx, pgy, pgz, qgx, qgy,
+                    qgz, ux_src, uy_src, uz_src, opt, slots, e, rho, mu, values);
     }
 }
 
