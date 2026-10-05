@@ -103,4 +103,92 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_isoparam(
     }
 }
 
+
+// The naive residual over CURVED macro elements: every micro cell derives its own geometry, and
+// nothing hoists.
+inline SFEM_NOINLINE void sscvfem_residual_naive_isoparam(
+        // The range this call is to cover, as positions in macro_order. DESIGN.md: the
+        // threading is abstract outside the sweep and what arrives is a range, so the sweep
+        // owns no parallel region.
+        const cvfem_range r,
+        // The curvature partition; null means the identity, which is a mesh with nothing
+        // curved. See SSMeshData::macro_order.
+        const ptrdiff_t *const SFEM_RESTRICT macro_order,
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        const Hex8PecletConfig<scalar_t> peclet,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
+                                                 scalar_t *const SFEM_RESTRICT res) {
+    // The destination arrives ZEROED. It used to be zeroed here, which was correct while this
+    // sweep owned its parallel region and ran once; driven by a range it runs once per thread,
+    // and every thread would re-zero the whole array -- over the contributions the others had
+    // already accumulated. The launcher zeroes it before the region opens.
+
+    const int L = level;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
+        const ptrdiff_t e = macro_order ? macro_order[i] : i;
+        sscvfem_residual_naive_curved_macro(box_lx, box_ly, box_lz, peclet, elems, level, pres,
+                                            pgx_src, pgy_src, pgz_src, points, upwind_eps, ux_src,
+                                            uy_src, uz_src, rcfg, rho, mu, e, off, res);
+    }
+}
+
+
+// The naive block diagonal over CURVED macro elements: every micro cell derives its own
+// geometry, and nothing hoists.
+inline SFEM_NOINLINE void sscvfem_block_diag_naive_isoparam(
+        // The range this call is to cover, as positions in macro_order. DESIGN.md: the
+        // threading is abstract outside the sweep and what arrives is a range, so the sweep
+        // owns no parallel region.
+        const cvfem_range r,
+        // The curvature partition; null means the identity, which is a mesh with nothing
+        // curved. See SSMeshData::macro_order.
+        const ptrdiff_t *const SFEM_RESTRICT macro_order,
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const ptrdiff_t nnodes,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
+                                                   scalar_t *const SFEM_RESTRICT out) {
+
+    const int L = level;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
+        const ptrdiff_t e = macro_order ? macro_order[i] : i;
+        sscvfem_block_diag_naive_curved_macro(box_lx, box_ly, box_lz, elems, level, pres, pgx_src,
+                                              pgy_src, pgz_src, points, ux_src, uy_src, uz_src, rcfg,
+                                              rho, mu, e, off, out);
+    }
+}
+
 #endif  // CVFEM_SSHEX8_NS_ISOPARAM_HPP

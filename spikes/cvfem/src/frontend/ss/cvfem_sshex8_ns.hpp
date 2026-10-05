@@ -1073,7 +1073,8 @@ inline void sscvfem_residual_naive(SSMeshData &d, const scalar_t rho, const scal
     {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
         CVFEM_TRACE_SCOPE("sscvfem::residual_naive_sweep");
         #pragma omp parallel
-            sscvfem_residual_naive_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
+            sscvfem_residual_naive_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
+            sscvfem_residual_naive_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.conv_peclet, d.elems, d.level, d.nnodes, d.p.empty() ? nullptr : d.p.data(), d.pgx.empty() ? nullptr : d.pgx.data(), d.pgy.empty() ? nullptr : d.pgy.data(), d.pgz.empty() ? nullptr : d.pgz.data(), d.points, d.upwind_eps, d.ux.empty() ? nullptr : d.ux.data(), d.uy.empty() ? nullptr : d.uy.data(), d.uz.empty() ? nullptr : d.uz.data(), sscvfem_rc_config(d), rho, mu, res);
     }
     sscvfem_apply_body_force(d, res);
     sscvfem_apply_transient(d, rho, res);
@@ -1233,10 +1234,17 @@ inline void sscvfem_block_diag_naive(SSMeshData &d, const scalar_t rho, const sc
     {  // its own scope: ScopedEvent's variable name is fixed, so two trace scopes in one block collide
         CVFEM_TRACE_SCOPE("sscvfem::block_diag_naive_sweep");
         #pragma omp parallel
-            sscvfem_block_diag_naive_sweep(cvfem_range_split(0, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()),d.Lx, d.Ly, d.Lz, d.elems, d.level,
-                                       d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
+        {
+            sscvfem_block_diag_naive_affine(cvfem_range_split(0, d.n_straight, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level,
+                                       d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
                                        d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(),
                                        sscvfem_rc_config(d), rho, mu, diag.data());
+            sscvfem_block_diag_naive_isoparam(cvfem_range_split(d.n_straight, d.nmacro, 1, cvfem_thread_index(), cvfem_n_threads()), d.macro_order.empty() ? nullptr : d.macro_order.data(), d.Lx, d.Ly, d.Lz, d.elems, d.level,
+                                       d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(),
+                                       d.pgz.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(),
+                                       sscvfem_rc_config(d), rho, mu, diag.data());
+        }
+
     }
 }
 
