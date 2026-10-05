@@ -663,18 +663,24 @@ inline void sscvfem_nodal_grad_scatter_range(
 // ---------------------------------------------------------------------------
 // Control: the flat gather, on the semi-structured mesh. Every micro-element reads its
 // eight nodes through the global id, exactly as the flat kernel does.
+//
+// SPLIT BY GEOMETRY, and the two halves are in affine/ and isoparametric/ beside this file.
+// What stays here is what they share: one micro cell, and the curved macro element's loop over
+// them. See affine/cvfem_sshex8_ns_affine.hpp for why the split is two ranges rather than a
+// template parameter.
 
-inline SFEM_NOINLINE void sscvfem_apply_naive(
-        // The range this call is to cover. DESIGN.md: the threading is abstract outside the
-        // sweep and what arrives is a range, so the sweep owns no parallel region.
-        const cvfem_range r,
+// One micro cell of the naive apply: gather through the global id, geometry, kernel, atomics.
+//
+// (hx, hy, hz) are the macro element's HOISTED corners; nullptr asks for this cell's own, which
+// is what a curved macro element needs. Same convention as sscvfem_block_diag_cell and for the
+// reason recorded there: the affine sweep passes arrays, so once this is inlined the choice
+// folds away and that loop is the loop it always was.
+static SFEM_INLINE void sscvfem_apply_naive_cell(
         // The staging object is gone; what this sweep reads out of it is what it takes.
         const scalar_t box_lx,
         const scalar_t box_ly,
         const scalar_t box_lz,
         idx_t **const SFEM_RESTRICT elems,
-        const int level,
-        const uint8_t *const SFEM_RESTRICT macro_curved,
         const scalar_t *const SFEM_RESTRICT pres,
         const scalar_t *const SFEM_RESTRICT pgx_src,
         const scalar_t *const SFEM_RESTRICT pgy_src,
@@ -685,77 +691,83 @@ inline SFEM_NOINLINE void sscvfem_apply_naive(
         const scalar_t *const SFEM_RESTRICT uy_src,
         const scalar_t *const SFEM_RESTRICT uz_src,
         const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
-                                              const scalar_t *const SFEM_RESTRICT dir,
-                                              scalar_t *const SFEM_RESTRICT       jv) {
-    const int L = level;
-    int       off[8];
-    sscvfem_corner_offsets(L, off);
+        const ptrdiff_t e, const int L, const int xi, const int yi, const int zi,
+        const int off[8], const scalar_t *const hx, const scalar_t *const hy,
+        const scalar_t *const hz,
+        const scalar_t *const SFEM_RESTRICT dir,
+        scalar_t *const SFEM_RESTRICT       jv) {
+    const int base = sscvfem_lidx(L, xi, yi, zi);
 
-    for (ptrdiff_t e = r.begin; e < r.end; ++e) {
-        // The geometry every micro cell of this macro element uses, as the hoisted
-        // variants use it; see sscvfem_hoisted_cell. Real positions stay per cell.
-        scalar_t hx[8], hy[8], hz[8];
-        {
-            int ext[8];
-            sscvfem_macro_corner_offsets(L, ext);
-            for (int a = 0; a < 8; ++a) {
-                const idx_t gm = elems[ext[a]][e];
-                hx[a] = (scalar_t)points[0][gm];
-                hy[a] = (scalar_t)points[1][gm];
-                hz[a] = (scalar_t)points[2][gm];
-            }
-            sscvfem_hoisted_cell(hx, hy, hz, L, hx, hy, hz);
-        }
-        const bool curved_e = sscvfem_macro_curved(macro_curved, e);
-        for (int zi = 0; zi < L; ++zi) {
-            for (int yi = 0; yi < L; ++yi) {
-                for (int xi = 0; xi < L; ++xi) {
-                    const int base = sscvfem_lidx(L, xi, yi, zi);
-
-                    idx_t g[8];
-                    scalar_t     x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
-                    scalar_t     vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
-                    scalar_t     r[CVFEM_HEX8_N_DOF];
-                    for (int a = 0; a < 8; ++a) {
-                        g[a]   = elems[base + off[a]][e];
-                        x[a]   = (scalar_t)points[0][g[a]];
-                        y[a]   = (scalar_t)points[1][g[a]];
-                        z[a]   = (scalar_t)points[2][g[a]];
-                        ux[a]  = ux_src[(size_t)g[a]];
-                        uy[a]  = uy_src[(size_t)g[a]];
-                        uz[a]  = uz_src[(size_t)g[a]];
-                        p[a]   = pres[(size_t)g[a]];
-                        vx[a]  = dir[(size_t)g[a] * 4 + 0];
-                        vy[a]  = dir[(size_t)g[a] * 4 + 1];
-                        vz[a]  = dir[(size_t)g[a] * 4 + 2];
-                        q[a]   = dir[(size_t)g[a] * 4 + 3];
-                        pgx[a] = pgx_src[(size_t)g[a]];
-                        pgy[a] = pgy_src[(size_t)g[a]];
-                        pgz[a] = pgz_src[(size_t)g[a]];
-                    }
-                    // A curved macro element: this cell's own geometry, not the hoisted one, selected
-                    // through pointers so the hoisted corners stay loop-invariant.
-                    const scalar_t *const gx = curved_e ? x : hx;
-                    const scalar_t *const gy = curved_e ? y : hy;
-                    const scalar_t *const gz = curved_e ? z : hz;
-
-
-                    const Hex8RhieChow rc{gx,      gy, gz,   pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
-                                          nullptr, ux, uy, uz,  rcfg.tau};
-                    scalar_t           adj[9], det;
-                    sscvfem_micro_geom(gx, gy, gz, adj, &det);
-                    cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
-                                                        rc, p, upwind_eps);
-                    boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, box_lx, box_ly, box_lz, x, y, z, ux, uy, uz,
-                                                     vx, vy, vz, q, r);
-
-                    for (int a = 0; a < 8; ++a)
-                        for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
-                            atomic_add(jv + (ptrdiff_t)g[a] * CVFEM_HEX8_N_FIELDS + c, 0, r[a * 4 + c]);
-                }
-            }
-        }
+    idx_t g[8];
+    scalar_t     x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8];
+    scalar_t     vx[8], vy[8], vz[8], q[8], pgx[8], pgy[8], pgz[8];
+    scalar_t     r[CVFEM_HEX8_N_DOF];
+    for (int a = 0; a < 8; ++a) {
+        g[a]   = elems[base + off[a]][e];
+        x[a]   = (scalar_t)points[0][g[a]];
+        y[a]   = (scalar_t)points[1][g[a]];
+        z[a]   = (scalar_t)points[2][g[a]];
+        ux[a]  = ux_src[(size_t)g[a]];
+        uy[a]  = uy_src[(size_t)g[a]];
+        uz[a]  = uz_src[(size_t)g[a]];
+        p[a]   = pres[(size_t)g[a]];
+        vx[a]  = dir[(size_t)g[a] * 4 + 0];
+        vy[a]  = dir[(size_t)g[a] * 4 + 1];
+        vz[a]  = dir[(size_t)g[a] * 4 + 2];
+        q[a]   = dir[(size_t)g[a] * 4 + 3];
+        pgx[a] = pgx_src[(size_t)g[a]];
+        pgy[a] = pgy_src[(size_t)g[a]];
+        pgz[a] = pgz_src[(size_t)g[a]];
     }
+    const scalar_t *const gx = hx ? hx : x;
+    const scalar_t *const gy = hx ? hy : y;
+    const scalar_t *const gz = hx ? hz : z;
+
+    const Hex8RhieChow rc{gx,      gy, gz,   pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                          nullptr, ux, uy, uz,  rcfg.tau};
+    scalar_t           adj[9], det;
+    sscvfem_micro_geom(gx, gy, gz, adj, &det);
+    cvfem_hex8_ns_upwind_jacobian_action<0>(rho, mu, adj, det, ux, uy, uz, vx, vy, vz, q, r,
+                                        rc, p, upwind_eps);
+    boundary_scs_add_jacobian_action<false>(rho, mu, adj, det, box_lx, box_ly, box_lz, x, y, z, ux, uy, uz,
+                                     vx, vy, vz, q, r);
+
+    for (int a = 0; a < 8; ++a)
+        for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c)
+            atomic_add(jv + (ptrdiff_t)g[a] * CVFEM_HEX8_N_FIELDS + c, 0, r[a * 4 + c]);
+}
+
+// The naive apply's micro cells for ONE CURVED macro element, each with its own geometry. Out
+// of line for the reason sscvfem_block_diag_curved_macro is: a second inlined call site of the
+// cell kernel costs the affine sweep its own inlining, because gcc outlines the Jacobian and
+// boundary kernels once they have two callers.
+static SFEM_NOINLINE void sscvfem_apply_naive_curved_macro(
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu, const ptrdiff_t e,
+        const int off[8],
+        const scalar_t *const SFEM_RESTRICT dir,
+        scalar_t *const SFEM_RESTRICT       jv) {
+    const int L = level;
+    for (int zi = 0; zi < L; ++zi)
+        for (int yi = 0; yi < L; ++yi)
+            for (int xi = 0; xi < L; ++xi)
+                sscvfem_apply_naive_cell(box_lx, box_ly, box_lz, elems, pres, pgx_src, pgy_src, pgz_src,
+                                         points, upwind_eps, ux_src, uy_src, uz_src, rcfg, rho, mu, e, L,
+                                         xi, yi, zi, off, nullptr, nullptr, nullptr, dir, jv);
 }
 
 // ---------------------------------------------------------------------------

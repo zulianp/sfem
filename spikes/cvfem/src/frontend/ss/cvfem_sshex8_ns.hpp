@@ -18,6 +18,8 @@
 #include <vector>
 #include <type_traits>
 #include "kernels/semistructured/cvfem_sshex8_ns.hpp"
+#include "kernels/semistructured/affine/cvfem_sshex8_ns_affine.hpp"
+#include "kernels/semistructured/isoparametric/cvfem_sshex8_ns_isoparam.hpp"
 
 // ---------------------------------------------------------------------------
 
@@ -1270,8 +1272,10 @@ inline void sscvfem_block_diag(SSMeshData &d, const scalar_t rho, const scalar_t
 // macro-element's nodes once is worth about 1.44x and lifting the affine-macro
 // invariants out of the micro-element loop a further 1.28x.
 //
-// The alternatives are kept rather than deleted. sscvfem_apply_naive is the correctness
-// control and is what the benchmark checks every other variant against.
+// The alternatives are kept rather than deleted. The naive apply -- now
+// sscvfem_apply_naive_affine over the straight macro elements and _isoparam over the curved
+// ones -- is the correctness control, and is what the benchmark checks every other variant
+// against.
 // sscvfem_apply_macro_local and _affine are the intermediate steps, which is how the
 // 1.44x and 1.28x above are attributed. The two element-matrix variants lost and moved
 // to subpar/cvfem_sshex8_em.hpp.
