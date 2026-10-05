@@ -185,17 +185,10 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
             fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
 
-            Hex8InputPackT<scalar_t>    u_pack;
-            Hex8InputPackT<scalar_t>    du_pack;
-            Hex8ResidualPackT<scalar_t> outp;
-            Hex8CoordPackT<scalar_t>    xyz;
-            Hex8RhieChowPackT<scalar_t> rcp;
+
             // The two gradient packs, staged exactly as apply_residual_packed_defcor stages its
             // one. The limiter and eps^2 live on the state pack because that is where the
             // correction's own kernel reads them; the direction pack carries only the field.
-            Hex8UGradPackT<scalar_t>    hop, hovp;
-            hop.limiter  = limiter;
-            hop.venkat_c = venkat_c;
             if (with_rc)
                 cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z,
                                                pk.pgx, pk.pgy, pk.pgz);
@@ -207,87 +200,10 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
             // branches above cover.
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
-            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
-                alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
-                        cof2[CVFEM_HEX8_VEC_SIZE];
-                alignas(ALIGN_BYTES) scalar_t cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
-                        cof5[CVFEM_HEX8_VEC_SIZE];
-                alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE],
-                        cof8[CVFEM_HEX8_VEC_SIZE];
-                alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
-                gather_hex8_action_simd_from_pack(pack_elems,
-                                                  pack_u,
-                                                  pack_dir,
-                                                  adj_ptr,
-                                                  det_ptr,
-                                                  begin,
-                                                  nlanes,
-                                                  u_pack,
-                                                  du_pack,
-                                                  cof0,
-                                                  cof1,
-                                                  cof2,
-                                                  cof3,
-                                                  cof4,
-                                                  cof5,
-                                                  cof6,
-                                                  cof7,
-                                                  cof8,
-                                                  det);
-                if (with_rc) {
-                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
-                                                   begin, nlanes, rcp);
-                    cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, begin, nlanes, rcp);
-                }
-                if (with_qg)
-                    cvfem_hex8_gather_qg_from_pack(pack_elems, qg.x, qg.y, qg.z, begin, nlanes, rcp);
-                if (with_ho) {
-                    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
-                        const ptrdiff_t e = begin + lane;
-                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            if (lane >= nlanes) {
-                                hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
-                                for (int c = 0; c < 9; ++c) {
-                                    hop.g[a][c][lane]  = scalar_t(0);
-                                    hovp.g[a][c][lane] = scalar_t(0);
-                                }
-                                continue;
-                            }
-                            const idx_t gn = mesh_elems[a][e];
-                            hop.x[a][lane] = scalar_t(points[0][gn]);
-                            hop.y[a][lane] = scalar_t(points[1][gn]);
-                            hop.z[a][lane] = scalar_t(points[2][gn]);
-                            for (int c = 0; c < 9; ++c) {
-                                hop.g[a][c][lane]  = ugrad[(ptrdiff_t)gn * 9 + c];
-                                hovp.g[a][c][lane] = vgrad[(ptrdiff_t)gn * 9 + c];
-                            }
-                        }
-                    }
-                }
-                cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
-                                                          mu,
-                                                          cof0,
-                                                          cof1,
-                                                          cof2,
-                                                          cof3,
-                                                          cof4,
-                                                          cof5,
-                                                          cof6,
-                                                          cof7,
-                                                          cof8,
-                                                          det,
-                                                          u_pack,
-                                                          du_pack,
-                                                          outp,
-                                                          with_rc ? &rcp : nullptr,
-                                                          rhie_chow_scale,
-                                                          with_qg,
-                                                          scalar_t(0),
-                                                          with_ho ? &hop : nullptr,
-                                                          with_ho ? &hovp : nullptr);
-                scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
-            }
+            cvfem_hex8_action_lanes_affine(x, pk, qg, adj_ptr, det_ptr, mesh_elems, points,
+                                           pack_elems, pack_u, pack_dir, pack_out, rc_coeff, rc_w,
+                                           ugrad, vgrad, rho, mu, rhie_chow_scale, with_rc,
+                                           with_qg, with_ho, rc_cfg, limiter, venkat_c);
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
             cvfem_hex8_drain_pack_aos(x, pack_out, n_ghost_entries, ghost_buf, jv);
@@ -832,6 +748,84 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
                                          rho, mu, rhie_chow_scale, with_rc);
 
         cvfem_hex8_flush_pack_to_global_soa(x, pack_out, rx, ry, rz, rc);
+    }
+}
+
+// PACK COLOURING, the Jacobian action. Same method as the residual's coloured twin: it
+// accumulates straight into jv instead of staging shared rows for a reduction pass, which is
+// what the colouring buys. The lane loop is the same function the contiguous sweep calls.
+//
+// No higher-order correction: ugrad and vgrad are null, so that branch folds away in the loop.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
+static SFEM_NOINLINE void apply_jacobian_action_packcolored_affine_range(
+        const cvfem_range packs,
+        const ptrdiff_t *const SFEM_RESTRICT pack_order,
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT det_ptr,
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT rc_coeff,
+        const scalar_t *const SFEM_RESTRICT rc_w,
+        const scalar_t rhie_chow_scale,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        pack_idx_t **const SFEM_RESTRICT pack_elems,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const ptrdiff_t max_actual_nodes_per_pack,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const dir,
+        scalar_t *const SFEM_RESTRICT jv,
+        const size_t scratch_n,
+        const int with_rc,
+        const bool with_qg,
+        const Hex8RcConfigT<scalar_t> &rc_cfg) {
+    scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
+    scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
+    scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
+    const Hex8PackCoordsT<scalar_t> pk =
+            cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
+    const Hex8PackQGradT<scalar_t> qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
+
+    for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
+        const ptrdiff_t pack = pack_order[i];
+        const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
+                pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
+
+        std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+        fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
+        fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
+        if (with_rc)
+            cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack,
+                                           x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z,
+                                           pk.pgx, pk.pgy, pk.pgz);
+        if (with_qg)
+            cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, x.n_contiguous,
+                                       x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
+
+        cvfem_hex8_action_lanes_affine(x, pk, qg, adj_ptr, det_ptr,
+                                       mesh_elems, points, pack_elems, pack_u, pack_dir, pack_out,
+                                       rc_coeff, rc_w,
+                                       // No higher-order correction on this path, and a
+                                       // nullptr literal deduces nothing.
+                                       static_cast<const scalar_t *>(nullptr),
+                                       static_cast<const scalar_t *>(nullptr),
+                                       rho, mu, rhie_chow_scale, with_rc, with_qg,
+                                       /*with_ho=*/false, rc_cfg, 0, scalar_t(0));
+
+        cvfem_hex8_flush_pack_to_global_aos(x, pack_out, jv);
     }
 }
 

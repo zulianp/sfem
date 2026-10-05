@@ -126,8 +126,13 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
 // Jacobian action
 // ---------------------------------------------------------------------------
 
-// The same colored sweep applied to the matrix-free Jacobian action, so --layout
-// colored covers all three operations instead of silently falling back.
+// THE PACK-COLOURED JACOBIAN ACTION. A launcher, like the residual above: one parallel region,
+// a slice of one colour per thread, a barrier between colours. The sweeps are in
+// kernels/packed/affine/ and kernels/packed/isoparametric/.
+//
+// jv is zeroed here because the sweeps' drain accumulates, and the hoisted Rhie-Chow coefficient
+// is built here because it is a per-solve quantity with its own cache key -- neither belongs
+// inside a sweep that runs once per thread per colour.
 static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                           &d,
                                                         PackedData                         &p,
                                                         const PackColoring                 &c,
@@ -135,134 +140,39 @@ static SFEM_NOINLINE void apply_jacobian_action_colored(MeshData                
                                                         const scalar_t                      mu,
                                                         const scalar_t *const SFEM_RESTRICT dir,
                                                         scalar_t *const SFEM_RESTRICT       jv,
-                                                        const GeomKind                      geom_kind) {
+                                                        const GeomKind                      geom) {
     cvfem_zero_scalars(jv, d.nnodes * N_FIELDS);
-
-    // The hoisted Rhie-Chow coefficient, twelve per element. Its own cache key means this
-    // is a no-op unless rho, mu, the scale or the mesh moved -- see Hex8RhieChowPack::coeff.
     cvfem_hex8_build_rc_coeff(d, rho, mu);
 
     const size_t scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
     const int    with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
-    // The exact form differentiates through the nodal gradient reconstruction, so it needs
-    // that reconstruction applied to the DIRECTION's pressure too. Present only when the
-    // caller filled qgx/qgy/qgz; otherwise the kernel takes the frozen-gradient form.
     const bool   with_qg   = with_rc && !d.qgx.empty();
 
 #pragma omp parallel
     {
-        PhaseAcc                          acc;
-        scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_xyz =
-                (geom_kind == GeomKind::Isoparam || with_rc)
-                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p.max_actual_nodes_per_pack) : packed_xyz_n(p.max_actual_nodes_per_pack))
-                        : nullptr;
-        const ptrdiff_t               xyz_n  = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
-        scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
-        scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(p.max_actual_nodes_per_pack)) : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
-        scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;
-
+        const int n_parts = cvfem_n_threads();
+        const int part    = cvfem_thread_index();
         for (int color = 0; color < c.n_colors; ++color) {
-            const ptrdiff_t cbegin = c.color_ptr[(size_t)color];
-            const ptrdiff_t cend   = c.color_ptr[(size_t)color + 1];
-#pragma omp for schedule(dynamic, 1)
-            for (ptrdiff_t i = cbegin; i < cend; ++i) {
-                const ptrdiff_t                         pack         = c.pack_order[(size_t)i];
-                const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
-                const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
-                const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
-                const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
-                const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
-                const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
-
-                double _t = phase_now();
-                std::memset(pack_out, 0, (size_t)(n_contiguous + n_ghost) * (size_t)N_FIELDS * sizeof(scalar_t));
-                fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
-                fill_pack_interleaved(p.owned_nodes_ptr, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
-                if (with_rc)
-                    cvfem_hex8_fill_pack_xyz_pgrad(p.owned_nodes_ptr, d.points, d.pgx.data(), d.pgy.data(), d.pgz.data(), !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0), pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
-                                                   pack_z, pack_pgx, pack_pgy, pack_pgz);
-                if (with_qg)
-                    cvfem_hex8_fill_pack_qgrad(p.owned_nodes_ptr, d.qgx.data(), d.qgy.data(), d.qgz.data(), pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy,
-                                               pack_qgz);
-                if (geom_kind == GeomKind::Isoparam)
-                    fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
-                if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
-
-                Hex8InputPack    u_pack, du_pack;
-                Hex8ResidualPack outp;
-                Hex8CoordPack    xyz;
-                Hex8RhieChowPack rcp;
-                for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                    const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
-                    if (geom_kind == GeomKind::Isoparam) {
-                        gather_hex8_isoparam_action_simd_from_pack(p.elems,
-                                                                   pack_u,
-                                                                   pack_dir,
-                                                                   pack_x,
-                                                                   pack_y,
-                                                                   pack_z,
-                                                                   begin,
-                                                                   nlanes,
-                                                                   u_pack,
-                                                                   du_pack,
-                                                                   xyz);
-                        cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(rho, mu, xyz, u_pack, du_pack, outp);
-                    } else {
-                        alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
-                                cof2[CVFEM_HEX8_VEC_SIZE];
-                        alignas(ALIGN_BYTES) scalar_t cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
-                                cof5[CVFEM_HEX8_VEC_SIZE];
-                        alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE],
-                                cof8[CVFEM_HEX8_VEC_SIZE];
-                        alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
-                        gather_hex8_action_simd_from_pack(p.elems,
-                                                          pack_u,
-                                                          pack_dir,
-                                                          d.adj_ptr, d.det_ptr,
-                                                          begin,
-                                                          nlanes,
-                                                          u_pack,
-                                                          du_pack,
-                                                          cof0,
-                                                          cof1,
-                                                          cof2,
-                                                          cof3,
-                                                          cof4,
-                                                          cof5,
-                                                          cof6,
-                                                          cof7,
-                                                          cof8,
-                                                          det);
-                        if (with_rc) {
-                            cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy,
-                                                           pack_pgz, begin, nlanes, rcp);
-                            cvfem_hex8_gather_rc_coeff(d.rc_coeff.data(), d.rc_w.data(), cvfem_hex8_rc_config_for(d), begin, nlanes, rcp);
-                        }
-                        if (with_qg)
-                            cvfem_hex8_gather_qg_from_pack(p.elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
-                        cvfem_hex8_ns_upwind_jacobian_action_simd(
-                                rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, u_pack, du_pack,
-                                outp, with_rc ? &rcp : nullptr, d.rhie_chow_scale, with_qg);
-                    }
-                    scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
-                }
-                if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
-
-                flush_pack_to_global_interleaved(p, pack, n_contiguous, n_ghost, ghosts, pack_out, jv);
-                if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
-            }
+            const cvfem_range r = cvfem_range_split(c.color_ptr[(size_t)color],
+                                                    c.color_ptr[(size_t)color + 1], 1,
+                                                    part, n_parts);
+            if (geom == GeomKind::Isoparam)
+                apply_jacobian_action_packcolored_isoparam_range(
+                        r, c.pack_order.data(), d.nelements, d.p.data(), d.points, d.ux.data(),
+                        d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
+                        p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
+                        rho, mu, dir, jv, scratch_n);
+            else
+                apply_jacobian_action_packcolored_affine_range(
+                        r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.p.data(), d.pgx.data(),
+                        d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(),
+                        d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale,
+                        d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
+                        p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
+                        rho, mu, dir, jv, scratch_n, with_rc, with_qg,
+                        cvfem_hex8_rc_config_for(d));
+            cvfem_thread_barrier();
         }
-        acc.flush();
     }
 }
 

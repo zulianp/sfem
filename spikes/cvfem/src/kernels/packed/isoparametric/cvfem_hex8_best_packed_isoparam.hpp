@@ -132,10 +132,6 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
             fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
 
-            Hex8InputPackT<scalar_t>    u_pack;
-            Hex8InputPackT<scalar_t>    du_pack;
-            Hex8ResidualPackT<scalar_t> outp;
-            Hex8CoordPackT<scalar_t>    xyz;
             Hex8RhieChowPackT<scalar_t> rcp;
             // The two gradient packs, staged exactly as apply_residual_packed_defcor stages its
             // one. The limiter and eps^2 live on the state pack because that is where the
@@ -147,22 +143,8 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
                 fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
-            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
-                gather_hex8_isoparam_action_simd_from_pack(pack_elems,
-                                                           pack_u,
-                                                           pack_dir,
-                                                           pk.x,
-                                                           pk.y,
-                                                           pk.z,
-                                                           begin,
-                                                           nlanes,
-                                                           u_pack,
-                                                           du_pack,
-                                                           xyz);
-                cvfem_hex8_ns_upwind_jacobian_action_isoparam_simd(rho, mu, xyz, u_pack, du_pack, outp);
-                scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
-            }
+            cvfem_hex8_action_lanes_isoparam(x, pk, pack_elems, pack_u, pack_dir, pack_out,
+                                             rho, mu);
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
             cvfem_hex8_drain_pack_aos(x, pack_out, n_ghost_entries, ghost_buf, jv);
@@ -419,6 +401,53 @@ static SFEM_NOINLINE void apply_residual_packcolored_isoparam_range(
         cvfem_hex8_residual_lanes_isoparam(x, pk, pack_elems, pack_u, pack_out, rho, mu);
 
         cvfem_hex8_flush_pack_to_global_soa(x, pack_out, rx, ry, rz, rc);
+    }
+}
+
+// PACK COLOURING, the isoparametric Jacobian action. See the affine twin in ../affine/ for the
+// method; this half differs from apply_jacobian_action_packed_isoparam_range in the drain and
+// nothing else.
+template <typename scalar_t, typename idx_t, typename pack_idx_t, typename geom_t>
+static SFEM_NOINLINE void apply_jacobian_action_packcolored_isoparam_range(
+        const cvfem_range packs,
+        const ptrdiff_t *const SFEM_RESTRICT pack_order,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        pack_idx_t **const SFEM_RESTRICT pack_elems,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const ptrdiff_t max_actual_nodes_per_pack,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const dir,
+        scalar_t *const SFEM_RESTRICT jv,
+        const size_t scratch_n) {
+    scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
+    scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
+    scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
+    // Coordinates always: this geometry derives its Jacobian from them.
+    const Hex8PackCoordsT<scalar_t> pk =
+            cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
+
+    for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
+        const ptrdiff_t pack = pack_order[i];
+        const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
+                pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
+
+        std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+        fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
+        fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
+        fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
+
+        cvfem_hex8_action_lanes_isoparam(x, pk, pack_elems, pack_u, pack_dir, pack_out, rho, mu);
+
+        cvfem_hex8_flush_pack_to_global_aos(x, pack_out, jv);
     }
 }
 

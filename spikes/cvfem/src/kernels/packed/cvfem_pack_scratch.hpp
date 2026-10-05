@@ -321,4 +321,27 @@ static SFEM_INLINE void cvfem_hex8_flush_pack_to_global_soa(
     }
 }
 
+
+// The Jacobian action's coloured drain: one interleaved vector, accumulated. The AoS twin of
+// cvfem_hex8_flush_pack_to_global_soa, and it cannot be a memcpy the way the contiguous AoS
+// drain is -- that one OWNS its rows and stores them, this one adds to rows an earlier colour
+// may already have written.
+template <typename scalar_t, typename idx_t>
+static SFEM_INLINE void cvfem_hex8_flush_pack_to_global_aos(
+        const Hex8PackExtentT<idx_t>       &x,
+        const scalar_t *const SFEM_RESTRICT pack_out,
+        scalar_t *const SFEM_RESTRICT       jv) {
+    for (ptrdiff_t k = 0; k < x.n_contiguous; ++k) {
+        const scalar_t *const SFEM_RESTRICT src = pack_out + k * CVFEM_HEX8_N_FIELDS;
+        scalar_t *const SFEM_RESTRICT       dst = jv + (x.owned + k) * CVFEM_HEX8_N_FIELDS;
+        for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) dst[c] += src[c];
+    }
+    for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
+        const scalar_t *const SFEM_RESTRICT src =
+                pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
+        scalar_t *const SFEM_RESTRICT dst = jv + (ptrdiff_t)x.ghosts[k] * CVFEM_HEX8_N_FIELDS;
+        for (int c = 0; c < CVFEM_HEX8_N_FIELDS; ++c) dst[c] += src[c];
+    }
+}
+
 #endif  // CVFEM_PACK_SCRATCH_HPP
