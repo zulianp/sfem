@@ -85,17 +85,6 @@ static void bench_nodal_grad(MeshData &d, PackedData &p, const GeomKind geom_kin
 // truncation of a one-sided one. Returns max|fd - jv| / max|fd|, and prints the lagged action
 // against the same reference beside it, because the number that matters to a solver is not
 // whether the exact action is right but how wrong the lagged one is.
-// The geometry is a template parameter of the packed kernels now rather than a GeomKind they
-// test per pack, so the runtime choice is resolved here. One dispatcher rather than a branch at
-// each call site: --geom is a user-level option and this is the front end.
-template <class... Args>
-static void apply_jacobian_action_packed_geom(const GeomKind g, Args &&...args) {
-    if (g == GeomKind::Isoparam)
-        apply_jacobian_action_packed<true>(std::forward<Args>(args)...);
-    else
-        apply_jacobian_action_packed<false>(std::forward<Args>(args)...);
-}
-
 static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t rho, const scalar_t mu,
                                     const int limiter, const GeomKind geom_kind, scalar_t &lagged_rel,
                                     // The fraction of degrees of freedom where the two disagree by
@@ -175,9 +164,9 @@ static scalar_t verify_ho_action_fd(MeshData &d, PackedData &p, const scalar_t r
     cvfem_hex8_assemble_nodal_grads_packed(d, p, iso, vsrcs, 3, gv, vbuf, vst);
 
     std::vector<scalar_t> jv((size_t)n * N_FIELDS), jl((size_t)n * N_FIELDS);
-    apply_jacobian_action_packed_geom(geom_kind, d, p, rho, mu, dir.data(), jv.data(),
+    apply_jacobian_action_packed(d, p, rho, mu, geom_kind, dir.data(), jv.data(),
                                  gu.data(), gv.data(), limiter, scalar_t(0));
-    apply_jacobian_action_packed_geom(geom_kind, d, p, rho, mu, dir.data(), jl.data());
+    apply_jacobian_action_packed(d, p, rho, mu, geom_kind, dir.data(), jl.data());
 
     scalar_t den = 0, num = 0, numl = 0;
     for (size_t i = 0; i < fd.size(); ++i) {
@@ -1952,7 +1941,7 @@ int main(int argc, char **argv) {
         else if (layout == "colored")
             apply_jacobian_action_colored(d, packed, colors, rho, mu, dir_v, jac_out.data(), geom_kind);
         else if (layout == "packed" || layout == "store")
-            apply_jacobian_action_packed_geom(geom_kind, d, packed, rho, mu, dir_v, jac_out.data(),
+            apply_jacobian_action_packed(d, packed, rho, mu, geom_kind, dir_v, jac_out.data(),
                                          with_hograd ? ugrad.data() : nullptr,
                                          with_hograd ? vgrad.data() : nullptr,
                                          conv_limiter, scalar_t(0));
@@ -2060,7 +2049,7 @@ int main(int argc, char **argv) {
         if (rhie_chow)
             bench_nodal_grad(d, packed, geom_kind, jac_dir.data() + 3, N_FIELDS, d.qgx, d.qgy, d.qgz);
         if (vs_matrix) bsr4_spmv(bsr, d.nnodes, jac_dir.data(), jv_spmv.data());
-        apply_jacobian_action_packed_geom(geom_kind, d, packed, rho, mu, jac_dir.data(), jv_mf.data());
+        apply_jacobian_action_packed(d, packed, rho, mu, geom_kind, jac_dir.data(), jv_mf.data());
         if (geom_kind == GeomKind::Isoparam)
             apply_jacobian_action_atomic_isoparam(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, jac_dir.data(), jv_mf_atomic.data());
         else

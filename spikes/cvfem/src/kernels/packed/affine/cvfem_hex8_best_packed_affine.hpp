@@ -119,4 +119,211 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
     }
 }
 
+
+// THE EXACT HIGHER-ORDER ACTION is this same sweep with two extra fields staged, so it is this
+// same function with two extra arguments rather than a second copy of two hundred lines.
+//
+//   ugrad  the state's nodal velocity gradient, the field the residual's correction reads;
+//   vgrad  the DIRECTION's, reconstructed by its own pass before every matvec.
+//
+// Both null -- the default -- is the lagged action: the correction is a constant within the
+// Newton step, contributes nothing to J, and this function computes exactly what it computed
+// before the arguments existed. Passing them carries the correction's derivative, which is what
+// makes the action exact for a higher-order residual and is what costs the extra pass.
+// ISO IS A TEMPLATE PARAMETER, NOT A RUNTIME ENUM. DESIGN.md asks for the affine and the
+// isoparametric kernels to be "logically separated (now they are mixed in with enum and
+// booleans)", and this was the enum: GeomKind arrived as an argument and was tested per pack,
+// inside the sweep. It also left the geometry undecided at the point where it matters -- the
+// lane loop -- which is the shape of guard this file's own notes record costing 1.83x, and which
+// the vectorisation gate now refuses outright. The caller picks the instantiation.
+// The pack sweep, driven by a range. The `#pragma omp parallel` is in the launcher below; see
+// kernels/cvfem_range.hpp for why DESIGN.md wants it there. The packs of a range touch only
+// nodes this part owns -- that is what the packed layout is for -- so the parts need no
+// synchronisation between them, and the ghost rows they do share are reduced afterwards in the
+// launcher, which is the second and independent parallel loop.
+static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
+        const cvfem_range packs,
+        // The mesh and the pack are staging objects -- they own vectors and a shared_ptr to a
+        // mesh -- so what this kernel reads out of them is what it takes. DESIGN.md: only
+        // arguments that are actually used are passed.
+        idx_t **const SFEM_RESTRICT mesh_elems,
+        const ptrdiff_t nelements,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx,
+        const scalar_t *const SFEM_RESTRICT pgy,
+        const scalar_t *const SFEM_RESTRICT pgz,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t *const SFEM_RESTRICT qgx,
+        const scalar_t *const SFEM_RESTRICT qgy,
+        const scalar_t *const SFEM_RESTRICT qgz,
+        const scalar_t *const SFEM_RESTRICT rc_coeff,
+        const scalar_t *const SFEM_RESTRICT rc_w,
+        const scalar_t rhie_chow_scale,
+        const scalar_t *const SFEM_RESTRICT ux,
+        const scalar_t *const SFEM_RESTRICT uy,
+        const scalar_t *const SFEM_RESTRICT uz,
+        pack_idx_t **const SFEM_RESTRICT pack_elems,
+        scalar_t *const SFEM_RESTRICT ghost_buf,
+        const idx_t *const SFEM_RESTRICT ghost_idx,
+        const ptrdiff_t *const SFEM_RESTRICT ghost_ptr,
+        const ptrdiff_t max_actual_nodes_per_pack,
+        const ptrdiff_t n_elements_per_pack,
+        const ptrdiff_t n_ghost_entries,
+        const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
+        const scalar_t rho,
+        const scalar_t mu,
+        const scalar_t *const dir,
+        scalar_t *const jv,
+        const scalar_t *const SFEM_RESTRICT ugrad,
+        const scalar_t *const SFEM_RESTRICT vgrad,
+        const int limiter,
+        const scalar_t venkat_c,
+        const bool with_ho,
+        const size_t scratch_n,
+        const int with_rc,
+        const bool with_qg,
+        const size_t slot3_n,
+        // Resolved once per solve, in the launcher, not per element here. This parameter replaced
+        // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
+        // the mesh, which a kernel is not meant to name.
+        const Hex8RcConfig &rc_cfg,
+        // The affine geometry, which this kernel forwards to the pack gather. It used to hand
+        // that gather the mesh instead, so the promotion did not see adj_ptr in the body and
+        // did not add it here.
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT        det_ptr) {
+        // The breakdown covered packed assembly and the colored matvec but not this one --
+        // the operator the solver's Krylov loop actually applies. Without it nothing here
+        // could be attributed to a phase.
+        CVFEM_PHASE_ACC(acc);
+        scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
+        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
+        const Hex8PackCoords pk =
+                cvfem_hex8_pack_coords(with_rc != 0, with_rc, max_actual_nodes_per_pack);
+        const Hex8PackQGrad qg = cvfem_hex8_pack_qgrad(with_qg, max_actual_nodes_per_pack);
+
+
+    for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
+            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+                    pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
+
+            CVFEM_PHASE_CLOCK(_t);
+            std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+            CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
+
+            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
+            fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
+
+            Hex8InputPack    u_pack;
+            Hex8InputPack    du_pack;
+            Hex8ResidualPack outp;
+            Hex8CoordPack    xyz;
+            Hex8RhieChowPack rcp;
+            // The two gradient packs, staged exactly as apply_residual_packed_defcor stages its
+            // one. The limiter and eps^2 live on the state pack because that is where the
+            // correction's own kernel reads them; the direction pack carries only the field.
+            Hex8UGradPack    hop, hovp;
+            hop.limiter  = limiter;
+            hop.venkat_c = venkat_c;
+            if (with_rc)
+                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z,
+                                               pk.pgx, pk.pgy, pk.pgz);
+            if (with_qg)
+                cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, x.n_contiguous, x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
+            // No coordinate staging for the geometry: the affine sweep reads one adjugate and
+            // determinant per element from the precomputed table. The pack stages coordinates
+            // only when Rhie-Chow or the higher-order reconstruction needs them, which the two
+            // branches above cover.
+            CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
+
+            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
+                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
+                alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
+                        cof2[CVFEM_HEX8_VEC_SIZE];
+                alignas(ALIGN_BYTES) scalar_t cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
+                        cof5[CVFEM_HEX8_VEC_SIZE];
+                alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE],
+                        cof8[CVFEM_HEX8_VEC_SIZE];
+                alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
+                gather_hex8_action_simd_from_pack(pack_elems,
+                                                  pack_u,
+                                                  pack_dir,
+                                                  adj_ptr,
+                                                  det_ptr,
+                                                  begin,
+                                                  nlanes,
+                                                  u_pack,
+                                                  du_pack,
+                                                  cof0,
+                                                  cof1,
+                                                  cof2,
+                                                  cof3,
+                                                  cof4,
+                                                  cof5,
+                                                  cof6,
+                                                  cof7,
+                                                  cof8,
+                                                  det);
+                if (with_rc) {
+                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
+                                                   begin, nlanes, rcp);
+                    cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, begin, nlanes, rcp);
+                }
+                if (with_qg)
+                    cvfem_hex8_gather_qg_from_pack(pack_elems, qg.x, qg.y, qg.z, begin, nlanes, rcp);
+                if (with_ho) {
+                    for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
+                        const ptrdiff_t e = begin + lane;
+                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                            if (lane >= nlanes) {
+                                hop.x[a][lane] = hop.y[a][lane] = hop.z[a][lane] = scalar_t(0);
+                                for (int c = 0; c < 9; ++c) {
+                                    hop.g[a][c][lane]  = scalar_t(0);
+                                    hovp.g[a][c][lane] = scalar_t(0);
+                                }
+                                continue;
+                            }
+                            const idx_t gn = mesh_elems[a][e];
+                            hop.x[a][lane] = scalar_t(points[0][gn]);
+                            hop.y[a][lane] = scalar_t(points[1][gn]);
+                            hop.z[a][lane] = scalar_t(points[2][gn]);
+                            for (int c = 0; c < 9; ++c) {
+                                hop.g[a][c][lane]  = ugrad[(ptrdiff_t)gn * 9 + c];
+                                hovp.g[a][c][lane] = vgrad[(ptrdiff_t)gn * 9 + c];
+                            }
+                        }
+                    }
+                }
+                cvfem_hex8_ns_upwind_jacobian_action_simd(rho,
+                                                          mu,
+                                                          cof0,
+                                                          cof1,
+                                                          cof2,
+                                                          cof3,
+                                                          cof4,
+                                                          cof5,
+                                                          cof6,
+                                                          cof7,
+                                                          cof8,
+                                                          det,
+                                                          u_pack,
+                                                          du_pack,
+                                                          outp,
+                                                          with_rc ? &rcp : nullptr,
+                                                          rhie_chow_scale,
+                                                          with_qg,
+                                                          scalar_t(0),
+                                                          with_ho ? &hop : nullptr,
+                                                          with_ho ? &hovp : nullptr);
+                scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+            }
+            CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
+
+            cvfem_hex8_drain_pack_aos(x, pack_out, n_ghost_entries, ghost_buf, jv);
+            CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
+    }
+        CVFEM_PHASE_FLUSH(acc);
+}
+
 #endif  // CVFEM_HEX8_BEST_PACKED_AFFINE_HPP

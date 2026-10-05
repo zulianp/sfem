@@ -282,11 +282,17 @@ static SFEM_NOINLINE void assemble_jacobian_packed(MeshData        &d,
     CVFEM_PHASE_GLOBAL(_tg, PH_GHOST);
 }
 
-template <bool ISO>
+// The front end chooses the geometry's sweep; see apply_residual_packed above.
 static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
                                                        PackedData            &p,
                                                        const scalar_t         rho,
                                                        const scalar_t         mu,
+                                                       // The geometry's sweep, chosen here and
+                                                       // nowhere below: DESIGN.md's correction.
+                                                       // Before the optional arguments so a
+                                                       // caller that wants only the geometry
+                                                       // need not spell the other four.
+                                                       const GeomKind         geom,
                                                        const scalar_t *const  dir,
                                                        scalar_t *const        jv,
                                                        const scalar_t *const SFEM_RESTRICT ugrad = nullptr,
@@ -309,11 +315,17 @@ static SFEM_NOINLINE void apply_jacobian_action_packed(MeshData              &d,
     const size_t slot3_n   = with_rc ? packed_rc_n(p.max_actual_nodes_per_pack) : packed_xyz_n(p.max_actual_nodes_per_pack);
 
 
+if (geom == GeomKind::Isoparam) {
 #pragma omp parallel
-    apply_jacobian_action_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.elems, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, with_rc, with_qg, slot3_n,
-            cvfem_hex8_rc_config_for(d),
-            d.adj_ptr, d.det_ptr);
+        apply_jacobian_action_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+                d.elems, d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, slot3_n);
+    } else {
+#pragma omp parallel
+        apply_jacobian_action_packed_affine_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+                d.elems, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc_coeff.data(), d.rc_w.data(), d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, dir, jv, ugrad, vgrad, limiter, venkat_c, with_ho, scratch_n, with_rc, with_qg, slot3_n,
+                cvfem_hex8_rc_config_for(d),
+                d.adj_ptr, d.det_ptr);
+    }
 
     CVFEM_PHASE_CLOCK(_tg);
 #pragma omp parallel for schedule(static)
