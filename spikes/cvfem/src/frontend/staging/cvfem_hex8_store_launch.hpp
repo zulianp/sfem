@@ -159,7 +159,7 @@ static SFEM_NOINLINE void assemble_jacobian_store(MeshData        &d,
         CVFEM_PHASE_ACC(acc);
         scalar_t *const SFEM_RESTRICT pack_u     = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals = thread_scratch<scalar_t>(2, bsr_n);
-        const Hex8PackCoords pk = cvfem_hex8_pack_coords(
+        const Hex8PackCoords pk = cvfem_hex8_pack_coords<scalar_t>(
                 geom == GeomKind::Isoparam, with_rc, p.max_actual_nodes_per_pack);
 
 #pragma omp for schedule(dynamic, 1)

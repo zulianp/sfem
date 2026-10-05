@@ -49,11 +49,11 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         // Coordinates always: this geometry derives its Jacobian from them.
-        const Hex8PackCoords pk = cvfem_hex8_pack_coords(true, 0, max_actual_nodes_per_pack);
+        const Hex8PackCoords pk = cvfem_hex8_pack_coords<scalar_t>(true, 0, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
@@ -125,11 +125,11 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         const Hex8PackCoords pk =
-                cvfem_hex8_pack_coords(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
+                cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             CVFEM_PHASE_CLOCK(_t);
@@ -226,11 +226,11 @@ static SFEM_NOINLINE void assemble_jacobian_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT pack_u          = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
         const Hex8PackCoords pk =
-                cvfem_hex8_pack_coords(/*want_xyz=*/true, with_rc, max_actual_nodes_per_pack);
+                cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, with_rc, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+            const Hex8PackExtent x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
             const auto                             &lrowptr      = local_rowptr[(size_t)pack];
             const auto                             &lslots       = local_global_slot[(size_t)pack];

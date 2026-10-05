@@ -110,7 +110,8 @@ static SFEM_INLINE size_t packed_qg_n(const ptrdiff_t max_actual_nodes_per_pack)
 // It is also what makes DESIGN.md's affine/isoparametric split free of duplication. Splitting a
 // `template <bool ISO>` sweep into two files copies everything the two geometries share, and
 // this staging is most of it; owning it here means the two sweeps each carry one line.
-struct Hex8PackCoords {
+template <typename scalar_t>
+struct Hex8PackCoordsT {
     scalar_t *SFEM_RESTRICT x;
     scalar_t *SFEM_RESTRICT y;
     scalar_t *SFEM_RESTRICT z;
@@ -119,11 +120,14 @@ struct Hex8PackCoords {
     scalar_t *SFEM_RESTRICT pgz;
 };
 
+using Hex8PackCoords = Hex8PackCoordsT<scalar_t>;
+
 // `want_xyz` is the geometry's own need for node coordinates -- the isoparametric kernels derive
 // the Jacobian from them -- and `with_rc` adds the pressure gradient. Either one claims the
 // slot; both together claim it at the larger size, which is why the size and the carve-up are
 // one decision and not two.
-static SFEM_INLINE Hex8PackCoords cvfem_hex8_pack_coords(const bool      want_xyz,
+template <typename scalar_t>
+static SFEM_INLINE Hex8PackCoordsT<scalar_t> cvfem_hex8_pack_coords(const bool      want_xyz,
                                                          const int       with_rc,
                                                          const ptrdiff_t max_actual_nodes_per_pack) {
     scalar_t *const SFEM_RESTRICT base =
@@ -132,7 +136,7 @@ static SFEM_INLINE Hex8PackCoords cvfem_hex8_pack_coords(const bool      want_xy
                                                           : packed_xyz_n(max_actual_nodes_per_pack))
                     : nullptr;
     const ptrdiff_t n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
-    Hex8PackCoords  c{};
+    Hex8PackCoordsT<scalar_t> c{};
     c.x   = base;
     c.y   = base ? base + n : nullptr;
     c.z   = base ? base + 2 * n : nullptr;
@@ -145,18 +149,22 @@ static SFEM_INLINE Hex8PackCoords cvfem_hex8_pack_coords(const bool      want_xy
 // SLOT 4, THE DIRECTION'S RECONSTRUCTED PRESSURE GRADIENT. Staged only by the Jacobian action,
 // and carved up exactly as slot 3 is -- it shared slot 3's `xyz_n` local, which is the kind of
 // coupling that makes a sizing change in one array silently re-offset another.
-struct Hex8PackQGrad {
+template <typename scalar_t>
+struct Hex8PackQGradT {
     scalar_t *SFEM_RESTRICT x;
     scalar_t *SFEM_RESTRICT y;
     scalar_t *SFEM_RESTRICT z;
 };
 
-static SFEM_INLINE Hex8PackQGrad cvfem_hex8_pack_qgrad(const int       with_qg,
+using Hex8PackQGrad = Hex8PackQGradT<scalar_t>;
+
+template <typename scalar_t>
+static SFEM_INLINE Hex8PackQGradT<scalar_t> cvfem_hex8_pack_qgrad(const int       with_qg,
                                                        const ptrdiff_t max_actual_nodes_per_pack) {
     scalar_t *const SFEM_RESTRICT base =
             with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(max_actual_nodes_per_pack)) : nullptr;
     const ptrdiff_t n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
-    Hex8PackQGrad   q{};
+    Hex8PackQGradT<scalar_t> q{};
     q.x = base;
     q.y = base ? base + n : nullptr;
     q.z = base ? base + 2 * n : nullptr;
@@ -166,7 +174,10 @@ static SFEM_INLINE Hex8PackQGrad cvfem_hex8_pack_qgrad(const int       with_qg,
 // WHICH ELEMENTS AND NODES ONE PACK COVERS. The same six lines opened the pack loop in all five
 // sweeps. Reading them out of one place is what keeps "owned" and the ghost slice consistent
 // between the sweep that fills a pack and the sweep that drains it.
-struct Hex8PackExtent {
+// The index type is the mesh's, not the computation's: DESIGN.md's correction names idx_t
+// beside scalar_t because the two are separate choices.
+template <typename idx_t>
+struct Hex8PackExtentT {
     ptrdiff_t                  e_start;
     ptrdiff_t                  e_end;
     ptrdiff_t                  owned;
@@ -180,14 +191,17 @@ struct Hex8PackExtent {
     const idx_t *SFEM_RESTRICT ghosts;
 };
 
-static SFEM_INLINE Hex8PackExtent cvfem_hex8_pack_extent(
+using Hex8PackExtent = Hex8PackExtentT<idx_t>;
+
+template <typename idx_t>
+static SFEM_INLINE Hex8PackExtentT<idx_t> cvfem_hex8_pack_extent(
         const ptrdiff_t                      pack,
         const ptrdiff_t                      nelements,
         const ptrdiff_t                      n_elements_per_pack,
         const ptrdiff_t *const SFEM_RESTRICT owned_nodes_ptr,
         const idx_t *const SFEM_RESTRICT     ghost_idx,
         const ptrdiff_t *const SFEM_RESTRICT ghost_ptr) {
-    Hex8PackExtent x{};
+    Hex8PackExtentT<idx_t> x{};
     x.e_start      = pack * n_elements_per_pack;
     x.e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
     x.owned        = owned_nodes_ptr[pack];
@@ -213,7 +227,8 @@ static SFEM_INLINE Hex8PackExtent cvfem_hex8_pack_extent(
 // scatter one pack's ghosts into another's rows, and nothing short of a residual comparison
 // would catch it. One definition is what makes that agreement structural rather than a
 // convention four copies happen to share.
-static SFEM_INLINE void cvfem_hex8_stage_pack_ghosts(const Hex8PackExtent               &x,
+template <typename scalar_t, typename idx_t>
+static SFEM_INLINE void cvfem_hex8_stage_pack_ghosts(const Hex8PackExtentT<idx_t>               &x,
                                                      const scalar_t *const SFEM_RESTRICT pack_out,
                                                      const ptrdiff_t                     n_ghost_entries,
                                                      scalar_t *const SFEM_RESTRICT       ghost_buf) {
@@ -232,7 +247,8 @@ static SFEM_INLINE void cvfem_hex8_stage_pack_ghosts(const Hex8PackExtent       
 }
 
 // The residual's drain: four field arrays.
-static SFEM_INLINE void cvfem_hex8_drain_pack_soa(const Hex8PackExtent               &x,
+template <typename scalar_t, typename idx_t>
+static SFEM_INLINE void cvfem_hex8_drain_pack_soa(const Hex8PackExtentT<idx_t>               &x,
                                                   const scalar_t *const SFEM_RESTRICT pack_out,
                                                   const ptrdiff_t                     n_ghost_entries,
                                                   scalar_t *const SFEM_RESTRICT       ghost_buf,
@@ -248,11 +264,12 @@ static SFEM_INLINE void cvfem_hex8_drain_pack_soa(const Hex8PackExtent          
         rz[g] = out[2];
         rc[g] = out[3];
     }
-    cvfem_hex8_stage_pack_ghosts(x, pack_out, n_ghost_entries, ghost_buf);
+    cvfem_hex8_stage_pack_ghosts<scalar_t, idx_t>(x, pack_out, n_ghost_entries, ghost_buf);
 }
 
 // The Jacobian action's drain: one interleaved vector, so the owned rows are a memcpy.
-static SFEM_INLINE void cvfem_hex8_drain_pack_aos(const Hex8PackExtent               &x,
+template <typename scalar_t, typename idx_t>
+static SFEM_INLINE void cvfem_hex8_drain_pack_aos(const Hex8PackExtentT<idx_t>               &x,
                                                   const scalar_t *const SFEM_RESTRICT pack_out,
                                                   const ptrdiff_t                     n_ghost_entries,
                                                   scalar_t *const SFEM_RESTRICT       ghost_buf,
@@ -260,7 +277,7 @@ static SFEM_INLINE void cvfem_hex8_drain_pack_aos(const Hex8PackExtent          
     std::memcpy(jv + x.owned * CVFEM_HEX8_N_FIELDS,
                 pack_out,
                 (size_t)x.n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
-    cvfem_hex8_stage_pack_ghosts(x, pack_out, n_ghost_entries, ghost_buf);
+    cvfem_hex8_stage_pack_ghosts<scalar_t, idx_t>(x, pack_out, n_ghost_entries, ghost_buf);
 }
 
 #endif  // CVFEM_PACK_SCRATCH_HPP
