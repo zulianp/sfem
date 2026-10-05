@@ -288,6 +288,15 @@ endif()
 # it refuses. The staging work only means something if the combinations it opened are checked
 # and the ones it kept shut stay shut, and both halves live in the driver's own oracles rather
 # than in a reimplementation -- so this drives the driver. n=8, a couple of seconds.
+# The TET4 benchmark's own oracles, which nothing ran. It carries verify_packed_vs_atomic,
+# verify_jac_packed_vs_atomic, the element-kernel finite-difference checks and the SpMV-against-
+# matrix-free chain, and it exits non-zero on any of them -- but no test invoked it, so the only
+# thing holding its kernels together was a person remembering to pass --verify by hand. That
+# became load-bearing when thirteen micro-kernel arms were reduced to three and the packed
+# assembly changed kernel; a reduction defended by an oracle nobody runs is not defended.
+add_test(NAME cvfem_tet4_bench_verify
+         COMMAND cvfem_tet4_ns_upwind_bench --n 10 --repeat 1 --warmup 0 --verify --verify-jac)
+
 add_test(NAME cvfem_bench_staging
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/verification/cvfem_bench_staging.sh
                  $<TARGET_FILE:cvfem_hex8_ns_upwind_bench>)
