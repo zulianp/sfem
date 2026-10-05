@@ -31,21 +31,35 @@ Three of the readings this file used to defend were overruled by the corrections
 DESIGN.md. They are recorded here as superseded rather than deleted, because each was wrong in a
 way worth not repeating.
 
-**"Templated types."** NOT DONE. The leaf element kernels are templated on the scalar type — 64
-of them, instantiated at both `float` and `double` by the CUDA smoke test, which is what makes
-the templating real rather than decorative. The **sweeps** are not: they take the build's types
-through the aliases the including translation unit supplies
-(`support/cvfem_default_types.hpp` for a unit without a family header).
+**"Templated types."** PARTLY DONE, and the blocker is gone. The correction: **"the kernels
+should be templated as well. They should support different types for the computation, template
+scalar_t, geom_t, idx_t, etc... (in a short time we would like to try single precision kernels as
+well)."**
 
-This file argued that the lane blocking exempted them: `CVFEM_HEX8_VEC_SIZE` is
+This file used to argue that the lane blocking exempted the sweeps: `CVFEM_HEX8_VEC_SIZE` was
 `VEC_BYTES / sizeof(scalar_t)` at namespace scope, so a sweep instantiated at `float` would keep
-the lane width computed for `double`. The correction: **"the kernels should be templated as well.
-They should support different types for the computation, template scalar_t, geom_t, idx_t, etc...
-(in a short time we would like to try single precision kernels as well)."** The obstacle is real
-but it is the work, not an exemption — the lane width has to become template-dependent, and the
-lane-blocked pack structs with it, so that an `f32` instantiation gets twice the lanes. `geom_t`
-and `idx_t` are named explicitly because the coordinate precision and the index width are
-separate choices from the accumulation precision.
+the width computed for `double`. That obstacle was real and it was the work, not an exemption.
+
+What is done, for HEX8:
+
+* `cvfem_hex8_vec_size<S>` — the lane width travels with the type, and an `f32` instantiation
+  gets 32 lanes against `f64`'s 16, in a lane group that is 128 bytes at both. That is what lane
+  blocking means here: a fixed byte width per group, so the same traffic carries twice the
+  elements.
+* the five lane-blocked packs, `Hex8RcTau` and `Hex8RcConfig` are templates with aliases at the
+  build's types; every existing caller spells the plain name and is unaffected.
+* the lane-blocked residual and Jacobian-action kernels, affine and isoparametric, and the six
+  leaf kernels beneath them.
+* eighty uses of `CVFEM_HEX8_VEC_SIZE` **inside** those kernels became
+  `cvfem_hex8_vec_size<scalar_t>`. This was the real bug and it is not a compile error: a kernel
+  indexing with the build's width walks a 16-element stride through a 32-lane pack.
+* `cvfem_mixed_precision_packs` holds it, by comparing the f32 answer against the f64 one rather
+  than by checking that lanes were written — a lane has several writers, so a short stride in one
+  of them is covered up by the next. Measured agreement: **8.5e-08 relative**.
+
+What is still owed: the **sweeps**, which take their types through the includer's aliases; and
+`geom_t` and `idx_t` beyond `Hex8PackExtentT`, which already takes the index type because it
+holds only counts and a node pointer. TET4 and the semi-structured kernels are untouched.
 
 **"Only the SIMD version is kept, the rest is moved to subpar."** DONE, and this file's survey
 was overruled. It had found that eight of the ten scalar matrix-free sweeps were verification
