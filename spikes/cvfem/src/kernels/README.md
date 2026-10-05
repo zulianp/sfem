@@ -88,10 +88,13 @@ What the splits shared rather than copied, each extracted before the format was 
   `cvfem_hex8_pack_staging.hpp`) — three for the packed layouts, one for the coloured ones,
   which accumulate straight into the globals because colouring removes the reduction pass;
 * the **Jacobian action's** lane loop, one per geometry, because the contiguous and
-  pack-coloured sweeps differ in the drain and in nothing else. The residual's is deliberately
-  NOT shared: sharing it measured −8% to −20% on Grace across two A/B runs, and
-  `packed/affine/README.md` carries the table. The numerical gates were silent throughout,
-  which is the argument for running the throughput A/B after any kernel restructuring;
+  pack-coloured sweeps differ in the drain and in nothing else. The residual's is written out
+  four times instead, and `packed/affine/README.md` tells that story properly: sharing it was
+  blamed for −8% to −20% on Grace, the revert did not clear the row, and the loss turned out to
+  be the colour loop's scheduling in the same commit. Whether sharing it costs anything is
+  untested. The lesson that survives is that a throughput A/B attributes a loss to a commit and
+  never to a line, and that the numerical gates were silent throughout — which is the argument
+  for running the A/B after any kernel or launcher restructuring;
 * `cvfem_hex8_assemble_element_{affine,isoparam}<ATOMIC>`, because the coloured assembly is the
   ATOMIC assembly's element body with the colouring standing in for the atomics — that sweep is
   element-indexed with global gathers, not a packed sweep, and the split is what made it plain.

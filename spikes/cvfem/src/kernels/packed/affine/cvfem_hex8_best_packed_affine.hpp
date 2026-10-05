@@ -88,22 +88,27 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
                 cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y,
                                                pk.z, pk.pgx, pk.pgy, pk.pgz);
 
-            // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, ON
-            // MEASURED GROUNDS. It was shared between them for exactly the reason the one-path
-            // rule asks -- the two sweeps differ only in their drain -- and Grace refused it:
-            // jobs/ab_refactor.sbatch 4983280 and 4983377 both put the bare packed residual at
-            // -9.4% and -9.7%, the larger size at -8.2% and -8.4%, and the PACK-COLOURED
-            // residual at -17.3% and -20.0%, reproduced within each allocation.
+            // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, AND
+            // THE REASON IS NOT THE ONE THIS COMMENT USED TO GIVE.
             //
-            // Two things narrow the cause. Every row carrying Rhie-Chow or the higher-order
-            // correction was clean, so the cost is fixed per pack and only the cheapest lane
-            // loop notices it; and the Jacobian action's lane loop, which IS still shared,
-            // measured +0.4% and +0.2% -- its packs are larger and its arithmetic per pack far
-            // greater. Hoisting the lane scratch to one object per thread did not recover it
-            // either (4983377 is that attempt).
+            // It was shared between them for exactly the reason the one-path rule asks -- the
+            // two sweeps differ only in their drain. Grace then reported the bare packed
+            // residual at -9.4% and the pack-coloured one at -17.3%, reproduced in two
+            // allocations (jobs/ab_refactor.sbatch 4983280, 4983377), so the sharing was
+            // reverted and those numbers were written here as its cost.
             //
-            // So the duplication is deliberate and the numbers are here so that it is not
-            // re-shared by someone applying the rule without the measurement.
+            // THAT ATTRIBUTION WAS WRONG. The revert did not clear the row: it stayed at -6.7%
+            // and then -9.4% in a fresh allocation on another node. The loss was in the
+            // LAUNCHER, in the same commit -- its colour loop had replaced
+            // `#pragma omp for schedule(dynamic, 1)` with cvfem_range_split, an equal static
+            // slice per thread, and a colour's packs are not equal work. Restoring dynamic
+            // scheduling took the row to +2.0% and the 21-row gate to PASSED (4983762).
+            //
+            // So whether sharing this loop costs anything is UNTESTED. One commit changed the
+            // kernel's code shape and the work distribution together, and a throughput A/B
+            // attributes a loss to a commit, never to a line. The copies stay because that is
+            // what is measured clean today; anyone re-sharing them should re-measure rather
+            // than trust a number this comment no longer claims.
 
                 alignas(ALIGN_BYTES) scalar_t cof0[cvfem_hex8_vec_size<scalar_t>], cof1[cvfem_hex8_vec_size<scalar_t>], cof2[cvfem_hex8_vec_size<scalar_t>];
                 alignas(ALIGN_BYTES) scalar_t cof3[cvfem_hex8_vec_size<scalar_t>], cof4[cvfem_hex8_vec_size<scalar_t>], cof5[cvfem_hex8_vec_size<scalar_t>];
@@ -785,22 +790,27 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
                                            x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z,
                                            pk.pgx, pk.pgy, pk.pgz);
 
-            // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, ON
-            // MEASURED GROUNDS. It was shared between them for exactly the reason the one-path
-            // rule asks -- the two sweeps differ only in their drain -- and Grace refused it:
-            // jobs/ab_refactor.sbatch 4983280 and 4983377 both put the bare packed residual at
-            // -9.4% and -9.7%, the larger size at -8.2% and -8.4%, and the PACK-COLOURED
-            // residual at -17.3% and -20.0%, reproduced within each allocation.
+            // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, AND
+            // THE REASON IS NOT THE ONE THIS COMMENT USED TO GIVE.
             //
-            // Two things narrow the cause. Every row carrying Rhie-Chow or the higher-order
-            // correction was clean, so the cost is fixed per pack and only the cheapest lane
-            // loop notices it; and the Jacobian action's lane loop, which IS still shared,
-            // measured +0.4% and +0.2% -- its packs are larger and its arithmetic per pack far
-            // greater. Hoisting the lane scratch to one object per thread did not recover it
-            // either (4983377 is that attempt).
+            // It was shared between them for exactly the reason the one-path rule asks -- the
+            // two sweeps differ only in their drain. Grace then reported the bare packed
+            // residual at -9.4% and the pack-coloured one at -17.3%, reproduced in two
+            // allocations (jobs/ab_refactor.sbatch 4983280, 4983377), so the sharing was
+            // reverted and those numbers were written here as its cost.
             //
-            // So the duplication is deliberate and the numbers are here so that it is not
-            // re-shared by someone applying the rule without the measurement.
+            // THAT ATTRIBUTION WAS WRONG. The revert did not clear the row: it stayed at -6.7%
+            // and then -9.4% in a fresh allocation on another node. The loss was in the
+            // LAUNCHER, in the same commit -- its colour loop had replaced
+            // `#pragma omp for schedule(dynamic, 1)` with cvfem_range_split, an equal static
+            // slice per thread, and a colour's packs are not equal work. Restoring dynamic
+            // scheduling took the row to +2.0% and the 21-row gate to PASSED (4983762).
+            //
+            // So whether sharing this loop costs anything is UNTESTED. One commit changed the
+            // kernel's code shape and the work distribution together, and a throughput A/B
+            // attributes a loss to a commit, never to a line. The copies stay because that is
+            // what is measured clean today; anyone re-sharing them should re-measure rather
+            // than trust a number this comment no longer claims.
 
             alignas(ALIGN_BYTES) scalar_t cof0[cvfem_hex8_vec_size<scalar_t>], cof1[cvfem_hex8_vec_size<scalar_t>], cof2[cvfem_hex8_vec_size<scalar_t>];
             alignas(ALIGN_BYTES) scalar_t cof3[cvfem_hex8_vec_size<scalar_t>], cof4[cvfem_hex8_vec_size<scalar_t>], cof5[cvfem_hex8_vec_size<scalar_t>];
