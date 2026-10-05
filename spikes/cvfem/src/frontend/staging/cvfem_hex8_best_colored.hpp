@@ -33,45 +33,14 @@
 #include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "frontend/staging/cvfem_pack_coloring.hpp"
 #include "kernels/packed/cvfem_hex8_pack_staging.hpp"
+#include "kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp"
+#include "kernels/packed/isoparametric/cvfem_hex8_best_packed_isoparam.hpp"
+#include "kernels/cvfem_range.hpp"
 
 // ---------------------------------------------------------------------------
 // Global-index gather / scatter
 // ---------------------------------------------------------------------------
 
-// Write a pack's accumulated output into the global arrays. Coloring makes this
-// race-free without atomics and without a separate reduction pass: the owned
-// nodes are a contiguous global window, the ghost nodes are scattered but few.
-// The updates accumulate (+=) rather than store, because a node owned by this
-// pack also receives contributions from packs that ghost it, and those may run in
-// an earlier color.
-static SFEM_INLINE void flush_pack_to_global_soa(const PackedData                       &p,
-                                                 const ptrdiff_t                         pack,
-                                                 const ptrdiff_t                         n_contiguous,
-                                                 const ptrdiff_t                         n_ghost,
-                                                 const smesh::idx_t *const SFEM_RESTRICT ghosts,
-                                                 const scalar_t *const SFEM_RESTRICT     pack_out,
-                                                 scalar_t *const SFEM_RESTRICT           rx,
-                                                 scalar_t *const SFEM_RESTRICT           ry,
-                                                 scalar_t *const SFEM_RESTRICT           rz,
-                                                 scalar_t *const SFEM_RESTRICT           rc) {
-    const ptrdiff_t owned = p.owned_nodes_ptr[pack];
-    for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
-        const scalar_t *const SFEM_RESTRICT src = pack_out + k * N_FIELDS;
-        const ptrdiff_t                     g   = owned + k;
-        rx[g] += src[0];
-        ry[g] += src[1];
-        rz[g] += src[2];
-        rc[g] += src[3];
-    }
-    for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-        const scalar_t *const SFEM_RESTRICT src = pack_out + (n_contiguous + k) * N_FIELDS;
-        const smesh::idx_t                  g   = ghosts[k];
-        rx[g] += src[0];
-        ry[g] += src[1];
-        rz[g] += src[2];
-        rc[g] += src[3];
-    }
-}
 
 static SFEM_INLINE void flush_pack_to_global_interleaved(const PackedData                       &p,
                                                          const ptrdiff_t                         pack,
@@ -97,18 +66,25 @@ static SFEM_INLINE void flush_pack_to_global_interleaved(const PackedData       
 // Residual
 // ---------------------------------------------------------------------------
 
-// Colored residual. Like the packed residual it stages the pack's nodal fields
-// into a compact pack-local buffer, so the element gather stays cheap; unlike it,
-// there is no pack-local *output* buffer to zero, copy out and reduce -- the
-// element kernels accumulate straight into d.rx/ry/rz/rc, which coloring makes
-// race-free. The sumfact and isoparam kernels run 16-wide over elements; the
-// scalar SymPy/current kernels fall back to one element at a time.
+// THE PACK-COLOURED RESIDUAL. A launcher now: it pulls the arrays out, owns the one parallel
+// region, hands each thread a slice of one colour, and barriers between colours -- the same
+// shape frontend/staging/cvfem_hex8_ecolored_launch.hpp uses for the element colouring, and for
+// the same reason: the barrier that used to be the implicit one at the end of `#pragma omp for`.
+//
+// The sweeps are in kernels/packed/affine/ and kernels/packed/isoparametric/, one per geometry,
+// because DESIGN.md's correction asks for the geometries to be separate kernels and this is a
+// packed layout -- it keeps the packed staging and colours the PACKS. colored/ is the ELEMENT
+// colouring, which is a different method.
+//
+// The global arrays are zeroed here before the first colour, because the sweeps' drain
+// accumulates: a node a pack owns also receives contributions from packs that ghost it, and
+// those may run in an earlier colour.
 static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
                                                  PackedData         &p,
                                                  const PackColoring &c,
                                                  const scalar_t      rho,
                                                  const scalar_t      mu,
-                                                 const GeomKind      geom_kind) {
+                                                 const GeomKind      geom) {
     reset_residual(d.nnodes, d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data());
 
     scalar_t *const SFEM_RESTRICT rx        = d.rx.data();
@@ -116,108 +92,33 @@ static SFEM_NOINLINE void apply_residual_colored(MeshData           &d,
     scalar_t *const SFEM_RESTRICT rz        = d.rz.data();
     scalar_t *const SFEM_RESTRICT rc        = d.rc.data();
     const size_t                  scratch_n = packed_scratch_n(p.max_actual_nodes_per_pack);
-    // Rhie-Chow staged exactly as apply_residual_packed stages it: six per-pack arrays in
-    // scratch slot 3 rather than three, the coordinates and the nodal gradient. The colored
-    // sweep is the same pack sweep with a colour loop around it, so the staging is the same
-    // and this is a lift, not a second implementation.
     const int                     with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 #pragma omp parallel
     {
-        PhaseAcc                          acc;
-        scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_xyz =
-                (geom_kind == GeomKind::Isoparam || with_rc)
-                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(p.max_actual_nodes_per_pack) : packed_xyz_n(p.max_actual_nodes_per_pack))
-                        : nullptr;
-        const ptrdiff_t               xyz_n  = p.max_actual_nodes_per_pack > 0 ? p.max_actual_nodes_per_pack : 1;
-        scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
-        scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
-
+        const int n_parts = cvfem_n_threads();
+        const int part    = cvfem_thread_index();
         for (int color = 0; color < c.n_colors; ++color) {
-            const ptrdiff_t cbegin = c.color_ptr[(size_t)color];
-            const ptrdiff_t cend   = c.color_ptr[(size_t)color + 1];
-#pragma omp for schedule(dynamic, 1)
-            for (ptrdiff_t i = cbegin; i < cend; ++i) {
-                const ptrdiff_t                         pack         = c.pack_order[(size_t)i];
-                const ptrdiff_t                         e_start      = pack * p.n_elements_per_pack;
-                const ptrdiff_t                         e_end        = MIN(d.nelements, (pack + 1) * p.n_elements_per_pack);
-                const ptrdiff_t                         owned        = p.owned_nodes_ptr[pack];
-                const ptrdiff_t                         n_contiguous = p.owned_nodes_ptr[pack + 1] - owned;
-                const ptrdiff_t                         n_ghost      = p.ghost_ptr[pack + 1] - p.ghost_ptr[pack];
-                const smesh::idx_t *const SFEM_RESTRICT ghosts       = &p.ghost_idx[p.ghost_ptr[pack]];
-
-                double _t = phase_now();
-                std::memset(pack_out, 0, (size_t)(n_contiguous + n_ghost) * (size_t)N_FIELDS * sizeof(scalar_t));
-                fill_pack_fields(p.owned_nodes_ptr, d.ux.data(), d.uy.data(), d.uz.data(), d.p.data(), pack, n_contiguous, n_ghost, ghosts, pack_u);
-                if (with_rc)
-                    cvfem_hex8_fill_pack_xyz_pgrad(p.owned_nodes_ptr, d.points, d.pgx.data(), d.pgy.data(), d.pgz.data(), !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0), pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
-                                                   pack_z, pack_pgx, pack_pgy, pack_pgz);
-                if (geom_kind == GeomKind::Isoparam)
-                    fill_pack_xyz(p.owned_nodes_ptr, d.points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
-                if (g_breakdown) { const double _n = wall_time(); acc.t[PH_GATHER] += _n - _t; _t = _n; }
-
-                if (geom_kind == GeomKind::Isoparam) {
-                    Hex8InputPack    in;
-                    Hex8CoordPack    xyz;
-                    Hex8ResidualPack outp;
-                    for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                        const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
-                        gather_hex8_isoparam_simd_from_pack(
-                                p.elems, pack_u, pack_x, pack_y, pack_z, begin, nlanes, in, xyz);
-                        cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp);
-                        scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
-                    }
-                } else {
-                    alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
-                            cof2[CVFEM_HEX8_VEC_SIZE];
-                    alignas(ALIGN_BYTES) scalar_t cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
-                            cof5[CVFEM_HEX8_VEC_SIZE];
-                    alignas(ALIGN_BYTES) scalar_t cof6[CVFEM_HEX8_VEC_SIZE], cof7[CVFEM_HEX8_VEC_SIZE],
-                            cof8[CVFEM_HEX8_VEC_SIZE];
-                    alignas(ALIGN_BYTES) scalar_t det[CVFEM_HEX8_VEC_SIZE];
-                    Hex8InputPack                 in;
-                    Hex8ResidualPack              outp;
-                    Hex8RhieChowPack              rcp;
-                    for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                        const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
-                        gather_hex8_simd_from_pack(p.elems,
-                                                   pack_u,
-                                                   d.adj_ptr, d.det_ptr,
-                                                   begin,
-                                                   nlanes,
-                                                   in,
-                                                   cof0,
-                                                   cof1,
-                                                   cof2,
-                                                   cof3,
-                                                   cof4,
-                                                   cof5,
-                                                   cof6,
-                                                   cof7,
-                                                   cof8,
-                                                   det);
-                        if (with_rc)
-                            cvfem_hex8_gather_rc_from_pack(p.elems, pack_pgx, pack_pgy,
-                                                           pack_pgz, begin, nlanes, rcp);
-                        cvfem_hex8_ns_upwind_residual_sumfact_simd(
-                                rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
-                                with_rc ? &rcp : nullptr, d.rhie_chow_scale);
-                        scatter_hex8_simd_to_pack(p.elems, pack_out, begin, nlanes, outp);
-                    }
-                }
-                if (g_breakdown) { const double _n = wall_time(); acc.t[PH_KERNEL] += _n - _t; _t = _n; }
-
-                flush_pack_to_global_soa(p, pack, n_contiguous, n_ghost, ghosts, pack_out, rx, ry, rz, rc);
-                if (g_breakdown) acc.t[PH_LOCAL_TO_GLOBAL] += wall_time() - _t;
-            }
+            const cvfem_range r = cvfem_range_split(c.color_ptr[(size_t)color],
+                                                    c.color_ptr[(size_t)color + 1], 1,
+                                                    part, n_parts);
+            if (geom == GeomKind::Isoparam)
+                apply_residual_packcolored_isoparam_range(
+                        r, c.pack_order.data(), d.nelements, d.p.data(), d.points, d.ux.data(),
+                        d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
+                        p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
+                        rho, mu, rx, ry, rz, rc, scratch_n);
+            else
+                apply_residual_packcolored_affine_range(
+                        r, c.pack_order.data(), d.adj_ptr, d.det_ptr, d.nelements, d.p.data(),
+                        d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale,
+                        d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_idx, p.ghost_ptr,
+                        p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.owned_nodes_ptr,
+                        rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+            // No two packs of a colour share a node, so the slices above need no
+            // synchronisation between them. The next colour does.
+            cvfem_thread_barrier();
         }
-        acc.flush();
     }
 }
 

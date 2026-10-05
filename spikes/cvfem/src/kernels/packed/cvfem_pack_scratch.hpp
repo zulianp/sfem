@@ -280,4 +280,45 @@ static SFEM_INLINE void cvfem_hex8_drain_pack_aos(const Hex8PackExtentT<idx_t>  
     cvfem_hex8_stage_pack_ghosts<scalar_t, idx_t>(x, pack_out, n_ghost_entries, ghost_buf);
 }
 
+// THE THIRD DRAIN: ACCUMULATE STRAIGHT INTO THE GLOBALS, which is what pack colouring buys.
+//
+// The other two stage the rows a pack shares into ghost_buf for a second, independent reduction
+// loop, because two packs of a contiguous range can touch the same node. Colouring removes that:
+// no two packs of a colour share a node, so a pack may add its rows -- owned and ghosted alike
+// -- into the global arrays directly, and the reduction pass disappears. That is the whole
+// method, and it is why the coloured sweeps are not simply the packed ones with a loop around
+// them, whatever the comment on them used to say.
+//
+// The updates accumulate rather than store: a node this pack owns also receives contributions
+// from packs that ghost it, and those may have run in an earlier colour.
+//
+// It takes the extent rather than the staging object the original did -- owned, n_contiguous,
+// n_ghost and the ghost slice are exactly what it reads, and they are what Hex8PackExtent holds.
+template <typename scalar_t, typename idx_t>
+static SFEM_INLINE void cvfem_hex8_flush_pack_to_global_soa(
+        const Hex8PackExtentT<idx_t>       &x,
+        const scalar_t *const SFEM_RESTRICT pack_out,
+        scalar_t *const SFEM_RESTRICT       rx,
+        scalar_t *const SFEM_RESTRICT       ry,
+        scalar_t *const SFEM_RESTRICT       rz,
+        scalar_t *const SFEM_RESTRICT       rc) {
+    for (ptrdiff_t k = 0; k < x.n_contiguous; ++k) {
+        const scalar_t *const SFEM_RESTRICT src = pack_out + k * CVFEM_HEX8_N_FIELDS;
+        const ptrdiff_t                     g   = x.owned + k;
+        rx[g] += src[0];
+        ry[g] += src[1];
+        rz[g] += src[2];
+        rc[g] += src[3];
+    }
+    for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
+        const scalar_t *const SFEM_RESTRICT src =
+                pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
+        const idx_t g = x.ghosts[k];
+        rx[g] += src[0];
+        ry[g] += src[1];
+        rz[g] += src[2];
+        rc[g] += src[3];
+    }
+}
+
 #endif  // CVFEM_PACK_SCRATCH_HPP

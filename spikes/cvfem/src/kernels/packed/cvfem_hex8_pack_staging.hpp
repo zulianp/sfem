@@ -21,6 +21,7 @@
 // a sweep cannot be templated while the staging it calls is not.
 
 #include "kernels/microkernels/hex8/cvfem_hex8_ns_upwind_kernels.hpp"
+#include "kernels/microkernels/hex8/isoparametric/cvfem_hex8_ns_upwind_isoparam.hpp"
 #include "kernels/packed/cvfem_pack_scratch.hpp"
 #include "kernels/cvfem_hex8_flags.hpp"
 
@@ -523,6 +524,68 @@ static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRI
             dst[2] += out.rz[a][lane];
             dst[3] += out.rc[a][lane];
         }
+    }
+}
+
+
+// ONE PACK'S LANE LOOP, AFFINE. Called by both drains' sweeps: the contiguous packed residual
+// and the pack-coloured one, which differ in nothing else. The adjugate and determinant come
+// from the precomputed table, which is what makes this the affine loop.
+template <typename scalar_t, typename idx_t, typename pack_idx_t>
+static SFEM_INLINE void cvfem_hex8_residual_lanes_affine(
+        const Hex8PackExtentT<idx_t>        &x,
+        const Hex8PackCoordsT<scalar_t>     &pk,
+        const scalar_t *const *const SFEM_RESTRICT adj_ptr,
+        const scalar_t *const SFEM_RESTRICT  det_ptr,
+        pack_idx_t **const SFEM_RESTRICT     pack_elems,
+        const scalar_t *const SFEM_RESTRICT  pack_u,
+        scalar_t *const SFEM_RESTRICT        pack_out,
+        const scalar_t                       rho,
+        const scalar_t                       mu,
+        const scalar_t                       rhie_chow_scale,
+        const int                            with_rc) {
+    alignas(ALIGN_BYTES) scalar_t cof0[cvfem_hex8_vec_size<scalar_t>], cof1[cvfem_hex8_vec_size<scalar_t>], cof2[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof3[cvfem_hex8_vec_size<scalar_t>], cof4[cvfem_hex8_vec_size<scalar_t>], cof5[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof6[cvfem_hex8_vec_size<scalar_t>], cof7[cvfem_hex8_vec_size<scalar_t>], cof8[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t det[cvfem_hex8_vec_size<scalar_t>];
+    Hex8InputPackT<scalar_t>    in;
+    Hex8ResidualPackT<scalar_t> outp;
+    Hex8RhieChowPackT<scalar_t> rcp;
+    for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
+        const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
+        gather_hex8_simd_from_pack(pack_elems, pack_u, adj_ptr, det_ptr, begin, nlanes, in,
+                                   cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+        if (with_rc) {
+            cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp);
+        }
+        cvfem_hex8_ns_upwind_residual_sumfact_simd(
+                rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
+                with_rc ? &rcp : nullptr, rhie_chow_scale);
+        scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+    }
+}
+
+// ONE PACK'S LANE LOOP, ISOPARAMETRIC. The Jacobian comes per sub-control surface from the
+// coordinates the pack staged, so this takes no adjugate table and no Rhie-Chow: the
+// isoparametric SIMD kernel carries no such term.
+template <typename scalar_t, typename idx_t, typename pack_idx_t>
+static SFEM_INLINE void cvfem_hex8_residual_lanes_isoparam(
+        const Hex8PackExtentT<idx_t>       &x,
+        const Hex8PackCoordsT<scalar_t>    &pk,
+        pack_idx_t **const SFEM_RESTRICT    pack_elems,
+        const scalar_t *const SFEM_RESTRICT pack_u,
+        scalar_t *const SFEM_RESTRICT       pack_out,
+        const scalar_t                      rho,
+        const scalar_t                      mu) {
+    Hex8InputPackT<scalar_t>    in;
+    Hex8CoordPackT<scalar_t>    xyz;
+    Hex8ResidualPackT<scalar_t> outp;
+    for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
+        const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
+        gather_hex8_isoparam_simd_from_pack(pack_elems, pack_u, pk.x, pk.y, pk.z, begin, nlanes,
+                                            in, xyz);
+        cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp);
+        scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
     }
 }
 
