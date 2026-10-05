@@ -406,10 +406,21 @@ inline void sscvfem_classify_macros(SSMeshData &d) {
     } else {
         d.macro_order.resize((size_t)d.nmacro);
         // The two fill positions: straight from the front, curved from where the straight ones end.
+        //
+        // Through sscvfem_macro_curved rather than indexing macro_curved here, so that "is this
+        // macro element curved" has one spelling. That predicate is the only reader of the flag
+        // array now: the sweeps are handed a range of one kind and no longer ask.
+        //
+        // The empty test is written out at the call rather than hoisted into a local pointer,
+        // because cvfem_null_tested_args requires it of every caller of a function that
+        // null-tests the argument -- and hoisting it would hide the call site from that gate
+        // rather than satisfy it. The vector is non-empty here, so it costs a compare.
         ptrdiff_t ns = 0, nc = d.nmacro - n_curved;
         for (ptrdiff_t e = 0; e < d.nmacro; ++e)
-            if (d.macro_curved[(size_t)e]) d.macro_order[(size_t)nc++] = e;
-            else d.macro_order[(size_t)ns++] = e;
+            if (sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e))
+                d.macro_order[(size_t)nc++] = e;
+            else
+                d.macro_order[(size_t)ns++] = e;
         d.n_straight = ns;
         std::printf("sscvfem: %td of %td macro elements are curved -- their micro cells get their own geometry\n",
                     n_curved, d.nmacro);

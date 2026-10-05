@@ -62,7 +62,7 @@ static void partition_of(sfem::Context &ctx, const int macro, const int level, c
     const ptrdiff_t n_curved = (ptrdiff_t)d.macro_curved.size() == d.nmacro
                                        ? [&] {
                                              ptrdiff_t n = 0;
-                                             for (ptrdiff_t e = 0; e < d.nmacro; ++e) n += d.macro_curved[(size_t)e] ? 1 : 0;
+                                             for (ptrdiff_t e = 0; e < d.nmacro; ++e) n += sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e) ? 1 : 0;
                                              return n;
                                          }()
                                        : 0;
@@ -105,9 +105,9 @@ static void partition_of(sfem::Context &ctx, const int macro, const int level, c
     // The two ranges hold what their sweeps assume, which is the invariant the split rests on.
     bool straight_clean = true, curved_clean = true, ascending = true;
     for (ptrdiff_t i = 0; i < d.n_straight; ++i)
-        if (d.macro_curved[(size_t)d.macro_order[(size_t)i]]) straight_clean = false;
+        if (sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_order[(size_t)i])) straight_clean = false;
     for (ptrdiff_t i = d.n_straight; i < d.nmacro; ++i)
-        if (!d.macro_curved[(size_t)d.macro_order[(size_t)i]]) curved_clean = false;
+        if (!sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), d.macro_order[(size_t)i])) curved_clean = false;
     for (ptrdiff_t i = 1; i < d.n_straight; ++i)
         if (d.macro_order[(size_t)i] <= d.macro_order[(size_t)i - 1]) ascending = false;
     for (ptrdiff_t i = d.n_straight + 1; i < d.nmacro; ++i)

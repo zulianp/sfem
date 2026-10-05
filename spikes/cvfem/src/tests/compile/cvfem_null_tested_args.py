@@ -59,7 +59,9 @@ for f in FILES:
 
 # TRANSITIVE. A sweep that forwards a parameter to a kernel which null-tests it is itself
 # null-testing it: sscvfem_block_diag_sweep never writes `if (macro_curved)`, it hands the
-# pointer to sscvfem_macro_curved, which is where `macro_curved && macro_curved[e]` lives. One
+# pointer to sscvfem_macro_curved, which is where `macro_curved && macro_curved[e]` lives --
+# though since the geometry split no sweep asks at all, and the predicate's one caller is the
+# partition builder. One
 # level of inspection found nothing at all, which is how this class of bug stays invisible.
 changed = True
 while changed:

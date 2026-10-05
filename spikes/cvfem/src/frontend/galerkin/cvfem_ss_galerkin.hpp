@@ -213,6 +213,260 @@ namespace cvfem_ss {
         return std::max<ptrdiff_t>(1, std::min<ptrdiff_t>(g.nmacro, (ptrdiff_t)(cap / std::max<size_t>(1, per))));
     }
 
+    // The macro element's nodes, gathered once. Shared by the two geometry halves below, which
+    // differ in their micro-cell loop and in nothing else.
+    static SFEM_INLINE void galerkin_gather(
+            const SSMeshData &d, const int nxe, const ptrdiff_t e,
+            scalar_t *const SFEM_RESTRICT lx, scalar_t *const SFEM_RESTRICT ly,
+            scalar_t *const SFEM_RESTRICT lz, scalar_t *const SFEM_RESTRICT lux,
+            scalar_t *const SFEM_RESTRICT luy, scalar_t *const SFEM_RESTRICT luz,
+            scalar_t *const SFEM_RESTRICT lp, scalar_t *const SFEM_RESTRICT lpgx,
+            scalar_t *const SFEM_RESTRICT lpgy, scalar_t *const SFEM_RESTRICT lpgz,
+            smesh::idx_t *const SFEM_RESTRICT lg) {
+        for (int a = 0; a < nxe; ++a) {
+            const smesh::idx_t gn = d.elems[a][e];
+            lg[(size_t)a]         = gn;
+            lx[(size_t)a]         = (scalar_t)d.points[0][gn];
+            ly[(size_t)a]         = (scalar_t)d.points[1][gn];
+            lz[(size_t)a]         = (scalar_t)d.points[2][gn];
+            lux[(size_t)a]        = d.ux[(size_t)gn];
+            luy[(size_t)a]        = d.uy[(size_t)gn];
+            luz[(size_t)a]        = d.uz[(size_t)gn];
+            lp[(size_t)a]         = d.p[(size_t)gn];
+            lpgx[(size_t)a]       = d.pgx[(size_t)gn];
+            lpgy[(size_t)a]       = d.pgy[(size_t)gn];
+            lpgz[(size_t)a]       = d.pgz[(size_t)gn];
+        }
+    }
+
+    // ONE MICRO CELL of the Galerkin assembly: the cell matrix, the transient term, the boundary
+    // closure, the two-stage contraction onto the coarse patch, and the scatter into the chunk.
+    //
+    // The geometry arrives as an SSMacroGeom and a set of Rhie-Chow corners, and this kernel
+    // does not choose them. galerkin_macro_affine builds the macro element's once and hands the
+    // same pair to every cell; galerkin_macro_isoparam builds this cell's own. Same shape as
+    // sscvfem_residual_cell, and for the same reason: the Rhie-Chow distances have to come from
+    // the corners the geometry was built from, or the coarse operator stops being the
+    // contraction of the operator the fine level applies.
+    static SFEM_INLINE void galerkin_cell(
+            const SSMeshData &d, const GalerkinLevel &g, const scalar_t rho, const scalar_t mu,
+            const SSMacroGeom &mg_, const scalar_t *const ex_, const scalar_t *const ey_,
+            const scalar_t *const ez_, const int L, const int q, const int Lc, const int nc,
+            const int off[8], const smesh::count_t sl[64], const int slot_ab[8][8],
+            const scalar_t *const SFEM_RESTRICT lx, const scalar_t *const SFEM_RESTRICT ly,
+            const scalar_t *const SFEM_RESTRICT lz, const scalar_t *const SFEM_RESTRICT lux,
+            const scalar_t *const SFEM_RESTRICT luy, const scalar_t *const SFEM_RESTRICT luz,
+            const scalar_t *const SFEM_RESTRICT lp, const scalar_t *const SFEM_RESTRICT lpgx,
+            const scalar_t *const SFEM_RESTRICT lpgy, const scalar_t *const SFEM_RESTRICT lpgz,
+            const smesh::idx_t *const SFEM_RESTRICT lg, const ptrdiff_t e, const int xi,
+            const int yi, const int zi, scalar_t *const SFEM_RESTRICT Ce) {
+        const int base = sscvfem_lidx(L, xi, yi, zi);
+
+        scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
+        for (int a = 0; a < 8; ++a) {
+            const int l = base + off[a];
+            x[a]        = lx[(size_t)l];
+            y[a]        = ly[(size_t)l];
+            z[a]        = lz[(size_t)l];
+            ux[a]       = lux[(size_t)l];
+            uy[a]       = luy[(size_t)l];
+            uz[a]       = luz[(size_t)l];
+            p[a]        = lp[(size_t)l];
+            pgx[a]      = lpgx[(size_t)l];
+            pgy[a]      = lpgy[(size_t)l];
+            pgz[a]      = lpgz[(size_t)l];
+        }
+        scalar_t loc[64 * 16];
+        for (int k = 0; k < 64 * 16; ++k) loc[k] = scalar_t(0);
+
+        const Hex8RcConfig rcfg = sscvfem_rc_config(d);
+        const Hex8RhieChow rc{ex_,      ey_, ez_, pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
+                              nullptr, ux, uy, uz,  rcfg.tau};
+        cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, mg_.adj, mg_.det, ux, uy, uz, sl,
+                                                       loc, rc, p);
+
+        // The transient term. It was MISSING, and this is the whole of the
+        // fix: every element-wise Galerkin level operator was the STEADY
+        // operator, so a transient run preconditioned with the wrong one.
+        //
+        // It hid because the term is a nodal post-pass everywhere else --
+        // sscvfem_apply_transient walks nodes and adds rho V_i a0/dt -- and
+        // an element loop that assembles a cell matrix never sees a nodal
+        // pass. Nothing compared the assembly against the action until the
+        // q=1 gate in tests/cvfem_operator_consistency_test, where the
+        // steady case agreed to 3.3e-16 and the BDF2 case was 8.5e-01 out.
+        //
+        // In control-volume form the mass matrix IS the control volume, so
+        // the element's share is |det|/8 per node -- exactly what
+        // sscvfem_node_volume accumulates, and from the same hoisted macro
+        // geometry, so the two agree term for term rather than nearly. The
+        // three velocity components carry it and pressure does not: the
+        // continuity equation is a constraint, not an evolution equation.
+        //
+        // Putting it in the CELL matrix rather than adding it to the coarse
+        // operator afterwards is what makes it correct for q > 1 as well:
+        // P^T (A + D) P coarsens the mass term by the same contraction as
+        // everything else, which is what a Galerkin coarse operator means.
+        if (const scalar_t tdw = sscvfem_transient_diag_weight(d, rho); tdw != scalar_t(0)) {
+            const scalar_t tw = tdw * std::fabs(mg_.det) / scalar_t(8);
+            for (int a = 0; a < 8; ++a) {
+                scalar_t *const blk = loc + (size_t)(a * 8 + a) * 16;
+                blk[0] += tw;
+                blk[5] += tw;
+                blk[10] += tw;
+            }
+        }
+        // The coarse operator must carry the same boundary treatment as
+        // the fine one. Without the masks here the element-wise Galerkin
+        // coarse operator closes control volumes by the bounding-box test
+        // -- missing the step faces -- and keeps p*a on the outflow where
+        // the fine level has prescribed it, so the coarse problem is a
+        // different, singular one. The visible symptom is not a wrong
+        // answer but no answer: the fine Krylov solve performs zero
+        // iterations.
+        boundary_scs_add_jacobian<false, false>(
+                rho, mu, mg_.adj, mg_.det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
+                d.macro_face_mask.empty()
+                        ? -1
+                        : sscvfem_micro_face_mask((int)d.macro_face_mask[(size_t)e], L, xi, yi, zi),
+                d.macro_natural_mask.empty()
+                        ? 0
+                        : sscvfem_micro_face_mask((int)d.macro_natural_mask[(size_t)e], L, xi, yi, zi),
+                sscvfem_bd(d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), e, L, xi, yi, zi));
+
+        if (!g.fine_constrained.empty()) {
+            for (int a = 0; a < 8; ++a) {
+                const size_t gn = (size_t)lg[(size_t)(base + off[a])];
+                for (int c = 0; c < 4; ++c) {
+                    if (!g.fine_constrained[gn * 4 + (size_t)c]) continue;
+                    for (int b = 0; b < 8; ++b)
+                        for (int r = 0; r < 4; ++r)
+                            loc[(size_t)(b * 8 + a) * 16 + (size_t)(r * 4 + c)] = scalar_t(0);
+                }
+            }
+        }
+
+        const CellQ &Q = g.qtab[(size_t)((zi % q) * q + (yi % q)) * (size_t)q + (size_t)(xi % q)];
+
+        // Stage 1: W[i][b] = sum_j loc[i][j] * Q[j][b], contracted over
+        // the fine index j through the transpose so each block is stored
+        // once rather than zeroed and accumulated into.
+        scalar_t W[8][8][16];
+        for (int i = 0; i < 8; ++i) {
+            const scalar_t *const SFEM_RESTRICT rowi = loc + (size_t)(i * 8) * 16;
+            for (int b = 0; b < 8; ++b) {
+                scalar_t *const SFEM_RESTRICT dst = W[i][b];
+                const int                     n0  = Q.trow[b][0];
+                const scalar_t                w0  = Q.tw[b][0];
+#pragma omp simd
+                for (int c = 0; c < 16; ++c) dst[c] = w0 * rowi[(size_t)n0 * 16 + (size_t)c];
+                for (int k = 1; k < Q.tnnz[b]; ++k) {
+                    const scalar_t *const SFEM_RESTRICT src =
+                            rowi + (size_t)Q.trow[b][k] * 16;
+                    const scalar_t wk = Q.tw[b][k];
+#pragma omp simd
+                    for (int c = 0; c < 16; ++c) dst[c] += wk * src[c];
+                }
+            }
+        }
+
+        // Stage 2: C[a][b] += sum_i Q[i][a] * W[i][b], scattered by the
+        // patch corner's lattice position and the fixed offset slot.
+        const int cax = xi / q, cay = yi / q, caz = zi / q;
+        int       pl[8];
+        for (int a = 0; a < 8; ++a)
+            pl[a] = sscvfem_lidx(Lc, cax + GAL_CORNER[a][0], cay + GAL_CORNER[a][1],
+                                 caz + GAL_CORNER[a][2]);
+
+        for (int i = 0; i < 8; ++i) {
+            for (int k = 0; k < Q.nnz[i]; ++k) {
+                const int      a  = Q.col[i][k];
+                const scalar_t wi = Q.w[i][k];
+                scalar_t *const SFEM_RESTRICT row = Ce + ((size_t)pl[a] * 27) * 16;
+                for (int b = 0; b < 8; ++b) {
+                    scalar_t *const SFEM_RESTRICT dst = row + (size_t)slot_ab[a][b] * 16;
+                    const scalar_t *const SFEM_RESTRICT src = W[i][b];
+#pragma omp simd
+                    for (int c = 0; c < 16; ++c) dst[c] += wi * src[c];
+                }
+            }
+        }
+        }
+
+    // One macro element, AFFINE: the geometry hoisted out of the micro-cell loop.
+    //
+    // Outside the loop on purpose: the Rhie-Chow term takes its node distances from the same
+    // hoisted cell mg was built from. See sscvfem_residual_affine for what each cell's own
+    // coordinates cost on a curved macro element.
+    static SFEM_INLINE void galerkin_macro_affine(
+            const SSMeshData &d, const GalerkinLevel &g, const scalar_t rho, const scalar_t mu,
+            const int L, const int q, const int Lc, const int nc, const int off[8],
+            const smesh::count_t sl[64], const int slot_ab[8][8],
+            const scalar_t *const SFEM_RESTRICT lx, const scalar_t *const SFEM_RESTRICT ly,
+            const scalar_t *const SFEM_RESTRICT lz, const scalar_t *const SFEM_RESTRICT lux,
+            const scalar_t *const SFEM_RESTRICT luy, const scalar_t *const SFEM_RESTRICT luz,
+            const scalar_t *const SFEM_RESTRICT lp, const scalar_t *const SFEM_RESTRICT lpgx,
+            const scalar_t *const SFEM_RESTRICT lpgy, const scalar_t *const SFEM_RESTRICT lpgz,
+            const smesh::idx_t *const SFEM_RESTRICT lg, const ptrdiff_t e,
+            scalar_t *const SFEM_RESTRICT Ce) {
+        const Hex8RcConfig rc_macro = sscvfem_rc_config(d);
+        SSMacroGeom        mg;
+        scalar_t           ex[8], ey[8], ez[8];
+        {
+            int ext[8];
+            sscvfem_macro_corner_offsets(L, ext);
+            for (int a = 0; a < 8; ++a) {
+                const int l = ext[a];
+                ex[a]       = lx[(size_t)l];
+                ey[a]       = ly[(size_t)l];
+                ez[a]       = lz[(size_t)l];
+            }
+            sscvfem_hoisted_cell(ex, ey, ez, L, ex, ey, ez);
+            sscvfem_macro_geom(ex, ey, ez, rho, mu, rc_macro.scale, rc_macro.tau, mg);
+        }
+        for (int zi = 0; zi < L; ++zi)
+            for (int yi = 0; yi < L; ++yi)
+                for (int xi = 0; xi < L; ++xi)
+                    galerkin_cell(d, g, rho, mu, mg, ex, ey, ez, L, q, Lc, nc, off, sl, slot_ab, lx,
+                                  ly, lz, lux, luy, luz, lp, lpgx, lpgy, lpgz, lg, e, xi, yi, zi, Ce);
+    }
+
+    // One macro element, ISOPARAMETRIC: every micro cell its own geometry and its own Rhie-Chow
+    // corners, and no hoisted macro geometry built at all.
+    //
+    // Out of line, for the reason recorded on sscvfem_macro_geom_cell: inlined, the per-cell
+    // construction grows the unit past the point where gcc still inlines the small per-cell
+    // helpers the affine path depends on.
+    static SFEM_NOINLINE void galerkin_macro_isoparam(
+            const SSMeshData &d, const GalerkinLevel &g, const scalar_t rho, const scalar_t mu,
+            const int L, const int q, const int Lc, const int nc, const int off[8],
+            const smesh::count_t sl[64], const int slot_ab[8][8],
+            const scalar_t *const SFEM_RESTRICT lx, const scalar_t *const SFEM_RESTRICT ly,
+            const scalar_t *const SFEM_RESTRICT lz, const scalar_t *const SFEM_RESTRICT lux,
+            const scalar_t *const SFEM_RESTRICT luy, const scalar_t *const SFEM_RESTRICT luz,
+            const scalar_t *const SFEM_RESTRICT lp, const scalar_t *const SFEM_RESTRICT lpgx,
+            const scalar_t *const SFEM_RESTRICT lpgy, const scalar_t *const SFEM_RESTRICT lpgz,
+            const smesh::idx_t *const SFEM_RESTRICT lg, const ptrdiff_t e,
+            scalar_t *const SFEM_RESTRICT Ce) {
+        const Hex8RcConfig rc_macro = sscvfem_rc_config(d);
+        for (int zi = 0; zi < L; ++zi)
+            for (int yi = 0; yi < L; ++yi)
+                for (int xi = 0; xi < L; ++xi) {
+                    const int base = sscvfem_lidx(L, xi, yi, zi);
+                    scalar_t  cx[8], cy[8], cz[8];
+                    for (int a = 0; a < 8; ++a) {
+                        const int l = base + off[a];
+                        cx[a]       = lx[(size_t)l];
+                        cy[a]       = ly[(size_t)l];
+                        cz[a]       = lz[(size_t)l];
+                    }
+                    SSMacroGeom cg;
+                    sscvfem_macro_geom_cell(cx, cy, cz, rho, mu, rc_macro, cg);
+                    galerkin_cell(d, g, rho, mu, cg, cx, cy, cz, L, q, Lc, nc, off, sl, slot_ab, lx,
+                                  ly, lz, lux, luy, luz, lp, lpgx, lpgy, lpgz, lg, e, xi, yi, zi, Ce);
+                }
+    }
+
     // The kernel. Mirrors sscvfem_apply_macro_local_hoisted's gather and geometry exactly --
     // the same hoisted micro-cell-0 adjugate, the same Rhie-Chow struct -- so that what is
     // assembled here is the operator that path applies, and the q=1 gate can say so.
@@ -247,193 +501,38 @@ namespace cvfem_ss {
             std::vector<scalar_t>     lpgx((size_t)nxe), lpgy((size_t)nxe), lpgz((size_t)nxe);
             std::vector<smesh::idx_t> lg((size_t)nxe);
 
+            // THE TWO RANGES, not a branch per element. The chunk covers macro elements
+            // [e0, e1), so sscvfem_order_positions restricts each half of the curvature
+            // partition to it -- a contiguous run of positions, because each half is in
+            // ascending element order. Each element still writes its own slice of the chunk,
+            // indexed by (e - e0), so visiting them in the partition's order is free.
+            const cvfem_range      pa  = sscvfem_order_positions(d, false, e0, e1);
+            const cvfem_range      pi  = sscvfem_order_positions(d, true, e0, e1);
+            const ptrdiff_t *const ord = sscvfem_order(d);
+
 #pragma omp for schedule(static)
-            for (ptrdiff_t e = e0; e < e1; ++e) {
-                for (int a = 0; a < nxe; ++a) {
-                    const smesh::idx_t gn = d.elems[a][e];
-                    lg[(size_t)a]         = gn;
-                    lx[(size_t)a]         = (scalar_t)d.points[0][gn];
-                    ly[(size_t)a]         = (scalar_t)d.points[1][gn];
-                    lz[(size_t)a]         = (scalar_t)d.points[2][gn];
-                    lux[(size_t)a]        = d.ux[(size_t)gn];
-                    luy[(size_t)a]        = d.uy[(size_t)gn];
-                    luz[(size_t)a]        = d.uz[(size_t)gn];
-                    lp[(size_t)a]         = d.p[(size_t)gn];
-                    lpgx[(size_t)a]       = d.pgx[(size_t)gn];
-                    lpgy[(size_t)a]       = d.pgy[(size_t)gn];
-                    lpgz[(size_t)a]       = d.pgz[(size_t)gn];
-                }
-
-                // Per macro element, and the curved branch below reads the same one: a call per
-                // micro cell there took this unit past the point where GCC inlines sscvfem_rc_config,
-                // which then became a call in every cell of the block diagonal, 9% slower on boxes.
-                const Hex8RcConfig rc_macro = sscvfem_rc_config(d);
-                SSMacroGeom mg;
-                // Outside the block: the Rhie-Chow term below takes its node distances from the
-                // same hoisted cell mg was built from. See sscvfem_residual for what the cell's
-                // own coordinates cost on a curved macro element.
-                scalar_t ex[8], ey[8], ez[8];
-                {
-                    int ext[8];
-                    sscvfem_macro_corner_offsets(L, ext);
-                    for (int a = 0; a < 8; ++a) {
-                        const int l = ext[a];
-                        ex[a]       = lx[(size_t)l];
-                        ey[a]       = ly[(size_t)l];
-                        ez[a]       = lz[(size_t)l];
-                    }
-                    sscvfem_hoisted_cell(ex, ey, ez, L, ex, ey, ez);
-                    sscvfem_macro_geom(ex, ey, ez, rho, mu, rc_macro.scale, rc_macro.tau, mg);
-                }
-
+            for (ptrdiff_t i = pa.begin; i < pa.end; ++i) {
+                const ptrdiff_t e  = ord ? ord[i] : i;
                 scalar_t *const Ce = g.C.data() + (size_t)(e - e0) * (size_t)nc * 27 * 16;
-
-                const bool curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
-                for (int zi = 0; zi < L; ++zi) {
-                    for (int yi = 0; yi < L; ++yi) {
-                        for (int xi = 0; xi < L; ++xi) {
-                            const int base = sscvfem_lidx(L, xi, yi, zi);
-
-                            scalar_t x[8], y[8], z[8], ux[8], uy[8], uz[8], p[8], pgx[8], pgy[8], pgz[8];
-                            for (int a = 0; a < 8; ++a) {
-                                const int l = base + off[a];
-                                x[a]        = lx[(size_t)l];
-                                y[a]        = ly[(size_t)l];
-                                z[a]        = lz[(size_t)l];
-                                ux[a]       = lux[(size_t)l];
-                                uy[a]       = luy[(size_t)l];
-                                uz[a]       = luz[(size_t)l];
-                                p[a]        = lp[(size_t)l];
-                                pgx[a]      = lpgx[(size_t)l];
-                                pgy[a]      = lpgy[(size_t)l];
-                                pgz[a]      = lpgz[(size_t)l];
-                            }
-                            // A curved macro element: this cell's own geometry, not the hoisted one.
-                            if (curved_e) {
-                                sscvfem_macro_geom_cell(x, y, z, rho, mu, rc_macro, mg);
-                                std::copy(x, x + 8, ex);
-                                std::copy(y, y + 8, ey);
-                                std::copy(z, z + 8, ez);
-                            }
-
-                            scalar_t loc[64 * 16];
-                            for (int k = 0; k < 64 * 16; ++k) loc[k] = scalar_t(0);
-
-                            const Hex8RcConfig rcfg = sscvfem_rc_config(d);
-                            const Hex8RhieChow rc{ex,      ey, ez, pgx, pgy, pgz, rcfg.scale, nullptr, nullptr,
-                                                  nullptr, ux, uy, uz,  rcfg.tau};
-                            cvfem_hex8_ns_upwind_jacobian_add_slots<false>(rho, mu, mg.adj, mg.det, ux, uy, uz, sl,
-                                                                           loc, rc, p);
-
-                            // The transient term. It was MISSING, and this is the whole of the
-                            // fix: every element-wise Galerkin level operator was the STEADY
-                            // operator, so a transient run preconditioned with the wrong one.
-                            //
-                            // It hid because the term is a nodal post-pass everywhere else --
-                            // sscvfem_apply_transient walks nodes and adds rho V_i a0/dt -- and
-                            // an element loop that assembles a cell matrix never sees a nodal
-                            // pass. Nothing compared the assembly against the action until the
-                            // q=1 gate in tests/cvfem_operator_consistency_test, where the
-                            // steady case agreed to 3.3e-16 and the BDF2 case was 8.5e-01 out.
-                            //
-                            // In control-volume form the mass matrix IS the control volume, so
-                            // the element's share is |det|/8 per node -- exactly what
-                            // sscvfem_node_volume accumulates, and from the same hoisted macro
-                            // geometry, so the two agree term for term rather than nearly. The
-                            // three velocity components carry it and pressure does not: the
-                            // continuity equation is a constraint, not an evolution equation.
-                            //
-                            // Putting it in the CELL matrix rather than adding it to the coarse
-                            // operator afterwards is what makes it correct for q > 1 as well:
-                            // P^T (A + D) P coarsens the mass term by the same contraction as
-                            // everything else, which is what a Galerkin coarse operator means.
-                            if (const scalar_t tdw = sscvfem_transient_diag_weight(d, rho); tdw != scalar_t(0)) {
-                                const scalar_t tw = tdw * std::fabs(mg.det) / scalar_t(8);
-                                for (int a = 0; a < 8; ++a) {
-                                    scalar_t *const blk = loc + (size_t)(a * 8 + a) * 16;
-                                    blk[0] += tw;
-                                    blk[5] += tw;
-                                    blk[10] += tw;
-                                }
-                            }
-                            // The coarse operator must carry the same boundary treatment as
-                            // the fine one. Without the masks here the element-wise Galerkin
-                            // coarse operator closes control volumes by the bounding-box test
-                            // -- missing the step faces -- and keeps p*a on the outflow where
-                            // the fine level has prescribed it, so the coarse problem is a
-                            // different, singular one. The visible symptom is not a wrong
-                            // answer but no answer: the fine Krylov solve performs zero
-                            // iterations.
-                            boundary_scs_add_jacobian<false, false>(
-                                    rho, mu, mg.adj, mg.det, d.Lx, d.Ly, d.Lz, x, y, z, ux, uy, uz, sl, loc,
-                                    d.macro_face_mask.empty()
-                                            ? -1
-                                            : sscvfem_micro_face_mask((int)d.macro_face_mask[(size_t)e], L, xi, yi, zi),
-                                    d.macro_natural_mask.empty()
-                                            ? 0
-                                            : sscvfem_micro_face_mask((int)d.macro_natural_mask[(size_t)e], L, xi, yi, zi),
-                                    sscvfem_bd(d.bc_p, d.bc_tx, d.bc_ty, d.bc_tz, d.macro_pressure_mask.empty() ? nullptr : d.macro_pressure_mask.data(), d.macro_traction_mask.empty() ? nullptr : d.macro_traction_mask.data(), e, L, xi, yi, zi));
-
-                            if (!g.fine_constrained.empty()) {
-                                for (int a = 0; a < 8; ++a) {
-                                    const size_t gn = (size_t)lg[(size_t)(base + off[a])];
-                                    for (int c = 0; c < 4; ++c) {
-                                        if (!g.fine_constrained[gn * 4 + (size_t)c]) continue;
-                                        for (int b = 0; b < 8; ++b)
-                                            for (int r = 0; r < 4; ++r)
-                                                loc[(size_t)(b * 8 + a) * 16 + (size_t)(r * 4 + c)] = scalar_t(0);
-                                    }
-                                }
-                            }
-
-                            const CellQ &Q = g.qtab[(size_t)((zi % q) * q + (yi % q)) * (size_t)q + (size_t)(xi % q)];
-
-                            // Stage 1: W[i][b] = sum_j loc[i][j] * Q[j][b], contracted over
-                            // the fine index j through the transpose so each block is stored
-                            // once rather than zeroed and accumulated into.
-                            scalar_t W[8][8][16];
-                            for (int i = 0; i < 8; ++i) {
-                                const scalar_t *const SFEM_RESTRICT rowi = loc + (size_t)(i * 8) * 16;
-                                for (int b = 0; b < 8; ++b) {
-                                    scalar_t *const SFEM_RESTRICT dst = W[i][b];
-                                    const int                     n0  = Q.trow[b][0];
-                                    const scalar_t                w0  = Q.tw[b][0];
-#pragma omp simd
-                                    for (int c = 0; c < 16; ++c) dst[c] = w0 * rowi[(size_t)n0 * 16 + (size_t)c];
-                                    for (int k = 1; k < Q.tnnz[b]; ++k) {
-                                        const scalar_t *const SFEM_RESTRICT src =
-                                                rowi + (size_t)Q.trow[b][k] * 16;
-                                        const scalar_t wk = Q.tw[b][k];
-#pragma omp simd
-                                        for (int c = 0; c < 16; ++c) dst[c] += wk * src[c];
-                                    }
-                                }
-                            }
-
-                            // Stage 2: C[a][b] += sum_i Q[i][a] * W[i][b], scattered by the
-                            // patch corner's lattice position and the fixed offset slot.
-                            const int cax = xi / q, cay = yi / q, caz = zi / q;
-                            int       pl[8];
-                            for (int a = 0; a < 8; ++a)
-                                pl[a] = sscvfem_lidx(Lc, cax + GAL_CORNER[a][0], cay + GAL_CORNER[a][1],
-                                                     caz + GAL_CORNER[a][2]);
-
-                            for (int i = 0; i < 8; ++i) {
-                                for (int k = 0; k < Q.nnz[i]; ++k) {
-                                    const int      a  = Q.col[i][k];
-                                    const scalar_t wi = Q.w[i][k];
-                                    scalar_t *const SFEM_RESTRICT row = Ce + ((size_t)pl[a] * 27) * 16;
-                                    for (int b = 0; b < 8; ++b) {
-                                        scalar_t *const SFEM_RESTRICT dst = row + (size_t)slot_ab[a][b] * 16;
-                                        const scalar_t *const SFEM_RESTRICT src = W[i][b];
-#pragma omp simd
-                                        for (int c = 0; c < 16; ++c) dst[c] += wi * src[c];
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                galerkin_gather(d, nxe, e, lx.data(), ly.data(), lz.data(), lux.data(), luy.data(),
+                                luz.data(), lp.data(), lpgx.data(), lpgy.data(), lpgz.data(),
+                                lg.data());
+                galerkin_macro_affine(d, g, rho, mu, L, q, Lc, nc, off, sl, slot_ab, lx.data(),
+                                      ly.data(), lz.data(), lux.data(), luy.data(), luz.data(),
+                                      lp.data(), lpgx.data(), lpgy.data(), lpgz.data(), lg.data(), e,
+                                      Ce);
+            }
+#pragma omp for schedule(static)
+            for (ptrdiff_t i = pi.begin; i < pi.end; ++i) {
+                const ptrdiff_t e  = ord[i];
+                scalar_t *const Ce = g.C.data() + (size_t)(e - e0) * (size_t)nc * 27 * 16;
+                galerkin_gather(d, nxe, e, lx.data(), ly.data(), lz.data(), lux.data(), luy.data(),
+                                luz.data(), lp.data(), lpgx.data(), lpgy.data(), lpgz.data(),
+                                lg.data());
+                galerkin_macro_isoparam(d, g, rho, mu, L, q, Lc, nc, off, sl, slot_ab, lx.data(),
+                                        ly.data(), lz.data(), lux.data(), luy.data(), luz.data(),
+                                        lp.data(), lpgx.data(), lpgy.data(), lpgz.data(), lg.data(),
+                                        e, Ce);
             }
         }
     }

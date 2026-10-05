@@ -158,6 +158,60 @@ namespace sfem {
                     what, nfaces, lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]);
     }
 
+    // ONE MACRO ELEMENT'S CONTRIBUTION to a sideset's mass flux.
+    //
+    // `hadj`/`hdet` are the operator's hoisted geometry and nullptr asks for each cell's own,
+    // which is the convention the semi-structured kernels use throughout. It is not a style
+    // choice here either: the flux has to be measured on the surfaces the RESIDUAL integrates,
+    // and on a curved macro element those are the per-cell ones.
+    static long double sideset_flux_macro(const SSMeshData &d, const real_t rho, const real_t mu,
+                                          const real_t *const w, const ptrdiff_t e, const int L,
+                                          const int off[8], const int mm,
+                                          const scalar_t *const hadj, const scalar_t hdet) {
+        long double q = 0;
+        for (int zi = 0; zi < L; ++zi) {
+            for (int yi = 0; yi < L; ++yi) {
+                for (int xi = 0; xi < L; ++xi) {
+                    const int fm = sscvfem_micro_face_mask(mm, L, xi, yi, zi);
+                    if (!fm) continue;
+                    const int base = sscvfem_lidx(L, xi, yi, zi);
+                    scalar_t  xe[8], ye[8], ze[8], uxe[8], uye[8], uze[8], pe[8];
+                    for (int a = 0; a < 8; ++a) {
+                        const smesh::idx_t g = d.elems[base + off[a]][e];
+                        xe[a]  = (scalar_t)d.points[0][g];
+                        ye[a]  = (scalar_t)d.points[1][g];
+                        ze[a]  = (scalar_t)d.points[2][g];
+                        uxe[a] = d.ux[(size_t)g];
+                        uye[a] = d.uy[(size_t)g];
+                        uze[a] = d.uz[(size_t)g];
+                        pe[a]  = d.p[(size_t)g];
+                    }
+                    scalar_t adj[9], det, re[CVFEM_HEX8_N_DOF];
+                    if (hadj) {
+                        std::copy(hadj, hadj + 9, adj);
+                        det = hdet;
+                    } else {
+                        sscvfem_micro_geom(xe, ye, ze, adj, &det);
+                    }
+                    for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) re[k] = 0;
+                    boundary_scs_add_residual<false>((scalar_t)rho, (scalar_t)mu, adj, det, d.Lx,
+                                              d.Ly, d.Lz, xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
+                    // Same weighting as the flat path: the continuity row a boundary
+                    // node receives IS its mass flux through this surface, so a nodal
+                    // weight applied here integrates w * (rho u.n) over exactly the
+                    // sub-control surfaces the residual used. The micro-element's global
+                    // node index is already in hand, so the weight costs one load.
+                    for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
+                        const smesh::idx_t g  = d.elems[base + off[a]][e];
+                        const long double  wf = w ? (long double)w[(size_t)g] : (long double)1;
+                        q += wf * (long double)re[a * N_FIELDS + 3];
+                    }
+                }
+            }
+        }
+            return q;
+    }
+
     // Compile a Sideset into the per-element bitmask the kernels read.
     //
     // The sideset is the specification and the mask is its compiled form: a sideset is a list
@@ -746,12 +800,18 @@ namespace sfem {
         int       off[8];
         sscvfem_corner_offsets(L, off);
         long double q = 0;
+        // The two ranges of the curvature partition, as everywhere else in the semi-structured
+        // path: the straight macro elements take the hoisted geometry, the curved ones each
+        // cell's own, and neither loop asks which it has.
+        const cvfem_range      pa  = sscvfem_order_positions(d, false, 0, d.nmacro);
+        const cvfem_range      pi  = sscvfem_order_positions(d, true, 0, d.nmacro);
+        const ptrdiff_t *const ord = sscvfem_order(d);
+
 #pragma omp parallel for reduction(+ : q)
-        for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
-            const int mm = (int)macro[(size_t)e];
+        for (ptrdiff_t i = pa.begin; i < pa.end; ++i) {
+            const ptrdiff_t e  = ord ? ord[i] : i;
+            const int       mm = (int)macro[(size_t)e];
             if (!mm) continue;
-            // The operator's hoisted geometry, not each cell's own: the flux is measured on the
-            // surfaces the residual integrates, which on a curved macro element differ.
             scalar_t hadj[9], hdet;
             {
                 int      ext[8];
@@ -766,46 +826,14 @@ namespace sfem {
                 sscvfem_hoisted_cell(hx, hy, hz, L, hx, hy, hz);
                 sscvfem_micro_geom(hx, hy, hz, hadj, &hdet);
             }
-            for (int zi = 0; zi < L; ++zi) {
-                for (int yi = 0; yi < L; ++yi) {
-                    for (int xi = 0; xi < L; ++xi) {
-                        const int fm = sscvfem_micro_face_mask(mm, L, xi, yi, zi);
-                        if (!fm) continue;
-                        const int base = sscvfem_lidx(L, xi, yi, zi);
-                        scalar_t  xe[8], ye[8], ze[8], uxe[8], uye[8], uze[8], pe[8];
-                        for (int a = 0; a < 8; ++a) {
-                            const smesh::idx_t g = d.elems[base + off[a]][e];
-                            xe[a]  = (scalar_t)d.points[0][g];
-                            ye[a]  = (scalar_t)d.points[1][g];
-                            ze[a]  = (scalar_t)d.points[2][g];
-                            uxe[a] = d.ux[(size_t)g];
-                            uye[a] = d.uy[(size_t)g];
-                            uze[a] = d.uz[(size_t)g];
-                            pe[a]  = d.p[(size_t)g];
-                        }
-                        scalar_t adj[9], det, re[CVFEM_HEX8_N_DOF];
-                        if (sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e)) {
-                            sscvfem_micro_geom(xe, ye, ze, adj, &det);
-                        } else {
-                            std::copy(hadj, hadj + 9, adj);
-                            det = hdet;
-                        }
-                        for (int k = 0; k < CVFEM_HEX8_N_DOF; ++k) re[k] = 0;
-                        boundary_scs_add_residual<false>((scalar_t)rho, (scalar_t)mu, adj, det, d.Lx,
-                                                  d.Ly, d.Lz, xe, ye, ze, uxe, uye, uze, pe, re, fm, 0);
-                        // Same weighting as the flat path: the continuity row a boundary
-                        // node receives IS its mass flux through this surface, so a nodal
-                        // weight applied here integrates w * (rho u.n) over exactly the
-                        // sub-control surfaces the residual used. The micro-element's global
-                        // node index is already in hand, so the weight costs one load.
-                        for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
-                            const smesh::idx_t g  = d.elems[base + off[a]][e];
-                            const long double  wf = w ? (long double)w[(size_t)g] : (long double)1;
-                            q += wf * (long double)re[a * N_FIELDS + 3];
-                        }
-                    }
-                }
-            }
+            q += sideset_flux_macro(d, rho, mu, w, e, L, off, mm, hadj, hdet);
+        }
+#pragma omp parallel for reduction(+ : q)
+        for (ptrdiff_t i = pi.begin; i < pi.end; ++i) {
+            const ptrdiff_t e  = ord[i];
+            const int       mm = (int)macro[(size_t)e];
+            if (!mm) continue;
+            q += sideset_flux_macro(d, rho, mu, w, e, L, off, mm, nullptr, scalar_t(0));
         }
         out = (real_t)q;
         return SFEM_SUCCESS;
