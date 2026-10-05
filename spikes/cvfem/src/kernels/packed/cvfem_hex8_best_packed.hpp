@@ -120,20 +120,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                         outp, with_rc ? &rcp : nullptr, rhie_chow_scale, scalar_t(0), &hop);
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
-            for (ptrdiff_t k = 0; k < x.n_contiguous; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + k * CVFEM_HEX8_N_FIELDS;
-                const ptrdiff_t                     g   = x.owned + k;
-                rx[g] = out[0]; ry[g] = out[1]; rz[g] = out[2]; rc[g] = out[3];
-            }
-            scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
-            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
-                gx[x.ghost_off + k] = out[0]; gy[x.ghost_off + k] = out[1];
-                gz[x.ghost_off + k] = out[2]; gc[x.ghost_off + k] = out[3];
-            }
+            cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
     }
 }
 
@@ -250,26 +237,7 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                 }
             }
 
-            for (ptrdiff_t k = 0; k < x.n_contiguous; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + k * CVFEM_HEX8_N_FIELDS;
-                const ptrdiff_t                     g   = x.owned + k;
-                rx[g]                                   = out[0];
-                ry[g]                                   = out[1];
-                rz[g]                                   = out[2];
-                rc[g]                                   = out[3];
-            }
-
-            scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
-            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
-                gx[x.ghost_off + k]                       = out[0];
-                gy[x.ghost_off + k]                       = out[1];
-                gz[x.ghost_off + k]                       = out[2];
-                gc[x.ghost_off + k]                       = out[3];
-            }
+            cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
     }
 }
 
@@ -636,19 +604,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
             }
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
-            std::memcpy(jv + x.owned * CVFEM_HEX8_N_FIELDS, pack_out, (size_t)x.n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
-
-            scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
-            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
-                gx[x.ghost_off + k]                       = out[0];
-                gy[x.ghost_off + k]                       = out[1];
-                gz[x.ghost_off + k]                       = out[2];
-                gc[x.ghost_off + k]                       = out[3];
-            }
+            cvfem_hex8_drain_pack_aos(x, pack_out, n_ghost_entries, ghost_buf, jv);
             CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
     }
         CVFEM_PHASE_FLUSH(acc);
@@ -766,18 +722,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
             }
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
-            std::memcpy(jv + x.owned * CVFEM_HEX8_N_FIELDS, pack_out, (size_t)x.n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
-            scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
-            scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
-            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
-                gx[x.ghost_off + k]                       = out[0];
-                gy[x.ghost_off + k]                       = out[1];
-                gz[x.ghost_off + k]                       = out[2];
-                gc[x.ghost_off + k]                       = out[3];
-            }
+            cvfem_hex8_drain_pack_aos(x, pack_out, n_ghost_entries, ghost_buf, jv);
             CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
     }
         CVFEM_PHASE_FLUSH(acc);

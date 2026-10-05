@@ -71,8 +71,8 @@ set -uo pipefail
 # same-binary spread that looks like NUMA or pinning luck across invocations -- and
 # `--layout packed --kernel sympy --assemble` shows the same bimodality less severely.
 CONFIGS=(
-    "residual_packed_sumfact|residual|packed|sumfact|128|5|12|"
-    "residual_packed_sumfact_big|residual|packed|sumfact|160|5|12|"
+    "residual_packed_sumfact|residual|packed|128|5|12|"
+    "residual_packed_sumfact_big|residual|packed|160|5|12|"
     # residual_packed_sympy was here and is RETIRED WITH ITS KERNEL. The affine generated
     # residual moved to subpar/ on measured grounds -- 2066.9 against sumfact's 2636.8 on the
     # packed layout at 8,586,756 dof (perf/campaign_generated_arms.csv) -- so the driver now
@@ -83,34 +83,39 @@ CONFIGS=(
     # and is the configuration the retired one was measured against. Worth recording: this
     # row was also the source of three wild low readings on this machine (see the
     # confirmation pass below), so the gate loses a known-noisy member along with it.
-    "residual_packed_current|residual|packed|current|128|5|12|"
-    "jac_action_packed_sumfact|jac_action|packed|sumfact|128|5|12|"
+    # residual_packed_current was here and is RETIRED WITH ITS KERNEL, for the same reason
+    # residual_packed_sympy was: the packed residual has one micro-kernel now (sumfact, 639
+    # MELEM/s against current's 518 at 28,756k dof), so this row and residual_packed_sumfact
+    # above ran the same code and reported it twice. The gate said so -- the two medians
+    # agreed -- and nobody read it that way, which is the same failure the three
+    # jac_action rows below had.
+    "jac_action_packed_sumfact|jac_action|packed|128|5|12|"
     # `jac_action_packed_sympy` and `jac_action_packed_current` used to sit here and were
     # not three checks but one: no apply_jacobian_action_* takes a KernelKind, so all three
     # ran the same code. The gate said so every time and nobody read it that way -- the
     # three medians agreed to 0.3%. Replaced by configurations that genuinely differ: the
     # atomic sweep is a different scatter, and the isoparametric kernel is different
     # arithmetic.
-    "jac_action_atomic_sumfact|jac_action|atomic|sumfact|128|5|12|"
-    "jac_action_packed_isoparam|jac_action|packed|sumfact|128|5|12|--geom isoparam"
-    "residual_colored_sumfact|residual|colored|sumfact|128|5|12|"
-    "bsr_apply_packed_sumfact|bsr_apply|packed|sumfact|128|8|-|"
-    "assemble_store_sumfact|assemble|store|sumfact|128|10|-|"
-    "assemble_colored_sumfact|assemble|colored|sumfact|128|10|-|"
-    "assemble_packed_sumfact|assemble|packed|sumfact|128|10|-|"
+    "jac_action_atomic_sumfact|jac_action|atomic|128|5|12|"
+    "jac_action_packed_isoparam|jac_action|packed|128|5|12|--geom isoparam"
+    "residual_colored_sumfact|residual|colored|128|5|12|"
+    "bsr_apply_packed_sumfact|bsr_apply|packed|128|8|-|"
+    "assemble_store_sumfact|assemble|store|128|10|-|"
+    "assemble_colored_sumfact|assemble|colored|128|10|-|"
+    "assemble_packed_sumfact|assemble|packed|128|10|-|"
     # The operator the SOLVER runs, as opposed to the element kernel in isolation. These
     # are the ones to watch when a change touches the Rhie-Chow term or the boundary
     # closure, and the four above them cannot see either. Measured on Grace at 8,586,756
     # dofs, they run at 63%, 53% and 28% of the bare kernel's 2579 MDOF/s.
-    "residual_packed_rc|residual|packed|sumfact|128|5|12|--rhie-chow"
-    "residual_packed_rc_bnd|residual|packed|sumfact|128|5|12|--rhie-chow --boundary"
-    "residual_packed_rc_perapply|residual|packed|sumfact|128|5|12|--rhie-chow --pgrad-per-apply"
+    "residual_packed_rc|residual|packed|128|5|12|--rhie-chow"
+    "residual_packed_rc_bnd|residual|packed|128|5|12|--rhie-chow --boundary"
+    "residual_packed_rc_perapply|residual|packed|128|5|12|--rhie-chow --pgrad-per-apply"
     # The Jacobian action carrying what the solver's Krylov loop evaluates. The gate had
     # nothing like this: every jac_action row above is the bare element kernel, and the
     # operator the solver runs is 3.5x slower than that (docs/CVFEM_Kernels.md), so a change
     # that cost the exact Rhie-Chow term half its speed would not have shown up anywhere.
-    "jac_action_packed_rc|jac_action|packed|sumfact|128|5|12|--rhie-chow"
-    "jac_action_packed_rc_bnd|jac_action|packed|sumfact|128|5|12|--rhie-chow --boundary"
+    "jac_action_packed_rc|jac_action|packed|128|5|12|--rhie-chow"
+    "jac_action_packed_rc_bnd|jac_action|packed|128|5|12|--rhie-chow --boundary"
     # THE HIGHER-ORDER RESIDUAL, one row per limiter, and the gate had nothing like it. Every
     # row above runs the first-order convective flux, so the deferred correction -- the most
     # expensive kernel the solver evaluates and the one with the most arithmetic per face --
@@ -119,18 +124,18 @@ CONFIGS=(
     # the emitted object, and nothing here would have. Each arm is listed separately because
     # they are different kernels -- LIM is a template parameter -- and because the one that has
     # gone scalar before is Venkatakrishnan, which an average over the four would hide.
-    "residual_packed_ho_unlim|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 0"
-    "residual_packed_ho_clip|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 1"
-    "residual_packed_ho_venk|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 2"
-    "residual_packed_ho_dm|residual|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 3"
+    "residual_packed_ho_unlim|residual|packed|128|5|12|--rhie-chow --ho-simd --conv-ho 0"
+    "residual_packed_ho_clip|residual|packed|128|5|12|--rhie-chow --ho-simd --conv-ho 1"
+    "residual_packed_ho_venk|residual|packed|128|5|12|--rhie-chow --ho-simd --conv-ho 2"
+    "residual_packed_ho_dm|residual|packed|128|5|12|--rhie-chow --ho-simd --conv-ho 3"
     # The higher-order JACOBIAN ACTION, which is what the Krylov loop evaluates when the
     # correction is exact. Its lane sweep is the one the build had been warning about 72 times
     # per compile, and the vectorisation gate found two of its arms emitting nothing at all under
     # clang. Two limiters rather than four: these are the slowest rows in the gate, and
     # unlimited against Venkatakrishnan spans the range -- the cheapest arm and the one with the
     # most arithmetic per face.
-    "jac_action_packed_ho_unlim|jac_action|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 0"
-    "jac_action_packed_ho_venk|jac_action|packed|sumfact|128|5|12|--rhie-chow --ho-simd --conv-ho 2"
+    "jac_action_packed_ho_unlim|jac_action|packed|128|5|12|--rhie-chow --ho-simd --conv-ho 0"
+    "jac_action_packed_ho_venk|jac_action|packed|128|5|12|--rhie-chow --ho-simd --conv-ho 2"
 )
 
 op_flag() {
@@ -197,13 +202,13 @@ echo "### binary   : $BIN"
 echo "### threads  : $THREADS   reps: $REPS   raw csv: $CSV_DIR/*.csv"
 echo "### host     : $(hostname)   $(date '+%Y-%m-%d %H:%M:%S')"
 
-measure() {  # binary tag_prefix key operation layout kernel n [extra options]
-    local bin=$1 pfx=$2 key=$3 op=$4 layout=$5 kernel=$6 n=$7 extra=${8:-}
+measure() {  # binary tag_prefix key operation layout n [extra options]
+    local bin=$1 pfx=$2 key=$3 op=$4 layout=$5 n=$6 extra=${7:-}
     local side=${pfx:-solo_}
     # shellcheck disable=SC2046
     OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=true OMP_PLACES=cores \
         stdbuf -oL "$bin" --n "$n" --repeat 20 --warmup 3 \
-            --layout "$layout" --kernel "$kernel" $(op_flag "$op") $extra \
+            --layout "$layout" $(op_flag "$op") $extra \
             --csv "$CSV_DIR/${side%_}.csv" --tag "${pfx}${key}" >/dev/null 2>&1 \
         || echo "### WARNING: ${pfx}${key} returned $? -- it will show as missing below"
 }
@@ -212,27 +217,27 @@ measure() {  # binary tag_prefix key operation layout kernel n [extra options]
 # one is thrown away before anything is recorded.
 echo "### discarding one warm-up invocation"
 OMP_NUM_THREADS="$THREADS" OMP_PROC_BIND=true OMP_PLACES=cores \
-    "$BIN" --n 96 --repeat 3 --warmup 1 --layout packed --kernel sumfact >/dev/null 2>&1
+    "$BIN" --n 96 --repeat 3 --warmup 1 --layout packed >/dev/null 2>&1
 
 # Runs every configuration REPS times, or only the keys named in $1 (newline separated).
 sweep() {
     local only="${1:-}"
     for rep in $(seq 1 "$REPS"); do
     for cfg in "${CONFIGS[@]}"; do
-        IFS='|' read -r key op layout kernel n band bband extra <<<"$cfg"
+        IFS='|' read -r key op layout n band bband extra <<<"$cfg"
         if [ -n "$only" ] && ! printf '%s\n' "$only" | grep -qx -- "$key"; then continue; fi
         echo "### rep $rep  $key"
         if [ "$MODE" = against ]; then
             # Alternate which side goes first, so position-in-pair is balanced.
             if [ $((rep % 2)) -eq 1 ]; then
-                measure "$BIN"     "new_" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
-                measure "$REF_BIN" "ref_" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
+                measure "$BIN"     "new_" "$key" "$op" "$layout" "$n" "$extra"
+                measure "$REF_BIN" "ref_" "$key" "$op" "$layout" "$n" "$extra"
             else
-                measure "$REF_BIN" "ref_" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
-                measure "$BIN"     "new_" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
+                measure "$REF_BIN" "ref_" "$key" "$op" "$layout" "$n" "$extra"
+                measure "$BIN"     "new_" "$key" "$op" "$layout" "$n" "$extra"
             fi
         else
-            measure "$BIN" "" "$key" "$op" "$layout" "$kernel" "$n" "$extra"
+            measure "$BIN" "" "$key" "$op" "$layout" "$n" "$extra"
         fi
     done
     done

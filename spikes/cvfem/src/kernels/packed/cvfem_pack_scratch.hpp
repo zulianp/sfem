@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>  // for the AoS drain's memcpy
 
 // For MIN, which cvfem_hex8_pack_extent uses to clamp the last pack's element range. It is
 // defined once, there, behind an include guard.
@@ -196,6 +197,70 @@ static SFEM_INLINE Hex8PackExtent cvfem_hex8_pack_extent(
     x.ghost_off    = ghost_ptr[pack];
     x.ghosts       = &ghost_idx[ghost_ptr[pack]];
     return x;
+}
+
+// DRAINING ONE PACK'S PRIVATE BUFFER. Four sweeps carried this, and the GHOST half was
+// identical in all four: the rows a pack touches without owning are staged into ghost_buf for
+// the launcher's second, independent parallel loop to reduce.
+//
+// The owned half differs by destination layout, which is why there are two drains over one
+// ghost stager rather than one drain with a flag: the residual writes four separate field
+// arrays and the Jacobian action writes one interleaved vector, which is a single memcpy
+// because the pack's owned rows are already contiguous in it.
+//
+// The halves have to agree about the pack's node ordering -- owned rows first, ghosts after,
+// which is the layout fill_pack_fields writes. A sweep draining them in another order would
+// scatter one pack's ghosts into another's rows, and nothing short of a residual comparison
+// would catch it. One definition is what makes that agreement structural rather than a
+// convention four copies happen to share.
+static SFEM_INLINE void cvfem_hex8_stage_pack_ghosts(const Hex8PackExtent               &x,
+                                                     const scalar_t *const SFEM_RESTRICT pack_out,
+                                                     const ptrdiff_t                     n_ghost_entries,
+                                                     scalar_t *const SFEM_RESTRICT       ghost_buf) {
+    scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
+    scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
+    scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
+    scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
+    for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
+        const scalar_t *const SFEM_RESTRICT out =
+                pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
+        gx[x.ghost_off + k] = out[0];
+        gy[x.ghost_off + k] = out[1];
+        gz[x.ghost_off + k] = out[2];
+        gc[x.ghost_off + k] = out[3];
+    }
+}
+
+// The residual's drain: four field arrays.
+static SFEM_INLINE void cvfem_hex8_drain_pack_soa(const Hex8PackExtent               &x,
+                                                  const scalar_t *const SFEM_RESTRICT pack_out,
+                                                  const ptrdiff_t                     n_ghost_entries,
+                                                  scalar_t *const SFEM_RESTRICT       ghost_buf,
+                                                  scalar_t *const SFEM_RESTRICT       rx,
+                                                  scalar_t *const SFEM_RESTRICT       ry,
+                                                  scalar_t *const SFEM_RESTRICT       rz,
+                                                  scalar_t *const SFEM_RESTRICT       rc) {
+    for (ptrdiff_t k = 0; k < x.n_contiguous; ++k) {
+        const scalar_t *const SFEM_RESTRICT out = pack_out + k * CVFEM_HEX8_N_FIELDS;
+        const ptrdiff_t                     g   = x.owned + k;
+        rx[g] = out[0];
+        ry[g] = out[1];
+        rz[g] = out[2];
+        rc[g] = out[3];
+    }
+    cvfem_hex8_stage_pack_ghosts(x, pack_out, n_ghost_entries, ghost_buf);
+}
+
+// The Jacobian action's drain: one interleaved vector, so the owned rows are a memcpy.
+static SFEM_INLINE void cvfem_hex8_drain_pack_aos(const Hex8PackExtent               &x,
+                                                  const scalar_t *const SFEM_RESTRICT pack_out,
+                                                  const ptrdiff_t                     n_ghost_entries,
+                                                  scalar_t *const SFEM_RESTRICT       ghost_buf,
+                                                  scalar_t *const SFEM_RESTRICT       jv) {
+    std::memcpy(jv + x.owned * CVFEM_HEX8_N_FIELDS,
+                pack_out,
+                (size_t)x.n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+    cvfem_hex8_stage_pack_ghosts(x, pack_out, n_ghost_entries, ghost_buf);
 }
 
 #endif  // CVFEM_PACK_SCRATCH_HPP
