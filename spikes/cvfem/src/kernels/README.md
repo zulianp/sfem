@@ -79,9 +79,20 @@ compiles and is simply wrong at the other precision.
   regenerated, and `set_stable_pow` went on with the TET4 A/B behind it (residual -0.3%,
   assembly -0.6%, action +0.2%, checksums identical).
 
-What is still owed: `geom_t` and `idx_t` in the FLAT packed sweeps beyond `Hex8PackExtentT`,
-which already takes the index type because it holds only counts and a node pointer. The
-semi-structured and TET4 families take all of theirs.
+Nothing is owed, and that is a gate rather than a claim. `cvfem_kernels_are_templated` walks
+the tree and fails on any definition whose signature names a computation type without declaring
+it, which is what the three running gates above cannot say -- a definition still spelling the
+build's `scalar_t` compiles perfectly and is reached at the other precision only if some f32
+test happens to instantiate it. Run after all three families were converted and all three gates
+were green, it found the flat **standard** and element-**coloured** formats entirely, sixteen
+boundary-closure kernels, the two partial-assembly convective kernels, four element gathers, the
+flattened semi-structured block diagonal, and six generated kernels naming `count_t` or
+`jacobian_t` without declaring either.
+
+The one listed exception is the shared constant tables: an accessor returning a reference to a
+`const double[...]` table promotes an f32 chain, and templating it means a copy of each table
+per precision -- a decision about storage, not a missing parameter. Its measured cost today is
+nothing, since the f32 comparisons agree to f32's own round-off.
 
 **"Only the SIMD version is kept, the rest is moved to subpar."** DONE, and this file's survey
 was overruled. It had found that eight of the ten scalar matrix-free sweeps were verification
