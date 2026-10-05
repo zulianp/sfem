@@ -76,8 +76,6 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
                 cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
 
 
-    // One per thread, not one per pack: see Hex8ResidualLaneScratch.
-    Hex8ResidualLaneScratch<scalar_t> ls;
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
@@ -90,9 +88,42 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
                 cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y,
                                                pk.z, pk.pgx, pk.pgy, pk.pgz);
 
-            cvfem_hex8_residual_lanes_affine(x, pk, adj_ptr, det_ptr, pack_elems,
-                                             pack_u, pack_out, rho, mu, rhie_chow_scale,
-                                             with_rc, ls);
+            // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, ON
+            // MEASURED GROUNDS. It was shared between them for exactly the reason the one-path
+            // rule asks -- the two sweeps differ only in their drain -- and Grace refused it:
+            // jobs/ab_refactor.sbatch 4983280 and 4983377 both put the bare packed residual at
+            // -9.4% and -9.7%, the larger size at -8.2% and -8.4%, and the PACK-COLOURED
+            // residual at -17.3% and -20.0%, reproduced within each allocation.
+            //
+            // Two things narrow the cause. Every row carrying Rhie-Chow or the higher-order
+            // correction was clean, so the cost is fixed per pack and only the cheapest lane
+            // loop notices it; and the Jacobian action's lane loop, which IS still shared,
+            // measured +0.4% and +0.2% -- its packs are larger and its arithmetic per pack far
+            // greater. Hoisting the lane scratch to one object per thread did not recover it
+            // either (4983377 is that attempt).
+            //
+            // So the duplication is deliberate and the numbers are here so that it is not
+            // re-shared by someone applying the rule without the measurement.
+
+                alignas(ALIGN_BYTES) scalar_t cof0[cvfem_hex8_vec_size<scalar_t>], cof1[cvfem_hex8_vec_size<scalar_t>], cof2[cvfem_hex8_vec_size<scalar_t>];
+                alignas(ALIGN_BYTES) scalar_t cof3[cvfem_hex8_vec_size<scalar_t>], cof4[cvfem_hex8_vec_size<scalar_t>], cof5[cvfem_hex8_vec_size<scalar_t>];
+                alignas(ALIGN_BYTES) scalar_t cof6[cvfem_hex8_vec_size<scalar_t>], cof7[cvfem_hex8_vec_size<scalar_t>], cof8[cvfem_hex8_vec_size<scalar_t>];
+                alignas(ALIGN_BYTES) scalar_t det[cvfem_hex8_vec_size<scalar_t>];
+                Hex8InputPackT<scalar_t>    in;
+                Hex8ResidualPackT<scalar_t> outp;
+                Hex8RhieChowPackT<scalar_t> rcp;
+            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
+                const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
+                gather_hex8_simd_from_pack(pack_elems, pack_u, adj_ptr, det_ptr, begin, nlanes, in,
+                                           cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+                if (with_rc) {
+                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp);
+                }
+                cvfem_hex8_ns_upwind_residual_sumfact_simd(
+                        rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
+                        with_rc ? &rcp : nullptr, rhie_chow_scale);
+                scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+            }
 
             cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
     }
@@ -741,8 +772,6 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
     const Hex8PackCoordsT<scalar_t> pk =
             cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
 
-    // One per thread, not one per pack: see Hex8ResidualLaneScratch.
-    Hex8ResidualLaneScratch<scalar_t> ls;
 
     for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
         const ptrdiff_t pack = pack_order[i];
@@ -756,8 +785,42 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
                                            x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z,
                                            pk.pgx, pk.pgy, pk.pgz);
 
-        cvfem_hex8_residual_lanes_affine(x, pk, adj_ptr, det_ptr, pack_elems, pack_u, pack_out,
-                                         rho, mu, rhie_chow_scale, with_rc, ls);
+            // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, ON
+            // MEASURED GROUNDS. It was shared between them for exactly the reason the one-path
+            // rule asks -- the two sweeps differ only in their drain -- and Grace refused it:
+            // jobs/ab_refactor.sbatch 4983280 and 4983377 both put the bare packed residual at
+            // -9.4% and -9.7%, the larger size at -8.2% and -8.4%, and the PACK-COLOURED
+            // residual at -17.3% and -20.0%, reproduced within each allocation.
+            //
+            // Two things narrow the cause. Every row carrying Rhie-Chow or the higher-order
+            // correction was clean, so the cost is fixed per pack and only the cheapest lane
+            // loop notices it; and the Jacobian action's lane loop, which IS still shared,
+            // measured +0.4% and +0.2% -- its packs are larger and its arithmetic per pack far
+            // greater. Hoisting the lane scratch to one object per thread did not recover it
+            // either (4983377 is that attempt).
+            //
+            // So the duplication is deliberate and the numbers are here so that it is not
+            // re-shared by someone applying the rule without the measurement.
+
+            alignas(ALIGN_BYTES) scalar_t cof0[cvfem_hex8_vec_size<scalar_t>], cof1[cvfem_hex8_vec_size<scalar_t>], cof2[cvfem_hex8_vec_size<scalar_t>];
+            alignas(ALIGN_BYTES) scalar_t cof3[cvfem_hex8_vec_size<scalar_t>], cof4[cvfem_hex8_vec_size<scalar_t>], cof5[cvfem_hex8_vec_size<scalar_t>];
+            alignas(ALIGN_BYTES) scalar_t cof6[cvfem_hex8_vec_size<scalar_t>], cof7[cvfem_hex8_vec_size<scalar_t>], cof8[cvfem_hex8_vec_size<scalar_t>];
+            alignas(ALIGN_BYTES) scalar_t det[cvfem_hex8_vec_size<scalar_t>];
+            Hex8InputPackT<scalar_t>    in;
+            Hex8ResidualPackT<scalar_t> outp;
+            Hex8RhieChowPackT<scalar_t> rcp;
+            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
+                const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
+                gather_hex8_simd_from_pack(pack_elems, pack_u, adj_ptr, det_ptr, begin, nlanes, in,
+                                           cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det);
+                if (with_rc) {
+                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, begin, nlanes, rcp);
+                }
+                cvfem_hex8_ns_upwind_residual_sumfact_simd(
+                        rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
+                        with_rc ? &rcp : nullptr, rhie_chow_scale);
+                scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+            }
 
         cvfem_hex8_flush_pack_to_global_soa(x, pack_out, rx, ry, rz, rc);
     }

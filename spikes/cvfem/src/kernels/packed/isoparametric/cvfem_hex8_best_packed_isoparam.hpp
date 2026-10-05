@@ -54,8 +54,6 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
         const Hex8PackCoordsT<scalar_t> pk = cvfem_hex8_pack_coords<scalar_t>(true, 0, max_actual_nodes_per_pack);
 
 
-    // One per thread, not one per pack: see Hex8ResidualLaneScratch.
-    Hex8ResidualLaneScratch<scalar_t> ls;
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
@@ -66,7 +64,33 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
 
             fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
-            cvfem_hex8_residual_lanes_isoparam(x, pk, pack_elems, pack_u, pack_out, rho, mu, ls);
+            // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, ON
+            // MEASURED GROUNDS. It was shared between them for exactly the reason the one-path
+            // rule asks -- the two sweeps differ only in their drain -- and Grace refused it:
+            // jobs/ab_refactor.sbatch 4983280 and 4983377 both put the bare packed residual at
+            // -9.4% and -9.7%, the larger size at -8.2% and -8.4%, and the PACK-COLOURED
+            // residual at -17.3% and -20.0%, reproduced within each allocation.
+            //
+            // Two things narrow the cause. Every row carrying Rhie-Chow or the higher-order
+            // correction was clean, so the cost is fixed per pack and only the cheapest lane
+            // loop notices it; and the Jacobian action's lane loop, which IS still shared,
+            // measured +0.4% and +0.2% -- its packs are larger and its arithmetic per pack far
+            // greater. Hoisting the lane scratch to one object per thread did not recover it
+            // either (4983377 is that attempt).
+            //
+            // So the duplication is deliberate and the numbers are here so that it is not
+            // re-shared by someone applying the rule without the measurement.
+
+                Hex8InputPackT<scalar_t>    in;
+                Hex8CoordPackT<scalar_t>    xyz;
+                Hex8ResidualPackT<scalar_t> outp;
+            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
+                const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
+                gather_hex8_isoparam_simd_from_pack(pack_elems, pack_u, pk.x, pk.y, pk.z, begin, nlanes,
+                                                    in, xyz);
+                cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp);
+                scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+            }
 
             cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
     }
@@ -396,8 +420,6 @@ static SFEM_NOINLINE void apply_residual_packcolored_isoparam_range(
     const Hex8PackCoordsT<scalar_t> pk =
             cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
 
-    // One per thread, not one per pack: see Hex8ResidualLaneScratch.
-    Hex8ResidualLaneScratch<scalar_t> ls;
 
     for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
         const ptrdiff_t pack = pack_order[i];
@@ -408,7 +430,33 @@ static SFEM_NOINLINE void apply_residual_packcolored_isoparam_range(
         fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
         fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
 
-        cvfem_hex8_residual_lanes_isoparam(x, pk, pack_elems, pack_u, pack_out, rho, mu, ls);
+            // THE LANE LOOP IS WRITTEN OUT HERE, AND IN THE PACK-COLOURED SWEEP BELOW, ON
+            // MEASURED GROUNDS. It was shared between them for exactly the reason the one-path
+            // rule asks -- the two sweeps differ only in their drain -- and Grace refused it:
+            // jobs/ab_refactor.sbatch 4983280 and 4983377 both put the bare packed residual at
+            // -9.4% and -9.7%, the larger size at -8.2% and -8.4%, and the PACK-COLOURED
+            // residual at -17.3% and -20.0%, reproduced within each allocation.
+            //
+            // Two things narrow the cause. Every row carrying Rhie-Chow or the higher-order
+            // correction was clean, so the cost is fixed per pack and only the cheapest lane
+            // loop notices it; and the Jacobian action's lane loop, which IS still shared,
+            // measured +0.4% and +0.2% -- its packs are larger and its arithmetic per pack far
+            // greater. Hoisting the lane scratch to one object per thread did not recover it
+            // either (4983377 is that attempt).
+            //
+            // So the duplication is deliberate and the numbers are here so that it is not
+            // re-shared by someone applying the rule without the measurement.
+
+            Hex8InputPackT<scalar_t>    in;
+            Hex8CoordPackT<scalar_t>    xyz;
+            Hex8ResidualPackT<scalar_t> outp;
+            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
+                const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
+                gather_hex8_isoparam_simd_from_pack(pack_elems, pack_u, pk.x, pk.y, pk.z, begin, nlanes,
+                                                    in, xyz);
+                cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp);
+                scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
+            }
 
         cvfem_hex8_flush_pack_to_global_soa(x, pack_out, rx, ry, rz, rc);
     }
