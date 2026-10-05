@@ -67,33 +67,20 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
         // Coordinates always, and the pressure gradient when Rhie-Chow is on: the same
         // six-array slot the first-order SIMD path uses, so no new scratch shape appears.
-        scalar_t *const SFEM_RESTRICT pack_xyz =
-                thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(max_actual_nodes_per_pack) : packed_xyz_n(max_actual_nodes_per_pack));
-        const ptrdiff_t xyz_n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
-        scalar_t *const SFEM_RESTRICT pack_x   = pack_xyz;
-        scalar_t *const SFEM_RESTRICT pack_y   = pack_xyz + xyz_n;
-        scalar_t *const SFEM_RESTRICT pack_z   = pack_xyz + 2 * xyz_n;
-        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
+        const Hex8PackCoords pk =
+                cvfem_hex8_pack_coords(true, with_rc, max_actual_nodes_per_pack);
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
-            const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t                         owned        = owned_nodes_ptr[pack];
-            const ptrdiff_t                         n_contiguous = owned_nodes_ptr[pack + 1] - owned;
-            const ptrdiff_t                         n_ghost      = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t                         ghost_off    = ghost_ptr[pack];
+            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+                    pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
-            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
             if (with_rc)
-                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, n_contiguous, n_ghost, ghosts, pack_x,
-                                               pack_y, pack_z, pack_pgx, pack_pgy, pack_pgz);
+                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x,
+                                               pk.y, pk.z, pk.pgx, pk.pgy, pk.pgz);
             else
-                fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
 
             alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
                     cof2[CVFEM_HEX8_VEC_SIZE], cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
@@ -105,13 +92,13 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
             Hex8UGradPack    hop;
             hop.limiter  = limiter;
             hop.venkat_c = venkat_c;
-            for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
+            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
+                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
                 gather_hex8_simd_from_pack(pack_elems, pack_u, adj_ptr, det_ptr, begin, nlanes, in,
                                            cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, detv);
                 if (with_rc) {
-                    cvfem_hex8_gather_rc_from_pack(pack_elems, pack_pgx,
-                                                   pack_pgy, pack_pgz, begin, nlanes, rcp);
+                    cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx,
+                                                   pk.pgy, pk.pgz, begin, nlanes, rcp);
                 }
                 for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                     const ptrdiff_t e = begin + lane;
@@ -133,19 +120,19 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
                         outp, with_rc ? &rcp : nullptr, rhie_chow_scale, scalar_t(0), &hop);
                 scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
             }
-            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+            for (ptrdiff_t k = 0; k < x.n_contiguous; ++k) {
                 const scalar_t *const SFEM_RESTRICT out = pack_out + k * CVFEM_HEX8_N_FIELDS;
-                const ptrdiff_t                     g   = owned + k;
+                const ptrdiff_t                     g   = x.owned + k;
                 rx[g] = out[0]; ry[g] = out[1]; rz[g] = out[2]; rc[g] = out[3];
             }
             scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
-                gx[ghost_off + k] = out[0]; gy[ghost_off + k] = out[1];
-                gz[ghost_off + k] = out[2]; gc[ghost_off + k] = out[3];
+            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
+                gx[x.ghost_off + k] = out[0]; gy[x.ghost_off + k] = out[1];
+                gz[x.ghost_off + k] = out[2]; gc[x.ghost_off + k] = out[3];
             }
     }
 }
@@ -199,45 +186,30 @@ static SFEM_NOINLINE void apply_residual_packed_range(
         const int with_rc) {
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(1, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_xyz =
-                (ISO || with_rc)
-                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(max_actual_nodes_per_pack) : packed_xyz_n(max_actual_nodes_per_pack))
-                        : nullptr;
-        const ptrdiff_t xyz_n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
-        scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
-        scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
+        const Hex8PackCoords pk =
+                cvfem_hex8_pack_coords(ISO || with_rc, with_rc, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
-            const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t                         owned        = owned_nodes_ptr[pack];
-            const ptrdiff_t                         n_contiguous = owned_nodes_ptr[pack + 1] - owned;
-            const ptrdiff_t                         n_ghost      = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t                         ghost_off    = ghost_ptr[pack];
+            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+                    pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+            std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
 
-            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
             if (with_rc)
-                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y,
-                                               pack_z, pack_pgx, pack_pgy, pack_pgz);
+                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y,
+                                               pk.z, pk.pgx, pk.pgy, pk.pgz);
 
             if constexpr (ISO) {
-                fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
                 Hex8InputPack    in;
                 Hex8CoordPack    xyz;
                 Hex8ResidualPack outp;
-                for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                    const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
+                for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
+                    const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
                     gather_hex8_isoparam_simd_from_pack(
-                            pack_elems, pack_u, pack_x, pack_y, pack_z, begin, nlanes, in, xyz);
+                            pack_elems, pack_u, pk.x, pk.y, pk.z, begin, nlanes, in, xyz);
                     cvfem_hex8_ns_upwind_residual_isoparam_simd(rho, mu, xyz, in, outp);
                     scatter_hex8_simd_to_pack(pack_elems, pack_out, begin, nlanes, outp);
                 }
@@ -249,8 +221,8 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                 Hex8InputPack    in;
                 Hex8ResidualPack outp;
                 Hex8RhieChowPack rcp;
-                for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                    const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
+                for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
+                    const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
                     gather_hex8_simd_from_pack(pack_elems,
                                                pack_u,
                                                adj_ptr, det_ptr,
@@ -268,8 +240,8 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                                                cof8,
                                                det);
                     if (with_rc) {
-                        cvfem_hex8_gather_rc_from_pack(pack_elems, pack_pgx, pack_pgy,
-                                                       pack_pgz, begin, nlanes, rcp);
+                        cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy,
+                                                       pk.pgz, begin, nlanes, rcp);
                     }
                     cvfem_hex8_ns_upwind_residual_sumfact_simd(
                             rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6, cof7, cof8, det, in, outp,
@@ -278,9 +250,9 @@ static SFEM_NOINLINE void apply_residual_packed_range(
                 }
             }
 
-            for (ptrdiff_t k = 0; k < n_contiguous; ++k) {
+            for (ptrdiff_t k = 0; k < x.n_contiguous; ++k) {
                 const scalar_t *const SFEM_RESTRICT out = pack_out + k * CVFEM_HEX8_N_FIELDS;
-                const ptrdiff_t                     g   = owned + k;
+                const ptrdiff_t                     g   = x.owned + k;
                 rx[g]                                   = out[0];
                 ry[g]                                   = out[1];
                 rz[g]                                   = out[2];
@@ -291,12 +263,12 @@ static SFEM_NOINLINE void apply_residual_packed_range(
             scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
-                gx[ghost_off + k]                       = out[0];
-                gy[ghost_off + k]                       = out[1];
-                gz[ghost_off + k]                       = out[2];
-                gc[ghost_off + k]                       = out[3];
+            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
+                gx[x.ghost_off + k]                       = out[0];
+                gy[x.ghost_off + k]                       = out[1];
+                gz[x.ghost_off + k]                       = out[2];
+                gc[x.ghost_off + k]                       = out[3];
             }
     }
 }
@@ -361,47 +333,34 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
         std::memset(dense_ke, 0, sizeof(dense_ke));
         scalar_t *const SFEM_RESTRICT pack_u          = thread_scratch<scalar_t>(0, u_n);
         scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
-        scalar_t *const SFEM_RESTRICT pack_xyz =
-                (ISO || with_rc)
-                        ? thread_scratch<scalar_t>(3, with_rc ? packed_rc_n(max_actual_nodes_per_pack) : packed_xyz_n(max_actual_nodes_per_pack))
-                        : nullptr;
-        const ptrdiff_t xyz_n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
-        scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
-        scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
+        const Hex8PackCoords pk =
+                cvfem_hex8_pack_coords(ISO || with_rc, with_rc, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
-            const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t                         owned        = owned_nodes_ptr[pack];
-            const ptrdiff_t                         n_contiguous = owned_nodes_ptr[pack + 1] - owned;
-            const ptrdiff_t                         n_ghost      = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
+            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+                    pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
             const auto                             &lrowptr      = local_rowptr[(size_t)pack];
             const auto                             &lslots       = local_global_slot[(size_t)pack];
-            // lrowptr has exactly n_contiguous + n_ghost + 1 entries -- build_pack_local_crs
+            // lrowptr has exactly x.n_contiguous + x.n_ghost + 1 entries -- build_pack_local_crs
             // assigns it that length -- so back() is the last of them and the empty() guard
             // could only fire on a pack the builder never saw. Indexed rather than called,
             // because this becomes a raw pointer when the kernel stops taking PackedData.
-            const int                               local_nnz    = lrowptr[(size_t)(n_contiguous + n_ghost)];
+            const int                               local_nnz    = lrowptr[(size_t)(x.n_contiguous + x.n_ghost)];
 
             CVFEM_PHASE_CLOCK(_t);
             std::memset(local_vals_pack, 0, (size_t)local_nnz * 16 * sizeof(scalar_t));
             CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
 
-            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
+            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
             if (with_rc)
-                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
-                                               pack_pgx, pack_pgy, pack_pgz);
+                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z,
+                                               pk.pgx, pk.pgy, pk.pgz);
             if constexpr (ISO)
-                fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
-            for (ptrdiff_t e = e_start; e < e_end; ++e) {
+            for (ptrdiff_t e = x.e_start; e < x.e_end; ++e) {
                 scalar_t ux_e[8], uy_e[8], uz_e[8], p_e[8];
                 for (int a = 0; a < CVFEM_HEX8_N_NODES; ++a) {
                     const scalar_t *const SFEM_RESTRICT u = pack_u + (ptrdiff_t)pack_elems[a][e] * CVFEM_HEX8_N_FIELDS;
@@ -423,15 +382,15 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
                 const Hex8RcConfig rcfg = rc_cfg;
                 Hex8RhieChow rc{};
                 if (with_rc) {
-                    gather_hex8_coords_from_pack(pack_elems, pack_x, pack_y, pack_z, e, rc_x, rc_y, rc_z);
-                    gather_hex8_coords_from_pack(pack_elems, pack_pgx, pack_pgy, pack_pgz, e, rc_pgx, rc_pgy, rc_pgz);
+                    gather_hex8_coords_from_pack(pack_elems, pk.x, pk.y, pk.z, e, rc_x, rc_y, rc_z);
+                    gather_hex8_coords_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz, e, rc_pgx, rc_pgy, rc_pgz);
                     rc = Hex8RhieChow{rc_x,    rc_y,  rc_z,  rc_pgx, rc_pgy, rc_pgz, rcfg.scale,
                                       nullptr, nullptr, nullptr, ux_e, uy_e, uz_e, rcfg.tau};
                 }
                 const scalar_t *const rc_p = with_rc ? p_e : nullptr;
                 if constexpr (ISO) {
                     scalar_t x[8], y[8], z[8];
-                    gather_hex8_coords_from_pack(pack_elems, pack_x, pack_y, pack_z, e, x, y, z);
+                    gather_hex8_coords_from_pack(pack_elems, pk.x, pk.y, pk.z, e, x, y, z);
                     cvfem_hex8_ns_upwind_jacobian_add_slots_isoparam<false>(
                             rho, mu, x, y, z, ux_e, uy_e, uz_e, slots, local_vals, rc, rc_p);
                 } else {
@@ -441,17 +400,16 @@ static SFEM_NOINLINE void assemble_jacobian_packed_range(
             }
 
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
-            const int                     owned_nnz = n_contiguous > 0 ? lrowptr[(size_t)n_contiguous] : 0;
+            const int                     owned_nnz = x.n_contiguous > 0 ? lrowptr[(size_t)x.n_contiguous] : 0;
             if (!g_kernel_only)
                 for (int t = 0; t < owned_nnz; ++t)
                     bsr4_add16(&gvalues[(ptrdiff_t)lslots[(size_t)t] * 16], local_vals_pack + (ptrdiff_t)t * 16);
 
-            const ptrdiff_t ghost_off = ghost_ptr[pack];
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const ptrdiff_t local_i = n_contiguous + k;
+            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
+                const ptrdiff_t local_i = x.n_contiguous + k;
                 const int       begin   = lrowptr[(size_t)local_i];
                 const int       end     = lrowptr[(size_t)local_i + 1];
-                const ptrdiff_t dest    = ghost_mat_ptr[(size_t)ghost_off + (size_t)k];
+                const ptrdiff_t dest    = ghost_mat_ptr[(size_t)x.ghost_off + (size_t)k];
                 std::memcpy(ghost_mat_val + dest * 16,
                             local_vals_pack + (ptrdiff_t)begin * 16,
                             (size_t)(end - begin) * 16 * sizeof(scalar_t));
@@ -544,37 +502,21 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
         scalar_t *const SFEM_RESTRICT pack_u   = thread_scratch<scalar_t>(0, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
-        scalar_t *const SFEM_RESTRICT pack_xyz =
-                (ISO || with_rc) ? thread_scratch<scalar_t>(3, slot3_n) : nullptr;
-        const ptrdiff_t xyz_n = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
-        scalar_t *const SFEM_RESTRICT pack_x = pack_xyz;
-        scalar_t *const SFEM_RESTRICT pack_y = pack_xyz ? pack_xyz + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_z = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgx = with_rc ? pack_xyz + 3 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgy = with_rc ? pack_xyz + 4 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_pgz = with_rc ? pack_xyz + 5 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(max_actual_nodes_per_pack)) : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
-        scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;
+        const Hex8PackCoords pk =
+                cvfem_hex8_pack_coords(ISO || with_rc, with_rc, max_actual_nodes_per_pack);
+        const Hex8PackQGrad qg = cvfem_hex8_pack_qgrad(with_qg, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
-            const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t                         owned        = owned_nodes_ptr[pack];
-            const ptrdiff_t                         n_contiguous = owned_nodes_ptr[pack + 1] - owned;
-            const ptrdiff_t                         n_ghost      = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t                         n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts       = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t                         ghost_off    = ghost_ptr[pack];
+            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+                    pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             CVFEM_PHASE_CLOCK(_t);
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+            std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
             CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
 
-            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, n_contiguous, n_ghost, ghosts, pack_u);
-            fill_pack_interleaved(owned_nodes_ptr, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
+            fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
+            fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
 
             Hex8InputPack    u_pack;
             Hex8InputPack    du_pack;
@@ -588,23 +530,23 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
             hop.limiter  = limiter;
             hop.venkat_c = venkat_c;
             if (with_rc)
-                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z,
-                                               pack_pgx, pack_pgy, pack_pgz);
+                cvfem_hex8_fill_pack_xyz_pgrad(owned_nodes_ptr, points, pgx, pgy, pgz, with_rc, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z,
+                                               pk.pgx, pk.pgy, pk.pgz);
             if (with_qg)
-                cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
+                cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, x.n_contiguous, x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
             if constexpr (ISO)
-                fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
+                fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
-            for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
+            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
+                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
                 if constexpr (ISO) {
                     gather_hex8_isoparam_action_simd_from_pack(pack_elems,
                                                                pack_u,
                                                                pack_dir,
-                                                               pack_x,
-                                                               pack_y,
-                                                               pack_z,
+                                                               pk.x,
+                                                               pk.y,
+                                                               pk.z,
                                                                begin,
                                                                nlanes,
                                                                u_pack,
@@ -639,12 +581,12 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
                                                       cof8,
                                                       det);
                     if (with_rc) {
-                        cvfem_hex8_gather_rc_from_pack(pack_elems, pack_pgx, pack_pgy, pack_pgz,
+                        cvfem_hex8_gather_rc_from_pack(pack_elems, pk.pgx, pk.pgy, pk.pgz,
                                                        begin, nlanes, rcp);
                         cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, begin, nlanes, rcp);
                     }
                     if (with_qg)
-                        cvfem_hex8_gather_qg_from_pack(pack_elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
+                        cvfem_hex8_gather_qg_from_pack(pack_elems, qg.x, qg.y, qg.z, begin, nlanes, rcp);
                     if (with_ho) {
                         for (int lane = 0; lane < CVFEM_HEX8_VEC_SIZE; ++lane) {
                             const ptrdiff_t e = begin + lane;
@@ -694,18 +636,18 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_range(
             }
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
-            std::memcpy(jv + owned * CVFEM_HEX8_N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+            std::memcpy(jv + x.owned * CVFEM_HEX8_N_FIELDS, pack_out, (size_t)x.n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
 
             scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
-                gx[ghost_off + k]                       = out[0];
-                gy[ghost_off + k]                       = out[1];
-                gz[ghost_off + k]                       = out[2];
-                gc[ghost_off + k]                       = out[3];
+            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
+                gx[x.ghost_off + k]                       = out[0];
+                gy[x.ghost_off + k]                       = out[1];
+                gz[x.ghost_off + k]                       = out[2];
+                gc[x.ghost_off + k]                       = out[3];
             }
             CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
     }
@@ -778,43 +720,31 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
         scalar_t *const SFEM_RESTRICT pack_dir = thread_scratch<scalar_t>(1, scratch_n);
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         // Three arrays in slot 3, not six: the nodal pressure gradient is inside the store.
-        scalar_t *const SFEM_RESTRICT pack_xyz = with_qg ? thread_scratch<scalar_t>(3, packed_xyz_n(max_actual_nodes_per_pack)) : nullptr;
-        const ptrdiff_t               xyz_n    = max_actual_nodes_per_pack > 0 ? max_actual_nodes_per_pack : 1;
-        scalar_t *const SFEM_RESTRICT pack_x   = pack_xyz;
-        scalar_t *const SFEM_RESTRICT pack_y   = pack_xyz ? pack_xyz + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_z   = pack_xyz ? pack_xyz + 2 * xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qg  = with_qg ? thread_scratch<scalar_t>(4, packed_qg_n(max_actual_nodes_per_pack)) : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qgx = pack_qg;
-        scalar_t *const SFEM_RESTRICT pack_qgy = with_qg ? pack_qg + xyz_n : nullptr;
-        scalar_t *const SFEM_RESTRICT pack_qgz = with_qg ? pack_qg + 2 * xyz_n : nullptr;
+        const Hex8PackCoords pk =
+                cvfem_hex8_pack_coords(with_qg, /*with_rc=*/0, max_actual_nodes_per_pack);
+        const Hex8PackQGrad qg = cvfem_hex8_pack_qgrad(with_qg, max_actual_nodes_per_pack);
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
-            const ptrdiff_t e_start      = pack * n_elements_per_pack;
-            const ptrdiff_t e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
-            const ptrdiff_t owned        = owned_nodes_ptr[pack];
-            const ptrdiff_t n_contiguous = owned_nodes_ptr[pack + 1] - owned;
-            const ptrdiff_t n_ghost      = ghost_ptr[pack + 1] - ghost_ptr[pack];
-            const ptrdiff_t n_pack_nodes = n_contiguous + n_ghost;
-            const idx_t *const SFEM_RESTRICT ghosts    = &ghost_idx[ghost_ptr[pack]];
-            const ptrdiff_t                         ghost_off = ghost_ptr[pack];
+            const Hex8PackExtent x = cvfem_hex8_pack_extent(
+                    pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
 
             CVFEM_PHASE_CLOCK(_t);
-            std::memset(pack_out, 0, (size_t)n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+            std::memset(pack_out, 0, (size_t)x.n_pack_nodes * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
             CVFEM_PHASE_MARK(acc, _t, PH_LOCAL_MEMSET);
 
-            fill_pack_interleaved(owned_nodes_ptr, pack, n_contiguous, n_ghost, ghosts, dir, pack_dir);
+            fill_pack_interleaved(owned_nodes_ptr, pack, x.n_contiguous, x.n_ghost, x.ghosts, dir, pack_dir);
             if (with_qg) {
-                fill_pack_xyz(owned_nodes_ptr, points, pack, n_contiguous, n_ghost, ghosts, pack_x, pack_y, pack_z);
-                cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, n_contiguous, n_ghost, ghosts, pack_qgx, pack_qgy, pack_qgz);
+                fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
+                cvfem_hex8_fill_pack_qgrad(owned_nodes_ptr, qgx, qgy, qgz, pack, x.n_contiguous, x.n_ghost, x.ghosts, qg.x, qg.y, qg.z);
             }
             CVFEM_PHASE_MARK(acc, _t, PH_GATHER);
 
             Hex8InputPack    du_pack;
             Hex8ResidualPack outp;
             Hex8RhieChowPack rcp;
-            for (ptrdiff_t begin = e_start; begin < e_end; begin += CVFEM_HEX8_VEC_SIZE) {
-                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, e_end - begin));
+            for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += CVFEM_HEX8_VEC_SIZE) {
+                const int nlanes = int(MIN((ptrdiff_t)CVFEM_HEX8_VEC_SIZE, x.e_end - begin));
                 alignas(ALIGN_BYTES) scalar_t cof0[CVFEM_HEX8_VEC_SIZE], cof1[CVFEM_HEX8_VEC_SIZE],
                         cof2[CVFEM_HEX8_VEC_SIZE];
                 alignas(ALIGN_BYTES) scalar_t cof3[CVFEM_HEX8_VEC_SIZE], cof4[CVFEM_HEX8_VEC_SIZE],
@@ -826,7 +756,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
                                            cof4, cof5, cof6, cof7, cof8, det);
                 if (with_rc) cvfem_hex8_gather_rc_coeff(rc_coeff, rc_w, rc_cfg, begin, nlanes, rcp);
                 if (with_qg) {
-                    cvfem_hex8_gather_qg_from_pack(pack_elems, pack_qgx, pack_qgy, pack_qgz, begin, nlanes, rcp);
+                    cvfem_hex8_gather_qg_from_pack(pack_elems, qg.x, qg.y, qg.z, begin, nlanes, rcp);
                 }
                 cvfem_hex8_ns_upwind_jacobian_action_pa_simd(rho, mu, cof0, cof1, cof2, cof3, cof4, cof5, cof6,
                                                              cof7, cof8, det, du_pack,
@@ -836,17 +766,17 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
             }
             CVFEM_PHASE_MARK(acc, _t, PH_KERNEL);
 
-            std::memcpy(jv + owned * CVFEM_HEX8_N_FIELDS, pack_out, (size_t)n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
+            std::memcpy(jv + x.owned * CVFEM_HEX8_N_FIELDS, pack_out, (size_t)x.n_contiguous * (size_t)CVFEM_HEX8_N_FIELDS * sizeof(scalar_t));
             scalar_t *const SFEM_RESTRICT gx = ghost_buf + 0 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gy = ghost_buf + 1 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gz = ghost_buf + 2 * n_ghost_entries;
             scalar_t *const SFEM_RESTRICT gc = ghost_buf + 3 * n_ghost_entries;
-            for (ptrdiff_t k = 0; k < n_ghost; ++k) {
-                const scalar_t *const SFEM_RESTRICT out = pack_out + (n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
-                gx[ghost_off + k]                       = out[0];
-                gy[ghost_off + k]                       = out[1];
-                gz[ghost_off + k]                       = out[2];
-                gc[ghost_off + k]                       = out[3];
+            for (ptrdiff_t k = 0; k < x.n_ghost; ++k) {
+                const scalar_t *const SFEM_RESTRICT out = pack_out + (x.n_contiguous + k) * CVFEM_HEX8_N_FIELDS;
+                gx[x.ghost_off + k]                       = out[0];
+                gy[x.ghost_off + k]                       = out[1];
+                gz[x.ghost_off + k]                       = out[2];
+                gc[x.ghost_off + k]                       = out[3];
             }
             CVFEM_PHASE_MARK_LAST(acc, _t, PH_LOCAL_TO_GLOBAL);
     }
