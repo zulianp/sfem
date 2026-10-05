@@ -74,6 +74,31 @@ int main(int argc, char **argv) {
     const auto macros = parse_list(smesh::Env::read_string("SFEM_BENCH_MACROS", "2,4,6,8"));
     const auto levels = parse_list(smesh::Env::read_string("SFEM_BENCH_LEVELS", "2,4,8"));
 
+    // CURVED MACRO ELEMENTS, WHICH THE BOX DOES NOT HAVE.
+    //
+    // Every arm below agrees to round-off on a box because its macro elements are affine: the
+    // hoisted sweeps lift one geometry over the micro cells and that IS the per-cell geometry,
+    // so the four variants cannot disagree about it however they derive it. That makes this
+    // bench blind to the curved path -- the branch that gives a curved macro element's micro
+    // cells their own geometry -- and the curved path is what a warped mesh such as the FDA
+    // nozzle runs on. A change to how the geometry is derived therefore has to be measured on a
+    // non-affine mesh, or the oracle cannot see the class of bug it introduces.
+    //
+    // The warp is a product of sines, which is the shape that buys both properties needed here.
+    // It vanishes on all six faces of the box, so the outer boundary stays where the
+    // coordinate-derived face tests expect it; and it is not a trilinear function of the macro
+    // corners, so both of sscvfem_classify_macros' tests fire -- the corners carry cross terms
+    // AND the lattice nodes sit off the trilinear map of those corners. The amplitude is a
+    // fraction of the micro cell size, so the Jacobian stays positive.
+    //
+    // It is confined to the INFLOW HALF of the box, and that is the point rather than economy:
+    // the right half stays a box, so one mesh carries curved and straight macro elements side
+    // by side. That is the configuration the geometry split has to get right -- which macro
+    // element belongs to which sweep -- and an all-curved mesh would not test it. The window is
+    // sin(2 pi X / Lx) on the inflow half and exactly zero beyond it, which is continuous at the
+    // midplane, so the macro elements there are undisplaced rather than half-displaced.
+    const double warp = smesh::Env::read<double>("SFEM_BENCH_WARP", 0.0);
+
     std::printf("%-4s %-10s %-11s %-11s %-11s %-11s %-11s %-11s %-9s %-9s %-9s %-10s %-10s %-10s %-10s %s\n",
                 "L", "ndof", "naive_ns/d", "macro_ns/d", "affine_ns/d", "hoist_ns/d", "em24_ns/d", "em32_ns/d", "bd_nv", "bd_mac", "pgrad", "hoist+pg", "agree", "bd_agree", "blk_agree", "res_agree");
 
@@ -90,6 +115,24 @@ int main(int argc, char **argv) {
             if (!mesh) {
                 std::fprintf(stderr, "to_semistructured failed for L=%d\n", L);
                 return EXIT_FAILURE;
+            }
+
+            if (warp > 0) {
+                const double h   = std::min(Lx / nx, std::min(Ly / ny, Lz / nz)) / L;
+                const double amp = warp * h;
+                auto *const  px  = mesh->points()->data()[0];
+                auto *const  py  = mesh->points()->data()[1];
+                auto *const  pz  = mesh->points()->data()[2];
+                for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+                    const double X  = (double)px[i];
+                    const double sx = X < 0.5 * Lx ? std::sin(2 * M_PI * X / Lx) : 0.0;
+                    const double sy = std::sin(M_PI * (double)py[i] / Ly);
+                    const double sz = std::sin(M_PI * (double)pz[i] / Lz);
+                    const double s  = sx * sy * sz;
+                    px[i] = (geom_t)((double)px[i] + amp * s);
+                    py[i] = (geom_t)((double)py[i] + amp * s * 0.7);
+                    pz[i] = (geom_t)((double)pz[i] - amp * s * 0.4);
+                }
             }
 
             SSMeshData d;

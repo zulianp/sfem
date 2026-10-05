@@ -38,6 +38,17 @@ static void check(const bool ok, const char *what) {
 static constexpr int    NF  = 4;
 static constexpr double LX = 1, LY = 1, LZ = 1;
 
+// The resolution the node key is rounded to. Read from the mesh after initialize() and never
+// from a snapshot taken before it: SFEM_SS_PACK_SIZE makes the Op RENUMBER the nodes, so an
+// earlier snapshot no longer lines up with the residual, and every arm of this test then fails.
+//
+// A ten-thousandth, not a millionth. On the box the nodes sit on lattice fractions, which round
+// the same way on both meshes however fine the resolution; a WARPED node sits at an arbitrary
+// real, and the 6e-08 the two float32 meshes differ by then decides the last digit, so at a
+// millionth the two meshes stop seeing the same node set. Here that noise is a thousandth of a
+// unit and the closest two nodes are six hundred units apart.
+static constexpr double KEY = 1e4;
+
 // A state that is a function of position, so it is the same field on both numberings.
 static std::vector<real_t> state_of(const std::shared_ptr<smesh::Mesh> &m) {
     const ptrdiff_t   n  = m->n_nodes();
@@ -58,11 +69,41 @@ static std::vector<real_t> state_of(const std::shared_ptr<smesh::Mesh> &m) {
 // Residual keyed by rounded coordinate.
 static std::map<std::array<long long, 3>, std::array<real_t, NF>> residual_of(
         sfem::Context &ctx, const int cells, const int level, const real_t rc_scale,
-        const real_t dt = 0, const bool jacobian = false) {
+        const real_t dt = 0, const bool jacobian = false, const double warp = 0) {
     const int macro = cells / level;
     auto      mesh  = smesh::Mesh::create_hex8_cube(ctx.communicator(), macro, macro, macro,
                                                     0, 0, 0, LX, LY, LZ);
     if (level > 1) mesh = smesh::to_semistructured(level, mesh, true, false);
+
+    // CURVED MACRO ELEMENTS, WHICH THE BOX HAS NONE OF.
+    //
+    // On a box the semi-structured sweeps hoist one geometry over a macro element's micro cells
+    // and that hoisted geometry IS each cell's own, so this comparison cannot see how the
+    // geometry was derived. A curved macro element is where it can: there the semi-structured
+    // path gives every micro cell its own geometry, which is exactly what the flat operator
+    // does, so the two must still agree -- and if a curved element were hoisted instead, they
+    // would not. That makes this the oracle for the curved path, and the four-variant agreement
+    // inside cvfem_sshex8_bench is not: those four sweeps share one geometry source and agree
+    // with each other whether it is right or wrong.
+    //
+    // The warp is a product of sines so that it vanishes on all six faces -- the boundary
+    // closure is selected by coordinate, so the box has to stay a box -- and is confined to
+    // X < LX/2, so one mesh carries curved and straight macro elements side by side and the
+    // split between the two sweeps is exercised rather than only one of them.
+    if (warp > 0) {
+        const double amp = warp * (double)LX / (double)cells;
+        auto *const  px  = mesh->points()->data()[0];
+        auto *const  py  = mesh->points()->data()[1];
+        auto *const  pz  = mesh->points()->data()[2];
+        for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
+            const double X = (double)px[i];
+            const double w = (X < 0.5 * LX ? std::sin(2 * M_PI * X / LX) : 0.0) *
+                             std::sin(M_PI * (double)py[i] / LY) * std::sin(M_PI * (double)pz[i] / LZ);
+            px[i] = (geom_t)((double)px[i] + amp * w);
+            py[i] = (geom_t)((double)py[i] + amp * w * 0.7);
+            pz[i] = (geom_t)((double)pz[i] - amp * w * 0.4);
+        }
+    }
 
     auto fs = sfem::FunctionSpace::create(mesh, NF);
     auto op = std::make_shared<sfem::CVFEMNavierStokes>(fs);
@@ -109,22 +150,23 @@ static std::map<std::array<long long, 3>, std::array<real_t, NF>> residual_of(
     const auto *const py = mesh->points()->data()[1];
     const auto *const pz = mesh->points()->data()[2];
     for (ptrdiff_t i = 0; i < mesh->n_nodes(); ++i) {
-        out[{(long long)std::llround(px[i] * 1e6), (long long)std::llround(py[i] * 1e6),
-             (long long)std::llround(pz[i] * 1e6)}] = {r[(size_t)i * NF + 0], r[(size_t)i * NF + 1],
+        out[{(long long)std::llround(px[i] * KEY), (long long)std::llround(py[i] * KEY),
+             (long long)std::llround(pz[i] * KEY)}] = {r[(size_t)i * NF + 0], r[(size_t)i * NF + 1],
                                                        r[(size_t)i * NF + 2], r[(size_t)i * NF + 3]};
     }
     return out;
 }
 
 static void compare(sfem::Context &ctx, const int cells, const int level, const real_t rc,
-                    const real_t dt = 0, const bool jacobian = false) {
-    const auto flat = residual_of(ctx, cells, 1, rc, dt, jacobian);
-    const auto ss   = residual_of(ctx, cells, level, rc, dt, jacobian);
+                    const real_t dt = 0, const bool jacobian = false, const double warp = 0) {
+    const auto flat = residual_of(ctx, cells, 1, rc, dt, jacobian, warp);
+    const auto ss   = residual_of(ctx, cells, level, rc, dt, jacobian, warp);
 
     char msg[160];
     const char *const what = jacobian ? (dt > 0 ? "jacobian, dt>0" : "jacobian") : "residual";
-    std::snprintf(msg, sizeof(msg), "level %d, rc %.1f, %s: both see the same node set", level,
-                  (double)rc, what);
+    const char *const geom = warp > 0 ? ", warped" : "";
+    std::snprintf(msg, sizeof(msg), "level %d, rc %.1f, %s%s: both see the same node set", level,
+                  (double)rc, what, geom);
     check(flat.size() == ss.size(), msg);
 
     real_t                  worst[NF] = {0, 0, 0, 0}, scale[NF] = {0, 0, 0, 0};
@@ -152,9 +194,9 @@ static void compare(sfem::Context &ctx, const int cells, const int level, const 
         if (here > 1e-12) {
             ++n_bad;
             const bool bnd = kv.first[0] == 0 || kv.first[1] == 0 || kv.first[2] == 0 ||
-                             kv.first[0] == (long long)std::llround(LX * 1e6) ||
-                             kv.first[1] == (long long)std::llround(LY * 1e6) ||
-                             kv.first[2] == (long long)std::llround(LZ * 1e6);
+                             kv.first[0] == (long long)std::llround(LX * KEY) ||
+                             kv.first[1] == (long long)std::llround(LY * KEY) ||
+                             kv.first[2] == (long long)std::llround(LZ * KEY);
             if (bnd) ++n_bad_bnd; else ++n_bad_int;
         }
     }
@@ -169,7 +211,7 @@ static void compare(sfem::Context &ctx, const int cells, const int level, const 
     }
     std::printf("    worst at (%.4f %.4f %.4f);  %td node(s) differ by >1e-12: %td on the boundary, "
                 "%td strictly interior\n",
-                worst_at[0] * 1e-6, worst_at[1] * 1e-6, worst_at[2] * 1e-6, n_bad, n_bad_bnd, n_bad_int);
+                worst_at[0] / KEY, worst_at[1] / KEY, worst_at[2] / KEY, n_bad, n_bad_bnd, n_bad_int);
     // 1e-3 and not round-off, deliberately.
     //
     // The two meshes are built independently and geom_t is single precision, so their node
@@ -180,7 +222,7 @@ static void compare(sfem::Context &ctx, const int cells, const int level, const 
     //
     // The threshold still has teeth for the thing it is here to catch: the hoisted geometry
     // at a non-power-of-two level reads 37 -- seven orders the wrong side of this line.
-    std::snprintf(msg, sizeof(msg), "level %d, rc %.1f: the %s agrees", level, (double)rc, what);
+    std::snprintf(msg, sizeof(msg), "level %d, rc %.1f: the %s%s agrees", level, (double)rc, what, geom);
     check(rel < 1e-3, msg);
 }
 
@@ -207,6 +249,16 @@ int main(int argc, char **argv) {
     compare(*ctx, 12, 2, 1, 0.0, true);
     compare(*ctx, 12, 2, 1, 0.05, true);
     compare(*ctx, 12, 4, 1, 0.05, true);
+
+    // THE SAME COMPARISONS ON A MESH WITH CURVED MACRO ELEMENTS.
+    //
+    // See the warp in residual_of for why these are the only arms that can see how the
+    // semi-structured path derives its geometry at all, and therefore the only ones that gate
+    // the affine / isoparametric split.
+    compare(*ctx, 12, 2, 1, 0.0, false, 0.25);
+    compare(*ctx, 12, 4, 1, 0.0, false, 0.25);
+    compare(*ctx, 12, 2, 1, 0.0, true, 0.25);
+    compare(*ctx, 12, 4, 1, 0.05, true, 0.25);
 
     if (g_failures) {
         std::fprintf(stderr, "\ncvfem_flat_vs_ss_test: %d check(s) failed\n", g_failures);

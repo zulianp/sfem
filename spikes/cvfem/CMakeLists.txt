@@ -177,6 +177,23 @@ add_test(NAME cvfem_sshex8_agree COMMAND cvfem_sshex8_bench)
 # a diagonal of anything.
 set_tests_properties(cvfem_sshex8_agree PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0;SFEM_BENCH_PROBE_DIAG=1")
 
+# THE SAME AGREEMENT ON A MESH WITH CURVED MACRO ELEMENTS, and what it does NOT gate.
+#
+# The box above has no curved macro element, so this arm warps its inflow half and one mesh then
+# carries curved and straight macro elements side by side. What that buys is coverage of the
+# curved branch and of which macro element each sweep claims: these four sweeps are split along
+# the affine / isoparametric line separately, so an element dropped from one sweep's range shows
+# up here as a disagreement with the other three.
+#
+# What it does NOT gate is whether the geometry is derived correctly, and the distinction was
+# measured rather than reasoned: forcing sscvfem_macro_curved to false -- which hoists one
+# geometry over a curved macro element's micro cells, the exact bug this split could introduce
+# -- leaves BOTH arms of this test passing. All four sweeps read the same geometry source, so
+# they agree with each other whether it is right or wrong. The oracle for that is
+# cvfem_flat_vs_ss_test's warped arms, where the same break fails four checks and nothing else.
+add_test(NAME cvfem_sshex8_agree_warped COMMAND cvfem_sshex8_bench)
+set_tests_properties(cvfem_sshex8_agree_warped PROPERTIES ENVIRONMENT "SFEM_BENCH_MACROS=2;SFEM_BENCH_LEVELS=2,4;SFEM_BENCH_REPS=1;SFEM_BENCH_WARMUP=0;SFEM_BENCH_PROBE_DIAG=1;SFEM_BENCH_WARP=0.15")
+
 # ------------------------------------------------------------------------ tests
 # One test per file in tests/, filename == target name == ctest name, as SFEM does for
 # <module>/tests/. What each one gates:
