@@ -361,7 +361,7 @@ int main(int argc, char **argv) {
                     (double)(d.nnodes * 4) / s * 1e-6, (double)d.nelements / s * 1e-6);
         csv_rows.push_back(mkrow("residual",
                                  m.mode == CVFEM_CUDA_FLUSH_TWO_PASS ? "cuda_two_pass" : "cuda_atomic",
-                                 "current", s));
+                                 "cuda_device", s));
     }
 
     // ---- matrix-free Jacobian action -----------------------------------------
@@ -403,7 +403,7 @@ int main(int argc, char **argv) {
                 csv_rows.push_back(mkrow("jac_action",
                                          m.mode == CVFEM_CUDA_FLUSH_TWO_PASS ? "cuda_two_pass"
                                                                              : "cuda_atomic",
-                                         "current", t));
+                                         "cuda_device", t));
             }
         }
     }
@@ -872,7 +872,7 @@ int main(int argc, char **argv) {
                     "standard mesh, same shape", tg,
                     tg > 0 ? (double)(d.nnodes * 4) / tg * 1e-6 : 0.0,
                     (td > 0 && tg > 0) ? td / tg : 0.0);
-        csv_rows.push_back(mkrow("residual", "cuda_deterministic", "current", td));
+        csv_rows.push_back(mkrow("residual", "cuda_deterministic", "cuda_device", td));
     }
 
     std::printf("\n=== packed mesh vs standard mesh, matrix-free ===\n");
@@ -936,7 +936,7 @@ int main(int argc, char **argv) {
             std::printf("%-38s %12.3e %12.1f %10.2e %s\n", rw.name, t,
                         t > 0 ? (double)(d.nnodes * 4) / t * 1e-6 : 0.0, rel, ok ? "OK" : "FAIL");
             csv_rows.push_back(mkrow(rw.jv ? "jac_action" : "residual",
-                                     rw.packed ? "cuda_packed" : "cuda_standard", "current", t));
+                                     rw.packed ? "cuda_packed" : "cuda_standard", "cuda_device", t));
         }
         if (t_pack_r > 0 && t_glob_r > 0)
             std::printf("packed mesh is %.2fx the standard mesh on the residual, %.2fx on J*v\n",

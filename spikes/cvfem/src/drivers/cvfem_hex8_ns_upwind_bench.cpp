@@ -2404,8 +2404,13 @@ int main(int argc, char **argv) {
     // that executed rather than the flags that were passed, and
     // tests/cvfem_bench_coverage_test checks the mapping.
     // --kernel is gone, so this is no longer a check that the row names the kernel the user
-    // asked for; it is the only statement of WHICH kernel the configuration selected. The
-    // names are the ones the campaign CSVs already carry, so old rows stay comparable.
+    // asked for; it is the only statement of WHICH kernel the configuration selected.
+    //
+    // The two isoparametric names are no longer `sympy` and `current`. Those were the
+    // selector's values, and with the selector gone they named nothing a caller could ask
+    // for -- a report row reading `atomic / current / isoparam` looks like a retired variant
+    // rather than the kernel that ran. They say which kernel instead. Nothing the paper
+    // generates reads this column; CSVs on record carry the old spelling.
     const char *const ran_kernel_name =
                 partial_assembly ? "pa_sumfact"
                 // The SpMV has no element kernel at all.
@@ -2415,12 +2420,14 @@ int main(int argc, char **argv) {
                 : (geom_kind == GeomKind::Isoparam && layout != "atomic" && !assemble) ? "isoparam_simd"
                 // Isoparametric assembly runs the hand-written scalar kernel on a pack-based
                 // layout, and on the atomic layout the generated one unless Rhie-Chow is on --
-                // which is the dispatch jac_fn makes, mirrored here.
+                // which is the dispatch jac_fn makes, mirrored here. The split is on the TERM,
+                // not on a name: the generated kernel never had Rhie-Chow put into its SymPy.
                 : (geom_kind == GeomKind::Isoparam && assemble)
-                          ? ((layout == "atomic" && !rhie_chow) ? "sympy" : "current")
+                          ? ((layout == "atomic" && !rhie_chow) ? "isoparam_generated"
+                                                                : "isoparam_handwritten")
                 // The isoparametric atomic residual, same two-way choice.
                 : (geom_kind == GeomKind::Isoparam && layout == "atomic")
-                          ? (rhie_chow ? "current" : "sympy")
+                          ? (rhie_chow ? "isoparam_handwritten" : "isoparam_generated")
                 // Everything affine: the sum-factored kernel, lane-blocked where the
                 // operation has a lane-blocked form.
                                                                    : "sumfact";
