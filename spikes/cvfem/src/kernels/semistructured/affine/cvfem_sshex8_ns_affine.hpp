@@ -131,9 +131,100 @@ inline SFEM_NOINLINE void sscvfem_apply_macro_local_affine(
             for (int yi = 0; yi < L; ++yi)
                 for (int xi = 0; xi < L; ++xi)
                     sscvfem_apply_macro_local_cell(box_lx, box_ly, box_lz, rcfg, rho, mu, upwind_eps, s,
-                                                   L, xi, yi, zi, off, hx, hy, hz);
+                                                   L, xi, yi, zi, off, nullptr, scalar_t(0), hx, hy, hz);
 
         // Scatter once per macro node instead of once per element-node incidence.
+        sscvfem_macro_drain(s, nullptr, nullptr, nxe, e, jv);
+    }
+}
+
+
+// macro_local with the macro element's geometry LIFTED OUT of the micro-cell loop, over the
+// straight macro elements.
+//
+// The flat kernel loads a precomputed adjugate and determinant per element; the two variants
+// above rebuild the Jacobian from eight corners for every micro cell, so they were doing
+// strictly more work than the kernel they are meant to beat. Inside an affine macro element
+// every micro cell is a translate of the same box, so adj and det are invariant over the whole
+// L^3 sweep and belong outside it. Worth 1.28x over sscvfem_apply_macro_local_affine, which is
+// what keeping both variants is for.
+//
+// THERE IS NO ISOPARAMETRIC TWIN OF THIS SWEEP, and that is the point of it rather than a gap:
+// lifting the geometry out of the micro-cell loop is precisely what a curved macro element
+// cannot do. A trilinear macro element's Jacobian varies across its lattice, and hoisting one
+// anyway does not merely lose accuracy -- neighbouring macro elements hoist different
+// geometries, the sub-control surfaces of a node's control volume stop closing, and a uniform
+// velocity acquires a discrete divergence (measured at 1.39 of the flux scale on the FDA
+// nozzle, against 0.085 for a flat mesh). So the curved range runs
+// sscvfem_apply_macro_local_isoparam, which is also the curved range of the variant above: as
+// branches inside the two sweeps those two paths were bit-identical, and they are one sweep now.
+//
+// What this sweep used to carry and does not: a `curved_e` test in seven places, and an assert
+// comparing the last micro cell's geometry against the hoisted value to catch a curved macro
+// element reaching it. The range it is given cannot contain one.
+inline SFEM_NOINLINE void sscvfem_apply_macro_lifted_affine(
+        // The range this call is to cover, as positions in macro_order. DESIGN.md: the
+        // threading is abstract outside the sweep and what arrives is a range, so the sweep
+        // owns no parallel region.
+        const cvfem_range r,
+        // The curvature partition; null means the identity, which is a mesh with nothing
+        // curved. See SSMeshData::macro_order.
+        const ptrdiff_t *const SFEM_RESTRICT macro_order,
+        // The staging object is gone; what this sweep reads out of it is what it takes.
+        const scalar_t box_lx,
+        const scalar_t box_ly,
+        const scalar_t box_lz,
+        idx_t **const SFEM_RESTRICT elems,
+        const int level,
+        const int nxe_src,
+        const scalar_t *const SFEM_RESTRICT pres,
+        const scalar_t *const SFEM_RESTRICT pgx_src,
+        const scalar_t *const SFEM_RESTRICT pgy_src,
+        const scalar_t *const SFEM_RESTRICT pgz_src,
+        geom_t **const SFEM_RESTRICT points,
+        const scalar_t upwind_eps,
+        const scalar_t *const SFEM_RESTRICT ux_src,
+        const scalar_t *const SFEM_RESTRICT uy_src,
+        const scalar_t *const SFEM_RESTRICT uz_src,
+        const Hex8RcConfig rcfg, const scalar_t rho, const scalar_t mu,
+                                                    const scalar_t *const SFEM_RESTRICT dir,
+                                                    scalar_t *const SFEM_RESTRICT       jv) {
+    const int L   = level;
+    const int nxe = nxe_src;
+    int       off[8];
+    sscvfem_corner_offsets(L, off);
+
+    const SSMacroScratch s = sscvfem_macro_scratch(nxe, CVFEM_HEX8_N_FIELDS, true, false, false);
+
+    for (ptrdiff_t i = r.begin; i < r.end; ++i) {
+        const ptrdiff_t e = macro_order ? macro_order[i] : i;
+        sscvfem_macro_gather(s, elems, points, pres, pgx_src, pgy_src, pgz_src, nullptr, nullptr,
+                             nullptr, nullptr, ux_src, uy_src, uz_src, dir, e, nxe,
+                             CVFEM_HEX8_N_FIELDS);
+
+        // Once per macro element: micro cell 0's corners hoisted, and the geometry built from
+        // them -- the adjugate AND the coordinates the Rhie-Chow term differences.
+        //
+        // The lattice inside a macro element is uniform, so every micro cell is congruent to
+        // cell 0 and one adjugate serves all of them. This used to hoist the adjugate but then
+        // hand the Rhie-Chow struct each cell's OWN coordinates, and the two agree only to the
+        // precision the node positions are stored in. geom_t is float32, so the block diagonal
+        // disagreed with the action it is supposed to be the diagonal of by 4.23e-08 -- eight
+        // orders above round-off, and invisible until the q-independent consistency gate looked.
+        //
+        // Only DIFFERENCES of these are taken (d = x_j - x_i), so cell 0's coordinates are exact
+        // for the purpose, not an approximation.
+        scalar_t madj[9], mdet;
+        scalar_t c0x[8], c0y[8], c0z[8];
+        sscvfem_macro_hoisted_corners(s, L, c0x, c0y, c0z);
+        sscvfem_micro_geom(c0x, c0y, c0z, madj, &mdet);
+
+        for (int zi = 0; zi < L; ++zi)
+            for (int yi = 0; yi < L; ++yi)
+                for (int xi = 0; xi < L; ++xi)
+                    sscvfem_apply_macro_local_cell(box_lx, box_ly, box_lz, rcfg, rho, mu, upwind_eps, s,
+                                                   L, xi, yi, zi, off, madj, mdet, c0x, c0y, c0z);
+
         sscvfem_macro_drain(s, nullptr, nullptr, nxe, e, jv);
     }
 }
