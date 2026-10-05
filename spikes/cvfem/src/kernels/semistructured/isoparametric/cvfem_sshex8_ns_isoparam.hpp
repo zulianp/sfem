@@ -588,4 +588,28 @@ inline SFEM_NOINLINE void sscvfem_block_diag_isoparam(
     // sums staging slots that other macro elements wrote.
 }
 
+
+// The same volume sum over CURVED macro elements: every micro cell's own determinant, and no
+// macro geometry built at all. See sscvfem_cell_volume_affine for what the two callers are and
+// why `scale` is a parameter.
+static SFEM_NOINLINE void sscvfem_cell_volume_isoparam(
+        // The staging object is gone; what this kernel reads out of it is what it takes.
+        idx_t **const SFEM_RESTRICT elems,
+        geom_t **const SFEM_RESTRICT points, const ptrdiff_t e, const int L, const int off[8],
+        const scalar_t scale,
+        scalar_t *const SFEM_RESTRICT dst) {
+    for (int zi = 0; zi < L; ++zi)
+        for (int yi = 0; yi < L; ++yi)
+            for (int xi = 0; xi < L; ++xi) {
+                const int base = sscvfem_lidx(L, xi, yi, zi);
+                scalar_t  cx[8], cy[8], cz[8], cadj[9], cdet;
+                sscvfem_cell_corners(elems, points, e, base, off, cx, cy, cz);
+                sscvfem_micro_geom(cx, cy, cz, cadj, &cdet);
+                const scalar_t vol = std::fabs(cdet);
+                if (vol < scalar_t(1e-30)) continue;
+                const scalar_t v = vol * scale;
+                for (int a = 0; a < 8; ++a) atomic_add(dst, elems[base + off[a]][e], v);
+            }
+}
+
 #endif  // CVFEM_SSHEX8_NS_ISOPARAM_HPP

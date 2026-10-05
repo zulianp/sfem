@@ -819,4 +819,47 @@ inline SFEM_NOINLINE __attribute__((flatten)) void sscvfem_block_diag_affine(
     // sums staging slots that other macro elements wrote.
 }
 
+
+// THE MICRO-CELL VOLUME SUM A NODE SEES, over STRAIGHT macro elements.
+//
+// Two front-end quantities are this same sum: the nodal gradient's denominator
+// (sscvfem_build_grad_weight, which inverts it) and the control volume the transient and body-
+// force terms weight by (sscvfem_node_volume, which takes an eighth of it, one micro cell being
+// split eight ways between its nodes). They differ in that factor and in what they do with the
+// result, not in what they accumulate, so `scale` is a parameter and this is one kernel rather
+// than two.
+//
+// A degenerate cell is skipped rather than added, which is a correctness requirement and not a
+// saving: the gradient's denominator has to count the micro cells its numerator counted, so both
+// must make the same decision on the same determinant. Numerically it is a no-op either way --
+// |det| below 1e-30 does not move a sum of order one.
+//
+// atomic_add in both callers, including the one whose element loop is serial: there the order is
+// fixed and the result is identical, and it is what lets that loop be parallelised later.
+static SFEM_INLINE void sscvfem_cell_volume_affine(
+        // The staging object is gone; what this kernel reads out of it is what it takes.
+        idx_t **const SFEM_RESTRICT elems,
+        geom_t **const SFEM_RESTRICT points, const ptrdiff_t e, const int L, const int off[8],
+        const scalar_t scale,
+        scalar_t *const SFEM_RESTRICT dst) {
+    scalar_t ex[8], ey[8], ez[8], adj[9], det;
+    for (int a = 0; a < 8; ++a) {
+        const idx_t g = elems[off[a]][e];
+        ex[a]                = (scalar_t)points[0][g];
+        ey[a]                = (scalar_t)points[1][g];
+        ez[a]                = (scalar_t)points[2][g];
+    }
+    sscvfem_micro_geom(ex, ey, ez, adj, &det);
+    const scalar_t vol = std::fabs(det);
+    if (vol < scalar_t(1e-30)) return;
+    const scalar_t v = vol * scale;
+
+    for (int zi = 0; zi < L; ++zi)
+        for (int yi = 0; yi < L; ++yi)
+            for (int xi = 0; xi < L; ++xi) {
+                const int base = sscvfem_lidx(L, xi, yi, zi);
+                for (int a = 0; a < 8; ++a) atomic_add(dst, elems[base + off[a]][e], v);
+            }
+}
+
 #endif  // CVFEM_SSHEX8_NS_AFFINE_HPP

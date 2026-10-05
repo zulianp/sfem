@@ -445,36 +445,18 @@ inline void sscvfem_build_grad_weight(SSMeshData &d) {
     const int                     L = d.level;
     int                           off[8];
     sscvfem_corner_offsets(L, off);
-    for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
-        // Hoisted exactly as the sweep hoists it, and that is a correctness requirement
-        // rather than a saving here: the denominator has to count the micro-elements the
-        // numerator counted, so both must make the same degeneracy decision on the same
-        // determinant.
-        scalar_t ex[8], ey[8], ez[8], adj[9], det;
-        for (int a = 0; a < 8; ++a) {
-            const idx_t g = d.elems[off[a]][e];
-            ex[a]                = (scalar_t)d.points[0][g];
-            ey[a]                = (scalar_t)d.points[1][g];
-            ez[a]                = (scalar_t)d.points[2][g];
-        }
-        sscvfem_micro_geom(ex, ey, ez, adj, &det);
-        const bool     curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
-        const scalar_t vol      = std::fabs(det);
-        if (!curved_e && vol < scalar_t(1e-30)) continue;
-        for (int zi = 0; zi < L; ++zi)
-            for (int yi = 0; yi < L; ++yi)
-                for (int xi = 0; xi < L; ++xi) {
-                    const int base = sscvfem_lidx(L, xi, yi, zi);
-                    scalar_t  v    = vol;
-                    if (curved_e) {
-                        scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
-                        sscvfem_cell_corners(d.elems, d.points, e, base, off, cx, cy, cz);
-                        sscvfem_micro_geom(cx, cy, cz, cadj, &cdet);
-                        v = std::fabs(cdet);
-                        if (v < scalar_t(1e-30)) continue;
-                    }
-                    for (int a = 0; a < 8; ++a) w[d.elems[base + off[a]][e]] += v;
-                }
+    // Hoisted exactly as the sweeps hoist it, and that is a correctness requirement rather than
+    // a saving here: the denominator has to count the micro cells the numerator counted, so both
+    // must make the same degeneracy decision on the same determinant. Which is why this walks the
+    // curvature partition the sweeps walk, rather than deciding per element itself.
+    {
+        const cvfem_range pa = sscvfem_order_positions(d, false, 0, d.nmacro);
+        const ptrdiff_t *const ord = sscvfem_order(d);
+        for (ptrdiff_t i = pa.begin; i < pa.end; ++i)
+            sscvfem_cell_volume_affine(d.elems, d.points, ord ? ord[i] : i, L, off, scalar_t(1), w);
+        const cvfem_range pi = sscvfem_order_positions(d, true, 0, d.nmacro);
+        for (ptrdiff_t i = pi.begin; i < pi.end; ++i)
+            sscvfem_cell_volume_isoparam(d.elems, d.points, ord[i], L, off, scalar_t(1), w);
     }
     for (ptrdiff_t i = 0; i < d.nnodes; ++i)
         w[i] = w[i] > scalar_t(0) ? scalar_t(1) / w[i] : scalar_t(0);
@@ -1041,37 +1023,20 @@ inline void sscvfem_node_volume(SSMeshData &d, std::vector<scalar_t> &node_vol) 
     int       off[8];
     sscvfem_corner_offsets(L, off);
 
+    // The same sum sscvfem_build_grad_weight accumulates, an eighth of it: a micro cell's volume
+    // is split eight ways between its nodes. One kernel pair with the factor as a parameter, over
+    // the curvature partition's two ranges.
+    const cvfem_range      pa  = sscvfem_order_positions(d, false, 0, d.nmacro);
+    const cvfem_range      pi  = sscvfem_order_positions(d, true, 0, d.nmacro);
+    const ptrdiff_t *const ord = sscvfem_order(d);
+    scalar_t *const        nv  = node_vol.data();
+    const scalar_t         eighth = scalar_t(1) / scalar_t(8);
 #pragma omp parallel for schedule(static)
-    for (ptrdiff_t e = 0; e < d.nmacro; ++e) {
-        scalar_t ex[8], ey[8], ez[8];
-        for (int a = 0; a < 8; ++a) {
-            const idx_t g = d.elems[off[a]][e];
-            ex[a] = (scalar_t)d.points[0][g];
-            ey[a] = (scalar_t)d.points[1][g];
-            ez[a] = (scalar_t)d.points[2][g];
-        }
-        scalar_t adj[9], det;
-        sscvfem_micro_geom(ex, ey, ez, adj, &det);
-        const scalar_t v        = std::fabs(det) / scalar_t(8);
-        const bool     curved_e = sscvfem_macro_curved(d.macro_curved.empty() ? nullptr : d.macro_curved.data(), e);
-
-        for (int zi = 0; zi < L; ++zi)
-            for (int yi = 0; yi < L; ++yi)
-                for (int xi = 0; xi < L; ++xi) {
-                    const int base = sscvfem_lidx(L, xi, yi, zi);
-                    scalar_t  vc   = v;
-                    if (curved_e) {
-                        scalar_t cx[8], cy[8], cz[8], cadj[9], cdet;
-                        sscvfem_cell_corners(d.elems, d.points, e, base, off, cx, cy, cz);
-                        sscvfem_micro_geom(cx, cy, cz, cadj, &cdet);
-                        vc = std::fabs(cdet) / scalar_t(8);
-                    }
-                    for (int a = 0; a < 8; ++a) {
-                        const idx_t g = d.elems[base + off[a]][e];
-                        atomic_add(node_vol.data(), g, vc);
-                    }
-                }
-    }
+    for (ptrdiff_t i = pa.begin; i < pa.end; ++i)
+        sscvfem_cell_volume_affine(d.elems, d.points, ord ? ord[i] : i, L, off, eighth, nv);
+#pragma omp parallel for schedule(static)
+    for (ptrdiff_t i = pi.begin; i < pi.end; ++i)
+        sscvfem_cell_volume_isoparam(d.elems, d.points, ord[i], L, off, eighth, nv);
 }
 
 // Whether there is a body force at all, and whether the control volume it is weighted by has
