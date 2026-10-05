@@ -16,7 +16,10 @@
 # option: the equivalence gate against a BSR built for the same state, the case with and without
 # multigrid, and the unit tests. The binary is built on the login node; this job only runs it.
 set -u
-SPIKE=$SCRATCH/sfem/spikes/cvfem; B=$SPIKE/build_gate
+# Overridable the way the rest of jobs/ is -- several spike checkouts live on this scratch at
+# once, one per workset, and the gate has to be runnable against whichever one is under test.
+: "${SPIKE:=$SCRATCH/sfem/spikes/cvfem}"
+: "${B:=$SPIKE/build_gate}"
 export OMP_NUM_THREADS=72 OMP_PROC_BIND=true OMP_PLACES=cores
 OUT=$SCRATCH/cvfem_vanka_default/$SLURM_JOB_ID; mkdir -p "$OUT"
 NOZ="SFEM_CASE=nozzle SFEM_NOZZLE_RE=500 SFEM_GEOM=affine SFEM_NOZZLE_NCORE=2 SFEM_NOZZLE_NBORE=1 SFEM_NOZZLE_NOUTER=1"
