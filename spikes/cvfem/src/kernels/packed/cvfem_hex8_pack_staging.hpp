@@ -528,6 +528,39 @@ static SFEM_INLINE void scatter_hex8_simd_to_pack(pack_idx_t **const SFEM_RESTRI
 }
 
 
+
+// THE LANE SCRATCH, DECLARED ONCE PER THREAD AND NOT ONCE PER PACK.
+//
+// This is a measured shape, not a tidiness choice. The residual's lane loop was first extracted
+// with these objects as locals of the helper, which made them per-CALL -- and the helper is
+// called once per pack. Grace job 4983280 measured that at -9.4% on the bare packed residual,
+// -8.2% at the larger size and -17.3% on the pack-coloured one, reproduced in the allocation;
+// the Jacobian action, whose packs are larger and whose arithmetic per pack is far greater, did
+// not move measurably. Four kilobytes of lane packs re-materialised per pack is the difference.
+//
+// So the sweep declares one of these outside its pack loop and hands it over, which is also
+// what apply_residual_ecolored_range does -- its launcher declares the packs once per thread
+// and passes them into every colour.
+template <typename scalar_t>
+struct Hex8ResidualLaneScratch {
+    alignas(ALIGN_BYTES) scalar_t cof0[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof1[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof2[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof3[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof4[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof5[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof6[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof7[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t cof8[cvfem_hex8_vec_size<scalar_t>];
+    alignas(ALIGN_BYTES) scalar_t det[cvfem_hex8_vec_size<scalar_t>];
+    Hex8InputPackT<scalar_t>      in;
+    Hex8ResidualPackT<scalar_t>   outp;
+    Hex8RhieChowPackT<scalar_t>   rcp;
+    // The isoparametric loop's coordinate pack. Unused by the affine one, and costing it
+    // nothing: it is stack the thread holds for the whole sweep either way.
+    Hex8CoordPackT<scalar_t>      xyz;
+};
+
 // ONE PACK'S LANE LOOP, AFFINE. Called by both drains' sweeps: the contiguous packed residual
 // and the pack-coloured one, which differ in nothing else. The adjugate and determinant come
 // from the precomputed table, which is what makes this the affine loop.
@@ -543,14 +576,15 @@ static SFEM_INLINE void cvfem_hex8_residual_lanes_affine(
         const scalar_t                       rho,
         const scalar_t                       mu,
         const scalar_t                       rhie_chow_scale,
-        const int                            with_rc) {
-    alignas(ALIGN_BYTES) scalar_t cof0[cvfem_hex8_vec_size<scalar_t>], cof1[cvfem_hex8_vec_size<scalar_t>], cof2[cvfem_hex8_vec_size<scalar_t>];
-    alignas(ALIGN_BYTES) scalar_t cof3[cvfem_hex8_vec_size<scalar_t>], cof4[cvfem_hex8_vec_size<scalar_t>], cof5[cvfem_hex8_vec_size<scalar_t>];
-    alignas(ALIGN_BYTES) scalar_t cof6[cvfem_hex8_vec_size<scalar_t>], cof7[cvfem_hex8_vec_size<scalar_t>], cof8[cvfem_hex8_vec_size<scalar_t>];
-    alignas(ALIGN_BYTES) scalar_t det[cvfem_hex8_vec_size<scalar_t>];
-    Hex8InputPackT<scalar_t>    in;
-    Hex8ResidualPackT<scalar_t> outp;
-    Hex8RhieChowPackT<scalar_t> rcp;
+        const int                            with_rc,
+        Hex8ResidualLaneScratch<scalar_t>   &ls) {
+    scalar_t *const cof0 = ls.cof0, *const cof1 = ls.cof1, *const cof2 = ls.cof2;
+    scalar_t *const cof3 = ls.cof3, *const cof4 = ls.cof4, *const cof5 = ls.cof5;
+    scalar_t *const cof6 = ls.cof6, *const cof7 = ls.cof7, *const cof8 = ls.cof8;
+    scalar_t *const det  = ls.det;
+    Hex8InputPackT<scalar_t>    &in   = ls.in;
+    Hex8ResidualPackT<scalar_t> &outp = ls.outp;
+    Hex8RhieChowPackT<scalar_t> &rcp  = ls.rcp;
     for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
         const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
         gather_hex8_simd_from_pack(pack_elems, pack_u, adj_ptr, det_ptr, begin, nlanes, in,
@@ -576,10 +610,11 @@ static SFEM_INLINE void cvfem_hex8_residual_lanes_isoparam(
         const scalar_t *const SFEM_RESTRICT pack_u,
         scalar_t *const SFEM_RESTRICT       pack_out,
         const scalar_t                      rho,
-        const scalar_t                      mu) {
-    Hex8InputPackT<scalar_t>    in;
-    Hex8CoordPackT<scalar_t>    xyz;
-    Hex8ResidualPackT<scalar_t> outp;
+        const scalar_t                      mu,
+        Hex8ResidualLaneScratch<scalar_t>  &ls) {
+    Hex8InputPackT<scalar_t>    &in   = ls.in;
+    Hex8CoordPackT<scalar_t>    &xyz  = ls.xyz;
+    Hex8ResidualPackT<scalar_t> &outp = ls.outp;
     for (ptrdiff_t begin = x.e_start; begin < x.e_end; begin += cvfem_hex8_vec_size<scalar_t>) {
         const int nlanes = int(MIN((ptrdiff_t)cvfem_hex8_vec_size<scalar_t>, x.e_end - begin));
         gather_hex8_isoparam_simd_from_pack(pack_elems, pack_u, pk.x, pk.y, pk.z, begin, nlanes,

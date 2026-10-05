@@ -76,6 +76,9 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
                 cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
 
 
+    // One per thread, not one per pack: see Hex8ResidualLaneScratch.
+    Hex8ResidualLaneScratch<scalar_t> ls;
+
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
@@ -89,7 +92,7 @@ static SFEM_NOINLINE void apply_residual_packed_affine_range(
 
             cvfem_hex8_residual_lanes_affine(x, pk, adj_ptr, det_ptr, pack_elems,
                                              pack_u, pack_out, rho, mu, rhie_chow_scale,
-                                             with_rc);
+                                             with_rc, ls);
 
             cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
     }
@@ -173,6 +176,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_affine_range(
         const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
         const Hex8PackQGradT<scalar_t> qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
+
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
@@ -272,6 +276,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_affine_range(
         scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
         const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
+
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
@@ -399,6 +404,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_affine_range(
         // to read -- DESIGN.md: "No user level option flags are propgated down here ... they are
         // handled outside in the front-end".
         const int *const SFEM_RESTRICT identity_slots) {
+
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
@@ -511,6 +517,7 @@ static SFEM_NOINLINE void apply_residual_packed_defcor_range(
         // six-array slot the first-order SIMD path uses, so no new scratch shape appears.
         const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(true, with_rc, max_actual_nodes_per_pack);
+
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
@@ -635,6 +642,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_pa_range(
         const Hex8PackQGradT<scalar_t> qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
 
 
+
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
@@ -733,6 +741,9 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
     const Hex8PackCoordsT<scalar_t> pk =
             cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
 
+    // One per thread, not one per pack: see Hex8ResidualLaneScratch.
+    Hex8ResidualLaneScratch<scalar_t> ls;
+
     for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
         const ptrdiff_t pack = pack_order[i];
         const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
@@ -746,7 +757,7 @@ static SFEM_NOINLINE void apply_residual_packcolored_affine_range(
                                            pk.pgx, pk.pgy, pk.pgz);
 
         cvfem_hex8_residual_lanes_affine(x, pk, adj_ptr, det_ptr, pack_elems, pack_u, pack_out,
-                                         rho, mu, rhie_chow_scale, with_rc);
+                                         rho, mu, rhie_chow_scale, with_rc, ls);
 
         cvfem_hex8_flush_pack_to_global_soa(x, pack_out, rx, ry, rz, rc);
     }
@@ -799,6 +810,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packcolored_affine_range(
     const Hex8PackCoordsT<scalar_t> pk =
             cvfem_hex8_pack_coords<scalar_t>(with_rc != 0, with_rc, max_actual_nodes_per_pack);
     const Hex8PackQGradT<scalar_t> qg = cvfem_hex8_pack_qgrad<scalar_t>(with_qg, max_actual_nodes_per_pack);
+
 
     for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
         const ptrdiff_t pack = pack_order[i];
@@ -865,6 +877,7 @@ static SFEM_NOINLINE void assemble_jacobian_packcolored_affine_range(
         const scalar_t rho,
         const scalar_t mu,
         scalar_t *const SFEM_RESTRICT values) {
+
     for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
         const ptrdiff_t pack    = pack_order[i];
         const ptrdiff_t e_start = pack * n_elements_per_pack;

@@ -54,6 +54,9 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
         const Hex8PackCoordsT<scalar_t> pk = cvfem_hex8_pack_coords<scalar_t>(true, 0, max_actual_nodes_per_pack);
 
 
+    // One per thread, not one per pack: see Hex8ResidualLaneScratch.
+    Hex8ResidualLaneScratch<scalar_t> ls;
+
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
                     pack, nelements, n_elements_per_pack, owned_nodes_ptr, ghost_idx, ghost_ptr);
@@ -63,7 +66,7 @@ static SFEM_NOINLINE void apply_residual_packed_isoparam_range(
             fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
 
             fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
-            cvfem_hex8_residual_lanes_isoparam(x, pk, pack_elems, pack_u, pack_out, rho, mu);
+            cvfem_hex8_residual_lanes_isoparam(x, pk, pack_elems, pack_u, pack_out, rho, mu, ls);
 
             cvfem_hex8_drain_pack_soa(x, pack_out, n_ghost_entries, ghost_buf, rx, ry, rz, rc);
     }
@@ -120,6 +123,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT pack_out = thread_scratch<scalar_t>(2, scratch_n);
         const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
+
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
@@ -210,6 +214,7 @@ static SFEM_NOINLINE void assemble_jacobian_packed_isoparam_range(
         scalar_t *const SFEM_RESTRICT local_vals_pack = thread_scratch<scalar_t>(2, bsr_n);
         const Hex8PackCoordsT<scalar_t> pk =
                 cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, with_rc, max_actual_nodes_per_pack);
+
 
 
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
@@ -309,6 +314,7 @@ static SFEM_NOINLINE void assemble_jacobian_store_isoparam_range(
         // the cvfem_hex8_rc_config_for(d) call that used to sit in this body: that function takes
         // the mesh, which a kernel is not meant to name.
         const Hex8RcConfigT<scalar_t> &rc_cfg) {
+
     for (ptrdiff_t pack = packs.begin; pack < packs.end; ++pack) {
             const ptrdiff_t                         e_start      = pack * n_elements_per_pack;
             const ptrdiff_t                         e_end        = MIN(nelements, (pack + 1) * n_elements_per_pack);
@@ -390,6 +396,9 @@ static SFEM_NOINLINE void apply_residual_packcolored_isoparam_range(
     const Hex8PackCoordsT<scalar_t> pk =
             cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
 
+    // One per thread, not one per pack: see Hex8ResidualLaneScratch.
+    Hex8ResidualLaneScratch<scalar_t> ls;
+
     for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
         const ptrdiff_t pack = pack_order[i];
         const Hex8PackExtentT<idx_t> x = cvfem_hex8_pack_extent<idx_t>(
@@ -399,7 +408,7 @@ static SFEM_NOINLINE void apply_residual_packcolored_isoparam_range(
         fill_pack_fields(owned_nodes_ptr, ux, uy, uz, pres, pack, x.n_contiguous, x.n_ghost, x.ghosts, pack_u);
         fill_pack_xyz(owned_nodes_ptr, points, pack, x.n_contiguous, x.n_ghost, x.ghosts, pk.x, pk.y, pk.z);
 
-        cvfem_hex8_residual_lanes_isoparam(x, pk, pack_elems, pack_u, pack_out, rho, mu);
+        cvfem_hex8_residual_lanes_isoparam(x, pk, pack_elems, pack_u, pack_out, rho, mu, ls);
 
         cvfem_hex8_flush_pack_to_global_soa(x, pack_out, rx, ry, rz, rc);
     }
@@ -435,6 +444,7 @@ static SFEM_NOINLINE void apply_jacobian_action_packcolored_isoparam_range(
     // Coordinates always: this geometry derives its Jacobian from them.
     const Hex8PackCoordsT<scalar_t> pk =
             cvfem_hex8_pack_coords<scalar_t>(/*want_xyz=*/true, /*with_rc=*/0, max_actual_nodes_per_pack);
+
 
     for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
         const ptrdiff_t pack = pack_order[i];
@@ -488,6 +498,7 @@ static SFEM_NOINLINE void assemble_jacobian_packcolored_isoparam_range(
         const scalar_t rho,
         const scalar_t mu,
         scalar_t *const SFEM_RESTRICT values) {
+
     for (ptrdiff_t i = packs.begin; i < packs.end; ++i) {
         const ptrdiff_t pack    = pack_order[i];
         const ptrdiff_t e_start = pack * n_elements_per_pack;
