@@ -70,16 +70,32 @@ a duplicate of the row above it, and two were strengthened by the retirement. Th
 scalar sweep stays is the CUDA verify driver's host reference, because the device kernels call
 the scalar `SFEM_HOST_DEVICE` leaf templates and so run the same arithmetic.
 
-**"affine / isoparametric / axis_aligned logically separated."** DONE for `packed`, `store`,
-`standard` and `colored` (the element colouring). This file argued that `template <bool ISO>`
-satisfied the clause; the correction is that the folders meant folders. See
-`packed/affine/README.md` for what the split bought beyond the structure — a templated sweep has
-to take the union of both geometries' inputs, so neither half could have a lean signature.
+**"affine / isoparametric / axis_aligned logically separated."** DONE for every HEX8 format:
+`packed`, `store`, `standard`, `colored` (the element colouring) and the **pack**-coloured
+sweeps. This file argued that `template <bool ISO>` satisfied the clause; the correction is that
+the folders meant folders. See `packed/affine/README.md` for what the split bought beyond the
+structure — a templated sweep has to take the union of both geometries' inputs, so neither half
+could have a lean signature.
 
-Outstanding: the **pack-coloured** sweeps, which still test `GeomKind` inside their pack loop and
-still live in `frontend/staging/` rather than here, and the **semi-structured** sweeps, which
-branch on `curved_e` per macro-element. Both need their shared loop factored out first, the way
-the packed layout's staging and drain were, so that splitting duplicates nothing.
+No sweep under `src/kernels/` takes a `GeomKind` or a geometry boolean. The front end chooses,
+from `--geom` at run time, in the four launchers: `cvfem_hex8_packed_launch.hpp`,
+`cvfem_hex8_store_launch.hpp`, `cvfem_hex8_ecolored_launch.hpp` and
+`cvfem_hex8_best_colored.hpp`.
+
+What the splits shared rather than copied, each extracted before the format was cut:
+
+* the pack staging, extent, element preamble and four drains (`cvfem_pack_scratch.hpp`,
+  `cvfem_hex8_pack_staging.hpp`) — three for the packed layouts, one for the coloured ones,
+  which accumulate straight into the globals because colouring removes the reduction pass;
+* the lane loops, one per operation per geometry, because the contiguous and pack-coloured
+  sweeps differ in the drain and in nothing else;
+* `cvfem_hex8_assemble_element_{affine,isoparam}<ATOMIC>`, because the coloured assembly is the
+  ATOMIC assembly's element body with the colouring standing in for the atomics — that sweep is
+  element-indexed with global gathers, not a packed sweep, and the split is what made it plain.
+
+Outstanding: the **semi-structured** sweeps, which branch on `curved_e` per macro-element.
+`semistructured/affine/README.md` states the partition this needs and why it is owed rather than
+impossible.
 
 **"The threading model for atomics free kernels is abstract outside the function."** DONE. Every
 atomics-free kernel takes a `cvfem_range` and owns no parallel region: the packed, element-
