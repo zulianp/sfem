@@ -260,7 +260,9 @@ plausibly close a 17% gap — but it perturbs the operator, and a Krylov method 
 consistent matvec, so it would need its own convergence evidence rather than a throughput.
 
 **Kept compiling.** `--partial-assembly` is rejected by name in the default build, the way
-`--kernel sympy_row` and `sympy_face` are, and runs under `-DCVFEM_ENABLE_SUBPAR=ON`.
+every other retired kernel is, and runs under `-DCVFEM_ENABLE_SUBPAR=ON`. (`--kernel` itself
+is gone; what refuses `--partial-assembly` is a check on the flag that asked for it, not a
+kernel name.)
 `tests/cvfem_pa_tangent_test` runs either way: it calls the kernels directly, so the
 quarantined path cannot rot, and it pins the algebraic identity the whole idea rests on.
 
@@ -401,9 +403,17 @@ up 21.6% (2066.9 against `sumfact`'s 2636.8). On the atomic layout it TIES `sumf
 for never being fastest anywhere rather than for losing everywhere, and a future change that
 moves the packed number is entitled to reopen it.
 
-`cvfem_hex8_ns_upwind_sympy_residual_isoparam` is NOT retired. It is the isoparametric
-scalar winner, this campaign measured affine geometry only, and nothing here is evidence
-about it. `--kernel sympy --geom isoparam` still runs; only `--geom affine` is refused.
+`cvfem_hex8_ns_upwind_sympy_residual_isoparam` is NOT retired, and it is now measured rather
+than merely unretired. This campaign covered affine geometry only, so for a while the sentence
+here was "nothing here is evidence about it"; `jobs/scalar_arms.sbatch` (Grace job 4982167)
+supplied the evidence, and the generated isoparametric residual wins — 449.8 against the
+hand-written 399.8 MDOF/s, 1.13x. Its generated assembly twin wins by more, 47.7 against 21.1.
+
+Both hand-written isoparametric kernels stay beside them, because the generated expressions
+carry no Rhie-Chow term and the hand-written ones do. The atomic isoparametric arms therefore
+dispatch on the TERM: generated when it is off, hand-written when it is on. That is not the
+selector the correction removes — the two compute different things, and nothing asks which
+arrangement to use.
 
 ### What moved, and what still checks it
 
@@ -422,45 +432,147 @@ One hardening came out of this. `SUBPAR_MARKERS` matched by substring, which can
 name from that same name with a suffix: quarantining `_residual` would have silently taken
 `_residual_isoparam`, the winner, with it. The rule now compares whole function names.
 
-## The scalar matrix-free sweeps are NOT here, and this is the measurement that settled it
+## The deferred-correction kernels — `cvfem_hex8_packed_defcor_scalar.hpp`, `cvfem_hex8_atomic_defcor_scalar.hpp`, and eight generated kernels
 
-DESIGN.md says "for the matrix-free kernels only the SIMD version is kept, the rest is moved to
-subpar". The spike has ten scalar matrix-free sweeps. **None of them can move here**, and the
-reason is not reluctance: every one is either a verification oracle that runs in the default
-build, or a variant a recorded earlier decision explicitly declined to retire. Quarantining any
-of them puts a check that currently runs behind `-DCVFEM_ENABLE_SUBPAR`, which is the opposite of
-what this directory is for — nothing here is load-bearing, and that is the property that makes
-the flag safe to leave off.
+The packed higher-order residual had three kernels and the number that chose between them
+compared the wrong pair. The generated lane-blocked family was the DEFAULT because it measured
+"1.39x the scalar one it replaced" — against the SCALAR arm, never against the hand-written
+LANE-BLOCKED kernel sitting beside it in the same sweep.
 
-| sweep | why it stays |
+`jobs/defcor_arms.sbatch`, Grace job 4981920, 8,586,756 dof, 72 threads, packed, best of three
+(generated / hand-written MDOF/s). `perf/defcor_arms_grace.csv` is the record:
+
+| limiter | bare | with Rhie-Chow |
+|---|---|---|
+| unlimited | 1012.9 / 1059.3 = 0.956 | 732.1 / 944.9 = **0.775** |
+| clip | 836.8 / 857.5 = 0.976 | — |
+| Venkatakrishnan | 706.6 / 763.7 = 0.925 | 583.3 / 638.5 = 0.914 |
+| Darwish–Moukalled | 729.7 / 797.1 = 0.916 | 592.1 / 686.1 = 0.863 |
+
+The generated arm loses all seven pairs, and loses worst exactly where it was meant to pay off:
+the Rhie-Chow arm, for which it reads a staged coefficient table that the hand-written kernel
+does not need. So the family is quarantined, the staged table with it, and the eight generated
+kernels drop 11,201 lines from the affine generated header (22839 → 11638).
+
+The two SCALAR sweeps go for a second, independent reason — DESIGN.md: *"for the matrix-free
+kernels only the SIMD version is kept, the rest is moved to subpar"* — and the measurement
+agrees: 940.6 against the lane-blocked 1059.3 bare, 571.6 against 944.9 with Rhie-Chow. The
+packed sweep's own comment had claimed the opposite, *"the scalar kernel is the FASTER of the two
+for this operator, 659 against 500 MDOF/s (job 4812910)"*. That ranking inverted when the
+lane-blocked higher-order kernel was optimised, and nothing had gone back to re-read it.
+
+With all three retired, `--ho-simd` and `--ho-scalar` are gone and the `bool sympy` that four
+sweeps carried goes with them.
+
+## `cvfem_hex8_atomic_retired.hpp` — the standard layout's nine orphans
+
+Four generated assembly arrangements, two finite-difference assemblies, the isoparametric
+split's two halves, and the generated affine residual's sweep. None had a caller once the
+selector was gone.
+
+The generated assembly's one win anywhere is the atomic layout, 14 MELEM/s against the
+sum-factored kernel's 10 at 28,756k dof — and that 14 only ties the PACKED sum-factored rate and
+is half the coloured one (28), which is the fastest assembly in the spike. Keeping the
+sum-factored kernel therefore costs no configuration anyone would run, which is the test that
+matters rather than the local ranking.
+
+The finite-difference assemblies were never a performance arm: they are the correctness
+reference, and `--kernel current --assemble` silently measured the affine one, because there is
+no hand-written affine assembly kernel for `current` to mean. A row reporting a
+finite-difference matrix as an assembly rate is one of the reports that made that flag a
+liability. The Jacobian-action gate's tolerance went back to 1e-8 with them; it had been loosened
+to 1e-3 to accommodate the truncation error of the differencing.
+
+The isoparametric split assembles the geometry-only half once and restores it per iteration.
+Grace job 4982167: 14.1 MELEM/s against the generated isoparametric assembly's 47.7 — 3.4x
+slower — and the affine form 14.3 against 39.0, 2.7x slower. The half it saves is the cheap one,
+and restoring it costs a full pass over the values. It was built from a sparsity study
+(`drivers/nlcover.cpp`, which measures how much of the matrix the velocity-dependent part
+touches) and never timed against the thing it replaces.
+
+## `cvfem_tet4_retired.hpp` — seventeen TET4 sweeps
+
+`perf/` held no TET4 row at all, so all thirteen arms of that driver's `--kernel` flag were
+unmeasured on this hardware, the default included. `jobs/tet4_arms.sbatch` (Grace job 4982357,
+packed, n=96 = 10,616,832 elements, 72 threads) measured every arm across all three operations;
+`perf/tet4_arms_grace.txt` is the record.
+
+| operation | winner | the field |
+|---|---|---|
+| residual | hand-written 1503.1 | the eleven generated arrangements cluster 1347–1360 |
+| Jacobian action | hand-written 1063.5 | the generated arrangements cluster 1003–1010 |
+| assembly | `sympy_block_simd` 168.1 | `sympy_row_simd` 167.1, `current_slots` 150.5, plain 136.2 |
+
+TET4 splits the opposite way from the HEX8 residual: the generated arrangements win the ASSEMBLY
+by 1.23x over the plain hand-written kernel and lose both matrix-free operations. The default was
+`sympy_row_simd`, which is the wrong kernel for two of the three operations — 10% off the
+residual, 5% off the action — and on the assembly it ties the winner rather than being it.
+
+**The job measured its own noise floor, for free.** `current` and `current_slots` differ only in
+the assembly, so the residual and the action ran identical code under both labels and came back
+0.6% and 0.4% apart. Every gap above beats that except `sympy_block_simd` against
+`sympy_row_simd`, which is a tie decided by the measured order. Reading those two arms as
+distinct results would have been reading the spread as a finding.
+
+These seventeen are included back from the driver under the flag rather than standing alone:
+they take its own `MeshData`, `PackedData` and `BSR4`, and TET4 has no staging header to put them
+behind — all twenty of its sweeps are still in the driver, which is DESIGN.md's main body rather
+than this correction.
+
+## The selector is gone, and that is what filled this directory
+
+DESIGN.md's correction: **"The micro-kernel selector must be removed. Only the best
+micro-kernels need to be used (given the results in Grace), so there should be only one per
+kernel. The rest is moved to subpar."**
+
+A section here used to argue the opposite. It surveyed the ten scalar matrix-free sweeps, found
+that eight were verification oracles running in the default build, and concluded that **none of
+them could move** — because quarantining one would put a check that currently runs behind
+`-DCVFEM_ENABLE_SUBPAR`. That reasoning is overruled. Serving as an oracle is not a reason to
+keep a second variant in the tree, and the consequence is accepted rather than avoided: a
+verification that compares the kept kernel against a retired one needs the flag, which is what
+the flag is for.
+
+In the event the consequence was much smaller than that argument predicted, because most of
+those oracles turned out not to be earning anything:
+
+| oracle | what happened to it |
 |---|---|
-| `apply_residual_atomic` | the CUDA verify driver's host reference |
-| `apply_jacobian_action_atomic` | the CUDA verify driver's host reference |
-| `apply_residual_atomic_isoparam` | the CUDA verify driver's host reference |
-| `apply_jacobian_action_atomic_isoparam` | the CUDA verify driver's host reference |
-| `apply_residual_atomic_sumfact` | reached from the solver family's own core, not only the bench |
-| `apply_jacobian_action_atomic_kernel` | the body the two above share |
-| `apply_residual_atomic_sumfact_defcor` | `verify_packed_ho_residual_vs_atomic_abs` compares the packed higher-order residual against it |
-| `apply_residual_atomic_sympy` | `verify_sympy_residual_vs_current_abs` compares the generated residual against `current` through it |
-| `apply_residual_packed_defcor_scalar_range` | `--ho-scalar`: `verify_packed_ho_simd_vs_packed_ho_scalar_abs` AND `verify_packed_ho_sympy_vs_packed_ho_scalar_abs` both compare against it |
-| `apply_residual_atomic_isoparam_sympy` | the isoparametric scalar winner, and the campaign that retired the affine form measured affine geometry only — the driver's own message says it "is NOT retired" |
+| `verify_sympy_residual_vs_current_abs` | it had been **aborting**. Its sweep called the generated affine residual, whose micro-kernel was already quarantined, so `--verify --layout atomic` died on the stub — true at `d0eb4c53e` with `-DCVFEM_ENABLE_SUBPAR=OFF` as well. On `--layout packed` it compared `sumfact` against `current`, which `verify_packed_sumfact_residual_vs_current_abs` already does. |
+| `verify_colored_sympy_residual_vs_atomic_abs` | became the identical call to the row above it once the coloured sweep had one kernel. |
+| `verify_packed_ho_simd_vs_packed_ho_scalar_abs` | its reference is the retired scalar sweep. |
+| `verify_packed_ho_sympy_vs_packed_ho_scalar_abs` | both sides retired. |
+| `verify_packed_ho_rc_sympy_vs_scalar_abs` | both sides retired; the Rhie-Chow higher-order arm is now covered across layouts instead. |
+| `verify_packed_ho_residual_vs_atomic_abs` | **strengthened.** It compared the survivor against the packed scalar sweep; it now compares the two surviving lane-blocked sweeps, packed against atomic — staging, accumulation and scatter differ while the micro-kernel is held fixed. 4.8e-18 bare, 5.2e-18 with Rhie-Chow. |
+| the TET4 `--verify-jac` chain | twelve arms against one reference became the packed generated block-SIMD assembly against the atomic hand-written scalar one: arrangement and scatter at once. 1.7e-17. |
+| the CUDA verify driver's host references | **kept.** The device kernels call the scalar `SFEM_HOST_DEVICE` leaf templates — there is no device counterpart to lane blocking — so the scalar host sweep runs the same arithmetic as the device and is the right oracle for it. Comparing the device against a lane-blocked host sweep would conflate host-SIMD-against-host-scalar with host-against-device, and a disagreement would not say which moved. These are the one place a scalar sweep stays, and it is stated here rather than left implied. |
 
-**Why the scalar sweeps are the right oracle for the device, specifically.** The CUDA kernels call
-the scalar `SFEM_HOST_DEVICE` leaf templates — there is no device counterpart to lane blocking —
-so comparing the device against the scalar host sweep tests the same arithmetic on both sides.
-Comparing it against the SIMD host sweep instead would conflate two differences at once, host-SIMD
-against host-scalar and host against device, and a disagreement would not say which moved.
+### What the three jobs measured, and what each changed
 
-**Measured on Grace while settling this**, 3,650,692 dof, 72 threads, the atomic layout:
+None of this was decidable from what was on record. Three arms were defaults chosen against the
+wrong comparison, and one element had never been measured on this hardware at all.
 
-| arm | MDOF/s |
-|---|---|
-| `--kernel sumfact` (the SIMD one DESIGN.md keeps) | 1132.3 |
-| `--kernel sumfact --conv-ho 2` (scalar deferred correction) | 532.1 |
-| `--kernel sympy --geom isoparam` (scalar) | 454.4 |
-| `--kernel sympy --geom affine` | refused — already quarantined at the driver |
+| job | question | answer |
+|---|---|---|
+| `jobs/defcor_arms.sbatch` (4981920) | the packed higher-order residual's three kernels | the hand-written lane-blocked one wins **all seven pairs**, 0.775x–0.976x. The generated family was the DEFAULT, on a number measured against the *scalar* arm. |
+| `jobs/scalar_arms.sbatch` (4982167) | the isoparametric atomic pair, and `split` | generated 1.13x on the residual, 2.26x on the assembly; `split` is **2.7x slower** than the assembly it replaces and had never been measured. |
+| `jobs/tet4_arms.sbatch` (4982357) | all thirteen TET4 arms, three operations | the generated arrangements win only the ASSEMBLY (1.23x) and lose both matrix-free operations. The default was wrong on two of three. |
 
-The affine generated arm is the one case where the clause already holds: the benchmark refuses it
-without the flag and says why. Its code still sits in `kernels/standard/affine/` because the
-verification block that compares it against `current` is in the default build, so moving the code
-would take that check with it.
+The pattern worth keeping: **every one of these defaults was set by a comparison against something
+other than its real competitor.** The generated higher-order kernel beat the scalar sweep and was
+never run against the lane-blocked one beside it; `split` was built from a sparsity study
+(`nlcover`) and never timed; the TET4 default was picked with no measurement in the tree.
+
+### The quarantine has a gate now
+
+`src/tests/compile/cvfem_subpar_compiles` and `cvfem_subpar_ss_compiles` include every header
+here. Nothing else does — which is exactly why they rot — and three had:
+`cvfem_sympy_action_test` had not followed the affine/isoparametric split or the limiter's
+promotion to a template parameter; `cvfem_ss_scatter_fixed_width.hpp` had not followed the
+sweeps' conversion to ranges; `cvfem_sshex8_em.hpp` had not followed `SSMacroGeom`'s Rhie-Chow
+hoist, `sscvfem_macro_geom`'s extra argument or the boundary kernel's template parameter. Each
+break dated from the commit that made the change it missed, and all three were invisible because
+the subpar build did not complete at all.
+
+A kept measurement that cannot be rebuilt is not a kept measurement. The gate is what makes the
+first paragraph of this file true.
