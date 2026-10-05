@@ -1294,7 +1294,7 @@ int main(int argc, char **argv) {
         apply_residual_atomic_sumfact(d.adj_ptr, d.det_ptr, d.elems, d.face_mask.data(), d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.qgx.data(), d.qgy.data(), d.qgz.data(), d.rc.data(), d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu);
         std::vector<scalar_t> atomic_r;
         pack_residual(d, atomic_r);
-        apply_residual_packed<false>(d, packed, rho, mu);
+        apply_residual_packed(d, packed, rho, mu, GeomKind::Affine);
         std::vector<scalar_t> packed_r;
         pack_residual(d, packed_r);
         apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Affine);
@@ -1450,7 +1450,7 @@ int main(int argc, char **argv) {
         }
 
         if ((layout == "packed" || verify_jac) && layout != "ecolor") {
-            apply_residual_packed<false>(d, packed, rho, mu);
+            apply_residual_packed(d, packed, rho, mu, GeomKind::Affine);
             std::vector<scalar_t> packed_current_r;
             pack_residual(d, packed_current_r);
             const scalar_t packed_err =
@@ -1462,7 +1462,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            apply_residual_packed<false>(d, packed, rho, mu);
+            apply_residual_packed(d, packed, rho, mu, GeomKind::Affine);
             std::vector<scalar_t> packed_sumfact_r;
             pack_residual(d, packed_sumfact_r);
             const scalar_t packed_sf_err =
@@ -1474,7 +1474,7 @@ int main(int argc, char **argv) {
                 return 1;
             }
 
-            apply_residual_packed<true>(d, packed, rho, mu);
+            apply_residual_packed(d, packed, rho, mu, GeomKind::Isoparam);
             std::vector<scalar_t> packed_iso_r;
             pack_residual(d, packed_iso_r);
             const scalar_t packed_iso_err =
@@ -1651,7 +1651,7 @@ int main(int argc, char **argv) {
             if (layout == "colored")
                 apply_residual_colored(d, packed, colors, rho, mu, GeomKind::Isoparam);
             else if (layout == "packed" || layout == "store")
-                apply_residual_packed<true>(d, packed, rho, mu);
+                apply_residual_packed(d, packed, rho, mu, GeomKind::Isoparam);
             // THE GENERATED KERNEL IS THE FASTER ONE AND THE HAND-WRITTEN ONE CARRIES THE
             // TERM IT CANNOT. Grace job 4982167, 8,586,756 dof, 72 threads: generated 449.8
             // against hand-written 399.8 MDOF/s, 1.13x. The generated expressions have no
@@ -1675,7 +1675,7 @@ int main(int argc, char **argv) {
             // are in subpar/ and --ho-simd/--ho-scalar are gone with them.
             apply_residual_packed_defcor(d, packed, rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else if (layout == "packed" || layout == "store")
-            apply_residual_packed<false>(d, packed, rho, mu);
+            apply_residual_packed(d, packed, rho, mu, GeomKind::Affine);
         else if (conv_ho)
             apply_residual_atomic_sumfact_simd(d.adj_ptr, d.det_ptr, d.elems, d.nelements, d.nnodes, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rc.data(), d.rhie_chow_scale, d.rx.data(), d.ry.data(), d.rz.data(), d.ux.data(), d.uy.data(), d.uz.data(), cvfem_hex8_extras_of(d), rho, mu, ugrad.data(), conv_limiter, scalar_t(0));
         else

@@ -15,6 +15,8 @@
 // they lived there. It no longer does.
 #include "frontend/staging/cvfem_hex8_best_common.hpp"
 #include "kernels/packed/cvfem_hex8_best_packed.hpp"
+#include "kernels/packed/affine/cvfem_hex8_best_packed_affine.hpp"
+#include "kernels/packed/isoparametric/cvfem_hex8_best_packed_isoparam.hpp"
 
 // The scalar higher-order sweep this header used to define. It is the slower of the packed
 // layout's two higher-order kernels (Grace job 4981920) and lives in subpar/; the stub in
@@ -176,11 +178,16 @@ static SFEM_NOINLINE void apply_residual_packed_defcor(MeshData       &d,
     }
 }
 
-template <bool ISO>
+// THE FRONT END DISPATCHES ON GeomKind, which is DESIGN.md's correction: "GeomKind is used at
+// the front end level to dispatch based on the type of elements in the block (now smesh also
+// provides such enums) and it can be overriden at runtime." The two sweeps are separate
+// functions in packed/affine/ and packed/isoparametric/, and this is the only place that
+// chooses between them -- nothing below here tests the geometry.
 static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
                                                 PackedData      &p,
                                                 const scalar_t   rho,
-                                                const scalar_t   mu) {
+                                                const scalar_t   mu,
+                                                const GeomKind   geom) {
     const scalar_t *const SFEM_RESTRICT ux = d.ux.data();
     const scalar_t *const SFEM_RESTRICT uy = d.uy.data();
     const scalar_t *const SFEM_RESTRICT uz = d.uz.data();
@@ -197,13 +204,19 @@ static SFEM_NOINLINE void apply_residual_packed(MeshData        &d,
     const int                           with_rc   = !d.pgx.empty() && d.rhie_chow_scale != scalar_t(0);
 
 
+// ONE ARM PER GEOMETRY. The sweep was also instantiated once per micro-kernel variant,
+    // chosen by a switch here; DESIGN.md's correction leaves one micro-kernel per kernel, and on
+    // Grace at 28,756k dof the affine one measured 639 MELEM/s against 518 and 505 for the two
+    // arms it replaced (perf/campaign_generated_arms.csv).
+    if (geom == GeomKind::Isoparam) {
 #pragma omp parallel
-    // ONE ARM. The sweep was instantiated once per micro-kernel variant and the variant chosen
-    // by a switch here; DESIGN.md's correction leaves one micro-kernel per kernel, and on Grace
-    // at 28,756k dof this one measured 639 MELEM/s against 518 and 505 for the two arms it
-    // replaced (perf/campaign_generated_arms.csv).
-            apply_residual_packed_range<ISO>(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
-            d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+        apply_residual_packed_isoparam_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+                d.nelements, d.p.data(), d.points, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n);
+    } else {
+#pragma omp parallel
+        apply_residual_packed_affine_range(cvfem_range_split(0, p.n_packs, 1, cvfem_thread_index(), cvfem_n_threads()),
+                d.adj_ptr, d.det_ptr, d.nelements, d.p.data(), d.pgx.data(), d.pgy.data(), d.pgz.data(), d.points, d.rhie_chow_scale, d.ux.data(), d.uy.data(), d.uz.data(), p.elems, p.ghost_buf.data(), p.ghost_idx, p.ghost_ptr, p.max_actual_nodes_per_pack, p.n_elements_per_pack, p.n_ghost_entries, p.owned_nodes_ptr, rho, mu, rx, ry, rz, rc, scratch_n, with_rc);
+    }
 
     scalar_t *const fields[CVFEM_HEX8_N_FIELDS] = {d.rx.data(), d.ry.data(), d.rz.data(), d.rc.data()};
 #pragma omp parallel for schedule(static)
